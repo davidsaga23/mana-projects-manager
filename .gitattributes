@@ -1,0 +1,12 @@
+# Normalise line endings: the server is Linux, the workstation is Windows.
+# Without this, every file looks "changed" after a checkout.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.mp4 binary
+*.mov binary
+*.zip binary
+*.gan text eol=lf
