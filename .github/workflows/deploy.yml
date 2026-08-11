@@ -1,0 +1,46 @@
+# Deploys to cPanel over FTP whenever main is updated.
+#
+# Only changed files are transferred — the action keeps a small state file on the
+# server to track what it has already uploaded.
+#
+# SAFETY: the exclude list below protects live server state. config.php holds the
+# database and SMTP passwords, and uploads/ holds ticket attachments — syncing
+# either would overwrite credentials or delete real files. Do not remove them.
+
+name: Deploy to cPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # allows a manual run from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Sync changed files over FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Target directory on the server. Must end with a slash.
+          server-dir: ${{ secrets.FTP_TARGET_DIR }}
+          protocol: ftps
+          # Show what would change without transferring anything:
+          # flip to true, push, and read the Actions log.
+          dry-run: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/docs/**
+            **/node_modules/**
+            config.php
+            sessions/**
+            uploads/**
+            *.md
+            *.zip

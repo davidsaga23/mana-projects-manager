@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+# NEVER commit secrets or live server state.
+# ---------------------------------------------------------------------------
+
+# Live credentials — DB password, SMTP password.
+# config.example.php IS committed as documentation; config.php never is.
+config.php
+
+# Server-side runtime state. Committing (or deploying) these would overwrite or
+# delete real production data.
+sessions/
+uploads/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# Local scratch
+/tmp/
+*.bak
+*.orig
