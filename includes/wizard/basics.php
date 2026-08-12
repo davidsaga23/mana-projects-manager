@@ -48,6 +48,12 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         flash('ok', 'Created "' . $name . '". Next, choose the pipeline steps.');
     }
 
+    // Early estimates, used by the quota only until a real breakdown exists.
+    foreach (['estimated_seconds', 'estimated_shots', 'estimated_assets'] as $key) {
+        $v = trim($_POST[$key] ?? '');
+        set_project_setting($pdo, $id, $key, $v === '' ? '0' : (string)max(0, (float)$v));
+    }
+
     if ($codeRaw !== $code) {
         flash('warn', 'The project code was tidied up to "' . $code . '" (letters and numbers only).');
     }
@@ -56,6 +62,8 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
 
 function wizard_render_basics(PDO $pdo, ?array $project): void {
     $p = $project ?: ['name'=>'', 'code'=>'', 'type'=>'3D', 'fps'=>24, 'start_date'=>'', 'delivery_date'=>''];
+    $est = $project ? project_estimates($pdo, (int)$project['id'])
+                    : ['seconds'=>0, 'shots'=>0, 'assets'=>0];
     ?>
     <p class="lead">The essentials. Everything here can be changed later.</p>
     <form method="post" class="stack">
@@ -90,6 +98,31 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
           <input type="number" name="fps" value="<?= (int)$p['fps'] ?>" min="1" max="120">
         </label>
       </div>
+
+      <fieldset class="unit-choice">
+        <legend>Early estimate — before the breakdown exists</legend>
+        <p class="muted small" style="margin-top:0">
+          At the start of a project the runtime is usually known long before the shot count is
+          — that only settles once the animatic is cut and labelled. Put what you know here and
+          the review screen can still tell you how many people the deadline needs.
+          <strong>These are used only until real shots or assets exist</strong>, then they're
+          ignored in favour of the actual counts.
+        </p>
+        <div class="row">
+          <label>Total runtime (seconds)
+            <input type="number" name="estimated_seconds" step="any" min="0"
+                   value="<?= e(fmt_num($est['seconds'] ?? 0)) ?>" placeholder="574">
+          </label>
+          <label>Roughly how many shots
+            <input type="number" name="estimated_shots" step="any" min="0"
+                   value="<?= e(fmt_num($est['shots'] ?? 0)) ?>" placeholder="188">
+          </label>
+          <label>Roughly how many assets
+            <input type="number" name="estimated_assets" step="any" min="0"
+                   value="<?= e(fmt_num($est['assets'] ?? 0)) ?>" placeholder="55">
+          </label>
+        </div>
+      </fieldset>
 
       <div class="actions">
         <button type="submit">Save and continue →</button>

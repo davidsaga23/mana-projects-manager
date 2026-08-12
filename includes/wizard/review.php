@@ -42,7 +42,13 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
 
     $warnings = [];
     if (!$project['delivery_date']) $warnings[] = 'No delivery date is set for the project.';
-    if ($shotCount === 0 && $assetCount === 0) $warnings[] = 'No shots or assets have been added yet.';
+    if ($shotCount === 0 && $assetCount === 0) {
+        $est = project_estimates($pdo, $projectId);
+        $warnings[] = ($est['seconds'] > 0 || $est['shots'] > 0 || $est['assets'] > 0)
+            ? 'No shots or assets yet, so the figures below come from the early estimate. ' .
+              'They recalculate from the real breakdown as soon as one exists.'
+            : 'No shots or assets have been added yet.';
+    }
 
     $quotas = $steps ? project_quotas($pdo, $projectId, $steps) : [];
     ?>
@@ -101,7 +107,11 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
         <td class="wf-name">
           <span class="dot" style="background:<?= e($q['step']['color'] ?: '#ccc') ?>"></span><?= e($q['step']['name']) ?>
         </td>
-        <td><?= fmt_rate((float)$q['units']) ?> <span class="muted"><?= e($q['unit_label']) ?></span></td>
+        <td><?= fmt_rate((float)$q['units']) ?> <span class="muted"><?= e($q['unit_label']) ?></span>
+          <?php if (!empty($q['estimated'])): ?>
+            <span class="est-tag" title="From the early estimate on the Basics screen — no breakdown exists yet">est.</span>
+          <?php endif; ?>
+        </td>
         <td><?= $q['working_days'] === null ? '—' : (int)$q['working_days'] ?></td>
         <td><?= fmt_rate($q['team_per_day']) ?></td>
         <td><?= $q['headcount'] === null ? '—' : e(fmt_num($q['headcount'])) ?></td>

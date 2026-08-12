@@ -6,6 +6,23 @@
 // an unrealistic plan should be visible at setup, not discovered in week three.
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/db.php';        // project_setting(), for the early estimates
+
+/**
+ * The project's early estimate, used before a real breakdown exists.
+ *
+ * Before an animatic is cut and labelled nobody knows the shot count, but the
+ * runtime is usually contracted — so seconds are the honest early number. These
+ * are only ever a FALLBACK: the moment real shots or assets exist, they are
+ * counted instead, and the UI says which was used.
+ */
+function project_estimates(PDO $pdo, int $projectId): array {
+    return [
+        'seconds' => (float)project_setting($pdo, $projectId, 'estimated_seconds', '0'),
+        'shots'   => (float)project_setting($pdo, $projectId, 'estimated_shots', '0'),
+        'assets'  => (float)project_setting($pdo, $projectId, 'estimated_assets', '0'),
+    ];
+}
 
 /**
  * How much work a step covers.
@@ -14,9 +31,15 @@ require_once __DIR__ . '/functions.php';
  * everything else counts items. A step applying to 'both' counts shots and
  * assets together, because both really do pass through it.
  *
- * Returns ['units' => float, 'label' => string].
+ * Falls back to the project estimate when nothing has been broken down yet, so
+ * "how many people will this need?" can be answered during quoting rather than
+ * only after the animatic. `estimated` says which source was used — an estimate
+ * must never be mistaken for a count.
+ *
+ * Returns ['units' => float, 'label' => string, 'estimated' => bool].
  */
-function step_work_units(PDO $pdo, int $projectId, array $step): array {
+function step_work_units(PDO $pdo, int $projectId, array $step, ?array $estimates = null): array {
+    $estimates = $estimates ?? project_estimates($pdo, $projectId);
     $appliesToShots  = in_array($step['applies_to'], ['shot', 'both'], true);
     $appliesToAssets = in_array($step['applies_to'], ['asset', 'both'], true);
 
@@ -25,23 +48,29 @@ function step_work_units(PDO $pdo, int $projectId, array $step): array {
             'SELECT COALESCE(SUM(placeholder_seconds), 0) FROM shots WHERE project_id = ?'
         );
         $stmt->execute([$projectId]);
-        return ['units' => (float)$stmt->fetchColumn(), 'label' => 'seconds'];
+        $seconds = (float)$stmt->fetchColumn();
+        if ($seconds > 0) return ['units' => $seconds, 'label' => 'seconds', 'estimated' => false];
+        return ['units' => $estimates['seconds'], 'label' => 'seconds', 'estimated' => $estimates['seconds'] > 0];
     }
 
-    $units = 0.0;
+    $units = 0.0; $estimated = 0.0;
     if ($appliesToShots) {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM shots WHERE project_id = ?');
         $stmt->execute([$projectId]);
         $units += (float)$stmt->fetchColumn();
+        $estimated += $estimates['shots'];
     }
     if ($appliesToAssets) {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE project_id = ?');
         $stmt->execute([$projectId]);
         $units += (float)$stmt->fetchColumn();
+        $estimated += $estimates['assets'];
     }
     $label = $appliesToShots && $appliesToAssets ? 'items'
            : ($appliesToShots ? 'shots' : 'assets');
-    return ['units' => $units, 'label' => $label];
+
+    if ($units > 0) return ['units' => $units, 'label' => $label, 'estimated' => false];
+    return ['units' => $estimated, 'label' => $label, 'estimated' => $estimated > 0];
 }
 
 /**
@@ -58,14 +87,15 @@ function step_work_units(PDO $pdo, int $projectId, array $step): array {
  * Returns a row of numbers plus 'problems' — anything that makes the plan
  * unworkable or unknowable, in plain language.
  */
-function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null): array {
+function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null, ?array $estimates = null): array {
     $today = $today ?: date('Y-m-d');
-    $work  = step_work_units($pdo, $projectId, $step);
+    $work  = step_work_units($pdo, $projectId, $step, $estimates);
 
     $out = [
         'step'              => $step,
         'units'             => $work['units'],
         'unit_label'        => $work['label'],
+        'estimated'         => $work['estimated'],
         'working_days'      => null,
         'team_per_day'      => null,
         'per_artist_day'    => null,
@@ -80,7 +110,8 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
         return $out;
     }
     if ($work['units'] <= 0) {
-        $out['problems'][] = 'No ' . $work['label'] . ' added yet, so there is nothing to schedule.';
+        $out['problems'][] = 'No ' . $work['label'] . ' added yet, and no estimate set, ' .
+                             'so there is nothing to work from.';
         return $out;
     }
 
@@ -126,8 +157,9 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
 
 /** Quotas for every step in a project, in pipeline order. */
 function project_quotas(PDO $pdo, int $projectId, array $steps): array {
+    $estimates = project_estimates($pdo, $projectId);   // read once, not per step
     $rows = [];
-    foreach ($steps as $step) $rows[] = step_quota($pdo, $projectId, $step);
+    foreach ($steps as $step) $rows[] = step_quota($pdo, $projectId, $step, null, $estimates);
     return $rows;
 }
 

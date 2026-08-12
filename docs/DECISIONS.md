@@ -322,6 +322,25 @@ rights to those tables at all. That is a guarantee an application can't give abo
 - Cheap to honour now, near-impossible to retrofit once budget data is sitting in shared
   tables — the same reasoning as `project_id` on day one.
 
+## 2026-08-12 — Early planning uses a project estimate, not placeholder shots
+**Decision:** a project carries `estimated_seconds`, `estimated_shots` and `estimated_assets`
+in `project_settings`. The quota uses them **only when no real shots or assets exist**, and
+labels any figure derived from them "est.". The moment a breakdown arrives, real counts win
+and the estimate is ignored.
+**Why:** at the start of a project nobody knows the shot count — that settles when the
+animatic is cut and labelled — but the runtime is usually contracted. Seconds are the honest
+early number, which is why STFC tracked `total_target_seconds` from day one.
+
+The alternative, generating placeholder shots, is actively harmful: they inflate every quota
+with work that may not exist, and they *look* like real data. When the real breakdown lands
+with different codes, the import creates the genuine rows alongside the fakes and every
+figure is quietly wrong until someone notices and prunes them. An estimate can't be mistaken
+for a breakdown; a fake shot can.
+**Consequence:** the recommended project start order is Plaky board first (the breakdown is
+entered once, there), then the platform wizard for basics/pipeline/workflow, then the import,
+then dates and headcount. Only Plaky → platform is automated; there is no export the other
+way. See `ROADMAP.md` if that becomes a nuisance.
+
 ---
 
 ## Still open

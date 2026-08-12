@@ -220,6 +220,11 @@ label.inline input { width: auto; }
 .hub-card strong { display: block; margin-bottom: 4px; }
 .hub-card span { font-size: 12.5px; }
 
+.est-tag {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
+  background: #fff3cd; color: #8a6d1a; border-radius: 3px; padding: 1px 4px; margin-left: 4px;
+}
+
 /* Import */
 .unit-choice { border: 1px solid #e4e8ec; border-radius: 6px; padding: 12px 14px; margin: 16px 0; background: #f7f9fb; }
 .unit-choice legend { font-weight: 600; padding: 0 6px; }
