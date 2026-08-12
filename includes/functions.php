@@ -7,7 +7,11 @@ function e(?string $s): string {
 }
 
 // Cache-buster for EVERY js/css include — a stale cached timeline.js cost a
-// whole debugging round on STFC. Usage: <script src="assets/app.js<?= asset_ver('app.js') ?>">
+// whole debugging round on STFC. Echo the return value straight after the
+// filename in an asset URL, e.g. href="assets/style.css" then asset_ver('style.css').
+//
+// Never write a closing PHP tag inside a comment here: PHP acts on it even in a
+// //-comment, ending PHP mode and dumping the rest of the file to the browser.
 function asset_ver(string $filename): string {
     $path = __DIR__ . '/../assets/' . $filename;
     $mtime = @filemtime($path);

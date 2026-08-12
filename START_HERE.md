@@ -113,7 +113,11 @@ Hard-won, all from real incidents:
 8. **Shared-hosting sessions expire early.** Neighbouring accounts' garbage collection
    deletes your session files. Use a private `sessions/` directory. (Note: STFC also sets
    `session.lazy_write=0`, which increases disk I/O — see Open Questions.)
-9. **PHP `mail()` cannot authenticate.** Send via authenticated SMTP. Match port to
+9. **Never write a closing PHP tag inside a comment.** PHP acts on `?>` even in a
+   `//` comment — it ends PHP mode, so the rest of the file is dumped to the browser as
+   text and every function below it goes undefined. Cost the platform's first install
+   attempt. (Found during the Phase 1 build, not on STFC.)
+10. **PHP `mail()` cannot authenticate.** Send via authenticated SMTP. Match port to
    encryption: **465 = SSL, 587 = STARTTLS** — mixing them hangs. cPanel mail servers usually
    need `verify_peer = false` (self-signed certs).
 
