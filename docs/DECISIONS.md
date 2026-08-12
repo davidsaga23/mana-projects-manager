@@ -82,6 +82,46 @@ project's `pipeline_steps` / `step_dependencies`, where it becomes fully editabl
 after Assembly, Comp waits for both) and a generic 2D template; both are editable in the DB
 or, later, in a template editor.
 
+## 2026-08-11 — A project exists from wizard step 1, as status 'setup'
+**Decision:** the wizard creates the `projects` row on the first save and leaves it at
+status `setup` until the review screen is finished. Progress is remembered in
+`project_settings.wizard_step`, and the project list offers "Resume setup".
+**Why:** the flow has seven steps and captures a lot; losing it to a closed tab or a
+shared-hosting session expiry would be infuriating. Saving as it goes also means each step
+validates against real stored data rather than a growing pile of session state.
+**Consequence:** unfinished drafts appear in the project list. Every wizard screen offers
+"Discard this draft", which is the only delete path and only works on `setup` projects.
+
+## 2026-08-11 — Parallelism is one checkbox, stored as a graph
+**Decision:** the workflow screen asks a single question per step — "runs at the same time
+as the step above" — and converts the answers into `step_dependencies` rows. It converts
+back the other way too: a step is shown as parallel when it depends on exactly the same
+things as its predecessor.
+**Why:** the architecture calls for a real dependency graph, but nobody should have to think
+in graphs to set one up. The checkbox covers the real cases (STFC's Lighting ∥ Render, Comp
+waiting for both) and round-trips a graph it didn't create — so a template's shape, or a
+future visual editor's, still reads correctly here.
+**Consequence:** the scheduler only ever sees the graph, so a richer editor can replace this
+screen without touching it. Cycles are checked before any save; a failing check saves nothing.
+
+## 2026-08-11 — Wizard saves are POST → redirect → GET, with flash messages
+**Decision:** every wizard action posts, saves, sets a flash message and redirects.
+**Why:** refreshing never resubmits, and each save gets to report what it did — how many
+rows landed, how many were skipped as duplicates, and why. Several STFC bugs presented as
+"nothing happened".
+**Consequence:** row buttons (move, delete) carry their action in the submit button's
+value, so a single form saves pending edits and performs the action together — HTML forms
+cannot nest, and losing typed edits to a row button would be its own silent failure.
+
+## 2026-08-11 — Wizard ships with paste-based entry; file import is Phase 3
+**Decision:** the shots and assets screens accept a pasted list and (for shots) generate
+numbered codes. CSV/Excel FILE upload with column mapping and alias resolution stays in
+Phase 3 as the build order has it.
+**Why:** keeps Phase 2 shippable end to end. Real file import needs the alias layer and the
+unmatched-names report to be worth having, and that is Phase 3's whole subject.
+**Consequence:** a project can be fully set up today by pasting a breakdown out of a
+spreadsheet, which is how the data usually arrives anyway.
+
 ---
 
 ## Still open

@@ -7,9 +7,12 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status:** Phase 1 (schema + migrations) built 2026-08-11 — `install.sql`, `migrate.php`,
-  login, and app skeleton exist; not yet deployed or run against a real database.
-  Next: deploy + install on the server, then Phase 2 (project setup wizard).
+- **Status:** Phase 1 **live** at <https://mana.davidsaga.com> — schema installed, login
+  working, deploys automatic. Phase 2 (setup wizard) built 2026-08-11, pending first real
+  use. Next: Phase 3 (shot/asset file import + the alias layer).
+- **Deploy:** push to `master` in GitHub Desktop; GitHub Actions FTP-syncs to
+  `public_html/mana` within ~30s. After deploying a change that adds a migration, open
+  `migrate.php` once.
 - **Predecessor:** the STFC S02 dashboard (see “Lessons” below) — a working, single-project
   tool that this platform generalises.
 
@@ -125,9 +128,10 @@ Hard-won, all from real incidents:
 
 ## 4. Suggested build order
 
-1. **Schema + migrations** — projects, global crew, pipeline steps & dependencies
-2. **Project setup wizard** — the New Project flow above
-3. **Shot / asset import + in-page creation**
+1. ~~**Schema + migrations**~~ — done, live
+2. ~~**Project setup wizard**~~ — done (paste-based entry; file import deferred to 3)
+3. **Shot / asset import + in-page creation** ← next: CSV/Excel upload with column
+   mapping, the alias layer, and the unmatched-names report
 4. **Scheduler** — forward pass + reverse quota maths, driven by the dependency graph
 5. **Timeline UI** — Gantt view, `.gan` export/import round trip
 6. **Reporting** — per-artist productivity, cross-project workload

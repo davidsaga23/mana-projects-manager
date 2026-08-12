@@ -18,8 +18,34 @@ function asset_ver(string $filename): string {
     return '?v=' . ($mtime ?: time());
 }
 
+// Messages that survive a redirect. Every save reports what it did, what it
+// skipped and why — several STFC bugs looked like "nothing happened".
+function flash(string $type, string $msg): void {   // $type: ok | warn | err
+    $_SESSION['flash'][] = ['type' => $type, 'msg' => $msg];
+}
+
+function take_flashes(): array {
+    $f = $_SESSION['flash'] ?? [];
+    unset($_SESSION['flash']);
+    return $f;
+}
+
 // Working days (Mon–Fri) between two dates, both INCLUSIVE — matching the
 // platform-wide rule that end dates are inclusive everywhere.
+// Every working day from $from to $to, both inclusive, as YYYY-MM-DD strings.
+// Built by stepping a DateTime, never by parsing dates in JS — 'YYYY-MM-DD' read
+// through JS's Date() is treated as UTC and walks backwards in a UTC−6 timezone.
+function working_days_list(string $from, string $to): array {
+    $f = new DateTime($from);
+    $t = new DateTime($to);
+    $days = [];
+    while ($f <= $t) {
+        if ((int)$f->format('N') < 6) $days[] = $f->format('Y-m-d');
+        $f->modify('+1 day');
+    }
+    return $days;
+}
+
 function working_days_between(string $from, string $to): int {
     $f = new DateTime($from);
     $t = new DateTime($to);
