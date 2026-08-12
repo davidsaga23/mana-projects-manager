@@ -237,6 +237,33 @@ function apply_pipeline_template(PDO $pdo, int $projectId, int $templateId): int
     }
 }
 
+/**
+ * Remember a step name for future projects.
+ *
+ * Called when a step is added by hand, so the next project suggests it with the
+ * settings it had last time. Purely a suggestion list — it never constrains what
+ * a project's pipeline can contain.
+ */
+function step_library_remember(PDO $pdo, string $name, string $appliesTo, int $tracksSeconds, ?string $color = null): void {
+    $stmt = $pdo->prepare(
+        'INSERT INTO step_library (name, applies_to, tracks_seconds, color, times_used, last_used)
+         VALUES (?, ?, ?, ?, 1, NOW())
+         ON DUPLICATE KEY UPDATE
+            times_used = times_used + 1,
+            last_used = NOW(),
+            applies_to = ?,
+            tracks_seconds = ?'
+    );
+    $stmt->execute([$name, $appliesTo, $tracksSeconds, $color, $appliesTo, $tracksSeconds]);
+}
+
+/** Remembered step names, most-used first. */
+function step_library(PDO $pdo): array {
+    return $pdo->query(
+        'SELECT * FROM step_library ORDER BY times_used DESC, last_used DESC, name'
+    )->fetchAll();
+}
+
 /** Renumber step_order 1..n in current display order (keeps reordering simple). */
 function renumber_steps(PDO $pdo, int $projectId): void {
     $steps = pipeline_steps($pdo, $projectId);

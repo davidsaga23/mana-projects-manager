@@ -69,8 +69,9 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
         'working_days'      => null,
         'team_per_day'      => null,
         'per_artist_day'    => null,
-        'required_headcount'=> null,
-        'headcount'         => $step['planned_headcount'] !== null ? (int)$step['planned_headcount'] : null,
+        'required_headcount'=> null,   // rounded up, for display
+        'required_exact'    => null,   // unrounded, for the comparison below
+        'headcount'         => $step['planned_headcount'] !== null ? (float)$step['planned_headcount'] : null,
         'problems'          => [],
     ];
 
@@ -101,16 +102,19 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
     $out['team_per_day'] = $work['units'] / $days;
 
     $daysPerUnit = (float)($step['days_per_unit'] ?: 1.0);
-    $out['required_headcount'] = (int)ceil($out['team_per_day'] * $daysPerUnit);
+    $out['required_exact']     = $out['team_per_day'] * $daysPerUnit;
+    $out['required_headcount'] = (int)ceil($out['required_exact']);
 
     if ($out['headcount'] !== null && $out['headcount'] > 0) {
         $out['per_artist_day'] = $out['team_per_day'] / $out['headcount'];
-        if ($out['required_headcount'] > $out['headcount']) {
+        // Compare against the unrounded requirement: 2.2 people needed against 2.5
+        // planned is fine, and rounding first would raise a warning that isn't real.
+        // The epsilon keeps floating-point noise from tripping an exact match.
+        if ($out['required_exact'] > $out['headcount'] + 0.0001) {
             $out['problems'][] = sprintf(
-                'Needs about %d people to hit this date, but %d %s planned.',
-                $out['required_headcount'],
-                $out['headcount'],
-                $out['headcount'] === 1 ? 'is' : 'are'
+                'Needs about %s people to hit this date; %s planned.',
+                fmt_num($out['required_exact'], 1),
+                fmt_num($out['headcount'])
             );
         }
     } else {

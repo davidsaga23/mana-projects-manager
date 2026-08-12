@@ -104,10 +104,10 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
         <td><?= fmt_rate((float)$q['units']) ?> <span class="muted"><?= e($q['unit_label']) ?></span></td>
         <td><?= $q['working_days'] === null ? '—' : (int)$q['working_days'] ?></td>
         <td><?= fmt_rate($q['team_per_day']) ?></td>
-        <td><?= $q['headcount'] === null ? '—' : (int)$q['headcount'] ?></td>
+        <td><?= $q['headcount'] === null ? '—' : e(fmt_num($q['headcount'])) ?></td>
         <td><strong><?= fmt_rate($q['per_artist_day']) ?></strong></td>
-        <td class="<?= $q['required_headcount'] !== null && $q['headcount'] !== null
-                      && $q['required_headcount'] > $q['headcount'] ? 'warn-text' : 'muted' ?>">
+        <td class="<?= $q['required_exact'] !== null && $q['headcount'] !== null
+                      && $q['required_exact'] > $q['headcount'] + 0.0001 ? 'warn-text' : 'muted' ?>">
           <?= $q['required_headcount'] === null ? '—' : (int)$q['required_headcount'] . ' people' ?>
         </td>
       </tr>

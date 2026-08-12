@@ -42,10 +42,16 @@ function wizard_mark_progress(PDO $pdo, int $projectId, int $step): void {
     if ($step > $furthest) set_project_setting($pdo, $projectId, 'wizard_step', (string)$step);
 }
 
-// The wizard needs the planning columns from migration 001. Checking here turns
-// what would be a raw SQL error into a sentence saying exactly what to do.
+// The wizard needs migration 001 (planning columns) and 002 (step library).
+// Checking here turns what would be a raw SQL error into a sentence saying
+// exactly what to do.
 $hasPlanningFields = (bool)$pdo->query("SHOW COLUMNS FROM pipeline_steps LIKE 'days_per_unit'")->fetch();
-if (!$hasPlanningFields) {
+$hasStepLibrary    = (bool)$pdo->query("SHOW TABLES LIKE 'step_library'")->fetch();
+// 003 widens headcount to a decimal. Without it MySQL would silently round 2.5
+// to 3 on save, so check the column's type rather than just its existence.
+$headcountCol      = $pdo->query("SHOW COLUMNS FROM pipeline_steps LIKE 'planned_headcount'")->fetch();
+$hasFractionalHeadcount = $headcountCol && stripos($headcountCol['Type'], 'decimal') !== false;
+if (!$hasPlanningFields || !$hasStepLibrary || !$hasFractionalHeadcount) {
     $pageTitle = 'Update needed';
     require __DIR__ . '/includes/header.php';
     echo '<div class="empty-state"><h2>One database update is needed first</h2>'

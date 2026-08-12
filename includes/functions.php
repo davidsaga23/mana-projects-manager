@@ -18,6 +18,13 @@ function asset_ver(string $filename): string {
     return '?v=' . ($mtime ?: time());
 }
 
+// Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
+// Empty string for null so it can fill a form field that means "not set".
+function fmt_num($v, int $decimals = 2): string {
+    if ($v === null || $v === '') return '';
+    return rtrim(rtrim(number_format((float)$v, $decimals, '.', ''), '0'), '.');
+}
+
 // Messages that survive a redirect. Every save reports what it did, what it
 // skipped and why — several STFC bugs looked like "nothing happened".
 function flash(string $type, string $msg): void {   // $type: ok | warn | err

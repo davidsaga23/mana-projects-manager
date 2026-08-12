@@ -73,6 +73,10 @@ button.danger:hover { background: #8f222c; }
 .actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .actions button { margin-top: 0; }
 .inline-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.toggle-form {
+  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 14px;
+}
+.toggle-form small { flex: 1 1 100%; margin-top: 0; }
 .inline-form button { margin-top: 0; }
 .inline-form small { margin-top: 0; }
 label.inline { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-weight: 400; }
@@ -131,6 +135,15 @@ label.inline input { width: auto; }
 .planning-table input { padding: 5px 7px; font-size: 14px; }
 .step-table input[type=color] { padding: 1px; height: 30px; width: 44px; }
 .step-table td, .workflow-table td, .planning-table td { vertical-align: middle; }
+.drag-handle {
+  cursor: grab; user-select: none; white-space: nowrap;
+  color: #8a97a3; padding-right: 4px;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle .grip { margin-right: 5px; font-size: 15px; letter-spacing: -1px; }
+.step-table tbody tr.dragging { opacity: .45; background: #eef4fa; }
+.step-table tbody tr { background: #fff; }
+
 .row-actions { white-space: nowrap; }
 .row-actions button {
   margin-top: 0; padding: 4px 9px; font-size: 13px;
@@ -161,6 +174,15 @@ label.inline input { width: auto; }
   border-radius: 50%; background: #ccd4db; color: #43535f; font-size: 11px;
 }
 .chip button:hover { background: #b02a37; color: #fff; }
+.chip input[type=checkbox] { width: auto; margin: 0 1px 0 0; }
+.check-all { font-weight: 400; font-size: 12px; color: #5a6a7a; margin-left: 8px; }
+.retype-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 10px 14px; margin-top: 16px;
+}
+.retype-bar select, .retype-bar input { width: auto; }
+.retype-bar button { margin-top: 0; }
 
 /* Paste / generate tools */
 .tool-grid { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 22px; }

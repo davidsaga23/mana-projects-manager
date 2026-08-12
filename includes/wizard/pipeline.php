@@ -91,11 +91,52 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             throw new RuntimeException('This project already has a step called "' . $name . '".');
         }
         resync_workflow($pdo, $projectId);
-        flash('ok', 'Added the step "' . $name . '" at the end of the pipeline.');
+        step_library_remember($pdo, $name, $appliesTo, $tracks);
+        flash('ok', 'Added the step "' . $name . '" at the end of the pipeline. ' .
+                    'It will be suggested on future projects too.');
         return wizard_url($projectId, 2);
     }
 
     $changed = wizard_pipeline_apply_edits($pdo, $projectId);
+
+    // Drag-and-drop posts the whole new order at once.
+    if ($action === 'reorder') {
+        $steps = pipeline_steps($pdo, $projectId);
+        $valid = [];
+        foreach ($steps as $s) $valid[(int)$s['id']] = true;
+
+        $ordered = [];
+        foreach (explode(',', $_POST['order'] ?? '') as $raw) {
+            $id = (int)trim($raw);
+            if (isset($valid[$id]) && !in_array($id, $ordered, true)) $ordered[] = $id;
+        }
+        // Anything the browser left out keeps its place at the end rather than
+        // vanishing from the ordering.
+        foreach ($steps as $s) {
+            if (!in_array((int)$s['id'], $ordered, true)) $ordered[] = (int)$s['id'];
+        }
+
+        $upd = $pdo->prepare('UPDATE pipeline_steps SET step_order = ? WHERE id = ? AND project_id = ?');
+        $n = 0;
+        foreach ($ordered as $id) $upd->execute([++$n, $id, $projectId]);
+
+        // Parallelism is stored as shared dependencies, so it is read relative to
+        // the order. Moving a step can therefore change which steps run together.
+        $depsBefore = step_dependencies_map($pdo, $projectId);
+        $hadParallel = false;
+        foreach (['shot', 'asset'] as $kind) {
+            $chain = chain_steps(pipeline_steps($pdo, $projectId), $kind);
+            if (array_filter(derive_parallel_flags($chain, $depsBefore))) $hadParallel = true;
+        }
+
+        resync_workflow($pdo, $projectId);
+        flash('ok', 'Saved the new step order.');
+        if ($hadParallel) {
+            flash('warn', 'Some steps run in parallel — check the Workflow screen still ' .
+                          'shows what you expect after moving things around.');
+        }
+        return wizard_url($projectId, 2);
+    }
 
     if (preg_match('/^(up|down|del):(\d+)$/', $action, $m)) {
         $verb = $m[1];
@@ -191,15 +232,23 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
                a plain save rather than whichever row button happens to come first. */ ?>
       <button type="submit" name="action" value="save" hidden></button>
 
+      <input type="hidden" name="order" id="step-order" value="">
+      <button type="submit" name="action" value="reorder" id="reorder-submit" hidden></button>
+
       <table class="step-table">
+        <thead>
         <tr>
           <th></th><th>Step</th><th>Applies to</th>
           <th title="Progress measured in seconds of footage rather than a count of items">Measured in</th>
           <th>Colour</th><th></th>
         </tr>
+        </thead>
+        <tbody id="step-rows">
         <?php foreach ($steps as $i => $s): $id = (int)$s['id']; ?>
-        <tr>
-          <td class="muted"><?= $i + 1 ?></td>
+        <tr data-id="<?= $id ?>">
+          <td class="drag-handle" draggable="true" title="Drag to reorder">
+            <span class="grip">⠿</span><span class="muted"><?= $i + 1 ?></span>
+          </td>
           <td><input name="name[<?= $id ?>]" value="<?= e($s['name']) ?>"></td>
           <td>
             <select name="applies_to[<?= $id ?>]">
@@ -224,6 +273,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
           </td>
         </tr>
         <?php endforeach; ?>
+        </tbody>
       </table>
 
       <div class="actions">
@@ -232,17 +282,52 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       </div>
     </form>
 
+    <?php
+    // Steps used on earlier projects, offered as suggestions. Anything already in
+    // this project is dropped from the list — it can't be added twice.
+    $used = [];
+    foreach ($steps as $s) $used[mb_strtolower($s['name'])] = true;
+    $library = array_values(array_filter(step_library($pdo), function ($l) use ($used) {
+        return !isset($used[mb_strtolower($l['name'])]);
+    }));
+    $libraryMap = [];
+    foreach ($library as $l) {
+        $libraryMap[$l['name']] = [
+            'applies_to'     => $l['applies_to'],
+            'tracks_seconds' => (int)$l['tracks_seconds'],
+        ];
+    }
+    ?>
     <form method="post" class="add-row">
       <input type="hidden" name="action" value="add">
       <strong>Add a step</strong>
-      <input name="new_name" placeholder="Step name" required>
-      <select name="new_applies_to">
+      <input name="new_name" id="new-step-name" placeholder="Step name"
+             list="step-library-names" autocomplete="off" required>
+      <datalist id="step-library-names">
+        <?php foreach ($library as $l): ?>
+          <option value="<?= e($l['name']) ?>"<?= $l['times_used'] > 0
+              ? ' label="used before"' : '' ?>></option>
+        <?php endforeach; ?>
+      </datalist>
+      <select name="new_applies_to" id="new-step-applies-to">
         <option value="shot">Shots</option>
         <option value="asset">Assets</option>
         <option value="both">Both</option>
       </select>
-      <label class="inline"><input type="checkbox" name="new_tracks_seconds" value="1"> measured in seconds</label>
+      <label class="inline">
+        <input type="checkbox" name="new_tracks_seconds" id="new-step-seconds" value="1"> measured in seconds
+      </label>
       <button type="submit" class="secondary">Add</button>
     </form>
+    <?php if ($library): ?>
+      <p class="muted small">Start typing to see <?= count($library) ?> step
+         <?= count($library) === 1 ? 'name' : 'names' ?> used on other projects — picking one
+         fills in its usual settings. Anything new you add gets remembered the same way.</p>
+    <?php endif; ?>
+
+    <script type="application/json" id="step-library-data"><?=
+        json_encode($libraryMap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+    ?></script>
+    <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
     <?php
 }

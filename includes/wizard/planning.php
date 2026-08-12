@@ -63,7 +63,8 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $deadline = trim($_POST['deadline'][$id] ?? '') ?: null;
         $dpu      = (float)($_POST['days_per_unit'][$id] ?? 1);
         $headRaw  = trim($_POST['planned_headcount'][$id] ?? '');
-        $head     = $headRaw === '' ? null : max(0, (int)$headRaw);
+        // Fractional on purpose: someone splitting a week across two shows is 0.5.
+        $head     = $headRaw === '' ? null : max(0, (float)$headRaw);
 
         if ($dpu <= 0) $dpu = 1.0;
         if ($start && $deadline && $deadline < $start) {
@@ -118,8 +119,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <table class="planning-table">
         <tr>
           <th>Step</th><th>Starts</th><th>Deadline</th>
-          <th title="How long one shot or asset takes one person">Days per item</th>
-          <th title="How many people are on this step">People</th>
+          <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day.">Days per item</th>
+          <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
         </tr>
         <?php foreach ($steps as $s): $id = (int)$s['id']; ?>
         <tr>
@@ -130,10 +131,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           </td>
           <td><input type="date" name="start_date[<?= $id ?>]" value="<?= e($s['start_date'] ?? '') ?>"></td>
           <td><input type="date" name="deadline[<?= $id ?>]" value="<?= e($s['deadline'] ?? '') ?>"></td>
-          <td><input type="number" name="days_per_unit[<?= $id ?>]" step="0.25" min="0.25"
-                     value="<?= e(rtrim(rtrim(number_format((float)($s['days_per_unit'] ?? 1), 2), '0'), '.')) ?>"></td>
-          <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0"
-                     value="<?= $s['planned_headcount'] === null ? '' : (int)$s['planned_headcount'] ?>"
+          <?php /* step="any" rather than a fixed increment — real estimates land on
+                   awkward numbers like 1.5 days or 2.5 people, and the browser
+                   should not reject them. */ ?>
+          <td><input type="number" name="days_per_unit[<?= $id ?>]" step="any" min="0.01"
+                     value="<?= e(fmt_num($s['days_per_unit'] ?? 1)) ?>"></td>
+          <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
+                     value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>
         </tr>
         <?php endforeach; ?>

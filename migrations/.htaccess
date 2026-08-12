@@ -1,0 +1,6 @@
+# Migration SQL is applied by migrate.php reading these files from disk.
+# There is no reason for a browser to fetch them.
+Require all denied
+<IfModule !mod_authz_core.c>
+  Deny from all
+</IfModule>

@@ -122,6 +122,60 @@ unmatched-names report to be worth having, and that is Phase 3's whole subject.
 **Consequence:** a project can be fully set up today by pasting a breakdown out of a
 spreadsheet, which is how the data usually arrives anyway.
 
+## 2026-08-11 — Step names are remembered globally in `step_library`
+**Decision:** adding a pipeline step by hand records its name, `applies_to` and
+`tracks_seconds` in a global `step_library` table. The wizard's "Add a step" field suggests
+those names and fills in the settings they had last time. Seeded from the built-in templates
+and from steps already in real projects (migration 002).
+**Why:** a step typed fresh on every show is a step spelled differently on every show —
+the same class of problem as the crew/asset alias layer, caught before it starts. The
+library also makes a studio's real vocabulary visible rather than living in one person's head.
+**Consequence:** it is a suggestion list only, never a constraint: projects still own their
+own `pipeline_steps` rows and any name can be typed. Deliberately global (no `project_id`) —
+cross-project reuse is the entire point. A typo entered once will linger as a suggestion;
+a small management screen for pruning the list is worth adding if that becomes annoying.
+
+## 2026-08-11 — Drag-to-reorder saves immediately
+**Decision:** pipeline steps can be dragged by a handle; dropping submits the form and
+saves the new order right away. The ↑ ↓ buttons stay.
+**Why:** an order change sitting unsaved in the page is exactly the silent loss this app
+tries to avoid, and it would be lost by navigating to the next wizard screen. The buttons
+remain because HTML5 drag and drop has no keyboard equivalent.
+**Consequence:** each drag costs a page reload. Reordering also re-derives the dependency
+graph, so a warning is shown when the project has parallel steps that may have been
+disturbed.
+
+## 2026-08-11 — Episodes are a per-project setting, not an assumption
+**Decision:** a project carries an `episodic` flag in `project_settings`. The shots screen
+follows it: episode fields disappear when off, and a pasted line is read as
+`SHOT, SECONDS` rather than `EPISODE, SHOT, SECONDS`. Before the toggle is ever used, the
+answer is inferred from the data — a project whose shots already carry episodes is episodic.
+**Why:** not every project is a series. A commercial or short is one flat shot list, and an
+episode column on that screen is noise that implies a required field.
+**Consequence:** turning episodes off hides them but never deletes them, and says so. The
+same flag will decide grouping in the timeline and reports later.
+
+## 2026-08-11 — Asset types are a dropdown built from data, still free text underneath
+**Decision:** `assets.asset_type` stays free text. The wizard offers a dropdown built from
+five built-in starters plus every type already used on any project, with a "new type" field
+beside it. Assets can be selected and retyped in bulk after the fact.
+**Why:** a fixed list in code is what forced a schema change on STFC to add Props; free text
+alone invites "Character" / "character" / "Char". Building the list from data gives
+consistency without a constraint, and matches the step library's approach.
+**Consequence:** a typo becomes a new "type" — hence the bulk retype control, which makes
+fixing it a two-click job rather than a reason to delete and re-paste.
+
+## 2026-08-11 — Headcount is fractional
+**Decision:** `pipeline_steps.planned_headcount` and `headcount_log.headcount` are
+`DECIMAL(5,2)`; the planning inputs accept any decimal (migration 003).
+**Why:** someone splitting a week between two shows is 0.5 on each, and rounding that to a
+whole number makes every quota derived from it wrong. `crew_projects.allocation_pct` already
+recognised part-time allocation; this makes the estimate side agree.
+**Consequence:** the "needs N people" warning now compares against the *unrounded*
+requirement, so 2.2 people needed against 2.5 planned no longer raises a false alarm.
+The wizard checks the column's TYPE (not just its existence) before running, because MySQL
+would otherwise round 2.5 to 3 on save without a word.
+
 ---
 
 ## Still open

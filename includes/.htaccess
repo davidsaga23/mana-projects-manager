@@ -1,0 +1,8 @@
+# These files are only ever loaded by PHP from disk; nothing should be able to
+# request them over the web. Blocking direct access costs nothing and removes a
+# whole category of accident (a PHP handler misconfiguration serving source, or
+# an include running standalone with half its context missing).
+Require all denied
+<IfModule !mod_authz_core.c>
+  Deny from all
+</IfModule>
