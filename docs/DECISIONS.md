@@ -59,15 +59,18 @@ silent-drift chore that gets forgotten. Freezing it removes the chore. `migrate.
 a dry-run list first and reports every file as applied/skipped/failed — nothing silent.
 **Consequence:** migrations must be additive only; a table drop never appears in one.
 
-## 2026-08-11 — Generated-column uniqueness for progress and schedule rows
+## 2026-08-11 — item_key uniqueness for progress and schedule rows (app-maintained)
 **Decision:** `progress` and `schedule` reference *either* a shot or an asset via nullable
-`shot_id`/`asset_id`, and uniqueness per (step, item) is enforced through a stored generated
-column `item_key` ('s'+shot_id or 'a'+asset_id) with `UNIQUE (step_id, item_key)`.
+`shot_id`/`asset_id`. Uniqueness per (step, item) is enforced through an `item_key` column
+('s'+shot_id or 'a'+asset_id) with `UNIQUE (step_id, item_key)`, **set by the application
+on every insert**.
 **Why:** MySQL unique indexes ignore NULLs, so `UNIQUE (step_id, shot_id, asset_id)` would
-silently allow duplicate rows whenever one column is NULL. The generated column makes the
-constraint real at the database level instead of relying on application code.
-**Consequence:** requires MySQL 5.7+ / MariaDB 10.2+ (any current cPanel host qualifies).
-Application inserts still set exactly one of the two ids.
+silently allow duplicate rows whenever one column is NULL. First attempt used a stored
+generated column, but the live server rejected it (error 1215): MySQL/MariaDB forbid ON
+DELETE CASCADE foreign keys on the base columns of a stored generated column, and the
+cascade clean-up is worth more than auto-computing the key.
+**Consequence:** every code path inserting into these tables must set `item_key`; the
+UNIQUE index still catches any row that forgets or miscomputes it.
 
 ## 2026-08-11 — Pipeline templates are seed rows the wizard copies
 **Decision:** `pipeline_templates` / `pipeline_template_steps` / `pipeline_template_deps`

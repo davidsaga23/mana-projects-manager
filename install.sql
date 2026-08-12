@@ -197,8 +197,10 @@ CREATE TABLE name_aliases (
 
 -- PROGRESS (one table for shots AND assets; steps can apply to either) -------
 -- Exactly one of shot_id / asset_id is set per row. MySQL unique indexes
--- ignore NULLs, so uniqueness per (step, item) is enforced through item_key,
--- a stored generated column: 's<shot_id>' or 'a<asset_id>'.
+-- ignore NULLs, so uniqueness per (step, item) is enforced through item_key:
+-- 's<shot_id>' or 'a<asset_id>', set by the application on every insert.
+-- (A generated column can't be used here: MySQL/MariaDB reject ON DELETE
+-- CASCADE foreign keys on the base columns of a stored generated column.)
 DROP TABLE IF EXISTS progress;
 CREATE TABLE progress (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -206,8 +208,7 @@ CREATE TABLE progress (
   step_id INT NOT NULL,
   shot_id INT DEFAULT NULL,
   asset_id INT DEFAULT NULL,
-  item_key VARCHAR(20) GENERATED ALWAYS AS
-    (CONCAT(IF(shot_id IS NULL, 'a', 's'), COALESCE(shot_id, asset_id, 0))) STORED,
+  item_key VARCHAR(20) NOT NULL,
   status VARCHAR(100) DEFAULT NULL,            -- raw external status text
   is_delivered TINYINT(1) NOT NULL DEFAULT 0,
   is_approved TINYINT(1) NOT NULL DEFAULT 0,
@@ -235,8 +236,7 @@ CREATE TABLE schedule (
   step_id INT NOT NULL,
   shot_id INT DEFAULT NULL,
   asset_id INT DEFAULT NULL,
-  item_key VARCHAR(20) GENERATED ALWAYS AS
-    (CONCAT(IF(shot_id IS NULL, 'a', 's'), COALESCE(shot_id, asset_id, 0))) STORED,
+  item_key VARCHAR(20) NOT NULL,               -- 's<shot_id>' or 'a<asset_id>', set by the app
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,                      -- inclusive last working day
   crew_id INT DEFAULT NULL,
