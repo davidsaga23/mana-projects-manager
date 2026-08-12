@@ -135,7 +135,10 @@ change of habit rather than a migration. Read the two paired Plaky entries in
 
 1. ~~**Schema + migrations**~~ — done, live
 2. ~~**Project setup wizard**~~ — done (paste-based entry)
-3. **Import + the status model** ← next, and these ship together.
+3. **Import + the status model** — built 2026-08-12, pending first real use.
+   `migrations/004_status_model.sql`, `import.php`, `statuses_edit.php`, `aliases.php`,
+   `project.php`, and the helpers in `includes/{statuses,names,plaky_import}.php`.
+   These shipped together:
    **Read `docs/PLAKY_EXPORT.md` first** — a real export has been analysed and the
    traps in it are written down (a `Lightning` typo, `(inactive)` name suffixes,
    multi-assignee fields, `DD/MM/YYYY` dates, an unmapped `On Hold` status):
