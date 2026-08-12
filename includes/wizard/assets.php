@@ -7,8 +7,9 @@
 // accumulate naturally and stay consistently spelled, without ever being a
 // fixed list in code.
 //
-// Types can also be corrected in bulk after the fact: paste fifty assets under
-// the wrong type and it is a two-click fix, not fifty deletions.
+// Everything is editable after the fact: names and types row by row, types in
+// bulk for a batch pasted wrongly. Pasting is easy to get slightly wrong, so
+// correcting it has to be easier than deleting and starting over.
 
 /** Type choices: built-in starters plus everything already used anywhere. */
 function wizard_asset_types(PDO $pdo): array {
@@ -25,8 +26,16 @@ function wizard_asset_types(PDO $pdo): array {
 /** Render <option> tags for a type dropdown. */
 function wizard_asset_type_options(array $types, string $selected = '', string $blankLabel = '— no type —'): string {
     $html = '<option value="">' . e($blankLabel) . '</option>';
+    $found = false;
     foreach ($types as $t) {
-        $html .= '<option value="' . e($t) . '"' . ($t === $selected ? ' selected' : '') . '>' . e($t) . '</option>';
+        $isSel = ($t === $selected);
+        if ($isSel) $found = true;
+        $html .= '<option value="' . e($t) . '"' . ($isSel ? ' selected' : '') . '>' . e($t) . '</option>';
+    }
+    // A type that exists only on this row must still be selectable, or saving the
+    // row would silently change it to something else.
+    if ($selected !== '' && !$found) {
+        $html .= '<option value="' . e($selected) . '" selected>' . e($selected) . '</option>';
     }
     return $html;
 }
@@ -37,9 +46,93 @@ function wizard_asset_chosen_type(string $selectField, string $newField): string
     return $new !== '' ? $new : trim($_POST[$selectField] ?? '');
 }
 
+/** Apply the name and type edits posted alongside whichever button was clicked. */
+function wizard_assets_apply_edits(PDO $pdo, int $projectId): int {
+    $names = $_POST['name'] ?? [];
+    if (!is_array($names) || !$names) return 0;
+
+    $stmt = $pdo->prepare('SELECT id, name, asset_type FROM assets WHERE project_id = ?');
+    $stmt->execute([$projectId]);
+    $existing = [];
+    foreach ($stmt as $row) $existing[(int)$row['id']] = $row;
+
+    $upd = $pdo->prepare('UPDATE assets SET name = ?, asset_type = ? WHERE id = ? AND project_id = ?');
+    $changed = 0;
+    foreach ($names as $id => $name) {
+        $id = (int)$id;
+        if (!isset($existing[$id])) continue;
+        $name = trim($name);
+        if ($name === '') {
+            flash('warn', 'An asset was left with a blank name, so its old name was kept.');
+            continue;
+        }
+        $type = trim($_POST['type'][$id] ?? '');
+        $before = $existing[$id];
+        if ($before['name'] === $name && ($before['asset_type'] ?? '') === $type) continue;
+
+        try {
+            $upd->execute([$name, $type !== '' ? $type : null, $id, $projectId]);
+            $changed++;
+        } catch (PDOException $e) {
+            flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
+                          '" — this project already has an asset with that name.');
+        }
+    }
+    return $changed;
+}
+
 function wizard_save_assets(PDO $pdo, ?array $project): string {
     $projectId = (int)$project['id'];
     $action = $_POST['action'] ?? 'continue';
+
+    if ($action === 'paste') {
+        $defaultType = wizard_asset_chosen_type('paste_type', 'paste_type_new');
+        // Captured before inserting, so a type this paste invents stands out.
+        $knownTypes = [];
+        foreach (wizard_asset_types($pdo) as $t) $knownTypes[mb_strtolower($t)] = true;
+
+        $lines = preg_split('/\R/', $_POST['paste'] ?? '');
+        $ins = $pdo->prepare('INSERT INTO assets (project_id, name, asset_type) VALUES (?, ?, ?)');
+        $added = 0; $dupes = []; $bad = 0; $invented = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+            $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\t]+/', $line)),
+                                               function ($p) { return $p !== ''; }));
+            if (!$parts) { $bad++; continue; }
+            $name = $parts[0];
+            $type = $parts[1] ?? $defaultType;
+            try {
+                $ins->execute([$projectId, $name, $type !== '' ? $type : null]);
+                $added++;
+                if ($type !== '' && !isset($knownTypes[mb_strtolower($type)])) {
+                    $invented[$type] = true;
+                }
+            } catch (PDOException $e) {
+                $dupes[] = $name;
+            }
+        }
+        if ($added) flash('ok', "Added $added asset" . ($added === 1 ? '' : 's') .
+                                ($defaultType !== '' ? " as \"$defaultType\"." : '.'));
+        // The classic paste mistake is several names on one line: the second name
+        // becomes a type. Naming the new types makes that obvious immediately.
+        if ($invented) {
+            flash('warn', 'This created ' . (count($invented) === 1 ? 'a new type' : 'new types') .
+                          ': "' . implode('", "', array_keys($invented)) . '". If that was not ' .
+                          'intended — putting two names on one line does it — tick those assets ' .
+                          'and use "Fix a type" below.');
+        }
+        if ($dupes) flash('warn', count($dupes) . ' already existed and were skipped: ' .
+                                   implode(', ', array_slice($dupes, 0, 12)) .
+                                   (count($dupes) > 12 ? ' …' : ''));
+        if ($bad)   flash('warn', "$bad line" . ($bad === 1 ? '' : 's') . ' could not be read and were skipped.');
+        if (!$added && !$dupes && !$bad) flash('warn', 'Nothing was pasted, so nothing was added.');
+        return wizard_url($projectId, 5);
+    }
+
+    // Everything below shares the edit form, so pending edits are saved first
+    // rather than being thrown away by clicking a row button.
+    $changed = wizard_assets_apply_edits($pdo, $projectId);
 
     if (preg_match('/^del:(\d+)$/', $action, $m)) {
         $stmt = $pdo->prepare('SELECT name FROM assets WHERE id = ? AND project_id = ?');
@@ -58,63 +151,37 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         $newType = wizard_asset_chosen_type('retype_type', 'retype_new');
 
         $in = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare(
-            "UPDATE assets SET asset_type = ? WHERE project_id = ? AND id IN ($in)"
-        );
-        $stmt->execute(array_merge([$newType ?: null, $projectId], $ids));
-        $n = $stmt->rowCount();
+        $stmt = $pdo->prepare("UPDATE assets SET asset_type = ? WHERE project_id = ? AND id IN ($in)");
+        $stmt->execute(array_merge([$newType !== '' ? $newType : null, $projectId], $ids));
 
         flash('ok', $newType === ''
-            ? "Cleared the type on " . count($ids) . ' asset' . (count($ids) === 1 ? '' : 's') . '.'
-            : "Moved " . count($ids) . ' asset' . (count($ids) === 1 ? '' : 's') . " to \"$newType\".");
-        if ($n === 0 && count($ids) > 0) {
-            flash('warn', 'Those assets already had that type, so nothing changed.');
-        }
+            ? 'Cleared the type on ' . count($ids) . ' asset' . (count($ids) === 1 ? '' : 's') . '.'
+            : 'Moved ' . count($ids) . ' asset' . (count($ids) === 1 ? '' : 's') . " to \"$newType\".");
         return wizard_url($projectId, 5);
     }
 
-    if ($action === 'paste') {
-        $defaultType = wizard_asset_chosen_type('paste_type', 'paste_type_new');
-        $lines = preg_split('/\R/', $_POST['paste'] ?? '');
-        $ins = $pdo->prepare('INSERT INTO assets (project_id, name, asset_type) VALUES (?, ?, ?)');
-        $added = 0; $dupes = []; $bad = 0;
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '') continue;
-            $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\t]+/', $line)),
-                                               function ($p) { return $p !== ''; }));
-            if (!$parts) { $bad++; continue; }
-            $name = $parts[0];
-            $type = $parts[1] ?? $defaultType;
-            try {
-                $ins->execute([$projectId, $name, $type ?: null]);
-                $added++;
-            } catch (PDOException $e) {
-                $dupes[] = $name;
-            }
-        }
-        if ($added) flash('ok', "Added $added asset" . ($added === 1 ? '' : 's') .
-                                ($defaultType !== '' ? " as \"$defaultType\"." : '.'));
-        if ($dupes) flash('warn', count($dupes) . ' already existed and were skipped: ' .
-                                   implode(', ', array_slice($dupes, 0, 12)) .
-                                   (count($dupes) > 12 ? ' …' : ''));
-        if ($bad)   flash('warn', "$bad line" . ($bad === 1 ? '' : 's') . ' could not be read and were skipped.');
-        if (!$added && !$dupes && !$bad) flash('warn', 'Nothing was pasted, so nothing was added.');
-        return wizard_url($projectId, 5);
+    if ($changed > 0) {
+        flash('ok', "Saved changes to $changed asset" . ($changed === 1 ? '' : 's') . '.');
+    } elseif ($action === 'save') {
+        flash('ok', 'No changes to save.');
     }
 
-    return wizard_next_url($projectId, 5);
+    if ($action === 'continue') return wizard_next_url($projectId, 5);
+    return wizard_url($projectId, 5);
 }
 
 function wizard_render_assets(PDO $pdo, ?array $project): void {
     $projectId = (int)$project['id'];
-    $stmt = $pdo->prepare('SELECT * FROM assets WHERE project_id = ? ORDER BY asset_type, name');
+    $stmt = $pdo->prepare('SELECT * FROM assets WHERE project_id = ? ORDER BY asset_type IS NULL, asset_type, name');
     $stmt->execute([$projectId]);
     $assets = $stmt->fetchAll();
     $types = wizard_asset_types($pdo);
 
-    $byType = [];
-    foreach ($assets as $a) $byType[$a['asset_type'] ?? ''][] = $a;
+    $typeCounts = [];
+    foreach ($assets as $a) {
+        $key = $a['asset_type'] ?? '';
+        $typeCounts[$key] = ($typeCounts[$key] ?? 0) + 1;
+    }
 
     $hasAssetSteps = false;
     foreach (pipeline_steps($pdo, $projectId) as $s) {
@@ -131,36 +198,49 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
     <?php endif; ?>
 
     <?php if ($assets): ?>
-      <p class="summary-line"><strong><?= count($assets) ?></strong> assets
-        <?php if (count($byType) > 1): ?>· <?= count($byType) ?> types<?php endif; ?>
+      <p class="summary-line"><strong><?= count($assets) ?></strong> assets ·
+        <?php $bits = [];
+              foreach ($typeCounts as $t => $n) $bits[] = ($t === '' ? 'no type' : $t) . ' ' . $n;
+              echo e(implode(' · ', $bits)); ?>
       </p>
 
       <form method="post">
-        <button type="submit" name="action" value="continue" hidden></button>
-        <?php $g = 0; foreach ($byType as $type => $rows): $g++; $groupId = 'asset-group-' . $g; ?>
-          <div class="chip-group">
-            <h4><?= $type === '' ? '<span class="muted">No type</span>' : e($type) ?>
-                <span class="muted small">· <?= count($rows) ?></span>
-                <label class="inline check-all">
-                  <input type="checkbox" data-check-all="<?= $groupId ?>"> select all
-                </label>
-            </h4>
-            <div class="chips" id="<?= $groupId ?>">
-            <?php foreach ($rows as $a): ?>
-              <span class="chip">
-                <input type="checkbox" name="sel[]" value="<?= (int)$a['id'] ?>"
-                       title="Select to change its type">
-                <?= e($a['name']) ?>
-                <button type="submit" name="action" value="del:<?= (int)$a['id'] ?>" title="Remove">✕</button>
-              </span>
-            <?php endforeach; ?>
-            </div>
-          </div>
-        <?php endforeach; ?>
+        <button type="submit" name="action" value="save" hidden></button>
+
+        <table class="asset-table">
+          <thead>
+            <tr>
+              <th><label class="inline"><input type="checkbox" data-check-all="asset-rows"></label></th>
+              <th>Name</th><th>Type</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="asset-rows">
+          <?php foreach ($assets as $a): $id = (int)$a['id']; ?>
+            <tr>
+              <td><input type="checkbox" name="sel[]" value="<?= $id ?>" title="Select for a bulk type change"></td>
+              <td><input name="name[<?= $id ?>]" value="<?= e($a['name']) ?>"></td>
+              <td>
+                <select name="type[<?= $id ?>]">
+                  <?= wizard_asset_type_options($types, $a['asset_type'] ?? '') ?>
+                </select>
+              </td>
+              <td class="row-actions">
+                <button type="submit" name="action" value="del:<?= $id ?>" class="danger" title="Remove"
+                        onclick="return confirm('Remove <?= e(addslashes($a['name'])) ?>?');">✕</button>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+
+        <div class="actions">
+          <button type="submit" name="action" value="continue">Save and continue →</button>
+          <button type="submit" name="action" value="save" class="secondary">Save changes</button>
+        </div>
 
         <div class="retype-bar">
-          <strong>Fix a type</strong>
-          <span class="muted small">Tick assets above, then set what they should be:</span>
+          <strong>Change several at once</strong>
+          <span class="muted small">Tick rows above, then set what they should be:</span>
           <select name="retype_type"><?= wizard_asset_type_options($types) ?></select>
           <input name="retype_new" placeholder="or a new type" size="14">
           <button type="submit" name="action" value="retype" class="secondary">Change type</button>
@@ -175,8 +255,8 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
         <input type="hidden" name="action" value="paste">
         <strong>Paste a list</strong>
         <textarea name="paste" rows="6" placeholder="Romulan Officer&#10;Bridge&#10;Phaser"></textarea>
-        <small>One asset per line. Add <code>, TYPE</code> after a name to override the
-               type for that line.</small>
+        <small><strong>One asset per line.</strong> A comma on a line means the part after it
+               is the <em>type</em>, not another asset — so put each name on its own line.</small>
         <label>Type for these assets
           <select name="paste_type"><?= wizard_asset_type_options($types) ?></select>
         </label>
@@ -187,9 +267,11 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
       </form>
     </div>
 
+    <?php if (!$assets): ?>
     <form method="post" class="actions">
       <button type="submit" name="action" value="continue">Save and continue →</button>
     </form>
+    <?php endif; ?>
 
     <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
     <?php
