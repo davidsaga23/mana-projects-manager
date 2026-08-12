@@ -114,16 +114,24 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <small>A starting point: each stage gets an equal slice, and parallel steps share dates.</small>
     </form>
 
+    <?php $estimates = project_estimates($pdo, $projectId); ?>
     <form method="post">
       <button type="submit" name="action" value="save" hidden></button>
-      <table class="planning-table">
+      <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>">
+        <thead>
         <tr>
           <th>Step</th><th>Starts</th><th>Deadline</th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
+          <th>Is that enough?</th>
         </tr>
-        <?php foreach ($steps as $s): $id = (int)$s['id']; ?>
-        <tr>
+        </thead>
+        <tbody>
+        <?php foreach ($steps as $s): $id = (int)$s['id'];
+              $work = step_work_units($pdo, $projectId, $s, $estimates); ?>
+        <tr data-units="<?= e(fmt_num($work['units'], 3)) ?>"
+            data-label="<?= e($work['label']) ?>"
+            data-estimated="<?= !empty($work['estimated']) ? '1' : '0' ?>">
           <td class="wf-name">
             <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span>
             <?= e($s['name']) ?>
@@ -139,8 +147,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>
+          <td class="verdict"><span class="muted">—</span></td>
         </tr>
         <?php endforeach; ?>
+        </tbody>
       </table>
 
       <div class="actions">
@@ -148,5 +158,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         <button type="submit" name="action" value="save" class="secondary">Save</button>
       </div>
     </form>
+
+    <p class="muted small">
+      The check updates as you type — nothing is saved until you press a button. The daily
+      rate is what the <em>whole team</em> must finish to hit the date; it doesn't fall when
+      you add people, only each person's share does.
+    </p>
+
+    <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
     <?php
 }

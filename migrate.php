@@ -17,7 +17,8 @@
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
-require_login();
+// Changing the database schema is an administrator's job.
+require_admin();
 
 // Naive but sufficient splitter for our migration style (plain DDL/DML, no
 // stored procedures): statements end with ';' at end of line. Strips '--'

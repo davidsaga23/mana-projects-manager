@@ -341,6 +341,26 @@ entered once, there), then the platform wizard for basics/pipeline/workflow, the
 then dates and headcount. Only Plaky → platform is automated; there is no export the other
 way. See `ROADMAP.md` if that becomes a nuisance.
 
+## 2026-08-12 — Three login roles, with read-only enforced in one place
+**Decision:** `users` gains `role` (admin / editor / viewer), `active` and `last_login`
+(migration 005). Admin manages accounts and runs migrations; editor does all production work;
+viewer can read everything and change nothing. Existing accounts became admins.
+**Why:** STFC deliberately had no read-only accounts — everyone who could log in could edit
+everything. Fine for three people who all ran the show; wrong the moment an assistant needs
+to see the numbers without being able to move a deadline.
+**Consequence — the enforcement point matters more than the roles.** View-only is applied
+inside `require_login()`, which every page already calls, by refusing any POST from an
+account that can't edit. Every write in this app is a POST, so that single check covers the
+whole surface *including screens built later* — nobody has to remember to add a guard. The
+alternative, a check per page, fails the first time someone forgets one, and fails silently.
+- The role is read from the database on every request rather than cached in the session, so a
+  demotion or a switch-off takes effect on the next page view instead of the next login.
+- `current_user()` falls back to treating everyone as an admin if the role columns don't
+  exist yet, because locking a working site out over a pending migration would be worse than
+  the missing feature.
+- **None of this touches money.** Contracts, budgets and rates are in a separate application
+  with separate accounts and a separate database; no role here reaches them.
+
 ---
 
 ## Still open

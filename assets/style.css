@@ -220,6 +220,24 @@ label.inline input { width: auto; }
 .hub-card strong { display: block; margin-bottom: 4px; }
 .hub-card span { font-size: 12.5px; }
 
+.planning-table .verdict { font-size: 13px; line-height: 1.45; min-width: 260px; }
+.planning-table .verdict-short { background: #fdf0f1; color: #8f222c; }
+.planning-table .verdict-ok    { background: #f0faf2; color: #1a5c28; }
+.planning-table .verdict .muted { font-size: 11.5px; }
+
+/* Users */
+.role-badge {
+  background: #fff3cd; color: #7a5f12; border-radius: 3px;
+  padding: 1px 6px; font-size: 11.5px; margin-left: 4px;
+}
+.row-inactive td { background: #f7f8f9; color: #8a97a3; }
+.row-inactive td strong { font-weight: 400; }
+.role-table td { vertical-align: top; }
+.inline-actions summary { cursor: pointer; font-size: 13px; color: #2f6fb2; }
+.inline-actions[open] summary { margin-bottom: 6px; }
+.inline-actions .inline-form { margin: 0; }
+.topbar-right .inline-form { display: inline-flex; }
+
 .est-tag {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
   background: #fff3cd; color: #8a6d1a; border-radius: 3px; padding: 1px 4px; margin-left: 4px;

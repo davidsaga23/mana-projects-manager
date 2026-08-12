@@ -100,7 +100,7 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
       </div>
 
       <fieldset class="unit-choice">
-        <legend>Early estimate — before the breakdown exists</legend>
+        <legend>Pre-production estimate</legend>
         <p class="muted small" style="margin-top:0">
           At the start of a project the runtime is usually known long before the shot count is
           — that only settles once the animatic is cut and labelled. Put what you know here and

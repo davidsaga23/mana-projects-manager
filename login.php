@@ -9,21 +9,47 @@ if (is_logged_in()) {
 }
 
 $err = null;
+if (isset($_GET['disabled'])) {
+    $err = 'That account has been switched off. Ask an administrator to switch it back on.';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $stmt = $pdo->prepare('SELECT id, username, password_hash, display_name FROM users WHERE username = ?');
     $stmt->execute([$username]);
     $user = $stmt->fetch();
+
     if ($user && password_verify($password, $user['password_hash'])) {
-        session_regenerate_id(true);
-        $_SESSION['user_id']      = $user['id'];
-        $_SESSION['username']     = $user['username'];
-        $_SESSION['display_name'] = $user['display_name'];
-        header('Location: index.php');
-        exit;
+        // Roles arrive in migration 005; before it has run, every account is
+        // simply active — checking separately keeps login working either way.
+        $active = true;
+        try {
+            $chk = $pdo->prepare('SELECT active FROM users WHERE id = ?');
+            $chk->execute([$user['id']]);
+            $active = (int)$chk->fetchColumn() === 1;
+        } catch (PDOException $e) {
+            $active = true;
+        }
+
+        if (!$active) {
+            $err = 'That account has been switched off. Ask an administrator to switch it back on.';
+        } else {
+            session_regenerate_id(true);
+            $_SESSION['user_id']      = $user['id'];
+            $_SESSION['username']     = $user['username'];
+            $_SESSION['display_name'] = $user['display_name'];
+            try {
+                $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?')->execute([$user['id']]);
+            } catch (PDOException $e) {
+                // Column arrives with migration 005 — not worth failing a login over.
+            }
+            header('Location: index.php');
+            exit;
+        }
+    } else {
+        $err = 'Wrong username or password.';
     }
-    $err = 'Wrong username or password.';
 }
 ?>
 <!doctype html>

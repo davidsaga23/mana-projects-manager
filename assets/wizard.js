@@ -68,6 +68,124 @@
   }
 })();
 
+// Live "is that enough?" check on the dates & headcount screen.
+//
+// Mirrors includes/quota.php exactly. If that maths ever changes, change it here
+// too — a check that disagrees with the review screen is worse than no check.
+(function () {
+  'use strict';
+
+  var table = document.getElementById('planning-table');
+  if (!table) return;
+  var today = table.getAttribute('data-today');
+
+  // NEVER new Date('2026-08-05') — that parses as UTC and reads back a day
+  // earlier in a UTC-6 timezone. Building from parts gives local midnight.
+  function parseDate(s) {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    var p = s.split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+
+  // Mon–Fri between two dates, both ends INCLUSIVE — the platform-wide rule.
+  function workingDays(fromStr, toStr) {
+    var d = parseDate(fromStr), end = parseDate(toStr);
+    if (!d || !end || end < d) return 0;
+    var n = 0, guard = 0;
+    while (d <= end && guard++ < 20000) {
+      var dow = d.getDay();               // 0 = Sunday, 6 = Saturday
+      if (dow !== 0 && dow !== 6) n++;
+      d.setDate(d.getDate() + 1);
+    }
+    return n;
+  }
+
+  function fmtRate(v) {
+    if (v >= 10) return v.toFixed(0);
+    if (v >= 1) return v.toFixed(1);
+    return v.toFixed(2);
+  }
+
+  function trimNum(v) {
+    return parseFloat(v.toFixed(2)).toString();
+  }
+
+  function recalc(row) {
+    var cell = row.querySelector('.verdict');
+    if (!cell) return;
+
+    var units = parseFloat(row.getAttribute('data-units')) || 0;
+    var label = row.getAttribute('data-label') || 'items';
+    var estimated = row.getAttribute('data-estimated') === '1';
+    // Found by field name rather than position — adding a column shouldn't
+    // silently start reading the wrong value.
+    function field(prefix) {
+      return row.querySelector('input[name^="' + prefix + '["]');
+    }
+    var startEl = field('start_date'), deadlineEl = field('deadline');
+    var perUnitEl = field('days_per_unit'), headEl = field('planned_headcount');
+
+    var start = startEl ? startEl.value : '';
+    var deadline = deadlineEl ? deadlineEl.value : '';
+    var perUnit = parseFloat(perUnitEl ? perUnitEl.value : '') || 0;
+    var headRaw = headEl ? headEl.value.trim() : '';
+    var head = headRaw === '' ? null : (parseFloat(headRaw) || 0);
+
+    function say(html, cls) {
+      cell.innerHTML = html;
+      cell.className = 'verdict' + (cls ? ' ' + cls : '');
+    }
+
+    if (units <= 0)  return say('<span class="muted">nothing to schedule yet</span>');
+    if (!deadline)   return say('<span class="muted">set a deadline</span>');
+
+    var from = (start && start > today) ? start : today;
+    if (deadline < from) return say('<span class="warn-text">deadline has passed</span>');
+
+    var days = workingDays(from, deadline);
+    if (days <= 0) return say('<span class="warn-text">no working days left</span>');
+
+    var teamPerDay = units / days;
+    var required = teamPerDay * (perUnit > 0 ? perUnit : 1);
+    var needed = Math.ceil(required);
+
+    var line1, cls = '';
+    if (head === null || head <= 0) {
+      line1 = 'needs about <strong>' + needed + '</strong> ' + (needed === 1 ? 'person' : 'people');
+    } else if (required > head + 0.0001) {
+      line1 = '<strong>' + needed + '</strong> needed, ' + trimNum(head) + ' planned';
+      cls = 'verdict-short';
+    } else {
+      line1 = '<strong>' + trimNum(head) + '</strong> is enough (needs ' + fmtRate(required) + ')';
+      cls = 'verdict-ok';
+    }
+
+    var line2 = fmtRate(teamPerDay) + ' ' + label + '/day across the team · ' + days + ' working days';
+    if (head !== null && head > 0) {
+      line2 = fmtRate(teamPerDay / head) + ' ' + label + '/day each · ' + line2;
+    }
+    if (estimated) line2 += ' · from the pre-production estimate';
+
+    say(line1 + '<br><span class="muted small">' + line2 + '</span>', cls);
+  }
+
+  function recalcAll() {
+    var rows = table.querySelectorAll('tbody tr');
+    for (var i = 0; i < rows.length; i++) recalc(rows[i]);
+  }
+
+  table.addEventListener('input', function (e) {
+    var row = e.target.closest('tr');
+    if (row) recalc(row);
+  });
+  table.addEventListener('change', function (e) {
+    var row = e.target.closest('tr');
+    if (row) recalc(row);
+  });
+
+  recalcAll();
+})();
+
 // "Select all" in an asset group — retyping fifty pasted assets shouldn't mean
 // fifty clicks. Each toggle names the container it controls.
 (function () {

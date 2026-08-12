@@ -61,9 +61,93 @@ function is_logged_in(): bool {
     return !empty($_SESSION['user_id']);
 }
 
+/**
+ * The logged-in user, read fresh from the database once per request.
+ *
+ * Deliberately not cached in the session: a role change or a deactivation must
+ * take effect on the user's very next page view, not whenever they next happen
+ * to log out. One small query per request is a fair price for that.
+ *
+ * Returns null when nobody is logged in or the account has since been deleted.
+ */
+function current_user(): ?array {
+    static $user = null;
+    static $loaded = false;
+    if ($loaded) return $user;
+    $loaded = true;
+
+    if (empty($_SESSION['user_id'])) return null;
+    global $pdo;
+    if (!($pdo instanceof PDO)) return null;
+
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT id, username, display_name, role, active FROM users WHERE id = ?'
+        );
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch() ?: null;
+    } catch (PDOException $e) {
+        // Roles arrive in migration 005. Before it has run those columns don't
+        // exist, and locking everyone out of a working site over a pending
+        // migration would be far worse than the missing feature — so fall back
+        // to the previous behaviour: everyone who can log in is an admin.
+        $stmt = $pdo->prepare('SELECT id, username, display_name FROM users WHERE id = ?');
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch() ?: null;
+        if ($user) { $user['role'] = 'admin'; $user['active'] = 1; }
+    }
+    return $user;
+}
+
+function user_role(): string {
+    $u = current_user();
+    return $u['role'] ?? 'viewer';
+}
+
+function is_admin(): bool {
+    return user_role() === 'admin';
+}
+
+/** Can this account change anything at all? */
+function can_edit(): bool {
+    return in_array(user_role(), ['admin', 'editor'], true);
+}
+
 function require_login(): void {
     if (!is_logged_in()) {
         header('Location: login.php');
+        exit;
+    }
+
+    $user = current_user();
+    if (!$user || (int)($user['active'] ?? 1) !== 1) {
+        // Deleted or deactivated while logged in.
+        $_SESSION = [];
+        session_destroy();
+        header('Location: login.php?disabled=1');
+        exit;
+    }
+
+    // Read-only is enforced HERE rather than page by page, so a screen added
+    // later is covered without anyone remembering to add a check. Every write in
+    // this app is a POST, so refusing POSTs is the whole of it.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !can_edit()) {
+        if (function_exists('flash')) {
+            flash('err', 'Your account has view-only access, so that change was not saved.');
+        }
+        header('Location: ' . ($_SERVER['REQUEST_URI'] ?? 'index.php'));
+        exit;
+    }
+}
+
+/** For pages only an admin may open. */
+function require_admin(): void {
+    require_login();
+    if (!is_admin()) {
+        if (function_exists('flash')) {
+            flash('err', 'That screen is for administrators only.');
+        }
+        header('Location: index.php');
         exit;
     }
 }
@@ -76,6 +160,12 @@ function require_login_json(): void {
         http_response_code(401);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => 'Your session has expired. Please reload the page and log in again.']);
+        exit;
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !can_edit()) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => 'Your account has view-only access.']);
         exit;
     }
 }
