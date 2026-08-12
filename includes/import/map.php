@@ -87,17 +87,20 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
         <select name="step_val[<?= $si ?>]">
           <option value="0">— skip these rows —</option>
           <?php foreach ($analysis['project_steps'] as $ps): ?>
+            <?php // Whole-project steps have no shot or asset to attach to, so a
+                  // subitem could never belong to one. Leaving them out prevents
+                  // a mapping that would silently produce nothing.
+                  if ($ps['applies_to'] === 'project') continue; ?>
             <option value="<?= (int)$ps['id'] ?>" <?= $s['step_id'] === (int)$ps['id'] ? 'selected' : '' ?>>
               <?= e($ps['name']) ?>
+              <?php if (!empty($ps['applies_to_asset_type'])): ?>· <?= e($ps['applies_to_asset_type']) ?><?php endif; ?>
             </option>
           <?php endforeach; ?>
           <option value="new">+ create a step called "<?= e($s['external']) ?>"</option>
         </select>
         <?php if ($s['step_id'] === null): ?>
           <select name="step_applies[<?= $si ?>]" title="Only used if you create the step">
-            <option value="shot">for shots</option>
-            <option value="asset">for assets</option>
-            <option value="both">for both</option>
+            <?= applies_to_options('shot', asset_types($pdo)) ?>
           </select>
         <?php endif; ?>
       </td>

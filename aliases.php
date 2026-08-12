@@ -118,8 +118,8 @@ $pageTitle = 'Names & aliases · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
+<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
 <h2 class="wizard-title">Names &amp; aliases <span class="muted">· <?= e($project['name']) ?></span></h2>
-<p><a href="project.php?id=<?= $projectId ?>">← Back to the project</a></p>
 
 <?php if (!$unmatched && !$unmapped): ?>
   <div class="flash flash-ok">Everything imported so far matched something here. Nothing needs attention.</div>

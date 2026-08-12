@@ -84,7 +84,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
         <td class="wf-name">
           <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?>
         </td>
-        <td class="muted"><?= $s['applies_to'] === 'both' ? 'shots and assets' : e($s['applies_to']) . 's' ?></td>
+        <td class="muted"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?></td>
         <td class="muted"><?= e(describe_dependencies($s, $depsMap, $stepsById)) ?></td>
         <td class="muted">
           <?= e($s['start_date'] ?: '—') ?> → <?= e($s['deadline'] ?: '—') ?>
@@ -108,6 +108,9 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
           <span class="dot" style="background:<?= e($q['step']['color'] ?: '#ccc') ?>"></span><?= e($q['step']['name']) ?>
         </td>
         <td><?= fmt_rate((float)$q['units']) ?> <span class="muted"><?= e($q['unit_label']) ?></span>
+          <?php if (($q['coverage'] ?? 1) < 1): ?>
+            <span class="muted small">(<?= (int)round(($q['coverage'] ?? 1) * 100) ?>% of <?= fmt_rate((float)$q['units_raw']) ?>)</span>
+          <?php endif; ?>
           <?php if (!empty($q['estimated'])): ?>
             <span class="est-tag" title="From the early estimate on the Basics screen — no breakdown exists yet">est.</span>
           <?php endif; ?>

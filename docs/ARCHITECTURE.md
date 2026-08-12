@@ -1,4 +1,4 @@
-# Mana Production Platform — Architecture
+# Anima — Architecture
 
 Draft v1 · 2026-08-11 · **proposal, not yet built**
 

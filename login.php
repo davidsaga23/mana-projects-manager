@@ -55,12 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Login · Mana Production Platform</title>
+<title>Login · Anima</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body class="login-page">
 <div class="login-box">
-  <h1>Mana Production Platform</h1>
+  <h1>Anima</h1>
   <?php if ($err): ?><p class="err"><?= e($err) ?></p><?php endif; ?>
   <form method="post">
     <label>Username <input name="username" required autofocus></label>

@@ -11,16 +11,12 @@
 // bulk for a batch pasted wrongly. Pasting is easy to get slightly wrong, so
 // correcting it has to be easier than deleting and starting over.
 
-/** Type choices: built-in starters plus everything already used anywhere. */
+/**
+ * Type choices. Shares asset_types() with the pipeline screen deliberately: a
+ * step can be scoped to "Character assets", so the two lists must never diverge.
+ */
 function wizard_asset_types(PDO $pdo): array {
-    $defaults = ['Character', 'Environment', 'Prop', 'Vehicle', 'FX'];
-    $used = $pdo->query(
-        "SELECT DISTINCT asset_type FROM assets
-          WHERE asset_type IS NOT NULL AND asset_type <> ''"
-    )->fetchAll(PDO::FETCH_COLUMN);
-    $all = array_unique(array_merge($defaults, $used));
-    natcasesort($all);
-    return array_values($all);
+    return asset_types($pdo);
 }
 
 /** Render <option> tags for a type dropdown. */

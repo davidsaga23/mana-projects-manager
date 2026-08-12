@@ -22,15 +22,22 @@ if (!$project) {
 $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 $assetCount = (int)$pdo->query("SELECT COUNT(*) FROM assets WHERE project_id = $projectId")->fetchColumn();
 
+$assetTypeCounts = [];
 $stmt = $pdo->prepare(
-    'SELECT ps.id, ps.name, ps.applies_to, ps.color, ps.deadline,
+    "SELECT COALESCE(asset_type, '') AS t, COUNT(*) AS n FROM assets WHERE project_id = ? GROUP BY asset_type"
+);
+$stmt->execute([$projectId]);
+foreach ($stmt as $row) $assetTypeCounts[$row['t']] = (int)$row['n'];
+
+$stmt = $pdo->prepare(
+    'SELECT ps.id, ps.name, ps.applies_to, ps.applies_to_asset_type, ps.color, ps.deadline,
             COUNT(pr.id)              AS tracked,
             COALESCE(SUM(pr.is_delivered), 0) AS delivered,
             COALESCE(SUM(pr.is_approved), 0)  AS approved
        FROM pipeline_steps ps
        LEFT JOIN progress pr ON pr.step_id = ps.id
       WHERE ps.project_id = ?
-      GROUP BY ps.id, ps.name, ps.applies_to, ps.color, ps.deadline, ps.step_order
+      GROUP BY ps.id, ps.name, ps.applies_to, ps.applies_to_asset_type, ps.color, ps.deadline, ps.step_order
       ORDER BY ps.step_order, ps.id'
 );
 $stmt->execute([$projectId]);
@@ -50,6 +57,8 @@ $unmappedStatuses = count(unmapped_statuses($pdo, $projectId));
 $pageTitle = $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
+
+<p class="crumb"><a href="index.php">← All projects</a></p>
 
 <h2 class="wizard-title">
   <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
@@ -114,13 +123,24 @@ require __DIR__ . '/includes/header.php';
   <table class="review-table">
     <tr><th>Step</th><th>Applies to</th><th>Tracked</th><th>Delivered</th><th>Approved</th><th>Deadline</th></tr>
     <?php foreach ($steps as $s):
-      $applicable = 0;
-      if (in_array($s['applies_to'], ['shot','both'], true))  $applicable += $shotCount;
-      if (in_array($s['applies_to'], ['asset','both'], true)) $applicable += $assetCount;
+      // A whole-project step is one deliverable; a type-scoped step counts only
+      // the assets of that type, never all of them.
+      $type = $s['applies_to_asset_type'] ?? null;
+      if ($s['applies_to'] === 'project') {
+          $applicable = 1;
+      } else {
+          $applicable = 0;
+          if (in_array($s['applies_to'], ['shot','both'], true))  $applicable += $shotCount;
+          if (in_array($s['applies_to'], ['asset','both'], true)) {
+              $applicable += ($type !== null && $type !== '')
+                  ? ($assetTypeCounts[$type] ?? 0)
+                  : $assetCount;
+          }
+      }
     ?>
     <tr>
       <td class="wf-name"><span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?></td>
-      <td class="muted"><?= $s['applies_to'] === 'both' ? 'shots and assets' : e($s['applies_to']) . 's' ?></td>
+      <td class="muted"><?= e(applies_to_phrase($s['applies_to'], $type)) ?></td>
       <td><?= (int)$s['tracked'] ?> <span class="muted">of <?= $applicable ?></span></td>
       <td><?= (int)$s['delivered'] ?></td>
       <td><strong><?= (int)$s['approved'] ?></strong></td>

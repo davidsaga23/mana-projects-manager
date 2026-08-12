@@ -17,7 +17,8 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
     foreach (pipeline_steps($pdo, $projectId) as $s) $existing[(int)$s['id']] = $s;
 
     $upd = $pdo->prepare(
-        'UPDATE pipeline_steps SET name = ?, applies_to = ?, tracks_seconds = ?, color = ?
+        'UPDATE pipeline_steps
+            SET name = ?, applies_to = ?, applies_to_asset_type = ?, tracks_seconds = ?, color = ?
           WHERE id = ? AND project_id = ?'
     );
     $changed = 0;
@@ -29,18 +30,20 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
             flash('warn', 'A step was left with a blank name, so its old name was kept.');
             continue;
         }
-        $appliesTo = $_POST['applies_to'][$id] ?? $existing[$id]['applies_to'];
-        if (!in_array($appliesTo, ['shot','asset','both'], true)) $appliesTo = 'shot';
+        $before = $existing[$id];
+        $rawApplies = $_POST['applies_to'][$id]
+            ?? applies_to_value($before['applies_to'], $before['applies_to_asset_type'] ?? null);
+        [$appliesTo, $assetType] = parse_applies_to($rawApplies);
         $tracks = !empty($_POST['tracks_seconds'][$id]) ? 1 : 0;
         $color  = trim($_POST['color'][$id] ?? '') ?: null;
 
-        $before = $existing[$id];
         if ($before['name'] === $name && $before['applies_to'] === $appliesTo
+            && ($before['applies_to_asset_type'] ?? null) === $assetType
             && (int)$before['tracks_seconds'] === $tracks && ($before['color'] ?? '') === ($color ?? '')) {
             continue;
         }
         try {
-            $upd->execute([$name, $appliesTo, $tracks, $color, $id, $projectId]);
+            $upd->execute([$name, $appliesTo, $assetType, $tracks, $color, $id, $projectId]);
             $changed++;
         } catch (PDOException $e) {
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
@@ -73,8 +76,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     if ($action === 'add') {
         $name = trim($_POST['new_name'] ?? '');
         if ($name === '') throw new RuntimeException('Give the new step a name.');
-        $appliesTo = $_POST['new_applies_to'] ?? 'shot';
-        if (!in_array($appliesTo, ['shot','asset','both'], true)) $appliesTo = 'shot';
+        [$appliesTo, $assetType] = parse_applies_to($_POST['new_applies_to'] ?? 'shot');
         $tracks = !empty($_POST['new_tracks_seconds']) ? 1 : 0;
 
         $max = $pdo->prepare('SELECT COALESCE(MAX(step_order), 0) FROM pipeline_steps WHERE project_id = ?');
@@ -83,10 +85,11 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 
         try {
             $ins = $pdo->prepare(
-                'INSERT INTO pipeline_steps (project_id, name, step_order, tracks_seconds, applies_to)
-                 VALUES (?, ?, ?, ?, ?)'
+                'INSERT INTO pipeline_steps
+                    (project_id, name, step_order, tracks_seconds, applies_to, applies_to_asset_type)
+                 VALUES (?, ?, ?, ?, ?, ?)'
             );
-            $ins->execute([$projectId, $name, $order, $tracks, $appliesTo]);
+            $ins->execute([$projectId, $name, $order, $tracks, $appliesTo, $assetType]);
         } catch (PDOException $e) {
             throw new RuntimeException('This project already has a step called "' . $name . '".');
         }
@@ -94,6 +97,18 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         step_library_remember($pdo, $name, $appliesTo, $tracks);
         flash('ok', 'Added the step "' . $name . '" at the end of the pipeline. ' .
                     'It will be suggested on future projects too.');
+        return wizard_url($projectId, 2);
+    }
+
+    if ($action === 'save_template') {
+        // Save the edits first, so the template captures what's on screen rather
+        // than what was last written.
+        wizard_pipeline_apply_edits($pdo, $projectId);
+        $name = trim($_POST['template_name'] ?? '');
+        $type = $_POST['template_type'] ?? $project['type'];
+        $n = create_template_from_project($pdo, $projectId, $name, $type);
+        flash('ok', "Saved this pipeline as the template \"$name\" — $n step" . ($n === 1 ? '' : 's') .
+                    ', including which of them run in parallel. It will be offered on new projects.');
         return wizard_url($projectId, 2);
     }
 
@@ -124,7 +139,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         // the order. Moving a step can therefore change which steps run together.
         $depsBefore = step_dependencies_map($pdo, $projectId);
         $hadParallel = false;
-        foreach (['shot', 'asset'] as $kind) {
+        foreach (PIPELINE_CHAINS as $kind) {
             $chain = chain_steps(pipeline_steps($pdo, $projectId), $kind);
             if (array_filter(derive_parallel_flags($chain, $depsBefore))) $hadParallel = true;
         }
@@ -186,6 +201,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     $projectId = (int)$project['id'];
     $steps = pipeline_steps($pdo, $projectId);
+    $assetTypes = asset_types($pdo);
 
     if (!$steps) {
         $tpl = $pdo->prepare(
@@ -226,6 +242,12 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     ?>
     <p class="lead">These are the stages work passes through. The order here is just for
        reading; which steps wait for which is set on the next screen.</p>
+    <p class="muted small">
+      <strong>Applies to</strong> decides what a step is counted against. <em>Both</em> is for
+      work that passes over shots <em>and</em> assets — 2D colour, where characters and shots
+      are both coloured. <em>The whole project</em> is for one-off deliverables like an
+      animatic, a music track or the final mix, which belong to no particular shot.
+    </p>
 
     <form method="post">
       <?php /* First submit button in the form is the one Enter triggers — make that
@@ -251,11 +273,9 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
           </td>
           <td><input name="name[<?= $id ?>]" value="<?= e($s['name']) ?>"></td>
           <td>
-            <select name="applies_to[<?= $id ?>]">
-              <option value="shot"  <?= $s['applies_to']==='shot'  ? 'selected':'' ?>>Shots</option>
-              <option value="asset" <?= $s['applies_to']==='asset' ? 'selected':'' ?>>Assets</option>
-              <option value="both"  <?= $s['applies_to']==='both'  ? 'selected':'' ?>>Both</option>
-            </select>
+            <select name="applies_to[<?= $id ?>]"><?=
+              applies_to_options(applies_to_value($s['applies_to'], $s['applies_to_asset_type'] ?? null), $assetTypes)
+            ?></select>
           </td>
           <td>
             <input type="hidden" name="tracks_seconds[<?= $id ?>]" value="0">
@@ -309,16 +329,27 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
               ? ' label="used before"' : '' ?>></option>
         <?php endforeach; ?>
       </datalist>
-      <select name="new_applies_to" id="new-step-applies-to">
-        <option value="shot">Shots</option>
-        <option value="asset">Assets</option>
-        <option value="both">Both</option>
-      </select>
+      <select name="new_applies_to" id="new-step-applies-to"><?= applies_to_options('shot', $assetTypes) ?></select>
       <label class="inline">
         <input type="checkbox" name="new_tracks_seconds" id="new-step-seconds" value="1"> measured in seconds
       </label>
       <button type="submit" class="secondary">Add</button>
     </form>
+    <form method="post" class="add-row">
+      <input type="hidden" name="action" value="save_template">
+      <strong>Save this pipeline as a template</strong>
+      <input name="template_name" placeholder="e.g. 3D — Mana house pipeline" required size="30">
+      <select name="template_type">
+        <?php foreach (['2D','3D','Mixed','Other'] as $t): ?>
+          <option value="<?= $t ?>" <?= $project['type'] === $t ? 'selected' : '' ?>>for <?= $t ?> projects</option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit" class="secondary">Save as template</button>
+      <small>Saves the steps, their settings and which of them run in parallel — but not
+             dates or headcount, which belong to this project alone. New projects will be
+             offered it alongside the built-in templates.</small>
+    </form>
+
     <?php if ($library): ?>
       <p class="muted small">Start typing to see <?= count($library) ?> step
          <?= count($library) === 1 ? 'name' : 'names' ?> used on other projects — picking one

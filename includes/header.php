@@ -1,17 +1,17 @@
 <?php
 // Shared page chrome. Set $pageTitle before including.
-$pageTitle = $pageTitle ?? 'Mana Production Platform';
+$pageTitle = $pageTitle ?? 'Anima';
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($pageTitle) ?> · Mana Production Platform</title>
+<title><?= e($pageTitle) ?> · Anima</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <h1><a href="index.php">Mana Production Platform</a></h1>
+    <h1><a href="index.php">Anima</a></h1>
     <div class="topbar-right">
       <span><?= e(current_user_display()) ?></span>
       <?php if (!can_edit()): ?><span class="role-badge">view only</span><?php endif; ?>

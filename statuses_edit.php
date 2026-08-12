@@ -129,8 +129,8 @@ $pageTitle = 'Statuses · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
+<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
 <h2 class="wizard-title">Statuses <span class="muted">· <?= e($project['name']) ?></span></h2>
-<p><a href="project.php?id=<?= $projectId ?>">← Back to the project</a></p>
 
 <p class="lead">Call a state whatever your team calls it. <strong>Counts as</strong> is what
    reporting reads, so the numbers keep working whatever the names are.</p>

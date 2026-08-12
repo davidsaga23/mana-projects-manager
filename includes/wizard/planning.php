@@ -31,7 +31,7 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $upd = $pdo->prepare('UPDATE pipeline_steps SET start_date = ?, deadline = ? WHERE id = ? AND project_id = ?');
 
         $touched = 0;
-        foreach (['shot', 'asset'] as $kind) {
+        foreach (PIPELINE_CHAINS as $kind) {
             $chain = chain_steps($steps, $kind);
             if (!$chain) continue;
             $clusters = sequential_clusters($chain, $depsMap);
@@ -53,7 +53,8 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
 
     $steps = pipeline_steps($pdo, $projectId);
     $upd = $pdo->prepare(
-        'UPDATE pipeline_steps SET start_date = ?, deadline = ?, days_per_unit = ?, planned_headcount = ?
+        'UPDATE pipeline_steps
+            SET start_date = ?, deadline = ?, days_per_unit = ?, coverage_pct = ?, planned_headcount = ?
           WHERE id = ? AND project_id = ?'
     );
     $saved = 0; $warnings = [];
@@ -62,6 +63,10 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $start    = trim($_POST['start_date'][$id] ?? '') ?: null;
         $deadline = trim($_POST['deadline'][$id] ?? '') ?: null;
         $dpu      = (float)($_POST['days_per_unit'][$id] ?? 1);
+        // A whole-project step has no coverage input, so it keeps whatever it has.
+        $coverage = isset($_POST['coverage_pct'][$id])
+            ? min(100, max(0, (float)$_POST['coverage_pct'][$id]))
+            : (float)($s['coverage_pct'] ?? 100);
         $headRaw  = trim($_POST['planned_headcount'][$id] ?? '');
         // Fractional on purpose: someone splitting a week across two shows is 0.5.
         $head     = $headRaw === '' ? null : max(0, (float)$headRaw);
@@ -74,7 +79,7 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         if ($deadline && $project['delivery_date'] && $deadline > $project['delivery_date']) {
             $warnings[] = $s['name'] . ': the deadline is after the project delivery date.';
         }
-        $upd->execute([$start, $deadline, $dpu, $head, $id, $projectId]);
+        $upd->execute([$start, $deadline, $dpu, $coverage, $head, $id, $projectId]);
         $saved++;
     }
 
@@ -120,7 +125,9 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>">
         <thead>
         <tr>
-          <th>Step</th><th>Starts</th><th>Deadline</th>
+          <th>Step</th>
+          <th title="How much of its scope this step actually touches. FX might only land on a third of the running time.">Covers</th>
+          <th>Starts</th><th>Deadline</th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
           <th>Is that enough?</th>
@@ -129,13 +136,29 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         <tbody>
         <?php foreach ($steps as $s): $id = (int)$s['id'];
               $work = step_work_units($pdo, $projectId, $s, $estimates); ?>
-        <tr data-units="<?= e(fmt_num($work['units'], 3)) ?>"
+        <?php
+        // data-units is the FULL scope; coverage is applied by the live check
+        // from the input beside it, so the two never double up. Keep the closing
+        // tag on its own line: a closing PHP tag written inside a one-line
+        // comment still ends PHP mode (lesson 9 in START_HERE).
+        ?>
+        <tr data-units="<?= e(fmt_num($work['units_raw'] ?? $work['units'], 3)) ?>"
             data-label="<?= e($work['label']) ?>"
             data-estimated="<?= !empty($work['estimated']) ? '1' : '0' ?>">
           <td class="wf-name">
             <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span>
             <?= e($s['name']) ?>
-            <span class="muted small"><?= $s['tracks_seconds'] ? ' · seconds' : '' ?></span>
+            <span class="muted small"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?><?= $s['tracks_seconds'] ? ' · seconds' : '' ?></span>
+          </td>
+          <td>
+            <?php if ($s['applies_to'] === 'project'): ?>
+              <span class="muted">—</span>
+            <?php else: ?>
+              <span class="pct-field">
+                <input type="number" name="coverage_pct[<?= $id ?>]" min="0" max="100" step="any"
+                       value="<?= e(fmt_num($s['coverage_pct'] ?? 100)) ?>">%
+              </span>
+            <?php endif; ?>
           </td>
           <td><input type="date" name="start_date[<?= $id ?>]" value="<?= e($s['start_date'] ?? '') ?>"></td>
           <td><input type="date" name="deadline[<?= $id ?>]" value="<?= e($s['deadline'] ?? '') ?>"></td>

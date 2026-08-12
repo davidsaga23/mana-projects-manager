@@ -1,4 +1,4 @@
-/* Mana Production Platform — base styles. Kept small; grows with the UI phases. */
+/* Anima — base styles. Kept small; grows with the UI phases. */
 
 * { box-sizing: border-box; }
 body {
@@ -93,6 +93,9 @@ label.inline input { width: auto; }
 .flash-err  { background: #fdf0f1; border-color: #b02a37; color: #8f222c; }
 
 /* ---------------------------------------------------------------- wizard */
+.crumb { margin: 0 0 6px; font-size: 13px; }
+.crumb a { color: #5a6a7a; }
+.crumb a:hover { color: #2f6fb2; }
 .wizard-title { font-size: 20px; margin: 4px 0 14px; }
 .wizard-nav {
   list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
@@ -220,6 +223,8 @@ label.inline input { width: auto; }
 .hub-card strong { display: block; margin-bottom: 4px; }
 .hub-card span { font-size: 12.5px; }
 
+.pct-field { white-space: nowrap; color: #5a6a7a; font-size: 13px; }
+.pct-field input { width: 62px; padding: 5px 6px; font-size: 14px; margin-right: 2px; }
 .planning-table .verdict { font-size: 13px; line-height: 1.45; min-width: 260px; }
 .planning-table .verdict-short { background: #fdf0f1; color: #8f222c; }
 .planning-table .verdict-ok    { background: #f0faf2; color: #1a5c28; }

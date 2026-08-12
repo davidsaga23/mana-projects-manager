@@ -38,12 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Install · Mana Production Platform</title>
+<title>Install · Anima</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body class="login-page">
 <div class="login-box">
-  <h1>Mana Production Platform · Installer</h1>
+  <h1>Anima · Installer</h1>
   <?php if ($done): ?>
     <p class="ok">✓ Admin user created.</p>
     <p><strong>Now delete <code>install.php</code> from the server for security.</strong></p>

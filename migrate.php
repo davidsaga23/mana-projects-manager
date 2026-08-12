@@ -93,7 +93,7 @@ $pendingCount = count(array_filter($results, function ($r) { return $r[1] === 'p
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Migrations · Mana Production Platform</title>
+<title>Migrations · Anima</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>

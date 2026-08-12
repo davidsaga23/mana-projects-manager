@@ -40,8 +40,22 @@ function project_estimates(PDO $pdo, int $projectId): array {
  */
 function step_work_units(PDO $pdo, int $projectId, array $step, ?array $estimates = null): array {
     $estimates = $estimates ?? project_estimates($pdo, $projectId);
+    // How much of its scope this step actually touches — FX on a third of the
+    // running time, concept skipped for character variations.
+    $coverage = (float)($step['coverage_pct'] ?? 100) / 100;
+    if ($coverage <= 0) $coverage = 0.0;
+
+    // One deliverable for the whole show — an animatic, a music track, the final
+    // mix. Never multiplied by the shot count, and coverage doesn't apply: half
+    // an animatic isn't a thing.
+    if (($step['applies_to'] ?? '') === 'project') {
+        return ['units' => 1.0, 'units_raw' => 1.0, 'coverage' => 1.0,
+                'label' => 'deliverable', 'estimated' => false];
+    }
+
     $appliesToShots  = in_array($step['applies_to'], ['shot', 'both'], true);
     $appliesToAssets = in_array($step['applies_to'], ['asset', 'both'], true);
+    $assetType = $step['applies_to_asset_type'] ?? null;
 
     if ($step['tracks_seconds'] && $appliesToShots) {
         $stmt = $pdo->prepare(
@@ -49,8 +63,12 @@ function step_work_units(PDO $pdo, int $projectId, array $step, ?array $estimate
         );
         $stmt->execute([$projectId]);
         $seconds = (float)$stmt->fetchColumn();
-        if ($seconds > 0) return ['units' => $seconds, 'label' => 'seconds', 'estimated' => false];
-        return ['units' => $estimates['seconds'], 'label' => 'seconds', 'estimated' => $estimates['seconds'] > 0];
+        if ($seconds > 0) {
+            return ['units' => $seconds * $coverage, 'units_raw' => $seconds,
+                    'coverage' => $coverage, 'label' => 'seconds', 'estimated' => false];
+        }
+        return ['units' => $estimates['seconds'] * $coverage, 'units_raw' => $estimates['seconds'],
+                'coverage' => $coverage, 'label' => 'seconds', 'estimated' => $estimates['seconds'] > 0];
     }
 
     $units = 0.0; $estimated = 0.0;
@@ -61,16 +79,31 @@ function step_work_units(PDO $pdo, int $projectId, array $step, ?array $estimate
         $estimated += $estimates['shots'];
     }
     if ($appliesToAssets) {
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE project_id = ?');
-        $stmt->execute([$projectId]);
+        // A step scoped to one kind of asset counts only those: rigging is
+        // character work, and counting all 55 assets would plan for four times
+        // the work that exists.
+        if ($assetType !== null && $assetType !== '') {
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE project_id = ? AND asset_type = ?');
+            $stmt->execute([$projectId, $assetType]);
+        } else {
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE project_id = ?');
+            $stmt->execute([$projectId]);
+        }
         $units += (float)$stmt->fetchColumn();
-        $estimated += $estimates['assets'];
+        // The project-level estimate can't be split by type, so it only stands
+        // in for a step covering every asset.
+        if ($assetType === null || $assetType === '') $estimated += $estimates['assets'];
     }
     $label = $appliesToShots && $appliesToAssets ? 'items'
-           : ($appliesToShots ? 'shots' : 'assets');
+           : ($appliesToShots ? 'shots'
+           : (($assetType !== null && $assetType !== '') ? $assetType . ' assets' : 'assets'));
 
-    if ($units > 0) return ['units' => $units, 'label' => $label, 'estimated' => false];
-    return ['units' => $estimated, 'label' => $label, 'estimated' => $estimated > 0];
+    if ($units > 0) {
+        return ['units' => $units * $coverage, 'units_raw' => $units,
+                'coverage' => $coverage, 'label' => $label, 'estimated' => false];
+    }
+    return ['units' => $estimated * $coverage, 'units_raw' => $estimated,
+            'coverage' => $coverage, 'label' => $label, 'estimated' => $estimated > 0];
 }
 
 /**
@@ -94,6 +127,8 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
     $out = [
         'step'              => $step,
         'units'             => $work['units'],
+        'units_raw'         => $work['units_raw'] ?? $work['units'],
+        'coverage'          => $work['coverage'] ?? 1.0,
         'unit_label'        => $work['label'],
         'estimated'         => $work['estimated'],
         'working_days'      => null,

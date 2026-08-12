@@ -114,7 +114,7 @@
     var cell = row.querySelector('.verdict');
     if (!cell) return;
 
-    var units = parseFloat(row.getAttribute('data-units')) || 0;
+    var unitsRaw = parseFloat(row.getAttribute('data-units')) || 0;
     var label = row.getAttribute('data-label') || 'items';
     var estimated = row.getAttribute('data-estimated') === '1';
     // Found by field name rather than position — adding a column shouldn't
@@ -124,6 +124,7 @@
     }
     var startEl = field('start_date'), deadlineEl = field('deadline');
     var perUnitEl = field('days_per_unit'), headEl = field('planned_headcount');
+    var coverageEl = field('coverage_pct');
 
     var start = startEl ? startEl.value : '';
     var deadline = deadlineEl ? deadlineEl.value : '';
@@ -131,11 +132,18 @@
     var headRaw = headEl ? headEl.value.trim() : '';
     var head = headRaw === '' ? null : (parseFloat(headRaw) || 0);
 
+    // Coverage is applied here, not baked into data-units, so moving the slider
+    // updates the answer without a round trip. Matches step_work_units() in PHP.
+    var coverage = coverageEl ? (parseFloat(coverageEl.value) || 0) / 100 : 1;
+    if (coverage < 0) coverage = 0;
+    var units = unitsRaw * coverage;
+
     function say(html, cls) {
       cell.innerHTML = html;
       cell.className = 'verdict' + (cls ? ' ' + cls : '');
     }
 
+    if (unitsRaw > 0 && units <= 0) return say('<span class="muted">covers 0% — nothing to do</span>');
     if (units <= 0)  return say('<span class="muted">nothing to schedule yet</span>');
     if (!deadline)   return say('<span class="muted">set a deadline</span>');
 
@@ -160,10 +168,13 @@
       cls = 'verdict-ok';
     }
 
-    var line2 = fmtRate(teamPerDay) + ' ' + label + '/day across the team · ' + days + ' working days';
+    var line2 = fmtRate(units) + ' ' + label + ' over ' + days + ' working days';
     if (head !== null && head > 0) {
       line2 = fmtRate(teamPerDay / head) + ' ' + label + '/day each · ' + line2;
+    } else {
+      line2 = fmtRate(teamPerDay) + ' ' + label + '/day · ' + line2;
     }
+    if (coverage < 1) line2 += ' · ' + Math.round(coverage * 100) + '% of ' + fmtRate(unitsRaw);
     if (estimated) line2 += ' · from the pre-production estimate';
 
     say(line1 + '<br><span class="muted small">' + line2 + '</span>', cls);

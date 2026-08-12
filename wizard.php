@@ -114,6 +114,14 @@ $pageTitle = $project ? 'Setup · ' . $project['name'] : 'New project';
 require __DIR__ . '/includes/header.php';
 ?>
 
+<p class="crumb">
+  <?php if ($project): ?>
+    <a href="project.php?id=<?= (int)$project['id'] ?>">← Back to <?= e($project['name']) ?></a>
+  <?php else: ?>
+    <a href="index.php">← All projects</a>
+  <?php endif; ?>
+</p>
+
 <h2 class="wizard-title">
   <?= $project ? e($project['name']) . ' <span class="muted">(' . e($project['code']) . ')</span>' : 'New project' ?>
 </h2>

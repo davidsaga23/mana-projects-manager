@@ -31,16 +31,113 @@ function step_dependencies_map(PDO $pdo, int $projectId): array {
     return $map;
 }
 
+/** The chains a project's workflow is derived over, in the order they're shown. */
+const PIPELINE_CHAINS = ['shot', 'asset', 'project'];
+
+/**
+ * What a step applies to, in words. Defined once so the four categories cannot
+ * drift apart between the wizard, the importer and the review screens.
+ *
+ * 'both' is the 2D colouring case: colour passes over characters AND over shots,
+ * so the step genuinely belongs to both chains.
+ * 'project' is the animatic / music / final mix case: one deliverable for the
+ * whole show, attached to no shot and no asset.
+ */
+const APPLIES_TO_LABELS = [
+    'shot'    => 'Shots',
+    'asset'   => 'Assets',
+    'both'    => 'Both shots and assets',
+    'project' => 'The whole project',
+];
+
+/**
+ * Asset types that can be picked from: five sensible starters plus every type
+ * actually in use anywhere. Built from data so adding a kind of asset never
+ * needs a code change — but the starters mean the list is useful on a brand new
+ * project that has no assets yet, which is the normal case at setup time.
+ */
+function asset_types(PDO $pdo): array {
+    $defaults = ['Character', 'Environment', 'Prop', 'Vehicle', 'FX'];
+    $used = $pdo->query(
+        "SELECT DISTINCT asset_type FROM assets WHERE asset_type IS NOT NULL AND asset_type <> ''"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $scoped = $pdo->query(
+        "SELECT DISTINCT applies_to_asset_type FROM pipeline_steps
+          WHERE applies_to_asset_type IS NOT NULL AND applies_to_asset_type <> ''"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    $all = array_unique(array_merge($defaults, $used, $scoped));
+    natcasesort($all);
+    return array_values($all);
+}
+
+/**
+ * A step's scope as a single form value: 'shot', 'asset', 'asset:Character',
+ * 'both' or 'project'. One dropdown is far easier to reason about than two
+ * controls where the second only sometimes applies.
+ */
+function applies_to_value(string $appliesTo, ?string $assetType): string {
+    return ($appliesTo === 'asset' && $assetType !== null && $assetType !== '')
+        ? 'asset:' . $assetType
+        : $appliesTo;
+}
+
+/** Split that form value back into [applies_to, asset_type|null]. */
+function parse_applies_to(string $raw): array {
+    $parts = explode(':', $raw, 2);
+    $kind = $parts[0];
+    if (!isset(APPLIES_TO_LABELS[$kind])) $kind = 'shot';
+    // Only 'asset' narrows to a type. 'both' deliberately means all shots and
+    // all assets — a step that is somehow both cross-type and type-specific
+    // would be a puzzle, not a feature.
+    $type = null;
+    if ($kind === 'asset' && isset($parts[1]) && trim($parts[1]) !== '') {
+        $type = trim($parts[1]);
+    }
+    return [$kind, $type];
+}
+
+/** <option> tags for an "applies to" dropdown, including per-asset-type choices. */
+function applies_to_options(string $selectedValue, array $assetTypes = []): string {
+    $html = '';
+    foreach (APPLIES_TO_LABELS as $value => $label) {
+        $html .= '<option value="' . e($value) . '"' . ($value === $selectedValue ? ' selected' : '')
+               . '>' . e($label) . '</option>';
+        if ($value === 'asset') {
+            foreach ($assetTypes as $t) {
+                $v = 'asset:' . $t;
+                $html .= '<option value="' . e($v) . '"' . ($v === $selectedValue ? ' selected' : '')
+                       . '>' . e('Assets — ' . $t . ' only') . '</option>';
+            }
+        }
+    }
+    return $html;
+}
+
+/** How a step's scope reads in a sentence. */
+function applies_to_phrase(string $appliesTo, ?string $assetType = null): string {
+    switch ($appliesTo) {
+        case 'both':    return 'shots and assets';
+        case 'project': return 'the whole project';
+        case 'asset':   return ($assetType !== null && $assetType !== '')
+                             ? $assetType . ' assets' : 'assets';
+        default:        return 'shots';
+    }
+}
+
 /**
  * The steps that make up one chain, in order.
  *
  * Shots and assets are separate production chains (Layout -> Animation vs
  * Concept -> Modeling), so dependencies are derived per chain. A step marked
- * 'both' belongs to each chain — uncommon, but it keeps "applies to both" from
- * meaning something different in the workflow than it does everywhere else.
+ * 'both' belongs to each of those — uncommon, but it keeps "applies to both"
+ * from meaning something different in the workflow than it does elsewhere.
+ *
+ * 'project' is its own chain: an animatic or a music track is one deliverable
+ * for the whole show, so it never joins the shot or asset chains.
  */
 function chain_steps(array $steps, string $kind): array {
     return array_values(array_filter($steps, function ($s) use ($kind) {
+        if ($kind === 'project') return $s['applies_to'] === 'project';
         return $s['applies_to'] === $kind || $s['applies_to'] === 'both';
     }));
 }
@@ -129,7 +226,7 @@ function pipeline_has_cycle(array $depsMap): bool {
 function save_workflow(PDO $pdo, int $projectId, array $parallelFlags): void {
     $steps = pipeline_steps($pdo, $projectId);
     $newDeps = [];
-    foreach (['shot', 'asset'] as $kind) {
+    foreach (PIPELINE_CHAINS as $kind) {
         $chain = chain_steps($steps, $kind);
         foreach (derive_dependencies($chain, $parallelFlags) as $stepId => $deps) {
             foreach ($deps as $d) {
@@ -178,7 +275,7 @@ function resync_workflow(PDO $pdo, int $projectId): void {
     $steps   = pipeline_steps($pdo, $projectId);
     $depsMap = step_dependencies_map($pdo, $projectId);
     $flags = [];
-    foreach (['shot', 'asset'] as $kind) {
+    foreach (PIPELINE_CHAINS as $kind) {
         $chain = chain_steps($steps, $kind);
         foreach (derive_parallel_flags($chain, $depsMap) as $id => $f) {
             $flags[$id] = ($flags[$id] ?? false) || $f;
@@ -203,15 +300,17 @@ function apply_pipeline_template(PDO $pdo, int $projectId, int $templateId): int
     try {
         $ins = $pdo->prepare(
             'INSERT INTO pipeline_steps
-                (project_id, name, step_order, tracks_seconds, applies_to, days_per_unit, color)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
+                (project_id, name, step_order, tracks_seconds, applies_to, applies_to_asset_type,
+                 days_per_unit, coverage_pct, color)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $idMap = [];       // template step id => new step id
         $order = 0;
         foreach ($tplSteps as $t) {
             $ins->execute([
                 $projectId, $t['name'], ++$order, $t['tracks_seconds'],
-                $t['applies_to'], $t['days_per_unit'] ?? 1.0, $t['color'],
+                $t['applies_to'], $t['applies_to_asset_type'] ?? null,
+                $t['days_per_unit'] ?? 1.0, $t['coverage_pct'] ?? 100, $t['color'],
             ]);
             $idMap[(int)$t['id']] = (int)$pdo->lastInsertId();
         }
@@ -262,6 +361,77 @@ function step_library(PDO $pdo): array {
     return $pdo->query(
         'SELECT * FROM step_library ORDER BY times_used DESC, last_used DESC, name'
     )->fetchAll();
+}
+
+/**
+ * Save a project's pipeline as a reusable template — the reverse of
+ * apply_pipeline_template().
+ *
+ * Copies the steps AND the dependency graph, so parallelism survives: a template
+ * saved from a pipeline where Lighting and Render run side by side recreates
+ * exactly that on the next project.
+ *
+ * Deliberately does not copy dates, headcount or deadlines — those belong to one
+ * project and would be actively misleading carried into another.
+ *
+ * Returns how many steps were saved.
+ */
+function create_template_from_project(PDO $pdo, int $projectId, string $name, string $projectType): int {
+    $name = trim($name);
+    if ($name === '') throw new RuntimeException('Give the template a name.');
+    if (!in_array($projectType, ['2D', '3D', 'Mixed', 'Other'], true)) $projectType = 'Other';
+
+    $steps = pipeline_steps($pdo, $projectId);
+    if (!$steps) throw new RuntimeException('There are no pipeline steps to save yet.');
+
+    $dup = $pdo->prepare('SELECT id FROM pipeline_templates WHERE name = ?');
+    $dup->execute([$name]);
+    if ($dup->fetch()) {
+        throw new RuntimeException('A template called "' . $name . '" already exists. ' .
+                                   'Pick another name — templates are never overwritten silently.');
+    }
+
+    $depsMap = step_dependencies_map($pdo, $projectId);
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('INSERT INTO pipeline_templates (name, project_type) VALUES (?, ?)')
+            ->execute([$name, $projectType]);
+        $templateId = (int)$pdo->lastInsertId();
+
+        $ins = $pdo->prepare(
+            'INSERT INTO pipeline_template_steps
+                (template_id, name, step_order, tracks_seconds, applies_to, applies_to_asset_type,
+                 days_per_unit, coverage_pct, color)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $idMap = [];   // project step id => template step id
+        foreach ($steps as $s) {
+            $ins->execute([
+                $templateId, $s['name'], (int)$s['step_order'], (int)$s['tracks_seconds'],
+                $s['applies_to'], $s['applies_to_asset_type'] ?? null,
+                $s['days_per_unit'] ?? 1.0, $s['coverage_pct'] ?? 100, $s['color'],
+            ]);
+            $idMap[(int)$s['id']] = (int)$pdo->lastInsertId();
+        }
+
+        $insDep = $pdo->prepare(
+            'INSERT INTO pipeline_template_deps (step_id, depends_on_step_id) VALUES (?, ?)'
+        );
+        foreach ($depsMap as $stepId => $deps) {
+            foreach ($deps as $d) {
+                if (isset($idMap[$stepId], $idMap[$d])) {
+                    $insDep->execute([$idMap[$stepId], $idMap[$d]]);
+                }
+            }
+        }
+
+        $pdo->commit();
+        return count($steps);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 }
 
 /** Renumber step_order 1..n in current display order (keeps reordering simple). */

@@ -52,7 +52,11 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
     <form method="post">
     <?php
     $rendered = [];
-    foreach (['shot' => 'Shot pipeline', 'asset' => 'Asset pipeline'] as $kind => $heading):
+    foreach ([
+        'shot'    => 'Shot pipeline',
+        'asset'   => 'Asset pipeline',
+        'project' => 'Whole-project steps',
+    ] as $kind => $heading):
         $chain = chain_steps($steps, $kind);
         if (!$chain) continue;
         $flags = derive_parallel_flags($chain, $depsMap);
@@ -64,7 +68,9 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
           <td class="wf-name">
             <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span>
             <?= e($s['name']) ?>
-            <?php if ($s['applies_to'] === 'both'): ?><span class="muted"> · shots and assets</span><?php endif; ?>
+            <?php if ($s['applies_to'] !== $kind || !empty($s['applies_to_asset_type'])): ?>
+              <span class="muted"> · <?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?></span>
+            <?php endif; ?>
           </td>
           <td class="wf-toggle">
             <?php if ($i === 0): ?>

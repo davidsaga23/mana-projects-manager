@@ -1,4 +1,4 @@
-# Mana Production Platform — Start Here
+# Anima — Start Here
 
 **Read this first.** It carries everything decided so far so a new conversation can begin
 without re-deriving context.

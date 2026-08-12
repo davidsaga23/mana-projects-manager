@@ -128,12 +128,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($choice === 'new') {
                     $max = $pdo->prepare('SELECT COALESCE(MAX(step_order),0) FROM pipeline_steps WHERE project_id = ?');
                     $max->execute([$projectId]);
-                    $applies = $stepChoices[$s['external']]['applies'] ?? 'shot';
-                    if (!in_array($applies, ['shot','asset','both'], true)) $applies = 'shot';
+                    [$applies, $assetType] = parse_applies_to($stepChoices[$s['external']]['applies'] ?? 'shot');
                     try {
                         $pdo->prepare(
-                            'INSERT INTO pipeline_steps (project_id, name, step_order, applies_to) VALUES (?, ?, ?, ?)'
-                        )->execute([$projectId, $s['external'], (int)$max->fetchColumn() + 1, $applies]);
+                            'INSERT INTO pipeline_steps
+                                (project_id, name, step_order, applies_to, applies_to_asset_type)
+                             VALUES (?, ?, ?, ?, ?)'
+                        )->execute([$projectId, $s['external'], (int)$max->fetchColumn() + 1, $applies, $assetType]);
                         $steps[$s['external']] = (int)$pdo->lastInsertId();
                         step_library_remember($pdo, $s['external'], $applies, 0);
                         $createdSteps++;
@@ -245,8 +246,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Import · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
+<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
 <h2 class="wizard-title">Import progress <span class="muted">· <?= e($project['name']) ?></span></h2>
-<p><a href="project.php?id=<?= $projectId ?>">← Back to the project</a></p>
 
 <?php
 if ($step === 'done') {
