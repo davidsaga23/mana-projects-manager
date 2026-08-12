@@ -20,6 +20,23 @@ Schema changes after the v1 baseline live here as numbered `.sql` files:
 - Plain DDL/DML only — one statement per `;` at end of line. No stored
   procedures or DELIMITER tricks (the runner's splitter is deliberately simple).
 - Comments start with `--`.
+- **Write every statement so it survives being re-run.** A failed migration isn't
+  recorded, so fixing the file and running it again replays the whole thing from
+  the top. `UPDATE … WHERE x IS NULL`, `CREATE TABLE IF NOT EXISTS` and
+  `INSERT IGNORE` all re-run harmlessly; a bare `INSERT` doesn't.
+
+## Replacing an index MySQL is using for a foreign key
+
+Create the new index **before** dropping the old one. MySQL refuses to drop an
+index that a foreign key relies on:
+
+> Cannot drop index 'x': needed in a foreign key constraint
+
+A `UNIQUE KEY (project_id, name)` doubles as the index for the FK on
+`project_id`, because `project_id` is its leftmost column. Adding the
+replacement first — as long as it is also leftmost on that column — gives the
+constraint something to keep using, and the drop then succeeds. Migration 009
+does it in that order and says why.
 
 ## Applying
 
