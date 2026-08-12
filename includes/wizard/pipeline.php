@@ -46,8 +46,11 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
             $upd->execute([$name, $appliesTo, $assetType, $tracks, $color, $id, $projectId]);
             $changed++;
         } catch (PDOException $e) {
+            // Names only have to be unique within what they apply to, so this
+            // means a clash with a step of the SAME scope.
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
-                          '" — another step already has that name.');
+                          '" — another step for ' . applies_to_phrase($appliesTo, $assetType) .
+                          ' is already called that. The same name is fine on a different scope.');
         }
     }
     return $changed;
@@ -92,7 +95,9 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             $ins->execute([$projectId, $name, $order, $tracks, $appliesTo, $assetType]);
             $newId = (int)$pdo->lastInsertId();
         } catch (PDOException $e) {
-            throw new RuntimeException('This project already has a step called "' . $name . '".');
+            throw new RuntimeException('This project already has a step called "' . $name .
+                                       '" for ' . applies_to_phrase($appliesTo, $assetType) .
+                                       '. The same name is fine on a different scope.');
         }
         // Give it somewhere sensible in the graph; the workflow screen refines it.
         link_new_step($pdo, $projectId, $newId);
@@ -329,13 +334,11 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     </form>
 
     <?php
-    // Steps used on earlier projects, offered as suggestions. Anything already in
-    // this project is dropped from the list — it can't be added twice.
-    $used = [];
-    foreach ($steps as $s) $used[mb_strtolower($s['name'])] = true;
-    $library = array_values(array_filter(step_library($pdo), function ($l) use ($used) {
-        return !isset($used[mb_strtolower($l['name'])]);
-    }));
+    // Every remembered step name, including ones already in this project: the
+    // same name on a different scope is now legitimate ("Color" for shots and
+    // "Color" for characters), so filtering out what's in use would hide exactly
+    // the names most likely to be wanted again.
+    $library = step_library($pdo);
     $libraryMap = [];
     foreach ($library as $l) {
         $libraryMap[$l['name']] = [

@@ -19,6 +19,23 @@ function asset_ver(string $filename): string {
 }
 
 /**
+ * The studio logo, if one has been supplied.
+ *
+ * Drop the artwork at assets/logo.svg (preferred — stays sharp at any size) or
+ * assets/logo.png with a transparent background. Until then this falls back to
+ * a plain wordmark, so the pages are never broken by a missing file and the
+ * logo appears everywhere at once the moment it exists.
+ */
+function site_logo(string $class = 'site-logo'): string {
+    foreach (['logo.svg', 'logo.png'] as $file) {
+        if (is_file(__DIR__ . '/../assets/' . $file)) {
+            return '<img src="assets/' . $file . asset_ver($file) . '" alt="Mana" class="' . e($class) . '">';
+        }
+    }
+    return '<span class="' . e($class) . ' site-logo-text">MANA</span>';
+}
+
+/**
  * How many migration files haven't been applied yet.
  *
  * Read on every admin page view so the header can say "there's something to run"

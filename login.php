@@ -55,12 +55,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Login · Anima</title>
+<title>Login · Anima | Project manager</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body class="login-page">
 <div class="login-box">
-  <h1>Anima</h1>
+  <div class="login-brand"><?= site_logo('site-logo site-logo-lg') ?></div>
+  <h1>Anima <span class="muted">| Project manager</span></h1>
   <?php if ($err): ?><p class="err"><?= e($err) ?></p><?php endif; ?>
   <form method="post">
     <label>Username <input name="username" required autofocus></label>

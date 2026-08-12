@@ -1,6 +1,6 @@
 <?php
 // Shared page chrome. Set $pageTitle before including.
-$pageTitle = $pageTitle ?? 'Anima';
+$pageTitle = $pageTitle ?? 'Anima | Project manager';
 // $pdo is in scope here because every page requires db.php before this file.
 $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     ? pending_migration_count($pdo) : 0;
@@ -8,13 +8,13 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($pageTitle) ?> · Anima</title>
+<title><?= e($pageTitle) ?> · Anima | Project manager</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <h1><a href="index.php">Anima</a></h1>
+    <h1><a href="index.php" class="brand"><?= site_logo() ?><span class="brand-name">Anima <span class="muted">| Project manager</span></span></a></h1>
     <div class="topbar-right">
       <span><?= e(current_user_display()) ?></span>
       <?php if (!can_edit()): ?><span class="role-badge">view only</span><?php endif; ?>

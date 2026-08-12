@@ -133,10 +133,13 @@ require __DIR__ . '/includes/header.php';
     $clickable = $project !== null && $n !== $stepNum;
   ?>
   <li class="<?= $cls ?>">
+    <?php /* Both branches wrap their contents identically. Without the wrapper the
+             number circle becomes the li's direct child and picks up the block
+             styling meant for the wrapper, which squashes it out of shape. */ ?>
     <?php if ($clickable): ?>
       <a href="<?= e(wizard_url((int)$project['id'], $n)) ?>"><span class="num"><?= $n ?></span> <?= e($s['label']) ?></a>
     <?php else: ?>
-      <span class="num"><?= $n ?></span> <?= e($s['label']) ?>
+      <span class="step-label"><span class="num"><?= $n ?></span> <?= e($s['label']) ?></span>
     <?php endif; ?>
   </li>
 <?php endforeach; ?>

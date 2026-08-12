@@ -38,12 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Install · Anima</title>
+<title>Install · Anima | Project manager</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body class="login-page">
 <div class="login-box">
-  <h1>Anima · Installer</h1>
+  <div class="login-brand"><?= site_logo('site-logo site-logo-lg') ?></div>
+  <h1>Anima <span class="muted">| Project manager</span> · Installer</h1>
   <?php if ($done): ?>
     <p class="ok">✓ Admin user created.</p>
     <p><strong>Now delete <code>install.php</code> from the server for security.</strong></p>

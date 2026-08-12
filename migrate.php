@@ -93,13 +93,16 @@ $pendingCount = count(array_filter($results, function ($r) { return $r[1] === 'p
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Migrations · Anima</title>
+<title>Migrations · Anima | Project manager</title>
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>
 <div class="wrap">
-  <h1>Schema migrations</h1>
-  <p><a href="index.php">← Back to dashboard</a></p>
+  <div class="topbar">
+    <h1><a href="index.php" class="brand"><?= site_logo() ?><span class="brand-name">Anima <span class="muted">| Project manager</span></span></a></h1>
+  </div>
+  <p class="crumb"><a href="index.php">← Back to the projects list</a></p>
+  <h2 class="wizard-title">Schema migrations</h2>
 
   <?php if (!$files): ?>
     <p class="ok">No migration files exist yet — the baseline schema is all there is. ✓</p>

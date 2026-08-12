@@ -1,6 +1,6 @@
 <?php
 // -----------------------------------------------------------------------------
-// Anima – CONFIG
+// Anima | Project manager – CONFIG
 // Copy this file to `config.php` on the SERVER and fill in the real values.
 // `config.php` is excluded from git and from the deploy, so it is never
 // overwritten by a push. When a new setting is added here, add the same line
@@ -44,7 +44,7 @@ return [
     'smtp_ehlo'      => '',
     'smtp_verify_peer' => false,
     'mail_from'      => '',
-    'mail_from_name' => 'Anima',
+    'mail_from_name' => 'Anima | Project manager',
     'mail_reply_to'  => 'david@mana.tv',
 
     // -------------------------------------------------------------------------

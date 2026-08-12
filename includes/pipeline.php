@@ -81,7 +81,14 @@ function applies_to_value(string $appliesTo, ?string $assetType): string {
         : $appliesTo;
 }
 
-/** Split that form value back into [applies_to, asset_type|null]. */
+/**
+ * Split that form value back into [applies_to, asset_type].
+ *
+ * The type is '' rather than null when there isn't one, because it forms part of
+ * the uniqueness rule for step names and MySQL unique indexes ignore NULLs —
+ * with NULLs the constraint would silently permit the duplicates it exists to
+ * prevent.
+ */
 function parse_applies_to(string $raw): array {
     $parts = explode(':', $raw, 2);
     $kind = $parts[0];
@@ -89,7 +96,7 @@ function parse_applies_to(string $raw): array {
     // Only 'asset' narrows to a type. 'both' deliberately means all shots and
     // all assets — a step that is somehow both cross-type and type-specific
     // would be a puzzle, not a feature.
-    $type = null;
+    $type = '';
     if ($kind === 'asset' && isset($parts[1]) && trim($parts[1]) !== '') {
         $type = trim($parts[1]);
     }
@@ -304,6 +311,9 @@ function apply_pipeline_template(PDO $pdo, int $projectId, int $templateId): int
                 $t['days_per_unit'] ?? 1.0, $t['coverage_pct'] ?? 100, $t['color'],
             ]);
             $idMap[(int)$t['id']] = (int)$pdo->lastInsertId();
+            // Remember template names too, so a step that arrived via a template
+            // is suggested on the next project just like a hand-typed one.
+            step_library_remember($pdo, $t['name'], $t['applies_to'], (int)$t['tracks_seconds'], $t['color']);
         }
 
         $ids = implode(',', array_map('intval', array_keys($idMap)));
