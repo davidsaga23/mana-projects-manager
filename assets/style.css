@@ -12,7 +12,14 @@ a { color: #2f6fb2; text-decoration: none; }
 a:hover { text-decoration: underline; }
 code { background: #eef1f4; padding: 1px 5px; border-radius: 3px; font-size: 0.92em; }
 
-.wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+/* Full width — the dense screens (18 pipeline steps, the dependency grid, the
+   planning table) all benefit, and none of them are prose. */
+.wrap { max-width: none; margin: 0; padding: 22px 26px; }
+
+/* Explanatory text is the exception: a line running the width of a wide monitor
+   is genuinely hard to read, so paragraphs stay at a comfortable measure while
+   the tables beside them use everything available. */
+.lead, .wizard-body > p, .wizard-body > .muted, p.muted { max-width: 92ch; }
 
 .topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .topbar h1 { font-size: 22px; margin: 0 0 16px; }

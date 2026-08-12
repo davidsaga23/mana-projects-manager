@@ -57,6 +57,16 @@ if (session_status() === PHP_SESSION_NONE) {
     }
 }
 
+// Every page here renders live data, so a browser must never show a stored copy.
+// Without this, going back to a screen can display names or numbers as they were
+// before an edit — which looks exactly like the save having failed.
+// Sent from here because it runs before any output. Assets are served by Apache
+// directly and keep their own cache-busting through asset_ver().
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+}
+
 function is_logged_in(): bool {
     return !empty($_SESSION['user_id']);
 }
