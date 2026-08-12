@@ -1,0 +1,126 @@
+<?php
+// The platform's own status vocabulary.
+//
+// A project owns its statuses. Anything arriving from outside is TRANSLATED onto
+// them through status_mapping — the external system never gets to be the source
+// of truth. That is what makes dropping Plaky later a change of habit rather
+// than a migration.
+
+/** Copy the global default statuses into a project. Returns how many landed. */
+function seed_project_statuses(PDO $pdo, int $projectId): int {
+    $stmt = $pdo->prepare(
+        'INSERT IGNORE INTO statuses (project_id, name, sort_order, maps_to, is_blocked, color)
+         SELECT ?, name, sort_order, maps_to, is_blocked, color FROM status_templates'
+    );
+    $stmt->execute([$projectId]);
+    return $stmt->rowCount();
+}
+
+/** A project's statuses, in display order. */
+function project_statuses(PDO $pdo, int $projectId): array {
+    $stmt = $pdo->prepare('SELECT * FROM statuses WHERE project_id = ? ORDER BY sort_order, name');
+    $stmt->execute([$projectId]);
+    return $stmt->fetchAll();
+}
+
+/** Status rows keyed by id, for quick lookup while rendering. */
+function statuses_by_id(PDO $pdo, int $projectId): array {
+    $out = [];
+    foreach (project_statuses($pdo, $projectId) as $s) $out[(int)$s['id']] = $s;
+    return $out;
+}
+
+/**
+ * Translate incoming external status text onto one of the project's statuses.
+ *
+ * Records every distinct value it sees, whether or not it maps — an unmapped
+ * value is a row with status_id NULL, which is exactly what the unmatched report
+ * reads. Nothing gets silently discarded.
+ *
+ * Returns the status_id, or null when the text has no mapping yet.
+ */
+function resolve_external_status(PDO $pdo, int $projectId, ?string $external): ?int {
+    $external = trim((string)$external);
+    if ($external === '') return null;
+
+    $stmt = $pdo->prepare(
+        'SELECT id, status_id FROM status_mapping WHERE project_id = ? AND external_status = ?'
+    );
+    $stmt->execute([$projectId, $external]);
+    $row = $stmt->fetch();
+
+    if ($row) {
+        $pdo->prepare('UPDATE status_mapping SET times_seen = times_seen + 1 WHERE id = ?')
+            ->execute([$row['id']]);
+        return $row['status_id'] !== null ? (int)$row['status_id'] : null;
+    }
+
+    // First sighting. If a status of the same name already exists in the project,
+    // map it automatically — that is not a guess, it is an exact match.
+    $find = $pdo->prepare('SELECT id FROM statuses WHERE project_id = ? AND name = ?');
+    $find->execute([$projectId, $external]);
+    $statusId = $find->fetchColumn();
+    $statusId = $statusId === false ? null : (int)$statusId;
+
+    $pdo->prepare(
+        'INSERT INTO status_mapping (project_id, external_status, status_id, times_seen)
+         VALUES (?, ?, ?, 1)'
+    )->execute([$projectId, $external, $statusId]);
+
+    return $statusId;
+}
+
+/** External status values seen but not yet mapped to anything. */
+function unmapped_statuses(PDO $pdo, int $projectId): array {
+    $stmt = $pdo->prepare(
+        'SELECT * FROM status_mapping
+          WHERE project_id = ? AND status_id IS NULL
+          ORDER BY times_seen DESC, external_status'
+    );
+    $stmt->execute([$projectId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Re-apply the status mapping to everything already stored, then recompute the
+ * delivered/approved flags from it.
+ *
+ * Same idea as re-resolving assignees: deciding later what "On Hold" means fixes
+ * every record that already arrived with it, because `progress.status` kept the
+ * raw text. Returns how many rows had their status re-pointed.
+ */
+function reapply_status_mapping(PDO $pdo, int $projectId): int {
+    $stmt = $pdo->prepare(
+        'UPDATE progress pr
+           JOIN status_mapping sm
+             ON sm.project_id = pr.project_id AND sm.external_status = pr.status
+            SET pr.status_id = sm.status_id
+          WHERE pr.project_id = ?'
+    );
+    $stmt->execute([$projectId]);
+    $n = $stmt->rowCount();
+
+    // COALESCE because a row may still have no status at all, and the flag
+    // columns are NOT NULL — an unmapped status simply counts as nothing.
+    $pdo->prepare(
+        "UPDATE progress pr
+           LEFT JOIN statuses s ON s.id = pr.status_id
+            SET pr.is_approved  = COALESCE(s.maps_to = 'approved', 0),
+                pr.is_delivered = COALESCE(s.maps_to IN ('approved','delivered'), 0)
+          WHERE pr.project_id = ?"
+    )->execute([$projectId]);
+
+    return $n;
+}
+
+/**
+ * What a status means for progress flags.
+ * Returns ['is_delivered' => int, 'is_approved' => int].
+ * Approved implies delivered — something finished was necessarily handed over.
+ */
+function status_flags(?array $status): array {
+    if (!$status) return ['is_delivered' => 0, 'is_approved' => 0];
+    $approved  = $status['maps_to'] === 'approved' ? 1 : 0;
+    $delivered = ($approved || $status['maps_to'] === 'delivered') ? 1 : 0;
+    return ['is_delivered' => $delivered, 'is_approved' => $approved];
+}

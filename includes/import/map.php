@@ -1,0 +1,162 @@
+<?php
+// Import screen 2 — say what the file's own vocabulary means here.
+// Every choice is remembered, so a second import of the same board is nearly
+// automatic. Variables in scope: $pdo, $project, $projectId, $selfUrl, $state.
+
+$parsed = plaky_read_csv($state['file']);
+$analysis = plaky_analyse($pdo, $projectId, $parsed['rows']);
+
+$crew = $pdo->query('SELECT id, name, active FROM crew ORDER BY active DESC, name')->fetchAll();
+$unmatchedSteps  = count(array_filter($analysis['steps'],  function ($s) { return $s['step_id'] === null; }));
+$unmatchedPeople = count(array_filter($analysis['people'], function ($p) { return $p['crew_id'] === null; }));
+$unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { return $s['status_id'] === null; }));
+?>
+<p class="summary-line">
+  <strong><?= e($state['name']) ?></strong> ·
+  <?= (int)$analysis['parent_count'] ?> items ·
+  <?= (int)$analysis['subitem_count'] ?> step records ·
+  time read as <strong><?= e($state['time_unit']) ?></strong>
+</p>
+
+<?php if ($unmatchedSteps || $unmatchedPeople || $unmatchedStatus): ?>
+  <div class="flash flash-warn">
+    Some values in this file aren't known here yet:
+    <?php $bits = [];
+      if ($unmatchedSteps)  $bits[] = "$unmatchedSteps step name" . ($unmatchedSteps === 1 ? '' : 's');
+      if ($unmatchedStatus) $bits[] = "$unmatchedStatus status value" . ($unmatchedStatus === 1 ? '' : 's');
+      if ($unmatchedPeople) $bits[] = "$unmatchedPeople " . ($unmatchedPeople === 1 ? 'person' : 'people');
+      echo e(implode(', ', $bits));
+    ?>. Set them below — what you choose is remembered for next time.
+  </div>
+<?php endif; ?>
+
+<form method="post">
+  <input type="hidden" name="action" value="map">
+
+  <h3>Groups</h3>
+  <p class="muted small">Plaky uses one "Group" column for two different things — episodes of
+     shots, and types of asset. Only you can say which is which.</p>
+  <table class="review-table">
+    <tr><th>Group</th><th>Items</th><th>Treat as</th></tr>
+    <?php $gi = 0; foreach ($analysis['groups'] as $g => $count):
+      // A sensible first guess, never a silent one — it is shown selected and can be changed.
+      $guess = preg_match('/^(ep|episode)\s*\d+/i', $g) ? 'episode' : 'asset_type';
+    ?>
+    <tr>
+      <td><strong><?= e($g) ?></strong>
+        <input type="hidden" name="group_key[<?= $gi ?>]" value="<?= e($g) ?>"></td>
+      <td class="muted"><?= (int)$count ?></td>
+      <td>
+        <select name="group_val[<?= $gi ?>]">
+          <option value="episode"    <?= $guess === 'episode'    ? 'selected' : '' ?>>an episode of shots</option>
+          <option value="asset_type" <?= $guess === 'asset_type' ? 'selected' : '' ?>>a type of asset</option>
+          <option value="ignore">ignore this group</option>
+        </select>
+      </td>
+    </tr>
+    <?php $gi++; endforeach; ?>
+  </table>
+
+  <?php if ($analysis['childless']): ?>
+    <label class="inline checkbox-note">
+      <input type="checkbox" name="skip_childless" value="1" checked>
+      Skip the <?= count($analysis['childless']) ?> item<?= count($analysis['childless']) === 1 ? '' : 's' ?>
+      with no pipeline steps under them
+    </label>
+    <p class="muted small">
+      <?php $names = array_map(function ($c) { return $c['title'] . ' (' . $c['group'] . ')'; }, $analysis['childless']); ?>
+      <?= e(implode(', ', array_slice($names, 0, 8))) ?><?= count($names) > 8 ? ' …' : '' ?>.
+      An item with no steps beneath it is usually not a shot or an asset — a time bucket or a
+      one-off deliverable. Untick to import them anyway.
+    </p>
+  <?php endif; ?>
+
+  <h3>Pipeline steps</h3>
+  <p class="muted small">Subitem names in the file, matched to this project's steps.</p>
+  <table class="review-table">
+    <tr><th>In the file</th><th>Rows</th><th>Is this project's step</th></tr>
+    <?php $si = 0; foreach ($analysis['steps'] as $s): ?>
+    <tr class="<?= $s['step_id'] === null ? 'has-problem' : '' ?>">
+      <td><strong><?= e($s['external']) ?></strong>
+        <?php if ($s['canonical'] !== $s['external']): ?>
+          <span class="muted small">→ <?= e($s['canonical']) ?> (existing alias)</span>
+        <?php endif; ?>
+        <input type="hidden" name="step_key[<?= $si ?>]" value="<?= e($s['external']) ?>"></td>
+      <td class="muted"><?= (int)$s['count'] ?></td>
+      <td>
+        <select name="step_val[<?= $si ?>]">
+          <option value="0">— skip these rows —</option>
+          <?php foreach ($analysis['project_steps'] as $ps): ?>
+            <option value="<?= (int)$ps['id'] ?>" <?= $s['step_id'] === (int)$ps['id'] ? 'selected' : '' ?>>
+              <?= e($ps['name']) ?>
+            </option>
+          <?php endforeach; ?>
+          <option value="new">+ create a step called "<?= e($s['external']) ?>"</option>
+        </select>
+        <?php if ($s['step_id'] === null): ?>
+          <select name="step_applies[<?= $si ?>]" title="Only used if you create the step">
+            <option value="shot">for shots</option>
+            <option value="asset">for assets</option>
+            <option value="both">for both</option>
+          </select>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php $si++; endforeach; ?>
+  </table>
+
+  <h3>Statuses</h3>
+  <p class="muted small">What each value in the file means here. Anything left unset is
+     imported as raw text and reported afterwards, never guessed at.</p>
+  <table class="review-table">
+    <tr><th>In the file</th><th>Rows</th><th>Means</th></tr>
+    <?php $ci = 0; foreach ($analysis['statuses'] as $s): ?>
+    <tr class="<?= $s['status_id'] === null ? 'has-problem' : '' ?>">
+      <td><strong><?= e($s['external']) ?></strong>
+        <input type="hidden" name="status_key[<?= $ci ?>]" value="<?= e($s['external']) ?>"></td>
+      <td class="muted"><?= (int)$s['count'] ?></td>
+      <td>
+        <select name="status_val[<?= $ci ?>]">
+          <option value="0">— leave unmapped —</option>
+          <?php foreach ($analysis['project_statuses'] as $ps): ?>
+            <option value="<?= (int)$ps['id'] ?>" <?= $s['status_id'] === (int)$ps['id'] ? 'selected' : '' ?>>
+              <?= e($ps['name']) ?> <?= $ps['maps_to'] !== 'none' ? '(' . e($ps['maps_to']) . ')' : '' ?><?= $ps['is_blocked'] ? ' (blocked)' : '' ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </td>
+    </tr>
+    <?php $ci++; endforeach; ?>
+  </table>
+
+  <h3>People</h3>
+  <p class="muted small">Names as the file writes them. "(inactive)" has already been stripped,
+     and fields holding two people have been split.</p>
+  <table class="review-table">
+    <tr><th>In the file</th><th>Rows</th><th>Is</th></tr>
+    <?php $pi = 0; foreach ($analysis['people'] as $p): ?>
+    <tr class="<?= $p['crew_id'] === null ? 'has-problem' : '' ?>">
+      <td><strong><?= e($p['name']) ?></strong>
+        <?php if ($p['inactive']): ?><span class="muted small"> · marked inactive</span><?php endif; ?>
+        <input type="hidden" name="person_key[<?= $pi ?>]" value="<?= e($p['name']) ?>"></td>
+      <td class="muted"><?= (int)$p['count'] ?></td>
+      <td>
+        <select name="person_val[<?= $pi ?>]">
+          <option value="0">— leave unmatched —</option>
+          <?php foreach ($crew as $c): ?>
+            <option value="<?= (int)$c['id'] ?>" <?= $p['crew_id'] === (int)$c['id'] ? 'selected' : '' ?>>
+              <?= e($c['name']) ?><?= $c['active'] ? '' : ' (inactive)' ?>
+            </option>
+          <?php endforeach; ?>
+          <option value="new" <?= $p['crew_id'] === null ? 'selected' : '' ?>>+ add "<?= e($p['name']) ?>" to the crew</option>
+        </select>
+      </td>
+    </tr>
+    <?php $pi++; endforeach; ?>
+  </table>
+
+  <div class="actions">
+    <button type="submit">Continue to preview →</button>
+    <button type="submit" name="action" value="cancel" class="secondary" formnovalidate>Cancel import</button>
+  </div>
+</form>

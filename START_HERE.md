@@ -128,14 +128,37 @@ Hard-won, all from real incidents:
 
 ## 4. Suggested build order
 
+Settled 2026-08-11: Plaky stays the working tool for now, and the platform imports from it —
+**but the schema is built as though the platform owned the data**, so switching later is a
+change of habit rather than a migration. Read the two paired Plaky entries in
+`docs/DECISIONS.md` before designing anything here.
+
 1. ~~**Schema + migrations**~~ — done, live
-2. ~~**Project setup wizard**~~ — done (paste-based entry; file import deferred to 3)
-3. **Shot / asset import + in-page creation** ← next: CSV/Excel upload with column
-   mapping, the alias layer, and the unmatched-names report
+2. ~~**Project setup wizard**~~ — done (paste-based entry)
+3. **Import + the status model** ← next, and these ship together.
+   **Read `docs/PLAKY_EXPORT.md` first** — a real export has been analysed and the
+   traps in it are written down (a `Lightning` typo, `(inactive)` name suffixes,
+   multi-assignee fields, `DD/MM/YYYY` dates, an unmapped `On Hold` status):
+   - `statuses` — the platform's OWN vocabulary, project-scoped, carrying STFC's
+     `maps_to` none/delivered/approved. `progress` points at these rows.
+   - `status_mapping` — translates incoming Plaky text onto those statuses.
+   - CSV/Excel upload with column mapping, for shots, assets and progress.
+   - The alias layer (`crew_aliases`, `name_aliases`) **and** the unmatched-names report,
+     built alongside the importer, never after it.
 4. **Scheduler** — forward pass + reverse quota maths, driven by the dependency graph
 5. **Timeline UI** — Gantt view, `.gan` export/import round trip
 6. **Reporting** — per-artist productivity, cross-project workload
 7. **Tickets / tasks** — port from STFC (it works well; see that codebase)
+
+**A separate track — the finance side.** Contracts, budgets, rates and invoices are
+*deliberately not in this codebase*. They belong to a separate application with its own
+logins and its own database, which may read production data but never the reverse. Don't add
+a rate column to `crew` "just for now" — see `docs/DECISIONS.md`, 2026-08-12.
+
+**Later, when Plaky is dropped:** a tracking grid (shots/assets × steps, status and assignee
+set in place) and — if artists update their own work rather than a coordinator doing it —
+logins linked to the crew table, with roles. Because step 3 already owns the status
+vocabulary, that phase adds screens; it does not change the schema underneath.
 
 Ship each phase end-to-end before starting the next.
 

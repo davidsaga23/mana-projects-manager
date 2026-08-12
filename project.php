@@ -1,0 +1,136 @@
+<?php
+// Project hub — where everything about one project is reachable from.
+
+require __DIR__ . '/includes/db.php';
+require __DIR__ . '/includes/auth.php';
+require __DIR__ . '/includes/functions.php';
+require __DIR__ . '/includes/pipeline.php';
+require __DIR__ . '/includes/statuses.php';
+require __DIR__ . '/includes/names.php';
+require_login();
+
+$projectId = (int)($_GET['id'] ?? 0);
+$stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+$stmt->execute([$projectId]);
+$project = $stmt->fetch();
+if (!$project) {
+    flash('err', 'That project no longer exists.');
+    header('Location: index.php');
+    exit;
+}
+
+$shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
+$assetCount = (int)$pdo->query("SELECT COUNT(*) FROM assets WHERE project_id = $projectId")->fetchColumn();
+
+$stmt = $pdo->prepare(
+    'SELECT ps.id, ps.name, ps.applies_to, ps.color, ps.deadline,
+            COUNT(pr.id)              AS tracked,
+            COALESCE(SUM(pr.is_delivered), 0) AS delivered,
+            COALESCE(SUM(pr.is_approved), 0)  AS approved
+       FROM pipeline_steps ps
+       LEFT JOIN progress pr ON pr.step_id = ps.id
+      WHERE ps.project_id = ?
+      GROUP BY ps.id, ps.name, ps.applies_to, ps.color, ps.deadline, ps.step_order
+      ORDER BY ps.step_order, ps.id'
+);
+$stmt->execute([$projectId]);
+$steps = $stmt->fetchAll();
+
+// Blocked work is remaining work, but it needs someone to unblock it rather than
+// an artist — so it is counted separately everywhere it appears.
+$blocked = (int)$pdo->query(
+    "SELECT COUNT(*) FROM progress pr
+       JOIN statuses s ON s.id = pr.status_id
+      WHERE pr.project_id = $projectId AND s.is_blocked = 1"
+)->fetchColumn();
+
+$unmatchedPeople  = count(unmatched_assignees($pdo, $projectId));
+$unmappedStatuses = count(unmapped_statuses($pdo, $projectId));
+
+$pageTitle = $project['name'];
+require __DIR__ . '/includes/header.php';
+?>
+
+<h2 class="wizard-title">
+  <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
+  <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
+</h2>
+
+<p class="summary-line">
+  <?= e($project['type']) ?> ·
+  <strong><?= $shotCount ?></strong> shots ·
+  <strong><?= $assetCount ?></strong> assets ·
+  <?= e($project['start_date'] ?: '—') ?> → <?= e($project['delivery_date'] ?: '—') ?>
+</p>
+
+<?php if ($unmatchedPeople || $unmappedStatuses): ?>
+  <div class="flash flash-warn">
+    <?php if ($unmatchedPeople): ?>
+      <strong><?= $unmatchedPeople ?></strong> assignee name<?= $unmatchedPeople === 1 ? '' : 's' ?>
+      didn't match anyone in the crew list.
+    <?php endif; ?>
+    <?php if ($unmappedStatuses): ?>
+      <strong><?= $unmappedStatuses ?></strong> status value<?= $unmappedStatuses === 1 ? '' : 's' ?>
+      arrived without a meaning.
+    <?php endif; ?>
+    <a href="aliases.php?project=<?= $projectId ?>">Review them →</a>
+  </div>
+<?php endif; ?>
+
+<div class="hub-grid">
+  <a class="hub-card" href="wizard.php?project=<?= $projectId ?>&step=1">
+    <strong>Setup</strong>
+    <span class="muted">Details, pipeline, workflow, shots, assets, dates</span>
+  </a>
+  <a class="hub-card" href="import.php?project=<?= $projectId ?>">
+    <strong>Import progress</strong>
+    <span class="muted">Read a Plaky export and update what's tracked</span>
+  </a>
+  <a class="hub-card" href="statuses_edit.php?project=<?= $projectId ?>">
+    <strong>Statuses</strong>
+    <span class="muted">What each state means for reporting</span>
+  </a>
+  <a class="hub-card" href="aliases.php?project=<?= $projectId ?>">
+    <strong>Names &amp; aliases</strong>
+    <span class="muted">
+      <?php if ($unmatchedPeople || $unmappedStatuses): ?>
+        <span class="warn-text"><?= $unmatchedPeople + $unmappedStatuses ?> need attention</span>
+      <?php else: ?>
+        Everything matched
+      <?php endif; ?>
+    </span>
+  </a>
+</div>
+
+<h3>Progress by step</h3>
+<?php if (!$steps): ?>
+  <p class="muted">No pipeline steps yet — <a href="wizard.php?project=<?= $projectId ?>&step=2">add them</a>.</p>
+<?php else: ?>
+  <?php if ($blocked): ?>
+    <p class="flash flash-warn"><strong><?= $blocked ?></strong> tracked
+      <?= $blocked === 1 ? 'task is' : 'tasks are' ?> blocked — they still count as work
+      remaining, but they need unblocking rather than an artist.</p>
+  <?php endif; ?>
+  <table class="review-table">
+    <tr><th>Step</th><th>Applies to</th><th>Tracked</th><th>Delivered</th><th>Approved</th><th>Deadline</th></tr>
+    <?php foreach ($steps as $s):
+      $applicable = 0;
+      if (in_array($s['applies_to'], ['shot','both'], true))  $applicable += $shotCount;
+      if (in_array($s['applies_to'], ['asset','both'], true)) $applicable += $assetCount;
+    ?>
+    <tr>
+      <td class="wf-name"><span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?></td>
+      <td class="muted"><?= $s['applies_to'] === 'both' ? 'shots and assets' : e($s['applies_to']) . 's' ?></td>
+      <td><?= (int)$s['tracked'] ?> <span class="muted">of <?= $applicable ?></span></td>
+      <td><?= (int)$s['delivered'] ?></td>
+      <td><strong><?= (int)$s['approved'] ?></strong></td>
+      <td class="muted"><?= e($s['deadline'] ?: '—') ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted small">"Tracked" is how many items have a progress record for that step —
+     lower than the total simply means nothing has been recorded for the rest yet.</p>
+<?php endif; ?>
+
+</div>
+</body></html>

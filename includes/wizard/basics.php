@@ -42,6 +42,9 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         );
         $stmt->execute([$code, $name, $type, 'setup', $fps, $start ?: null, $delivery ?: null]);
         $id = (int)$pdo->lastInsertId();
+        // Every project owns its own copy of the statuses, editable from the
+        // project screen. Copied, not referenced — same as pipeline templates.
+        seed_project_statuses($pdo, $id);
         flash('ok', 'Created "' . $name . '". Next, choose the pipeline steps.');
     }
 

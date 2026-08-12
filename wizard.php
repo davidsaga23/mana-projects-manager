@@ -13,6 +13,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/quota.php';
+require __DIR__ . '/includes/statuses.php';
 require_login();
 
 const WIZARD_STEPS = [
@@ -51,7 +52,8 @@ $hasStepLibrary    = (bool)$pdo->query("SHOW TABLES LIKE 'step_library'")->fetch
 // to 3 on save, so check the column's type rather than just its existence.
 $headcountCol      = $pdo->query("SHOW COLUMNS FROM pipeline_steps LIKE 'planned_headcount'")->fetch();
 $hasFractionalHeadcount = $headcountCol && stripos($headcountCol['Type'], 'decimal') !== false;
-if (!$hasPlanningFields || !$hasStepLibrary || !$hasFractionalHeadcount) {
+$hasStatuses       = (bool)$pdo->query("SHOW TABLES LIKE 'statuses'")->fetch();
+if (!$hasPlanningFields || !$hasStepLibrary || !$hasFractionalHeadcount || !$hasStatuses) {
     $pageTitle = 'Update needed';
     require __DIR__ . '/includes/header.php';
     echo '<div class="empty-state"><h2>One database update is needed first</h2>'

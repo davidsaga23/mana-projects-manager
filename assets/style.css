@@ -210,6 +210,33 @@ label.inline input { width: auto; }
 .add-row input, .add-row select { width: auto; }
 .add-row button { margin-top: 0; }
 
+/* Project hub */
+.hub-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0 26px; }
+.hub-card {
+  flex: 1 1 200px; background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 14px; color: inherit; text-decoration: none;
+}
+.hub-card:hover { border-color: #2f6fb2; background: #f7fafd; text-decoration: none; }
+.hub-card strong { display: block; margin-bottom: 4px; }
+.hub-card span { font-size: 12.5px; }
+
+/* Import */
+.unit-choice { border: 1px solid #e4e8ec; border-radius: 6px; padding: 12px 14px; margin: 16px 0; background: #f7f9fb; }
+.unit-choice legend { font-weight: 600; padding: 0 6px; }
+.unit-choice label.inline { margin-right: 16px; }
+.checkbox-note { display: inline-flex; margin: 12px 0 2px; }
+.plain-list { color: #43535f; padding-left: 20px; }
+.plain-list li { margin-bottom: 6px; }
+a.button-link { font-size: 14px; }
+.review-table form { display: inline; }
+.review-table form button { margin-top: 0; }
+input[type=file] { padding: 6px; background: #fff; }
+
+/* Statuses */
+.status-table input:not([type]), .status-table select { padding: 5px 7px; font-size: 14px; }
+.status-table input[type=color] { padding: 1px; height: 30px; width: 44px; }
+.status-table td { vertical-align: middle; }
+
 /* Review */
 .review-grid { display: flex; gap: 16px; flex-wrap: wrap; }
 .review-card {

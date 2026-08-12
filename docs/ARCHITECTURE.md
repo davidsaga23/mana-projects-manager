@@ -94,21 +94,67 @@ progress
   id, project_id, step_id,
   shot_id NULL, asset_id NULL,       -- exactly one is set
   status VARCHAR,                    -- raw external status text
+  status_id NULL,                    -- -> statuses (the platform's own; see below)
   is_delivered TINYINT, is_approved TINYINT,
-  crew_id NULL,                      -- resolved assignee
+  crew_id NULL,                      -- primary assignee
   assignee_raw VARCHAR,              -- what the source actually said
+  time_spent_minutes INT NULL,       -- stored in MINUTES, shown/entered in HOURS.
+                                     -- Integer minutes are exact; decimal hours drift
+                                     -- when summed against an invoice.
   updated_at
+
+progress_crew                        -- a task can have several people on it
+  progress_id, crew_id               -- composite PK
 ```
+
+`progress_crew` exists because the live board really does assign two people to one step
+(`Júnior Fonseca,Michal Pilch`). `crew_id` stays as the primary so simple queries keep
+working; the join table is the complete answer.
 
 One progress table for shots *and* assets, because pipeline steps can apply to either.
 Keeping `assignee_raw` alongside the resolved `crew_id` is what makes unmatched-name
 reporting possible — a lesson from STFC, where the raw value was discarded.
+
+> **Revised 2026-08-11 — the status model.** Plaky stays the working tool for now, but the
+> platform defines its own statuses from the start, so that dropping Plaky later changes
+> habits rather than schema (see the paired Plaky entries in `DECISIONS.md`):
+>
+> ```sql
+> statuses                          -- the platform's OWN vocabulary
+>   id, project_id, name, sort_order,
+>   maps_to ENUM('none','delivered','approved'),
+>   is_blocked TINYINT,             -- cannot proceed, vs simply not started
+>   color VARCHAR(7)
+>
+> status_mapping                    -- incoming external text -> one of the above
+>   id, project_id, external_status, status_id
+> ```
+>
+> `is_blocked` exists because "On Hold" and "Waiting to start" both mean *not finished* but
+> mean opposite things for planning: one needs someone to unblock it, the other needs an
+> artist. Blocked work still counts as remaining — it has to happen eventually — but is
+> reported separately so it reads as the escalation it is.
+>
+> `maps_to` is STFC's idea kept intact: a show can call a state anything it likes, and
+> reporting still knows whether it counts as delivered or approved. Seed each project with a
+> default set during setup, editable afterwards.
+>
+> `progress.status_id` references a `statuses` row. `progress.status` keeps the raw incoming
+> text, and `assignee_raw` the raw name — both are what make "here is what arrived and here
+> is what we could not match" reportable.
+>
+> **Why it matters:** the importer writes to exactly the same rows a person would. The day
+> Plaky is dropped, the importer stops running and people set those statuses by hand. No
+> migration, no reporting rewrite.
 
 ### Crew (global)
 
 ```sql
 crew
   id, name, role, email, is_team TINYINT, active TINYINT
+  -- NO pay rates, day rates or contract terms. Money lives in a separate
+  -- application and database that this one has no credentials for.
+  -- See DECISIONS.md, 2026-08-12.
 
 crew_projects
   crew_id, project_id, allocation_pct INT DEFAULT 100

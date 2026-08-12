@@ -42,7 +42,7 @@ require __DIR__ . '/includes/header.php';
     <?php foreach ($projects as $p): ?>
     <tr>
       <td><code><?= e($p['code']) ?></code></td>
-      <td><?= e($p['name']) ?></td>
+      <td><a href="project.php?id=<?= (int)$p['id'] ?>"><?= e($p['name']) ?></a></td>
       <td><?= e($p['type']) ?></td>
       <td><span class="status status-<?= e($p['status']) ?>"><?= e(str_replace('_', ' ', $p['status'])) ?></span></td>
       <td><?= (int)$p['step_count'] ?></td>
@@ -54,7 +54,7 @@ require __DIR__ . '/includes/header.php';
         <?php if ($p['status'] === 'setup'): ?>
           <a href="wizard.php?project=<?= (int)$p['id'] ?>&step=<?= max(1, (int)($p['wizard_step'] ?: 1)) ?>">Resume setup →</a>
         <?php else: ?>
-          <a href="wizard.php?project=<?= (int)$p['id'] ?>&step=1">Edit setup</a>
+          <a href="project.php?id=<?= (int)$p['id'] ?>">Open →</a>
         <?php endif; ?>
       </td>
     </tr>
