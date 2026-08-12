@@ -49,6 +49,36 @@ without its backend counterpart, and a cached JS file that made a fix appear not
 **Consequence:** `config.php`, `uploads/` and `sessions/` must stay excluded from both git and
 the deploy, or credentials get overwritten and attachments deleted.
 
+## 2026-08-11 — Frozen baseline + additive migrations
+**Decision:** `install.sql` is the frozen v1 schema (fresh installs only, destructive);
+all later changes are numbered files in `migrations/`, applied through `migrate.php`,
+tracked in a `schema_migrations` table. Fresh install = import `install.sql`, then run
+`migrate.php` to catch up.
+**Why:** keeping `install.sql` in sync with every migration by hand is exactly the kind of
+silent-drift chore that gets forgotten. Freezing it removes the chore. `migrate.php` shows
+a dry-run list first and reports every file as applied/skipped/failed — nothing silent.
+**Consequence:** migrations must be additive only; a table drop never appears in one.
+
+## 2026-08-11 — Generated-column uniqueness for progress and schedule rows
+**Decision:** `progress` and `schedule` reference *either* a shot or an asset via nullable
+`shot_id`/`asset_id`, and uniqueness per (step, item) is enforced through a stored generated
+column `item_key` ('s'+shot_id or 'a'+asset_id) with `UNIQUE (step_id, item_key)`.
+**Why:** MySQL unique indexes ignore NULLs, so `UNIQUE (step_id, shot_id, asset_id)` would
+silently allow duplicate rows whenever one column is NULL. The generated column makes the
+constraint real at the database level instead of relying on application code.
+**Consequence:** requires MySQL 5.7+ / MariaDB 10.2+ (any current cPanel host qualifies).
+Application inserts still set exactly one of the two ids.
+
+## 2026-08-11 — Pipeline templates are seed rows the wizard copies
+**Decision:** `pipeline_templates` / `pipeline_template_steps` / `pipeline_template_deps`
+hold the 2D and 3D starting pipelines. The setup wizard copies a template into the new
+project's `pipeline_steps` / `step_dependencies`, where it becomes fully editable.
+**Why:** templates as data, not code — same principle as the dependency graph. Copying
+(rather than referencing) means editing a template never disturbs existing projects.
+**Consequence:** the baseline seeds a 3D template matching STFC's shape (Lighting ∥ Render
+after Assembly, Comp waits for both) and a generic 2D template; both are editable in the DB
+or, later, in a template editor.
+
 ---
 
 ## Still open

@@ -6,7 +6,9 @@ without re-deriving context.
 - **Owner:** David Salinas Garfias (Mana Animation Studio) — *not a developer; explain
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
-- **Status:** Design agreed, no code written yet.
+- **Status:** Phase 1 (schema + migrations) built 2026-08-11 — `install.sql`, `migrate.php`,
+  login, and app skeleton exist; not yet deployed or run against a real database.
+  Next: deploy + install on the server, then Phase 2 (project setup wizard).
 - **Predecessor:** the STFC S02 dashboard (see “Lessons” below) — a working, single-project
   tool that this platform generalises.
 
