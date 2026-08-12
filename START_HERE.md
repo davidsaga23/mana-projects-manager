@@ -6,6 +6,7 @@ without re-deriving context.
 - **Owner:** David Salinas Garfias (Mana Animation Studio) — *not a developer; explain
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
+- **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
 - **Status:** Phase 1 (schema + migrations) built 2026-08-11 — `install.sql`, `migrate.php`,
   login, and app skeleton exist; not yet deployed or run against a real database.
   Next: deploy + install on the server, then Phase 2 (project setup wizard).
