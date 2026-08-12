@@ -32,7 +32,7 @@ jobs:
           protocol: ftps
           # Show what would change without transferring anything:
           # flip to true, push, and read the Actions log.
-          dry-run: true
+          dry-run: false
           exclude: |
             **/.git*
             **/.git*/**
