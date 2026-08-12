@@ -90,10 +90,12 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
                  VALUES (?, ?, ?, ?, ?, ?)'
             );
             $ins->execute([$projectId, $name, $order, $tracks, $appliesTo, $assetType]);
+            $newId = (int)$pdo->lastInsertId();
         } catch (PDOException $e) {
             throw new RuntimeException('This project already has a step called "' . $name . '".');
         }
-        resync_workflow($pdo, $projectId);
+        // Give it somewhere sensible in the graph; the workflow screen refines it.
+        link_new_step($pdo, $projectId, $newId);
         step_library_remember($pdo, $name, $appliesTo, $tracks);
         flash('ok', 'Added the step "' . $name . '" at the end of the pipeline. ' .
                     'It will be suggested on future projects too.');
@@ -135,21 +137,10 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         $n = 0;
         foreach ($ordered as $id) $upd->execute([++$n, $id, $projectId]);
 
-        // Parallelism is stored as shared dependencies, so it is read relative to
-        // the order. Moving a step can therefore change which steps run together.
-        $depsBefore = step_dependencies_map($pdo, $projectId);
-        $hadParallel = false;
-        foreach (PIPELINE_CHAINS as $kind) {
-            $chain = chain_steps(pipeline_steps($pdo, $projectId), $kind);
-            if (array_filter(derive_parallel_flags($chain, $depsBefore))) $hadParallel = true;
-        }
-
-        resync_workflow($pdo, $projectId);
-        flash('ok', 'Saved the new step order.');
-        if ($hadParallel) {
-            flash('warn', 'Some steps run in parallel — check the Workflow screen still ' .
-                          'shows what you expect after moving things around.');
-        }
+        // Order is presentation only now that dependencies are set explicitly, so
+        // rearranging this list can no longer disturb the workflow.
+        flash('ok', 'Saved the new step order. The workflow is unaffected — order here is ' .
+                    'just how the list reads.');
         return wizard_url($projectId, 2);
     }
 
@@ -167,11 +158,14 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 
         if ($verb === 'del') {
             $name = $steps[$index]['name'];
+            // Close the gap first: anything waiting on this step inherits what it
+            // was waiting on, so nothing is left free to start on day one.
+            heal_dependencies_before_delete($pdo, $projectId, $stepId);
             $pdo->prepare('DELETE FROM pipeline_steps WHERE id = ? AND project_id = ?')
                 ->execute([$stepId, $projectId]);
             renumber_steps($pdo, $projectId);
-            resync_workflow($pdo, $projectId);
-            flash('ok', 'Removed the step "' . $name . '".');
+            flash('ok', 'Removed the step "' . $name . '". Anything that waited for it now ' .
+                        'waits for whatever it waited for.');
             return wizard_url($projectId, 2);
         }
 
@@ -184,7 +178,6 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         $upd->execute([(int)$steps[$swapWith]['step_order'], $steps[$index]['id']]);
         $upd->execute([(int)$steps[$index]['step_order'], $steps[$swapWith]['id']]);
         renumber_steps($pdo, $projectId);
-        resync_workflow($pdo, $projectId);
         flash('ok', 'Moved "' . $steps[$index]['name'] . '" ' . $verb . '.');
         return wizard_url($projectId, 2);
     }
@@ -257,6 +250,31 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       <input type="hidden" name="order" id="step-order" value="">
       <button type="submit" name="action" value="reorder" id="reorder-submit" hidden></button>
 
+      <?php
+      // Only offer filters for categories that actually appear, so the control
+      // stays short and never promises a view that would come back empty.
+      $present = [];
+      foreach ($steps as $s) {
+          $v = applies_to_value($s['applies_to'], $s['applies_to_asset_type'] ?? null);
+          $present[$v] = ($present[$v] ?? 0) + 1;
+      }
+      ?>
+      <?php if (count($present) > 1): ?>
+      <div class="step-filter">
+        <label class="inline"><strong>Show</strong>
+          <select id="step-filter-select">
+            <option value="">everything (<?= count($steps) ?>)</option>
+            <?php foreach ($present as $value => $count):
+                  [$k, $t] = parse_applies_to($value); ?>
+              <option value="<?= e($value) ?>"><?= e(ucfirst(applies_to_phrase($k, $t))) ?> (<?= $count ?>)</option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <span class="muted small" id="step-filter-note">Filtering only changes what you see —
+          saving still keeps every step.</span>
+      </div>
+      <?php endif; ?>
+
       <table class="step-table">
         <thead>
         <tr>
@@ -266,12 +284,18 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         </tr>
         </thead>
         <tbody id="step-rows">
-        <?php foreach ($steps as $i => $s): $id = (int)$s['id']; ?>
-        <tr data-id="<?= $id ?>">
+        <?php foreach ($steps as $i => $s): $id = (int)$s['id'];
+              $catValue = applies_to_value($s['applies_to'], $s['applies_to_asset_type'] ?? null); ?>
+        <tr data-id="<?= $id ?>" data-category="<?= e($catValue) ?>" class="cat-row cat-<?= e($s['applies_to']) ?>">
           <td class="drag-handle" draggable="true" title="Drag to reorder">
             <span class="grip">⠿</span><span class="muted"><?= $i + 1 ?></span>
           </td>
-          <td><input name="name[<?= $id ?>]" value="<?= e($s['name']) ?>"></td>
+          <td>
+            <input name="name[<?= $id ?>]" value="<?= e($s['name']) ?>">
+            <span class="cat-chip cat-chip-<?= e($s['applies_to']) ?>"><?=
+              e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null))
+            ?></span>
+          </td>
           <td>
             <select name="applies_to[<?= $id ?>]"><?=
               applies_to_options(applies_to_value($s['applies_to'], $s['applies_to_asset_type'] ?? null), $assetTypes)
@@ -297,8 +321,10 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       </table>
 
       <div class="actions">
+        <button type="submit" name="action" value="save" class="secondary">Save and stay here</button>
+        <span class="hint">keeps your changes, leaves you on this screen</span>
+        <span class="spacer"></span>
         <button type="submit" name="action" value="continue">Save and continue →</button>
-        <button type="submit" name="action" value="save" class="secondary">Save</button>
       </div>
     </form>
 

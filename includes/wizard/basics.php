@@ -125,8 +125,12 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
       </fieldset>
 
       <div class="actions">
+        <?php if ($project): ?>
+          <button type="submit" name="stay" value="1" class="secondary">Save and stay here</button>
+          <span class="hint">keeps your changes, leaves you on this screen</span>
+          <span class="spacer"></span>
+        <?php endif; ?>
         <button type="submit">Save and continue →</button>
-        <?php if ($project): ?><button type="submit" name="stay" value="1" class="secondary">Save</button><?php endif; ?>
       </div>
     </form>
     <?php

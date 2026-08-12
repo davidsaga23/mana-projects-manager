@@ -127,13 +127,10 @@ function applies_to_phrase(string $appliesTo, ?string $assetType = null): string
 /**
  * The steps that make up one chain, in order.
  *
- * Shots and assets are separate production chains (Layout -> Animation vs
- * Concept -> Modeling), so dependencies are derived per chain. A step marked
- * 'both' belongs to each of those — uncommon, but it keeps "applies to both"
- * from meaning something different in the workflow than it does elsewhere.
- *
- * 'project' is its own chain: an animatic or a music track is one deliverable
- * for the whole show, so it never joins the shot or asset chains.
+ * Used for grouping and for giving a newly added step a sensible starting
+ * prerequisite. Dependencies themselves are NOT confined to a chain — they are
+ * set explicitly and cross freely, because real pipelines do (crowd animation
+ * waits on shot layout; a shot waits on its characters being rigged).
  */
 function chain_steps(array $steps, string $kind): array {
     return array_values(array_filter($steps, function ($s) use ($kind) {
@@ -142,60 +139,6 @@ function chain_steps(array $steps, string $kind): array {
     }));
 }
 
-/**
- * Which steps run in parallel with the one before them, read back from the
- * stored graph. A step is parallel with its predecessor when the two depend on
- * exactly the same things — which is precisely what makes them run side by
- * side. Lets the checkbox UI round-trip a graph it didn't create (a template's,
- * or a later graph editor's).
- *
- * Returns step_id => bool for the given chain.
- */
-function derive_parallel_flags(array $chain, array $depsMap): array {
-    $flags = [];
-    $prevDeps = null;
-    foreach ($chain as $i => $step) {
-        $id = (int)$step['id'];
-        $deps = $depsMap[$id] ?? [];
-        sort($deps);
-        $flags[$id] = ($i > 0 && $prevDeps !== null && $deps === $prevDeps);
-        $prevDeps = $deps;
-    }
-    return $flags;
-}
-
-/**
- * Turn "runs in parallel with the previous step" checkboxes back into a graph.
- *
- * Walking the chain, steps accumulate into a parallel cluster. A step that is
- * NOT parallel closes the current cluster and depends on all of it; a step that
- * IS parallel joins the current cluster and copies its dependencies. STFC's
- * pipeline falls out of this exactly:
- *
- *   Assembly -> Lighting, Render (both parallel, both depend on Assembly)
- *            -> Comp (not parallel, depends on Lighting AND Render)
- *
- * Returns step_id => [dep ids]; edges only ever point backwards, so this cannot
- * produce a cycle. pipeline_has_cycle() still verifies before anything is saved.
- */
-function derive_dependencies(array $chain, array $parallelFlags): array {
-    $deps = [];
-    $prevCluster = [];
-    $cluster = [];
-    foreach ($chain as $i => $step) {
-        $id = (int)$step['id'];
-        $isParallel = $i > 0 && !empty($parallelFlags[$id]);
-        if ($isParallel) {
-            $deps[$id] = $prevCluster;
-            $cluster[] = $id;
-        } else {
-            $prevCluster = $cluster;
-            $cluster = [$id];
-            $deps[$id] = $prevCluster;
-        }
-    }
-    return $deps;
-}
 
 /** Depth-first cycle check. A cycle would make the scheduler loop forever. */
 function pipeline_has_cycle(array $depsMap): bool {
@@ -216,72 +159,120 @@ function pipeline_has_cycle(array $depsMap): bool {
     return false;
 }
 
+
 /**
- * Replace a project's whole dependency graph from the wizard's checkboxes.
- * $parallelFlags is step_id => bool across both chains.
+ * Save an explicit dependency graph: step_id => [ids it waits for].
  *
- * Throws if the result would contain a cycle, leaving the stored graph
- * untouched — the scheduler must never be handed one.
+ * Replaces the old "parallel with the step above" model, which could only ever
+ * express dependencies WITHIN one chain — so an asset step could never wait for
+ * a shot step, however the boxes were ticked. Real pipelines do that: crowd
+ * animation waits on layout, a shot can't be assembled until its characters are
+ * rigged.
+ *
+ * Parallelism is still not something you set: two steps waiting on the same
+ * things simply run side by side. That falls out of the graph, as it should.
+ *
+ * Throws without saving anything if the result would contain a cycle.
  */
-function save_workflow(PDO $pdo, int $projectId, array $parallelFlags): void {
-    $steps = pipeline_steps($pdo, $projectId);
-    $newDeps = [];
-    foreach (PIPELINE_CHAINS as $kind) {
-        $chain = chain_steps($steps, $kind);
-        foreach (derive_dependencies($chain, $parallelFlags) as $stepId => $deps) {
-            foreach ($deps as $d) {
-                $newDeps[$stepId][$d] = true;   // union across chains, deduped
-            }
-            $newDeps[$stepId] = $newDeps[$stepId] ?? [];
+function save_dependencies(PDO $pdo, int $projectId, array $wanted): void {
+    $valid = [];
+    foreach (pipeline_steps($pdo, $projectId) as $s) $valid[(int)$s['id']] = true;
+
+    $clean = [];
+    foreach ($wanted as $stepId => $deps) {
+        $stepId = (int)$stepId;
+        if (!isset($valid[$stepId])) continue;
+        $clean[$stepId] = [];
+        foreach ((array)$deps as $d) {
+            $d = (int)$d;
+            // A step waiting for itself is a typo, not an instruction.
+            if ($d === $stepId || !isset($valid[$d])) continue;
+            $clean[$stepId][$d] = true;
         }
+        $clean[$stepId] = array_keys($clean[$stepId]);
+    }
+    foreach (array_keys($valid) as $id) {
+        if (!isset($clean[$id])) $clean[$id] = [];
     }
 
-    $check = [];
-    foreach ($newDeps as $stepId => $set) $check[$stepId] = array_keys($set);
-    if (pipeline_has_cycle($check)) {
-        throw new RuntimeException('That workflow would loop back on itself. Nothing was saved.');
+    if (pipeline_has_cycle($clean)) {
+        throw new RuntimeException(
+            'That would make steps wait for each other in a loop, so nothing was saved. ' .
+            'Check the step you just changed.'
+        );
     }
 
     $pdo->beginTransaction();
     try {
-        $del = $pdo->prepare(
+        $pdo->prepare(
             'DELETE d FROM step_dependencies d
                JOIN pipeline_steps s ON s.id = d.step_id
               WHERE s.project_id = ?'
-        );
-        $del->execute([$projectId]);
+        )->execute([$projectId]);
         $ins = $pdo->prepare(
             'INSERT INTO step_dependencies (step_id, depends_on_step_id) VALUES (?, ?)'
         );
-        foreach ($check as $stepId => $deps) {
+        foreach ($clean as $stepId => $deps) {
             foreach ($deps as $d) $ins->execute([$stepId, $d]);
         }
         $pdo->commit();
     } catch (Throwable $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 }
 
 /**
- * Rebuild the graph from the parallelism already stored in it.
+ * Give a newly added step a sensible starting dependency: the last step of its
+ * own chain. Without one the scheduler would happily start it on day one.
  *
- * Called after steps are added, deleted or reordered: existing parallel
- * clusters are preserved, and a newly added step links into the chain in
- * sequence. Without this a new step would sit with no dependencies at all and
- * the scheduler would happily start it on day one.
+ * Only ever touches a step that has no dependencies at all, so it can never
+ * disturb a graph someone has deliberately set up.
  */
-function resync_workflow(PDO $pdo, int $projectId): void {
-    $steps   = pipeline_steps($pdo, $projectId);
+function link_new_step(PDO $pdo, int $projectId, int $stepId): void {
     $depsMap = step_dependencies_map($pdo, $projectId);
-    $flags = [];
-    foreach (PIPELINE_CHAINS as $kind) {
-        $chain = chain_steps($steps, $kind);
-        foreach (derive_parallel_flags($chain, $depsMap) as $id => $f) {
-            $flags[$id] = ($flags[$id] ?? false) || $f;
+    if (!empty($depsMap[$stepId])) return;
+
+    $steps = pipeline_steps($pdo, $projectId);
+    $self = null;
+    foreach ($steps as $s) if ((int)$s['id'] === $stepId) $self = $s;
+    if (!$self) return;
+
+    $kind = $self['applies_to'] === 'both' ? 'shot' : $self['applies_to'];
+    $previous = null;
+    foreach (chain_steps($steps, $kind) as $s) {
+        if ((int)$s['id'] === $stepId) break;
+        $previous = (int)$s['id'];
+    }
+    if ($previous !== null) {
+        $pdo->prepare(
+            'INSERT IGNORE INTO step_dependencies (step_id, depends_on_step_id) VALUES (?, ?)'
+        )->execute([$stepId, $previous]);
+    }
+}
+
+/**
+ * Close the gap before a step is deleted: anything waiting on it inherits what
+ * IT was waiting on. Deleting B from A -> B -> C leaves A -> C rather than
+ * leaving C with no prerequisite and free to start immediately.
+ *
+ * Must be called BEFORE the delete, while the graph still describes reality.
+ */
+function heal_dependencies_before_delete(PDO $pdo, int $projectId, int $stepId): void {
+    $depsMap = step_dependencies_map($pdo, $projectId);
+    $inherited = $depsMap[$stepId] ?? [];
+
+    $ins = $pdo->prepare(
+        'INSERT IGNORE INTO step_dependencies (step_id, depends_on_step_id) VALUES (?, ?)'
+    );
+    foreach ($depsMap as $dependentId => $deps) {
+        if ($dependentId === $stepId) continue;
+        if (!in_array($stepId, $deps, true)) continue;
+        foreach ($inherited as $d) {
+            if ($d !== $dependentId) $ins->execute([$dependentId, $d]);
         }
     }
-    save_workflow($pdo, $projectId, $flags);
+    // The step's own rows go with it via ON DELETE CASCADE.
 }
 
 /** Copy a template's steps and dependencies into a project. */
@@ -442,24 +433,106 @@ function renumber_steps(PDO $pdo, int $projectId): void {
     foreach ($steps as $s) $upd->execute([++$n, $s['id']]);
 }
 
+
 /**
- * Group a chain into the clusters that actually run one after another.
+ * How far into the pipeline each step sits: 0 for anything that can start
+ * immediately, otherwise one past the latest thing it waits for.
  *
- * Steps running in parallel land in the same cluster, so the number of clusters
- * is how many sequential slots the calendar has to accommodate — which is what
- * spreading deadlines across a project needs to know.
+ * This is what makes a picture possible — steps at the same level genuinely run
+ * at the same time, so a level is a column.
  */
-function sequential_clusters(array $chain, array $depsMap): array {
-    $flags = derive_parallel_flags($chain, $depsMap);
-    $clusters = [];
-    foreach ($chain as $i => $step) {
-        if ($i === 0 || empty($flags[(int)$step['id']])) {
-            $clusters[] = [$step];
-        } else {
-            $clusters[count($clusters) - 1][] = $step;
+function workflow_levels(array $steps, array $depsMap): array {
+    $byId = [];
+    foreach ($steps as $s) $byId[(int)$s['id']] = $s;
+
+    $level = [];
+    $resolve = function ($id) use (&$resolve, &$level, $depsMap, $byId) {
+        if (isset($level[$id])) return $level[$id];
+        $level[$id] = 0;                       // also stops a cycle looping forever
+        $max = -1;
+        foreach ($depsMap[$id] ?? [] as $d) {
+            if (isset($byId[$d])) $max = max($max, $resolve($d));
+        }
+        return $level[$id] = $max + 1;
+    };
+    foreach (array_keys($byId) as $id) $resolve($id);
+    return $level;
+}
+
+/**
+ * Draw the workflow as a left-to-right diagram: one column per level, curves
+ * from each prerequisite to the steps that wait for it.
+ *
+ * Plain SVG built server-side — no library, no script, and it prints. A list
+ * saying "waits for X" is accurate but you can't see the shape of a pipeline in
+ * it, which is the whole reason to look.
+ */
+function workflow_diagram_svg(array $steps, array $depsMap): string {
+    if (!$steps) return '';
+
+    $levels = workflow_levels($steps, $depsMap);
+    $columns = [];
+    foreach ($steps as $s) $columns[$levels[(int)$s['id']] ?? 0][] = $s;
+    ksort($columns);
+
+    $boxW = 158; $boxH = 40; $colGap = 54; $rowGap = 14; $padX = 8; $padY = 10;
+    $pos = [];
+    $maxRows = 0;
+    foreach ($columns as $col => $rows) {
+        $maxRows = max($maxRows, count($rows));
+        foreach (array_values($rows) as $row => $s) {
+            $pos[(int)$s['id']] = [
+                'x' => $padX + $col * ($boxW + $colGap),
+                'y' => $padY + $row * ($boxH + $rowGap),
+                'step' => $s,
+            ];
         }
     }
-    return $clusters;
+    $width  = $padX * 2 + count($columns) * $boxW + (count($columns) - 1) * $colGap;
+    $height = $padY * 2 + $maxRows * $boxH + max(0, $maxRows - 1) * $rowGap;
+
+    $svg  = '<svg class="wf-diagram" viewBox="0 0 ' . $width . ' ' . $height . '" '
+          . 'width="' . $width . '" height="' . $height . '" xmlns="http://www.w3.org/2000/svg" '
+          . 'role="img" aria-label="Pipeline workflow diagram">';
+
+    // Edges first so boxes sit on top of them.
+    foreach ($depsMap as $stepId => $deps) {
+        if (!isset($pos[$stepId])) continue;
+        $to = $pos[$stepId];
+        foreach ($deps as $d) {
+            if (!isset($pos[$d])) continue;
+            $from = $pos[$d];
+            $x1 = $from['x'] + $boxW; $y1 = $from['y'] + $boxH / 2;
+            $x2 = $to['x'];           $y2 = $to['y'] + $boxH / 2;
+            $mid = max(18, ($x2 - $x1) / 2);
+            $svg .= '<path d="M' . $x1 . ',' . $y1
+                  . ' C' . ($x1 + $mid) . ',' . $y1 . ' ' . ($x2 - $mid) . ',' . $y2
+                  . ' ' . $x2 . ',' . $y2 . '" class="wf-edge" />';
+        }
+    }
+
+    foreach ($pos as $id => $p) {
+        $s = $p['step'];
+        $color = $s['color'] ?: '#8a97a3';
+        $name = $s['name'];
+        // SVG has no text wrapping; trim rather than let it run over the box.
+        $label = mb_strlen($name) > 20 ? mb_substr($name, 0, 19) . '…' : $name;
+        $scope = applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null);
+
+        $svg .= '<g class="wf-node">'
+              . '<title>' . e($name . ' · ' . $scope) . '</title>'
+              . '<rect x="' . $p['x'] . '" y="' . $p['y'] . '" width="' . $boxW . '" height="' . $boxH
+              . '" rx="5" class="wf-box" />'
+              . '<rect x="' . $p['x'] . '" y="' . $p['y'] . '" width="4" height="' . $boxH
+              . '" rx="2" fill="' . e($color) . '" />'
+              . '<text x="' . ($p['x'] + 13) . '" y="' . ($p['y'] + 17) . '" class="wf-label">'
+              . e($label) . '</text>'
+              . '<text x="' . ($p['x'] + 13) . '" y="' . ($p['y'] + 31) . '" class="wf-sub">'
+              . e($scope) . '</text>'
+              . '</g>';
+    }
+
+    return $svg . '</svg>';
 }
 
 /** Human-readable "waits for X and Y" for the review screen. */

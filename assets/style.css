@@ -59,8 +59,12 @@ a.button, .page-actions .button {
   background: #2f6fb2; color: #fff; text-decoration: none;
 }
 a.button:hover { background: #275d95; text-decoration: none; }
-button.secondary { background: #e4e8ec; color: #1c2733; }
-button.secondary:hover { background: #d5dbe1; }
+/* Bordered rather than flat grey — a low-contrast filled button reads as
+   disabled, which hid the plain "Save" option next to "Save and continue". */
+button.secondary {
+  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+}
+button.secondary:hover { background: #eef4fa; border-color: #2f6fb2; }
 button:disabled { background: #c3ccd4; cursor: not-allowed; }
 button.danger { background: #b02a37; }
 button.danger:hover { background: #8f222c; }
@@ -72,6 +76,10 @@ button.danger:hover { background: #8f222c; }
 .page-actions { margin-bottom: 16px; }
 .actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .actions button { margin-top: 0; }
+/* "Stay here and save" is a different intention from "move on" — give them a
+   visible gap so they don't read as one control with two halves. */
+.actions .spacer { flex: 0 0 18px; }
+.actions .hint { color: #5a6a7a; font-size: 12.5px; }
 .inline-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
 .toggle-form {
   background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 14px;
@@ -146,6 +154,46 @@ label.inline input { width: auto; }
 .drag-handle .grip { margin-right: 5px; font-size: 15px; letter-spacing: -1px; }
 .step-table tbody tr.dragging { opacity: .45; background: #eef4fa; }
 .step-table tbody tr { background: #fff; }
+
+/* Step categories — one colour per kind of work, used on the row and the chip */
+.cat-chip {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 9px;
+  font-size: 11px; white-space: nowrap; vertical-align: middle;
+}
+.cat-chip-shot    { background: #e3f0fb; color: #1c4f7c; }
+.cat-chip-asset   { background: #e0f5f2; color: #14675e; }
+.cat-chip-both    { background: #efe6f7; color: #5b3a7e; }
+.cat-chip-project { background: #fdeee0; color: #8a4b12; }
+.cat-row td:first-child { border-left: 3px solid transparent; }
+.cat-row.cat-shot    td:first-child { border-left-color: #4A90D9; }
+.cat-row.cat-asset   td:first-child { border-left-color: #45B8AC; }
+.cat-row.cat-both    td:first-child { border-left-color: #8E7CC3; }
+.cat-row.cat-project td:first-child { border-left-color: #E67E22; }
+.step-filter {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 8px 12px; margin-bottom: 10px;
+}
+.step-filter select { width: auto; }
+.step-filter small, .step-filter .small { margin: 0; }
+
+/* Workflow diagram */
+.wf-diagram-wrap {
+  overflow-x: auto; background: #fff; border: 1px solid #e4e8ec;
+  border-radius: 6px; padding: 8px; margin-bottom: 6px;
+}
+.wf-diagram { display: block; }
+.wf-edge { fill: none; stroke: #b6c2cd; stroke-width: 1.6; }
+.wf-box { fill: #f7f9fb; stroke: #dbe2e8; stroke-width: 1; }
+.wf-label { font: 600 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
+.wf-sub   { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #7b8894; }
+
+/* Dependency picker */
+.deps-table td { vertical-align: top; }
+.deps-table .wf-name { white-space: normal; min-width: 170px; }
+.dep-picks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.dep-pick { font-size: 13px; }
+.dep-pick .dot { width: 7px; height: 7px; margin-right: 3px; }
 
 .row-actions { white-space: nowrap; }
 .row-actions button {
@@ -231,6 +279,14 @@ label.inline input { width: auto; }
 .planning-table .verdict .muted { font-size: 11.5px; }
 
 /* Users */
+/* Pending migrations — visible without having to go and look */
+.topbar-right a.needs-action { color: #8a6d1a; font-weight: 600; }
+.pending-badge {
+  display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 5px;
+  background: #d6a72a; color: #fff; border-radius: 8px;
+  font-size: 11px; line-height: 16px; text-align: center; font-weight: 700;
+}
+
 .role-badge {
   background: #fff3cd; color: #7a5f12; border-radius: 3px;
   padding: 1px 6px; font-size: 11.5px; margin-left: 4px;

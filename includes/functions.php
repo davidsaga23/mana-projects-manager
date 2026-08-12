@@ -18,6 +18,37 @@ function asset_ver(string $filename): string {
     return '?v=' . ($mtime ?: time());
 }
 
+/**
+ * How many migration files haven't been applied yet.
+ *
+ * Read on every admin page view so the header can say "there's something to run"
+ * without anyone having to go and look. One directory listing plus one small
+ * query, cached for the request.
+ *
+ * Returns 0 rather than throwing when schema_migrations doesn't exist — that
+ * means a fresh install mid-setup, which is not a state to raise an alarm about.
+ */
+function pending_migration_count(PDO $pdo): int {
+    static $count = null;
+    if ($count !== null) return $count;
+
+    $files = glob(__DIR__ . '/../migrations/*.sql') ?: [];
+    if (!$files) return $count = 0;
+
+    try {
+        $applied = $pdo->query('SELECT filename FROM schema_migrations')->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        return $count = 0;
+    }
+
+    $done = array_flip($applied);
+    $n = 0;
+    foreach ($files as $f) {
+        if (!isset($done[basename($f)])) $n++;
+    }
+    return $count = $n;
+}
+
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
 // Empty string for null so it can fill a form field that means "not set".
 function fmt_num($v, int $decimals = 2): string {

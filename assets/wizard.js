@@ -197,6 +197,42 @@
   recalcAll();
 })();
 
+// Filter the pipeline step list by category.
+//
+// Hides rows rather than removing them: every step's fields stay in the form, so
+// saving while filtered can never drop the steps you can't currently see.
+(function () {
+  'use strict';
+
+  var select = document.getElementById('step-filter-select');
+  var tbody = document.getElementById('step-rows');
+  var note = document.getElementById('step-filter-note');
+  if (!select || !tbody) return;
+
+  select.addEventListener('change', function () {
+    var want = select.value;
+    var rows = tbody.querySelectorAll('tr[data-category]');
+    var shown = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var match = !want || rows[i].getAttribute('data-category') === want;
+      rows[i].style.display = match ? '' : 'none';
+      if (match) shown++;
+    }
+    if (note) {
+      note.textContent = want
+        ? 'Showing ' + shown + ' of ' + rows.length + ' steps. Saving still keeps every step.'
+        : 'Filtering only changes what you see — saving still keeps every step.';
+    }
+    // Reordering a filtered list would post an order missing the hidden rows,
+    // so dragging is switched off until the full list is back.
+    var handles = tbody.querySelectorAll('.drag-handle');
+    for (var j = 0; j < handles.length; j++) {
+      if (want) handles[j].removeAttribute('draggable');
+      else handles[j].setAttribute('draggable', 'true');
+    }
+  });
+})();
+
 // "Select all" in an asset group — retyping fifty pasted assets shouldn't mean
 // fifty clicks. Each toggle names the container it controls.
 (function () {

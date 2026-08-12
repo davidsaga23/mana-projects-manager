@@ -135,7 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 (project_id, name, step_order, applies_to, applies_to_asset_type)
                              VALUES (?, ?, ?, ?, ?)'
                         )->execute([$projectId, $s['external'], (int)$max->fetchColumn() + 1, $applies, $assetType]);
-                        $steps[$s['external']] = (int)$pdo->lastInsertId();
+                        $newStepId = (int)$pdo->lastInsertId();
+                        $steps[$s['external']] = $newStepId;
+                        link_new_step($pdo, $projectId, $newStepId);
                         step_library_remember($pdo, $s['external'], $applies, 0);
                         $createdSteps++;
                     } catch (PDOException $e) {
@@ -156,9 +158,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             if ($createdSteps) {
-                resync_workflow($pdo, $projectId);
                 flash('ok', "Created $createdSteps new pipeline step" . ($createdSteps === 1 ? '' : 's') .
-                            '. Check the workflow screen so they sit in the right order.');
+                            '. Each waits for the last step of its own chain — set what they ' .
+                            'really wait for on the workflow screen.');
             }
 
             // Statuses: remembered in status_mapping, so this is asked once.

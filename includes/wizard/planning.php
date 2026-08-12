@@ -30,24 +30,30 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $depsMap = step_dependencies_map($pdo, $projectId);
         $upd = $pdo->prepare('UPDATE pipeline_steps SET start_date = ?, deadline = ? WHERE id = ? AND project_id = ?');
 
+        // Group by how deep into the graph each step sits. Everything at the same
+        // depth genuinely runs at the same time, so it shares a slot — and this
+        // works across chains, which per-chain clustering could not.
+        $levels = workflow_levels($steps, $depsMap);
+        $byLevel = [];
+        foreach ($steps as $s) $byLevel[$levels[(int)$s['id']] ?? 0][] = $s;
+        ksort($byLevel);
+
         $touched = 0;
-        foreach (PIPELINE_CHAINS as $kind) {
-            $chain = chain_steps($steps, $kind);
-            if (!$chain) continue;
-            $clusters = sequential_clusters($chain, $depsMap);
-            $n = count($days);
-            $c = count($clusters);
-            foreach ($clusters as $i => $cluster) {
-                $startIdx = (int)floor($n * $i / $c);
-                $endIdx   = max($startIdx, (int)floor($n * ($i + 1) / $c) - 1);
-                foreach ($cluster as $step) {
-                    $upd->execute([$days[$startIdx], $days[$endIdx], $step['id'], $projectId]);
-                    $touched++;
-                }
+        $n = count($days);
+        $c = max(1, count($byLevel));
+        $i = 0;
+        foreach ($byLevel as $group) {
+            $startIdx = (int)floor($n * $i / $c);
+            $endIdx   = max($startIdx, (int)floor($n * ($i + 1) / $c) - 1);
+            foreach ($group as $step) {
+                $upd->execute([$days[$startIdx], $days[$endIdx], $step['id'], $projectId]);
+                $touched++;
             }
+            $i++;
         }
-        flash('ok', "Spread $touched steps evenly between $start and $end. " .
-                    'Steps running in parallel share the same dates. Adjust anything below.');
+        flash('ok', "Spread $touched steps across $c stage" . ($c === 1 ? '' : 's') .
+                    " between $start and $end. Steps that run at the same time share dates. " .
+                    'Adjust anything below.');
         return wizard_url($projectId, 6);
     }
 
@@ -177,8 +183,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       </table>
 
       <div class="actions">
+        <button type="submit" name="action" value="save" class="secondary">Save and stay here</button>
+        <span class="hint">keeps your changes, leaves you on this screen</span>
+        <span class="spacer"></span>
         <button type="submit" name="action" value="continue">Save and continue →</button>
-        <button type="submit" name="action" value="save" class="secondary">Save</button>
       </div>
     </form>
 
