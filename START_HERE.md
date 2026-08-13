@@ -179,7 +179,18 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      Marking items `N/A` (the new `statuses.is_excluded`) turns it into real per-item dates.
    - Dry-run preview first, then save — same convention as the importer and `migrate.php`.
      `is_manual = 1` rows are read but never rewritten.
-5. **Timeline UI** — Gantt view, `.gan` export/import round trip
+4b. **Crew slots + snapshot history** — built 2026-08-13, alongside Phase 4.
+   `migrations/011_snapshot_history.sql`, `012_crew_placeholders.sql`,
+   `includes/{snapshots,crew}.php`, `crew.php`.
+   - **Slots, not people.** A crew is never complete until the show nearly is — people
+     arrive as their department starts — so headcount generates named slots
+     ("Animation 01/02") that the scheduler assigns work to. Hiring someone **renames the
+     slot**; the crew row's id never changes, so all planned work becomes theirs with
+     nothing moved.
+   - **Daily snapshots now actually get written**, on page load. `daily_snapshots` had
+     existed since v1 with no writer. History can't be backfilled, which is why this
+     jumped the queue.
+5. **Timeline UI** — Gantt view, `.gan` export/import round trip · **NEXT**
 6. **Reporting** — per-artist productivity, cross-project workload
 7. **Tickets / tasks** — port from STFC (it works well; see that codebase)
 

@@ -265,20 +265,44 @@ require __DIR__ . '/includes/header.php';
   </table>
 
   <?php // --- who is on what ------------------------------------------- ?>
+  <?php
+  // Read the lanes off the tasks rather than rebuilding the labels here, so this
+  // list can never disagree with the names on the plan itself.
+  $laneChips = [];
+  foreach ($plan['tasks'] as $t) {
+      $laneChips[$t['step_id'] . '|' . $t['lane']] = $t;
+  }
+  $anyPlaceholder = false;
+  $anySlotless    = false;
+  foreach ($laneChips as $t) {
+      if (!empty($t['placeholder'])) $anyPlaceholder = true;
+      if (empty($t['has_slot']))     $anySlotless    = true;
+  }
+  ?>
   <h3>Lanes</h3>
   <p class="muted small">
-    Names are placeholders derived from the step and how many people are on it — there is no
-    record yet of who does which discipline, and a real name on a task would read as a real
-    assignment. They become people when the crew screen exists.
+    <?php if ($anySlotless): ?>
+      These are derived from the step name because this project has no crew slots yet.
+      <a href="crew.php?project=<?= $projectId ?>">Create them from the headcount</a> and the
+      plan starts naming who does what — a placeholder at first, a real person once someone
+      is hired into the slot.
+    <?php elseif ($anyPlaceholder): ?>
+      Slots, not yet all people. A placeholder holds the plan until someone is hired into it;
+      naming them on the <a href="crew.php?project=<?= $projectId ?>">crew screen</a> turns
+      everything planned here into that person's work, with nothing moved.
+    <?php else: ?>
+      Every slot on this plan is a real person.
+    <?php endif; ?>
   </p>
   <div class="lane-list">
-    <?php foreach ($plan['steps'] as $s): if ($s['scheduled'] === 0) continue; ?>
-      <?php for ($i = 1; $i <= $s['lanes']; $i++): ?>
-        <span class="lane-chip">
-          <span class="dot" style="background:<?= e($s['step']['color'] ?: '#ccc') ?>"></span>
-          <?= e(lane_label($s['step']['name'], $i, (int)$s['lanes'])) ?>
-        </span>
-      <?php endfor; ?>
+    <?php foreach ($laneChips as $t): ?>
+      <span class="lane-chip">
+        <span class="dot" style="background:<?= e($t['color'] ?: '#ccc') ?>"></span>
+        <?= e($t['lane_label']) ?>
+        <?php if (!empty($t['placeholder']) && !empty($t['has_slot'])): ?>
+          <span class="est-tag">slot</span>
+        <?php endif; ?>
+      </span>
     <?php endforeach; ?>
   </div>
 

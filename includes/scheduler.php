@@ -27,9 +27,15 @@ require_once __DIR__ . '/calendar.php';
 require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/quota.php';
 
-/** How a lane is named until real people are assigned to it: "Compositing 02". */
+/**
+ * How a lane is named.
+ *
+ * Falls back to deriving a name from the step when no crew slot exists for that
+ * lane yet. Once the setup has generated slots (includes/crew.php) the lane
+ * carries a real crew row instead — a placeholder like "Animation 02" at first,
+ * and the actual person's name the day that slot is filled, with no change here.
+ */
 function lane_label(string $stepName, int $lane, int $laneCount): string {
-    // A single lane needs no number — "Animatic 01" reads like there is an 02.
     if ($laneCount <= 1) return $stepName;
     return $stepName . ' ' . str_pad((string)$lane, 2, '0', STR_PAD_LEFT);
 }
@@ -82,6 +88,9 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     $progress   = scheduler_progress_map($pdo, $projectId);
     $manual     = scheduler_manual_rows($pdo, $projectId);
     $shotAssets = scheduler_shot_assets($pdo, $projectId);
+    // Who fills each lane. A placeholder slot ("Animation 02") counts as filled:
+    // the whole point is being able to plan before anyone is hired.
+    $laneCrew   = scheduler_lane_crew($pdo, $projectId);
 
     // Steps in dependency order. A step's level is one past everything it waits
     // for, so ordering by level is a valid topological order and the graph never
@@ -103,7 +112,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
         $summary = scheduler_schedule_step(
             $pdo, $project, $step, $axis, $anchor, $projectDeadline,
             $items, $progress, $manual, $shotAssets, $depsMap,
-            $stepEnd, $itemEnd, $estimates
+            $stepEnd, $itemEnd, $estimates, $laneCrew
         );
 
         $out['steps'][$stepId] = $summary;
@@ -241,6 +250,35 @@ function scheduler_manual_rows(PDO $pdo, int $projectId): array {
     return $map;
 }
 
+/**
+ * step_id => [lane_no => ['id' => crew id, 'name' => …, 'placeholder' => bool]].
+ *
+ * Read through a guard because crew_lanes arrives in migration 012: an install
+ * that hasn't run it yet still schedules perfectly well, it just falls back to
+ * derived lane names.
+ */
+function scheduler_lane_crew(PDO $pdo, int $projectId): array {
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT cl.step_id, cl.lane_no, c.id, c.name, c.is_placeholder
+               FROM crew_lanes cl JOIN crew c ON c.id = cl.crew_id
+              WHERE cl.project_id = ?'
+        );
+        $stmt->execute([$projectId]);
+    } catch (PDOException $e) {
+        return [];
+    }
+    $map = [];
+    foreach ($stmt as $r) {
+        $map[(int)$r['step_id']][(int)$r['lane_no']] = [
+            'id'          => (int)$r['id'],
+            'name'        => $r['name'],
+            'placeholder' => (int)$r['is_placeholder'] === 1,
+        ];
+    }
+    return $map;
+}
+
 /** shot id => [asset ids], for dependencies that cross from assets to shots. */
 function scheduler_shot_assets(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
@@ -261,7 +299,7 @@ function scheduler_shot_assets(PDO $pdo, int $projectId): array {
 function scheduler_schedule_step(
     PDO $pdo, array $project, array $step, array &$axis, string $anchor, ?string $projectDeadline,
     array $items, array $progress, array $manual, array $shotAssets, array $depsMap,
-    array $stepEnd, array $itemEnd, array $estimates
+    array $stepEnd, array $itemEnd, array $estimates, array $laneCrew = []
 ): array {
     $stepId    = (int)$step['id'];
     $stepName  = $step['name'];
@@ -452,7 +490,7 @@ function scheduler_schedule_step(
 
         $task = scheduler_make_task(
             $axis, $projectId, $step, null, 'band', $label,
-            $earliest, $span, 1, $lanes, false, 0
+            $earliest, $span, 1, $lanes, false, 0, $laneCrew[$stepId] ?? []
         );
         if ($task) {
             $s['tasks'][] = $task;
@@ -482,7 +520,8 @@ function scheduler_schedule_step(
 
             $task = scheduler_make_task(
                 $axis, $projectId, $step, $item, $item['key'], $item['name'],
-                $start, $len, $lane + 1, $lanes, !empty($item['blocked']), $n
+                $start, $len, $lane + 1, $lanes, !empty($item['blocked']), $n,
+                $laneCrew[$stepId] ?? []
             );
             if ($task === null) break;   // ran off the end of the calendar
 
@@ -644,7 +683,8 @@ function scheduler_item_earliest(
  */
 function scheduler_make_task(
     array &$axis, int $projectId, array $step, ?array $item, string $itemKey, string $label,
-    float $start, float $length, int $lane, int $laneCount, bool $blocked, int $sort
+    float $start, float $length, int $lane, int $laneCount, bool $blocked, int $sort,
+    array $stepLaneCrew = []
 ): ?array {
     $startIdx = (int)floor($start);
     // Exclusive end, so a task of length 1 starting at 0 covers day 0 only.
@@ -653,6 +693,10 @@ function scheduler_make_task(
     $startDate = axis_date($axis, $startIdx);
     $endDate   = axis_date($axis, $endIdx);
     if ($startDate === null || $endDate === null) return null;
+
+    // Whoever holds this slot — a placeholder until somebody is hired into it,
+    // then the real person, with nothing here needing to change.
+    $slot = $stepLaneCrew[$lane] ?? null;
 
     return [
         'project_id' => $projectId,
@@ -665,9 +709,12 @@ function scheduler_make_task(
         'label'      => $label,
         'start_date' => $startDate,
         'end_date'   => $endDate,
-        'lane'       => $lane,
-        'lane_label' => lane_label($step['name'], $lane, $laneCount),
-        'blocked'    => $blocked,
+        'lane'        => $lane,
+        'crew_id'     => $slot['id'] ?? null,
+        'lane_label'  => $slot['name'] ?? lane_label($step['name'], $lane, $laneCount),
+        'placeholder' => $slot === null ? true : $slot['placeholder'],
+        'has_slot'    => $slot !== null,
+        'blocked'     => $blocked,
         'end_index'  => $endIdx,
         'sort'       => $sort,
     ];
@@ -696,18 +743,21 @@ function commit_schedule(PDO $pdo, int $projectId, array $plan): array {
             "INSERT INTO schedule
                 (project_id, step_id, shot_id, asset_id, item_key, start_date, end_date,
                  crew_id, lane, is_manual, source)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, 'auto')"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'auto')"
         );
         $written = 0;
         foreach ($plan['tasks'] as $t) {
-            // crew_id stays NULL on purpose: there is no record yet of who does
-            // what discipline, and a name on a task reads as a real assignment.
-            // The lane carries a placeholder name instead ("Compositing 02"),
-            // derived from the step at display time so renaming the step renames
-            // the lanes with it.
+            // crew_id points at whoever holds this lane's slot — a placeholder
+            // ("Animation 02") until a real person is hired into it. Storing it
+            // now is what makes the promotion cheap later: renaming the slot
+            // turns every one of these rows into that person's work without a
+            // single assignment being moved.
+            //
+            // NULL only when a project has no slots generated yet, in which case
+            // the lane number still records which track the task is on.
             $ins->execute([
                 $projectId, $t['step_id'], $t['shot_id'], $t['asset_id'], $t['item_key'],
-                $t['start_date'], $t['end_date'], $t['lane'],
+                $t['start_date'], $t['end_date'], $t['crew_id'] ?? null, $t['lane'],
             ]);
             $written++;
         }

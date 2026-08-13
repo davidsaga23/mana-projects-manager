@@ -156,6 +156,28 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 5);
     }
 
+    // Merge two spellings of one type. Offered only where the screen has already
+    // pointed the pair out, and it moves ASSETS onto the winning spelling rather
+    // than renaming anything on the pipeline — a step's scope is what the plan is
+    // built against, so it is the thing to converge on, not the thing to change.
+    if (preg_match('/^merge_types$/', $action)) {
+        $into = trim($_POST['merge_into'] ?? '');
+        $from = (array)($_POST['merge_from'] ?? []);
+        if ($into === '' || !$from) {
+            throw new RuntimeException('Nothing to merge.');
+        }
+        $in = implode(',', array_fill(0, count($from), '?'));
+        $stmt = $pdo->prepare(
+            "UPDATE assets SET asset_type = ? WHERE project_id = ? AND asset_type IN ($in)"
+        );
+        $stmt->execute(array_merge([$into, $projectId], array_values($from)));
+        flash('ok', sprintf(
+            'Moved %d asset%s onto "%s". Any step scoped to that type now counts them.',
+            $stmt->rowCount(), $stmt->rowCount() === 1 ? '' : 's', $into
+        ));
+        return wizard_url($projectId, 5);
+    }
+
     if ($changed > 0) {
         flash('ok', "Saved changes to $changed asset" . ($changed === 1 ? '' : 's') . '.');
     } elseif ($action === 'save') {
@@ -183,9 +205,43 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
     foreach (pipeline_steps($pdo, $projectId) as $s) {
         if (in_array($s['applies_to'], ['asset', 'both'], true)) { $hasAssetSteps = true; break; }
     }
+    // Two spellings of one type is the quietest way to break a plan: a step
+    // scoped to "Environment" counts none of six assets typed "Environments",
+    // reports a healthy-looking number, and every date derived from it is wrong.
+    $similar = similar_asset_types($pdo, $projectId);
+    $anchors = array_merge(step_scoped_asset_types($pdo, $projectId),
+                           ['Character', 'Environment', 'Prop', 'Vehicle', 'FX']);
     ?>
     <p class="lead">Characters, environments, props — anything built once and reused across
        shots. Skip this if the project doesn't track assets separately.</p>
+
+    <?php foreach ($similar as $spellings):
+        $into  = preferred_asset_type($spellings, $anchors);
+        $from  = array_keys(array_diff_key($spellings, [$into => true]));
+        $moving = 0;
+        foreach ($from as $f) $moving += $spellings[$f];
+        $parts = [];
+        foreach ($spellings as $name => $n) $parts[] = '"' . $name . '" (' . $n . ')';
+    ?>
+      <div class="flash flash-warn">
+        <strong>Two spellings of the same type:</strong> <?= e(implode(' and ', $parts)) ?>.
+        These count as completely different types — a pipeline step scoped to one of them
+        counts none of the other, and every quota and date derived from it is wrong without
+        anything looking broken.
+        <?php if (can_edit()): ?>
+          <form method="post" class="inline-form">
+            <input type="hidden" name="merge_into" value="<?= e($into) ?>">
+            <?php foreach ($from as $f): ?>
+              <input type="hidden" name="merge_from[]" value="<?= e($f) ?>">
+            <?php endforeach; ?>
+            <button type="submit" name="action" value="merge_types" class="secondary">
+              Move all <?= $moving ?> onto "<?= e($into) ?>"
+            </button>
+            <small>Picked because a pipeline step is scoped to it.</small>
+          </form>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
 
     <?php if (!$hasAssetSteps && $assets): ?>
       <div class="flash flash-warn">No pipeline step applies to assets, so these won't be

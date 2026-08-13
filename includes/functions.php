@@ -134,6 +134,14 @@ function take_flashes(): array {
 // they always did.
 require_once __DIR__ . '/calendar.php';
 
+// The daily snapshot, called from require_login(). Loaded from HERE rather than
+// from auth.php on purpose: every page does `require auth.php` and then
+// `require functions.php` (plain, not _once), so anything auth.php pulls in
+// early gets executed a second time by that line and every function in it is
+// redeclared. functions.php is the last of the three, so it is the safe place to
+// add to. require_login() is only ever CALLED after all three have loaded.
+require_once __DIR__ . '/snapshots.php';
+
 function working_days_list(string $from, string $to): array {
     $holidays = non_working_days();
     $f = new DateTime($from);

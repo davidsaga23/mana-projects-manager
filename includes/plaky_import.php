@@ -98,6 +98,60 @@ function plaky_group_matches_type(string $group, string $assetType): bool {
 }
 
 /**
+ * The spelling an imported asset's type should be written as.
+ *
+ * The board says "Environments". The project already calls that "Environment",
+ * and its pipeline steps are scoped to the singular. Writing the group name
+ * verbatim — which is what this importer did — creates a SECOND type differing
+ * only by an "s", and a step scoped to one then counts none of the other while
+ * reporting a perfectly healthy-looking number.
+ *
+ * plaky_group_matches_type() above already encodes that boards are pluralised
+ * and types aren't. It was only ever applied when READING a group to find a
+ * step. This applies the same knowledge when writing, which is where it was
+ * missing.
+ *
+ * Order matters: what a pipeline step is scoped to wins, because that is the
+ * spelling the plan is built against and therefore the one that makes the step
+ * count these assets at all.
+ */
+function plaky_canonical_asset_type(PDO $pdo, int $projectId, string $group): string {
+    static $cache = [];
+    $group = trim($group);
+    $key = $projectId . '|' . mb_strtolower($group);
+    if (isset($cache[$key])) return $cache[$key];
+    if ($group === '') return $cache[$key] = '';
+
+    // 1. A type a pipeline step is scoped to.
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT applies_to_asset_type FROM pipeline_steps
+          WHERE project_id = ? AND applies_to_asset_type <> ''"
+    );
+    $stmt->execute([$projectId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $t) {
+        if (plaky_group_matches_type($group, (string)$t)) return $cache[$key] = (string)$t;
+    }
+
+    // 2. A spelling this project's assets already use.
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT asset_type FROM assets
+          WHERE project_id = ? AND asset_type IS NOT NULL AND asset_type <> ''"
+    );
+    $stmt->execute([$projectId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $t) {
+        if (plaky_group_matches_type($group, (string)$t)) return $cache[$key] = (string)$t;
+    }
+
+    // 3. A built-in starter, so different shows converge on one vocabulary.
+    foreach (['Character', 'Environment', 'Prop', 'Vehicle', 'FX'] as $t) {
+        if (plaky_group_matches_type($group, $t)) return $cache[$key] = $t;
+    }
+
+    // 4. Genuinely new. The group name becomes the type, as it always did.
+    return $cache[$key] = $group;
+}
+
+/**
  * Pick the best project step for a name arriving under a given group.
  *
  * The name has to match. Beyond that, a step scoped to the asset type this group
@@ -312,6 +366,11 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
         'skipped_no_step' => 0, 'skipped_no_parent' => 0,
         'skipped_no_project_step' => 0,
         'unmatched_people' => [], 'unmapped_statuses' => [], 'unmatched_project_steps' => [],
+        // Board group name => the asset type it was written as, where the two
+        // differ. Reported rather than done quietly: an importer that renames
+        // things without saying so is the same silent-change problem as one that
+        // creates duplicates without saying so.
+        'types_normalised' => [],
         'notes' => [],
     ];
 
@@ -451,8 +510,14 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                 }
             } else {   // asset_type
                 $key = mb_strtolower($title);
+                // Resolve "Environments" onto the "Environment" this project
+                // already uses, rather than creating a second type an "s" apart.
+                $assetType = plaky_canonical_asset_type($pdo, $projectId, (string)$p['Group']);
+                if ($assetType !== trim((string)$p['Group'])) {
+                    $report['types_normalised'][trim((string)$p['Group'])] = $assetType;
+                }
                 if (isset($assetIds[$key])) {
-                    if (!$dryRun) $updAsset->execute([$p['Group'], $plakyId, $assetIds[$key]]);
+                    if (!$dryRun) $updAsset->execute([$assetType, $plakyId, $assetIds[$key]]);
                     $report['assets_updated']++;
                     $parentTarget[$plakyId] = ['kind' => 'asset', 'id' => $assetIds[$key]];
                 } else {
@@ -460,7 +525,7 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                         $report['assets_created']++;
                         $parentTarget[$plakyId] = ['kind' => 'asset', 'id' => 0];
                     } else {
-                        $insAsset->execute([$projectId, $title, $p['Group'], $plakyId]);
+                        $insAsset->execute([$projectId, $title, $assetType, $plakyId]);
                         $newId = (int)$pdo->lastInsertId();
                         $assetIds[$key] = $newId;
                         $report['assets_created']++;

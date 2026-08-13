@@ -138,6 +138,24 @@ function require_login(): void {
         exit;
     }
 
+    // The daily progress snapshot, taken by whoever opens the app first that
+    // day. Here because it is the one place every page already passes through —
+    // the alternative, remembering to call it per screen, fails the first time
+    // someone adds a page and forgets.
+    //
+    // GET only: a POST is somebody saving something, and recording history in
+    // the middle of that would attribute the change to the wrong day. Never
+    // throws; a failure is surfaced to admins rather than swallowed.
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && function_exists('maybe_take_snapshots')) {
+        global $pdo;
+        if ($pdo instanceof PDO) {
+            $problem = maybe_take_snapshots($pdo);
+            if ($problem !== null && is_admin() && function_exists('flash')) {
+                flash('warn', $problem);
+            }
+        }
+    }
+
     // Read-only is enforced HERE rather than page by page, so a screen added
     // later is covered without anyone remembering to add a check. Every write in
     // this app is a POST, so refusing POSTs is the whole of it.

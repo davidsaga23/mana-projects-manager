@@ -479,6 +479,89 @@ application. This file is the bridge between the two: production numbers out, mo
 on the other side. Written with a UTF-8 byte-order mark, or Excel mangles names like
 "Santiago Bernabéu".
 
+## 2026-08-13 — Daily snapshots are taken on page load, not by cron
+**Decision:** `daily_snapshots` finally gets a writer (`includes/snapshots.php`), called from
+`require_login()` on GET requests. The first person to open the app on a given day records
+every active project's position. Migration 011 adds `items_*` (steps apply to assets too, not
+just shots), `items_total`, `blocked_count` and an index on `snapshot_date`.
+**Why:** David's call — no cPanel cron to configure, and it starts working the moment the
+code is deployed. The urgency is the point: **a report screen can be built whenever, but
+history cannot be backfilled.** The table had existed since v1 with nothing writing to it, so
+every day was being lost permanently.
+**Consequence:**
+- On a day nobody opens the app, no snapshot is taken. That gap is *reported*
+  (`snapshot_gaps()`) rather than hidden, because an unrecorded week and a flat week look
+  identical on a chart otherwise.
+- `items_total` is stored, not derived. The breakdown grows — a shot added in October would
+  otherwise make every September percentage recompute against a total that didn't exist yet,
+  silently rewriting history.
+- A row is written for **every** step, including ones with nothing logged. Zeroes are data; a
+  line that just begins partway through reads as "work started here".
+- Loaded from `functions.php`, never from `auth.php`. Every page does `require auth.php` then
+  `require functions.php` **plain, not `_once`** — so anything auth.php pulls in early gets
+  executed twice and fatals on redeclaration.
+
+## 2026-08-13 — Crew is planned as SLOTS; a placeholder becomes a person by being renamed
+**Decision:** reverses the Phase 4 position that the scheduler assigns nobody. A step's
+`planned_headcount` generates named slots — "Animation 01", "Animation 02" — as rows in
+`crew` with `is_placeholder = 1`, tied to a lane by `crew_lanes (project_id, step_id,
+lane_no, crew_id)` (migration 012). The scheduler assigns `schedule.crew_id` to them.
+**Why:** David's correction, and it exposes a wrong assumption. Phase 4 treated crew as
+something that arrives from Plaky once the team exists. **A crew is never complete until the
+show nearly is** — people arrive as their department starts, so waiting for real names means
+never being able to plan at all. Planning against slots is how a production office actually
+works.
+**Consequence — the part that makes it worth doing:** hiring someone *renames the slot* and
+clears the flag. The crew row's **id never changes**, so every scheduled task, every progress
+record and all the history follow automatically — no re-linking, no migration of assignments.
+The old slot name is kept as a `crew_aliases` entry, so an import still saying "Animation 02"
+resolves to the right person.
+- Slots are rows in `crew`, not a parallel table: `schedule.crew_id`, `progress.crew_id`,
+  `progress_crew` and `crew_projects` all point at `crew` already, and `is_team` established
+  the precedent that it holds rows which aren't a person. A separate table would force every
+  future report to understand two kinds of assignee.
+- `sync_project_lanes()` only ever **adds**. Dropping headcount from 3 to 2 never deletes the
+  third slot, which may already have work planned against it — surplus is reported and a
+  person decides.
+- No unique constraint on `crew.name`: "Animation 01" legitimately exists on two shows at
+  once, and forcing a project prefix would put "RTC · Animation 01" on every timeline bar.
+  Which project a slot belongs to is `crew_lanes.project_id`'s job.
+- This supersedes the Phase 4 note that lane names are derived at display time. They are only
+  derived as a **fallback**, for a project with no slots generated yet.
+
+## 2026-08-13 — Near-duplicate asset types are detected and offered, never auto-merged
+**Decision:** `similar_asset_types()` flags types that differ only by case, spacing or a
+trailing "s". The Assets screen shows the pair with a one-click merge; the Dates & headcount
+screen warns when a step is scoped to one spelling while assets carry another. Nothing merges
+by itself.
+**Why:** found on real data — six assets typed "Environments", one typed "Environment", and a
+pipeline step scoped to the singular. The step counted **1 of 7**, reported "1.0 Environment
+assets", and looked completely healthy. Every quota, headcount and scheduled date derived
+from it was short by a factor of seven with nothing on screen suggesting a problem.
+The 2026-08-11 free-text-types entry predicted "a typo becomes a new type" and answered it
+with the bulk retype control — which is the right fix, but only helps someone who has already
+noticed. This is the noticing.
+**Consequence:**
+- The winning spelling is **the one a pipeline step points at**, then a built-in starter,
+  then sheer count. Not the most common: in the case that prompted this, the popular spelling
+  was precisely the one that made the step count nothing.
+- Merging moves *assets*, never a step's scope. A step's scope is what the plan is built
+  against, so it is the thing to converge on rather than the thing to change.
+- Detection only, never automatic. "Prop"/"Props" being one type is a safe guess, but guessing
+  silently is the habit the alias layer exists to avoid.
+
+**Where the plurals actually came from — the importer, not a person.** `plaky_import.php`
+wrote `asset_type = $p['Group']` verbatim, and Plaky groups are plural ("Environments")
+because a group holds many things. So every imported asset got a type one "s" away from the
+one the wizard's built-in list offers. The file already contained
+`plaky_group_matches_type()`, whose docblock says *"Boards are pluralised, asset types
+usually aren't"* — it was applied when READING a group to find a step, and never when
+writing. `plaky_canonical_asset_type()` now applies it on write, preferring a step's scope,
+then a spelling the project already uses, then a built-in starter. **Without this, merging the
+data by hand is undone by the next import**, silently. The preview screen reports every
+group→type resolution, because an importer that renames things without saying so is the same
+failure as one that duplicates them without saying so.
+
 ---
 
 ## Still open
@@ -496,12 +579,13 @@ on the other side. Written with a UTF-8 byte-order mark, or Excel mangles names 
 - **Splitting credit on shared tasks** — when two people are on one step, does per-artist
   reporting count it for both, or halve it? Probably both for "who worked on this" and
   halved for "how much did each deliver". Settle it when reporting is built.
-- **Crew days off** (`crew_absences`) — designed in `ROADMAP.md`, deliberately not built:
-  there are no real people on scheduled tasks yet for it to act on. Build it with crew
-  assignment, in the same phase.
-- **Which lane is which person** — a lane is currently a placeholder name. Turning it into an
-  assignment needs `crew_skills` populated, which needs a crew screen. That screen is the
-  natural home for absences too.
+- **Crew days off** (`crew_absences`) — designed in `ROADMAP.md`. Now genuinely buildable,
+  since scheduled tasks carry a `crew_id`: a slot's absences are as real a scheduling
+  constraint as a public holiday. Worth doing with the timeline, so a bar visibly moves.
+- ~~**Which lane is which person**~~ — settled 2026-08-13 by the slot model above.
+- **Whether a slot should carry its own headcount fraction.** `planned_headcount` of 2.5
+  currently rounds up to 3 slots. Making the third slot half-time would be more honest, but
+  needs an `allocation_pct` per slot (`crew_projects` already has one for real people).
 - Whether STFC's historical data is imported later, or the dashboard simply retires.
 
 ### Settled earlier

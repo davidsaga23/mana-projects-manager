@@ -125,6 +125,36 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <small>A starting point: each stage gets an equal slice, and parallel steps share dates.</small>
     </form>
 
+    <?php
+    // A step scoped to an asset type that is ALSO spelled another way counts only
+    // its own spelling. That is where this screen's "1.0 Environment assets"
+    // against seven environments came from, and nothing here said so.
+    $similar = similar_asset_types($pdo, $projectId);
+    $scoped  = [];
+    foreach ($steps as $s) {
+        $t = $s['applies_to_asset_type'] ?? '';
+        if ($t !== '') $scoped[mb_strtolower(trim($t))] = $t;
+    }
+    foreach ($similar as $spellings):
+        // Only worth raising here if a step actually points at one of them.
+        $hit = null;
+        foreach (array_keys($spellings) as $name) {
+            if (isset($scoped[mb_strtolower(trim((string)$name))])) { $hit = (string)$name; break; }
+        }
+        if ($hit === null) continue;
+        $others = array_diff_key($spellings, [$hit => true]);
+        $missed = array_sum($others);
+    ?>
+      <div class="flash flash-warn">
+        A step is scoped to <strong>"<?= e($hit) ?>"</strong>, but
+        <strong><?= $missed ?></strong> asset<?= $missed === 1 ? ' is' : 's are' ?> typed
+        <?= e(implode(' or ', array_map(function ($n) { return '"' . $n . '"'; }, array_keys($others)))) ?>
+        instead — so <?= $missed === 1 ? 'it is' : 'they are' ?> not counted in the work below,
+        and every date and headcount here is short by that much.
+        <a href="<?= e(wizard_url($projectId, 5)) ?>">Fix it on the Assets screen →</a>
+      </div>
+    <?php endforeach; ?>
+
     <?php $estimates = project_estimates($pdo, $projectId); ?>
     <form method="post">
       <button type="submit" name="action" value="save" hidden></button>

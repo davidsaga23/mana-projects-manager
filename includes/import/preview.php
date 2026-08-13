@@ -74,6 +74,17 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
   </div>
 <?php endif; ?>
 
+<?php if (!empty($report['types_normalised'])): ?>
+  <div class="flash flash-ok">
+    Board groups are plural; asset types here aren't. These will be filed under the spelling
+    this project already uses, rather than creating a second type an "s" apart:
+    <?php $bits = [];
+      foreach ($report['types_normalised'] as $group => $type) $bits[] = "\"$group\" → \"$type\"";
+      echo e(implode(', ', $bits));
+    ?>.
+  </div>
+<?php endif; ?>
+
 <?php if ($report['unmatched_people']): ?>
   <div class="flash flash-warn">
     <strong><?= count($report['unmatched_people']) ?></strong>

@@ -57,6 +57,24 @@ $unmappedStatuses = count(unmapped_statuses($pdo, $projectId));
 // Whether a schedule exists yet, for the hub card. Wrapped because the schedule
 // table is empty until Phase 4's migration has been applied and the pass run —
 // an unscheduled project is the normal state, not an error.
+// Crew slots, for the hub card. Guarded rather than assumed: crew_lanes arrives
+// in migration 012 and a project with no slots yet is the normal starting state.
+$slotCount = 0; $slotsUnfilled = 0;
+try {
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*), COALESCE(SUM(c.is_placeholder), 0)
+           FROM crew_lanes cl JOIN crew c ON c.id = cl.crew_id
+          WHERE cl.project_id = ?'
+    );
+    $stmt->execute([$projectId]);
+    if ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+        $slotCount     = (int)$row[0];
+        $slotsUnfilled = (int)$row[1];
+    }
+} catch (PDOException $e) {
+    // Migration pending; the header already says so.
+}
+
 $scheduled = 0; $scheduleEnd = null;
 $stmt = $pdo->prepare('SELECT COUNT(*), MAX(end_date) FROM schedule WHERE project_id = ?');
 $stmt->execute([$projectId]);
@@ -110,6 +128,17 @@ require __DIR__ . '/includes/header.php';
         <?php if ($scheduleEnd): ?>· finishes <?= e($scheduleEnd) ?><?php endif; ?>
       <?php else: ?>
         Work forwards from the pipeline to real dates
+      <?php endif; ?>
+    </span>
+  </a>
+  <a class="hub-card" href="crew.php?project=<?= $projectId ?>">
+    <strong>Crew</strong>
+    <span class="muted">
+      <?php if ($slotCount): ?>
+        <?= $slotCount ?> slot<?= $slotCount === 1 ? '' : 's' ?><?php
+          if ($slotsUnfilled): ?> · <?= $slotsUnfilled ?> still a placeholder<?php endif; ?>
+      <?php else: ?>
+        Who is on this show — real people and planned slots
       <?php endif; ?>
     </span>
   </a>

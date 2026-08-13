@@ -71,6 +71,84 @@ function asset_types(PDO $pdo): array {
 }
 
 /**
+ * Asset types that are almost certainly the same type spelled two ways.
+ *
+ * Free-text types were a deliberate choice — a fixed list in code is what forced
+ * a schema change on STFC to add Props — and the decision log predicted the cost:
+ * "a typo becomes a new type". What it didn't predict is how QUIETLY it lands.
+ * A step scoped to "Environment" against six assets typed "Environments" counts
+ * one, reports "1.0 Environment assets", and looks entirely healthy. Every quota
+ * and every scheduled date derived from it is then wrong by a factor of seven,
+ * with nothing on screen suggesting a problem.
+ *
+ * Matching ignores case, surrounding space, and a trailing "s", which covers the
+ * three ways this actually happens. It deliberately does NOT merge anything by
+ * itself: "Prop" and "Props" being one type is a safe guess, but guessing is how
+ * the alias layer got built rather than assumed.
+ *
+ * Returns [normalised => ['Type' => count, ...]] for groups with more than one
+ * spelling in use.
+ */
+function similar_asset_types(PDO $pdo, int $projectId): array {
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(asset_type, '') AS t, COUNT(*) AS n
+           FROM assets WHERE project_id = ? GROUP BY asset_type"
+    );
+    $stmt->execute([$projectId]);
+
+    $groups = [];
+    foreach ($stmt as $row) {
+        if ($row['t'] === '') continue;
+        $key = mb_strtolower(trim($row['t']));
+        $key = preg_replace('/\s+/', ' ', $key);
+        $key = preg_replace('/s$/', '', $key);      // Environment / Environments
+        $groups[$key][$row['t']] = (int)$row['n'];
+    }
+    return array_filter($groups, function ($spellings) { return count($spellings) > 1; });
+}
+
+/**
+ * The spelling a group should settle on.
+ *
+ * NOT simply the most-used one. The case this exists for had six assets typed
+ * "Environments" and one typed "Environment", but the pipeline step was scoped
+ * to "Environment" — so the popular spelling was the one that made the step
+ * count nothing. What a step points at wins, because that is the spelling which
+ * makes the plan work; then the built-in starters, so studios converge on the
+ * same vocabulary across shows; then sheer weight of numbers.
+ *
+ * $anchors is the list that outranks the count: types pipeline steps reference,
+ * plus the built-in starters.
+ */
+function preferred_asset_type(array $spellings, array $anchors = []): string {
+    $anchorSet = [];
+    foreach ($anchors as $a) {
+        if ($a !== null && $a !== '') $anchorSet[mb_strtolower(trim($a))] = $a;
+    }
+    foreach ($spellings as $name => $n) {
+        if (isset($anchorSet[mb_strtolower(trim((string)$name))])) return (string)$name;
+    }
+
+    $best = null; $bestN = -1;
+    foreach ($spellings as $name => $n) {
+        if ($n > $bestN || ($n === $bestN && mb_strlen((string)$name) < mb_strlen((string)$best))) {
+            $best = $name; $bestN = $n;
+        }
+    }
+    return (string)$best;
+}
+
+/** Types the project's own pipeline steps are scoped to — the strongest anchor. */
+function step_scoped_asset_types(PDO $pdo, int $projectId): array {
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT applies_to_asset_type FROM pipeline_steps
+          WHERE project_id = ? AND applies_to_asset_type IS NOT NULL AND applies_to_asset_type <> ''"
+    );
+    $stmt->execute([$projectId]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
  * A step's scope as a single form value: 'shot', 'asset', 'asset:Character',
  * 'both' or 'project'. One dropdown is far easier to reason about than two
  * controls where the second only sometimes applies.
