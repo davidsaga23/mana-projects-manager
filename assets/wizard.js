@@ -206,6 +206,30 @@
   recalcAll();
 })();
 
+// Import mapping: the "what would a new step apply to" picker is only meaningful
+// when "create a step" is actually selected, so keep it out of sight otherwise.
+// It also clears the needs-attention highlight once a row has been answered.
+(function () {
+  'use strict';
+
+  var choices = document.querySelectorAll('select.step-choice[data-scope-for]');
+
+  function sync(sel) {
+    var scope = document.getElementById(sel.getAttribute('data-scope-for'));
+    if (scope) scope.style.display = sel.value === 'new' ? '' : 'none';
+
+    var row = sel.closest('tr');
+    if (row) row.classList.toggle('has-problem', sel.value === '0');
+  }
+
+  for (var i = 0; i < choices.length; i++) {
+    (function (sel) {
+      sel.addEventListener('change', function () { sync(sel); });
+      sync(sel);
+    })(choices[i]);
+  }
+})();
+
 // Generic list filter, used by the pipeline, shots and assets screens.
 //
 // A <select data-filter-for="containerId" data-filter-attr="data-x"> hides any

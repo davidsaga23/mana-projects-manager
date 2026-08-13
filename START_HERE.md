@@ -7,9 +7,9 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status:** Phase 1 **live** at <https://mana.davidsaga.com> — schema installed, login
-  working, deploys automatic. Phase 2 (setup wizard) built 2026-08-11, pending first real
-  use. Next: Phase 3 (shot/asset file import + the alias layer).
+- **Status:** Phases 1–3 **live and proven on real data** at <https://mana.davidsaga.com>.
+  A real show ("Return to Club") is set up and imported from Plaky. Next: Phase 4, the
+  scheduler.
 - **Deploy:** push to `master` in GitHub Desktop; GitHub Actions FTP-syncs to
   `public_html/mana` within ~30s. After deploying a change that adds a migration, open
   `migrate.php` once.
@@ -135,7 +135,9 @@ change of habit rather than a migration. Read the two paired Plaky entries in
 
 1. ~~**Schema + migrations**~~ — done, live
 2. ~~**Project setup wizard**~~ — done (paste-based entry)
-3. **Import + the status model** — built 2026-08-12, pending first real use.
+3. ~~**Import + the status model**~~ — **done and proven on real data** 2026-08-12:
+   the "Return to Club" board imported from Plaky (1 shot, 22 assets, 71 progress
+   records including 4 whole-project deliverables).
    `migrations/004_status_model.sql`, `import.php`, `statuses_edit.php`, `aliases.php`,
    `project.php`, and the helpers in `includes/{statuses,names,plaky_import}.php`.
    These shipped together:

@@ -15,10 +15,26 @@ if (!$report):
 
 <h3>What changed</h3>
 <table class="review-table">
-  <tr><th>Records</th><th>New</th><th>Updated</th></tr>
-  <tr><td>Shots</td><td><strong><?= (int)$report['shots_created'] ?></strong></td><td><?= (int)$report['shots_updated'] ?></td></tr>
-  <tr><td>Assets</td><td><strong><?= (int)$report['assets_created'] ?></strong></td><td><?= (int)$report['assets_updated'] ?></td></tr>
-  <tr><td>Progress records</td><td><strong><?= (int)$report['progress_created'] ?></strong></td><td><?= (int)$report['progress_updated'] ?></td></tr>
+  <tr><th>Records</th><th>Total</th><th>New</th><th>Updated</th></tr>
+  <tr>
+    <td><strong>Shots</strong></td>
+    <td><strong><?= (int)$report['shots_created'] + (int)$report['shots_updated'] ?></strong></td>
+    <td><?= (int)$report['shots_created'] ?></td>
+    <td><?= (int)$report['shots_updated'] ?></td>
+  </tr>
+  <tr>
+    <td><strong>Assets</strong></td>
+    <td><strong><?= (int)$report['assets_created'] + (int)$report['assets_updated'] ?></strong></td>
+    <td><?= (int)$report['assets_created'] ?></td>
+    <td><?= (int)$report['assets_updated'] ?></td>
+  </tr>
+  <tr>
+    <td><strong>Progress records</strong>
+      <div class="muted small">one per pipeline step on each shot or asset</div></td>
+    <td><strong><?= (int)$report['progress_created'] + (int)$report['progress_updated'] ?></strong></td>
+    <td><?= (int)$report['progress_created'] ?></td>
+    <td><?= (int)$report['progress_updated'] ?></td>
+  </tr>
 </table>
 
 <?php

@@ -338,6 +338,9 @@ label.inline input { width: auto; }
 .unit-choice legend { font-weight: 600; padding: 0 6px; }
 .unit-choice label.inline { margin-right: 16px; }
 .checkbox-note { display: inline-flex; margin: 12px 0 2px; }
+.step-scope { display: inline-flex; align-items: center; gap: 6px; margin-top: 5px; }
+.step-scope .muted { margin: 0; }
+.step-scope select { width: auto; }
 .plain-list { color: #43535f; padding-left: 20px; }
 .plain-list li { margin-bottom: 6px; }
 a.button-link { font-size: 14px; }

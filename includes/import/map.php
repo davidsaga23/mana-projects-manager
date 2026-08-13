@@ -100,7 +100,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
         <input type="hidden" name="step_name[<?= $si ?>]" value="<?= e($s['external']) ?>"></td>
       <td class="muted"><?= (int)$s['count'] ?></td>
       <td>
-        <select name="step_val[<?= $si ?>]">
+        <select name="step_val[<?= $si ?>]" class="step-choice" data-scope-for="step-scope-<?= $si ?>">
           <option value="0">— skip these rows —</option>
           <?php foreach ($analysis['project_steps'] as $ps): ?>
             <?php // Whole-project steps have no shot or asset to attach to, so a
@@ -114,10 +114,16 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
           <?php endforeach; ?>
           <option value="new">+ create a step called "<?= e($s['external']) ?>"</option>
         </select>
+        <?php /* Only relevant when "create a step" is chosen. Rendered visible so
+                 it still works without JavaScript; the script hides it until it
+                 actually applies. */ ?>
         <?php if ($s['step_id'] === null): ?>
-          <select name="step_applies[<?= $si ?>]" title="Only used if you create the step">
-            <?= applies_to_options('shot', asset_types($pdo)) ?>
-          </select>
+          <span class="step-scope" id="step-scope-<?= $si ?>">
+            <span class="muted small">new step applies to</span>
+            <select name="step_applies[<?= $si ?>]">
+              <?= applies_to_options('shot', asset_types($pdo)) ?>
+            </select>
+          </span>
         <?php endif; ?>
       </td>
     </tr>
@@ -179,3 +185,5 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
     <button type="submit" name="action" value="cancel" class="secondary" formnovalidate>Cancel import</button>
   </div>
 </form>
+
+<script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
