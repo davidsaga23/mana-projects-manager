@@ -112,23 +112,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $groups = [];
             foreach (($_POST['group_key'] ?? []) as $i => $g) {
                 $kind = $_POST['group_val'][$i] ?? 'ignore';
-                $groups[$g] = in_array($kind, ['episode', 'asset_type', 'ignore'], true) ? $kind : 'ignore';
+                $groups[$g] = in_array($kind, ['shots', 'episode', 'asset_type', 'project_step', 'ignore'], true)
+                    ? $kind : 'ignore';
             }
 
             // Steps: an existing step id, "new" to create one, or 0 to skip.
             $steps = [];
             $createdSteps = 0;
+            // Keyed by group + name, since the same name under two groups can mean
+            // two different steps.
             $stepChoices = [];
-            foreach (($_POST['step_key'] ?? []) as $i => $name) {
-                $stepChoices[$name] = ['choice' => $_POST['step_val'][$i] ?? '0',
-                                       'applies' => $_POST['step_applies'][$i] ?? 'shot'];
+            foreach (($_POST['step_key'] ?? []) as $i => $key) {
+                $stepChoices[$key] = [
+                    'choice'  => $_POST['step_val'][$i] ?? '0',
+                    'applies' => $_POST['step_applies'][$i] ?? 'shot',
+                    'name'    => $_POST['step_name'][$i] ?? '',
+                ];
             }
             foreach ($analysis['steps'] as $s) {
-                $choice = $stepChoices[$s['external']]['choice'] ?? '0';
+                $choice = $stepChoices[$s['key']]['choice'] ?? '0';
                 if ($choice === 'new') {
                     $max = $pdo->prepare('SELECT COALESCE(MAX(step_order),0) FROM pipeline_steps WHERE project_id = ?');
                     $max->execute([$projectId]);
-                    [$applies, $assetType] = parse_applies_to($stepChoices[$s['external']]['applies'] ?? 'shot');
+                    [$applies, $assetType] = parse_applies_to($stepChoices[$s['key']]['applies'] ?? 'shot');
                     try {
                         $pdo->prepare(
                             'INSERT INTO pipeline_steps
@@ -136,17 +142,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                              VALUES (?, ?, ?, ?, ?)'
                         )->execute([$projectId, $s['external'], (int)$max->fetchColumn() + 1, $applies, $assetType]);
                         $newStepId = (int)$pdo->lastInsertId();
-                        $steps[$s['external']] = $newStepId;
+                        $steps[$s['key']] = $newStepId;
                         link_new_step($pdo, $projectId, $newStepId);
                         step_library_remember($pdo, $s['external'], $applies, 0);
                         $createdSteps++;
                     } catch (PDOException $e) {
-                        throw new RuntimeException('Could not create the step "' . $s['external'] . '".');
+                        throw new RuntimeException('Could not create the step "' . $s['external'] . '" for ' .
+                                                   applies_to_phrase($applies, $assetType) . '.');
                     }
                 } else {
                     $id = (int)$choice;
-                    $steps[$s['external']] = $id;
+                    $steps[$s['key']] = $id;
                     // Remember the spelling so the next import matches it by itself.
+                    // Only when the name genuinely differs — a name that is right
+                    // but ambiguous across groups is not an alias, and recording
+                    // one would wrongly force every group to the same step.
                     if ($id > 0) {
                         $stmtN = $pdo->prepare('SELECT name FROM pipeline_steps WHERE id = ? AND project_id = ?');
                         $stmtN->execute([$id, $projectId]);

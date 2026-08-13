@@ -83,6 +83,45 @@ function plaky_split_rows(array $rows): array {
     return ['parents' => $parents, 'subitems' => $subitems, 'child_count' => $childCount];
 }
 
+/**
+ * Does a Plaky group name mean the same thing as an asset type?
+ *
+ * Boards are pluralised ("Characters"), asset types usually aren't
+ * ("Character"). Comparing both with a trailing "s" trimmed covers that without
+ * pretending to know English grammar.
+ */
+function plaky_group_matches_type(string $group, string $assetType): bool {
+    $g = mb_strtolower(trim($group));
+    $t = mb_strtolower(trim($assetType));
+    if ($g === '' || $t === '') return false;
+    return $g === $t || rtrim($g, 's') === rtrim($t, 's');
+}
+
+/**
+ * Pick the best project step for a name arriving under a given group.
+ *
+ * The name has to match. Beyond that, a step scoped to the asset type this group
+ * represents wins over an unscoped one — which is what tells "Concept · Character"
+ * apart from "Concept · Environment" when the file just says "Concept".
+ *
+ * Returns null when nothing matches, or when two equally good candidates exist:
+ * guessing between them would be worse than asking.
+ */
+function plaky_best_step(array $steps, string $name, string $group): ?array {
+    $needle = mb_strtolower(trim($name));
+    $scoped = [];
+    $unscoped = [];
+    foreach ($steps as $s) {
+        if (mb_strtolower($s['name']) !== $needle) continue;
+        $type = $s['applies_to_asset_type'] ?? '';
+        if ($type !== '' && plaky_group_matches_type($group, $type)) $scoped[] = $s;
+        elseif ($type === '') $unscoped[] = $s;
+    }
+    if (count($scoped) === 1) return $scoped[0];
+    if (!$scoped && count($unscoped) === 1) return $unscoped[0];
+    return null;
+}
+
 /** Convert the file's time value into whole minutes, honouring the declared unit. */
 function plaky_time_to_minutes(string $raw, string $unit): ?int {
     $raw = trim($raw);
@@ -99,38 +138,80 @@ function plaky_time_to_minutes(string $raw, string $unit): ?int {
 function plaky_analyse(PDO $pdo, int $projectId, array $rows): array {
     $split = plaky_split_rows($rows);
 
-    // Groups, with what they contain.
+    // Project-level steps, matched by name — used below to spot a group that is
+    // really a set of whole-project deliverables rather than shots or assets.
+    $projectStepsByName = [];
+    foreach (pipeline_steps($pdo, $projectId) as $s) {
+        if ($s['applies_to'] === 'project') $projectStepsByName[mb_strtolower($s['name'])] = $s;
+    }
+
+    // Groups, with enough detail to suggest what each one is.
     $groups = [];
-    foreach ($split['parents'] as $p) {
+    foreach ($split['parents'] as $plakyId => $p) {
         $g = $p['Group'];
-        $groups[$g] = ($groups[$g] ?? 0) + 1;
+        if (!isset($groups[$g])) {
+            $groups[$g] = ['count' => 0, 'childless' => 0, 'project_step_matches' => 0];
+        }
+        $groups[$g]['count']++;
+        if (($split['child_count'][$plakyId] ?? 0) === 0) $groups[$g]['childless']++;
+        $canonical = resolve_name_alias($pdo, $projectId, 'step', $p['Title']);
+        if (isset($projectStepsByName[mb_strtolower($canonical)])) $groups[$g]['project_step_matches']++;
     }
     ksort($groups, SORT_NATURAL | SORT_FLAG_CASE);
 
-    // Step names, resolved through the alias layer then matched to real steps.
-    $stepRows = pipeline_steps($pdo, $projectId);
-    $stepsByName = [];
-    foreach ($stepRows as $s) $stepsByName[mb_strtolower($s['name'])] = $s;
+    // A suggestion per group, never applied silently — it arrives pre-selected in
+    // a dropdown the user still has to look at.
+    foreach ($groups as $name => $info) {
+        if ($info['count'] > 0 && $info['project_step_matches'] === $info['count']) {
+            $guess = 'project_step';           // every item names a whole-project step
+        } elseif (preg_match('/^(ep|episode)\s*\d+/i', $name)) {
+            $guess = 'episode';
+        } elseif (preg_match('/^shots?$/i', trim($name))) {
+            $guess = 'shots';                  // a group literally called "Shots"
+        } else {
+            $guess = 'asset_type';
+        }
+        $groups[$name]['guess'] = $guess;
+    }
 
-    $steps = [];
+    // Step names, keyed by the GROUP they appear under as well as the name.
+    //
+    // "Concept" under Characters and "Concept" under Environments are different
+    // steps with different scopes, so one dropdown per name could never map both.
+    // The parent's group is what distinguishes them.
+    $stepRows = pipeline_steps($pdo, $projectId);
+
+    $seen = [];
     foreach ($split['subitems'] as $s) {
         $title = $s['Title'];
         if ($title === '') continue;
-        $steps[$title] = ($steps[$title] ?? 0) + 1;
+        $parent = $split['parents'][$s['Item Parent Id']] ?? null;
+        $group = $parent['Group'] ?? '';
+        $key = $group . "\x1F" . $title;
+        if (!isset($seen[$key])) {
+            $seen[$key] = ['group' => $group, 'external' => $title, 'count' => 0];
+        }
+        $seen[$key]['count']++;
     }
+
     $stepInfo = [];
-    foreach ($steps as $title => $count) {
-        $canonical = resolve_name_alias($pdo, $projectId, 'step', $title);
-        $match = $stepsByName[mb_strtolower($canonical)] ?? null;
+    foreach ($seen as $key => $row) {
+        $canonical = resolve_name_alias($pdo, $projectId, 'step', $row['external']);
+        $match = plaky_best_step($stepRows, $canonical, $row['group']);
         $stepInfo[] = [
-            'external'  => $title,
+            'key'       => $key,
+            'group'     => $row['group'],
+            'external'  => $row['external'],
             'canonical' => $canonical,
-            'count'     => $count,
+            'count'     => $row['count'],
             'step_id'   => $match ? (int)$match['id'] : null,
             'step_name' => $match['name'] ?? null,
         ];
     }
-    usort($stepInfo, function ($a, $b) { return $b['count'] <=> $a['count']; });
+    // Grouped in the order the groups appear, then commonest first inside each.
+    usort($stepInfo, function ($a, $b) {
+        return [$a['group'], -$a['count']] <=> [$b['group'], -$b['count']];
+    });
 
     // Status values.
     $statusCounts = [];
@@ -229,7 +310,8 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
         'progress_created' => 0, 'progress_updated' => 0,
         'skipped_ignored_group' => 0, 'skipped_childless' => 0,
         'skipped_no_step' => 0, 'skipped_no_parent' => 0,
-        'unmatched_people' => [], 'unmapped_statuses' => [],
+        'skipped_no_project_step' => 0,
+        'unmatched_people' => [], 'unmapped_statuses' => [], 'unmatched_project_steps' => [],
         'notes' => [],
     ];
 
@@ -264,21 +346,93 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             'UPDATE assets SET asset_type = COALESCE(?, asset_type), external_id = COALESCE(?, external_id) WHERE id = ?'
         );
 
-        // --- parents: shots and assets ---------------------------------------
+        // Whole-project steps, for groups mapped to 'project_step'.
+        $projectStepsByName = [];
+        foreach (pipeline_steps($pdo, $projectId) as $s) {
+            if ($s['applies_to'] === 'project') $projectStepsByName[mb_strtolower($s['name'])] = $s;
+        }
+        $statusRowsEarly = statuses_by_id($pdo, $projectId);
+        $projectItemKey = 'p' . $projectId;   // one row per project step, by definition
+
+        // --- parents: shots, assets and whole-project deliverables ------------
         $parentTarget = [];   // plaky parent id => ['kind' => 'shot'|'asset', 'id' => int]
         foreach ($split['parents'] as $plakyId => $p) {
             $kind = $groupKinds[$p['Group']] ?? 'ignore';
             if ($kind === 'ignore') { $report['skipped_ignored_group']++; continue; }
+
+            $title = $p['Title'];
+            if ($title === '') continue;
+
+            // A whole-project deliverable IS the step — an animatic or a music
+            // track isn't a shot with steps beneath it, it's one piece of work
+            // for the show. So the item's own status becomes that step's progress.
+            if ($kind === 'project_step') {
+                $canonical = resolve_name_alias($pdo, $projectId, 'step', $title);
+                $step = $projectStepsByName[mb_strtolower($canonical)] ?? null;
+                if (!$step) {
+                    $report['skipped_no_project_step']++;
+                    $report['unmatched_project_steps'][$title] =
+                        ($report['unmatched_project_steps'][$title] ?? 0) + 1;
+                    continue;
+                }
+                $stepId = (int)$step['id'];
+                $statusText = $p['Status'] ?? '';
+                $statusId = (int)($statusMap[$statusText] ?? 0) ?: null;
+                if ($statusText !== '' && $statusId === null) {
+                    $report['unmapped_statuses'][$statusText] = ($report['unmapped_statuses'][$statusText] ?? 0) + 1;
+                }
+                $flags = status_flags($statusId ? ($statusRowsEarly[$statusId] ?? null) : null);
+                $minutes = plaky_time_to_minutes($p['Time spent'] ?? '', $timeUnit);
+                $assigneeRaw = ($p['Assignee'] ?? '') !== '' ? $p['Assignee'] : null;
+                $crewIds = [];
+                foreach (split_assignees($p['Assignee'] ?? '') as $person) {
+                    $cid = (int)($crewMap[$person['name']] ?? 0);
+                    if ($cid > 0) $crewIds[] = $cid;
+                    else $report['unmatched_people'][$person['name']] =
+                        ($report['unmatched_people'][$person['name']] ?? 0) + 1;
+                }
+                $existingId = $progressIds[$stepId . '|' . $projectItemKey] ?? null;
+
+                if ($dryRun) {
+                    if ($existingId) $report['progress_updated']++; else $report['progress_created']++;
+                    continue;
+                }
+                if ($existingId) {
+                    $pdo->prepare(
+                        'UPDATE progress SET status = ?, status_id = ?, is_delivered = ?, is_approved = ?,
+                            crew_id = COALESCE(?, crew_id), assignee_raw = COALESCE(?, assignee_raw),
+                            time_spent_minutes = COALESCE(?, time_spent_minutes)
+                          WHERE id = ?'
+                    )->execute([$statusText, $statusId, $flags['is_delivered'], $flags['is_approved'],
+                                $crewIds[0] ?? null, $assigneeRaw, $minutes, $existingId]);
+                    $report['progress_updated']++;
+                } else {
+                    $pdo->prepare(
+                        'INSERT INTO progress
+                            (project_id, step_id, shot_id, asset_id, item_key, status, status_id,
+                             is_delivered, is_approved, crew_id, assignee_raw, time_spent_minutes)
+                         VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    )->execute([$projectId, $stepId, $projectItemKey, $statusText, $statusId,
+                                $flags['is_delivered'], $flags['is_approved'],
+                                $crewIds[0] ?? null, $assigneeRaw, $minutes]);
+                    $progressIds[$stepId . '|' . $projectItemKey] = (int)$pdo->lastInsertId();
+                    $report['progress_created']++;
+                }
+                continue;
+            }
+
             if ($skipChildless && ($split['child_count'][$plakyId] ?? 0) === 0) {
                 $report['skipped_childless']++;
                 continue;
             }
-            $title = $p['Title'];
-            if ($title === '') continue;
             $frames = is_numeric($p['Total frames'] ?? '') ? (int)$p['Total frames'] : null;
 
-            if ($kind === 'episode') {
-                $key = mb_strtolower($p['Group'] . '|' . $title);
+            if ($kind === 'episode' || $kind === 'shots') {
+                // 'shots' is the same thing without an episode: a single film or
+                // commercial has one flat shot list, and stamping the group name
+                // in as an episode would invent structure that isn't there.
+                $episode = $kind === 'episode' ? $p['Group'] : '';
+                $key = mb_strtolower($episode . '|' . $title);
                 if (isset($shotIds[$key])) {
                     if (!$dryRun) $updShot->execute([$frames, $plakyId, $shotIds[$key]]);
                     $report['shots_updated']++;
@@ -342,7 +496,11 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             $parent = $parentTarget[$s['Item Parent Id']] ?? null;
             if (!$parent) { $report['skipped_no_parent']++; continue; }
 
-            $stepId = (int)($stepMap[$s['Title']] ?? 0);
+            // Keyed by group AND name: the same subitem name under Characters and
+            // under Environments maps to two different steps.
+            $parentRow = $split['parents'][$s['Item Parent Id']] ?? null;
+            $mapKey = ($parentRow['Group'] ?? '') . "\x1F" . $s['Title'];
+            $stepId = (int)($stepMap[$mapKey] ?? 0);
             if ($stepId <= 0) { $report['skipped_no_step']++; continue; }
 
             $statusText = $s['Status'] ?? '';

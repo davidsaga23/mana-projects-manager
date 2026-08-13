@@ -27,6 +27,7 @@ $skips = [
   'skipped_childless'     => 'items with no pipeline steps under them',
   'skipped_no_step'       => 'step records whose step was set to be skipped',
   'skipped_no_parent'     => 'step records whose parent item was not imported',
+  'skipped_no_project_step' => 'whole-project items with no matching project step',
 ];
 $anySkips = false;
 foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;

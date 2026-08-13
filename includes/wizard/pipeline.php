@@ -267,7 +267,8 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       <?php if (count($present) > 1): ?>
       <div class="step-filter">
         <label class="inline"><strong>Show</strong>
-          <select id="step-filter-select">
+          <select data-filter-for="step-rows" data-filter-attr="data-category"
+                  data-filter-note="step-filter-note" data-filter-noun="steps">
             <option value="">everything (<?= count($steps) ?>)</option>
             <?php foreach ($present as $value => $count):
                   [$k, $t] = parse_applies_to($value); ?>

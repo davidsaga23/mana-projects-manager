@@ -38,24 +38,35 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
      shots, and types of asset. Only you can say which is which.</p>
   <table class="review-table">
     <tr><th>Group</th><th>Items</th><th>Treat as</th></tr>
-    <?php $gi = 0; foreach ($analysis['groups'] as $g => $count):
-      // A sensible first guess, never a silent one — it is shown selected and can be changed.
-      $guess = preg_match('/^(ep|episode)\s*\d+/i', $g) ? 'episode' : 'asset_type';
+    <?php $gi = 0; foreach ($analysis['groups'] as $g => $info):
+      $guess = $info['guess'];   // suggested, never applied silently
     ?>
     <tr>
       <td><strong><?= e($g) ?></strong>
+        <?php if ($info['project_step_matches'] === $info['count'] && $info['count'] > 0): ?>
+          <div class="muted small">every item here names a whole-project step</div>
+        <?php endif; ?>
         <input type="hidden" name="group_key[<?= $gi ?>]" value="<?= e($g) ?>"></td>
-      <td class="muted"><?= (int)$count ?></td>
+      <td class="muted"><?= (int)$info['count'] ?></td>
       <td>
         <select name="group_val[<?= $gi ?>]">
-          <option value="episode"    <?= $guess === 'episode'    ? 'selected' : '' ?>>an episode of shots</option>
-          <option value="asset_type" <?= $guess === 'asset_type' ? 'selected' : '' ?>>a type of asset</option>
+          <option value="shots"        <?= $guess === 'shots'        ? 'selected' : '' ?>>shots (no episodes)</option>
+          <option value="episode"      <?= $guess === 'episode'      ? 'selected' : '' ?>>an episode of shots</option>
+          <option value="asset_type"   <?= $guess === 'asset_type'   ? 'selected' : '' ?>>a type of asset</option>
+          <option value="project_step" <?= $guess === 'project_step' ? 'selected' : '' ?>>whole-project steps</option>
           <option value="ignore">ignore this group</option>
         </select>
       </td>
     </tr>
     <?php $gi++; endforeach; ?>
   </table>
+  <p class="muted small">
+    <strong>Shots (no episodes)</strong> is for a single film or commercial — the shots go in
+    as one flat list rather than an episode named after the group.
+    <strong>Whole-project steps</strong> is for groups like Pre-production or Post-production,
+    where each item (an animatic, a music track) <em>is</em> a step for the whole show rather
+    than something with steps beneath it.
+  </p>
 
   <?php if ($analysis['childless']): ?>
     <label class="inline checkbox-note">
@@ -72,16 +83,21 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   <?php endif; ?>
 
   <h3>Pipeline steps</h3>
-  <p class="muted small">Subitem names in the file, matched to this project's steps.</p>
+  <p class="muted small">Subitem names in the file, matched to this project's steps —
+     listed <strong>per group</strong>, because the same name can mean different steps.
+     "Concept" under Characters and "Concept" under Environments are two different things,
+     so each gets its own choice.</p>
   <table class="review-table">
-    <tr><th>In the file</th><th>Rows</th><th>Is this project's step</th></tr>
-    <?php $si = 0; foreach ($analysis['steps'] as $s): ?>
+    <tr><th>Group</th><th>In the file</th><th>Rows</th><th>Is this project's step</th></tr>
+    <?php $si = 0; $lastGroup = null; foreach ($analysis['steps'] as $s): ?>
     <tr class="<?= $s['step_id'] === null ? 'has-problem' : '' ?>">
+      <td class="muted"><?= $s['group'] === $lastGroup ? '' : e($s['group']) ?><?php $lastGroup = $s['group']; ?></td>
       <td><strong><?= e($s['external']) ?></strong>
         <?php if ($s['canonical'] !== $s['external']): ?>
           <span class="muted small">→ <?= e($s['canonical']) ?> (existing alias)</span>
         <?php endif; ?>
-        <input type="hidden" name="step_key[<?= $si ?>]" value="<?= e($s['external']) ?>"></td>
+        <input type="hidden" name="step_key[<?= $si ?>]" value="<?= e($s['key']) ?>">
+        <input type="hidden" name="step_name[<?= $si ?>]" value="<?= e($s['external']) ?>"></td>
       <td class="muted"><?= (int)$s['count'] ?></td>
       <td>
         <select name="step_val[<?= $si ?>]">

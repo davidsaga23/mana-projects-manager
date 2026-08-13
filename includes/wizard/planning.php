@@ -133,6 +133,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         <tr>
           <th>Step</th>
           <th title="How much of its scope this step actually touches. FX might only land on a third of the running time.">Covers</th>
+          <th title="The amount of work the quota is calculated from, after the coverage percentage is applied.">Work</th>
           <th>Starts</th><th>Deadline</th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
@@ -164,6 +165,20 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 <input type="number" name="coverage_pct[<?= $id ?>]" min="0" max="100" step="any"
                        value="<?= e(fmt_num($s['coverage_pct'] ?? 100)) ?>">%
               </span>
+            <?php endif; ?>
+          </td>
+          <?php
+          /* What the quota is actually computed from. Recalculated live as the
+             coverage beside it changes. */
+          ?>
+          <td class="work-cell">
+            <strong><?= e(fmt_rate((float)$work['units'])) ?></strong>
+            <span class="muted"><?= e($work['label']) ?></span>
+            <?php if (($work['coverage'] ?? 1) < 1): ?>
+              <div class="muted small">of <?= e(fmt_rate((float)($work['units_raw'] ?? 0))) ?></div>
+            <?php endif; ?>
+            <?php if (!empty($work['estimated'])): ?>
+              <div><span class="est-tag">est.</span></div>
             <?php endif; ?>
           </td>
           <td><input type="date" name="start_date[<?= $id ?>]" value="<?= e($s['start_date'] ?? '') ?>"></td>

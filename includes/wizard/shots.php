@@ -201,10 +201,27 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
         <?php endif; ?>
       </p>
 
+      <?php if ($episodic && count($byEpisode) > 1): ?>
+      <div class="step-filter">
+        <label class="inline"><strong>Show</strong>
+          <select data-filter-for="shot-list" data-filter-attr="data-episode"
+                  data-filter-note="shot-filter-note" data-filter-noun="episodes">
+            <option value="">all episodes (<?= count($shots) ?> shots)</option>
+            <?php foreach ($byEpisode as $ep => $rows): ?>
+              <option value="<?= e($ep) ?>"><?= $ep === '' ? 'No episode' : e($ep) ?> (<?= count($rows) ?>)</option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <span class="muted small" id="shot-filter-note">Filtering only changes what you see —
+          saving still keeps everything.</span>
+      </div>
+      <?php endif; ?>
+
       <form method="post">
         <button type="submit" name="action" value="continue" hidden></button>
+        <div id="shot-list">
         <?php foreach ($byEpisode as $ep => $rows): ?>
-          <div class="chip-group">
+          <div class="chip-group" data-episode="<?= e($ep) ?>">
             <?php if ($episodic): ?>
               <h4><?= $ep === '' ? '<span class="muted">No episode</span>' : e($ep) ?>
                   <span class="muted small">· <?= count($rows) ?> shots</span></h4>
@@ -222,6 +239,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
             </div>
           </div>
         <?php endforeach; ?>
+        </div>
       </form>
     <?php else: ?>
       <p class="muted">No shots yet.</p>
@@ -281,5 +299,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
     <form method="post" class="actions">
       <button type="submit" name="action" value="continue">Save and continue →</button>
     </form>
+
+    <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
     <?php
 }

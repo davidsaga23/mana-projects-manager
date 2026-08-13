@@ -26,6 +26,7 @@ $skips = [
   'skipped_childless'     => 'items with no pipeline steps under them',
   'skipped_no_step'       => 'step records whose step is set to be skipped',
   'skipped_no_parent'     => 'step records whose parent item was not imported',
+  'skipped_no_project_step' => 'whole-project items with no matching project step',
 ];
 $anySkips = false;
 foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
@@ -39,6 +40,17 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
   </table>
   <p class="muted small">These are the consequences of the choices on the previous screen —
      go back if any of them look wrong.</p>
+<?php endif; ?>
+
+<?php if (!empty($report['unmatched_project_steps'])): ?>
+  <div class="flash flash-warn">
+    <strong><?= count($report['unmatched_project_steps']) ?></strong> whole-project
+    <?= count($report['unmatched_project_steps']) === 1 ? 'item doesn\'t' : 'items don\'t' ?>
+    match a project-level step in this pipeline, so they won't be imported:
+    <?= e(implode(', ', array_keys($report['unmatched_project_steps']))) ?>.
+    Add them on the <a href="wizard.php?project=<?= $projectId ?>&step=2">Pipeline</a> screen
+    as "The whole project" steps, or set that group to be ignored.
+  </div>
 <?php endif; ?>
 
 <?php if ($report['unmatched_people']): ?>

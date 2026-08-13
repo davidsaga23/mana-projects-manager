@@ -200,6 +200,22 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
               echo e(implode(' · ', $bits)); ?>
       </p>
 
+      <?php if (count($typeCounts) > 1): ?>
+      <div class="step-filter">
+        <label class="inline"><strong>Show</strong>
+          <select data-filter-for="asset-rows" data-filter-attr="data-type"
+                  data-filter-note="asset-filter-note" data-filter-noun="assets">
+            <option value="">all types (<?= count($assets) ?>)</option>
+            <?php foreach ($typeCounts as $t => $n): ?>
+              <option value="<?= e($t) ?>"><?= $t === '' ? 'No type' : e($t) ?> (<?= $n ?>)</option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <span class="muted small" id="asset-filter-note">Filtering only changes what you see —
+          saving still keeps everything.</span>
+      </div>
+      <?php endif; ?>
+
       <form method="post">
         <button type="submit" name="action" value="save" hidden></button>
 
@@ -212,7 +228,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
           </thead>
           <tbody id="asset-rows">
           <?php foreach ($assets as $a): $id = (int)$a['id']; ?>
-            <tr>
+            <tr data-type="<?= e($a['asset_type'] ?? '') ?>">
               <td><input type="checkbox" name="sel[]" value="<?= $id ?>" title="Select for a bulk type change"></td>
               <td><input name="name[<?= $id ?>]" value="<?= e($a['name']) ?>"></td>
               <td>

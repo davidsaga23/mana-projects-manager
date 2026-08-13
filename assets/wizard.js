@@ -138,6 +138,16 @@
     if (coverage < 0) coverage = 0;
     var units = unitsRaw * coverage;
 
+    // Keep the Work column honest as coverage changes — it's the number every
+    // figure to its right is derived from.
+    var workCell = row.querySelector('.work-cell');
+    if (workCell) {
+      var workHtml = '<strong>' + fmtRate(units) + '</strong> <span class="muted">' + label + '</span>';
+      if (coverage < 1) workHtml += '<div class="muted small">of ' + fmtRate(unitsRaw) + '</div>';
+      if (estimated) workHtml += '<div><span class="est-tag">est.</span></div>';
+      workCell.innerHTML = workHtml;
+    }
+
     function say(html, cls) {
       cell.innerHTML = html;
       cell.className = 'verdict' + (cls ? ' ' + cls : '');
@@ -168,13 +178,12 @@
       cls = 'verdict-ok';
     }
 
-    var line2 = fmtRate(units) + ' ' + label + ' over ' + days + ' working days';
+    // The Work column already states the amount, so this line covers the rates.
+    var line2 = fmtRate(teamPerDay) + ' ' + label + '/day across the team · '
+              + days + ' working days';
     if (head !== null && head > 0) {
       line2 = fmtRate(teamPerDay / head) + ' ' + label + '/day each · ' + line2;
-    } else {
-      line2 = fmtRate(teamPerDay) + ' ' + label + '/day · ' + line2;
     }
-    if (coverage < 1) line2 += ' · ' + Math.round(coverage * 100) + '% of ' + fmtRate(unitsRaw);
     if (estimated) line2 += ' · from the pre-production estimate';
 
     say(line1 + '<br><span class="muted small">' + line2 + '</span>', cls);
@@ -197,40 +206,56 @@
   recalcAll();
 })();
 
-// Filter the pipeline step list by category.
+// Generic list filter, used by the pipeline, shots and assets screens.
 //
-// Hides rows rather than removing them: every step's fields stay in the form, so
-// saving while filtered can never drop the steps you can't currently see.
+// A <select data-filter-for="containerId" data-filter-attr="data-x"> hides any
+// element inside that container carrying the attribute, unless its value matches.
+//
+// Hiding, never removing: every hidden row's inputs stay in the form, so saving
+// while filtered can't drop what you can't currently see. That matters — a
+// filter that silently narrowed a save would be the worst kind of bug here.
 (function () {
   'use strict';
 
-  var select = document.getElementById('step-filter-select');
-  var tbody = document.getElementById('step-rows');
-  var note = document.getElementById('step-filter-note');
-  if (!select || !tbody) return;
+  var selects = document.querySelectorAll('select[data-filter-for]');
 
-  select.addEventListener('change', function () {
-    var want = select.value;
-    var rows = tbody.querySelectorAll('tr[data-category]');
+  function apply(sel) {
+    var container = document.getElementById(sel.getAttribute('data-filter-for'));
+    if (!container) return;
+
+    var attr = sel.getAttribute('data-filter-attr') || 'data-filter-value';
+    var noun = sel.getAttribute('data-filter-noun') || 'items';
+    var items = container.querySelectorAll('[' + attr + ']');
+    var want = sel.value;
     var shown = 0;
-    for (var i = 0; i < rows.length; i++) {
-      var match = !want || rows[i].getAttribute('data-category') === want;
-      rows[i].style.display = match ? '' : 'none';
+
+    for (var i = 0; i < items.length; i++) {
+      var match = !want || items[i].getAttribute(attr) === want;
+      items[i].style.display = match ? '' : 'none';
       if (match) shown++;
     }
+
+    var note = document.getElementById(sel.getAttribute('data-filter-note') || '');
     if (note) {
       note.textContent = want
-        ? 'Showing ' + shown + ' of ' + rows.length + ' steps. Saving still keeps every step.'
-        : 'Filtering only changes what you see — saving still keeps every step.';
+        ? 'Showing ' + shown + ' of ' + items.length + ' ' + noun + '. Saving still keeps every one.'
+        : 'Filtering only changes what you see — saving still keeps everything.';
     }
-    // Reordering a filtered list would post an order missing the hidden rows,
-    // so dragging is switched off until the full list is back.
-    var handles = tbody.querySelectorAll('.drag-handle');
+
+    // Reordering a filtered list would post an order missing the hidden rows, so
+    // dragging is switched off until the full list is back.
+    var handles = container.querySelectorAll('.drag-handle');
     for (var j = 0; j < handles.length; j++) {
       if (want) handles[j].removeAttribute('draggable');
       else handles[j].setAttribute('draggable', 'true');
     }
-  });
+  }
+
+  for (var k = 0; k < selects.length; k++) {
+    (function (sel) {
+      sel.addEventListener('change', function () { apply(sel); });
+    })(selects[k]);
+  }
 })();
 
 // "Select all" in an asset group — retyping fifty pasted assets shouldn't mean
