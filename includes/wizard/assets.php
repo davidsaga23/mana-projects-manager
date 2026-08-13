@@ -246,8 +246,10 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
         </table>
 
         <div class="actions">
+          <button type="submit" name="action" value="save" class="secondary">Save and stay here</button>
+          <span class="hint">keeps your name and type edits, leaves you on this screen</span>
+          <span class="spacer"></span>
           <button type="submit" name="action" value="continue">Save and continue →</button>
-          <button type="submit" name="action" value="save" class="secondary">Save changes</button>
         </div>
 
         <div class="retype-bar">

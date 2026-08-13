@@ -78,6 +78,9 @@
   var table = document.getElementById('planning-table');
   if (!table) return;
   var today = table.getAttribute('data-today');
+  // Retakes scale how long each item takes, so they scale the crew a date needs.
+  // Must match project_retake_pct() / retake_factor() in includes/quota.php.
+  var retakeFactor = 1 + ((parseFloat(table.getAttribute('data-retake')) || 0) / 100);
 
   // NEVER new Date('2026-08-05') — that parses as UTC and reads back a day
   // earlier in a UTC-6 timezone. Building from parts gives local midnight.
@@ -164,7 +167,7 @@
     if (days <= 0) return say('<span class="warn-text">no working days left</span>');
 
     var teamPerDay = units / days;
-    var required = teamPerDay * (perUnit > 0 ? perUnit : 1);
+    var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor;
     var needed = Math.ceil(required);
 
     var line1, cls = '';
@@ -183,6 +186,9 @@
               + days + ' working days';
     if (head !== null && head > 0) {
       line2 = fmtRate(teamPerDay / head) + ' ' + label + '/day each · ' + line2;
+    }
+    if (retakeFactor > 1) {
+      line2 += ' · includes ' + fmtRate((retakeFactor - 1) * 100) + '% retakes';
     }
     if (estimated) line2 += ' · from the pre-production estimate';
 

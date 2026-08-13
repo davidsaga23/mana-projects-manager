@@ -23,6 +23,11 @@ if (!$project) {
 
 $selfUrl = 'statuses_edit.php?project=' . $projectId;
 
+// "Not applicable" arrives with the scheduler in migration 010. Until that has
+// run the column isn't there, so the control is hidden rather than the screen
+// breaking — same reasoning as the role fallback in current_user().
+$hasExcluded = column_exists($pdo, 'statuses', 'is_excluded');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? 'save';
@@ -32,15 +37,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($name === '') throw new RuntimeException('Give the new status a name.');
             $mapsTo = in_array($_POST['new_maps_to'] ?? '', ['none','delivered','approved'], true)
                     ? $_POST['new_maps_to'] : 'none';
-            $blocked = !empty($_POST['new_is_blocked']) ? 1 : 0;
+            $blocked  = !empty($_POST['new_is_blocked'])  ? 1 : 0;
+            $excluded = !empty($_POST['new_is_excluded']) ? 1 : 0;
             $max = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0) FROM statuses WHERE project_id = ?');
             $max->execute([$projectId]);
             try {
-                $pdo->prepare(
-                    'INSERT INTO statuses (project_id, name, sort_order, maps_to, is_blocked, color)
-                     VALUES (?, ?, ?, ?, ?, ?)'
-                )->execute([$projectId, $name, (int)$max->fetchColumn() + 1, $mapsTo, $blocked,
-                            trim($_POST['new_color'] ?? '') ?: null]);
+                $cols = 'project_id, name, sort_order, maps_to, is_blocked, color'
+                      . ($hasExcluded ? ', is_excluded' : '');
+                $vals = '?, ?, ?, ?, ?, ?' . ($hasExcluded ? ', ?' : '');
+                $args = [$projectId, $name, (int)$max->fetchColumn() + 1, $mapsTo, $blocked,
+                         trim($_POST['new_color'] ?? '') ?: null];
+                if ($hasExcluded) $args[] = $excluded;
+                $pdo->prepare("INSERT INTO statuses ($cols) VALUES ($vals)")->execute($args);
             } catch (PDOException $e) {
                 throw new RuntimeException('This project already has a status called "' . $name . '".');
             }
@@ -73,7 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $names = $_POST['name'] ?? [];
         $existing = statuses_by_id($pdo, $projectId);
         $upd = $pdo->prepare(
-            'UPDATE statuses SET name = ?, maps_to = ?, is_blocked = ?, color = ?, sort_order = ?
+            'UPDATE statuses SET name = ?, maps_to = ?, is_blocked = ?, '
+            . ($hasExcluded ? 'is_excluded = ?, ' : '')
+            . 'color = ?, sort_order = ?
               WHERE id = ? AND project_id = ?'
         );
         $changed = 0; $order = 0;
@@ -88,10 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $mapsTo = in_array($_POST['maps_to'][$id] ?? '', ['none','delivered','approved'], true)
                     ? $_POST['maps_to'][$id] : 'none';
-            $blocked = !empty($_POST['is_blocked'][$id]) ? 1 : 0;
+            $blocked  = !empty($_POST['is_blocked'][$id])  ? 1 : 0;
+            $excluded = !empty($_POST['is_excluded'][$id]) ? 1 : 0;
             $color = trim($_POST['color'][$id] ?? '') ?: null;
             try {
-                $upd->execute([$name, $mapsTo, $blocked, $color, $order, $id, $projectId]);
+                $args = [$name, $mapsTo, $blocked];
+                if ($hasExcluded) $args[] = $excluded;
+                array_push($args, $color, $order, $id, $projectId);
+                $upd->execute($args);
                 if ($upd->rowCount() > 0) $changed++;
             } catch (PDOException $e) {
                 flash('warn', 'Could not rename "' . $existing[$id]['name'] . '" — that name is already used.');
@@ -143,6 +157,9 @@ require __DIR__ . '/includes/header.php';
         <th>Status</th>
         <th title="What this state means for delivered/approved reporting">Counts as</th>
         <th title="Work that cannot proceed, as opposed to work not yet started">Blocked</th>
+        <?php if ($hasExcluded): ?>
+          <th title="This item does not pass through this step at all — the scheduler plans no time for it">Not applicable</th>
+        <?php endif; ?>
         <th>Colour</th><th>In use</th><th></th>
       </tr>
     </thead>
@@ -164,6 +181,15 @@ require __DIR__ . '/includes/header.php';
             blocked
           </label>
         </td>
+        <?php if ($hasExcluded): ?>
+        <td>
+          <input type="hidden" name="is_excluded[<?= $id ?>]" value="0">
+          <label class="inline">
+            <input type="checkbox" name="is_excluded[<?= $id ?>]" value="1" <?= !empty($s['is_excluded']) ? 'checked' : '' ?>>
+            not applicable
+          </label>
+        </td>
+        <?php endif; ?>
         <td><input type="color" name="color[<?= $id ?>]" value="<?= e($s['color'] ?: '#95A5A6') ?>"></td>
         <td class="muted"><?= $n ?: '—' ?></td>
         <td class="row-actions">
@@ -189,6 +215,9 @@ require __DIR__ . '/includes/header.php';
     <option value="approved">counts as approved</option>
   </select>
   <label class="inline"><input type="checkbox" name="new_is_blocked" value="1"> blocked</label>
+  <?php if ($hasExcluded): ?>
+    <label class="inline"><input type="checkbox" name="new_is_excluded" value="1"> not applicable</label>
+  <?php endif; ?>
   <input type="color" name="new_color" value="#95A5A6">
   <button type="submit" class="secondary">Add</button>
 </form>
@@ -198,6 +227,17 @@ require __DIR__ . '/includes/header.php';
   or a decision — rather than work nobody has started. Both count as unfinished, but blocked
   work needs someone to unblock it, so it is reported separately.
 </p>
+
+<?php if ($hasExcluded): ?>
+<p class="muted small">
+  <strong>Not applicable</strong> is different again: the work doesn't exist. A shot with no
+  FX, a prop that needs no rig. It is what <code>N/A</code> has always meant, and the
+  scheduler reads it — an item marked this way gets no time planned for it, rather than
+  sitting in the plan forever as something nobody will ever finish. It is also how a step
+  whose coverage is still a guess ("FX is about 30% of the show") turns into real per-shot
+  dates: mark the shots it doesn't touch, and the estimate stops being needed.
+</p>
+<?php endif; ?>
 
 </div>
 </body></html>

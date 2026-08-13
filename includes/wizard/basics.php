@@ -54,6 +54,14 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         set_project_setting($pdo, $id, $key, $v === '' ? '0' : (string)max(0, (float)$v));
     }
 
+    // Retake allowance — capped at 200% because beyond that it is almost
+    // certainly a typo, and a silent 1000% would quietly triple the crew.
+    if (isset($_POST['retake_pct'])) {
+        $r = trim($_POST['retake_pct']);
+        set_project_setting($pdo, $id, 'retake_pct',
+            (string)min(200, max(0, $r === '' ? 0 : (float)$r)));
+    }
+
     if ($codeRaw !== $code) {
         flash('warn', 'The project code was tidied up to "' . $code . '" (letters and numbers only).');
     }
@@ -64,6 +72,7 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
     $p = $project ?: ['name'=>'', 'code'=>'', 'type'=>'3D', 'fps'=>24, 'start_date'=>'', 'delivery_date'=>''];
     $est = $project ? project_estimates($pdo, (int)$project['id'])
                     : ['seconds'=>0, 'shots'=>0, 'assets'=>0];
+    $retakePct = $project ? project_retake_pct($pdo, (int)$project['id']) : 0.0;
     ?>
     <p class="lead">The essentials. Everything here can be changed later.</p>
     <form method="post" class="stack">
@@ -120,6 +129,24 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
           <label>Roughly how many assets
             <input type="number" name="estimated_assets" step="any" min="0"
                    value="<?= e(fmt_num($est['assets'] ?? 0)) ?>" placeholder="55">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="unit-choice">
+        <legend>Expected retakes</legend>
+        <p class="muted small" style="margin-top:0">
+          Work that comes back and is done again. It doesn't change how much there is to
+          make — 22 assets are still 22 assets — it changes how long each one takes, so it
+          scales the days per item and therefore the crew a deadline needs.
+          Mana's projections have used <strong>10%</strong>.
+        </p>
+        <div class="row">
+          <label>Retake allowance
+            <span class="pct-field">
+              <input type="number" name="retake_pct" step="any" min="0" max="200"
+                     value="<?= e(fmt_num($retakePct)) ?>" placeholder="10">%
+            </span>
           </label>
         </div>
       </fieldset>

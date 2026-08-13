@@ -128,14 +128,16 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
     <?php $estimates = project_estimates($pdo, $projectId); ?>
     <form method="post">
       <button type="submit" name="action" value="save" hidden></button>
-      <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>">
+      <?php $retakePct = project_retake_pct($pdo, $projectId); ?>
+      <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>"
+             data-retake="<?= e(fmt_num($retakePct)) ?>">
         <thead>
         <tr>
           <th>Step</th>
           <th title="How much of its scope this step actually touches. FX might only land on a third of the running time.">Covers</th>
           <th title="The amount of work the quota is calculated from, after the coverage percentage is applied.">Work</th>
           <th>Starts</th><th>Deadline</th>
-          <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day.">Days per item</th>
+          <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
           <th>Is that enough?</th>
         </tr>
@@ -186,8 +188,17 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <?php /* step="any" rather than a fixed increment — real estimates land on
                    awkward numbers like 1.5 days or 2.5 people, and the browser
                    should not reject them. */ ?>
+          <?php /* A step measured in seconds is measured in seconds here too: this
+                    is days per SECOND of footage, not per shot. The quota has always
+                    read it that way; the scheduler now turns it into dates, where
+                    getting it backwards is the difference between a two-day task and
+                    a twenty-day one. */ ?>
           <td><input type="number" name="days_per_unit[<?= $id ?>]" step="any" min="0.01"
-                     value="<?= e(fmt_num($s['days_per_unit'] ?? 1)) ?>"></td>
+                     value="<?= e(fmt_num($s['days_per_unit'] ?? 1)) ?>">
+            <?php if ($s['tracks_seconds']): ?>
+              <div class="muted small">per second</div>
+            <?php endif; ?>
+          </td>
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>

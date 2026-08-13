@@ -296,8 +296,13 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
       <?php endif; ?>
     </div>
 
+    <?php /* No "save and stay" here: every control on this screen writes as soon
+             as it is used, so there is never anything pending to save. A button
+             offering to save nothing would be worse than not having one. */ ?>
     <form method="post" class="actions">
-      <button type="submit" name="action" value="continue">Save and continue →</button>
+      <span class="hint">Shots are saved as soon as you add them — nothing is waiting here.</span>
+      <span class="spacer"></span>
+      <button type="submit" name="action" value="continue">Continue →</button>
     </form>
 
     <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>

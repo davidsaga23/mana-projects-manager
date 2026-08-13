@@ -54,6 +54,17 @@ $blocked = (int)$pdo->query(
 $unmatchedPeople  = count(unmatched_assignees($pdo, $projectId));
 $unmappedStatuses = count(unmapped_statuses($pdo, $projectId));
 
+// Whether a schedule exists yet, for the hub card. Wrapped because the schedule
+// table is empty until Phase 4's migration has been applied and the pass run —
+// an unscheduled project is the normal state, not an error.
+$scheduled = 0; $scheduleEnd = null;
+$stmt = $pdo->prepare('SELECT COUNT(*), MAX(end_date) FROM schedule WHERE project_id = ?');
+$stmt->execute([$projectId]);
+if ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+    $scheduled   = (int)$row[0];
+    $scheduleEnd = $row[1];
+}
+
 $pageTitle = $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
@@ -91,6 +102,17 @@ require __DIR__ . '/includes/header.php';
     <strong>Setup</strong>
     <span class="muted">Details, pipeline, workflow, shots, assets, dates</span>
   </a>
+  <a class="hub-card" href="schedule.php?project=<?= $projectId ?>">
+    <strong>Schedule</strong>
+    <span class="muted">
+      <?php if ($scheduled): ?>
+        <?= $scheduled ?> task<?= $scheduled === 1 ? '' : 's' ?> planned
+        <?php if ($scheduleEnd): ?>· finishes <?= e($scheduleEnd) ?><?php endif; ?>
+      <?php else: ?>
+        Work forwards from the pipeline to real dates
+      <?php endif; ?>
+    </span>
+  </a>
   <a class="hub-card" href="import.php?project=<?= $projectId ?>">
     <strong>Import progress</strong>
     <span class="muted">Read a Plaky export and update what's tracked</span>
@@ -98,6 +120,11 @@ require __DIR__ . '/includes/header.php';
   <a class="hub-card" href="statuses_edit.php?project=<?= $projectId ?>">
     <strong>Statuses</strong>
     <span class="muted">What each state means for reporting</span>
+  </a>
+  <a class="hub-card" href="export.php?project=<?= $projectId ?>">
+    <strong>Export setup (CSV)</strong>
+    <span class="muted">Work, days and headcount per step — the numbers an expense
+      projection is built from</span>
   </a>
   <a class="hub-card" href="aliases.php?project=<?= $projectId ?>">
     <strong>Names &amp; aliases</strong>
@@ -149,7 +176,10 @@ require __DIR__ . '/includes/header.php';
     <?php endforeach; ?>
   </table>
   <p class="muted small">"Tracked" is how many items have a progress record for that step —
-     lower than the total simply means nothing has been recorded for the rest yet.</p>
+     lower than the total simply means nothing has been recorded for the rest yet.
+     <a href="export.php?project=<?= $projectId ?>">Export these figures as CSV</a>, or
+     <a href="export.php?project=<?= $projectId ?>&amp;what=items">export the shot and asset
+     list</a>.</p>
 <?php endif; ?>
 
 </div>

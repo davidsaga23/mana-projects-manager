@@ -8,8 +8,9 @@ without re-deriving context.
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
 - **Status:** Phases 1–3 **live and proven on real data** at <https://mana.davidsaga.com>.
-  A real show ("Return to Club") is set up and imported from Plaky. Next: Phase 4, the
-  scheduler.
+  A real show ("Return to Club") is set up and imported from Plaky. Phase 4 (the scheduler)
+  is **built, not yet proven on real data** — run it on Return to Club and check the dates
+  against judgement before trusting them. Next: Phase 5, the timeline UI.
 - **Deploy:** push to `master` in GitHub Desktop; GitHub Actions FTP-syncs to
   `public_html/mana` within ~30s. After deploying a change that adds a migration, open
   `migrate.php` once.
@@ -150,7 +151,25 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    - CSV/Excel upload with column mapping, for shots, assets and progress.
    - The alias layer (`crew_aliases`, `name_aliases`) **and** the unmatched-names report,
      built alongside the importer, never after it.
-4. **Scheduler** — forward pass + reverse quota maths, driven by the dependency graph
+4. ~~**Scheduler**~~ — **built 2026-08-12, not yet run against the real show.** The reverse
+   quota maths already existed (`includes/quota.php`, shown on the wizard's review screen);
+   this phase added the forward pass. `migrations/010_scheduler.sql`, `includes/scheduler.php`,
+   `includes/calendar.php`, `schedule.php`, `calendar.php`. Read the seven `2026-08-12`
+   entries in `docs/DECISIONS.md` before changing any of it. In short:
+   - **A studio calendar.** `working_days_between()` counted Mon–Fri and nothing else, so
+     every Mexican public holiday was a day someone could finish a shot on. It now reads
+     `non_working_days`, which means **the quota figures on the review screen changed too** —
+     this was never only a scheduler fix.
+   - **Lanes, not people.** A step with two people gets two parallel tracks named
+     "Compositing 01 / 02". `crew_id` stays NULL: nothing records who does which discipline,
+     and a real name on a task reads as a real assignment.
+   - **Headcount is used as planned, even when it's short** — the overrun is reported rather
+     than papered over with lanes that don't exist. With no headcount it is derived from the
+     deadline, never defaulted to 1 (lesson 5).
+   - **A step whose coverage is a guess is drawn as one band**, not as invented per-shot rows.
+     Marking items `N/A` (the new `statuses.is_excluded`) turns it into real per-item dates.
+   - Dry-run preview first, then save — same convention as the importer and `migrate.php`.
+     `is_manual = 1` rows are read but never rewritten.
 5. **Timeline UI** — Gantt view, `.gan` export/import round trip
 6. **Reporting** — per-artist productivity, cross-project workload
 7. **Tickets / tasks** — port from STFC (it works well; see that codebase)

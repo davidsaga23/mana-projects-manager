@@ -66,6 +66,30 @@ function pending_migration_count(PDO $pdo): int {
     return $count = $n;
 }
 
+/**
+ * Does a column exist yet?
+ *
+ * For screens that gained a field in a migration which may not have been applied
+ * on this install. Locking a working page over a pending migration is worse than
+ * the missing feature — the same call made for roles in current_user().
+ *
+ * Cached per request: one query per table/column, however many rows are drawn.
+ */
+function column_exists(PDO $pdo, string $table, string $column): bool {
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (isset($cache[$key])) return $cache[$key];
+    try {
+        // Table and column names can't be bound as parameters, so they are
+        // quoted instead. Both are only ever literals written in this codebase.
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '', $table) . '` LIKE ?');
+        $stmt->execute([$column]);
+        return $cache[$key] = (bool)$stmt->fetch();
+    } catch (PDOException $e) {
+        return $cache[$key] = false;
+    }
+}
+
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
 // Empty string for null so it can fill a form field that means "not set".
 function fmt_num($v, int $decimals = 2): string {
@@ -85,30 +109,41 @@ function take_flashes(): array {
     return $f;
 }
 
-// Working days (Mon–Fri) between two dates, both INCLUSIVE — matching the
-// platform-wide rule that end dates are inclusive everywhere.
+// Working days between two dates, both INCLUSIVE — matching the platform-wide
+// rule that end dates are inclusive everywhere.
 // Every working day from $from to $to, both inclusive, as YYYY-MM-DD strings.
 // Built by stepping a DateTime, never by parsing dates in JS — 'YYYY-MM-DD' read
 // through JS's Date() is treated as UTC and walks backwards in a UTC−6 timezone.
+//
+// "Working" means Mon–Fri AND not in non_working_days — Mexican public holidays
+// are not weekends, and counting them as workable overstated every deadline in
+// the app. See includes/calendar.php. Before migration 010 has run that table
+// doesn't exist, non_working_days() returns nothing, and these behave exactly as
+// they always did.
+require_once __DIR__ . '/calendar.php';
+
 function working_days_list(string $from, string $to): array {
+    $holidays = non_working_days();
     $f = new DateTime($from);
     $t = new DateTime($to);
     $days = [];
     while ($f <= $t) {
-        if ((int)$f->format('N') < 6) $days[] = $f->format('Y-m-d');
+        $s = $f->format('Y-m-d');
+        if ((int)$f->format('N') < 6 && !isset($holidays[$s])) $days[] = $s;
         $f->modify('+1 day');
     }
     return $days;
 }
 
 function working_days_between(string $from, string $to): int {
+    $holidays = non_working_days();
     $f = new DateTime($from);
     $t = new DateTime($to);
     if ($t < $f) return 0;
     $count = 0;
     while ($f <= $t) {
-        $dow = (int)$f->format('N'); // 1=Mon .. 7=Sun
-        if ($dow < 6) $count++;
+        $s = $f->format('Y-m-d');
+        if ((int)$f->format('N') < 6 && !isset($holidays[$s])) $count++;   // 1=Mon .. 7=Sun
         $f->modify('+1 day');
     }
     return $count;

@@ -16,6 +16,27 @@ require_once __DIR__ . '/db.php';        // project_setting(), for the early est
  * are only ever a FALLBACK: the moment real shots or assets exist, they are
  * counted instead, and the UI says which was used.
  */
+/**
+ * Expected retakes, as a percentage of the base effort.
+ *
+ * Every projection Mana writes carries a retake allowance — the reference sheet
+ * applies "+10% RTK" to each line. It is a real, predictable cost: work comes
+ * back and is done again, so planning without it plans for a world where nothing
+ * is ever revised.
+ *
+ * It does NOT change how much there is to make — 22 assets stay 22 assets. It
+ * changes how long each one takes, so it multiplies days-per-item, never the
+ * work units.
+ */
+function project_retake_pct(PDO $pdo, int $projectId): float {
+    return max(0.0, (float)project_setting($pdo, $projectId, 'retake_pct', '0'));
+}
+
+/** The multiplier that allowance becomes: 10% -> 1.10. */
+function retake_factor(float $retakePct): float {
+    return 1 + ($retakePct / 100);
+}
+
 function project_estimates(PDO $pdo, int $projectId): array {
     return [
         'seconds' => (float)project_setting($pdo, $projectId, 'estimated_seconds', '0'),
@@ -120,9 +141,11 @@ function step_work_units(PDO $pdo, int $projectId, array $step, ?array $estimate
  * Returns a row of numbers plus 'problems' — anything that makes the plan
  * unworkable or unknowable, in plain language.
  */
-function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null, ?array $estimates = null): array {
+function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null,
+                    ?array $estimates = null, ?float $retakePct = null): array {
     $today = $today ?: date('Y-m-d');
     $work  = step_work_units($pdo, $projectId, $step, $estimates);
+    $retakePct = $retakePct ?? project_retake_pct($pdo, $projectId);
 
     $out = [
         'step'              => $step,
@@ -136,6 +159,7 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
         'per_artist_day'    => null,
         'required_headcount'=> null,   // rounded up, for display
         'required_exact'    => null,   // unrounded, for the comparison below
+        'retake_pct'        => $retakePct,
         'headcount'         => $step['planned_headcount'] !== null ? (float)$step['planned_headcount'] : null,
         'problems'          => [],
     ];
@@ -167,7 +191,9 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
 
     $out['team_per_day'] = $work['units'] / $days;
 
-    $daysPerUnit = (float)($step['days_per_unit'] ?: 1.0);
+    // Retakes make each item take longer, so they scale days-per-item — not the
+    // amount of work, which is fixed by the breakdown.
+    $daysPerUnit = (float)($step['days_per_unit'] ?: 1.0) * retake_factor($retakePct);
     $out['required_exact']     = $out['team_per_day'] * $daysPerUnit;
     $out['required_headcount'] = (int)ceil($out['required_exact']);
 
@@ -192,9 +218,13 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
 
 /** Quotas for every step in a project, in pipeline order. */
 function project_quotas(PDO $pdo, int $projectId, array $steps): array {
-    $estimates = project_estimates($pdo, $projectId);   // read once, not per step
+    // Read once, not per step.
+    $estimates = project_estimates($pdo, $projectId);
+    $retakePct = project_retake_pct($pdo, $projectId);
     $rows = [];
-    foreach ($steps as $step) $rows[] = step_quota($pdo, $projectId, $step, null, $estimates);
+    foreach ($steps as $step) {
+        $rows[] = step_quota($pdo, $projectId, $step, null, $estimates, $retakePct);
+    }
     return $rows;
 }
 

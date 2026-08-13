@@ -124,6 +124,8 @@ reporting possible — a lesson from STFC, where the raw value was discarded.
 >   id, project_id, name, sort_order,
 >   maps_to ENUM('none','delivered','approved'),
 >   is_blocked TINYINT,             -- cannot proceed, vs simply not started
+>   is_excluded TINYINT,            -- doesn't pass through this step at all ('N/A');
+>                                   -- added migration 010, read by the scheduler
 >   color VARCHAR(7)
 >
 > status_mapping                    -- incoming external text -> one of the above
@@ -174,9 +176,17 @@ from scheduling and per-artist reporting.
 ```sql
 schedule
   id, project_id, step_id, shot_id NULL, asset_id NULL,
+  item_key,                          -- 's<id>' / 'a<id>' / 'p<project_id>' / 'band'
   start_date, end_date,              -- both INCLUSIVE (decide once, honour everywhere)
-  crew_id NULL, is_manual TINYINT,
-  UNIQUE (step_id, shot_id, asset_id)
+  crew_id NULL,                      -- stays NULL until a crew screen exists
+  lane SMALLINT,                     -- which parallel track; names the placeholder artist
+  is_manual TINYINT,                 -- hand-planned; the auto pass never rewrites these
+  source VARCHAR(20),                -- 'auto' — what a re-run is allowed to replace
+  UNIQUE (step_id, item_key)
+
+non_working_days                     -- studio-wide; public holidays and shutdowns.
+  day (PK), name                     -- read by working_days_between(), so it moves the
+                                     -- quota figures too, not just the schedule
 
 headcount_log
   project_id, step_id, log_date, headcount, notes
@@ -222,18 +232,51 @@ fixed. Only the per-artist share moves. This confused people on STFC; label it c
 
 ### Forward (auto-schedule)
 
-For each shot/asset, walk the dependency graph in topological order:
+**Built 2026-08-12** — `includes/scheduler.php`. `build_schedule()` computes and returns;
+`commit_schedule()` writes. They are separate so the screen shows a full dry-run first.
 
-1. Skip approved work.
-2. Preserve `is_manual = 1` tasks (hand-planned or `.gan`-imported).
-3. Earliest start = day after **all** dependencies complete for that item.
-4. Duration = `work_units ÷ per_artist_quota`, minimum 1 day.
-5. Concurrency = `ceil(remaining_tasks × days_per_task ÷ working_days_available)`,
-   floored at headcount. **Never default this to 1** — that bug turned a 3-week schedule
-   into 9 months on STFC.
-6. Assign crew round-robin from the step's skill pool, excluding `is_team` rows.
-7. If anything still lands past the deadline, **say so in the UI** rather than silently
-   scheduling into next year.
+Steps are walked in dependency order (a step's `workflow_levels()` depth is already a valid
+topological order). Within a step:
+
+1. Skip approved work, and work marked **not applicable** (`statuses.is_excluded` — the
+   board's `N/A`, added in migration 010).
+2. Preserve `is_manual = 1` tasks (hand-planned or `.gan`-imported). They are read — what
+   follows still waits for them — but never rewritten, and the pass skips any (step, item)
+   that already has one, so nothing it writes can collide.
+3. Earliest start = day after **all** dependencies complete *for that item*, resolved as
+   specifically as the data allows: the same item in the step it waits for; failing that, for
+   a shot waiting on an asset step, the assets that shot actually uses (`shot_assets`);
+   failing that, the whole step.
+4. Duration = `days_per_unit` per item — times the shot's `placeholder_seconds` on a step
+   tracked in seconds, since that step measures footage, not items.
+5. **Lanes**, not concurrency-as-a-number. Where `planned_headcount` is set, that is the lane
+   count, *even when it isn't enough* — the shortfall shows up as a late finish and is
+   reported, rather than being papered over with people who don't exist. Where it isn't set,
+   the count is derived from the deadline: `ceil(work ÷ working_days_available)`, capped at
+   the number of items and **never defaulted to 1** — that bug turned a 3-week schedule into
+   9 months on STFC. Each item takes the lane that frees up soonest.
+6. **No crew assignment.** `crew_id` stays NULL and `schedule.lane` carries the track number;
+   the name shown is derived from the step ("Compositing 01", "Compositing 02"). Nothing
+   records who does which discipline yet, and a real name reads as a real assignment.
+7. Anything past a deadline is **reported per step and for the project**, never scheduled
+   quietly into next year.
+
+Two things are drawn as a single band (`item_key = 'band'`, both item columns NULL) rather
+than as invented per-item rows: a step whose `coverage_pct` is still a guess, and a project
+with no breakdown yet (from `project_settings.estimated_*`). Both become real per-item dates
+as soon as the underlying facts exist. Whole-project steps use `item_key = 'p<project_id>'`,
+the convention the importer already set.
+
+The maths runs on a **fractional** working-day axis anchored at the project start, converted
+to dates only at the end — so two half-day tasks share a date instead of each being rounded
+up to a full day. Handover between steps still moves in whole days.
+
+### Working days
+
+`working_days_between()` and `working_days_list()` read `non_working_days` (studio-wide;
+`includes/calendar.php`). Before this they counted Mon–Fri only, treating every Mexican
+public holiday as workable — an error always in the optimistic direction, and one that
+affected the **quota** figures as much as the schedule.
 
 ### Round trip
 

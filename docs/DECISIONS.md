@@ -361,6 +361,124 @@ alternative, a check per page, fails the first time someone forgets one, and fai
 - **None of this touches money.** Contracts, budgets and rates are in a separate application
   with separate accounts and a separate database; no role here reaches them.
 
+## 2026-08-12 — Working days mean Mon–Fri **minus a studio calendar**
+**Decision:** a `non_working_days` table (studio-wide, not per project) holds public holidays
+and shutdowns. `working_days_between()` and `working_days_list()` read it, so every quota
+already on the review screen changed the day migration 010 was applied — this was never only
+a scheduler concern.
+**Why:** the maths counted Mon–Fri and nothing else, so every Mexican public holiday was
+treated as a day somebody could finish a shot on. That error is always in the *optimistic*
+direction, which is the worst one for a deadline.
+**Consequence:**
+- Studio-wide, with `day` as the primary key. A nullable `project_id` plus
+  `UNIQUE (project_id, day)` was rejected for the reason `item_key` exists: MySQL unique
+  indexes ignore NULLs, so the same holiday could be stored twice.
+- The migration seeds **statutory days only** (Ley Federal del Trabajo art. 74, 2026–2027).
+  Semana Santa, the 24th and the 31st are offered as one-click suggestions on the calendar
+  screen instead — they are near-universal but they are Mana's choice, and seeding a day off
+  that the studio actually works would pad every schedule silently.
+- `crew_absences` is **deliberately not built yet**, though `ROADMAP.md` pairs it with this
+  work. The scheduler assigns no real people (see below), so there is nothing for a person's
+  days off to act on. Build it with crew assignment, or it is a table nothing reads.
+
+## 2026-08-12 — Statuses gain `is_excluded`: "this item doesn't pass through this step"
+**Decision:** a third flag beside `maps_to` and `is_blocked`. `N/A` carries it by default.
+**Why:** `is_blocked` already separates "cannot proceed" from "not started". This is the case
+neither covers — the work does not exist. A shot with no FX, a prop that needs no rig.
+Without it the scheduler has to plan time for work nobody will ever do, and the item sits in
+the plan forever looking unfinished.
+**Consequence:** it is also what lets `coverage_pct` stop being a guess. Coverage says *how
+much* of a step there is before anyone knows *which* items; these rows say which, once they
+do. Real data wins over the estimate, exactly as a real shot count already beats
+`project_settings.estimated_shots`.
+
+## 2026-08-12 — A step whose coverage is still a guess is drawn as one band
+**Decision:** when `coverage_pct < 100` and nothing has been marked not-applicable yet, the
+forward pass writes **one** `schedule` row for the whole step (`item_key = 'band'`, both item
+columns NULL) rather than per-item rows. It splits into real per-item dates the moment
+coverage reaches 100% or some items are marked N/A.
+**Why:** David's call, asked directly. "FX covers 30% of the show" gives the right start
+date, finish date and headcount, but naming *which* 56 shots would be invention — a
+supervisor would see FX planned on a shot that has none. The alternative, giving all 188
+shots a bar shortened to 30%, is worse: every individual bar is then a fiction.
+**Consequence:** the same shape is used for a project with no breakdown at all, drawn from
+`project_settings.estimated_*`, and for whole-project deliverables (`item_key = 'p<id>'`, the
+convention the importer already uses). A band can never be mistaken for a breakdown because
+it has no item names in it.
+
+## 2026-08-12 — Lanes, with placeholder names — the scheduler assigns no real people
+**Decision:** `schedule.lane` records which parallel track a task sits in. `crew_id` is left
+NULL. The name shown is derived from the step and the lane number — "Compositing 01",
+"Compositing 02" — at display time, never stored.
+**Why:** David's call. There is no record yet of who does which discipline (`crew_skills`
+exists but nothing populates it), so round-robin assignment would confidently put a
+compositor on rigging, and a real name on a task reads as a real assignment. A numbered lane
+says the useful thing — *this step needs two compositors* — without claiming who they are.
+**Consequence:** deriving the label rather than storing it means renaming a step renames its
+lanes, with no stale copy left behind. When the crew screen exists, a lane maps to a person
+and `crew_id` fills in underneath without the schedule changing shape.
+
+## 2026-08-12 — Headcount is used as planned, even when it isn't enough
+**Decision:** where `planned_headcount` is set, that is the number of lanes — full stop. The
+scheduler does **not** quietly add people until the deadline is met. Falling short shows up
+as a late finish, reported per step and for the project. Where headcount is *not* set, the
+lane count is derived from the deadline and never defaulted to 1.
+**Why:** the two failure modes are opposite and both bad. Defaulting to 1 is STFC lesson 5 —
+it serialised 188 shots into nine months. But inventing lanes to hit the date draws a
+schedule for a team that doesn't exist and hides the single fact a producer needs. Using the
+real team and reporting the overrun is the only version that is true.
+**Consequence:** the derived figure is capped at the number of items — more lanes than there
+are things to work on is meaningless, and the cap is also what stops an already-passed
+deadline asking for four thousand artists.
+
+## 2026-08-12 — The scheduler plans blocked work, and says how much
+**Decision:** settles the question left open by the `is_blocked` entry above. Blocked items
+are scheduled like any other, counted separately, and flagged in the plan.
+**Why:** consistent with what was already decided for reporting — blocked work still has to
+happen, and leaving it out would make a plan look achievable when it isn't. It is surfaced
+separately so it reads as the escalation it is rather than disappearing into a total.
+
+## 2026-08-12 — Schedule maths is fractional; only the dates are whole days
+**Decision:** the forward pass works in fractional working-day *indices* on an axis anchored
+at the project start, and converts to real dates only at the end. `schedule.source` records
+what wrote a row so a re-run replaces its own work and nothing else.
+**Why:** the planning screen explicitly invites "0.5 days per item". Rounding each task up to
+a whole day would double the length of any step made of them. Working fractionally lets two
+half-day tasks share a date, which is what actually happens. Handover between steps still
+moves in whole days — a shot passes to the next step the following morning, not mid-
+afternoon.
+**Consequence:** both dates stay INCLUSIVE, as everywhere else. `is_manual = 1` rows are read
+(they gate what follows them) but never rewritten, and the pass skips any (step, item) that
+already has one — so nothing it writes can collide with a hand-planned row.
+
+## 2026-08-12 — Retake allowance is a project-level percentage on days-per-item
+**Decision:** `project_settings.retake_pct` (no migration — the table is key/value). It
+multiplies **days per item**, never the work units. Set on the wizard's Basics screen,
+applied by `step_quota()`, the live check on Dates & headcount, and the CSV export.
+**Why:** every projection Mana writes carries one — the reference sheet applies "+10% RTK"
+to each line. Retakes are a predictable cost, and planning without them plans for a world
+where nothing is ever revised.
+**Why days-per-item and not work units:** 22 assets are still 22 assets after a retake. What
+changes is how long each one takes, and therefore the crew a date needs. Scaling the units
+instead would corrupt every count on the progress screens.
+**Consequence:** the figure is duplicated in `assets/wizard.js` for the live check, as the
+quota maths already is — both carry a comment saying they must move together. Capped at 200%
+on save, because a mistyped 1000 would silently triple the crew.
+
+## 2026-08-12 — CSV export of the setup, deliberately without money
+**Decision:** `export.php` emits one row per pipeline step — work units, coverage, days per
+unit, retakes, base and total person-days, person-months, planned and required headcount,
+dates. Plus `?what=items` for the plain shot and asset list.
+**Why:** it feeds an expense projection. The reference sheet's own Notes column
+("20 shots × 2 d/u + 10% RTK = 44 d ÷ 3 artists") is arithmetic the platform already holds,
+so the export hands over finished sums rather than raw data to be re-derived. The Notes
+column is reproduced in the same sentence form, so the numbers can be checked without
+opening the app.
+**Consequence:** it carries no rates and no costs — those belong to the separate finance
+application. This file is the bridge between the two: production numbers out, money applied
+on the other side. Written with a UTF-8 byte-order mark, or Excel mangles names like
+"Santiago Bernabéu".
+
 ---
 
 ## Still open
@@ -378,6 +496,12 @@ alternative, a check per page, fails the first time someone forgets one, and fai
 - **Splitting credit on shared tasks** — when two people are on one step, does per-artist
   reporting count it for both, or halve it? Probably both for "who worked on this" and
   halved for "how much did each deliver". Settle it when reporting is built.
+- **Crew days off** (`crew_absences`) — designed in `ROADMAP.md`, deliberately not built:
+  there are no real people on scheduled tasks yet for it to act on. Build it with crew
+  assignment, in the same phase.
+- **Which lane is which person** — a lane is currently a placeholder name. Turning it into an
+  assignment needs `crew_skills` populated, which needs a crew screen. That screen is the
+  natural home for absences too.
 - Whether STFC's historical data is imported later, or the dashboard simply retires.
 
 ### Settled earlier
