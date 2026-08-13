@@ -140,6 +140,14 @@ function sync_project_lanes(PDO $pdo, int $projectId): array {
             $stepId = (int)$step['id'];
             $want   = step_slot_count($step);
 
+            // Surplus is worked out BEFORE the no-headcount short-circuit below.
+            // Clearing a step's headcount leaves every one of its slots above
+            // what is asked for, and skipping the check meant the sync reported
+            // none while the screen highlighted them all.
+            foreach ($existing[$stepId] ?? [] as $laneNo => $row) {
+                if ($laneNo > $want) $out['surplus'][] = $row;
+            }
+
             if ($want === 0) {
                 $out['skipped'][] = $step['name'];
                 continue;
@@ -177,10 +185,64 @@ function sync_project_lanes(PDO $pdo, int $projectId): array {
                 $out['created']++;
             }
 
-            // More slots than the headcount now asks for. Kept, and named.
-            foreach ($existing[$stepId] ?? [] as $laneNo => $row) {
-                if ($laneNo > $want) $out['surplus'][] = $row;
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return $out;
+}
+
+/** Is this lane above what its step's headcount now asks for? */
+function lane_is_surplus(array $lane): bool {
+    return (int)$lane['lane_no'] > step_slot_count($lane);
+}
+
+/**
+ * Remove every slot above the current headcount, in one go.
+ *
+ * Two things it will not do, both for the same reason — a slot is only litter
+ * once nothing depends on it:
+ *
+ *   * A slot with scheduled tasks is left alone and reported. Deleting it would
+ *     orphan real planned work; re-running the schedule moves that work onto the
+ *     remaining slots first, and then it goes.
+ *   * A slot holding a REAL person releases the slot but never deletes the
+ *     person. They belong to the studio, not to one show's headcount estimate.
+ *
+ * Returns ['removed' => int, 'blocked' => [['name','tasks'], ...], 'kept_people' => int].
+ */
+function remove_surplus_lanes(PDO $pdo, int $projectId): array {
+    $out = ['removed' => 0, 'blocked' => [], 'kept_people' => 0];
+
+    $used = $pdo->prepare(
+        'SELECT COUNT(*) FROM schedule WHERE step_id = ? AND lane = ? AND project_id = ?'
+    );
+    $delLane = $pdo->prepare('DELETE FROM crew_lanes WHERE id = ? AND project_id = ?');
+    // Only ever removes the crew row when it is an unfilled placeholder that
+    // nothing else points at. Same guard the single-slot remove uses.
+    $delCrew = $pdo->prepare(
+        'DELETE FROM crew WHERE id = ? AND is_placeholder = 1
+           AND NOT EXISTS (SELECT 1 FROM crew_lanes WHERE crew_id = crew.id)'
+    );
+
+    $pdo->beginTransaction();
+    try {
+        foreach (project_lanes($pdo, $projectId) as $l) {
+            if (!lane_is_surplus($l)) continue;
+
+            $used->execute([(int)$l['step_id'], (int)$l['lane_no'], $projectId]);
+            $n = (int)$used->fetchColumn();
+            if ($n > 0) {
+                $out['blocked'][] = ['name' => $l['name'], 'tasks' => $n];
+                continue;
             }
+
+            $delLane->execute([(int)$l['id'], $projectId]);
+            $delCrew->execute([(int)$l['crew_id']]);
+            if ((int)$l['is_placeholder'] !== 1) $out['kept_people']++;
+            $out['removed']++;
         }
         $pdo->commit();
     } catch (Throwable $e) {

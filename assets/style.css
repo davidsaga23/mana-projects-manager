@@ -400,9 +400,20 @@ button.linkish {
 button.linkish:hover { background: none; color: #1d4e80; }
 .danger-actions { margin-top: 28px; }
 
+.duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.duration.verdict-short strong { color: #8a6d1a; }
+
 /* Crew */
 .col-num { width: 3.5rem; font-variant-numeric: tabular-nums; }
 .crew-step-head .dot { vertical-align: baseline; }
+/* Two buttons side by side, each in its own form (HTML forms can't nest, and
+   they post different actions). */
+.slot-actions { gap: 10px; }
+.slot-actions form { margin: 0; }
+.slot-actions small { flex: 1 1 100%; margin-top: 2px; }
+/* A disabled button must still show its title tooltip: pointer-events:none on
+   the button would suppress it, so only the cursor changes. */
+.slot-actions button:disabled { opacity: 1; }
 
 /* Login / installer */
 .login-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; }

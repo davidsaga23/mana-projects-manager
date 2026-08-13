@@ -583,6 +583,10 @@ failure as one that duplicates them without saying so.
   since scheduled tasks carry a `crew_id`: a slot's absences are as real a scheduling
   constraint as a public holiday. Worth doing with the timeline, so a bar visibly moves.
 - ~~**Which lane is which person**~~ — settled 2026-08-13 by the slot model above.
+- **Capturing an estimate baseline before it is overwritten.** `pipeline_steps.days_per_unit`,
+  `coverage_pct` and `planned_headcount` are edited in place, so "what we guessed at kickoff"
+  is destroyed on every edit — and that is exactly the number cross-project benchmarking needs
+  (`ROADMAP.md`, "Cross-project benchmarking"). Small, urgent, and impossible to backfill.
 - **Whether a slot should carry its own headcount fraction.** `planned_headcount` of 2.5
   currently rounds up to 3 slots. Making the third slot half-time would be more honest, but
   needs an `allocation_pct` per slot (`crew_projects` already has one for real people).

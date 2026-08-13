@@ -106,13 +106,22 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     $stepEnd  = [];   // step id => last working-day index anything in it finishes
     $itemEnd  = [];   // step id => [item_key => last working-day index]
     $estimates = project_estimates($pdo, $projectId);
+    // Read once, not per step — and applied the same way step_quota() applies it,
+    // so the dates below can never drift from the figures on the review screen.
+    $retakePct = project_retake_pct($pdo, $projectId);
+    if ($retakePct > 0) {
+        $out['notes'][] = sprintf(
+            'Every task is %s%% longer than its base estimate, for the retake allowance set on ' .
+            'the Basics screen.', fmt_num($retakePct)
+        );
+    }
 
     foreach ($steps as $step) {
         $stepId  = (int)$step['id'];
         $summary = scheduler_schedule_step(
             $pdo, $project, $step, $axis, $anchor, $projectDeadline,
             $items, $progress, $manual, $shotAssets, $depsMap,
-            $stepEnd, $itemEnd, $estimates, $laneCrew
+            $stepEnd, $itemEnd, $estimates, $laneCrew, $retakePct
         );
 
         $out['steps'][$stepId] = $summary;
@@ -299,13 +308,20 @@ function scheduler_shot_assets(PDO $pdo, int $projectId): array {
 function scheduler_schedule_step(
     PDO $pdo, array $project, array $step, array &$axis, string $anchor, ?string $projectDeadline,
     array $items, array $progress, array $manual, array $shotAssets, array $depsMap,
-    array $stepEnd, array $itemEnd, array $estimates, array $laneCrew = []
+    array $stepEnd, array $itemEnd, array $estimates, array $laneCrew = [],
+    float $retakePct = 0.0
 ): array {
     $stepId    = (int)$step['id'];
     $stepName  = $step['name'];
     $projectId = (int)$project['id'];
     $dpu       = (float)($step['days_per_unit'] ?: 1.0);
     if ($dpu <= 0) $dpu = 1.0;
+    // Retakes lengthen each item, so they scale days-per-item — NOT the item
+    // count. Exactly what step_quota() does. Without this the schedule ran
+    // shorter than the quota screen said it would, and two numbers derived from
+    // the same inputs disagreeing is the failure this codebase keeps paying for
+    // (STFC lesson 4: two layers each applying their own adjustment).
+    $dpu *= retake_factor($retakePct);
     $coverage  = max(0.0, min(100.0, (float)($step['coverage_pct'] ?? 100))) / 100;
 
     $s = [

@@ -74,6 +74,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ));
             }
 
+        } elseif ($action === 'clean_surplus') {
+            $r = remove_surplus_lanes($pdo, $projectId);
+            if ($r['removed'] === 0 && !$r['blocked']) {
+                flash('warn', 'Nothing to clean up — every slot matches its step\'s headcount.');
+            } else {
+                flash('ok', sprintf(
+                    'Removed %d surplus slot%s.%s',
+                    $r['removed'], $r['removed'] === 1 ? '' : 's',
+                    $r['kept_people'] > 0
+                        ? ' ' . $r['kept_people'] . ' of them held a real person — they were taken off '
+                          . 'this step but remain on the studio crew list.'
+                        : ''
+                ));
+            }
+            if ($r['blocked']) {
+                $bits = [];
+                foreach ($r['blocked'] as $b) $bits[] = $b['name'] . ' (' . $b['tasks'] . ')';
+                flash('warn', sprintf(
+                    '%d slot%s left alone because %s still %s scheduled work on %s: %s. ' .
+                    'Re-run the schedule so that work moves onto the remaining slots, then clean up again.',
+                    count($r['blocked']), count($r['blocked']) === 1 ? ' was' : 's were',
+                    count($r['blocked']) === 1 ? 'it' : 'they',
+                    count($r['blocked']) === 1 ? 'has' : 'have',
+                    count($r['blocked']) === 1 ? 'it' : 'them',
+                    implode(', ', $bits)
+                ));
+            }
+
         } elseif (preg_match('/^promote:(\d+)$/', $action, $m)) {
             promote_placeholder(
                 $pdo, (int)$m[1],
@@ -210,17 +238,42 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php endif; ?>
 
-  <?php if ($missing > 0 && can_edit()): ?>
-    <form method="post" class="inline-form toggle-form">
-      <input type="hidden" name="action" value="generate">
-      <button type="submit"><?= $lanes ? 'Add the missing slots' : 'Create slots from the headcount' ?></button>
+  <?php if (can_edit()): ?>
+    <?php
+    // Both buttons are always drawn, each disabled when it has nothing to do, so
+    // the pair reads as "the slots and the headcount can be brought into line"
+    // rather than as controls that appear and vanish. The title says WHY a
+    // disabled button is disabled — a greyed-out control with no explanation is
+    // indistinguishable from a broken one.
+    ?>
+    <div class="inline-form toggle-form slot-actions">
+      <form method="post">
+        <input type="hidden" name="action" value="generate">
+        <button type="submit" <?= $missing === 0 ? 'disabled' : '' ?>
+                title="<?= $missing === 0
+                    ? 'Every step already has the slots its headcount asks for.'
+                    : e($missing . ' slot(s) the headcount asks for are missing.') ?>">
+          <?= $lanes ? 'Add missing slots' : 'Create slots from the headcount' ?><?php
+            if ($missing > 0): ?> (<?= $missing ?>)<?php endif; ?>
+        </button>
+      </form>
+
+      <form method="post"
+            onsubmit="return confirm('Remove <?= $surplusCount ?> slot(s) above the current headcount? Any holding a real person keep the person on the studio crew list; any with scheduled work are left alone.');">
+        <input type="hidden" name="action" value="clean_surplus">
+        <button type="submit" class="secondary" <?= $surplusCount === 0 ? 'disabled' : '' ?>
+                title="<?= $surplusCount === 0
+                    ? 'No slot is above what its step\'s headcount asks for.'
+                    : e($surplusCount . ' slot(s) are above the current headcount.') ?>">
+          Remove surplus slots<?php if ($surplusCount > 0): ?> (<?= $surplusCount ?>)<?php endif; ?>
+        </button>
+      </form>
+
       <small>
-        <?= $missing ?> slot<?= $missing === 1 ? '' : 's' ?> the headcount asks for
-        <?= $missing === 1 ? 'is' : 'are' ?> missing. Slots are named after their step
-        — "Animation 01", "Animation 02" — and can be renamed at any time.
-        Nothing is ever deleted by this.
+        Adding never deletes anything. Removing only takes out slots above the headcount, and
+        skips any that still have scheduled work on them.
       </small>
-    </form>
+    </div>
   <?php endif; ?>
 
   <?php if (!$lanes): ?>

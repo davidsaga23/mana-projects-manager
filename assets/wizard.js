@@ -151,20 +151,82 @@
       workCell.innerHTML = workHtml;
     }
 
+    // How long the step takes at these settings, as opposed to how long it has.
+    // "Is that enough?" answers whether the people fit the date; this answers
+    // how many days the work itself needs, which is the number you compare
+    // against the gap between Starts and Deadline.
+    var durationCell = row.querySelector('.duration');
+    function sayDuration(html, cls) {
+      if (!durationCell) return;
+      durationCell.innerHTML = html;
+      durationCell.className = 'duration' + (cls ? ' ' + cls : '');
+    }
+
+    function updateDuration(availableDays) {
+      if (!durationCell) return;
+      if (units <= 0) return sayDuration('<span class="muted">—</span>');
+
+      // Retakes lengthen each item, exactly as in step_quota(). A duration that
+      // ignored them would disagree with the verdict in the next column.
+      var personDays = units * (perUnit > 0 ? perUnit : 1) * retakeFactor;
+
+      if (head === null || head <= 0) {
+        return sayDuration(
+          '<span class="muted">' + fmtRate(personDays) + ' person-days</span>'
+          + '<div class="muted small">set people to get a duration</div>'
+        );
+      }
+
+      var elapsed = personDays / head;
+      var whole = Math.max(1, Math.ceil(elapsed - 0.0001));
+      var html = '<strong>' + whole + '</strong> ' + (whole === 1 ? 'day' : 'days');
+      var cls = '';
+      if (availableDays > 0) {
+        if (whole > availableDays) {
+          html += '<div class="warn-text small">' + (whole - availableDays)
+                + ' more than the dates allow</div>';
+          cls = 'verdict-short';
+        } else {
+          html += '<div class="muted small">' + (availableDays - whole) + ' days spare</div>';
+        }
+      }
+      sayDuration(html, cls);
+    }
+
     function say(html, cls) {
       cell.innerHTML = html;
       cell.className = 'verdict' + (cls ? ' ' + cls : '');
     }
 
-    if (unitsRaw > 0 && units <= 0) return say('<span class="muted">covers 0% — nothing to do</span>');
-    if (units <= 0)  return say('<span class="muted">nothing to schedule yet</span>');
-    if (!deadline)   return say('<span class="muted">set a deadline</span>');
+    // Duration needs neither a deadline nor a valid window — work divided by
+    // people is knowable as soon as both exist — so it is filled on every path
+    // out of here, not just the one where everything is set.
+    if (unitsRaw > 0 && units <= 0) {
+      updateDuration(0);
+      return say('<span class="muted">covers 0% — nothing to do</span>');
+    }
+    if (units <= 0) {
+      updateDuration(0);
+      return say('<span class="muted">nothing to schedule yet</span>');
+    }
+    if (!deadline) {
+      updateDuration(0);
+      return say('<span class="muted">set a deadline</span>');
+    }
 
     var from = (start && start > today) ? start : today;
-    if (deadline < from) return say('<span class="warn-text">deadline has passed</span>');
+    if (deadline < from) {
+      updateDuration(0);
+      return say('<span class="warn-text">deadline has passed</span>');
+    }
 
     var days = workingDays(from, deadline);
-    if (days <= 0) return say('<span class="warn-text">no working days left</span>');
+    if (days <= 0) {
+      updateDuration(0);
+      return say('<span class="warn-text">no working days left</span>');
+    }
+
+    updateDuration(days);
 
     var teamPerDay = units / days;
     var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor;

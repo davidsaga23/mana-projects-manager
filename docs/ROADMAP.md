@@ -19,6 +19,7 @@ separate database — see `DECISIONS.md` 2026-08-12)
 | Budget vs actual at project end | **F** | time log, rates | Needs real logged hours to mean anything |
 | Budget simulator — "what if we add people?" | **F** | scheduler | Production already computes the hard half |
 | Payments / invoice tracking hub | **F** | invoice upload | Which invoices are paid |
+| Cross-project benchmarking — estimated vs actual per step | P | estimate baseline, time log | **Read the section below.** The capture half is urgent; the reporting half isn't |
 
 ### Deliberately last (decided 2026-08-12)
 
@@ -65,6 +66,81 @@ Which means it lives on the finance side (rates), but the production platform
 should expose the quota numbers cleanly enough for it to consume. Worth
 remembering when the scheduler is built: keep that maths in one reusable place
 (`includes/quota.php` already is), not buried in a page.
+
+---
+
+## Cross-project benchmarking — "how long does Concept actually take?"
+
+David, 2026-08-13: *"I want to compare the same tasks along different projects so when I'm
+creating a new one, my starting estimates get better and better."*
+
+This is the payoff that makes the platform worth more than a spreadsheet, and the reason
+`step_library` was built global rather than per project. It is a **reporting** feature, but it
+has a **data-capture** prerequisite that is urgent, for the same reason `daily_snapshots` was:
+what isn't recorded as it happens cannot be reconstructed afterwards.
+
+### The identity to compare on
+
+Not the step name alone. "Concept" for characters and "Concept" for environments are different
+jobs with different day rates, and migration 009 already treats them as different steps. The
+comparison key is the triple that migration made unique:
+
+```
+(name, applies_to, applies_to_asset_type)   e.g. ("Concept", asset, "Character")
+```
+
+`step_library` already normalises names across shows, so it is the natural spine. It would need
+to carry that full triple rather than just `name` + `applies_to`.
+
+### THE URGENT PART — estimates are overwritten in place
+
+`pipeline_steps.days_per_unit`, `coverage_pct` and `planned_headcount` are edited directly on
+the Dates & headcount screen. Every edit destroys what was thought before it. So the single
+most valuable number for improving estimates — **what we guessed at kickoff, next to what it
+actually took** — is being lost on every project, silently, right now.
+
+The fix is small and should not wait for the reporting screens:
+
+- A `step_estimate_baseline` table (project_id, step_id, the estimate fields, `captured_at`,
+  `reason`), written when the wizard's Review screen sets a project to `active`.
+- Immutable afterwards. A deliberate **re-baseline** action can add a new row when a plan is
+  genuinely replanned — so the history reads as "we thought 2 days, then revised to 3, and it
+  took 3.4" rather than silently becoming "we always said 3".
+- Cheap now; impossible to backfill. Exactly the `project_id`-on-day-one argument.
+
+### What's already in place
+
+| Piece | Status |
+|---|---|
+| Global step vocabulary (`step_library`) | Built (migration 002) — the join key |
+| Step scope triple as identity | Built (migration 009) |
+| Per-step estimates | Built, but **mutable** — see above |
+| Daily progress history (`daily_snapshots`) | Built 2026-08-13, recording from now on |
+| Planned dates per task (`schedule`) | Built (Phase 4) |
+| Actual effort per task | **Missing.** `progress.time_spent_minutes` is one running total and nearly empty; needs the `time_logs` table |
+| Per-step figures as CSV (`export.php`) | Built — a stopgap for doing this in a spreadsheet today |
+
+### What the analysis eventually answers
+
+Per step identity, across every project that has run it:
+
+- **Estimated vs actual days per item** — the headline. "We plan Character Concept at 2 days;
+  across four shows it has averaged 3.1."
+- **Estimate drift by project type and scale.** A 2D short and a 3D series are not the same
+  show; comparing them without splitting by `projects.type` would average away the signal.
+- **Which steps are reliably estimated and which are not.** A step that is always 10% over is a
+  calibration fix; one that swings between 0.5× and 3× is a scoping problem, and they need
+  different responses.
+- **Retake allowance actually observed** vs the percentage set on the Basics screen.
+- **Feeding it forward:** when a new project picks a step from the library, offer the observed
+  median as the default `days_per_unit`, labelled as coming from N previous shows. That is the
+  loop closing — the estimate improves because the tool remembers, not because someone
+  remembers.
+
+**Scale caveat worth designing for:** two or three finished projects is not a sample. Show the
+number of observations next to any figure, and never present a median drawn from one previous
+show as though it were a benchmark. An over-confident average is worse than no average, because
+people plan against it.
 
 ---
 

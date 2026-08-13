@@ -169,6 +169,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <th>Starts</th><th>Deadline</th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
+          <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
           <th>Is that enough?</th>
         </tr>
         </thead>
@@ -232,6 +233,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>
+          <?php /* Filled by wizard.js, like the verdict beside it — both are
+                   recalculated as you type, so rendering a number here on load
+                   would only be right until the first keystroke. */ ?>
+          <td class="duration"><span class="muted">—</span></td>
           <td class="verdict"><span class="muted">—</span></td>
         </tr>
         <?php endforeach; ?>
