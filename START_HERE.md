@@ -124,6 +124,15 @@ Hard-won, all from real incidents:
 10. **PHP `mail()` cannot authenticate.** Send via authenticated SMTP. Match port to
    encryption: **465 = SSL, 587 = STARTTLS** — mixing them hangs. cPanel mail servers usually
    need `verify_peer = false` (self-signed certs).
+11. **Never put a placeholder in a `SHOW` statement, and never let a `catch` decide a
+   feature is missing.** `config.php` sets `PDO::ATTR_EMULATE_PREPARES => false`, so
+   `$pdo->prepare('SHOW COLUMNS FROM x LIKE ?')` is a real server-side prepare and MySQL's
+   protocol rejects the parameter. Use `$pdo->query()` with a literal, as `wizard.php`
+   already did. The damage wasn't the failed query — it was the `catch (PDOException)`
+   turning it into "that column doesn't exist", which made the scheduler's save button
+   quietly not draw itself. **A feature that disables itself on a swallowed exception is
+   indistinguishable from a feature that was never built.** If a catch decides something is
+   unavailable, it has to say so on screen. (Phase 4 build, 2026-08-12.)
 
 ---
 

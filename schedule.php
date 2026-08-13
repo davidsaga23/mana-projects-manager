@@ -109,16 +109,28 @@ require __DIR__ . '/includes/header.php';
   out. Nothing below is saved until you press the button.
 </p>
 
-<?php // --- what is already saved --------------------------------------- ?>
+<?php
+// --- saved vs. previewed ----------------------------------------------------
+// These are two different things and the page shows both at once, so the line
+// has to say WHICH it is talking about. "No schedule" on its own, printed
+// directly above a full plan with dates in it, reads as a failure rather than
+// as "you haven't pressed the button yet".
+?>
 <div class="summary-line">
   <?php if ($savedCount): ?>
-    <strong><?= $savedCount ?></strong> task<?= $savedCount === 1 ? '' : 's' ?> saved
+    <strong>Saved:</strong> <?= $savedCount ?> task<?= $savedCount === 1 ? '' : 's' ?>
     <?php if ($savedManual): ?>
       (<?= $savedManual ?> hand-planned)
     <?php endif; ?>
-    · <?= e($saved['first']) ?> → <?= e($saved['last']) ?>
+    · <?= e($saved['first']) ?> → <?= e($saved['last']) ?>.
+    The plan below is worked out fresh each time this page opens, so it may differ from what
+    is stored — saving again replaces it.
   <?php else: ?>
-    Nothing saved yet — this project has no schedule.
+    <strong>Nothing saved yet.</strong>
+    Everything below is a preview, worked out fresh just now and thrown away when you leave.
+    <?php if ($plan['tasks']): ?>
+      Press <em>Save this schedule</em> at the bottom to keep it.
+    <?php endif; ?>
   <?php endif; ?>
 </div>
 
@@ -128,6 +140,20 @@ require __DIR__ . '/includes/header.php';
 <?php foreach ($plan['notes'] as $n): ?>
   <div class="flash flash-warn"><?= e($n) ?></div>
 <?php endforeach; ?>
+
+<?php
+// A condition that removes the save button has to be stated BEFORE the plan,
+// not underneath it. Hidden further down, it reads as the button simply not
+// existing.
+?>
+<?php if (!$schemaReady): ?>
+  <div class="flash flash-err">
+    This plan can be looked at but not saved: the database updates the scheduler needs
+    haven't been applied, so there is nowhere to put it.
+    <?= is_admin() ? '<a href="migrate.php">Apply them →</a>'
+                   : 'Ask an administrator to run them.' ?>
+  </div>
+<?php endif; ?>
 
 <?php if (!$holidays): ?>
   <div class="flash flash-warn">
@@ -304,13 +330,7 @@ require __DIR__ . '/includes/header.php';
     </table>
   <?php endif; ?>
 
-  <?php if (!$schemaReady): ?>
-    <div class="flash flash-warn">
-      This plan can be looked at but not saved yet — the database updates the scheduler needs
-      haven't been applied. <?= is_admin() ? '<a href="migrate.php">Apply them →</a>'
-                                           : 'Ask an administrator to run them.' ?>
-    </div>
-  <?php elseif (can_edit()): ?>
+  <?php if ($schemaReady && can_edit()): ?>
   <form method="post" class="actions">
     <input type="hidden" name="action" value="commit">
     <button type="submit">Save this schedule</button>
@@ -318,6 +338,10 @@ require __DIR__ . '/includes/header.php';
       Replaces whatever the last run saved. Hand-planned tasks are never touched.
     </small>
   </form>
+  <?php elseif (!can_edit()): ?>
+    <p class="muted small">
+      Your account has view-only access, so this plan can be read but not saved.
+    </p>
   <?php endif; ?>
 
 <?php else: ?>

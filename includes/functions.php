@@ -73,21 +73,33 @@ function pending_migration_count(PDO $pdo): int {
  * on this install. Locking a working page over a pending migration is worse than
  * the missing feature — the same call made for roles in current_user().
  *
- * Cached per request: one query per table/column, however many rows are drawn.
+ * NO PLACEHOLDER, deliberately. The first version of this ran
+ * `SHOW COLUMNS FROM x LIKE ?` as a prepared statement, and db.php sets
+ * PDO::ATTR_EMULATE_PREPARES => false — so that is a real server-side prepare,
+ * and MySQL's prepared-statement protocol will not accept a parameter there. It
+ * threw, the catch below swallowed it, and every column in the app was reported
+ * missing. The visible symptom was the scheduler's save button quietly not being
+ * drawn: a feature disabling itself with no message, which is the exact failure
+ * class this codebase keeps paying for.
+ *
+ * Reads the whole table's column list in one query and caches all of it, so a
+ * page asking about four columns still costs one round trip.
  */
 function column_exists(PDO $pdo, string $table, string $column): bool {
     static $cache = [];
     $key = $table . '.' . $column;
-    if (isset($cache[$key])) return $cache[$key];
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    // A table name can't be bound as a parameter, so it is whitelisted to the
+    // characters an identifier can contain. Every caller passes a literal.
+    $safe = preg_replace('/[^A-Za-z0-9_]/', '', $table);
     try {
-        // Table and column names can't be bound as parameters, so they are
-        // quoted instead. Both are only ever literals written in this codebase.
-        $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '', $table) . '` LIKE ?');
-        $stmt->execute([$column]);
-        return $cache[$key] = (bool)$stmt->fetch();
+        $cols = $pdo->query('SHOW COLUMNS FROM `' . $safe . '`')->fetchAll(PDO::FETCH_COLUMN);
     } catch (PDOException $e) {
-        return $cache[$key] = false;
+        return $cache[$key] = false;    // table itself doesn't exist yet
     }
+    foreach ($cols as $c) $cache[$table . '.' . $c] = true;
+    return $cache[$key] = in_array($column, $cols, true);
 }
 
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
