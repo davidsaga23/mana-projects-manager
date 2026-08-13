@@ -400,6 +400,10 @@ button.linkish {
 button.linkish:hover { background: none; color: #1d4e80; }
 .danger-actions { margin-top: 28px; }
 
+/* Crew */
+.col-num { width: 3.5rem; font-variant-numeric: tabular-nums; }
+.crew-step-head .dot { vertical-align: baseline; }
+
 /* Login / installer */
 .login-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; }
 .login-box {

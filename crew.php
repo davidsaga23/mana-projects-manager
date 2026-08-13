@@ -208,22 +208,23 @@ require __DIR__ . '/includes/header.php';
   <?php else: ?>
 
     <?php foreach ($byStep as $rows): $first = $rows[0]; ?>
-      <h3>
+      <h3 class="crew-step-head">
         <span class="dot" style="background:<?= e($first['color'] ?: '#ccc') ?>"></span>
         <?= e($first['step_name']) ?>
         <span class="muted">· <?= e(applies_to_phrase($first['applies_to'],
                                      $first['applies_to_asset_type'] ?? null)) ?></span>
       </h3>
+      <?php
+      // Only two facts per row: which position, and who is in it. The step name
+      // and what it applies to are in the heading above — repeating them on
+      // every row made three columns that all said the same thing, and made
+      // "Slot" and "Who" look like duplicates of each other.
+      ?>
       <table class="review-table">
-        <tr><th>Slot</th><th>Applies to</th><th>Who</th><th></th></tr>
+        <tr><th class="col-num">#</th><th>Who</th><th></th></tr>
         <?php foreach ($rows as $l): $isPh = (int)$l['is_placeholder'] === 1; ?>
         <tr>
-          <td class="wf-name">
-            <span class="dot" style="background:<?= e($l['color'] ?: '#ccc') ?>"></span>
-            <?= e($l['step_name']) ?> <?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?>
-          </td>
-          <td class="muted"><?= e(applies_to_phrase($l['applies_to'],
-                                  $l['applies_to_asset_type'] ?? null)) ?></td>
+          <td class="col-num muted"><?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?></td>
           <td>
             <strong><?= e($l['name']) ?></strong>
             <?php if ($isPh): ?>
