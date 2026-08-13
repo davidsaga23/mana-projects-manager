@@ -73,7 +73,7 @@ function project_lanes(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
         'SELECT cl.*, c.name, c.role, c.is_placeholder, c.active, c.email,
                 ps.name AS step_name, ps.color, ps.step_order,
-                ps.applies_to, ps.applies_to_asset_type
+                ps.applies_to, ps.applies_to_asset_type, ps.planned_headcount
            FROM crew_lanes cl
            JOIN crew c            ON c.id  = cl.crew_id
            JOIN pipeline_steps ps ON ps.id = cl.step_id

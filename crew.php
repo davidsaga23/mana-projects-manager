@@ -59,11 +59,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('warn', 'No headcount set, so no slots were made for: ' .
                               implode(', ', $r['skipped']) . '.');
             }
-            foreach ($r['surplus'] as $s) {
+            // ONE message, not one per slot. Lowering a headcount from 7 to 2
+            // produces five surplus slots at a stroke, and five near-identical
+            // warnings pushed everything else off the screen — including the two
+            // lines saying what had actually been done. The slots themselves are
+            // marked in the table below, which is where they can be acted on.
+            if ($r['surplus']) {
+                $n = count($r['surplus']);
                 flash('warn', sprintf(
-                    '"%s" is beyond what %s\'s headcount now asks for. It was kept, not deleted — ' .
-                    'it may already have work planned against it. Remove it below if it is not needed.',
-                    $s['name'], $s['step_name']
+                    '%d slot%s beyond what the current headcount asks for. %s kept, not deleted — ' .
+                    '%s may already have work planned against %s. They are marked below.',
+                    $n, $n === 1 ? ' is' : 's are', $n === 1 ? 'It was' : 'They were',
+                    $n === 1 ? 'it' : 'they', $n === 1 ? 'it' : 'them'
                 ));
             }
 
@@ -143,6 +150,14 @@ foreach ($steps as $s) {
     $missing += max(0, $want - ($haveByStep[(int)$s['id']] ?? 0));
 }
 
+// Slots above what their step's headcount now asks for. Counted on every page
+// view, not just after a sync: a flash message is gone on the next reload, and
+// this is a state the project is IN rather than something that just happened.
+$surplusCount = 0;
+foreach ($lanes as $l) {
+    if ((int)$l['lane_no'] > step_slot_count($l)) $surplusCount++;
+}
+
 // Grouped by step ID, not step name. Two steps can legitimately share a name —
 // "Concept" for characters and "Concept" for environments — and keying by name
 // merged them into one block showing "Concept 01" twice.
@@ -176,10 +191,24 @@ require __DIR__ . '/includes/header.php';
       <strong><?= count($lanes) ?></strong> slot<?= count($lanes) === 1 ? '' : 's' ?>
       · <strong><?= count($lanes) - $unfilled ?></strong> filled
       · <strong><?= $unfilled ?></strong> still a placeholder
+      <?php if ($surplusCount): ?>
+        · <span class="warn-text"><strong><?= $surplusCount ?></strong> beyond the headcount</span>
+      <?php endif; ?>
     <?php else: ?>
       No slots yet.
     <?php endif; ?>
   </div>
+
+  <?php if ($surplusCount): ?>
+    <div class="flash flash-warn">
+      <strong><?= $surplusCount ?></strong> slot<?= $surplusCount === 1 ? '' : 's' ?>
+      <?= $surplusCount === 1 ? 'is' : 'are' ?> above what the headcount now asks for —
+      lowering a step's headcount never deletes people, because work may already be planned
+      against them. <?= $surplusCount === 1 ? 'It is' : 'They are' ?> highlighted below.
+      Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a> first so that
+      work moves onto the remaining slots, then remove the empty ones.
+    </div>
+  <?php endif; ?>
 
   <?php if ($missing > 0 && can_edit()): ?>
     <form method="post" class="inline-form toggle-form">
@@ -222,8 +251,14 @@ require __DIR__ . '/includes/header.php';
       ?>
       <table class="review-table">
         <tr><th class="col-num">#</th><th>Who</th><th></th></tr>
-        <?php foreach ($rows as $l): $isPh = (int)$l['is_placeholder'] === 1; ?>
-        <tr>
+        <?php foreach ($rows as $l):
+          $isPh = (int)$l['is_placeholder'] === 1;
+          // Beyond what this step's headcount now asks for. Shown on the row
+          // rather than only in a flash message, so it is still visible on the
+          // next page view and sits next to the button that removes it.
+          $isSurplus = (int)$l['lane_no'] > step_slot_count($l);
+        ?>
+        <tr class="<?= $isSurplus ? 'has-problem' : '' ?>">
           <td class="col-num muted"><?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?></td>
           <td>
             <strong><?= e($l['name']) ?></strong>
@@ -231,6 +266,11 @@ require __DIR__ . '/includes/header.php';
               <span class="est-tag">placeholder</span>
             <?php elseif (!$l['active']): ?>
               <span class="muted small">(inactive)</span>
+            <?php endif; ?>
+            <?php if ($isSurplus): ?>
+              <div class="warn-text small">
+                Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this step.
+              </div>
             <?php endif; ?>
           </td>
           <td>
