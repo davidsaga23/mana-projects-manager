@@ -47,6 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $r['created'], $r['created'] === 1 ? '' : 's', $r['existing']
                 ));
             }
+            if (!empty($r['renamed'])) {
+                flash('ok', sprintf(
+                    'Renamed %d slot%s so two steps sharing a name can be told apart — ' .
+                    'they now carry what they apply to, e.g. "Concept Character 01". ' .
+                    'Only unfilled slots were touched.',
+                    $r['renamed'], $r['renamed'] === 1 ? '' : 's'
+                ));
+            }
             if ($r['skipped']) {
                 flash('warn', 'No headcount set, so no slots were made for: ' .
                               implode(', ', $r['skipped']) . '.');
@@ -135,8 +143,11 @@ foreach ($steps as $s) {
     $missing += max(0, $want - ($haveByStep[(int)$s['id']] ?? 0));
 }
 
+// Grouped by step ID, not step name. Two steps can legitimately share a name —
+// "Concept" for characters and "Concept" for environments — and keying by name
+// merged them into one block showing "Concept 01" twice.
 $byStep = [];
-foreach ($lanes as $l) $byStep[$l['step_name']][] = $l;
+foreach ($lanes as $l) $byStep[(int)$l['step_id']][] = $l;
 
 $pageTitle = 'Crew · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
@@ -196,16 +207,23 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php else: ?>
 
-    <?php foreach ($byStep as $stepName => $rows): ?>
-      <h3><?= e($stepName) ?></h3>
+    <?php foreach ($byStep as $rows): $first = $rows[0]; ?>
+      <h3>
+        <span class="dot" style="background:<?= e($first['color'] ?: '#ccc') ?>"></span>
+        <?= e($first['step_name']) ?>
+        <span class="muted">· <?= e(applies_to_phrase($first['applies_to'],
+                                     $first['applies_to_asset_type'] ?? null)) ?></span>
+      </h3>
       <table class="review-table">
-        <tr><th>Slot</th><th>Who</th><th></th></tr>
+        <tr><th>Slot</th><th>Applies to</th><th>Who</th><th></th></tr>
         <?php foreach ($rows as $l): $isPh = (int)$l['is_placeholder'] === 1; ?>
         <tr>
           <td class="wf-name">
             <span class="dot" style="background:<?= e($l['color'] ?: '#ccc') ?>"></span>
-            <?= e($stepName) ?> <?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?>
+            <?= e($l['step_name']) ?> <?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?>
           </td>
+          <td class="muted"><?= e(applies_to_phrase($l['applies_to'],
+                                  $l['applies_to_asset_type'] ?? null)) ?></td>
           <td>
             <strong><?= e($l['name']) ?></strong>
             <?php if ($isPh): ?>

@@ -8,11 +8,55 @@
 
 require_once __DIR__ . '/functions.php';
 
-/** The default name for slot N of a step: "Animation 02". */
-function placeholder_name(string $stepName, int $lane, int $laneCount): string {
+/**
+ * A short word for what a step covers, for telling two steps of the same name
+ * apart: "Character", "Environment", "Shots", "Project".
+ *
+ * The asset type is used verbatim rather than abbreviated. "CH"/"PR"/"EN" is how
+ * people say it out loud, but types are free text — a studio that adds "Crowd"
+ * or "Matte painting" would need an abbreviation nobody agreed on, and a wrong
+ * guess here ends up printed on a timeline bar.
+ */
+function step_scope_tag(array $step): string {
+    $type = $step['applies_to_asset_type'] ?? '';
+    switch ($step['applies_to'] ?? 'shot') {
+        case 'asset':   return $type !== '' ? $type : 'Assets';
+        case 'both':    return 'All';
+        case 'project': return 'Project';
+        default:        return 'Shots';
+    }
+}
+
+/**
+ * Step names that more than one step in the project uses.
+ *
+ * "Concept" is legitimately both a character step and an environment step — step
+ * names have only had to be unique within their scope since migration 009. Slots
+ * generated from them would otherwise both be called "Concept 01", which is
+ * indistinguishable on this screen, on the schedule, and on every future
+ * timeline bar.
+ */
+function ambiguous_step_names(array $steps): array {
+    $seen = [];
+    foreach ($steps as $s) {
+        $k = mb_strtolower(trim($s['name']));
+        $seen[$k] = ($seen[$k] ?? 0) + 1;
+    }
+    return array_filter($seen, function ($n) { return $n > 1; });
+}
+
+/**
+ * The default name for slot N of a step: "Animation 02".
+ *
+ * Gains the scope only when the step name is shared with another step —
+ * "Concept Character 01" — so the common case stays short and the ambiguous case
+ * is readable rather than merely numbered.
+ */
+function placeholder_name(string $stepName, int $lane, int $laneCount, string $scopeTag = ''): string {
+    $base = $scopeTag !== '' ? $stepName . ' ' . $scopeTag : $stepName;
     // A single slot needs no number — "Animatic 01" implies there is an 02.
-    if ($laneCount <= 1) return $stepName;
-    return $stepName . ' ' . str_pad((string)$lane, 2, '0', STR_PAD_LEFT);
+    if ($laneCount <= 1) return $base;
+    return $base . ' ' . str_pad((string)$lane, 2, '0', STR_PAD_LEFT);
 }
 
 /** How many slots a step's planned headcount asks for. */
@@ -28,7 +72,8 @@ function step_slot_count(array $step): int {
 function project_lanes(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
         'SELECT cl.*, c.name, c.role, c.is_placeholder, c.active, c.email,
-                ps.name AS step_name, ps.color, ps.step_order
+                ps.name AS step_name, ps.color, ps.step_order,
+                ps.applies_to, ps.applies_to_asset_type
            FROM crew_lanes cl
            JOIN crew c            ON c.id  = cl.crew_id
            JOIN pipeline_steps ps ON ps.id = cl.step_id
@@ -62,7 +107,7 @@ function lane_crew_map(PDO $pdo, int $projectId): array {
  * Returns ['created' => int, 'existing' => int, 'surplus' => [...], 'skipped' => [...]].
  */
 function sync_project_lanes(PDO $pdo, int $projectId): array {
-    $out = ['created' => 0, 'existing' => 0, 'surplus' => [], 'skipped' => []];
+    $out = ['created' => 0, 'existing' => 0, 'surplus' => [], 'skipped' => [], 'renamed' => 0];
 
     $stmt = $pdo->prepare(
         'SELECT * FROM pipeline_steps WHERE project_id = ? ORDER BY step_order, id'
@@ -71,10 +116,16 @@ function sync_project_lanes(PDO $pdo, int $projectId): array {
     $steps = $stmt->fetchAll();
     if (!$steps) return $out;
 
-    $existing = lane_crew_map($pdo, $projectId);
+    $existing  = lane_crew_map($pdo, $projectId);
+    $ambiguous = ambiguous_step_names($steps);
 
     $insCrew = $pdo->prepare(
         'INSERT INTO crew (name, role, is_placeholder, active) VALUES (?, ?, 1, 1)'
+    );
+    // Only ever renames rows that are still placeholders. Once a slot has been
+    // given a real person's name it is theirs, and nothing here may touch it.
+    $renameCrew = $pdo->prepare(
+        'UPDATE crew SET name = ?, role = ? WHERE id = ? AND is_placeholder = 1 AND name <> ?'
     );
     $insLane = $pdo->prepare(
         'INSERT INTO crew_lanes (project_id, step_id, lane_no, crew_id) VALUES (?, ?, ?, ?)'
@@ -94,12 +145,31 @@ function sync_project_lanes(PDO $pdo, int $projectId): array {
                 continue;
             }
 
+            // Scope only appears in the name when two steps share a name, so
+            // "Animatic" stays "Animatic" and the two Concepts become
+            // "Concept Character" and "Concept Environment".
+            $tag = isset($ambiguous[mb_strtolower(trim($step['name']))])
+                 ? step_scope_tag($step) : '';
+            $role = trim($step['name'] . ($tag !== '' ? ' · ' . $tag : ''));
+
             for ($lane = 1; $lane <= $want; $lane++) {
-                if (isset($existing[$stepId][$lane])) { $out['existing']++; continue; }
+                if (isset($existing[$stepId][$lane])) {
+                    $out['existing']++;
+                    // A step that has just become ambiguous — because another
+                    // step was added with the same name — leaves slots named as
+                    // if it were still unique. Bring them up to date.
+                    $wanted = placeholder_name($step['name'], $lane, $want, $tag);
+                    $row = $existing[$stepId][$lane];
+                    if ((int)$row['is_placeholder'] === 1 && $row['name'] !== $wanted) {
+                        $renameCrew->execute([$wanted, $role, (int)$row['crew_id'], $wanted]);
+                        $out['renamed'] += $renameCrew->rowCount();
+                    }
+                    continue;
+                }
 
                 $insCrew->execute([
-                    placeholder_name($step['name'], $lane, $want),
-                    $step['name'],           // role: what this slot does
+                    placeholder_name($step['name'], $lane, $want, $tag),
+                    $role,                   // role: what this slot does
                 ]);
                 $crewId = (int)$pdo->lastInsertId();
                 $insLane->execute([$projectId, $stepId, $lane, $crewId]);
