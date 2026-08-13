@@ -57,6 +57,30 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 6);
     }
 
+    // A deliberate re-plan. Never automatic: the value of a baseline is that it
+    // says what was believed at a particular moment, and one that silently
+    // followed every edit would say nothing at all.
+    if ($action === 'rebaseline') {
+        // A project that was already running when baselines arrived has no
+        // original to revise, and its numbers have been edited since it started.
+        // Labelling that first capture "re-planned" would imply an earlier
+        // estimate existed; saying so plainly keeps it from ever being read as
+        // what the project actually set out with.
+        $isFirst = last_baseline($pdo, $projectId) === null;
+        $reason  = trim($_POST['rebaseline_reason'] ?? '');
+        if ($reason === '') $reason = $isFirst ? 'first record — already running' : 're-planned';
+
+        $n = capture_baseline($pdo, $projectId, $reason);
+        flash('ok', $isFirst
+            ? "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') . '. This project ' .
+              'was already running, so these are current numbers rather than what it started ' .
+              'with — the record says so, and future projects get a true starting estimate.'
+            : "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') .
+              '. The previous baseline is kept — the history now shows both, so a revision ' .
+              'reads as a revision rather than replacing what came before.');
+        return wizard_url($projectId, 6);
+    }
+
     $steps = pipeline_steps($pdo, $projectId);
     $upd = $pdo->prepare(
         'UPDATE pipeline_steps
@@ -124,6 +148,77 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <button type="submit" class="secondary">Spread the steps evenly across those dates</button>
       <small>A starting point: each stage gets an equal slice, and parallel steps share dates.</small>
     </form>
+
+    <?php
+    // What this project committed to, and how far today's numbers have moved
+    // from it. Drift is not an error — plans change — but it should be a thing
+    // somebody decided, not something that happened.
+    $baseline = last_baseline($pdo, $projectId);
+    $drift    = $baseline ? baseline_drift($pdo, $projectId) : [];
+    ?>
+    <div class="inline-form toggle-form">
+      <?php if ($baseline): ?>
+        <span>
+          Starting estimate recorded
+          <strong><?= e(substr((string)$baseline['captured_at'], 0, 10)) ?></strong>
+          <span class="muted">(<?= e($baseline['reason']) ?>, <?= (int)$baseline['steps'] ?> steps)</span>
+        </span>
+      <?php else: ?>
+        <span class="warn-text">No starting estimate recorded for this project yet.</span>
+      <?php endif; ?>
+
+      <form method="post"
+            onsubmit="return confirm('Record today\'s estimates as a new baseline? The previous one is kept.');">
+        <input type="hidden" name="action" value="rebaseline">
+        <input name="rebaseline_reason" placeholder="Why — e.g. scope change" size="22">
+        <button type="submit" class="secondary"><?= $baseline ? 'Re-baseline' : 'Record the starting estimate' ?></button>
+      </form>
+
+      <small>
+        Editing the numbers below never changes what was recorded — that is the point.
+        Comparing the two is how next project's estimates get better
+        <?php if ($drift): ?>
+          · <strong><?= count($drift) ?></strong> step<?= count($drift) === 1 ? '' : 's' ?>
+          now differ<?= count($drift) === 1 ? 's' : '' ?> from the baseline
+        <?php endif; ?>
+      </small>
+    </div>
+
+    <?php if ($drift): ?>
+      <details class="inline-actions">
+        <summary><?= count($drift) ?> step<?= count($drift) === 1 ? '' : 's' ?>
+          changed since the estimate was recorded</summary>
+        <table class="review-table">
+          <tr><th>Step</th><th>What changed</th></tr>
+          <?php foreach ($drift as $d): ?>
+            <tr>
+              <td class="wf-name">
+                <span class="dot" style="background:<?= e($d['step']['color'] ?: '#ccc') ?>"></span>
+                <?= e($d['step']['name']) ?>
+              </td>
+              <td class="muted small">
+                <?php
+                $labels = ['days_per_unit' => 'days per item', 'coverage_pct' => 'covers',
+                           'planned_headcount' => 'people'];
+                $bits = [];
+                foreach ($labels as $key => $label) {
+                    if (!isset($d[$key])) continue;
+                    [$was, $now] = $d[$key];
+                    $bits[] = $label . ': ' . ($was === null ? '—' : fmt_num($was))
+                            . ' → ' . ($now === null ? '—' : fmt_num($now));
+                }
+                echo e(implode(' · ', $bits));
+                ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+        <p class="muted small">
+          Nothing here is wrong — plans move. Re-baseline when the change is a decision you want
+          recorded, and leave it when you are still adjusting.
+        </p>
+      </details>
+    <?php endif; ?>
 
     <?php
     // A step scoped to an asset type that is ALSO spelled another way counts only

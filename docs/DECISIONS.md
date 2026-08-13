@@ -562,6 +562,36 @@ data by hand is undone by the next import**, silently. The preview screen report
 group→type resolution, because an importer that renames things without saying so is the same
 failure as one that duplicates them without saying so.
 
+## 2026-08-13 — The starting estimate is frozen, and never overwritten
+**Decision:** `step_estimate_baseline` (migration 013) copies every step's estimate —
+`days_per_unit`, `coverage_pct`, `planned_headcount`, the retake %, and the work scale it was
+estimated against — at the moment the wizard turns a project `active`. Append-only. A
+deliberate **Re-baseline** on the Dates & headcount screen adds a new row with a reason;
+nothing ever updates one.
+**Why:** those fields are edited in place, so every adjustment destroyed what was believed
+before it. "What we guessed at kickoff, next to what it actually took" is the number that makes
+the next project's estimate better, and it was being lost on every show as it ran
+(`ROADMAP.md`, "Cross-project benchmarking"). Same asymmetry as the daily snapshots: cheap to
+capture as it happens, impossible to reconstruct afterwards.
+**Consequence:**
+- **The step's identity is copied into the row, not just referenced.** `step_id` is nullable
+  with `ON DELETE SET NULL`, and `step_name` / `applies_to` / `applies_to_asset_type` are
+  stored alongside. Steps get renamed and pipelines tidied after a show wraps; a baseline that
+  could only say "step 412" would be worthless by the time anyone wanted it. Same reasoning as
+  `progress.assignee_raw`.
+- **`work_units` is stored too.** "2 days per asset" means nothing later without knowing it was
+  22 assets or 200 — estimates degrade with scale, and comparing across shows without it would
+  be comparing noise.
+- **Not backfilled from today's `pipeline_steps`.** Those values have already been edited, so
+  recording them as an "original" estimate would be a lie. A wrong baseline is worse than a
+  missing one: the missing one is visibly missing, the wrong one quietly poisons every average
+  built on it. Existing projects get their first row when someone re-baselines, labelled as
+  such.
+- Re-baselining is never automatic. A baseline that followed every edit would say nothing.
+- The screen shows **drift** — which steps now differ from the baseline and by how much. Not an
+  error; plans move. But it should be something someone decided rather than something that
+  happened.
+
 ---
 
 ## Still open
@@ -583,10 +613,11 @@ failure as one that duplicates them without saying so.
   since scheduled tasks carry a `crew_id`: a slot's absences are as real a scheduling
   constraint as a public holiday. Worth doing with the timeline, so a bar visibly moves.
 - ~~**Which lane is which person**~~ — settled 2026-08-13 by the slot model above.
-- **Capturing an estimate baseline before it is overwritten.** `pipeline_steps.days_per_unit`,
-  `coverage_pct` and `planned_headcount` are edited in place, so "what we guessed at kickoff"
-  is destroyed on every edit — and that is exactly the number cross-project benchmarking needs
-  (`ROADMAP.md`, "Cross-project benchmarking"). Small, urgent, and impossible to backfill.
+- ~~**Capturing an estimate baseline**~~ — built 2026-08-13, see above.
+- **What "actual" means for the comparison.** The baseline records the estimate; the other half
+  needs real effort per step. `progress.time_spent_minutes` is one running total and nearly
+  empty, so the honest measure today is elapsed dates (`schedule` vs `daily_snapshots`), not
+  person-days. A `time_logs` table is what makes it effort rather than duration.
 - **Whether a slot should carry its own headcount fraction.** `planned_headcount` of 2.5
   currently rounds up to 3 slots. Making the third slot half-time would be more honest, but
   needs an `allocation_pct` per slot (`crew_projects` already has one for real people).

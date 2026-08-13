@@ -18,12 +18,41 @@ function wizard_save_review(PDO $pdo, ?array $project): string {
         throw new RuntimeException('Add at least one pipeline step before finishing setup.');
     }
 
+    // Freeze the estimates BEFORE anything else can edit them. This is the one
+    // moment a project's original guesses are known to be original — from here
+    // on the planning screen overwrites them in place, and what was believed at
+    // kickoff would otherwise be gone for good. It is what makes "we planned 2
+    // days, it took 3.4" answerable later, on this show and on the next one.
+    //
+    // Only on the setup -> active transition: re-opening a live project and
+    // pressing Finish again must not record a revised estimate as an original.
+    $justCommitted = ($project['status'] ?? '') === 'setup';
+
     $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute(['active', $projectId]);
     $pdo->prepare('DELETE FROM project_settings WHERE project_id = ? AND setting_key = ?')
         ->execute([$projectId, 'wizard_step']);
 
     flash('ok', '"' . $project['name'] . '" is set up and now active. ' .
                 'Everything here stays editable from the project screens.');
+
+    if ($justCommitted) {
+        try {
+            $n = capture_baseline($pdo, $projectId, 'setup complete');
+            if ($n > 0) {
+                flash('ok', "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') .
+                            '. Editing them later never overwrites this, so what the project ' .
+                            'planned can be compared with what it actually took.');
+            }
+        } catch (Throwable $e) {
+            // Never block finishing setup over this. Reported, not swallowed —
+            // a baseline that silently didn't happen is the failure it exists
+            // to prevent.
+            flash('warn', 'The project is set up, but its starting estimate could not be ' .
+                          'recorded: ' . $e->getMessage() .
+                          ' You can capture it from the Dates & headcount screen.');
+        }
+    }
+
     return 'index.php';
 }
 

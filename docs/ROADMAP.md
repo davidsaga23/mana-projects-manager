@@ -92,21 +92,19 @@ comparison key is the triple that migration made unique:
 `step_library` already normalises names across shows, so it is the natural spine. It would need
 to carry that full triple rather than just `name` + `applies_to`.
 
-### THE URGENT PART — estimates are overwritten in place
+### The capture half — DONE 2026-08-13
 
-`pipeline_steps.days_per_unit`, `coverage_pct` and `planned_headcount` are edited directly on
-the Dates & headcount screen. Every edit destroys what was thought before it. So the single
-most valuable number for improving estimates — **what we guessed at kickoff, next to what it
-actually took** — is being lost on every project, silently, right now.
+`pipeline_steps.days_per_unit`, `coverage_pct` and `planned_headcount` were edited directly on
+the Dates & headcount screen, so every edit destroyed what was thought before it. That is now
+fixed: `step_estimate_baseline` (migration 013, `includes/baseline.php`) freezes every step's
+estimate when the wizard turns a project `active`, and a deliberate **Re-baseline** button adds
+a revision rather than replacing one. The screen shows which steps have drifted from the
+recorded estimate. See `DECISIONS.md`, 2026-08-13.
 
-The fix is small and should not wait for the reporting screens:
-
-- A `step_estimate_baseline` table (project_id, step_id, the estimate fields, `captured_at`,
-  `reason`), written when the wizard's Review screen sets a project to `active`.
-- Immutable afterwards. A deliberate **re-baseline** action can add a new row when a plan is
-  genuinely replanned — so the history reads as "we thought 2 days, then revised to 3, and it
-  took 3.4" rather than silently becoming "we always said 3".
-- Cheap now; impossible to backfill. Exactly the `project_id`-on-day-one argument.
+**Live projects have no baseline yet, on purpose.** Their current numbers have already been
+edited, so recording them as an "original" estimate would be a lie — and a wrong baseline is
+worse than a missing one, because a missing one is visibly missing. Return to Club will get its
+first row the next time someone presses Re-baseline, labelled as a revision.
 
 ### What's already in place
 
@@ -114,7 +112,7 @@ The fix is small and should not wait for the reporting screens:
 |---|---|
 | Global step vocabulary (`step_library`) | Built (migration 002) — the join key |
 | Step scope triple as identity | Built (migration 009) |
-| Per-step estimates | Built, but **mutable** — see above |
+| Estimate baseline (`step_estimate_baseline`) | Built 2026-08-13 — frozen at kickoff, append-only |
 | Daily progress history (`daily_snapshots`) | Built 2026-08-13, recording from now on |
 | Planned dates per task (`schedule`) | Built (Phase 4) |
 | Actual effort per task | **Missing.** `progress.time_spent_minutes` is one running total and nearly empty; needs the `time_logs` table |

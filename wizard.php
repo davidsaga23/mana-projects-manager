@@ -13,6 +13,9 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/quota.php';
+// require_once: baseline.php pulls in quota.php and pipeline.php itself, and
+// both are already loaded by the two lines above.
+require_once __DIR__ . '/includes/baseline.php';
 require __DIR__ . '/includes/statuses.php';
 require_login();
 
