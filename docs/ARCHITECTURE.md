@@ -201,6 +201,56 @@ daily_snapshots
 of external tools (Frappe Gantt, GanttProject). STFC lost days to two layers each applying
 their own ±1.
 
+### Tickets and tasks (Phase 7, built 2026-08-14)
+
+```sql
+tickets
+  id, project_id, seq,               -- seq is per project; "RTC-12" is DERIVED from
+                                     -- projects.code at display time, never stored
+  type ENUM('task','ticket'),
+  title, description,
+  status_id NULL,                    -- -> statuses. NOT a separate ENUM: the board's
+                                     -- columns are the project's own vocabulary
+  priority ENUM('low','medium','high','urgent'),
+  assigned_crew_id NULL,             -- may be a person, a team, or an unfilled SLOT
+  due_date,
+  shot_id NULL, asset_id NULL, step_id NULL,   -- what it is about; any combination
+  created_by, created_at, updated_at,
+  completed_at NULL,                 -- when it first reached an approved status;
+                                     -- updated_at can't serve, it bumps on any edit
+  archived TINYINT,
+  UNIQUE (project_id, seq)
+
+ticket_comments
+  id, ticket_id, user_id, kind ENUM('user','system'), body, created_at
+  -- 'system' lines record status/owner/priority/due changes in the SAME thread,
+  -- so "who moved this to Done" is answerable. STFC's Activity section showed
+  -- only typed comments.
+
+ticket_attachments
+  id, ticket_id, comment_id NULL,    -- NULL = attached to the ticket, not a reply
+  stored_name (unique), original_name, mime_type, file_size, uploaded_by, created_at
+
+statuses.on_ticket_board TINYINT     -- which statuses are columns on the board
+users.crew_id NULL                   -- which person a login is; makes "assigned to me,
+                                     -- across all projects" answerable at all
+```
+
+**Why the board reuses `statuses`.** The project already owns a vocabulary with `maps_to`,
+`is_blocked` and `is_excluded`, and it covers a ticket's states better than a five-value ENUM
+does — including On Hold (blocked, not idle) and Retake. A second vocabulary would mean two
+mental models for one idea. Eleven statuses is too many columns, hence `on_ticket_board`.
+
+**Tickets never write to `progress`.** A ticket in a "Completed" status must not count toward
+approved work, and Plaky still owns production status — a retake ticket that set a step back
+would be silently overwritten by the next import. `step_id` is the link that makes closing
+that loop cheap on the day the platform owns progress directly.
+
+**Attachments** live in `uploads/tickets/`, excluded from git *and* from the FTP deploy. Files
+are served only through `attachment.php` behind the login; the directory denies direct access
+and disables PHP execution. Extension and detected MIME type are both whitelisted, and stored
+names are random.
+
 ### Name aliases
 
 ```sql

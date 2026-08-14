@@ -674,6 +674,123 @@ The data had been arriving correctly and going nowhere — zero references outsi
 - `time_logs` (per-day entries) is still not built. Until it is, "actual" means one running
   total per task, which is enough to compare against an estimate and not enough to bill from.
 
+## 2026-08-14 — Ticket states are the project's OWN status vocabulary, not a second ENUM
+**Decision:** `tickets.status_id` references `statuses`. Which of them appear as board
+columns is a per-project tick, `statuses.on_ticket_board` (migration 017), set on the
+Statuses screen.
+**Why:** STFC hardcoded five states — backlog / todo / in_progress / review / done. This
+project already owns a per-project vocabulary with `maps_to`, `is_blocked` and `is_excluded`,
+and it maps onto those five almost exactly (Waiting to start / Ready to start / In progress /
+Pending review / Completed) while also covering two the ENUM cannot: **On Hold**, which
+already means *blocked* here rather than idle, and **Retake**. A second vocabulary would mean
+a producer holding two mental models for one idea, and every report learning both. Same
+principle as "pipeline workflow is data, not code": a vocabulary is rows.
+**The problem that creates, and the answer:** eleven statuses is eleven columns, which is not
+a board anybody can read. Hence the tick. Six are seeded — the five STFC uses plus On Hold,
+which earns its place because it is the only column that reads as an escalation rather than a
+queue. N/A and Retake are deliberately *not* columns: as columns they invite a card to be
+parked instead of resolved.
+**Consequence:**
+- A card in a status that isn't a column is **shown anyway**, in the first column, marked
+  *off-board*, with a line above the board saying how many. Hiding it would make a real
+  ticket invisible, which is the failure this codebase keeps paying for.
+- The detail page's status dropdown offers **every** status, not only the columns — a card
+  can legitimately sit in "Retake", and hiding it there would make the next save silently
+  rewrite it.
+- Deleting a status now refuses if cards are on it, and says how many. The foreign key is
+  `ON DELETE SET NULL`, so without the check the delete would succeed and leave cards with no
+  status at all.
+- `ticket_board_columns()` falls back to one status per meaning if nothing is ticked, and
+  **says on screen that it did** — rather than rendering a board with nowhere to put a card.
+- `seed_project_statuses()` copies the flag, so new projects inherit it. It now checks each
+  newer column exists on both tables before copying it: this function has to keep working on
+  an install whose migrations are a step behind the code, as `current_user()` does for roles.
+
+## 2026-08-14 — Tickets are their own table and never write to `progress`
+**Decision:** board cards live in `tickets`. A card can name a shot, an asset and a pipeline
+**step**, but closing one changes no production status.
+**Why:** two separate reasons, and the second is the decisive one.
+- A ticket is not an item passing through a pipeline step. If a ticket in "Completed" counted
+  toward the project's approved work, every dashboard figure would be wrong.
+- **Plaky is still the source of truth for progress** (2026-08-11). A ticket that set a step
+  back to "Retake" would have that overwritten by the next import, silently — the worst
+  possible version of the feature, because the loop would appear to work.
+**Consequence:** `tickets.step_id` exists anyway. It costs nothing now and is expensive later
+(the `project_id` lesson), it is what surfaces open tickets on the Phase 6 step page, and it
+is the hook the retake loop needs on the day the platform owns progress directly. Nothing
+about that day requires a schema change — only a decision.
+
+## 2026-08-14 — The ticket reference is per project, and derived rather than stored
+**Decision:** `tickets.seq` is a per-project counter; the reference people quote — `RTC-12` —
+is built from `projects.code` at display time and never stored.
+**Why:** STFC used the row id globally (`TICKET-042`), which on a multi-project install would
+number one show's tickets 3, 17, 40 as other shows interleave. And a stored string goes stale:
+correcting a project code should re-label its tickets rather than leave the old prefix on
+them. Same reasoning as derived lane names (2026-08-12).
+**Note the asymmetry with the estimate baseline (2026-08-13), which copies identity IN.** A
+baseline is a historical record that must outlive the step it describes; a ticket reference is
+a live pointer to a live project. Historical records copy; live pointers derive.
+**Consequence:** `seq` is read and written inside the same transaction as the insert, and the
+table carries `UNIQUE (project_id, seq)` — so two people filing at once collide loudly instead
+of quietly sharing a number somebody has already pasted into a chat.
+
+## 2026-08-14 — A login can say which crew member it is (`users.crew_id`)
+**Decision:** nullable `users.crew_id` (migration 017). `mytasks.php` asks once, with an exact
+display-name match pre-selected; an admin can correct it on the users screen.
+**Why:** "everything assigned to me, across all shows" is the clearest thing multi-project
+buys — somebody booked on two productions gets one list instead of two boards to remember. It
+was unanswerable: `users` are logins, `crew` are people, and nothing joined them.
+**Why not matched by name automatically:** two people can share a display name, and attaching
+one person's work to another's login is precisely the quiet mis-mapping the alias layer exists
+to prevent. The match is *offered*, not applied — the same distinction as detecting duplicate
+asset types and never merging them (2026-08-13).
+**Consequence:** anyone can claim any crew row, which is not a privilege escalation here (every
+role already reads everything) — it only changes their own filter. This is also the link the
+"artists update their own work" phase needs, so it is worth a column rather than a name lookup
+at every call site.
+
+## 2026-08-14 — Status and owner changes are written into the ticket's own thread
+**Decision:** `ticket_comments.kind` is `user` or `system`. Every status, owner, priority and
+due-date change writes a system line into the same thread, from the detail page and from the
+board's drag-and-drop alike.
+**Why:** STFC titles that section "Activity" but only ever shows what people typed — so "who
+moved this to Done, and when" is nowhere, which is the single question anybody asks about a
+card that changed behind their back. One column, no second table, no second query, and the
+section becomes honestly named.
+**Consequence:** a dragged card writes history too, which is the case that would otherwise be
+invisible — dragging is exactly the change nobody remembers making.
+
+## 2026-08-14 — The uploader's XHR was eating every flash message (bug found in the port)
+**Decision:** forms that upload send `X-Requested-With`, and the server answers those with
+`{ok, redirect}` JSON instead of a redirect.
+**Why — this is a bug inherited from STFC, not a preference.** The attachment forms submit
+through `XMLHttpRequest` to get a progress bar, and the server answers a save with
+POST-redirect-GET. **XHR follows that redirect and fetches the page itself** — which reads and
+clears the flash — and only then does the browser navigate, to a page with nothing left to
+say. Every "3 files attached", every "no shot by that name", every "email not configured" was
+being swallowed by the request meant to deliver it. It is STFC lesson 7 turned inside out: not
+a failure that forgot to report itself, but a report the transport destroyed.
+**Consequence:** the server also gets to choose the destination, so creating a ticket opens its
+own page while a plain task returns to the board. Worth back-porting to STFC while it runs.
+
+## 2026-08-14 — No forced-triage rule, because the role that needs it doesn't exist here
+**Decision:** STFC forces non-admin submissions into Backlog. Not ported.
+**Why:** STFC's roles are admin/member. This platform's are admin/editor/viewer, and a viewer
+cannot POST at all — enforced once, inside `require_login()`. So there is nobody here who may
+file a ticket but should not be trusted to place it. A rule guarding against a role that does
+not exist is a surprise waiting for whoever hits it.
+
+## 2026-08-14 — A ticket may be owned by a slot or a team, and the silence is reported
+**Decision:** the assignee list is this project's crew plus teams and unfilled slots. Assigning
+to one is allowed; `notify_assignee()` returns a sentence explaining why no mail went out, and
+the detail page repeats it as a banner.
+**Why:** planning against slots is how a production office works (2026-08-13), so refusing to
+let a ticket name one would be wrong. But a slot has no email because nobody is in the job yet,
+and "assigned and notified" must never look the same as "assigned, nobody told". A team fans
+out to active crew whose role names it, and reports it when that finds nobody.
+**Consequence:** every notification path returns `[sent, message]` and every caller shows the
+message. There is no path that silently sends nothing.
+
 ---
 
 ## Still open
@@ -691,6 +808,16 @@ The data had been arriving correctly and going nowhere — zero references outsi
 - **Splitting credit on shared tasks** — when two people are on one step, does per-artist
   reporting count it for both, or halve it? Probably both for "who worked on this" and
   halved for "how much did each deliver". Settle it when reporting is built.
+- **Whether closing a ticket should set production status** — designed for but deliberately
+  not built (see the tickets entry above). It becomes a small job the day the platform owns
+  progress instead of importing it; until then the next Plaky import would silently undo it.
+- **Notifications block the save.** `notify_assignee()` opens an SMTP connection inline, so
+  creating a ticket waits on the mail server (up to the 20-second timeout) once SMTP is
+  configured. STFC behaves the same way and nobody has complained, but a queue or a shorter
+  timeout is the fix if it starts to bite.
+- **A ticket has one owner.** `progress` learned in Phase 3 that real work has several people
+  on it (`progress_crew`); the board has not. Fine while a ticket means "one person is
+  responsible for this", worth revisiting if people start listing two names in the title.
 - **Crew days off** (`crew_absences`) — designed in `ROADMAP.md`. Now genuinely buildable,
   since scheduled tasks carry a `crew_id`: a slot's absences are as real a scheduling
   constraint as a public holiday. Worth doing with the timeline, so a bar visibly moves.

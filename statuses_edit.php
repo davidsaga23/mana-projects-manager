@@ -28,6 +28,10 @@ $selfUrl = 'statuses_edit.php?project=' . $projectId;
 // breaking — same reasoning as the role fallback in current_user().
 $hasExcluded = column_exists($pdo, 'statuses', 'is_excluded');
 
+// "Show as a column on the tasks board" arrives with the tickets phase in
+// migration 017. Same treatment: hide the control rather than break the screen.
+$hasBoard = column_exists($pdo, 'statuses', 'on_ticket_board');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? 'save';
@@ -39,15 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? $_POST['new_maps_to'] : 'none';
             $blocked  = !empty($_POST['new_is_blocked'])  ? 1 : 0;
             $excluded = !empty($_POST['new_is_excluded']) ? 1 : 0;
+            $onBoard  = !empty($_POST['new_on_board'])    ? 1 : 0;
             $max = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0) FROM statuses WHERE project_id = ?');
             $max->execute([$projectId]);
             try {
                 $cols = 'project_id, name, sort_order, maps_to, is_blocked, color'
-                      . ($hasExcluded ? ', is_excluded' : '');
-                $vals = '?, ?, ?, ?, ?, ?' . ($hasExcluded ? ', ?' : '');
+                      . ($hasExcluded ? ', is_excluded' : '')
+                      . ($hasBoard ? ', on_ticket_board' : '');
+                $vals = '?, ?, ?, ?, ?, ?' . ($hasExcluded ? ', ?' : '') . ($hasBoard ? ', ?' : '');
                 $args = [$projectId, $name, (int)$max->fetchColumn() + 1, $mapsTo, $blocked,
                          trim($_POST['new_color'] ?? '') ?: null];
                 if ($hasExcluded) $args[] = $excluded;
+                if ($hasBoard)    $args[] = $onBoard;
                 $pdo->prepare("INSERT INTO statuses ($cols) VALUES ($vals)")->execute($args);
             } catch (PDOException $e) {
                 throw new RuntimeException('This project already has a status called "' . $name . '".');
@@ -68,6 +75,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     '. Change those first, or keep the status.'
                 );
             }
+            // Board cards point at statuses too. The foreign key is ON DELETE SET
+            // NULL, so removing one used by a ticket would not fail — it would
+            // leave cards with no status, which the board can only draw in its
+            // first column with a warning. Refuse instead, and say how many.
+            if (column_exists($pdo, 'tickets', 'status_id')) {
+                $usedT = $pdo->prepare('SELECT COUNT(*) FROM tickets WHERE status_id = ?');
+                $usedT->execute([$id]);
+                $nt = (int)$usedT->fetchColumn();
+                if ($nt > 0) {
+                    throw new RuntimeException(
+                        "That status is on $nt card" . ($nt === 1 ? '' : 's') .
+                        ' on the tasks board. Move those first, or keep the status.'
+                    );
+                }
+            }
             $nameStmt = $pdo->prepare('SELECT name FROM statuses WHERE id = ? AND project_id = ?');
             $nameStmt->execute([$id, $projectId]);
             $name = $nameStmt->fetchColumn();
@@ -83,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd = $pdo->prepare(
             'UPDATE statuses SET name = ?, maps_to = ?, is_blocked = ?, '
             . ($hasExcluded ? 'is_excluded = ?, ' : '')
+            . ($hasBoard ? 'on_ticket_board = ?, ' : '')
             . 'color = ?, sort_order = ?
               WHERE id = ? AND project_id = ?'
         );
@@ -100,10 +123,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? $_POST['maps_to'][$id] : 'none';
             $blocked  = !empty($_POST['is_blocked'][$id])  ? 1 : 0;
             $excluded = !empty($_POST['is_excluded'][$id]) ? 1 : 0;
+            $onBoard  = !empty($_POST['on_board'][$id])    ? 1 : 0;
             $color = trim($_POST['color'][$id] ?? '') ?: null;
             try {
                 $args = [$name, $mapsTo, $blocked];
                 if ($hasExcluded) $args[] = $excluded;
+                if ($hasBoard)    $args[] = $onBoard;
                 array_push($args, $color, $order, $id, $projectId);
                 $upd->execute($args);
                 if ($upd->rowCount() > 0) $changed++;
@@ -160,6 +185,9 @@ require __DIR__ . '/includes/header.php';
         <?php if ($hasExcluded): ?>
           <th title="This item does not pass through this step at all — the scheduler plans no time for it">Not applicable</th>
         <?php endif; ?>
+        <?php if ($hasBoard): ?>
+          <th title="Show this status as a column on the tasks board">Board column</th>
+        <?php endif; ?>
         <th>Colour</th><th>In use</th><th></th>
       </tr>
     </thead>
@@ -187,6 +215,15 @@ require __DIR__ . '/includes/header.php';
           <label class="inline">
             <input type="checkbox" name="is_excluded[<?= $id ?>]" value="1" <?= !empty($s['is_excluded']) ? 'checked' : '' ?>>
             not applicable
+          </label>
+        </td>
+        <?php endif; ?>
+        <?php if ($hasBoard): ?>
+        <td>
+          <input type="hidden" name="on_board[<?= $id ?>]" value="0">
+          <label class="inline">
+            <input type="checkbox" name="on_board[<?= $id ?>]" value="1" <?= !empty($s['on_ticket_board']) ? 'checked' : '' ?>>
+            column
           </label>
         </td>
         <?php endif; ?>
@@ -218,6 +255,9 @@ require __DIR__ . '/includes/header.php';
   <?php if ($hasExcluded): ?>
     <label class="inline"><input type="checkbox" name="new_is_excluded" value="1"> not applicable</label>
   <?php endif; ?>
+  <?php if ($hasBoard): ?>
+    <label class="inline"><input type="checkbox" name="new_on_board" value="1"> board column</label>
+  <?php endif; ?>
   <input type="color" name="new_color" value="#95A5A6">
   <button type="submit" class="secondary">Add</button>
 </form>
@@ -236,6 +276,17 @@ require __DIR__ . '/includes/header.php';
   sitting in the plan forever as something nobody will ever finish. It is also how a step
   whose coverage is still a guess ("FX is about 30% of the show") turns into real per-shot
   dates: mark the shots it doesn't touch, and the estimate stops being needed.
+</p>
+<?php endif; ?>
+
+<?php if ($hasBoard): ?>
+<p class="muted small">
+  <strong>Board column</strong> decides which of these appear as columns on the
+  <a href="tasks.php?project=<?= $projectId ?>">tasks board</a>. Tickets use this same
+  vocabulary rather than a second set of words for the same ideas — but eleven columns is not
+  a board anyone can read, so pick the five or six a card really moves between. A status that
+  isn't a column still works: a card can sit in it, and the board shows those in its first
+  column marked <em>off-board</em> rather than hiding them.
 </p>
 <?php endif; ?>
 

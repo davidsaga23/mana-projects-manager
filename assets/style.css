@@ -650,3 +650,255 @@ button {
   background: #2f6fb2; color: #fff; font-size: 15px; cursor: pointer;
 }
 button:hover { background: #275d95; }
+
+/* ==========================================================================
+   TASKS AND TICKETS (Phase 7)
+
+   Ported from STFC's board, but rewritten rather than copied: that stylesheet
+   is a dark theme built on CSS variables and this one is a light theme with
+   literal colours, so pasting it across would have produced white on white.
+   What carried over is the layout, the priority stripe down the left of a card,
+   and the crew colour along the top — those are what make the board readable at
+   a glance, which is the only thing a board is for.
+   ========================================================================== */
+
+.board-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin: 4px 0 12px;
+}
+.board-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.board-tools select { width: auto; padding: 5px 8px; font-size: 13px; }
+.board-tools button, .board-tools .button { margin-top: 0; }
+
+/* Columns are the project's statuses, so how many there are is data — the
+   grid-template-columns is written inline by tasks.php from that count. */
+.board {
+  display: grid; gap: 12px; align-items: start;
+  margin: 14px 0 18px; overflow-x: auto; padding-bottom: 6px;
+}
+.board-col {
+  background: #eef1f4; border: 1px solid #e4e8ec; border-radius: 8px;
+  display: flex; flex-direction: column; min-height: 180px;
+}
+.board-col-head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 12px 8px; border-bottom: 1px solid #dde3e9;
+}
+.board-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.board-col-name { font-size: 13px; font-weight: 600; flex: 1; }
+.board-col-flag {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  background: #fff3cd; color: #8a6d1a; border: 1px solid #e0c98a;
+  padding: 1px 6px; border-radius: 9px;
+}
+.board-col-count {
+  font-size: 11px; color: #5a6a7a; background: #fff;
+  border: 1px solid #dde3e9; padding: 1px 7px; border-radius: 10px;
+}
+.board-cards {
+  padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 7px;
+  min-height: 70px; transition: background .15s;
+}
+.board-cards.drag-over { background: #e3f0fb; border-radius: 0 0 8px 8px; }
+
+/* --- cards --- */
+.board-card {
+  background: #fff; border: 1px solid #e4e8ec; border-left: 3px solid #c3ccd4;
+  border-radius: 6px; padding: 9px 11px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  transition: box-shadow .15s, border-color .15s;
+}
+.board-card[draggable="true"] { cursor: grab; }
+.board-card[draggable="true"]:active { cursor: grabbing; }
+.board-card:hover { border-color: #9fb6cc; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+.board-card.overdue { background: #fdf6f7; }
+.board-card.filtered-out { display: none; }
+
+/* Priority is the left stripe: readable without a legend, and it never competes
+   with the crew colour, which is a bar along the top. */
+.board-card.priority-low    { border-left-color: #b6c2cd; }
+.board-card.priority-medium { border-left-color: #2f6fb2; }
+.board-card.priority-high   { border-left-color: #d6a72a; }
+.board-card.priority-urgent { border-left-color: #b02a37; }
+
+.card-crew-bar { height: 3px; border-radius: 2px; margin: -3px -7px 7px; }
+.card-ref { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.ref-ticket { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: #2f6fb2; }
+.ref-task   { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: #5a6a7a; }
+.off-board {
+  font-size: 10px; background: #fff3cd; color: #8a6d1a;
+  border: 1px solid #e0c98a; border-radius: 9px; padding: 0 6px;
+}
+.card-title { font-size: 13.5px; font-weight: 500; line-height: 1.35; }
+.card-desc { font-size: 11.5px; color: #5a6a7a; margin-top: 3px; line-height: 1.4; }
+.card-context { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+.card-meta {
+  display: flex; align-items: center; gap: 7px; margin-top: 7px;
+  font-size: 11px; color: #5a6a7a;
+}
+.card-owner {
+  padding: 1px 6px; border-radius: 4px; font-size: 10.5px;
+  font-weight: 600; border: 1px solid transparent;
+}
+.card-due.is-overdue { color: #b02a37; font-weight: 600; }
+.card-badge { font-size: 10.5px; }
+.prio-dot {
+  width: 7px; height: 7px; border-radius: 50%; margin-left: auto;
+  display: inline-block; flex-shrink: 0;
+}
+.prio-dot.priority-low    { background: #b6c2cd; }
+.prio-dot.priority-medium { background: #2f6fb2; }
+.prio-dot.priority-high   { background: #d6a72a; }
+.prio-dot.priority-urgent { background: #b02a37; }
+.card-archive-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 8px; padding-top: 7px; border-top: 1px dashed #dde3e9;
+}
+.card-archive-row form { margin: 0; display: inline; }
+.card-archive-row button { margin-top: 0; padding: 3px 9px; font-size: 12px; }
+
+/* Shot / asset / step chips, on cards and in lists. The same three colours as
+   the step category chips, so "asset" means the same green across the app. */
+.ctx-chip {
+  display: inline-block; padding: 1px 7px; border-radius: 9px;
+  font-size: 10.5px; font-weight: 500; margin-right: 3px;
+}
+.ctx-chip.ctx-shot  { background: #e3f0fb; color: #1c4f7c; }
+.ctx-chip.ctx-asset { background: #e0f5f2; color: #14675e; }
+.ctx-chip.ctx-step  { background: #efe6f7; color: #5b3a7e; }
+
+.status-chip {
+  display: inline-block; padding: 1px 8px; border-radius: 10px;
+  font-size: 11.5px; font-weight: 600;
+}
+tr.row-overdue td { background: #fdf6f7; }
+
+/* --- modals --- */
+.modal {
+  position: fixed; inset: 0; background: rgba(20,30,40,.45);
+  align-items: center; justify-content: center; z-index: 100; overflow-y: auto;
+  padding: 24px 16px;
+}
+.modal-box {
+  background: #fff; border-radius: 8px; padding: 22px 26px;
+  width: 540px; max-width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,.18);
+  margin: auto;
+}
+.modal-box h3 { margin: 0 0 4px; font-size: 17px; }
+.modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-box textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  font-family: inherit; font-size: 15px; resize: vertical;
+}
+.form-error {
+  background: #fdf0f1; border-left: 4px solid #b02a37; color: #8f222c;
+  padding: 9px 12px; border-radius: 4px; margin: 12px 0 0; font-size: 14px;
+}
+.req-mark { color: #b02a37; font-weight: 700; }
+
+/* --- ticket detail --- */
+.panel {
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.panel > h2:first-child { margin-top: 0; }
+.ticket-ref-lg { font-size: 14px; font-weight: 700; letter-spacing: .04em; margin-right: 6px; }
+.ticket-body {
+  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 12px 14px; margin-top: 14px; line-height: 1.55; white-space: pre-wrap;
+}
+.detail-form textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  font-family: inherit; font-size: 15px; resize: vertical;
+}
+
+.attachment-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.attachment {
+  width: 190px; background: #f7f9fb; border: 1px solid #e4e8ec;
+  border-radius: 6px; overflow: hidden;
+}
+.attachment img, .attachment video {
+  display: block; width: 100%; height: 118px; object-fit: cover; background: #1c2733;
+}
+.attachment .file-link { display: block; padding: 24px 10px; text-align: center; font-size: 13px; }
+.attachment-meta {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  font-size: 10.5px; color: #5a6a7a; border-top: 1px solid #e4e8ec;
+}
+.attachment-meta span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-meta form { margin: 0; display: inline; }
+
+/* The thread. System lines — a status change, a reassignment — sit in the same
+   list, quieter: they are the context for the comments rather than competing
+   with them, but they are visibly THERE, which is the whole point of writing
+   them. STFC's version showed only what people typed, so "who moved this to
+   Done" was unanswerable. */
+.comment { border-left: 2px solid #e4e8ec; padding: 3px 0 10px 12px; margin-bottom: 13px; }
+.comment-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+.comment-body { line-height: 1.5; white-space: pre-wrap; }
+.comment-system { border-left-color: #c3ccd4; }
+.comment-system .comment-body {
+  color: #5a6a7a; font-size: 13px; background: #f7f9fb;
+  border-radius: 4px; padding: 6px 10px; display: inline-block;
+}
+.comment-form { margin-top: 18px; border-top: 1px solid #e4e8ec; padding-top: 14px; }
+.comment-form textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  font-family: inherit; font-size: 15px; resize: vertical;
+}
+.comment-form input[type=file] { padding: 6px 0; border: 0; }
+
+/* --- the picker's own file list (a native input cannot drop ONE file) --- */
+.file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.file-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: #f7f9fb; border: 1px solid #e4e8ec;
+  border-radius: 5px; padding: 5px 8px; font-size: 13px;
+}
+.file-chip.too-big { border-color: #e0b4ba; background: #fdf0f1; }
+.file-chip-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip-size { color: #5a6a7a; font-size: 12px; white-space: nowrap; }
+.file-chip.too-big .file-chip-size { color: #b02a37; font-weight: 600; }
+.file-chip-remove {
+  background: none; border: 0; color: #5a6a7a; cursor: pointer;
+  font-size: 17px; line-height: 1; padding: 0 2px; margin: 0;
+}
+.file-chip-remove:hover { background: none; color: #b02a37; }
+
+.upload-progress { margin-top: 12px; }
+.progress-track {
+  height: 6px; background: #eef1f4; border: 1px solid #dde3e9;
+  border-radius: 3px; overflow: hidden;
+}
+.progress-fill { height: 100%; width: 0; background: #2f6fb2; transition: width .2s ease; }
+.progress-label { margin-top: 5px; }
+
+.danger-zone {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; margin-top: 22px; padding: 14px 16px;
+  border: 1px solid #e0b4ba; border-radius: 6px; background: #fdf6f7;
+}
+.danger-zone form { margin: 0; }
+.danger-zone button { margin-top: 0; }
+
+.share-url {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 8px 12px; margin-bottom: 16px;
+}
+.share-url-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: #5a6a7a; flex-shrink: 0;
+}
+.share-url input {
+  flex: 1; min-width: 220px; padding: 6px 9px; font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f7f9fb;
+}
+.share-url button { margin-top: 0; flex-shrink: 0; }
+.share-url button.copied { background: #1e7e34; color: #fff; }
+
+@media (max-width: 900px) {
+  .board { grid-template-columns: 1fr !important; }
+  .modal-row { grid-template-columns: 1fr; }
+}

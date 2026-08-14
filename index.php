@@ -24,6 +24,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="page-actions">
   <a class="button" href="wizard.php">+ New project</a>
+  <a href="mytasks.php" style="margin-left:12px;">My work across all projects →</a>
 </div>
 
 <?php if (!$projects): ?>

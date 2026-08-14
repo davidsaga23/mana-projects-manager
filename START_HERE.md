@@ -11,10 +11,14 @@ without re-deriving context.
   <https://mana.davidsaga.com> — setup, Plaky import, scheduler, crew slots, timeline
   (both charts, `.gan` both directions), dashboard and per-step detail. David is working in
   it daily and reporting bugs from real data, which is how most of 14 August was spent.
-  **Next: Phase 7, tickets / tasks.**
-- **⚠ Deploy state:** migrations **015** and **016** were written on 14 August and may not be
-  applied yet — open `migrate.php` and check before assuming departments are live. Everything
-  up to 014 is applied.
+  **Phase 7 (tickets / tasks) is built but has not been used yet.**
+- **⚠ Deploy state:** migrations **015**, **016** and **017** were written on 14 August and
+  are probably not applied — open `migrate.php` and check before assuming departments or the
+  tasks board are live. Everything up to 014 is applied.
+- **⚠ Email is off until configured.** The tickets phase sends notifications through
+  authenticated SMTP, and `smtp_host` is empty in `config.example.php`. Until the real values
+  are added to the server's `config.php`, every notification says so on screen rather than
+  failing quietly — but nobody gets an email.
 - **The reference implementation is STFC.** Settled 2026-08-14: *"everything we build from now
   on should also be informed by the STFC2 project — that's the MVP and we can add on top of
   it."* Read the equivalent screen there before designing a new one here. It is at
@@ -231,12 +235,43 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      hours for both.
    - Still thin: the pace section needs a few days of `daily_snapshots` before it says
      anything, and refuses to answer below two readings.
-7. **Tickets / tasks** — **NEXT.** Port from STFC, which has `kanban.php`, `ticket.php`,
-   `kanban_api.php`, `activity.php` and `migrate-tickets.sql` / `migrate-kanban.sql`.
-   Read those first — the board there is used daily and its shape is already proven.
-   Note what this codebase has that STFC didn't: multi-project (`project_id` on everything),
-   crew slots rather than only real people, and the `statuses` vocabulary — a ticket system
-   here should reuse that vocabulary rather than inventing a second set of states.
+7. ~~**Tickets / tasks**~~ — **built 2026-08-14, not yet run against the real show.**
+   `migrations/017_tickets.sql`, `includes/{tickets,uploads,mailer}.php`, `tasks.php`,
+   `ticket.php`, `tasks_api.php`, `attachment.php`, `mytasks.php`,
+   `assets/{tickets,board}.js`. Ported from STFC's `kanban.php` / `ticket.php` /
+   `kanban_api.php`. Read the nine `2026-08-14` tickets entries in `docs/DECISIONS.md`
+   before changing any of it. In short:
+   - **Board columns are the project's own `statuses`**, not a hardcoded ENUM — with a
+     "board column" tick on the Statuses screen, because eleven statuses is not a board.
+     A card in a status that isn't a column is shown anyway, marked *off-board*.
+   - **Tickets never write to `progress`.** Plaky still owns production status, so the next
+     import would silently undo it. `tickets.step_id` exists so that becomes a small job
+     later; today it surfaces open tickets on the step page.
+   - **References are per project and derived** — `RTC-12`, built from `projects.code`
+     at display time, never stored.
+   - **`users.crew_id`** links a login to a person, which is what makes `mytasks.php`
+     ("everything assigned to me, across all shows") possible. Asked once, never guessed.
+   - **Status and owner changes write into the ticket's own thread**, dragging included —
+     STFC's "Activity" only ever held typed comments.
+   - **A bug came across with the port and was fixed here:** the attachment forms upload by
+     XHR, XHR follows the server's redirect, and the page it fetches consumed the flash
+     message — so every "3 files attached" and "no shot by that name" was swallowed.
+     **Worth back-porting to STFC while that show runs.**
+   - **`activity.php` was not ported.** It is STFC's per-artist productivity report reading
+     `shot_activity_log`, not a ticket screen — that ground is Phase 6's dashboard and
+     `includes/timelog.php`. It is listed here only because the original build order
+     misfiled it.
+
+8. **Next: run it against the real show.** Everything through Phase 7 is built; what none of
+   it has had is a week of Return to Club going through it. The specific things to watch,
+   in the order they will bite:
+   - **Apply migrations 015, 016 and 017** (`migrate.php`), then set SMTP in the server's
+     `config.php` — until that is filled in, every notification reports "email is not set up"
+     rather than sending. `config.example.php` already documents the settings; 465 = ssl,
+     587 = tls, and mixing them hangs.
+   - Check the seeded board columns suit how the team actually works, on the Statuses screen.
+   - `crew_absences` — now genuinely buildable and paired with the timeline in `ROADMAP.md`.
+   - `time_logs` — the per-day table that turns "actual" from elapsed duration into effort.
 
 **A separate track — the finance side.** Contracts, budgets, rates and invoices are
 *deliberately not in this codebase*. They belong to a separate application with its own

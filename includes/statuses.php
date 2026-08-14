@@ -6,11 +6,28 @@
 // of truth. That is what makes dropping Plaky later a change of habit rather
 // than a migration.
 
-/** Copy the global default statuses into a project. Returns how many landed. */
+/**
+ * Copy the global default statuses into a project. Returns how many landed.
+ *
+ * The column list is written out rather than using SELECT *, because the two
+ * tables are not identical (statuses has project_id). Every column added to
+ * status_templates has to be added HERE too, or it silently stops reaching new
+ * projects — which is why the newer ones are copied conditionally rather than
+ * assumed: this function has to keep working on an install whose migrations are
+ * a step behind the code, exactly as current_user() does for roles.
+ */
 function seed_project_statuses(PDO $pdo, int $projectId): int {
+    $optional = [];
+    foreach (['is_excluded', 'on_ticket_board'] as $col) {
+        if (column_exists($pdo, 'status_templates', $col) && column_exists($pdo, 'statuses', $col)) {
+            $optional[] = $col;
+        }
+    }
+    $extra = $optional ? ', ' . implode(', ', $optional) : '';
+
     $stmt = $pdo->prepare(
-        'INSERT IGNORE INTO statuses (project_id, name, sort_order, maps_to, is_blocked, color)
-         SELECT ?, name, sort_order, maps_to, is_blocked, color FROM status_templates'
+        'INSERT IGNORE INTO statuses (project_id, name, sort_order, maps_to, is_blocked, color' . $extra . ')
+         SELECT ?, name, sort_order, maps_to, is_blocked, color' . $extra . ' FROM status_templates'
     );
     $stmt->execute([$projectId]);
     return $stmt->rowCount();

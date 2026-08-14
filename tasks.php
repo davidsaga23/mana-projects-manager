@@ -1,0 +1,594 @@
+<?php
+// The tasks and tickets board for one project.
+//
+// Ported from STFC's kanban.php, which is the version the team opens every day.
+// What changed on the way across:
+//
+//   * COLUMNS ARE THE PROJECT'S STATUSES, not a hardcoded five-value ENUM. See
+//     migrations/017_tickets.sql for why, and the Statuses screen for which ones
+//     appear here.
+//   * The board is scoped to a project, and the reference on a card is
+//     "RTC-12" — per project, so two shows don't interleave their numbering.
+//   * Assignees are this project's crew, including unfilled SLOTS and teams.
+//   * A ticket can name a shot, an asset, a pipeline STEP, or any combination.
+//
+// One rule STFC has that is deliberately NOT ported: there, non-admin
+// submissions were forced into Backlog for triage. This platform's roles are
+// admin / editor / viewer, and a viewer cannot POST at all (enforced once, in
+// require_login()). So there is nobody here who may file a ticket but should not
+// be trusted to place it, and a rule guarding against a role that doesn't exist
+// is just a surprise waiting for whoever hits it.
+
+require __DIR__ . '/includes/db.php';
+require __DIR__ . '/includes/auth.php';
+require __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/statuses.php';
+require_once __DIR__ . '/includes/uploads.php';
+require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/tickets.php';
+require_login();
+
+$projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
+$stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+$stmt->execute([$projectId]);
+$project = $stmt->fetch();
+if (!$project) {
+    flash('err', 'That project no longer exists.');
+    header('Location: index.php');
+    exit;
+}
+
+$selfUrl = 'tasks.php?project=' . $projectId;
+$userId  = (int)($_SESSION['user_id'] ?? 0);
+
+// The whole feature arrives in migration 017. Detect it rather than assuming, and
+// SAY SO if it is missing — a screen that quietly renders empty is the failure
+// this codebase keeps paying for (START_HERE, lesson 11).
+$ready = column_exists($pdo, 'tickets', 'id');
+
+// --- create -----------------------------------------------------------------
+if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
+    $title = trim($_POST['title'] ?? '');
+    if ($title === '') {
+        flash('err', 'A card needs a title — nothing was created.');
+        finish_post($selfUrl);
+    }
+
+    $type = ($_POST['type'] ?? 'task') === 'ticket' ? 'ticket' : 'task';
+    $crewId = !empty($_POST['assigned_crew_id']) ? (int)$_POST['assigned_crew_id'] : null;
+
+    // A ticket is a problem somebody owns. Without an assignee it sits unowned
+    // and nobody is told about it — checked here as well as in the form, so a
+    // hand-made POST cannot slip past.
+    if ($type === 'ticket' && !$crewId) {
+        flash('err', 'A ticket needs somebody to own it — nothing was created. Pick who should look at it.');
+        finish_post($selfUrl);
+    }
+
+    $statusId = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
+    $priority = in_array($_POST['priority'] ?? '', ticket_priorities(), true) ? $_POST['priority'] : 'medium';
+
+    $ticketId = null;
+    try {
+        $pdo->beginTransaction();
+        // seq is read and written inside the transaction, and the table carries
+        // UNIQUE (project_id, seq) — so two people filing at once collide loudly
+        // rather than quietly sharing a reference number.
+        $seq = next_ticket_seq($pdo, $projectId);
+        $pdo->prepare(
+            'INSERT INTO tickets
+               (project_id, seq, type, title, description, status_id, priority,
+                assigned_crew_id, due_date, shot_id, asset_id, step_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $projectId, $seq, $type, $title,
+            trim($_POST['description'] ?? '') ?: null,
+            $statusId, $priority, $crewId,
+            !empty($_POST['due_date']) ? $_POST['due_date'] : null,
+            resolve_shot_id($pdo, $projectId, $_POST['shot_label'] ?? ''),
+            resolve_asset_id($pdo, $projectId, $_POST['asset_label'] ?? ''),
+            !empty($_POST['step_id']) ? (int)$_POST['step_id'] : null,
+            $userId ?: null,
+        ]);
+        $ticketId = (int)$pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        flash('err', 'That card could not be saved: ' . $e->getMessage());
+        finish_post($selfUrl);
+    }
+
+    $statusRow = $statusId ? (statuses_by_id($pdo, $projectId)[$statusId] ?? null) : null;
+    sync_ticket_completion($pdo, $ticketId, $statusRow);
+
+    // Report what actually happened — including what was typed but not matched.
+    // A shot label nobody recognised silently becoming "no shot" is exactly the
+    // unmatched-name failure the alias layer exists to prevent.
+    $notes = [];
+    $typedShot = trim($_POST['shot_label'] ?? '');
+    $typedAsset = trim($_POST['asset_label'] ?? '');
+    if ($typedShot !== '' && !resolve_shot_id($pdo, $projectId, $typedShot)) {
+        $notes[] = 'No shot called "' . $typedShot . '" in this project, so the card was not linked to one.';
+    }
+    if ($typedAsset !== '' && !resolve_asset_id($pdo, $projectId, $typedAsset)) {
+        $notes[] = 'No asset called "' . $typedAsset . '" in this project, so the card was not linked to one.';
+    }
+
+    if (!empty($_FILES['attachments'])) {
+        $res = save_ticket_attachments(
+            $pdo, normalize_files_array($_FILES['attachments']), $ticketId, null, $userId
+        );
+        if ($res['saved'])  $notes[] = $res['saved'] . ' file(s) attached.';
+        if ($res['errors']) $notes[] = implode(' ', $res['errors']);
+    }
+    if ($crewId) {
+        [, $mailMsg] = notify_assignee($pdo, $ticketId, 'assigned');
+        $notes[] = $mailMsg;
+    }
+
+    $code = $project['code'] . '-' . $seq;
+    flash('ok', ucfirst($type) . ' ' . $code . ' created. ' . trim(implode(' ', $notes)));
+    // A new ticket opens its own page — that is where its thread and attachments
+    // are, and it is the link people paste to each other. A plain task goes back
+    // to the board.
+    finish_post($type === 'ticket' ? 'ticket.php?id=' . $ticketId : $selfUrl);
+}
+
+// --- restore from the archive ----------------------------------------------
+// Clears the flag and restarts the completion clock, so the card isn't swept
+// straight back on the next page load.
+if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore'])) {
+    $rid = (int)$_POST['restore'];
+    $pdo->prepare('UPDATE tickets SET archived = 0, completed_at = NOW() WHERE id = ? AND project_id = ?')
+        ->execute([$rid, $projectId]);
+    flash('ok', 'Card put back on the board.');
+    header('Location: ' . $selfUrl);
+    exit;
+}
+
+// --- delete -----------------------------------------------------------------
+if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) {
+    $delId = (int)$_POST['delete'];
+    $owner = $pdo->prepare('SELECT created_by FROM tickets WHERE id = ? AND project_id = ?');
+    $owner->execute([$delId, $projectId]);
+    $createdBy = (int)$owner->fetchColumn();
+
+    if (is_admin() || $createdBy === $userId) {
+        $res = delete_ticket_with_files($pdo, $delId);
+        flash($res['deleted'] ? 'ok' : 'warn', $res['deleted']
+            ? 'Deleted' . ($res['files'] ? ", and removed {$res['files']} attached file(s)." : '.')
+            : 'Nothing was deleted — that card is already gone.');
+    } else {
+        flash('err', 'Only an administrator, or whoever raised it, can delete this card.');
+    }
+    header('Location: ' . $selfUrl . (!empty($_POST['from_archive']) ? '&archived=1' : ''));
+    exit;
+}
+
+// --- load -------------------------------------------------------------------
+$columns = []; $usedFallback = false; $cards = []; $justArchived = 0;
+$archivedCount = 0; $archiveDays = 3; $showArchived = false;
+$assignees = []; $steps = []; $shotOptions = []; $assetOptions = [];
+$episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
+
+if ($ready) {
+    [$columns, $usedFallback] = ticket_board_columns($pdo, $projectId);
+
+    $justArchived  = archive_stale_done($pdo, $projectId);
+    $archiveDays   = (int)project_setting($pdo, $projectId, 'archive_done_after_days', '3');
+    $showArchived  = !empty($_GET['archived']);
+    $ac = $pdo->prepare('SELECT COUNT(*) FROM tickets WHERE project_id = ? AND archived = 1');
+    $ac->execute([$projectId]);
+    $archivedCount = (int)$ac->fetchColumn();
+
+    $cards     = board_tickets($pdo, $projectId, $showArchived);
+    $assignees = ticket_assignees($pdo, $projectId);
+
+    $stepsQ = $pdo->prepare('SELECT id, name FROM pipeline_steps WHERE project_id = ? ORDER BY step_order, name');
+    $stepsQ->execute([$projectId]);
+    $steps = $stepsQ->fetchAll();
+
+    $shotsQ = $pdo->prepare('SELECT episode, shot_code FROM shots WHERE project_id = ? ORDER BY episode, shot_code');
+    $shotsQ->execute([$projectId]);
+    foreach ($shotsQ->fetchAll() as $s) {
+        $label = shot_label($s['episode'], $s['shot_code']);
+        if ($label !== '') $shotOptions[] = $label;
+    }
+
+    $assetsQ = $pdo->prepare('SELECT name FROM assets WHERE project_id = ? ORDER BY name');
+    $assetsQ->execute([$projectId]);
+    $assetOptions = $assetsQ->fetchAll(PDO::FETCH_COLUMN);
+}
+
+$crewColors = crew_color_map($assignees);
+$today = date('Y-m-d');
+
+$pageTitle = 'Tasks · ' . $project['name'];
+require __DIR__ . '/includes/header.php';
+?>
+
+<?php project_nav($project, 'tasks'); ?>
+
+<?php if (!$ready): ?>
+  <h2 class="wizard-title">Tasks <span class="muted">· <?= e($project['name']) ?></span></h2>
+  <div class="empty-state">
+    <p><strong>The tasks board needs a database update that hasn't been applied yet.</strong></p>
+    <p class="muted">Migration <code>017_tickets.sql</code> creates the tables this screen reads.
+       Nothing is broken — the feature simply isn't switched on until it runs.</p>
+    <?php if (is_admin()): ?>
+      <p><a class="button" href="migrate.php">Review and apply it →</a></p>
+    <?php else: ?>
+      <p class="muted">Ask an administrator to open the Migrations screen.</p>
+    <?php endif; ?>
+  </div>
+  </div></body></html>
+  <?php exit; ?>
+<?php endif; ?>
+
+<div class="board-head">
+  <h2 class="wizard-title" style="margin:0;">
+    <?= $showArchived ? 'Archive' : 'Tasks' ?> <span class="muted">· <?= e($project['name']) ?></span>
+  </h2>
+  <div class="board-tools">
+    <label class="inline muted small">Show
+      <select id="filterType">
+        <option value="all">Everything</option>
+        <option value="task">Tasks only</option>
+        <option value="ticket">Tickets only</option>
+      </select>
+    </label>
+    <label class="inline muted small">Owner
+      <select id="filterAssignee">
+        <option value="all">Anyone</option>
+        <option value="none">Nobody</option>
+        <?php foreach ($assignees as $c): ?>
+          <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <label class="inline muted small">Due
+      <select id="filterDue">
+        <option value="all">Any date</option>
+        <option value="overdue">Overdue</option>
+        <option value="today">Today</option>
+        <option value="week">Next 7 days</option>
+        <option value="nodate">No due date</option>
+      </select>
+    </label>
+    <?php if ($showArchived): ?>
+      <a class="button" href="<?= e($selfUrl) ?>">← Back to the board</a>
+    <?php else: ?>
+      <?php if ($archivedCount > 0): ?>
+        <a class="button" href="<?= e($selfUrl) ?>&amp;archived=1">Archive (<?= $archivedCount ?>)</a>
+      <?php endif; ?>
+      <?php if (can_edit()): ?>
+        <button type="button" class="secondary" onclick="openCreate('task')">+ New task</button>
+        <button type="button" onclick="openCreate('ticket')">+ New ticket</button>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+</div>
+
+<?php if ($showArchived): ?>
+  <p class="muted small">
+    <strong><?= $archivedCount ?></strong> archived card(s). Finished work lands here
+    <?= $archiveDays ?> day<?= $archiveDays === 1 ? '' : 's' ?> after it reaches a status that counts
+    as approved. <strong>Nothing is deleted</strong> — use Restore to bring one back.
+  </p>
+<?php elseif ($justArchived > 0): ?>
+  <p class="muted small">
+    <?= $justArchived ?> finished card(s) just moved to the
+    <a href="<?= e($selfUrl) ?>&amp;archived=1">archive</a>.
+  </p>
+<?php endif; ?>
+
+<?php if (!$columns): ?>
+  <div class="empty-state">
+    <p><strong>This project has no statuses yet, so the board has no columns.</strong></p>
+    <p class="muted">Board columns are the project's own statuses — the same vocabulary the
+       shots and assets use, rather than a second set of words for the same ideas.</p>
+    <p><a class="button" href="statuses_edit.php?project=<?= $projectId ?>">Set up statuses →</a></p>
+  </div>
+<?php else: ?>
+
+<?php if ($usedFallback): ?>
+  <p class="flash flash-warn">
+    No status is ticked as a board column, so these <?= count($columns) ?> were chosen automatically —
+    one per meaning. Pick the ones you actually want on the
+    <a href="statuses_edit.php?project=<?= $projectId ?>">Statuses screen</a>.
+  </p>
+<?php endif; ?>
+
+<?php
+// Cards whose status was deleted out from under them. They belong nowhere, so
+// they go in the first column with a marker rather than disappearing.
+$orphans = $cards[0] ?? [];
+$columnIds = array_map(fn($c) => (int)$c['id'], $columns);
+// A card sitting in a status that exists but is NOT a board column would be
+// invisible too — collect those the same way.
+foreach ($cards as $sid => $list) {
+    if ($sid !== 0 && !in_array((int)$sid, $columnIds, true)) {
+        $orphans = array_merge($orphans, $list);
+    }
+}
+?>
+
+<?php if ($orphans): ?>
+  <p class="flash flash-warn">
+    <?= count($orphans) ?> card(s) are in a status that isn't one of the columns below, so they are
+    shown in the first column marked <em>off-board</em>. Tick that status on the
+    <a href="statuses_edit.php?project=<?= $projectId ?>">Statuses screen</a>, or drag them somewhere else.
+  </p>
+<?php endif; ?>
+
+<div class="board" style="grid-template-columns: repeat(<?= count($columns) ?>, minmax(200px, 1fr));">
+  <?php foreach ($columns as $i => $col):
+    $sid = (int)$col['id'];
+    $list = $cards[$sid] ?? [];
+    if ($i === 0) $list = array_merge($orphans, $list);
+    $colColor = $col['color'] ?: '#8a97a3';
+  ?>
+    <div class="board-col" data-status-id="<?= $sid ?>">
+      <div class="board-col-head">
+        <span class="board-dot" style="background:<?= e($colColor) ?>"></span>
+        <span class="board-col-name"><?= e($col['name']) ?></span>
+        <?php if ((int)$col['is_blocked'] === 1): ?>
+          <span class="board-col-flag" title="Work that cannot proceed — this column is an escalation, not a queue">blocked</span>
+        <?php endif; ?>
+        <span class="board-col-count"><?= count($list) ?></span>
+      </div>
+      <div class="board-cards"
+           ondragover="event.preventDefault(); this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="dropCard(event, <?= $sid ?>); this.classList.remove('drag-over')">
+        <?php foreach ($list as $t):
+          $isTicket  = ($t['type'] ?? 'task') === 'ticket';
+          $isOverdue = $t['due_date'] && $t['due_date'] < $today && ($t['status_maps_to'] ?? '') !== 'approved';
+          $offBoard  = (int)($t['status_id'] ?? 0) !== $sid;
+          $crewColor = $t['assigned_crew_id'] ? ($crewColors[(int)$t['assigned_crew_id']] ?? '#8a97a3') : '';
+          $shot = shot_label($t['episode'] ?? '', $t['shot_code'] ?? '');
+        ?>
+          <div class="board-card priority-<?= e($t['priority']) ?> <?= $isOverdue ? 'overdue' : '' ?> <?= $isTicket ? 'is-ticket' : '' ?>"
+               <?= can_edit() ? 'draggable="true"' : '' ?>
+               data-id="<?= (int)$t['id'] ?>"
+               data-type="<?= $isTicket ? 'ticket' : 'task' ?>"
+               data-crew="<?= $t['assigned_crew_id'] ? (int)$t['assigned_crew_id'] : 'none' ?>"
+               data-due="<?= e($t['due_date'] ?? '') ?>"
+               ondragstart="dragCard(event, <?= (int)$t['id'] ?>)"
+               onclick="openCard(<?= (int)$t['id'] ?>)">
+            <?php if ($crewColor): ?>
+              <div class="card-crew-bar" style="background:<?= e($crewColor) ?>;"></div>
+            <?php endif; ?>
+            <div class="card-ref">
+              <span class="<?= $isTicket ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($t)) ?></span>
+              <?php if ($offBoard): ?>
+                <span class="off-board" title="This card's status is not one of the board columns"><?= e($t['status_name'] ?? 'no status') ?></span>
+              <?php endif; ?>
+            </div>
+            <div class="card-title"><?= e($t['title']) ?></div>
+            <?php if (!empty($t['description'])): ?>
+              <div class="card-desc"><?= e(mb_strimwidth($t['description'], 0, 90, '…')) ?></div>
+            <?php endif; ?>
+            <?php if ($shot !== '' || !empty($t['asset_name']) || !empty($t['step_name'])): ?>
+              <div class="card-context">
+                <?php if ($shot !== ''): ?><span class="ctx-chip ctx-shot"><?= e($shot) ?></span><?php endif; ?>
+                <?php if (!empty($t['asset_name'])): ?><span class="ctx-chip ctx-asset"><?= e($t['asset_name']) ?></span><?php endif; ?>
+                <?php if (!empty($t['step_name'])): ?><span class="ctx-chip ctx-step"><?= e($t['step_name']) ?></span><?php endif; ?>
+              </div>
+            <?php endif; ?>
+            <div class="card-meta">
+              <?php if (!empty($t['crew_name'])): ?>
+                <span class="card-owner" style="background:<?= e($crewColor) ?>1a;color:<?= e($crewColor) ?>;border-color:<?= e($crewColor) ?>44;">
+                  <?= e($t['crew_name']) ?><?= (int)($t['is_placeholder'] ?? 0) === 1 ? ' ·' : '' ?>
+                </span>
+              <?php endif; ?>
+              <?php if ($t['due_date']): ?>
+                <span class="card-due <?= $isOverdue ? 'is-overdue' : '' ?>"><?= date('M j', strtotime($t['due_date'])) ?></span>
+              <?php endif; ?>
+              <?php if ((int)($t['attachment_count'] ?? 0) > 0): ?>
+                <span class="card-badge" title="Attachments">📎<?= (int)$t['attachment_count'] ?></span>
+              <?php endif; ?>
+              <?php if ((int)($t['comment_count'] ?? 0) > 0): ?>
+                <span class="card-badge" title="Comments">💬<?= (int)$t['comment_count'] ?></span>
+              <?php endif; ?>
+              <span class="prio-dot priority-<?= e($t['priority']) ?>" title="<?= e(ucfirst($t['priority'])) ?> priority"></span>
+            </div>
+            <?php if ($showArchived): ?>
+              <div class="card-archive-row" onclick="event.stopPropagation();">
+                <span class="muted small">Finished <?= $t['completed_at'] ? date('M j', strtotime($t['completed_at'])) : '—' ?></span>
+                <span>
+                  <?php if (can_edit()): ?>
+                  <form method="post" style="display:inline;">
+                    <button type="submit" name="restore" value="<?= (int)$t['id'] ?>" class="secondary">Restore</button>
+                  </form>
+                  <form method="post" style="display:inline;"
+                        onsubmit="return confirm('Delete this permanently? Its comments and attachments go too.');">
+                    <input type="hidden" name="from_archive" value="1">
+                    <button type="submit" name="delete" value="<?= (int)$t['id'] ?>" class="danger">Delete</button>
+                  </form>
+                  <?php endif; ?>
+                </span>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
+<p class="muted small">
+  Columns are this project's own statuses, so the words on this board are the same ones the
+  shots and assets use. Change which appear on the
+  <a href="statuses_edit.php?project=<?= $projectId ?>">Statuses screen</a>.
+  Finished cards archive themselves after <?= $archiveDays ?> day<?= $archiveDays === 1 ? '' : 's' ?>.
+</p>
+
+<?php if (can_edit() && $columns): ?>
+<!-- New task / ticket -->
+<div id="createModal" class="modal" style="display:none;">
+  <div class="modal-box">
+    <h3 id="createTitle">New task</h3>
+    <form method="post" enctype="multipart/form-data" id="createForm"
+          data-ticket-form data-redirect="<?= e($selfUrl) ?>">
+      <input type="hidden" name="create" value="1">
+      <input type="hidden" name="type" id="createType" value="task">
+
+      <label>Title
+        <input name="title" id="createTitleField" required placeholder="What needs doing?">
+      </label>
+      <label>Description
+        <textarea name="description" id="createDesc" rows="3" placeholder="Details, links, notes…"></textarea>
+      </label>
+
+      <!-- What the card is about. Shown for tickets; a plain task rarely needs it. -->
+      <div class="ticket-only" style="display:none;">
+        <div class="modal-row">
+          <label>Shot <span class="muted small">(type to search)</span>
+            <input name="shot_label" list="shotList" autocomplete="off"
+                   placeholder="<?= $episodic ? 'e.g. EP002_SH050' : 'e.g. SH050' ?>">
+            <datalist id="shotList">
+              <?php foreach ($shotOptions as $s): ?><option value="<?= e($s) ?>"></option><?php endforeach; ?>
+            </datalist>
+          </label>
+          <label>Asset <span class="muted small">(type to search)</span>
+            <input name="asset_label" list="assetList" autocomplete="off" placeholder="e.g. Romulan Officer">
+            <datalist id="assetList">
+              <?php foreach ($assetOptions as $a): ?><option value="<?= e($a) ?>"></option><?php endforeach; ?>
+            </datalist>
+          </label>
+        </div>
+        <label>Pipeline step <span class="muted small">(which part of the pipeline this is about)</span>
+          <select name="step_id">
+            <option value="">— not step-specific —</option>
+            <?php foreach ($steps as $st): ?>
+              <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-row">
+        <label>Status
+          <select name="status_id">
+            <?php foreach ($columns as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Priority
+          <select name="priority">
+            <?php foreach (ticket_priorities() as $p): ?>
+              <option value="<?= $p ?>" <?= $p === 'medium' ? 'selected' : '' ?>><?= ucfirst($p) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-row">
+        <label>Owner <span class="req-mark ticket-only" style="display:none;">*</span>
+          <select name="assigned_crew_id" id="createCrew">
+            <option value="">— nobody —</option>
+            <?php foreach ($assignees as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Due date
+          <input type="date" name="due_date">
+        </label>
+      </div>
+
+      <label>Attachments
+        <input type="file" name="attachments[]" multiple data-filepicker
+               accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf">
+        <small>Up to <?= (int)($config['upload_max_files'] ?? 5) ?> files · images, video or PDF ·
+               max <?= human_size((int)($config['upload_max_bytes'] ?? 26214400)) ?> each</small>
+      </label>
+      <div class="file-list" data-filelist></div>
+
+      <div class="upload-progress" data-progress style="display:none;">
+        <div class="progress-track"><div class="progress-fill"></div></div>
+        <div class="progress-label muted small">Preparing…</div>
+      </div>
+
+      <p class="form-error" id="createError" style="display:none;"></p>
+
+      <div class="actions">
+        <button type="submit">Create</button>
+        <button type="button" class="secondary" onclick="closeCreate()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Quick edit, for plain tasks. Tickets open their own page, where the thread lives. -->
+<div id="editModal" class="modal" style="display:none;">
+  <div class="modal-box">
+    <h3>Edit task</h3>
+    <form id="editForm">
+      <input type="hidden" id="editId">
+      <label>Title <input id="editTitle" required></label>
+      <label>Description <textarea id="editDesc" rows="3"></textarea></label>
+      <div class="modal-row">
+        <label>Status
+          <select id="editStatus">
+            <?php foreach ($columns as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Priority
+          <select id="editPriority">
+            <?php foreach (ticket_priorities() as $p): ?>
+              <option value="<?= $p ?>"><?= ucfirst($p) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
+      <div class="modal-row">
+        <label>Owner
+          <select id="editCrew">
+            <option value="">— nobody —</option>
+            <?php foreach ($assignees as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Due date <input type="date" id="editDue"></label>
+      </div>
+      <p class="form-error" id="editError" style="display:none;"></p>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" class="secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+        <span class="spacer"></span>
+        <a id="editOpenLink" class="muted small" href="#">Open the full page →</a>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
+
+<script>
+// Every card on screen, so the quick-edit modal can fill itself without a round
+// trip. Built from the same rows the board rendered, so the two cannot disagree.
+//
+// JSON_HEX_TAG matters and is not decoration: a card description containing
+// "</script>" would otherwise close this block and everything after it would be
+// parsed as HTML. Titles and descriptions are typed by people, and one of them
+// will eventually paste markup. The other three flags close the same door for
+// quotes and ampersands.
+<?php $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT; ?>
+const CARDS = <?= json_encode(array_values(array_merge(...array_values($cards ?: [[]]))), $jsonFlags) ?>;
+const PROJECT_URL = <?= json_encode($selfUrl, $jsonFlags) ?>;
+const CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
+// Read by tickets.js as it initialises, so these MUST be set before that file
+// loads — not after it, which is a silent no-op that falls back to the defaults.
+window.TICKET_MAX_FILES = <?= (int)($config['upload_max_files'] ?? 5) ?>;
+window.TICKET_MAX_BYTES = <?= (int)($config['upload_max_bytes'] ?? 26214400) ?>;
+</script>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<script src="assets/board.js<?= asset_ver('board.js') ?>"></script>
+</div>
+</body></html>

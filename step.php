@@ -16,6 +16,8 @@ require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/crew.php';
+require_once __DIR__ . '/includes/uploads.php';
+require_once __DIR__ . '/includes/tickets.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -89,6 +91,15 @@ try {
     $slots = $q->fetchAll();
 } catch (PDOException $e) { /* migration 012 pending */ }
 
+// Open tickets raised against this step. This is the payoff for tickets.step_id:
+// "what is outstanding on Compositing" is a question the board can only answer
+// per card, and the step page is where somebody is already looking when they
+// ask it.
+$stepTickets = [];
+try {
+    $stepTickets = tickets_for_step($pdo, $stepId);
+} catch (PDOException $e) { /* migration 017 pending */ }
+
 $unit = $s['unit'];
 
 $pageTitle = $step['name'] . ' · ' . $project['name'];
@@ -105,6 +116,23 @@ require __DIR__ . '/includes/header.php';
   <span class="muted">· <?= e(applies_to_phrase($step['applies_to'], $step['applies_to_asset_type'] ?? null)) ?></span>
   <?php if ($s['tracks_seconds']): ?><span class="unit-badge">Seconds</span><?php endif; ?>
 </h2>
+
+<?php if ($stepTickets): ?>
+  <div class="flash flash-warn">
+    <strong><?= count($stepTickets) ?></strong> open
+    ticket<?= count($stepTickets) === 1 ? '' : 's' ?> raised against this step:
+    <?php foreach ($stepTickets as $i => $tk): ?>
+      <?php if ($i > 0): ?>·<?php endif; ?>
+      <a href="ticket.php?id=<?= (int)$tk['id'] ?>"><?= e(ticket_ref($tk)) ?></a>
+      <?= e(mb_strimwidth($tk['title'], 0, 60, '…')) ?><?php
+        $tkShot = shot_label($tk['episode'] ?? '', $tk['shot_code'] ?? '');
+        if ($tkShot !== '') echo ' (' . e($tkShot) . ')';
+        elseif (!empty($tk['asset_name'])) echo ' (' . e($tk['asset_name']) . ')';
+      ?>
+    <?php endforeach; ?>
+    <a href="tasks.php?project=<?= $projectId ?>">Open the board →</a>
+  </div>
+<?php endif; ?>
 
 <div class="kpi-grid kpi-grid-6">
   <div><div class="kpi-label">Approved</div>

@@ -18,6 +18,9 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     <div class="topbar-right">
       <span><?= e(current_user_display()) ?></span>
       <?php if (!can_edit()): ?><span class="role-badge">view only</span><?php endif; ?>
+      <?php // Cross-project, so it belongs in the global bar rather than on a
+            // project tab — the whole point is that it spans all of them. ?>
+      · <a href="mytasks.php">My work</a>
       <?php if (is_admin()): ?>
         · <a href="users.php">Users</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
