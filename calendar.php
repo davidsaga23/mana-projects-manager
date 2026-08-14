@@ -15,29 +15,38 @@ require_once __DIR__ . '/includes/calendar.php';
 require_login();
 
 /**
- * Days most Mexican studios take that are NOT statutory, offered one click away.
+ * US days the studio MIGHT take, offered one click away.
  *
- * Deliberately suggested rather than seeded: the migration only added days the
- * studio legally does not work, because seeding a day off that Mana actually
- * works would pad every schedule silently. These are a choice, so a person makes
- * it. Easter dates are written out rather than computed — easter_date() needs
- * the calendar extension, which shared hosting often leaves out.
+ * Mana works to US client calendars, so this is the American federal list minus
+ * the days migration 014 already seeds — the near-universal ones. What is left
+ * here is genuinely split: plenty of studios work MLK Day and Veterans Day, and
+ * seeding a day the team actually works would pad every schedule silently. So
+ * they are offered, not assumed.
+ *
+ * Dates are written out rather than computed. "Third Monday in January" is easy
+ * to get subtly wrong in code, the list only needs extending every few years,
+ * and a wrong holiday is invisible until a deadline slips. Observed dates are
+ * used where the nominal one falls at a weekend.
  */
 function suggested_days(): array {
-    $out = [];
-    foreach ([
-        ['2026-04-02', '2026-04-03'], ['2027-03-25', '2027-03-26'],
-        ['2028-04-13', '2028-04-14'], ['2029-03-29', '2029-03-30'],
-        ['2030-04-18', '2030-04-19'],
-    ] as [$thu, $fri]) {
-        $out[$thu] = 'Jueves Santo';
-        $out[$fri] = 'Viernes Santo';
-    }
-    foreach ([2026, 2027, 2028, 2029, 2030] as $y) {
-        $out["$y-12-24"] = 'Nochebuena';
-        $out["$y-12-31"] = 'Fin de año';
-    }
-    return $out;
+    return [
+        // 2026
+        '2026-01-19' => 'Martin Luther King Jr. Day',
+        '2026-02-16' => "Presidents' Day",
+        '2026-06-19' => 'Juneteenth',
+        '2026-10-12' => 'Columbus Day',
+        '2026-11-11' => 'Veterans Day',
+        '2026-12-24' => 'Christmas Eve',
+        '2026-12-31' => "New Year's Eve",
+        // 2027
+        '2027-01-18' => 'Martin Luther King Jr. Day',
+        '2027-02-15' => "Presidents' Day",
+        '2027-06-18' => 'Juneteenth (observed)',
+        '2027-10-11' => 'Columbus Day',
+        '2027-11-11' => 'Veterans Day',
+        '2027-12-23' => 'Christmas Eve (observed)',
+        '2027-12-31' => "New Year's Eve",
+    ];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -123,10 +132,15 @@ require __DIR__ . '/includes/header.php';
 <h2 class="wizard-title">Studio calendar</h2>
 
 <p class="lead">
-  Days nobody works. Every deadline in this tool counts working days, and until now that
-  meant Monday to Friday and nothing else — so a public holiday was quietly treated as a day
-  someone could finish a shot on. That error always makes a plan look more achievable than
-  it is.
+  Days nobody works. Every deadline in this tool counts working days, and without this it
+  would mean Monday to Friday and nothing else — so a holiday would be quietly treated as a
+  day someone could finish a shot on. That error always makes a plan look more achievable
+  than it is.
+</p>
+<p class="lead">
+  Mana works to <strong>US client calendars</strong>, so this is seeded with the American
+  holidays almost every company closes for. It is a starting point, not a rule — remove any
+  the studio works, and add whatever else it takes.
 </p>
 
 <?php if ($tableMissing): ?>
@@ -143,10 +157,11 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
 
   <?php if ($suggestions && can_edit()): ?>
-    <h3>Commonly taken, not automatic</h3>
+    <h3>Taken by some studios, not all</h3>
     <p class="muted small">
-      These aren't statutory days off, so they weren't added for you — most Mexican studios
-      close for them, but that is Mana's call, not the law's. Tick the ones the studio takes.
+      The rest of the US federal calendar. These weren't added for you because studios genuinely
+      differ on them — plenty work Martin Luther King Jr. Day and Veterans Day — and a day off
+      the team actually works would quietly pad every schedule. Tick the ones Mana takes.
     </p>
     <form method="post">
       <input type="hidden" name="action" value="add_suggested">

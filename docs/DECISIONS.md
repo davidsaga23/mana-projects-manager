@@ -592,6 +592,29 @@ capture as it happens, impossible to reconstruct afterwards.
   error; plans move. But it should be something someone decided rather than something that
   happened.
 
+## 2026-08-13 — The studio calendar is US, not Mexican
+**Corrects the "Working days mean Mon–Fri minus a studio calendar" entry of 2026-08-12.**
+Migration 010 seeded Mexico's statutory holidays (Ley Federal del Trabajo art. 74). Wrong:
+Mana works to **US client calendars**. Migration 014 removes those rows and seeds the American
+days almost every company closes for — New Year's Day, Memorial Day, Independence Day, Labor
+Day, Thanksgiving and the day after, Christmas. The rest of the federal list (MLK Day,
+Presidents' Day, Juneteenth, Columbus Day, Veterans Day) is offered as tick-boxes on the
+calendar screen, because studios genuinely differ on those.
+**Why the mistake was worth a migration rather than a note:** the wrong calendar is wrong in
+*both* directions. It marked days the team works as days off, and left the days they really do
+take counted as workable — and both feed straight into every quota and every scheduled date.
+**Consequence:**
+- The DELETE matches on **date and name together**, so a row somebody has since renamed or
+  added themselves is left alone. Only untouched seed rows go.
+- Seeded dates are the **observed** day, not the nominal one: 4 July 2026 is a Saturday and the
+  day actually taken is Friday the 3rd. A holiday landing at a weekend costs nothing anyway,
+  since `working_days_between()` already skips weekends — so a nominal-date row would be a row
+  that changes no answer.
+- **Any schedule saved before 014 ran was computed against the wrong calendar.** Screens
+  recalculate on sight; a saved schedule is a stored snapshot and must be re-run and re-saved.
+- The lesson generalises: the calendar is a *studio* fact, not a *country* fact. A studio's
+  location says nothing about which holidays it keeps when its clients are elsewhere.
+
 ---
 
 ## Still open

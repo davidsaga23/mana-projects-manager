@@ -1,17 +1,23 @@
 <?php
 // Phase 5 — the timeline.
 //
-// Reads the SAVED schedule, not a fresh calculation. That is the difference
-// between this screen and schedule.php: there you look at what the plan would
-// be, here you look at what the plan IS. A Gantt that quietly recomputed itself
-// on every visit would be a picture of a plan nobody agreed to.
+// Modelled directly on STFC's, which is the version people actually used: two
+// charts, filters, zoom, and the labels sitting either side of the bar rather
+// than in a fixed gutter. That last detail is what makes it readable at any
+// zoom — the assignee stays glued to the left edge of its bar and the item name
+// to the right, so nothing has to line up with a column far off screen.
+//
+// Frappe Gantt does the drawing, as it did on STFC. Two date traps come with it,
+// both already paid for once and both commented where they bite:
+//   * its `end` is the INCLUSIVE last day, which is this platform's convention
+//     too — so nothing is added or subtracted anywhere;
+//   * never toISOString() a date in the browser (lesson 3).
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/scheduler.php';
-require_once __DIR__ . '/includes/timeline.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -24,99 +30,253 @@ if (!$project) {
     exit;
 }
 
-$schedule = stored_schedule($pdo, $projectId);
-$rows     = timeline_rows($schedule);
-
-// Step deadlines, for the summary underneath — a bar that runs past its own
-// deadline is the thing worth spotting.
-$steps = pipeline_steps($pdo, $projectId);
-$stepById = [];
-foreach ($steps as $s) $stepById[(int)$s['id']] = $s;
-
-$today = date('Y-m-d');
-$late  = [];
-foreach ($rows as $r) {
-    $step = $stepById[$r['step_id']] ?? null;
-    $deadline = $step && $step['deadline'] ? $step['deadline'] : ($project['delivery_date'] ?: null);
-    if ($deadline && $r['end'] > $deadline) {
-        $late[] = ['row' => $r, 'deadline' => $deadline,
-                   'days' => working_days_after($deadline, $r['end'])];
+// Regenerate: recompute and save, without leaving the timeline.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regenerate'])) {
+    try {
+        $plan = build_schedule($pdo, $project);
+        if (!$plan['tasks']) {
+            throw new RuntimeException('The plan came out empty — open the Schedule screen, ' .
+                                       'which lists the reasons.');
+        }
+        $res = commit_schedule($pdo, $projectId, $plan);
+        flash('ok', sprintf('Rescheduled %d task%s, replacing %d from the previous run. %s',
+            $res['written'], $res['written'] === 1 ? '' : 's', $res['deleted'],
+            $plan['kept'] ? count($plan['kept']) . ' hand-locked task(s) were left alone.'
+                          : 'No hand-locked tasks were affected.'));
+        foreach ($plan['problems'] as $p) flash('warn', $p);
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
     }
+    header('Location: timeline.php?project=' . $projectId);
+    exit;
 }
 
-$svg = timeline_svg($rows, [
-    'today'         => $today,
-    'delivery_date' => $project['delivery_date'] ?: null,
-]);
+$steps    = pipeline_steps($pdo, $projectId);
+$episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
+
+// --- the detailed chart ------------------------------------------------------
+$stmt = $pdo->prepare(
+    "SELECT sc.id, sc.start_date, sc.end_date, sc.crew_id, sc.is_manual, sc.lane,
+            sc.shot_id, sc.asset_id, sc.item_key,
+            ps.id AS step_id, ps.name AS step_name, ps.step_order, ps.color,
+            sh.episode, sh.shot_code, a.name AS asset_name,
+            c.name AS crew_name,
+            COALESCE(pr.is_approved, 0) AS is_approved
+       FROM schedule sc
+       JOIN pipeline_steps ps ON ps.id = sc.step_id
+       LEFT JOIN shots  sh ON sh.id = sc.shot_id
+       LEFT JOIN assets a  ON a.id  = sc.asset_id
+       LEFT JOIN crew   c  ON c.id  = sc.crew_id
+       LEFT JOIN progress pr ON pr.step_id = sc.step_id AND pr.item_key = sc.item_key
+      WHERE sc.project_id = ?
+      ORDER BY sc.start_date, ps.step_order, sc.lane, sc.id"
+);
+$stmt->execute([$projectId]);
+$rows = $stmt->fetchAll();
+
+$episodes = [];
+$tasks = [];
+foreach ($rows as $r) {
+    // What the bar is FOR. A shot carries its episode when the project has them;
+    // an asset is just its name; a band or whole-project deliverable has neither
+    // and falls back to the step, which is exactly what it represents.
+    if ($r['shot_code'] !== null) {
+        $item = trim(($r['episode'] ? $r['episode'] . ' ' : '') . $r['shot_code']);
+    } elseif ($r['asset_name'] !== null) {
+        $item = $r['asset_name'];
+    } else {
+        $item = $r['step_name'];
+    }
+    if ($r['episode']) $episodes[$r['episode']] = true;
+
+    $tasks[] = [
+        'id'          => (string)$r['id'],
+        // Frappe draws this to the RIGHT of the bar — the item and what is being
+        // done to it, which is the pairing a supervisor scans for.
+        'name'        => $item . ' · ' . $r['step_name'],
+        'start'       => $r['start_date'],
+        // NOT extended by a day. Frappe treats `end` as the inclusive last day and
+        // stretches it internally; this platform stores it inclusive too. STFC had
+        // both sides adding a day and the two errors hid each other for weeks.
+        'end'         => $r['end_date'],
+        'progress'    => (int)$r['is_approved'] === 1 ? 100 : 0,
+        'episode'     => $r['episode'] ?? '',
+        'step_id'     => (int)$r['step_id'],
+        'step_name'   => $r['step_name'],
+        'item_label'  => $item,
+        'color'       => $r['color'] ?: '#4A90D9',
+        'crew_id'     => $r['crew_id'] !== null ? (int)$r['crew_id'] : null,
+        'crew_name'   => $r['crew_name'] ?? '',
+        'is_approved' => (int)$r['is_approved'] === 1,
+        'is_manual'   => (int)$r['is_manual'] === 1,
+    ];
+}
+ksort($episodes);
+$episodes = array_keys($episodes);
+
+// --- the general chart: one bar per pipeline step ----------------------------
+// Spans what is actually scheduled for that step, falling back to its planned
+// dates when nothing is. A step with neither is left out rather than drawn as a
+// zero-width sliver nobody can click.
+$spanStmt = $pdo->prepare(
+    'SELECT MIN(start_date) AS s, MAX(end_date) AS e FROM schedule WHERE step_id = ?'
+);
+$general = [];
+foreach ($steps as $s) {
+    $spanStmt->execute([(int)$s['id']]);
+    $span = $spanStmt->fetch();
+    $start = $span['s'] ?: ($s['start_date'] ?: null);
+    $end   = $span['e'] ?: ($s['deadline'] ?: null);
+    if (!$start || !$end) continue;
+    if ($end < $start) $end = $start;
+    $general[] = [
+        'id'       => 'step-' . (int)$s['id'],
+        'name'     => $s['name'] . ' · ' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null),
+        'start'    => $start,
+        'end'      => $end,
+        'progress' => 0,
+        'color'    => $s['color'] ?: '#4A90D9',
+        'deadline' => $s['deadline'] ?: null,
+        'late'     => ($s['deadline'] && $end > $s['deadline']) ? 1 : 0,
+    ];
+}
+
+$crewList = $pdo->query(
+    'SELECT id, name, role, is_placeholder FROM crew WHERE active = 1 ORDER BY is_placeholder, name'
+)->fetchAll();
 
 $pageTitle = 'Timeline · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
 <p class="crumb"><a href="project.php?id=<?= $projectId ?>">← <?= e($project['name']) ?></a></p>
-
 <h2 class="wizard-title">Timeline</h2>
 
-<?php if (!$schedule): ?>
+<?php if (!$rows): ?>
   <div class="empty-state">
     <h2>Nothing scheduled yet</h2>
-    <p>The timeline draws the schedule that has been saved. Work one out and save it, and it
-       appears here.</p>
+    <p>The timeline draws the schedule that has been saved.</p>
     <p><a class="button" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
   </div>
 <?php else: ?>
 
-  <p class="lead">
-    One row per person — a placeholder slot until somebody is hired into it. Gaps in a row are
-    days that person has nothing scheduled. This is the <strong>saved</strong> plan; changing
-    an estimate doesn't move it until you re-save the schedule.
-  </p>
-
-  <div class="summary-line">
-    <strong><?= count($schedule) ?></strong> task<?= count($schedule) === 1 ? '' : 's' ?>
-    across <strong><?= count($rows) ?></strong> <?= count($rows) === 1 ? 'person' : 'people' ?>
-    · <?= e(min(array_column($schedule, 'start_date'))) ?>
-    → <?= e(max(array_column($schedule, 'end_date'))) ?>
-    <?php if ($project['delivery_date']): ?>
-      · delivery <?= e($project['delivery_date']) ?>
-    <?php endif; ?>
-  </div>
-
-  <?php if ($late): ?>
-    <div class="flash flash-warn">
-      <strong><?= count($late) ?></strong>
-      <?= count($late) === 1 ? 'row runs' : 'rows run' ?> past
-      <?= count($late) === 1 ? 'its' : 'their' ?> deadline —
-      <?php
-      $bits = [];
-      foreach (array_slice($late, 0, 6) as $l) {
-          $bits[] = $l['row']['label'] . ' (+' . $l['days'] . 'd)';
-      }
-      echo e(implode(', ', $bits)) . (count($late) > 6 ? ' …' : '');
-      ?>.
+<section class="tl-section">
+  <div class="tl-head">
+    <h3>General · pipeline steps</h3>
+    <div class="tl-controls">
+      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','png')">PNG</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','pdf')">PDF</button>
     </div>
-  <?php endif; ?>
+  </div>
+  <div id="generalGantt" class="tl-chart"></div>
+</section>
 
-  <div class="gantt-wrap">
-    <?= $svg ?>
+<section class="tl-section">
+  <div class="tl-head">
+    <h3>Detailed schedule</h3>
+    <div class="tl-controls">
+      <?php if ($episodic && $episodes): ?>
+        <label class="muted small">Episode
+          <select id="episodeFilter">
+            <option value="all">All episodes</option>
+            <?php foreach ($episodes as $ep): ?>
+              <option value="<?= e($ep) ?>"><?= e($ep) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      <?php endif; ?>
+
+      <?php // A checkbox panel rather than <select multiple>, which needs ctrl+click. ?>
+      <span class="muted small multiselect" id="stepFilterWrap">Step
+        <button type="button" class="multiselect-toggle" id="stepFilterToggle"
+                aria-haspopup="true" aria-expanded="false">
+          <span id="stepFilterLabel">All steps</span> <span class="caret">▾</span>
+        </button>
+        <div class="multiselect-panel" id="stepFilterPanel" hidden>
+          <label class="multiselect-opt"><input type="checkbox" id="stepFilterAll" checked>
+            <strong>All steps</strong></label>
+          <div class="multiselect-divider"></div>
+          <?php foreach ($steps as $st): ?>
+            <label class="multiselect-opt">
+              <input type="checkbox" class="step-cb" value="<?= (int)$st['id'] ?>">
+              <?= e($st['name']) ?>
+              <span class="muted small"><?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></span>
+            </label>
+          <?php endforeach; ?>
+        </div>
+      </span>
+
+      <label class="muted small"><input type="checkbox" id="hideCompleted"> Hide completed</label>
+
+      <span class="zoom-controls">
+        <button type="button" class="secondary zoom-btn" onclick="zoomChange(-1)" title="Zoom out">−</button>
+        <span id="zoomLabel" class="zoom-label">Week</span>
+        <button type="button" class="secondary zoom-btn" onclick="zoomChange(1)" title="Zoom in">+</button>
+      </span>
+
+      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','detailed-timeline','png')">PNG</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','detailed-timeline','pdf')">PDF</button>
+      <button type="button" class="secondary" onclick="downloadGan()"
+              title="Download as a GanttProject file, honouring the filters above">.gan ↓</button>
+
+      <?php if (can_edit()): ?>
+        <form method="post" class="tl-inline"
+              onsubmit="return confirm('Recalculate and save the schedule? Hand-locked tasks are preserved.');">
+          <input type="hidden" name="regenerate" value="1">
+          <button type="submit">Regenerate</button>
+        </form>
+      <?php endif; ?>
+    </div>
   </div>
 
   <p class="muted small">
-    Shaded columns are weekends and days on the
-    <a href="calendar.php">studio calendar</a>. Both dates on every bar are inclusive — a bar
-    one day wide is one day of work. Hover a bar for the shot or asset it covers.
-    <?php
-    $manual = 0;
-    foreach ($rows as $r) $manual += $r['manual'];
-    if ($manual): ?>
-      <?= $manual ?> hand-planned task<?= $manual === 1 ? '' : 's' ?>
-      <?= $manual === 1 ? 'is' : 'are' ?> outlined — the scheduler never rewrites those.
-    <?php endif; ?>
+    <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
+    the name to the <strong>left</strong> of each bar is who is on it — a placeholder slot
+    until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
+    scheduler won't move it · click a bar to edit it, or drag it.
   </p>
+  <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
+</section>
 
-  <div class="actions">
-    <a class="button" href="schedule.php?project=<?= $projectId ?>">Recalculate the schedule</a>
+<div id="taskEditor" class="tl-modal" style="display:none;">
+  <div class="tl-modal-box">
+    <h3>Edit task</h3>
+    <p id="taskLabel" class="muted"></p>
+    <form id="taskEditForm">
+      <input type="hidden" id="editTaskId">
+      <label>Starts <input type="date" id="editStart" required></label>
+      <label>Finishes <input type="date" id="editEnd" required>
+        <small>Inclusive — the last day worked.</small></label>
+      <label>Assigned to
+        <select id="editCrew">
+          <option value="">— nobody —</option>
+          <?php foreach ($crewList as $c): ?>
+            <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?><?php
+              if ((int)$c['is_placeholder'] === 1) echo ' (slot)'; ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label class="inline"><input type="checkbox" id="editManual">
+        Lock this task — Regenerate won't move it</label>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="closeTaskEditor()">Cancel</button>
+        <button type="submit">Save</button>
+      </div>
+    </form>
   </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+window.TL_PROJECT   = <?= (int)$projectId ?>;
+window.TL_CAN_EDIT  = <?= can_edit() ? 'true' : 'false' ?>;
+window.GENERAL_TASKS = <?= json_encode($general, JSON_UNESCAPED_UNICODE) ?>;
+window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<script src="assets/timeline.js<?= asset_ver('timeline.js') ?>"></script>
 
 <?php endif; ?>
 

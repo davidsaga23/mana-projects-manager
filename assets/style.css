@@ -403,28 +403,72 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .duration.verdict-short strong { color: #8a6d1a; }
 
-/* Timeline (Gantt) — server-rendered SVG, so these style it from outside. */
-.gantt-wrap {
-  overflow-x: auto; background: #fff; border: 1px solid #e4e8ec;
-  border-radius: 6px; padding: 4px 0 8px; margin: 14px 0;
+/* Timeline — Frappe Gantt plus the bits it doesn't do (step colours, the
+   assignee label glued to the left of each bar, the lock outline). */
+.tl-section {
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 12px 14px; margin: 16px 0;
 }
-.gantt { display: block; }
-.g-weekend { fill: #f2f4f6; }
-.g-holiday { fill: #fdf2e2; }
-.g-row:nth-child(even) { fill: #fbfcfd; }
-.g-row { fill: transparent; }
-.g-month { stroke: #dfe4e9; stroke-width: 1; }
-.g-month-label { font: 600 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
-.g-label { font: 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
-.g-bar { opacity: .92; }
-.g-bar-manual { stroke: #1c2733; stroke-width: 1.2; stroke-dasharray: 3 2; }
-.g-today { stroke: #b02a37; stroke-width: 1.5; }
-.g-today-label { font: 600 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #b02a37; }
-.g-delivery { stroke: #2f6fb2; stroke-width: 1.5; stroke-dasharray: 4 3; }
-.g-delivery-label { font: 600 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #2f6fb2; }
+.tl-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tl-head h3 { margin: 0; }
+.tl-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tl-controls button { margin-top: 0; padding: 5px 10px; font-size: 13px; }
+.tl-controls label { margin: 0; font-weight: 400; display: inline-flex; align-items: center; gap: 5px; }
+.tl-controls select { width: auto; padding: 4px 7px; font-size: 13px; }
+.tl-controls input[type=checkbox] { width: auto; }
+.tl-inline { display: inline; }
+.tl-chart { overflow: auto; max-height: 420px; }
+.tl-chart-tall { max-height: 620px; }
+
+.zoom-controls { display: inline-flex; align-items: center; gap: 6px; }
+.zoom-label { font-size: 12.5px; color: #5a6a7a; min-width: 42px; text-align: center; }
+.zoom-btn { min-width: 30px; }
+
+/* Step multi-select */
+.multiselect { position: relative; display: inline-flex; align-items: center; gap: 5px; }
+.multiselect-toggle {
+  background: #fff; border: 1px solid #c3ccd4; border-radius: 4px;
+  padding: 4px 9px; font-size: 13px; color: #1c2733; cursor: pointer; margin: 0;
+}
+.multiselect-toggle:hover { background: #eef4fa; border-color: #2f6fb2; }
+.multiselect-panel {
+  position: absolute; top: 100%; left: 0; z-index: 40; margin-top: 4px;
+  background: #fff; border: 1px solid #c3ccd4; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 8px; min-width: 230px;
+  max-height: 300px; overflow: auto;
+}
+.multiselect-opt { display: flex; align-items: center; gap: 7px; padding: 3px 4px; font-weight: 400; margin: 0; }
+.multiselect-opt:hover { background: #f2f6fa; }
+.multiselect-opt input { width: auto; }
+.multiselect-divider { height: 1px; background: #e4e8ec; margin: 6px 0; }
+.caret { color: #5a6a7a; font-size: 10px; }
+
+/* Frappe overrides */
+.gantt .bar-wrapper.tl-locked .bar { stroke: #b8860b; stroke-width: 1.6; stroke-dasharray: 3 2; }
+.gantt .bar-wrapper.tl-done .bar-progress { fill: #1e7e34; }
+.gantt .bar-label { fill: #1c2733; font-size: 11.5px; }
+.gantt .bar-label.big { fill: #1c2733; }
+.tl-crew-label { font-size: 11px; font-weight: 700; fill: #43535f; }
+.tl-popup {
+  background: #1c2733; color: #fff; padding: 8px 10px;
+  border-radius: 5px; font-size: 12.5px; line-height: 1.45;
+}
+.tl-popup .muted { color: #b8c2cc; }
+
+/* Task editor */
+.tl-modal {
+  position: fixed; inset: 0; background: rgba(20,28,36,.45);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.tl-modal-box {
+  background: #fff; border-radius: 8px; padding: 22px 24px;
+  width: 380px; max-width: 92vw; box-shadow: 0 6px 26px rgba(0,0,0,.22);
+}
+.tl-modal-box h3 { margin-top: 0; }
+
 @media print {
-  .gantt-wrap { overflow: visible; border: 0; }
-  .topbar, .actions, .crumb { display: none; }
+  .tl-controls, .topbar, .crumb { display: none; }
+  .tl-chart, .tl-chart-tall { max-height: none; overflow: visible; }
 }
 
 /* Crew */
