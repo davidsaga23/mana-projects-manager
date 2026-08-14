@@ -7,10 +7,19 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status:** Phases 1–3 **live and proven on real data** at <https://mana.davidsaga.com>.
-  A real show ("Return to Club") is set up and imported from Plaky. Phase 4 (the scheduler)
-  is **built, not yet proven on real data** — run it on Return to Club and check the dates
-  against judgement before trusting them. Next: Phase 5, the timeline UI.
+- **Status (end of 2026-08-14):** Phases 1–6 built and **in real use** on "Return to Club" at
+  <https://mana.davidsaga.com> — setup, Plaky import, scheduler, crew slots, timeline
+  (both charts, `.gan` both directions), dashboard and per-step detail. David is working in
+  it daily and reporting bugs from real data, which is how most of 14 August was spent.
+  **Next: Phase 7, tickets / tasks.**
+- **⚠ Deploy state:** migrations **015** and **016** were written on 14 August and may not be
+  applied yet — open `migrate.php` and check before assuming departments are live. Everything
+  up to 014 is applied.
+- **The reference implementation is STFC.** Settled 2026-08-14: *"everything we build from now
+  on should also be informed by the STFC2 project — that's the MVP and we can add on top of
+  it."* Read the equivalent screen there before designing a new one here. It is at
+  `D:\Work\Mana\STFC2\stfc-dashboard\stfc-dashboard_v58\stfc-dashboard\`. The timeline was
+  ported that way and came out far better than the version invented from scratch.
 - **Deploy:** push to `master` in GitHub Desktop; GitHub Actions FTP-syncs to
   `public_html/mana` within ~30s. After deploying a change that adds a migration, open
   `migrate.php` once.
@@ -202,14 +211,32 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    - A first attempt used hand-rolled server-side SVG (`includes/timeline.php`, since
      deleted). It was replaced rather than kept: two chart implementations would drift,
      and Frappe gives zoom, drag and popups for free.
-   - **Still to do: `.gan` IMPORT** — read a refined file back, mark rows `is_manual = 1`,
-     dry-run preview first. STFC's `timeline_import.php` is the reference.
+   - **`.gan` import done** (`timeline_import.php`): dry-run first, matched on item name +
+     step name, ambiguity resolved by scope, imported rows locked. `add_working_days()` is
+     the exact inverse of `working_days_between()`, which is what makes an untouched file
+     round-trip onto the same dates — change one and change the other.
    - Watch lesson 4 throughout: `end_date` is inclusive here, and Frappe's `end` is
      inclusive too — so **nothing is added or subtracted** at that boundary. GanttProject's
      `duration` is a count of working days, converted in exactly one place
      (`gan_duration()`). STFC lost weeks to two layers each applying their own ±1.
-6. **Reporting** — per-artist productivity, cross-project workload
-7. **Tickets / tasks** — port from STFC (it works well; see that codebase)
+6. ~~**Reporting**~~ — **built 2026-08-14.** `dashboard.php`, `step.php`,
+   `includes/{dashboard,timelog}.php`.
+   - Every figure is a **comparison** — approved *of* total, finish *against* delivery,
+     actual pace *against* required pace. A bare number was the thing to avoid.
+   - Per-step cards carry the minimum quota per day, and each opens a detail page.
+   - **Time logged** reads `progress.time_spent_minutes`, which the Plaky importer had been
+     writing correctly all along and nothing had ever displayed.
+   - Two things it states rather than decides: the days↔hours comparison assumes an
+     8-hour day (`project_settings.hours_per_day`), and a task with two people counts its
+     hours for both.
+   - Still thin: the pace section needs a few days of `daily_snapshots` before it says
+     anything, and refuses to answer below two readings.
+7. **Tickets / tasks** — **NEXT.** Port from STFC, which has `kanban.php`, `ticket.php`,
+   `kanban_api.php`, `activity.php` and `migrate-tickets.sql` / `migrate-kanban.sql`.
+   Read those first — the board there is used daily and its shape is already proven.
+   Note what this codebase has that STFC didn't: multi-project (`project_id` on everything),
+   crew slots rather than only real people, and the `statuses` vocabulary — a ticket system
+   here should reuse that vocabulary rather than inventing a second set of states.
 
 **A separate track — the finance side.** Contracts, budgets, rates and invoices are
 *deliberately not in this codebase*. They belong to a separate application with its own
@@ -241,6 +268,11 @@ Ship each phase end-to-end before starting the next.
 ## 6. How to work in the new chat
 
 - Start by reading this file and `docs/ARCHITECTURE.md`.
+- **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
+  binary on the dev machine, so no `php -l`; this catches the one mistake that is both easy
+  to make here and invisible until a page renders blank — a missing `endif;` or an
+  `endforeach;` closing the wrong block. Counting braces with grep is *not* a substitute and
+  produced false alarms on healthy files; `tools/README.md` says why.
 - Work **one phase per conversation**, not one feature — related work should share context.
 - Use `/compact` when a chat gets long rather than starting over.
 - Update `docs/DECISIONS.md` whenever something is settled, so it survives context loss.

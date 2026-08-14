@@ -38,6 +38,7 @@ jobs:
             **/.git*/**
             **/.github/**
             **/docs/**
+            **/tools/**
             **/node_modules/**
             config.php
             sessions/**

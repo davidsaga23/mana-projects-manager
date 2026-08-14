@@ -615,6 +615,65 @@ take counted as workable — and both feed straight into every quota and every s
 - The lesson generalises: the calendar is a *studio* fact, not a *country* fact. A studio's
   location says nothing about which holidays it keeps when its clients are elsewhere.
 
+## 2026-08-14 — STFC is the reference implementation, not just a predecessor
+**Decision:** David's instruction — *"everything we build from now on should also be informed
+by the STFC2 project; that's the MVP and we can add on top of it."* Before designing a screen
+here, read the equivalent one in
+`D:\Work\Mana\STFC2\stfc-dashboard\stfc-dashboard_v58\stfc-dashboard\`.
+**Why:** proven in anger. The timeline was first built here as hand-rolled server-side SVG and
+was worse than STFC's in every way that mattered; porting STFC's version — Frappe Gantt, the
+labels either side of each bar, the filters, the zoom — took less time and produced something
+usable the same day. Its bug-fix comments are paid-for knowledge (`end` is inclusive, never
+`toISOString()`), and they came across with the code.
+**Consequence:** the port is a starting point, not a copy. This codebase is multi-project, has
+assets as well as shots, optional episodes, crew slots and a `statuses` vocabulary — STFC has
+none of those, so every ported screen needs those four checked.
+
+## 2026-08-14 — Departments are a column, not a prefix on the step name
+**Decision:** `pipeline_steps.department` (migration 015), free text with the four usual phases
+suggested. Remembered per step NAME in `step_library` (migration 016), so it is answered once
+and every later project starts filled in. A "fill in N blank departments" button maps an
+existing project's steps from what other projects already say.
+**Why:** the obvious shortcut is to call the step "Pre-prod / Concept". That breaks two things
+that already key on the name: `(name, applies_to, applies_to_asset_type)` is the identity used
+to compare a step across projects, so two shows spelling the phase differently stop matching
+and the benchmark quietly halves its sample; and `step_library` is a *global* vocabulary, which
+prefixing fills with one entry per phase per step — the naming drift the alias layer exists to
+prevent, self-inflicted.
+**Consequence:** saving a step with the field blank never ERASES a remembered department
+(`COALESCE(NULLIF(...))`). Forgetting on a blank is how a remembered answer quietly stops being
+remembered. Departments travel into and out of pipeline templates, so a new project inherits
+them with the steps.
+
+## 2026-08-14 — A pipeline template can be replaced, but only on purpose
+**Decision:** `create_template_from_project()` takes `$overwrite`. The screen has a "replace it
+if the name exists" tick and offers existing names as a datalist. Without the tick the old
+refusal still fires.
+**Why:** the original rule said templates are "never overwritten silently" — the load-bearing
+word was *silently*, and it was read as a ban. Refining a house pipeline and having to invent
+"3D v2", "3D v3" is worse than the accident it prevents.
+**Consequence:** the template ROW survives and only its steps are replaced, so the template id
+is stable — deleting and recreating would issue a new id and anything referencing a template by
+id would point at nothing. `pipeline_template_deps` cascades off the old steps.
+
+## 2026-08-14 — Logged time was already imported; only the reading was missing
+**Decision:** no new import work. `plaky_time_to_minutes()` has been writing
+`progress.time_spent_minutes` against the right (step, item) since Phase 3, with the unit
+declared on the upload screen. `includes/timelog.php` is the reading half, shown on the
+dashboard per step and per person.
+**Why:** worth recording because it looked like a missing feature and was a missing *screen*.
+The data had been arriving correctly and going nowhere — zero references outside the importer.
+**Consequence:**
+- Comparing estimated DAYS with logged MINUTES needs an hours-per-day figure. It is
+  `project_settings.hours_per_day` (default 8), and every figure derived from it says so.
+- A step shows what proportion of its tasks have any time against them at all. Without that,
+  three of forty tasks reported looks wildly under budget rather than barely reported.
+- A task with two people counts its hours for **both** — right for "who worked on this", wrong
+  for "how much did each deliver". Still the open question below; surfaced on screen rather
+  than silently picked.
+- `time_logs` (per-day entries) is still not built. Until it is, "actual" means one running
+  total per task, which is enough to compare against an estimate and not enough to bill from.
+
 ---
 
 ## Still open
