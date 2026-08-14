@@ -76,18 +76,23 @@
     var x = (hours / g.options.step) * g.options.column_width;
 
     var h = svg.getAttribute('height') || svg.getBoundingClientRect().height;
+    var head = svg.querySelector('.grid-header');
+    // Starts BELOW the header rather than at zero. Running it to the top would
+    // put a red line through the month labels — and since the header now floats
+    // above everything while scrolling, the line would be hidden there anyway.
+    var top = head ? (parseFloat(head.getAttribute('height')) || 60) : 0;
     var ns = 'http://www.w3.org/2000/svg';
 
     var line = document.createElementNS(ns, 'line');
     line.setAttribute('class', 'tl-today');
     line.setAttribute('x1', x); line.setAttribute('x2', x);
-    line.setAttribute('y1', 0); line.setAttribute('y2', h);
+    line.setAttribute('y1', top); line.setAttribute('y2', h);
     svg.appendChild(line);
 
     var text = document.createElementNS(ns, 'text');
     text.setAttribute('class', 'tl-today-label');
     text.setAttribute('x', x + 4);
-    text.setAttribute('y', 12);
+    text.setAttribute('y', top + 12);
     text.textContent = 'today';
     svg.appendChild(text);
   }
@@ -117,6 +122,10 @@
     setTimeout(function () {
       paintBars(el, window.GENERAL_TASKS);
       addTodayLine(generalGantt, el);
+      // This chart scrolls too — nineteen steps overflow its height — so its
+      // header has to float as well, or the months scroll away and the bars
+      // below have nothing to be read against.
+      stickyHeader(el);
     }, 60);
   }
 
@@ -214,8 +223,10 @@
     applyWidth(detailedGantt, z.w);
     setTimeout(function () {
       decorate();
-      stickyHeader(el);
       addTodayLine(detailedGantt, el);
+      // Last, so the floating header paints over the bars and the today line
+      // rather than under them.
+      stickyHeader(el);
     }, 80);
   }
 
@@ -269,24 +280,46 @@
   }
 
   // --- keep the date header visible while scrolling vertically ---------------
+  //
+  // SVG has no z-index: things paint in document order, and Frappe draws the
+  // header near the START, before the bars. Translating it down on scroll
+  // therefore slid it UNDER every bar it passed, which is why the month and day
+  // numbers appeared tangled up with the tasks.
+  //
+  // The fix is to move the header elements into a group appended LAST, so they
+  // paint on top, and translate that one group instead of each element.
   function stickyHeader(container) {
     var svg = container.querySelector('svg.gantt');
     if (!svg) return;
+
     var head = svg.querySelector('.grid-header');
     if (!head) return;
     var headH = parseFloat(head.getAttribute('height')) || 60;
 
-    var els = [head]
-      .concat(Array.prototype.slice.call(svg.querySelectorAll('.upper-text')))
-      .concat(Array.prototype.slice.call(svg.querySelectorAll('.lower-text')));
-    svg.querySelectorAll('.tick').forEach(function (t) {
-      if (parseFloat(t.getAttribute('y1')) < headH + 5) els.push(t);
-    });
+    var ns = 'http://www.w3.org/2000/svg';
+    var g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'tl-sticky');
 
-    container.addEventListener('scroll', function () {
-      var y = container.scrollTop;
-      els.forEach(function (n) { n.setAttribute('transform', 'translate(0,' + y + ')'); });
+    // appendChild MOVES a node rather than copying it, which is exactly what is
+    // wanted: the header leaves the grid layer and joins the top of the stack.
+    g.appendChild(head);
+    var dates = svg.querySelector('.date');
+    if (dates) g.appendChild(dates);
+    // Only the ticks that sit inside the header band — the full-height grid
+    // lines must stay where they are, behind the bars.
+    Array.prototype.slice.call(svg.querySelectorAll('.tick')).forEach(function (t) {
+      if (parseFloat(t.getAttribute('y1')) < headH + 5) g.appendChild(t);
     });
+    svg.appendChild(g);
+
+    // The container survives re-renders (only its contents are replaced), so a
+    // fresh listener every time would stack up and translate a detached group.
+    if (container._tlScroll) container.removeEventListener('scroll', container._tlScroll);
+    container._tlScroll = function () {
+      g.setAttribute('transform', 'translate(0,' + container.scrollTop + ')');
+    };
+    container.addEventListener('scroll', container._tlScroll);
+    container._tlScroll();
   }
 
   // --- zoom -------------------------------------------------------------------

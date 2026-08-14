@@ -451,6 +451,13 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .tl-crew-label { font-size: 11px; font-weight: 700; fill: #43535f; }
 .tl-today { stroke: #b02a37; stroke-width: 1.5; pointer-events: none; }
 .tl-today-label { font-size: 10.5px; font-weight: 700; fill: #b02a37; }
+/* The floating date header. It is moved to the end of the SVG so it paints over
+   the bars, which only works if it is actually opaque — Frappe's default fill
+   is white but a transparent one would let every bar show straight through. */
+.gantt .tl-sticky .grid-header { fill: #f4f6f8; stroke: #dfe4e9; stroke-width: 1; }
+.gantt .tl-sticky { pointer-events: none; }
+.gantt .tl-sticky .upper-text,
+.gantt .tl-sticky .lower-text { fill: #43535f; }
 .tl-popup {
   background: #1c2733; color: #fff; padding: 8px 10px;
   border-radius: 5px; font-size: 12.5px; line-height: 1.45;
