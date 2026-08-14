@@ -433,6 +433,12 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .tl-controls select { width: auto; padding: 4px 7px; font-size: 13px; }
 .tl-controls input[type=checkbox] { width: auto; }
 .tl-inline { display: inline; }
+/* An <a> that has to sit in a row of <button>s without looking like an outsider. */
+.tl-linkbtn {
+  display: inline-block; padding: 5px 10px; font-size: 13px; font-weight: 600;
+  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; border-radius: 4px;
+}
+.tl-linkbtn:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
 .tl-chart { overflow: auto; max-height: 420px; }
 .tl-chart-tall { max-height: 620px; }
 

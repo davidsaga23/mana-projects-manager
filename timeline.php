@@ -265,6 +265,8 @@ require __DIR__ . '/includes/header.php';
       <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','detailed-timeline','pdf')">PDF</button>
       <button type="button" class="secondary" onclick="downloadGan()"
               title="Download as a GanttProject file, honouring the filters above">.gan ↓</button>
+      <a class="tl-linkbtn" href="timeline_import.php?project=<?= $projectId ?>"
+         title="Read a refined GanttProject file back into the schedule">.gan ↑</a>
 
       <?php if (can_edit()): ?>
         <form method="post" class="tl-inline"

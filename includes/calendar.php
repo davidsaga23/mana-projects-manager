@@ -112,6 +112,27 @@ function axis_index(array &$axis, string $date): ?int {
 }
 
 /**
+ * The date $n working days after $from, counting $from itself as day zero.
+ *
+ * The inverse of working_days_between(): add_working_days($s, working_days_between($s,$e) - 1)
+ * returns $e. That identity is what makes the .gan round trip land back on the
+ * dates it started from, so the two must stay in step — change one and change
+ * the other.
+ */
+function add_working_days(string $from, int $n, ?array $holidays = null): string {
+    $holidays = $holidays ?? non_working_days();
+    $d = new DateTime(next_working_day($from, $holidays));
+    $added = 0;
+    // Cap for the same reason next_working_day() has one: a calendar filled with
+    // non-working days must not spin forever.
+    for ($i = 0; $added < $n && $i < 4000; $i++) {
+        $d->modify('+1 day');
+        if (is_working_day($d->format('Y-m-d'), $holidays)) $added++;
+    }
+    return $d->format('Y-m-d');
+}
+
+/**
  * Working days strictly AFTER $after, up to and including $to. Zero if $to is on
  * or before $after.
  *

@@ -16,9 +16,13 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
     $existing = [];
     foreach (pipeline_steps($pdo, $projectId) as $s) $existing[(int)$s['id']] = $s;
 
+    // department arrives in migration 015; the column is written only when it
+    // exists, so this screen keeps saving on an install that hasn't caught up.
+    $hasDept = column_exists($pdo, 'pipeline_steps', 'department');
     $upd = $pdo->prepare(
         'UPDATE pipeline_steps
-            SET name = ?, applies_to = ?, applies_to_asset_type = ?, tracks_seconds = ?, color = ?
+            SET name = ?, applies_to = ?, applies_to_asset_type = ?, tracks_seconds = ?, color = ?'
+        . ($hasDept ? ', department = ?' : '') . '
           WHERE id = ? AND project_id = ?'
     );
     $changed = 0;
@@ -36,14 +40,19 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
         [$appliesTo, $assetType] = parse_applies_to($rawApplies);
         $tracks = !empty($_POST['tracks_seconds'][$id]) ? 1 : 0;
         $color  = trim($_POST['color'][$id] ?? '') ?: null;
+        $dept   = $hasDept ? trim($_POST['department'][$id] ?? '') : '';
 
         if ($before['name'] === $name && $before['applies_to'] === $appliesTo
             && ($before['applies_to_asset_type'] ?? null) === $assetType
-            && (int)$before['tracks_seconds'] === $tracks && ($before['color'] ?? '') === ($color ?? '')) {
+            && (int)$before['tracks_seconds'] === $tracks && ($before['color'] ?? '') === ($color ?? '')
+            && (!$hasDept || ($before['department'] ?? '') === $dept)) {
             continue;
         }
         try {
-            $upd->execute([$name, $appliesTo, $assetType, $tracks, $color, $id, $projectId]);
+            $args = [$name, $appliesTo, $assetType, $tracks, $color];
+            if ($hasDept) $args[] = $dept;
+            array_push($args, $id, $projectId);
+            $upd->execute($args);
             $changed++;
         } catch (PDOException $e) {
             // Names only have to be unique within what they apply to, so this
@@ -200,6 +209,9 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     $projectId = (int)$project['id'];
     $steps = pipeline_steps($pdo, $projectId);
     $assetTypes = asset_types($pdo);
+    // Departments arrive in migration 015; hide the column rather than break the
+    // screen on an install that hasn't caught up.
+    $hasDept = column_exists($pdo, 'pipeline_steps', 'department');
 
     if (!$steps) {
         $tpl = $pdo->prepare(
@@ -281,10 +293,25 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       </div>
       <?php endif; ?>
 
+      <?php if ($hasDept): ?>
+        <?php /* Suggestions, not a constraint — built from the phases already in
+                 use on any project plus the four a production office starts
+                 with, the same pattern as the asset-type list. */ ?>
+        <datalist id="dept-options">
+          <?php foreach (department_options($pdo) as $d): ?>
+            <option value="<?= e($d) ?>"></option>
+          <?php endforeach; ?>
+        </datalist>
+      <?php endif; ?>
+
       <table class="step-table">
         <thead>
         <tr>
-          <th></th><th>Step</th><th>Applies to</th>
+          <th></th><th>Step</th>
+          <?php if ($hasDept): ?>
+            <th title="Which phase of production this step belongs to. Groups the timeline and is the subtotal boundary on a budget.">Department</th>
+          <?php endif; ?>
+          <th>Applies to</th>
           <th title="Progress measured in seconds of footage rather than a count of items">Measured in</th>
           <th>Colour</th><th></th>
         </tr>
@@ -302,6 +329,16 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
               e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null))
             ?></span>
           </td>
+          <?php if ($hasDept): ?>
+          <td>
+            <?php /* A datalist, not a <select>: the phases below are the common
+                     ones, but a studio that runs "Editorial" or "Finishing" must
+                     be able to type it without a schema change — the same
+                     free-text-with-suggestions shape as asset types. */ ?>
+            <input name="department[<?= $id ?>]" list="dept-options" size="14"
+                   value="<?= e($s['department'] ?? '') ?>" placeholder="—">
+          </td>
+          <?php endif; ?>
           <td>
             <select name="applies_to[<?= $id ?>]"><?=
               applies_to_options(applies_to_value($s['applies_to'], $s['applies_to_asset_type'] ?? null), $assetTypes)

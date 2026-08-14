@@ -16,6 +16,7 @@ require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/statuses.php';
 require __DIR__ . '/includes/names.php';
 require_once __DIR__ . '/includes/dashboard.php';
+require_once __DIR__ . '/includes/timelog.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -201,6 +202,78 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
   <?php if (!$pace['confident']): ?>
     <p class="muted small">Two readings is arithmetic, not a trend — this firms up over a few days.</p>
   <?php endif; ?>
+<?php endif; ?>
+
+<?php // --- logged time, if any has arrived ------------------------------- ?>
+<?php if (has_logged_time($pdo, $projectId)):
+  $byStep   = timelog_by_step($pdo, $projectId, array_column($steps, 'step'));
+  $byPerson = timelog_by_person($pdo, $projectId);
+  $hpd      = hours_per_day($pdo, $projectId);
+  $totalMin = 0; foreach ($byStep as $t) $totalMin += $t['minutes'];
+?>
+<h3>Time logged</h3>
+<p class="muted small">
+  Imported from Plaky against each task. Estimates are in days, logged time in hours, so the
+  comparison assumes a <strong><?= e(fmt_num($hpd)) ?>-hour day</strong> — every "estimated"
+  figure below is derived from that.
+  <strong>Reported</strong> is how much of a step has any time against it at all: a step with
+  three of forty tasks filled in will look far under budget when it is simply barely reported.
+</p>
+
+<table class="review-table">
+  <tr><th>Step</th><th>Logged</th><th>Estimated</th><th>Difference</th><th>Reported</th></tr>
+  <?php foreach ($byStep as $t): if ($t['minutes'] <= 0 && $t['est_hours'] <= 0) continue; ?>
+  <tr>
+    <td class="wf-name">
+      <span class="dot" style="background:<?= e($t['step']['color'] ?: '#ccc') ?>"></span>
+      <?= e($t['step']['name']) ?>
+    </td>
+    <td><strong><?= e(fmt_hours($t['minutes'])) ?></strong></td>
+    <td class="muted"><?= $t['est_hours'] > 0 ? e(fmt_rate($t['est_hours'])) . ' h' : '—' ?>
+      <?php if ($t['est_days'] > 0): ?>
+        <div class="small"><?= e(fmt_rate($t['est_days'])) ?> person-days</div>
+      <?php endif; ?></td>
+    <td class="<?= ($t['variance'] !== null && $t['variance'] > 0.15) ? 'warn-text' : 'muted' ?>">
+      <?php if ($t['variance'] === null): ?>—
+      <?php else: ?>
+        <?= $t['variance'] > 0 ? '+' : '' ?><?= (int)round($t['variance'] * 100) ?>%
+      <?php endif; ?>
+    </td>
+    <td class="muted small">
+      <?php if ($t['tracked'] > 0): ?>
+        <?= (int)$t['with_time'] ?>/<?= (int)$t['tracked'] ?>
+        <?php if ($t['coverage'] < 0.5 && $t['minutes'] > 0): ?>
+          <span class="warn-text">thin</span>
+        <?php endif; ?>
+      <?php else: ?>—<?php endif; ?>
+    </td>
+  </tr>
+  <?php endforeach; ?>
+  <tr><td><strong>Total</strong></td><td><strong><?= e(fmt_hours($totalMin)) ?></strong></td>
+    <td colspan="3" class="muted small">across every step with time against it</td></tr>
+</table>
+
+<?php if ($byPerson): ?>
+  <h4>By person</h4>
+  <table class="review-table">
+    <tr><th>Who</th><th>Hours</th><th>Tasks</th><th>Approved</th></tr>
+    <?php foreach ($byPerson as $p): ?>
+    <tr>
+      <td><strong><?= e($p['name']) ?></strong>
+        <?php if ((int)$p['is_placeholder'] === 1): ?><span class="est-tag">slot</span><?php endif; ?></td>
+      <td><strong><?= e(fmt_hours((int)$p['minutes'])) ?></strong></td>
+      <td><?= (int)$p['tasks'] ?></td>
+      <td class="muted"><?= (int)$p['approved'] ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted small">
+    A task with two people on it counts its hours for <strong>both</strong> — right for "who
+    worked on this", wrong for "how much did each deliver". Which of the two per-artist
+    reporting should mean is still an open question in the decision log, so it is stated here
+    rather than quietly picked.
+  </p>
+<?php endif; ?>
 <?php endif; ?>
 
 <h3>Who is carrying what</h3>

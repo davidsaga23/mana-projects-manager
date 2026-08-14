@@ -71,6 +71,29 @@ function asset_types(PDO $pdo): array {
 }
 
 /**
+ * Production phases to suggest: the four a production office starts with, plus
+ * every phase already in use on any project.
+ *
+ * Global on purpose, like step_library — a studio's phases are the studio's, and
+ * seeing what other shows called things is how the vocabulary converges instead
+ * of drifting. Suggestions only; the field is free text underneath.
+ */
+function department_options(PDO $pdo): array {
+    $defaults = ['Above the line', 'Pre-production', 'Production', 'Post-production'];
+    try {
+        $used = $pdo->query(
+            "SELECT DISTINCT department FROM pipeline_steps WHERE department <> ''"
+        )->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        $used = [];                       // migration 015 pending
+    }
+    $all = array_values(array_unique(array_merge($defaults, $used)));
+    // Not sorted alphabetically: these are a sequence, and "Above the line,
+    // Post-production, Pre-production, Production" is nobody's pipeline.
+    return $all;
+}
+
+/**
  * Asset types that are almost certainly the same type spelled two ways.
  *
  * Free-text types were a deliberate choice — a fixed list in code is what forced
