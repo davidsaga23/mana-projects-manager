@@ -375,6 +375,8 @@
   var nameEl = document.getElementById('new-step-name');
   var appliesEl = document.getElementById('new-step-applies-to');
   var secondsEl = document.getElementById('new-step-seconds');
+  // Optional: only present once migration 015 has added the column.
+  var deptEl = document.getElementById('new-step-department');
   if (!dataEl || !nameEl || !appliesEl || !secondsEl) return;
 
   var library;
@@ -389,5 +391,10 @@
     if (!match) return;
     appliesEl.value = match.applies_to;
     secondsEl.checked = match.tracks_seconds === 1;
+    // Only fills a BLANK department: something already typed is a deliberate
+    // choice and must not be overwritten by what the library happens to know.
+    if (deptEl && match.department && !deptEl.value.trim()) {
+      deptEl.value = match.department;
+    }
   });
 })();

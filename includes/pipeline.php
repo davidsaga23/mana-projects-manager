@@ -397,24 +397,35 @@ function apply_pipeline_template(PDO $pdo, int $projectId, int $templateId): int
 
     $pdo->beginTransaction();
     try {
+        // The template's own department, falling back to whatever the library
+        // remembers for that step name — so a template written before departments
+        // existed still lands them on a new project.
+        $hasDept = column_exists($pdo, 'pipeline_steps', 'department');
+        $known   = $hasDept ? step_departments_known($pdo) : [];
+
         $ins = $pdo->prepare(
             'INSERT INTO pipeline_steps
                 (project_id, name, step_order, tracks_seconds, applies_to, applies_to_asset_type,
-                 days_per_unit, coverage_pct, color)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                 days_per_unit, coverage_pct, color'
+            . ($hasDept ? ', department' : '') . ')
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?' . ($hasDept ? ', ?' : '') . ')'
         );
         $idMap = [];       // template step id => new step id
         $order = 0;
         foreach ($tplSteps as $t) {
-            $ins->execute([
+            $dept = trim((string)($t['department'] ?? '')) ?: ($known[$t['name']] ?? '');
+            $args = [
                 $projectId, $t['name'], ++$order, $t['tracks_seconds'],
                 $t['applies_to'], $t['applies_to_asset_type'] ?? null,
                 $t['days_per_unit'] ?? 1.0, $t['coverage_pct'] ?? 100, $t['color'],
-            ]);
+            ];
+            if ($hasDept) $args[] = $dept;
+            $ins->execute($args);
             $idMap[(int)$t['id']] = (int)$pdo->lastInsertId();
             // Remember template names too, so a step that arrived via a template
             // is suggested on the next project just like a hand-typed one.
-            step_library_remember($pdo, $t['name'], $t['applies_to'], (int)$t['tracks_seconds'], $t['color']);
+            step_library_remember($pdo, $t['name'], $t['applies_to'], (int)$t['tracks_seconds'],
+                                  $t['color'], $dept);
         }
 
         $ids = implode(',', array_map('intval', array_keys($idMap)));
@@ -445,17 +456,45 @@ function apply_pipeline_template(PDO $pdo, int $projectId, int $templateId): int
  * settings it had last time. Purely a suggestion list — it never constrains what
  * a project's pipeline can contain.
  */
-function step_library_remember(PDO $pdo, string $name, string $appliesTo, int $tracksSeconds, ?string $color = null): void {
+function step_library_remember(PDO $pdo, string $name, string $appliesTo, int $tracksSeconds,
+                               ?string $color = null, string $department = ''): void {
+    if (!column_exists($pdo, 'step_library', 'department')) {
+        // Migration 016 pending — remember everything else rather than nothing.
+        $stmt = $pdo->prepare(
+            'INSERT INTO step_library (name, applies_to, tracks_seconds, color, times_used, last_used)
+             VALUES (?, ?, ?, ?, 1, NOW())
+             ON DUPLICATE KEY UPDATE
+                times_used = times_used + 1, last_used = NOW(),
+                applies_to = ?, tracks_seconds = ?'
+        );
+        $stmt->execute([$name, $appliesTo, $tracksSeconds, $color, $appliesTo, $tracksSeconds]);
+        return;
+    }
+
+    // department uses COALESCE(NULLIF(...)) rather than plain assignment: a step
+    // saved with the field left blank must not ERASE the department the library
+    // already knows. Forgetting on a blank is how a remembered answer quietly
+    // stops being remembered.
     $stmt = $pdo->prepare(
-        'INSERT INTO step_library (name, applies_to, tracks_seconds, color, times_used, last_used)
-         VALUES (?, ?, ?, ?, 1, NOW())
+        'INSERT INTO step_library (name, department, applies_to, tracks_seconds, color, times_used, last_used)
+         VALUES (?, ?, ?, ?, ?, 1, NOW())
          ON DUPLICATE KEY UPDATE
             times_used = times_used + 1,
             last_used = NOW(),
             applies_to = ?,
-            tracks_seconds = ?'
+            tracks_seconds = ?,
+            department = COALESCE(NULLIF(VALUES(department), \'\'), department)'
     );
-    $stmt->execute([$name, $appliesTo, $tracksSeconds, $color, $appliesTo, $tracksSeconds]);
+    $stmt->execute([$name, $department, $appliesTo, $tracksSeconds, $color,
+                    $appliesTo, $tracksSeconds]);
+}
+
+/** name => department, for prefilling. Empty when migration 016 is pending. */
+function step_departments_known(PDO $pdo): array {
+    if (!column_exists($pdo, 'step_library', 'department')) return [];
+    return $pdo->query(
+        "SELECT name, department FROM step_library WHERE department <> ''"
+    )->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
 /** Remembered step names, most-used first. */
@@ -478,7 +517,8 @@ function step_library(PDO $pdo): array {
  *
  * Returns how many steps were saved.
  */
-function create_template_from_project(PDO $pdo, int $projectId, string $name, string $projectType): int {
+function create_template_from_project(PDO $pdo, int $projectId, string $name, string $projectType,
+                                      bool $overwrite = false): int {
     $name = trim($name);
     if ($name === '') throw new RuntimeException('Give the template a name.');
     if (!in_array($projectType, ['2D', '3D', 'Mixed', 'Other'], true)) $projectType = 'Other';
@@ -488,32 +528,53 @@ function create_template_from_project(PDO $pdo, int $projectId, string $name, st
 
     $dup = $pdo->prepare('SELECT id FROM pipeline_templates WHERE name = ?');
     $dup->execute([$name]);
-    if ($dup->fetch()) {
+    $existingId = $dup->fetchColumn();
+
+    if ($existingId !== false && !$overwrite) {
         throw new RuntimeException('A template called "' . $name . '" already exists. ' .
-                                   'Pick another name — templates are never overwritten silently.');
+                                   'Tick "replace it" to overwrite, or pick another name — ' .
+                                   'a template is never replaced by accident.');
     }
 
     $depsMap = step_dependencies_map($pdo, $projectId);
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare('INSERT INTO pipeline_templates (name, project_type) VALUES (?, ?)')
-            ->execute([$name, $projectType]);
-        $templateId = (int)$pdo->lastInsertId();
+        if ($existingId !== false) {
+            // Replace the CONTENTS, keeping the template row and therefore its id.
+            // Deleting and recreating would hand out a new id, and anything that
+            // ever references a template by id — a "made from" record, a report —
+            // would silently point at nothing.
+            $pdo->prepare('DELETE FROM pipeline_template_steps WHERE template_id = ?')
+                ->execute([(int)$existingId]);
+            $pdo->prepare('UPDATE pipeline_templates SET project_type = ? WHERE id = ?')
+                ->execute([$projectType, (int)$existingId]);
+            $templateId = (int)$existingId;
+        } else {
+            $pdo->prepare('INSERT INTO pipeline_templates (name, project_type) VALUES (?, ?)')
+                ->execute([$name, $projectType]);
+            $templateId = (int)$pdo->lastInsertId();
+        }
 
+        // Departments travel into the template too — a template that dropped
+        // them would hand the blanks straight back on the next project.
+        $hasDept = column_exists($pdo, 'pipeline_template_steps', 'department');
         $ins = $pdo->prepare(
             'INSERT INTO pipeline_template_steps
                 (template_id, name, step_order, tracks_seconds, applies_to, applies_to_asset_type,
-                 days_per_unit, coverage_pct, color)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                 days_per_unit, coverage_pct, color'
+            . ($hasDept ? ', department' : '') . ')
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?' . ($hasDept ? ', ?' : '') . ')'
         );
         $idMap = [];   // project step id => template step id
         foreach ($steps as $s) {
-            $ins->execute([
+            $args = [
                 $templateId, $s['name'], (int)$s['step_order'], (int)$s['tracks_seconds'],
                 $s['applies_to'], $s['applies_to_asset_type'] ?? null,
                 $s['days_per_unit'] ?? 1.0, $s['coverage_pct'] ?? 100, $s['color'],
-            ]);
+            ];
+            if ($hasDept) $args[] = (string)($s['department'] ?? '');
+            $ins->execute($args);
             $idMap[(int)$s['id']] = (int)$pdo->lastInsertId();
         }
 
