@@ -416,8 +416,19 @@ function scheduler_schedule_step(
     // already knows how to fall back to project_settings.estimated_*, and says
     // so; a band built from it is the honest shape of that knowledge. It can
     // never be mistaken for a breakdown because it has no item names in it.
+    //
+    // The `!$items['shots'] && !$items['assets']` guard is load-bearing and was
+    // missing. Without it, a step that merely matched NOTHING — scoped to an
+    // asset type nothing is typed as, or to shots on a project that has none —
+    // quietly fell back to the project-wide estimate and drew one plausible
+    // band. On a project with a real breakdown that is a fabrication: it looks
+    // like a scheduled step, it is the right shape and roughly the right length,
+    // and it silently replaces the dozens of per-item bars that should be there.
+    // The estimate is only ever a stand-in for a breakdown that does not exist
+    // YET — never for one that exists and didn't match.
     $fromEstimate = false;
-    if (!$todo && $s['items_total'] === 0 && $s['mode'] !== 'project') {
+    if (!$todo && $s['items_total'] === 0 && $s['mode'] !== 'project'
+        && !$items['shots'] && !$items['assets']) {
         $work = step_work_units($pdo, $projectId, $step, $estimates);
         if (!empty($work['estimated']) && $work['units'] > 0) {
             $fromEstimate = true;
