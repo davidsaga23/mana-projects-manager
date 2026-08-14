@@ -40,19 +40,11 @@ $tables   = dashboard_breakdown($pdo, $projectId, $visible, $episodic);
 $workload = dashboard_workload($pdo, $projectId, $today);
 $pace     = dashboard_pace($pdo, $projectId, $delivery, $today);
 
-// The step the show is judged by: the one measured in footage. Falls back to
-// whatever is furthest from finished, so this block is never empty on a project
-// that doesn't track seconds at all.
-$primary = null; $others = [];
-foreach ($visible as $s) {
-    if ($s['tracks_seconds'] && $primary === null) $primary = $s;
-    else $others[] = $s;
-}
-if ($primary === null && $visible) {
-    usort($visible, function ($a, $b) { return ($b['remaining'] <=> $a['remaining']); });
-    $primary = $visible[0];
-    $others = array_slice($visible, 1);
-}
+// No step gets promoted out of the grid. STFC singled out its seconds-tracked
+// step because one step carried that whole show; here the headline is the
+// PROJECT, and every step — animatic included — is a card of the same size.
+$others = $visible;
+$overall = dashboard_overall($steps, $delivery, $pace, $today);
 
 $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 $assetCount = (int)$pdo->query("SELECT COUNT(*) FROM assets WHERE project_id = $projectId")->fetchColumn();
@@ -119,62 +111,71 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
   </ul>
 <?php endif; ?>
 
-<?php // --- the step the show is judged by ---------------------------------- ?>
-<?php if ($primary): $p = $primary; ?>
+<?php // --- the whole project, in one block --------------------------------- ?>
 <section class="dash-primary">
   <div class="dash-primary-head">
     <div>
-      <h3><a href="step.php?project=<?= $projectId ?>&step=<?= (int)$p['step']['id'] ?>"><?= e($p['step']['name']) ?></a>
-        <span class="unit-badge"><?= $p['tracks_seconds'] ? 'Seconds' : 'Items' ?> · Primary</span>
-      </h3>
+      <h3>Overall progress</h3>
       <p class="muted small">
-        Deadline <strong><?= e($p['deadline'] ?: 'not set') ?></strong>
-        <?php if ($p['days_left'] !== null): ?>
-          · <span class="<?= $p['days_left'] <= 5 ? 'warn-text' : '' ?>"><?= (int)$p['days_left'] ?> working days left</span>
-        <?php elseif ($p['overdue']): ?>
-          · <span class="warn-text">overdue</span>
+        Every shot and asset, through every step —
+        <strong><?= (int)$overall['applicable'] ?></strong> tasks in total.
+        <?php if ($overall['days_left'] !== null): ?>
+          <span class="<?= $overall['days_left'] <= 5 ? 'warn-text' : '' ?>">
+            <?= (int)$overall['days_left'] ?> working days to delivery</span>
+        <?php elseif ($overall['overdue']): ?>
+          <span class="warn-text">the delivery date has passed</span>
+        <?php else: ?>
+          <span class="muted">no delivery date set</span>
         <?php endif; ?>
       </p>
     </div>
     <div class="dash-big">
-      <div class="big-pct"><?= $p['pct'] === null ? '—' : $p['pct'] . '%' ?></div>
-      <div class="muted small">of <?= $p['tracks_seconds'] ? 'runtime' : 'items' ?> approved</div>
+      <div class="big-pct"><?= $overall['pct'] === null ? '—' : $overall['pct'] . '%' ?></div>
+      <div class="muted small">of all work approved</div>
     </div>
   </div>
 
-  <?php $pendingOnly = max(0, $p['delivered_v'] - $p['approved_v']); ?>
   <div class="stacked-progress">
-    <span class="band-approved" style="width:<?= (float)($p['pct'] ?? 0) ?>%"></span>
-    <span class="band-delivered" style="left:<?= (float)($p['pct'] ?? 0) ?>%;width:<?= max(0, (float)($p['pct_delivered'] ?? 0) - (float)($p['pct'] ?? 0)) ?>%"></span>
+    <span class="band-approved" style="width:<?= (float)($overall['pct'] ?? 0) ?>%"></span>
+    <span class="band-delivered" style="left:<?= (float)($overall['pct'] ?? 0) ?>%;width:<?= max(0, (float)($overall['pct_delivered'] ?? 0) - (float)($overall['pct'] ?? 0)) ?>%"></span>
   </div>
   <div class="dash-legend">
-    <span><i class="sw sw-approved"></i>Approved <?= e(fmt_unit($p['approved_v'], $p['unit'])) ?></span>
-    <span><i class="sw sw-delivered"></i>Delivered pending <?= e(fmt_unit($pendingOnly, $p['unit'])) ?></span>
-    <span class="muted">Remaining <?= e(fmt_unit($p['remaining'], $p['unit'])) ?></span>
+    <span><i class="sw sw-approved"></i>Approved <?= (int)$overall['approved'] ?></span>
+    <span><i class="sw sw-delivered"></i>Delivered pending <?= (int)max(0, $overall['delivered'] - $overall['approved']) ?></span>
+    <span class="muted">Remaining <?= (int)$overall['remaining'] ?></span>
+    <?php if ($overall['blocked']): ?>
+      <span class="warn-text"><?= (int)$overall['blocked'] ?> blocked</span>
+    <?php endif; ?>
   </div>
 
   <div class="kpi-grid">
     <div><div class="kpi-label">Approved since last reading</div>
-      <div class="kpi-value ok"><?= $p['delta']['approved'] === null ? '—'
-            : '+' . e(fmt_unit((float)$p['delta']['approved'], $p['unit'])) ?></div></div>
+      <div class="kpi-value ok"><?= $overall['delta_approved'] === null ? '—'
+            : '+' . (int)$overall['delta_approved'] ?></div>
+      <div class="muted small"><?= $overall['last_reading'] ? 'as of ' . e($overall['last_reading']) : 'no readings yet' ?></div></div>
     <div><div class="kpi-label">Delivered since last reading</div>
-      <div class="kpi-value info"><?= $p['delta']['delivered'] === null ? '—'
-            : '+' . e(fmt_unit((float)$p['delta']['delivered'], $p['unit'])) ?></div></div>
+      <div class="kpi-value info"><?= $overall['delta_delivered'] === null ? '—'
+            : '+' . (int)$overall['delta_delivered'] ?></div></div>
     <div><div class="kpi-label">Required pace</div>
-      <div class="kpi-value warn"><?= e(pace_text($p['required_pace'], $p['unit'])) ?>
-        <span class="unit"><?= $p['tracks_seconds'] ? 'sec/day' : '/day' ?></span></div></div>
+      <div class="kpi-value warn"><?= e(pace_text($overall['required_pace'], 'items')) ?>
+        <span class="unit">tasks/day</span></div>
+      <div class="muted small">across the whole team</div></div>
     <div><div class="kpi-label">Actual, last 7 days</div>
-      <div class="kpi-value status-<?= e($p['status']) ?>">
-        <?= $p['actual_pace'] === null ? '—' : e(fmt_unit((float)$p['actual_pace'], $p['unit'])) ?>
-        <span class="unit"><?= $p['tracks_seconds'] ? 'sec/day' : '/day' ?></span>
-        <?php if ($p['status'] === 'ontrack'): ?><span class="trend up">▲ on track</span>
-        <?php elseif ($p['status'] === 'behind'): ?><span class="trend down">▼ behind</span>
-        <?php elseif ($p['status'] === 'critical'): ?><span class="trend down">▼ critical</span>
+      <div class="kpi-value status-<?= e($overall['status']) ?>">
+        <?= $overall['actual_pace'] === null ? '—' : e(fmt_rate((float)$overall['actual_pace'])) ?>
+        <span class="unit">tasks/day</span>
+        <?php if ($overall['status'] === 'ontrack'): ?><span class="trend up">▲ on track</span>
+        <?php elseif ($overall['status'] === 'behind'): ?><span class="trend down">▼ behind</span>
+        <?php elseif ($overall['status'] === 'critical'): ?><span class="trend down">▼ critical</span>
         <?php else: ?><span class="muted small">no history yet</span><?php endif; ?>
       </div></div>
   </div>
+  <p class="muted small">
+    Counted in <strong>tasks</strong> — one item through one step — because that is the only
+    unit every step shares. A step measured in seconds and one measured in shots cannot be
+    added together, so each card below keeps its own unit.
+  </p>
 </section>
-<?php endif; ?>
 
 <?php // --- a card per step, each carrying its quota ------------------------ ?>
 <h3>Every step, and what it needs per day</h3>
@@ -193,6 +194,10 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
         <?= e(fmt_unit($s['remaining'], $s['unit'])) ?> to go<?php if ($s['blocked']): ?>
           · <span class="warn-text"><?= (int)$s['blocked'] ?> blocked</span><?php endif; ?>
       </div>
+      <?php if (!empty($s['seconds_missing'])): ?>
+        <div class="muted small">Set to track seconds, but no shot has a duration — counted as
+          items until they do.</div>
+      <?php endif; ?>
       <div class="mini-pace">
         <?php if ($s['overdue']): ?>
           <span class="warn-text">Overdue since <?= e($s['deadline']) ?></span>

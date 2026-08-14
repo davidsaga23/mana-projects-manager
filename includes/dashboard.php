@@ -92,6 +92,12 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
         $sp = $sched->fetch();
         $deadline = $s['deadline'] ?: $deliveryDate;
         $tracksSeconds = (int)$s['tracks_seconds'] === 1;
+        // A step set to track seconds is only MEASURABLE in seconds once shots
+        // carry durations. Without them every figure comes out 0:00.00 / 0:00.00
+        // — a row of zeros that looks like no progress rather than like a
+        // missing input. Fall back to counting items, and say so on the card.
+        $secondsMissing = $tracksSeconds && $totalSeconds <= 0;
+        if ($secondsMissing) $tracksSeconds = false;
 
         // A step measured in footage is measured in footage everywhere: its
         // total, its progress and its quota are all seconds, not item counts.
@@ -125,6 +131,7 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
             'step'       => $s,
             'unit'       => $unit,
             'tracks_seconds' => $tracksSeconds,
+            'seconds_missing' => $secondsMissing,
             'applicable' => $applicable,
             'tracked'    => (int)$s['tracked'],
             'delivered'  => (int)$s['delivered'],
@@ -405,6 +412,43 @@ function cell_health(float $approved, float $total, ?string $start, ?string $dea
 }
 
 /**
+ * The whole project as one figure.
+ *
+ * Counted in TASKS — one item passing through one step — because that is the
+ * only unit every step shares. Seconds and item counts cannot be added
+ * together, so a project total measured in either would be nonsense the moment
+ * a show mixes them, which every show does.
+ */
+function dashboard_overall(array $steps, ?string $delivery, ?array $pace, ?string $today = null): array {
+    $today = $today ?: date('Y-m-d');
+    $applicable = 0; $approved = 0; $delivered = 0; $blocked = 0;
+    foreach ($steps as $s) {
+        $applicable += $s['applicable'];
+        // Capped: a step can carry progress rows for items that have since been
+        // removed, and an uncapped sum could show 103% complete.
+        $approved   += min($s['approved'],  $s['applicable']);
+        $delivered  += min($s['delivered'], $s['applicable']);
+        $blocked    += $s['blocked'];
+    }
+    $remaining = max(0, $applicable - $approved);
+    $req = step_required_pace((float)$remaining, $delivery, $today);
+    $actual = $pace['actual_per_day'] ?? null;
+
+    return [
+        'applicable' => $applicable, 'approved' => $approved,
+        'delivered' => $delivered, 'blocked' => $blocked, 'remaining' => $remaining,
+        'pct'           => $applicable > 0 ? min(100, round($approved / $applicable * 100)) : null,
+        'pct_delivered' => $applicable > 0 ? min(100, round($delivered / $applicable * 100)) : null,
+        'required_pace' => $req['pace'], 'days_left' => $req['days'], 'overdue' => $req['overdue'],
+        'actual_pace'   => $actual,
+        'status'        => pace_status($actual, $req['pace']),
+        'delta_approved'  => $pace['delta_approved']  ?? null,
+        'delta_delivered' => $pace['delta_delivered'] ?? null,
+        'last_reading'  => $pace['to'] ?? null,
+    ];
+}
+
+/**
  * Are we keeping up?
  *
  * Compares what has actually been approved per working day against what the
@@ -422,7 +466,8 @@ function dashboard_pace(PDO $pdo, int $projectId, ?string $deliveryDate, ?string
     try {
         $stmt = $pdo->prepare(
             'SELECT snapshot_date,
-                    SUM(items_approved_cum) AS approved,
+                    SUM(items_approved_cum)  AS approved,
+                    SUM(items_delivered_cum) AS delivered,
                     SUM(items_total) AS total
                FROM daily_snapshots WHERE project_id = ?
               GROUP BY snapshot_date ORDER BY snapshot_date'
@@ -449,8 +494,13 @@ function dashboard_pace(PDO $pdo, int $projectId, ?string $deliveryDate, ?string
         $needed   = $remaining / $daysLeft;
     }
 
+    // Movement since the previous reading — the "what happened today" figures.
+    $prev = $days[count($days) - 2];
+
     return [
         'from' => $first['snapshot_date'], 'to' => $last['snapshot_date'],
+        'delta_approved'  => max(0, (int)$last['approved']  - (int)$prev['approved']),
+        'delta_delivered' => max(0, (int)$last['delivered'] - (int)$prev['delivered']),
         'span_days' => $span, 'done_in_span' => $doneSoFar,
         'actual_per_day' => $actual, 'needed_per_day' => $needed,
         'remaining' => $remaining, 'days_left' => $daysLeft,
