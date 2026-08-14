@@ -64,8 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ));
             foreach ($plan['problems'] as $p) flash('warn', $p);
         } elseif ($action === 'clear') {
+            // is_manual alone, matching commit_schedule() — and matching the
+            // count on the button, which is derived from is_manual. With
+            // source = 'auto' also required, a task that had been unlocked
+            // survived a "clear" that had just promised to remove N tasks.
             $del = $pdo->prepare(
-                "DELETE FROM schedule WHERE project_id = ? AND is_manual = 0 AND source = 'auto'"
+                'DELETE FROM schedule WHERE project_id = ? AND is_manual = 0'
             );
             $del->execute([$projectId]);
             flash('ok', 'Removed ' . $del->rowCount() . ' automatically scheduled task(s). ' .

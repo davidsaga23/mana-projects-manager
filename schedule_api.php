@@ -66,10 +66,14 @@ if (array_key_exists('crew_id', $_POST) && trim((string)$_POST['crew_id']) !== '
 $isManual = array_key_exists('is_manual', $_POST) ? ((int)$_POST['is_manual'] === 1 ? 1 : 0) : 1;
 
 try {
+    // source follows is_manual in BOTH directions. Letting it keep saying
+    // 'manual' after a task was unlocked left the row in a state that neither
+    // the scheduler's delete nor its hand-planned lookup matched — see the
+    // comment on the DELETE in commit_schedule().
     $pdo->prepare(
         "UPDATE schedule
             SET start_date = ?, end_date = ?, crew_id = ?, is_manual = ?,
-                source = CASE WHEN ? = 1 THEN 'manual' ELSE source END
+                source = CASE WHEN ? = 1 THEN 'manual' ELSE 'auto' END
           WHERE id = ?"
     )->execute([$start, $end, $crewId, $isManual, $isManual, (int)$task['id']]);
 } catch (Throwable $e) {

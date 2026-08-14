@@ -806,8 +806,20 @@ function scheduler_make_task(
 function commit_schedule(PDO $pdo, int $projectId, array $plan): array {
     $pdo->beginTransaction();
     try {
+        // Keyed on is_manual ALONE, not on source as well.
+        //
+        // Requiring source = 'auto' here left a gap: unticking "lock this task"
+        // sets is_manual = 0 but the row still carried source = 'manual', so the
+        // delete skipped it AND the pass — which looks for is_manual = 1 —
+        // didn't see it either. It then generated a fresh row for the same step
+        // and item, hit UNIQUE (step_id, item_key), and rolled the entire
+        // regenerate back. Unlocking one task stopped the scheduler dead.
+        //
+        // is_manual is the only thing that should decide this: a row nobody has
+        // claimed by hand is the auto pass's to replace. `source` stays as a
+        // record of what wrote a row, not as a condition for removing it.
         $del = $pdo->prepare(
-            "DELETE FROM schedule WHERE project_id = ? AND is_manual = 0 AND source = 'auto'"
+            'DELETE FROM schedule WHERE project_id = ? AND is_manual = 0'
         );
         $del->execute([$projectId]);
         $deleted = $del->rowCount();
