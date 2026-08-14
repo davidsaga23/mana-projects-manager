@@ -480,7 +480,73 @@ button.linkish:hover { background: none; color: #1d4e80; }
   .tl-chart, .tl-chart-tall { max-height: none; overflow: visible; }
 }
 
-/* Dashboard */
+/* Dashboard — hero, primary step, KPI tiles, step cards, breakdown grid */
+.dash-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+.dash-hero .wizard-title { margin-bottom: 4px; }
+
+.dash-primary {
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  padding: 18px 20px; margin: 16px 0;
+}
+.dash-primary-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+.dash-primary-head h3 { margin: 0 0 4px; font-size: 19px; }
+.dash-primary-head p { margin: 0; }
+.dash-big { text-align: right; }
+.big-pct { font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.unit-badge {
+  background: #eef1f4; color: #43535f; border-radius: 3px;
+  padding: 2px 7px; font-size: 11px; font-weight: 600; margin-left: 7px;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+
+.stacked-progress {
+  position: relative; height: 14px; background: #e8ecef;
+  border-radius: 7px; overflow: hidden; margin: 16px 0 8px;
+}
+.stacked-progress span { position: absolute; top: 0; bottom: 0; }
+.band-approved { left: 0; background: #2fa84f; }
+.band-delivered { background: #4A90D9; }
+.dash-legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: #43535f; }
+.sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+.sw-approved { background: #2fa84f; }
+.sw-delivered { background: #4A90D9; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }
+.kpi-grid-6 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 16px 0; }
+.kpi-grid > div { background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 13px; }
+.kpi-label { font-size: 11.5px; color: #5a6a7a; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 5px; }
+.kpi-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kpi-value .unit { font-size: 12px; font-weight: 400; color: #5a6a7a; }
+.kpi-value.ok, .status-ontrack { color: #1e7e34; }
+.kpi-value.info { color: #2f6fb2; }
+.kpi-value.warn, .status-behind { color: #8a6d1a; }
+.status-critical { color: #b02a37; }
+.status-unknown { color: #5a6a7a; }
+.trend { font-size: 11.5px; font-weight: 600; margin-left: 5px; }
+
+.step-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
+.step-card { background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 12px 14px; }
+.step-card.overdue { border-color: #e0b4ba; background: #fdf6f7; }
+.step-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.step-card-head h4 { margin: 0; font-size: 14px; }
+.mini-bar { height: 5px; background: #e8ecef; border-radius: 3px; overflow: hidden; margin: 9px 0 7px; }
+.mini-bar span { display: block; height: 100%; border-radius: 3px; }
+.mini-num { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mini-total { font-size: 13px; color: #5a6a7a; font-weight: 400; }
+.mini-pace { margin-top: 8px; font-size: 12.5px; color: #43535f; border-top: 1px solid #eef1f4; padding-top: 7px; }
+
+.table-scroll { overflow-x: auto; }
+.grid-table td.num, .grid-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.health-green   { background: #eef8f0; color: #1e7e34; }
+.health-amber   { background: #fdf6e3; color: #8a6d1a; }
+.health-red     { background: #fdeff0; color: #b02a37; }
+.health-neutral { color: #5a6a7a; }
+.hdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; }
+.hdot.green { background: #2fa84f; } .hdot.amber { background: #d9a520; } .hdot.red { background: #b02a37; }
+.legend-key { margin-top: 8px; }
+.row-done td { color: #8a97a3; }
+.row-done td strong { font-weight: 400; }
+
 .dash-strip, .dash-pace {
   display: flex; gap: 28px; flex-wrap: wrap;
   background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;

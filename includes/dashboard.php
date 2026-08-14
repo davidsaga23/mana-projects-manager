@@ -54,6 +54,24 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
         'SELECT MIN(start_date) s, MAX(end_date) e, COUNT(*) n FROM schedule WHERE step_id = ?'
     );
 
+    // Footage, for steps measured in seconds. Computed live rather than read
+    // from the snapshots so the figures are right on day one, before any
+    // history exists — the snapshots are for the TREND, not for the total.
+    $totalSeconds = (float)$pdo->query(
+        "SELECT COALESCE(SUM(placeholder_seconds), 0) FROM shots WHERE project_id = $projectId"
+    )->fetchColumn();
+    $secApproved = $pdo->prepare(
+        'SELECT COALESCE(SUM(sh.placeholder_seconds), 0) AS ap,
+                COALESCE(SUM(CASE WHEN pr.is_delivered = 1 THEN sh.placeholder_seconds ELSE 0 END), 0) AS de
+           FROM progress pr JOIN shots sh ON sh.id = pr.shot_id
+          WHERE pr.step_id = ? AND pr.is_approved = 1'
+    );
+    $secDelivered = $pdo->prepare(
+        'SELECT COALESCE(SUM(sh.placeholder_seconds), 0)
+           FROM progress pr JOIN shots sh ON sh.id = pr.shot_id
+          WHERE pr.step_id = ? AND pr.is_delivered = 1'
+    );
+
     $out = [];
     foreach ($steps as $s) {
         $type = $s['applies_to_asset_type'] ?? '';
@@ -73,16 +91,59 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
         $sched->execute([(int)$s['id']]);
         $sp = $sched->fetch();
         $deadline = $s['deadline'] ?: $deliveryDate;
+        $tracksSeconds = (int)$s['tracks_seconds'] === 1;
+
+        // A step measured in footage is measured in footage everywhere: its
+        // total, its progress and its quota are all seconds, not item counts.
+        if ($tracksSeconds) {
+            $secApproved->execute([(int)$s['id']]);
+            $secDelivered->execute([(int)$s['id']]);
+            $target    = $totalSeconds;
+            $approved  = (float)$secApproved->fetchColumn();
+            $delivered = (float)$secDelivered->fetchColumn();
+            $unit = 'sec';
+        } else {
+            $target    = (float)$applicable;
+            $approved  = (float)min((int)$s['approved'], $applicable);
+            $delivered = (float)min((int)$s['delivered'], $applicable);
+            $unit = 'items';
+        }
+        $remaining = max(0.0, $target - $approved);
+
+        $req    = step_required_pace($remaining, $deadline);
+        $actual = step_actual_pace($pdo, (int)$s['id'], $tracksSeconds);
+        $delta  = step_last_deltas($pdo, (int)$s['id'], $tracksSeconds);
+
+        // The quota split across the people actually on the step — the number a
+        // producer repeats in a stand-up. Headcount, not lanes: half a person is
+        // a real answer here.
+        $head = $s['planned_headcount'] !== null ? (float)$s['planned_headcount'] : null;
+        $perArtist = ($req['pace'] !== null && !is_infinite($req['pace']) && $head > 0)
+                   ? $req['pace'] / $head : null;
 
         $out[] = [
             'step'       => $s,
+            'unit'       => $unit,
+            'tracks_seconds' => $tracksSeconds,
             'applicable' => $applicable,
             'tracked'    => (int)$s['tracked'],
             'delivered'  => (int)$s['delivered'],
             'approved'   => (int)$s['approved'],
             'blocked'    => (int)$s['blocked'],
-            'pct'        => $applicable > 0 ? min(100, round((int)$s['approved'] / $applicable * 100)) : null,
-            'pct_delivered' => $applicable > 0 ? min(100, round((int)$s['delivered'] / $applicable * 100)) : null,
+            'target'     => $target,
+            'approved_v' => $approved,
+            'delivered_v'=> $delivered,
+            'remaining'  => $remaining,
+            'pct'        => $target > 0 ? min(100, round($approved / $target * 100)) : null,
+            'pct_delivered' => $target > 0 ? min(100, round($delivered / $target * 100)) : null,
+            'required_pace' => $req['pace'],
+            'days_left'  => $req['days'],
+            'overdue'    => $req['overdue'],
+            'actual_pace'=> $actual,
+            'per_artist' => $perArtist,
+            'headcount'  => $head,
+            'status'     => pace_status($actual, $req['pace']),
+            'delta'      => $delta,
             'sched_start'=> $sp['s'] ?: null,
             'sched_end'  => $sp['e'] ?: null,
             'sched_n'    => (int)$sp['n'],
@@ -92,6 +153,255 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
         ];
     }
     return $out;
+}
+
+/** Format a value in a step's own unit. */
+function fmt_unit(float $v, string $unit): string {
+    return $unit === 'sec' ? fmt_secs($v) : fmt_rate($v);
+}
+
+/**
+ * A required pace, or the plain truth when there isn't one.
+ *
+ * INF is printed as "overdue", never as a number: a pace of infinity is not a
+ * target somebody should see on a screen and try to plan against.
+ */
+function pace_text($v, string $unit): string {
+    if ($v === null) return '—';
+    if (is_infinite($v)) return 'overdue';
+    return fmt_unit((float)$v, $unit);
+}
+
+/**
+ * The breakdown grid: groups down the side, steps across the top.
+ *
+ * TWO grids, not one. STFC could put episodes down the side because everything
+ * it tracked was a shot. Here a step applies to shots or to assets, and a single
+ * grid would have to leave most of itself blank — so shots group by episode and
+ * assets group by type, each against only the steps that actually touch them.
+ *
+ * Returns a list of ['title', 'unit_label', 'steps', 'groups'].
+ */
+function dashboard_breakdown(PDO $pdo, int $projectId, array $steps, bool $episodic): array {
+    $tables = [];
+
+    // --- shots, by episode ---------------------------------------------------
+    $shotSteps = array_values(array_filter($steps, function ($s) {
+        return in_array($s['step']['applies_to'], ['shot', 'both'], true);
+    }));
+    if ($shotSteps) {
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(NULLIF(episode, ''), 'No episode') AS grp,
+                    COUNT(*) AS n, COALESCE(SUM(placeholder_seconds), 0) AS secs
+               FROM shots WHERE project_id = ? GROUP BY grp ORDER BY grp"
+        );
+        $stmt->execute([$projectId]);
+        $groups = [];
+        foreach ($stmt as $r) {
+            $groups[$r['grp']] = ['name' => $r['grp'], 'count' => (int)$r['n'],
+                                  'secs' => (float)$r['secs'], 'cells' => []];
+        }
+        if ($groups) {
+            $cell = $pdo->prepare(
+                "SELECT COALESCE(NULLIF(sh.episode, ''), 'No episode') AS grp,
+                        COALESCE(SUM(pr.is_approved), 0) AS ap,
+                        COALESCE(SUM(CASE WHEN pr.is_approved = 1 THEN sh.placeholder_seconds ELSE 0 END), 0) AS ap_secs
+                   FROM progress pr JOIN shots sh ON sh.id = pr.shot_id
+                  WHERE pr.step_id = ? GROUP BY grp"
+            );
+            foreach ($shotSteps as $st) {
+                $cell->execute([(int)$st['step']['id']]);
+                foreach ($cell as $r) {
+                    if (!isset($groups[$r['grp']])) continue;
+                    $groups[$r['grp']]['cells'][(int)$st['step']['id']] =
+                        $st['tracks_seconds'] ? (float)$r['ap_secs'] : (float)$r['ap'];
+                }
+            }
+            $tables[] = ['title' => $episodic ? 'Shots by episode' : 'Shots',
+                         'unit_label' => 'Shots', 'steps' => $shotSteps,
+                         'groups' => array_values($groups), 'kind' => 'shot'];
+        }
+    }
+
+    // --- assets, by type -----------------------------------------------------
+    $assetSteps = array_values(array_filter($steps, function ($s) {
+        return in_array($s['step']['applies_to'], ['asset', 'both'], true);
+    }));
+    if ($assetSteps) {
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(NULLIF(asset_type, ''), 'No type') AS grp, COUNT(*) AS n
+               FROM assets WHERE project_id = ? GROUP BY grp ORDER BY grp"
+        );
+        $stmt->execute([$projectId]);
+        $groups = [];
+        foreach ($stmt as $r) {
+            $groups[$r['grp']] = ['name' => $r['grp'], 'count' => (int)$r['n'],
+                                  'secs' => 0.0, 'cells' => []];
+        }
+        if ($groups) {
+            $cell = $pdo->prepare(
+                "SELECT COALESCE(NULLIF(a.asset_type, ''), 'No type') AS grp,
+                        COALESCE(SUM(pr.is_approved), 0) AS ap
+                   FROM progress pr JOIN assets a ON a.id = pr.asset_id
+                  WHERE pr.step_id = ? GROUP BY grp"
+            );
+            foreach ($assetSteps as $st) {
+                $cell->execute([(int)$st['step']['id']]);
+                foreach ($cell as $r) {
+                    if (!isset($groups[$r['grp']])) continue;
+                    $groups[$r['grp']]['cells'][(int)$st['step']['id']] = (float)$r['ap'];
+                }
+            }
+            $tables[] = ['title' => 'Assets by type', 'unit_label' => 'Assets',
+                         'steps' => $assetSteps, 'groups' => array_values($groups),
+                         'kind' => 'asset'];
+        }
+    }
+
+    return $tables;
+}
+
+/**
+ * How many of a group's items a step actually covers.
+ *
+ * A step scoped to "Character" covers none of the environments, so its cell in
+ * the environment row is not 0-of-6 — it is not applicable at all, and colouring
+ * it red would invent a problem.
+ */
+function breakdown_cell_total(array $st, array $group, string $kind): ?float {
+    $step = $st['step'];
+    if ($kind === 'asset') {
+        $type = $step['applies_to_asset_type'] ?? '';
+        if ($type !== '' && $type !== $group['name']) return null;
+        return (float)$group['count'];
+    }
+    if ($st['tracks_seconds']) return (float)$group['secs'];
+    return (float)$group['count'];
+}
+
+/**
+ * Seconds as a running time: 233.62 → "3:53.62".
+ *
+ * A step measured in footage is quoted in minutes and seconds by everyone who
+ * works on it; printing "233.62 sec" makes people do the arithmetic themselves.
+ */
+function fmt_secs(float $s): string {
+    if ($s < 0) $s = 0;
+    $m = (int)floor($s / 60);
+    $r = $s - $m * 60;
+    return $m . ':' . str_pad(number_format($r, 2, '.', ''), 5, '0', STR_PAD_LEFT);
+}
+
+/**
+ * What a step has actually been finishing per working day, from the snapshots.
+ *
+ * Reads the last seven days where possible and falls back to the whole recorded
+ * history when there isn't that much yet. Returns null rather than 0 when there
+ * is nothing to measure — zero means "nothing got done", which is a completely
+ * different statement from "we don't know yet", and showing one as the other is
+ * how a dashboard starts lying.
+ */
+function step_actual_pace(PDO $pdo, int $stepId, bool $tracksSeconds, int $windowDays = 7): ?float {
+    $col = $tracksSeconds ? 'seconds_approved_cum' : 'items_approved_cum';
+    try {
+        $s = $pdo->prepare("SELECT snapshot_date, $col AS v FROM daily_snapshots
+                             WHERE step_id = ? ORDER BY snapshot_date DESC LIMIT 1");
+        $s->execute([$stepId]);
+        $latest = $s->fetch();
+        if (!$latest) return null;
+
+        $s2 = $pdo->prepare("SELECT snapshot_date, $col AS v FROM daily_snapshots
+                              WHERE step_id = ? AND snapshot_date <= DATE_SUB(?, INTERVAL $windowDays DAY)
+                              ORDER BY snapshot_date DESC LIMIT 1");
+        $s2->execute([$stepId, $latest['snapshot_date']]);
+        $prior = $s2->fetch();
+
+        if (!$prior) {
+            $s3 = $pdo->prepare("SELECT snapshot_date, $col AS v FROM daily_snapshots
+                                  WHERE step_id = ? ORDER BY snapshot_date ASC LIMIT 1");
+            $s3->execute([$stepId]);
+            $prior = $s3->fetch();
+        }
+        if (!$prior || $prior['snapshot_date'] === $latest['snapshot_date']) return null;
+
+        $wd = max(1, working_days_between($prior['snapshot_date'], $latest['snapshot_date']) - 1);
+        return ((float)$latest['v'] - (float)$prior['v']) / $wd;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+/** The change since the previous snapshot, for the "today" tiles. */
+function step_last_deltas(PDO $pdo, int $stepId, bool $tracksSeconds): array {
+    $a = $tracksSeconds ? 'seconds_approved_cum'  : 'items_approved_cum';
+    $d = $tracksSeconds ? 'seconds_delivered_cum' : 'items_delivered_cum';
+    $out = ['approved' => null, 'delivered' => null, 'date' => null];
+    try {
+        $s = $pdo->prepare("SELECT snapshot_date, $a AS ap, $d AS de FROM daily_snapshots
+                             WHERE step_id = ? ORDER BY snapshot_date DESC LIMIT 2");
+        $s->execute([$stepId]);
+        $rows = $s->fetchAll();
+    } catch (PDOException $e) { return $out; }
+
+    if (!$rows) return $out;
+    $out['date'] = $rows[0]['snapshot_date'];
+    if (count($rows) < 2) return $out;
+    $out['approved']  = max(0, (float)$rows[0]['ap'] - (float)$rows[1]['ap']);
+    $out['delivered'] = max(0, (float)$rows[0]['de'] - (float)$rows[1]['de']);
+    return $out;
+}
+
+/**
+ * The quota, per step: what has to be finished each day from here to hit the
+ * deadline, and what that means for each person on it.
+ *
+ * This is the reverse-quota maths the wizard shows before a project starts,
+ * re-measured against what is actually left. INF when the deadline has passed
+ * with work outstanding — which the screen must print as "overdue", never as a
+ * very large number somebody might try to plan against.
+ */
+function step_required_pace(float $remaining, ?string $deadline, ?string $today = null): array {
+    $today = $today ?: date('Y-m-d');
+    if (!$deadline)          return ['pace' => null, 'days' => null, 'overdue' => false];
+    if ($deadline < $today)  return ['pace' => $remaining > 0 ? INF : 0.0, 'days' => 0,
+                                     'overdue' => $remaining > 0];
+    $wd = working_days_between($today, $deadline);
+    if ($wd <= 0)            return ['pace' => $remaining > 0 ? INF : 0.0, 'days' => 0,
+                                     'overdue' => $remaining > 0];
+    return ['pace' => $remaining / $wd, 'days' => $wd, 'overdue' => false];
+}
+
+/** ontrack / behind / critical, comparing what is happening to what is needed. */
+function pace_status(?float $actual, $required): string {
+    if ($actual === null || $required === null) return 'unknown';
+    if (is_infinite($required)) return 'critical';
+    if ($required <= 0) return 'ontrack';
+    if ($actual >= $required) return 'ontrack';
+    return $actual >= $required * 0.6 ? 'behind' : 'critical';
+}
+
+/**
+ * The colour of a cell in the breakdown grid.
+ *
+ * Compares how much is done against how much SHOULD be done by now, judged on
+ * elapsed time between the step's start and its deadline. A step that is 40%
+ * done is fine in week one and critical in the last week, and a flat percentage
+ * threshold cannot tell those apart.
+ */
+function cell_health(float $approved, float $total, ?string $start, ?string $deadline, ?string $today = null): string {
+    if ($total <= 0 || !$deadline) return 'neutral';
+    $today = $today ?: date('Y-m-d');
+    $start = $start ?: $today;
+    if ($start > $deadline) return 'neutral';
+
+    $totalWd   = max(1, working_days_between($start, $deadline));
+    $elapsedWd = min($totalWd, max(0, working_days_between($start, $today)));
+    $expected  = $elapsedWd / $totalWd;
+    if ($expected <= 0.01) return 'neutral';       // too early to judge
+
+    $ratio = ($approved / $total) / $expected;
+    if ($ratio >= 1.0) return 'green';
+    return $ratio >= 0.6 ? 'amber' : 'red';
 }
 
 /**
