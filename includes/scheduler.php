@@ -288,6 +288,37 @@ function scheduler_lane_crew(PDO $pdo, int $projectId): array {
     return $map;
 }
 
+/**
+ * An asset type that is one spelling away from what this step is scoped to.
+ *
+ * Returns ['type' => …, 'count' => int] or null. Used only to explain a step
+ * that matched nothing — the fix itself lives on the Assets screen, because
+ * merging types is a decision, not something a scheduler should do behind
+ * somebody's back.
+ */
+function scheduler_near_miss_type(PDO $pdo, int $projectId, array $step): ?array {
+    $want = trim((string)($step['applies_to_asset_type'] ?? ''));
+    if ($want === '' || !in_array($step['applies_to'], ['asset', 'both'], true)) return null;
+
+    $norm = function (string $s): string {
+        return preg_replace('/s$/', '', preg_replace('/\s+/', ' ', mb_strtolower(trim($s))));
+    };
+    $target = $norm($want);
+
+    $stmt = $pdo->prepare(
+        "SELECT asset_type, COUNT(*) AS n FROM assets
+          WHERE project_id = ? AND asset_type IS NOT NULL AND asset_type <> ''
+          GROUP BY asset_type"
+    );
+    $stmt->execute([$projectId]);
+    foreach ($stmt as $r) {
+        if ($r['asset_type'] !== $want && $norm($r['asset_type']) === $target) {
+            return ['type' => $r['asset_type'], 'count' => (int)$r['n']];
+        }
+    }
+    return null;
+}
+
 /** shot id => [asset ids], for dependencies that cross from assets to shots. */
 function scheduler_shot_assets(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
@@ -402,8 +433,23 @@ function scheduler_schedule_step(
         // has to say which of the reasons it was.
         if ($s['item_end']) $s['end_index'] = max($s['item_end']);
         if ($s['items_total'] === 0) {
-            $s['notes'][] = 'No ' . applies_to_phrase($step['applies_to'], $step['applies_to_asset_type'] ?? null)
-                          . ' exist yet and no estimate is set, so there is nothing to place.';
+            // A step scoped to "Environment" against assets typed "Environments"
+            // matches nothing and vanishes from the plan without explanation.
+            // That is the single most confusing way for tasks to go missing, so
+            // it gets named rather than left as "nothing to place".
+            $nearMiss = scheduler_near_miss_type($pdo, $projectId, $step);
+            if ($nearMiss !== null) {
+                $s['notes'][] = sprintf(
+                    'Scoped to "%s", but nothing is typed that way — %d asset%s typed "%s". ' .
+                    'Nothing is planned for this step until the two spellings are merged on ' .
+                    'the Assets screen.',
+                    $step['applies_to_asset_type'], $nearMiss['count'],
+                    $nearMiss['count'] === 1 ? ' is' : 's are', $nearMiss['type']
+                );
+            } else {
+                $s['notes'][] = 'No ' . applies_to_phrase($step['applies_to'], $step['applies_to_asset_type'] ?? null)
+                              . ' exist yet and no estimate is set, so there is nothing to place.';
+            }
         } elseif ($s['done'] === $s['items_total']) {
             $s['notes'][] = 'Everything here is already approved.';
         } elseif ($s['excluded'] === $s['items_total']) {

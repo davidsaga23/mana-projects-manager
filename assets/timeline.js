@@ -16,19 +16,91 @@
   'use strict';
   if (!window.DETAILED_TASKS) return;
 
-  var ZOOM_LEVELS = ['Day', 'Week', 'Month', 'Year'];
-  var zoomIdx = 1;                       // Week
+  // Zoom is a ladder of (view mode, column width) rather than view mode alone.
+  // Frappe only has four sensible modes and jumping Week → Month → Year moves
+  // the scale by roughly 4× a click, which overshoots what you were looking at.
+  // Varying the column width between mode changes turns that into eight gentle
+  // steps. Ordered widest span (most zoomed OUT) to narrowest.
+  var ZOOM = [
+    { mode: 'Year',        w: 120, label: 'Year' },
+    { mode: 'Month',       w: 120, label: 'Month' },
+    { mode: 'Week',        w: 60,  label: 'Week' },
+    { mode: 'Week',        w: 100, label: 'Week' },
+    { mode: 'Week',        w: 150, label: 'Week' },
+    { mode: 'Day',         w: 24,  label: 'Day' },
+    { mode: 'Day',         w: 38,  label: 'Day' },
+    { mode: 'Half Day',    w: 38,  label: 'Half day' }
+  ];
+  var zoomIdx = 3;                       // Week, comfortable default
+  var generalZoomIdx = 2;
   var detailedGantt = null;
+  var generalGantt = null;
 
   var $ = function (id) { return document.getElementById(id); };
+
+  /**
+   * Apply a zoom level's column width.
+   *
+   * Frappe recomputes column_width from the view mode inside change_view_mode(),
+   * so it cannot simply be passed in the constructor — it gets overwritten. It
+   * CAN be set afterwards and re-rendered, which is what this does. Guarded:
+   * if a future Frappe version drops render(), the chart still draws, just at
+   * the library's own width.
+   */
+  function applyWidth(g, w) {
+    if (!g || !g.options || typeof g.render !== 'function') return;
+    try {
+      g.options.column_width = w;
+      g.render();
+    } catch (e) { /* leave it at the default width */ }
+  }
+
+  /**
+   * A "today" line, drawn ourselves.
+   *
+   * Frappe only paints its today-highlight band in some view modes, so at Month
+   * or Year the one reference point everybody looks for silently disappears.
+   * The x maths here is Frappe's own: hours from the chart's start, divided by
+   * the step, times the column width.
+   */
+  function addTodayLine(g, container) {
+    if (!g || !g.gantt_start || !g.options) return;
+    var svg = container.querySelector('svg.gantt');
+    if (!svg) return;
+    svg.querySelectorAll('.tl-today').forEach(function (n) { n.remove(); });
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var hours = (today - g.gantt_start) / 3600000;
+    if (hours < 0) return;                       // today is before the chart starts
+    var x = (hours / g.options.step) * g.options.column_width;
+
+    var h = svg.getAttribute('height') || svg.getBoundingClientRect().height;
+    var ns = 'http://www.w3.org/2000/svg';
+
+    var line = document.createElementNS(ns, 'line');
+    line.setAttribute('class', 'tl-today');
+    line.setAttribute('x1', x); line.setAttribute('x2', x);
+    line.setAttribute('y1', 0); line.setAttribute('y2', h);
+    svg.appendChild(line);
+
+    var text = document.createElementNS(ns, 'text');
+    text.setAttribute('class', 'tl-today-label');
+    text.setAttribute('x', x + 4);
+    text.setAttribute('y', 12);
+    text.textContent = 'today';
+    svg.appendChild(text);
+  }
 
   // --- general chart ---------------------------------------------------------
   function renderGeneral() {
     var el = $('generalGantt');
     if (!el || !window.GENERAL_TASKS || !window.GENERAL_TASKS.length) return;
+    var z = ZOOM[generalZoomIdx];
+    if ($('generalZoomLabel')) $('generalZoomLabel').textContent = z.label;
     el.innerHTML = '';
-    new Gantt(el, window.GENERAL_TASKS, {
-      view_mode: 'Week',
+    generalGantt = new Gantt(el, window.GENERAL_TASKS, {
+      view_mode: z.mode,
       bar_height: 22,
       bar_corner_radius: 3,
       language: 'en',
@@ -41,8 +113,17 @@
              + t.start + ' → ' + t.end + late + '</div>';
       }
     });
-    setTimeout(function () { paintBars(el, window.GENERAL_TASKS); }, 60);
+    applyWidth(generalGantt, z.w);
+    setTimeout(function () {
+      paintBars(el, window.GENERAL_TASKS);
+      addTodayLine(generalGantt, el);
+    }, 60);
   }
+
+  window.zoomGeneral = function (delta) {
+    generalZoomIdx = Math.max(0, Math.min(ZOOM.length - 1, generalZoomIdx + delta));
+    renderGeneral();
+  };
 
   // --- detailed chart --------------------------------------------------------
   function selectedStepIds() {
@@ -55,19 +136,44 @@
     var ep = epEl ? epEl.value : 'all';
     var steps = selectedStepIds();
     var hide = $('hideCompleted') && $('hideCompleted').checked;
-    return window.DETAILED_TASKS.filter(function (t) {
+    var out = window.DETAILED_TASKS.filter(function (t) {
       if (ep !== 'all' && t.episode !== ep) return false;
       if (steps.length && steps.indexOf(String(t.step_id)) === -1) return false;
       if (hide && t.is_approved) return false;
       return true;
     });
+
+    // Grouping is just ordering — Frappe draws a flat list, and rows sharing a
+    // key end up adjacent, which is all "group by asset" needs to mean here.
+    var mode = $('groupBy') ? $('groupBy').value : 'date';
+    var cmp = {
+      // Every task on one asset or shot together, in pipeline order: what is
+      // left to do on Harry Kane, rather than what happens next week.
+      item: function (a, b) {
+        return a.item_label.localeCompare(b.item_label)
+            || a.step_order - b.step_order
+            || a.start.localeCompare(b.start);
+      },
+      step: function (a, b) {
+        return a.step_order - b.step_order
+            || a.start.localeCompare(b.start)
+            || a.item_label.localeCompare(b.item_label);
+      },
+      date: function (a, b) {
+        return a.start.localeCompare(b.start)
+            || a.step_order - b.step_order
+            || a.item_label.localeCompare(b.item_label);
+      }
+    }[mode] || null;
+    if (cmp) out = out.slice().sort(cmp);
+    return out;
   }
 
   function renderDetailed() {
     var el = $('detailedGantt');
     if (!el) return;
-    var view = ZOOM_LEVELS[zoomIdx];
-    $('zoomLabel').textContent = view;
+    var z = ZOOM[zoomIdx];
+    $('zoomLabel').textContent = z.label;
 
     var tasks = filtered();
     if (!tasks.length) {
@@ -77,7 +183,7 @@
     el.innerHTML = '';
 
     detailedGantt = new Gantt(el, tasks, {
-      view_mode: view,
+      view_mode: z.mode,
       bar_height: 18,
       bar_corner_radius: 2,
       language: 'en',
@@ -105,7 +211,12 @@
       }
     });
 
-    setTimeout(function () { decorate(); stickyHeader(el); }, 80);
+    applyWidth(detailedGantt, z.w);
+    setTimeout(function () {
+      decorate();
+      stickyHeader(el);
+      addTodayLine(detailedGantt, el);
+    }, 80);
   }
 
   function byId(id) {
@@ -180,8 +291,8 @@
 
   // --- zoom -------------------------------------------------------------------
   window.zoomChange = function (delta) {
-    // + means zoom IN, which is a smaller unit, which is a lower index.
-    zoomIdx = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, zoomIdx - delta));
+    // The ladder runs widest-span first, so + (zoom in) moves UP the index.
+    zoomIdx = Math.max(0, Math.min(ZOOM.length - 1, zoomIdx + delta));
     renderDetailed();
   };
 
@@ -318,6 +429,7 @@
   // --- filters -----------------------------------------------------------------
   if ($('episodeFilter')) $('episodeFilter').addEventListener('change', renderDetailed);
   if ($('hideCompleted')) $('hideCompleted').addEventListener('change', renderDetailed);
+  if ($('groupBy'))       $('groupBy').addEventListener('change', renderDetailed);
 
   (function stepFilter() {
     var toggle = $('stepFilterToggle'), panel = $('stepFilterPanel');

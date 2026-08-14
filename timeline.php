@@ -103,6 +103,7 @@ foreach ($rows as $r) {
         'episode'     => $r['episode'] ?? '',
         'step_id'     => (int)$r['step_id'],
         'step_name'   => $r['step_name'],
+        'step_order'  => (int)$r['step_order'],
         'item_label'  => $item,
         'color'       => $r['color'] ?: '#4A90D9',
         'crew_id'     => $r['crew_id'] !== null ? (int)$r['crew_id'] : null,
@@ -145,12 +146,42 @@ $crewList = $pdo->query(
     'SELECT id, name, role, is_placeholder FROM crew WHERE active = 1 ORDER BY is_placeholder, name'
 )->fetchAll();
 
+// Is what's drawn still what the setup implies?
+//
+// The saved schedule is a snapshot, and everything it was derived from keeps
+// moving — asset types get merged, headcounts change, items are added. A stale
+// plan looks exactly like a complete one: fewer bars, no warning, nothing to
+// suggest the picture is out of date. So the plan is recomputed here purely to
+// compare the COUNT against what is stored.
+$fresh = build_schedule($pdo, $project);
+$freshCount  = count($fresh['tasks']);
+$storedCount = count($rows);
+$stale = $freshCount !== $storedCount;
+
 $pageTitle = 'Timeline · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
 <p class="crumb"><a href="project.php?id=<?= $projectId ?>">← <?= e($project['name']) ?></a></p>
 <h2 class="wizard-title">Timeline</h2>
+
+<?php if ($rows && $stale): ?>
+  <div class="flash flash-warn">
+    <strong>This timeline is out of date.</strong>
+    It shows <?= $storedCount ?> saved task<?= $storedCount === 1 ? '' : 's' ?>, but the setup
+    as it stands now works out to <strong><?= $freshCount ?></strong>.
+    <?php if ($freshCount > $storedCount): ?>
+      <?= $freshCount - $storedCount ?> task<?= ($freshCount - $storedCount) === 1 ? ' is' : 's are' ?>
+      missing from the picture — usually because shots or assets were added, or an asset type
+      was corrected, after this schedule was saved.
+    <?php else: ?>
+      <?= $storedCount - $freshCount ?> more <?= ($storedCount - $freshCount) === 1 ? 'is' : 'are' ?>
+      drawn than the setup now calls for — usually because work was approved, marked not
+      applicable, or items were removed.
+    <?php endif; ?>
+    <?php if (can_edit()): ?>Press <em>Regenerate</em> to bring it in line.<?php endif; ?>
+  </div>
+<?php endif; ?>
 
 <?php if (!$rows): ?>
   <div class="empty-state">
@@ -164,6 +195,11 @@ require __DIR__ . '/includes/header.php';
   <div class="tl-head">
     <h3>General · pipeline steps</h3>
     <div class="tl-controls">
+      <span class="zoom-controls">
+        <button type="button" class="secondary zoom-btn" onclick="zoomGeneral(-1)" title="Zoom out">−</button>
+        <span id="generalZoomLabel" class="zoom-label">Week</span>
+        <button type="button" class="secondary zoom-btn" onclick="zoomGeneral(1)" title="Zoom in">+</button>
+      </span>
       <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','png')">PNG</button>
       <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','pdf')">PDF</button>
     </div>
@@ -207,6 +243,17 @@ require __DIR__ . '/includes/header.php';
       </span>
 
       <label class="muted small"><input type="checkbox" id="hideCompleted"> Hide completed</label>
+
+      <?php // Grouping, not just sorting: ordering by item puts every task for one
+             // asset or shot together, which is how you read "what is left on Harry
+             // Kane" rather than "what happens next week". ?>
+      <label class="muted small">Order
+        <select id="groupBy">
+          <option value="date">By date</option>
+          <option value="item">By asset / shot</option>
+          <option value="step">By pipeline step</option>
+        </select>
+      </label>
 
       <span class="zoom-controls">
         <button type="button" class="secondary zoom-btn" onclick="zoomChange(-1)" title="Zoom out">−</button>
