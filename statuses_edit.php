@@ -143,7 +143,7 @@ $pageTitle = 'Statuses · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'statuses'); ?>
 <h2 class="wizard-title">Statuses <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <p class="lead">Call a state whatever your team calls it. <strong>Counts as</strong> is what

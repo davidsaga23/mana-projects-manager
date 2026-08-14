@@ -67,7 +67,7 @@ $pageTitle = 'Dashboard · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'dashboard'); ?>
 
 <div class="dash-hero">
   <div>

@@ -117,13 +117,12 @@ $pageTitle = $project ? 'Setup · ' . $project['name'] : 'New project';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb">
-  <?php if ($project): ?>
-    <a href="project.php?id=<?= (int)$project['id'] ?>">← Back to <?= e($project['name']) ?></a>
-  <?php else: ?>
-    <a href="index.php">← All projects</a>
-  <?php endif; ?>
-</p>
+<?php // A brand new project has no id yet, so there is nothing to navigate to. ?>
+<?php if ($project): ?>
+  <?php project_nav($project, 'setup'); ?>
+<?php else: ?>
+  <p class="crumb"><a href="index.php">← All projects</a></p>
+<?php endif; ?>
 
 <h2 class="wizard-title">
   <?= $project ? e($project['name']) . ' <span class="muted">(' . e($project['code']) . ')</span>' : 'New project' ?>

@@ -118,7 +118,7 @@ $pageTitle = 'Names & aliases · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'aliases'); ?>
 <h2 class="wizard-title">Names &amp; aliases <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <?php if (!$unmatched && !$unmapped): ?>

@@ -258,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Import · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← Back to <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'import'); ?>
 <h2 class="wizard-title">Import progress <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <?php

@@ -142,6 +142,11 @@ require_once __DIR__ . '/calendar.php';
 // add to. require_login() is only ever CALLED after all three have loaded.
 require_once __DIR__ . '/snapshots.php';
 
+// The project tab bar. Loaded here for the same reason and with the same
+// caveat: every page requires functions.php, so nothing has to remember to pull
+// this in — and it must NOT be required from auth.php, which runs before it.
+require_once __DIR__ . '/project_nav.php';
+
 function working_days_list(string $from, string $to): array {
     $holidays = non_working_days();
     $f = new DateTime($from);

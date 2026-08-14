@@ -162,7 +162,7 @@ $pageTitle = 'Timeline · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'timeline'); ?>
 <h2 class="wizard-title">Timeline</h2>
 
 <?php if ($rows && $stale): ?>

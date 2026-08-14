@@ -95,10 +95,9 @@ $pageTitle = $step['name'] . ' · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb">
-  <a href="dashboard.php?project=<?= $projectId ?>">← Dashboard</a> ·
-  <a href="project.php?id=<?= $projectId ?>"><?= e($project['name']) ?></a>
-</p>
+<?php // A drill-down of the dashboard, so that tab stays lit rather than none. ?>
+<?php project_nav($project, 'dashboard'); ?>
+<p class="crumb"><a href="dashboard.php?project=<?= $projectId ?>">← Back to the dashboard</a></p>
 
 <h2 class="wizard-title">
   <span class="dot" style="background:<?= e($step['color'] ?: '#ccc') ?>"></span>

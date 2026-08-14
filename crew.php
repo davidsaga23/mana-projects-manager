@@ -196,7 +196,7 @@ $pageTitle = 'Crew · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="project.php?id=<?= $projectId ?>">← <?= e($project['name']) ?></a></p>
+<?php project_nav($project, 'crew'); ?>
 
 <h2 class="wizard-title">Crew <span class="muted">· <?= e($project['name']) ?></span></h2>
 

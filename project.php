@@ -87,7 +87,7 @@ $pageTitle = $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="index.php">← All projects</a></p>
+<?php project_nav($project, 'overview'); ?>
 
 <h2 class="wizard-title">
   <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
