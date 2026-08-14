@@ -131,6 +131,10 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
     </span>
   </a>
+  <a class="hub-card" href="dashboard.php?project=<?= $projectId ?>">
+    <strong>Dashboard</strong>
+    <span class="muted">Where this show stands, and what needs attention</span>
+  </a>
   <a class="hub-card" href="timeline.php?project=<?= $projectId ?>">
     <strong>Timeline</strong>
     <span class="muted">

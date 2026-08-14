@@ -544,6 +544,31 @@ function scheduler_schedule_step(
     });
 
     if ($useBand) {
+        // A band can be dragged like any other bar, and dragging one locks it.
+        // The per-item path checks for that before generating; this one didn't,
+        // so a locked band survived the delete AND got regenerated, colliding on
+        // UNIQUE (step_id, item_key) and killing the whole run.
+        //
+        // Checked FIRST, before any of the work below, because a locked band
+        // means the answer is already decided.
+        if (isset($manual[$stepId . '|band'])) {
+            $row = $manual[$stepId . '|band'];
+            $s['manual']++;
+            $s['scheduled'] = 0;
+            $s['kept'][] = ['step' => $stepName, 'item' => $stepName . ' (whole step)',
+                            'start_date' => $row['start_date'], 'end_date' => $row['end_date']];
+            $s['start_date'] = $row['start_date'];
+            $s['end_date']   = $row['end_date'];
+            $idx = axis_index($axis, $row['end_date']);
+            if ($idx !== null) $s['end_index'] = $idx;
+            if ($s['deadline'] && $s['end_date'] > $s['deadline']) {
+                $s['late_days'] = working_days_after($s['deadline'], $s['end_date']);
+            }
+            $s['notes'][] = 'This step is drawn as one band and that band has been placed by ' .
+                            'hand, so the scheduler left it exactly where it is.';
+            return $s;
+        }
+
         // One bar for the whole step. Its length is the work spread across the
         // lanes, starting as soon as everything it waits for is done.
         $earliest = $entries
@@ -830,8 +855,23 @@ function commit_schedule(PDO $pdo, int $projectId, array $plan): array {
                  crew_id, lane, is_manual, source)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'auto')"
         );
+        // Belt and braces. Everything the pass generates SHOULD already skip
+        // any (step, item) that has a hand-locked row — but this is the second
+        // time a path forgot to, and the failure mode is brutal: one duplicate
+        // key aborts the transaction and nothing at all gets rescheduled, with
+        // an SQL error where a plan should be. Skipping the collision instead
+        // means a future oversight costs one task, visibly, not the whole run.
+        $lockedKeys = [];
+        $lockStmt = $pdo->prepare(
+            'SELECT step_id, item_key FROM schedule WHERE project_id = ? AND is_manual = 1'
+        );
+        $lockStmt->execute([$projectId]);
+        foreach ($lockStmt as $l) $lockedKeys[$l['step_id'] . '|' . $l['item_key']] = true;
+
         $written = 0;
+        $skipped = 0;
         foreach ($plan['tasks'] as $t) {
+            if (isset($lockedKeys[$t['step_id'] . '|' . $t['item_key']])) { $skipped++; continue; }
             // crew_id points at whoever holds this lane's slot — a placeholder
             // ("Animation 02") until a real person is hired into it. Storing it
             // now is what makes the promotion cheap later: renaming the slot
@@ -847,7 +887,7 @@ function commit_schedule(PDO $pdo, int $projectId, array $plan): array {
             $written++;
         }
         $pdo->commit();
-        return ['deleted' => $deleted, 'written' => $written];
+        return ['deleted' => $deleted, 'written' => $written, 'skipped_locked' => $skipped];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
