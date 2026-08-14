@@ -403,6 +403,30 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .duration.verdict-short strong { color: #8a6d1a; }
 
+/* Timeline (Gantt) — server-rendered SVG, so these style it from outside. */
+.gantt-wrap {
+  overflow-x: auto; background: #fff; border: 1px solid #e4e8ec;
+  border-radius: 6px; padding: 4px 0 8px; margin: 14px 0;
+}
+.gantt { display: block; }
+.g-weekend { fill: #f2f4f6; }
+.g-holiday { fill: #fdf2e2; }
+.g-row:nth-child(even) { fill: #fbfcfd; }
+.g-row { fill: transparent; }
+.g-month { stroke: #dfe4e9; stroke-width: 1; }
+.g-month-label { font: 600 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
+.g-label { font: 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
+.g-bar { opacity: .92; }
+.g-bar-manual { stroke: #1c2733; stroke-width: 1.2; stroke-dasharray: 3 2; }
+.g-today { stroke: #b02a37; stroke-width: 1.5; }
+.g-today-label { font: 600 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #b02a37; }
+.g-delivery { stroke: #2f6fb2; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.g-delivery-label { font: 600 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #2f6fb2; }
+@media print {
+  .gantt-wrap { overflow: visible; border: 0; }
+  .topbar, .actions, .crumb { display: none; }
+}
+
 /* Crew */
 .col-num { width: 3.5rem; font-variant-numeric: tabular-nums; }
 .crew-step-head .dot { vertical-align: baseline; }

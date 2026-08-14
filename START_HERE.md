@@ -190,7 +190,18 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    - **Daily snapshots now actually get written**, on page load. `daily_snapshots` had
      existed since v1 with no writer. History can't be backfilled, which is why this
      jumped the queue.
-5. **Timeline UI** — Gantt view, `.gan` export/import round trip · **NEXT**
+5. **Timeline UI** — **half built 2026-08-13.** `timeline.php`, `includes/timeline.php`.
+   - The **Gantt view is done**: server-side SVG, one row per crew slot, weekends and studio
+     holidays shaded, today and delivery marked, hand-planned bars outlined. No chart
+     library — the same choice `workflow_diagram_svg()` made, and it prints. It reads the
+     **saved** schedule, never a fresh calculation: a picture that silently recomputed
+     itself would be a plan nobody agreed to.
+   - **Still to do: the `.gan` round trip** — export to GanttProject, refine by hand,
+     re-import as `is_manual = 1` with a dry-run preview. Working code for both directions
+     exists in STFC's `timeline_gan.php` / `timeline_import.php`.
+   - Watch lesson 4 when doing it: `end_date` is inclusive here, and GanttProject's own
+     convention is not. `includes/timeline.php` already contains the one place that
+     conversion happens for the chart; the `.gan` writer needs its own, and only one.
 6. **Reporting** — per-artist productivity, cross-project workload
 7. **Tickets / tasks** — port from STFC (it works well; see that codebase)
 

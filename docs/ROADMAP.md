@@ -15,7 +15,8 @@ separate database — see `DECISIONS.md` 2026-08-12)
 | Crew management — name, position, days off | P | — | Small. Extends `crew`, which already exists |
 | Crew management — time log | P | Phase 3 | Per-day entries, not one total per task |
 | Crew management — invoice upload + status | **F** | time log | Documents and money; not this codebase |
-| Budget expense projections | **F** | rates, headcount | Mana already does this in a spreadsheet |
+| Budget expense projections | **F** | rates, headcount | **Verified against a real sheet — see below.** Production half exports from here; money stays finance-side |
+| Step departments (pre-prod / production / post) | P | — | Small, and the expense projection's grouping depends on it. Also bands the timeline |
 | Budget vs actual at project end | **F** | time log, rates | Needs real logged hours to mean anything |
 | Budget simulator — "what if we add people?" | **F** | scheduler | Production already computes the hard half |
 | Payments / invoice tracking hub | **F** | invoice upload | Which invoices are paid |
@@ -142,7 +143,55 @@ people plan against it.
 
 ---
 
-## Caution: online version review is a different class of project
+## Expense projection — verified against a real sheet
+
+David built `RTC_ExpenseProjection_v07.xlsx` by hand from what the platform already holds, and
+confirmed it reconciles: **35 artist rows** against the 36 crew slots the platform generated,
+**184.43 projected person-days**, grand total $36,935.20. That makes it a specification rather
+than a wish, so the mapping is written down here while it is known to be accurate.
+
+**The boundary still holds.** Rates and costs stay in the separate finance application with its
+own database and logins (`DECISIONS.md`, 2026-08-12). What belongs in *this* platform is
+emitting the production half cleanly — `export.php` already does part of it.
+
+### Column by column
+
+| Sheet column | Comes from | Status |
+|---|---|---|
+| A · Department | **Nothing.** Steps have no phase grouping | **The one real gap — see below** |
+| B · Role / Position | `pipeline_steps` name + scope — "Concept (Character)", "Color (Shots)" | Built. The `(name, applies_to, applies_to_asset_type)` triple, exactly |
+| C · Artist Name | `crew` slot per lane — "Animator 01", "Env Layout Artist 02" | Built (migration 012). His hand-written names and the generated ones are the same idea |
+| D · Rate Type (day / flat) | — | Finance side |
+| E · Day Rate | — | Finance side |
+| F · Total Days | Per-slot duration: work × days-per-item × retakes ÷ lanes | Built — the Duration column, 2026-08-13 |
+| G · Total Months | F ÷ 22 | Derived, finance side |
+| H · Projected Cost | E × F | Finance side |
+| I · Total units count | `work_units` — 13 characters, 6 environments | Built; also frozen in `step_estimate_baseline` |
+| J–M · Actuals and variance | Planned vs actual | Needs `time_logs`; the estimate half is the baseline table |
+| N · Monthly cost (ref) | E × 22 | Finance side |
+
+Note rows 25–28: Tie-down across four artists comes out 7.59 / 7.59 / 7.59 / **7.61**. That
+uneven remainder is exactly what the scheduler's lane packing produces, which is a good sign
+the two models agree.
+
+### The gap: steps have no department
+
+"Above the line / Pre-production / Production / Post-production" is the sheet's top-level
+grouping and its subtotal boundary, and the platform cannot express it. `step_order` and the
+dependency graph say what runs when, not which *phase* a step belongs to.
+
+This is a **production** concept, not a financial one — it is how a crew list, a call sheet and
+a Gantt are all organised — so it belongs in this codebase. Small: one column on
+`pipeline_steps` (plus the templates), a field on the Pipeline wizard screen, and it groups the
+timeline as well as any export. Worth doing before, or with, the timeline phase so bars can be
+banded by phase.
+
+### What to build here, eventually
+
+A projection **export**, not a projection screen: one row per crew slot, carrying department,
+role, slot name, unit count and total days — everything above except the money. The finance app
+joins rates to it. `export.php` is already the right shape and already deliberately carries no
+rates; this widens it to per-slot rows and adds the department column.
 
 Everything else on this list is forms, tables and arithmetic. Review-and-approve
 is video: upload, storage, playback across devices, versions side by side,

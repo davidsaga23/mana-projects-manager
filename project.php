@@ -131,6 +131,16 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
     </span>
   </a>
+  <a class="hub-card" href="timeline.php?project=<?= $projectId ?>">
+    <strong>Timeline</strong>
+    <span class="muted">
+      <?php if ($scheduled): ?>
+        Gantt view of the saved plan<?php if ($scheduleEnd): ?> · to <?= e($scheduleEnd) ?><?php endif; ?>
+      <?php else: ?>
+        Appears once a schedule is saved
+      <?php endif; ?>
+    </span>
+  </a>
   <a class="hub-card" href="crew.php?project=<?= $projectId ?>">
     <strong>Crew</strong>
     <span class="muted">
