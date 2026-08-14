@@ -7,6 +7,7 @@ require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/statuses.php';
 require __DIR__ . '/includes/names.php';
+require_once __DIR__ . '/includes/dashboard.php';
 require_login();
 
 $projectId = (int)($_GET['id'] ?? 0);
@@ -83,6 +84,14 @@ if ($row = $stmt->fetch(PDO::FETCH_NUM)) {
     $scheduleEnd = $row[1];
 }
 
+// The same headline the dashboard leads with. Computed here rather than passed
+// around, so the two screens can never show different numbers for the same day.
+$overall = dashboard_overall(
+    dashboard_steps($pdo, $projectId, $project['delivery_date'] ?: null),
+    $project['delivery_date'] ?: null,
+    dashboard_pace($pdo, $projectId, $project['delivery_date'] ?: null)
+);
+
 $pageTitle = $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
@@ -99,6 +108,13 @@ require __DIR__ . '/includes/header.php';
   <strong><?= $shotCount ?></strong> shots ·
   <strong><?= $assetCount ?></strong> assets ·
   <?= e($project['start_date'] ?: '—') ?> → <?= e($project['delivery_date'] ?: '—') ?>
+</p>
+
+<?php // Compact: the shape of where the show is. The rates and deltas behind it
+       // live on the dashboard, which is one click away and lit in the tab bar. ?>
+<?php render_overall_progress($overall, true); ?>
+<p class="muted small">
+  <a href="dashboard.php?project=<?= $projectId ?>">See the pace behind this →</a>
 </p>
 
 <?php if ($unmatchedPeople || $unmappedStatuses): ?>

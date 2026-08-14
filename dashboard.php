@@ -112,70 +112,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <?php endif; ?>
 
 <?php // --- the whole project, in one block --------------------------------- ?>
-<section class="dash-primary">
-  <div class="dash-primary-head">
-    <div>
-      <h3>Overall progress</h3>
-      <p class="muted small">
-        Every shot and asset, through every step —
-        <strong><?= (int)$overall['applicable'] ?></strong> tasks in total.
-        <?php if ($overall['days_left'] !== null): ?>
-          <span class="<?= $overall['days_left'] <= 5 ? 'warn-text' : '' ?>">
-            <?= (int)$overall['days_left'] ?> working days to delivery</span>
-        <?php elseif ($overall['overdue']): ?>
-          <span class="warn-text">the delivery date has passed</span>
-        <?php else: ?>
-          <span class="muted">no delivery date set</span>
-        <?php endif; ?>
-      </p>
-    </div>
-    <div class="dash-big">
-      <div class="big-pct"><?= $overall['pct'] === null ? '—' : $overall['pct'] . '%' ?></div>
-      <div class="muted small">of all work approved</div>
-    </div>
-  </div>
-
-  <div class="stacked-progress">
-    <span class="band-approved" style="width:<?= (float)($overall['pct'] ?? 0) ?>%"></span>
-    <span class="band-delivered" style="left:<?= (float)($overall['pct'] ?? 0) ?>%;width:<?= max(0, (float)($overall['pct_delivered'] ?? 0) - (float)($overall['pct'] ?? 0)) ?>%"></span>
-  </div>
-  <div class="dash-legend">
-    <span><i class="sw sw-approved"></i>Approved <?= (int)$overall['approved'] ?></span>
-    <span><i class="sw sw-delivered"></i>Delivered pending <?= (int)max(0, $overall['delivered'] - $overall['approved']) ?></span>
-    <span class="muted">Remaining <?= (int)$overall['remaining'] ?></span>
-    <?php if ($overall['blocked']): ?>
-      <span class="warn-text"><?= (int)$overall['blocked'] ?> blocked</span>
-    <?php endif; ?>
-  </div>
-
-  <div class="kpi-grid">
-    <div><div class="kpi-label">Approved since last reading</div>
-      <div class="kpi-value ok"><?= $overall['delta_approved'] === null ? '—'
-            : '+' . (int)$overall['delta_approved'] ?></div>
-      <div class="muted small"><?= $overall['last_reading'] ? 'as of ' . e($overall['last_reading']) : 'no readings yet' ?></div></div>
-    <div><div class="kpi-label">Delivered since last reading</div>
-      <div class="kpi-value info"><?= $overall['delta_delivered'] === null ? '—'
-            : '+' . (int)$overall['delta_delivered'] ?></div></div>
-    <div><div class="kpi-label">Required pace</div>
-      <div class="kpi-value warn"><?= e(pace_text($overall['required_pace'], 'items')) ?>
-        <span class="unit">tasks/day</span></div>
-      <div class="muted small">across the whole team</div></div>
-    <div><div class="kpi-label">Actual, last 7 days</div>
-      <div class="kpi-value status-<?= e($overall['status']) ?>">
-        <?= $overall['actual_pace'] === null ? '—' : e(fmt_rate((float)$overall['actual_pace'])) ?>
-        <span class="unit">tasks/day</span>
-        <?php if ($overall['status'] === 'ontrack'): ?><span class="trend up">▲ on track</span>
-        <?php elseif ($overall['status'] === 'behind'): ?><span class="trend down">▼ behind</span>
-        <?php elseif ($overall['status'] === 'critical'): ?><span class="trend down">▼ critical</span>
-        <?php else: ?><span class="muted small">no history yet</span><?php endif; ?>
-      </div></div>
-  </div>
-  <p class="muted small">
-    Counted in <strong>tasks</strong> — one item through one step — because that is the only
-    unit every step shares. A step measured in seconds and one measured in shots cannot be
-    added together, so each card below keeps its own unit.
-  </p>
-</section>
+<?php render_overall_progress($overall); ?>
 
 <?php // --- a card per step, each carrying its quota ------------------------ ?>
 <h3>Every step, and what it needs per day</h3>
