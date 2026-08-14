@@ -33,7 +33,23 @@ h2 { font-size: 18px; }
 
 table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e4e8ec; }
-th { background: #eef1f4; font-weight: 600; }
+/* Sticky header row on EVERY table.
+   Applied globally rather than table by table: there are thirty-odd tables
+   across the app and every one of them can grow past a screen — the planning
+   table, the task list, the import mapping, the per-episode breakdown. Opting
+   each one in individually would mean the next table added is the one that
+   scrolls its headings away.
+   Safe as a blanket rule because <th> is only ever a column heading here; no
+   table uses it as a row heading.
+   The dividing line is an inset shadow, not the border below: with
+   border-collapse: collapse a sticky cell leaves its border behind when it
+   detaches, so the heading floats over the rows with nothing under it. */
+th {
+  background: #eef1f4; font-weight: 600;
+  position: sticky; top: 0; z-index: 5;
+  box-shadow: inset 0 -1px 0 #d7dde3;
+}
+/* Above the rows, below the step filter panel (40) and the task editor (100). */
 
 .empty-state {
   background: #fff; border: 1px dashed #c3ccd4; border-radius: 8px;
@@ -554,7 +570,13 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .mini-total { font-size: 13px; color: #5a6a7a; font-weight: 400; }
 .mini-pace { margin-top: 8px; font-size: 12.5px; color: #43535f; border-top: 1px solid #eef1f4; padding-top: 7px; }
 
-.table-scroll { overflow-x: auto; }
+/* A wide table gets its own scroll box. overflow-x: auto forces overflow-y to
+   compute as auto too — the spec doesn't allow one axis to stay visible — so
+   this element is a scroll container whether or not that was intended, and a
+   sticky heading inside it anchors to THIS box rather than the page. Giving it
+   a height makes that behaviour deliberate: the heading row stays put while the
+   episodes scroll under it, and short tables never hit the limit at all. */
+.table-scroll { overflow: auto; max-height: 70vh; }
 .grid-table td.num, .grid-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .health-green   { background: #eef8f0; color: #1e7e34; }
 .health-amber   { background: #fdf6e3; color: #8a6d1a; }
