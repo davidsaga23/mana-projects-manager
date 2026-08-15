@@ -203,6 +203,37 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
 <?php endif; ?>
 
+<?php // --- the trend ---------------------------------------------------------
+      // $history is newest-first for the table below; a chart reads left to
+      // right, so it is reversed here rather than queried twice.
+      $trendRows = [];
+      foreach (array_reverse($history) as $h) {
+          $trendRows[] = [
+              'date'      => $h['snapshot_date'],
+              'approved'  => $s['tracks_seconds'] ? (float)$h['seconds_approved_cum']  : (float)$h['items_approved_cum'],
+              'delivered' => $s['tracks_seconds'] ? (float)$h['seconds_delivered_cum'] : (float)$h['items_delivered_cum'],
+          ];
+      }
+?>
+<h3>Trend</h3>
+<?php if (count($trendRows) < 2): ?>
+  <p class="muted">
+    A trend needs at least two days of history, and snapshots only began on 13 August 2026 —
+    the day the writer was added. This fills in on its own from here, one reading per day, and
+    <strong>cannot be backfilled</strong>: a day nobody opened the app is a day that was never
+    recorded. That is why the snapshot work jumped the queue.
+  </p>
+<?php else: ?>
+  <div class="trend-wrap">
+    <?= step_trend_svg($trendRows, (float)$s['target'], $s['deadline'] ?: null, $unit) ?>
+  </div>
+  <p class="dash-legend">
+    <span class="legend-key"><span class="trend-swatch approved"></span> Approved</span>
+    <span class="legend-key"><span class="trend-swatch delivered"></span> Delivered</span>
+    <span class="legend-key"><span class="trend-swatch target"></span> Target (<?= e(fmt_unit((float)$s['target'], $unit)) ?>)</span>
+  </p>
+<?php endif; ?>
+
 <?php // --- daily history ---------------------------------------------------- ?>
 <h3>Daily history</h3>
 <?php if (count($history) < 2): ?>

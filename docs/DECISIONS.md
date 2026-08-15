@@ -870,6 +870,50 @@ on a show with no vehicles is noise implying a gap that does not exist.
 "7 On Hold" is useless until it says *which seven*. Same principle as the unmatched-names report:
 a number that cannot be opened is a number nobody can act on.
 
+## 2026-08-15 — Rates and contracts DO live here after all, behind one door
+**Reverses "Money lives in a separate application and a separate database" (2026-08-12).**
+That entry said in terms: *"`crew` does not gain a `rate` column."* Migration 018 adds
+`crew.day_rate`, `rate_unit`, `rate_currency` and `contract_url`.
+**Why the reversal:** David's call, asked directly and with the consequence stated. The finance
+application does not exist and has no date. One screen showing the whole picture of a person —
+what they carry, how they are doing, what they cost — is worth more today than a guarantee about
+an app nobody has built. It is his studio's data and his risk to take.
+**What was actually given up.** The old decision's strength was never the tidiness; it was that a
+separate MySQL user with no rights to those tables made a leak *impossible* rather than merely
+unlikely — a guarantee an application cannot give about itself, because a role check is one `if`
+away from failing. That is gone and cannot be got back by being careful.
+**What replaces it, since something had to:**
+- **`includes/money.php` is the only door.** Every read and write of those four columns goes
+  through it, and it returns an empty array for anyone who is not an admin — not a partial row,
+  not nulls. A caller that forgets to check renders nothing, which is the right failure.
+  Verified by grep: no other file in the codebase names those columns.
+- Same shape as the read-only enforcement in `require_login()`, and for the same reason: a check
+  per screen fails the first time somebody forgets one, and fails silently.
+- The **contract stays in Google Drive** and only its link is stored. Drive enforces its own
+  permissions, so that half of the original guarantee survives intact — a link is useless to
+  somebody Drive will not let in.
+- `crew.department` is in the same migration and is deliberately **not** behind the guard. It is
+  not financial, and routing it through a money door would only make it look like it was.
+**Consequence:** if the finance app is ever built, these four columns move there and migration
+018's header is what explains why they were here. `DECIMAL`, never `FLOAT` — a rate is money and
+gets summed against an invoice, the same reasoning as storing time in whole minutes.
+
+## 2026-08-15 — Per-person pace is approximate, and says so
+**Decision:** the person and team screens report assignments, approvals and logged time as
+facts, and anything about PACE as an approximation, labelled on screen.
+**Why:** `daily_snapshots` records history **per step, not per person**, so "how much did Ana
+approve last week" has no history to read. The only per-person time signal is
+`progress.updated_at`, which is when a row last changed *for any reason* — a status edit, a
+re-import, a reassignment. Counting approved rows touched inside a window over-reports after a
+bulk import and under-reports when work goes unrecorded for a week.
+**Why publish it anyway:** the direction of travel against the required quota is the question a
+producer actually asks, and refusing to answer until a perfect measure exists would leave the
+most useful screen unbuilt. What is not acceptable is presenting it as measurement — a number in
+a table reads as a fact unless the page says otherwise, so the page says otherwise.
+**Consequence:** a per-person history table is what would make it real. Same shape as the gap
+`time_logs` fills for effort, and worth building at the same time — one writer, two questions
+answered.
+
 ---
 
 ## Still open

@@ -959,6 +959,37 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .grid-scroll { overflow-x: auto; }
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
+/* Trend chart on the step page. Hand-rolled SVG — no chart library. */
+.trend-wrap { background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 12px; }
+.trend { display: block; }
+.trend-grid { stroke: #eef1f4; stroke-width: 1; }
+.trend-target { stroke: #b02a37; stroke-width: 1.6; stroke-dasharray: 6 4; }
+.trend-approved { fill: none; stroke: #1e7e34; stroke-width: 2.2; }
+.trend-delivered { fill: none; stroke: #2f6fb2; stroke-width: 1.8; }
+.trend-axis { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #7b8894; }
+.trend-cap { font: 400 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #8a97a3; }
+.trend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.trend-swatch.approved { background: #1e7e34; }
+.trend-swatch.delivered { background: #2f6fb2; }
+.trend-swatch.target { background: repeating-linear-gradient(90deg, #b02a37 0 5px, transparent 5px 9px); }
+
+/* People screens */
+.slot-tag {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; background: #eceff1; color: #546e7a;
+  border-radius: 8px; padding: 1px 7px; margin-left: 6px;
+}
+tr.row-slot td { background: #fbfcfd; }
+/* Marks a block only administrators can see. Deliberately loud: somebody
+   screen-sharing should know before they scroll into it. */
+.admin-only-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; background: #fdf0f1; color: #8f222c;
+  border: 1px solid #e0b4ba; border-radius: 8px; padding: 1px 8px; margin-left: 8px;
+  vertical-align: middle;
+}
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
 /* The scope under a repeated step name — "Concept / Characters" vs
    "Concept / Environments". Shown only where the name really is repeated. */
 .step-scope {

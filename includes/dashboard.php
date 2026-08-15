@@ -678,3 +678,87 @@ function dashboard_burnup_svg(array $points, ?string $deliveryDate = null, int $
 
     return $svg . '</svg>';
 }
+
+/**
+ * The trend chart: cumulative approved and delivered against the target.
+ *
+ * Ported in shape from STFC's step page, which drew it with a charting library.
+ * This is hand-rolled SVG, matching workflow_diagram_svg() and grid_donut_svg()
+ * — no external dependency has been added to this codebase yet, and three lines
+ * on a grid do not justify the first one.
+ *
+ * The target is a flat dashed line rather than a sloped "burn-up ideal". A
+ * sloped line implies work should accrue evenly from day one, which is not how
+ * any step here behaves: nothing lands for weeks while a department ramps, then
+ * a lot does. A flat ceiling says the only thing that is actually true — this is
+ * how much there is, and here is how close you are.
+ *
+ * @param array $rows  oldest first: ['date' => 'Y-m-d', 'approved' => f, 'delivered' => f]
+ */
+function step_trend_svg(array $rows, float $target, ?string $deadline = null,
+                        string $unitLabel = '', int $w = 900, int $h = 300): string {
+    if (count($rows) < 2) return '';
+
+    $padL = 54; $padR = 16; $padT = 14; $padB = 46;
+    $plotW = $w - $padL - $padR;
+    $plotH = $h - $padT - $padB;
+
+    $max = $target;
+    foreach ($rows as $r) {
+        $max = max($max, (float)$r['approved'], (float)$r['delivered']);
+    }
+    if ($max <= 0) $max = 1.0;
+    $max *= 1.05;   // a little air, so a line at the target isn't drawn on the frame
+
+    $n = count($rows);
+    $x = fn($i) => $padL + ($n === 1 ? 0 : ($i / ($n - 1)) * $plotW);
+    $y = fn($v) => $padT + $plotH - (max(0.0, (float)$v) / $max) * $plotH;
+
+    $path = function (string $key) use ($rows, $x, $y) {
+        $d = '';
+        foreach ($rows as $i => $r) {
+            $d .= ($i === 0 ? 'M ' : ' L ') . sprintf('%.1f %.1f', $x($i), $y($r[$key]));
+        }
+        return $d;
+    };
+
+    $svg = '<svg class="trend" viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" height="' . $h
+         . '" preserveAspectRatio="none" role="img">';
+
+    // Horizontal guides, labelled. Four is enough to read a value off without
+    // turning the chart into graph paper.
+    for ($g = 0; $g <= 4; $g++) {
+        $val = $max * $g / 4;
+        $gy  = $y($val);
+        $svg .= '<line class="trend-grid" x1="' . $padL . '" y1="' . sprintf('%.1f', $gy)
+              . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $gy) . '"></line>';
+        $svg .= '<text class="trend-axis" x="' . ($padL - 8) . '" y="' . sprintf('%.1f', $gy + 4)
+              . '" text-anchor="end">' . e(fmt_num($val, $val >= 100 ? 0 : 1)) . '</text>';
+    }
+
+    // Target ceiling.
+    $svg .= '<line class="trend-target" x1="' . $padL . '" y1="' . sprintf('%.1f', $y($target))
+          . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $y($target)) . '"></line>';
+
+    // Delivered under, approved over — approved is the number that matters, so it
+    // is never the one hidden behind the other line.
+    $svg .= '<path class="trend-delivered" d="' . $path('delivered') . '"></path>';
+    $svg .= '<path class="trend-approved" d="' . $path('approved') . '"></path>';
+
+    // Date labels: first, last, and a few between, so they never collide.
+    $every = max(1, (int)ceil($n / 8));
+    foreach ($rows as $i => $r) {
+        if ($i !== 0 && $i !== $n - 1 && $i % $every !== 0) continue;
+        $svg .= '<text class="trend-axis" x="' . sprintf('%.1f', $x($i)) . '" y="' . ($h - 26)
+              . '" text-anchor="middle">' . e(date('M j', strtotime($r['date']))) . '</text>';
+    }
+
+    $svg .= '<text class="trend-cap" x="' . $padL . '" y="' . ($h - 8) . '">'
+          . e('Cumulative ' . ($unitLabel !== '' ? $unitLabel : 'work')
+              . ' · approved vs delivered vs target'
+              . ($deadline ? ' · deadline ' . $deadline : ''))
+          . '</text>';
+
+    $svg .= '</svg>';
+    return $svg;
+}

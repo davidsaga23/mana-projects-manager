@@ -278,16 +278,49 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      `includes/timelog.php`. It is listed here only because the original build order
      misfiled it.
 
-8. **Tracking grid + Production tab** — **NEXT.** Port from STFC's `preprod.php`,
-   `preprod_api.php` and `assets/preprod.js`. **Read the three `2026-08-14` tracking-grid
-   entries in `docs/DECISIONS.md` and the spec in `docs/ROADMAP.md` before starting** — the
-   shape is settled, and the one thing that cannot port unchanged is already reasoned out.
-   **No migration is needed.** `progress` already holds `(project_id, step_id,
-   shot_id/asset_id, status_id)` and `pipeline_steps.applies_to` already knows which steps
-   cover which items. This is screens and an API over data the importer is already writing —
-   which is exactly what the 2026-08-11 status-model decision was for.
+8. ~~**Tracking grid — the Production tracking tab**~~ — **built and working 2026-08-15.**
+   `includes/grid.php`, `production.php`, `production_api.php`, `assets/production.js`.
+   Ported from STFC's `preprod.php`. **No migration** — it reads `progress` and
+   `pipeline_steps`, exactly what the 2026-08-11 status-model decision was bought for.
+   Read the three `2026-08-14` tracking-grid entries in `docs/DECISIONS.md` before changing
+   any of it. In short:
+   - **A cell is a status colour, not a checkbox**, because a checkbox has no inverse against
+     an eleven-value vocabulary. **Green still means what it meant on STFC** — `approved`,
+     i.e. ready for the next department.
+   - **Three phases**, named as the studio names them and driven by the scopes the schema
+     already has: Pre-production = assets, Production = shots, **Post-production =
+     `applies_to = 'project'` steps** (SFX, music, mix, master — one row, one deliverable
+     each). `pipeline_steps.department` is the more precise long-term answer but is blank on
+     every existing project; see ROADMAP.
+   - **A dash is structural**, from `applies_to` / `applies_to_asset_type`, or an
+     `is_excluded` status on that cell. A character with no rig can still read as ready.
+   - A donut per group: status spread around it, "N ready" in the middle, drawn only for
+     groups that exist. Clicking a segment lists exactly which items report that status.
+   - Writing a cell **also recomputes `is_delivered` / `is_approved`** — those flags are what
+     every dashboard figure counts. Writing `status_id` alone would move the colour and leave
+     every number unchanged, which looks like it worked.
+   - Totals do not live-update after an edit; the page says so and offers a refresh. An
+     out-of-date total is recoverable, a wrong one is not.
+   - The tab order and the Overview screen were tidied the same day: the nine hub cards are
+     gone, having duplicated the tab bar exactly.
 
-9. **Then: run it all against the real show.** The specific things still to watch:
+9. **People and performance** — **built 2026-08-15.** `migrations/018_…sql`,
+   `includes/{people,money}.php`, `team.php`, `person.php`, plus the trend chart on
+   `step.php`. A **Team performance** tab lists everyone by unfinished work; a person page
+   shows their load per step, required vs recent pace, logged time and open tickets.
+   - **⚠ This migration reverses the 2026-08-12 "money lives elsewhere" decision** — David's
+     call, made with the consequence stated. Read the 2026-08-15 entries in
+     `docs/DECISIONS.md` and the header of migration 018 **before touching anything to do
+     with rates**. `includes/money.php` is the ONLY door those four columns are read through
+     and it refuses for non-admins; keep it that way, or the replacement guarantee is gone too.
+   - **Pace per person is approximate and labelled as such.** History is recorded per step,
+     not per person. Don't remove the caveats without building the history that would justify
+     removing them.
+   - The trend chart is hand-rolled SVG, like the workflow diagram and the donuts. **No chart
+     library has been added and none is needed.** It stays nearly empty until enough
+     `daily_snapshots` accumulate — those only began on 13 August.
+
+10. **Then: run it all against the real show.** The specific things still to watch:
    - Check the seeded board columns suit how the team actually works, on the Statuses screen.
    - `crew_absences` — now genuinely buildable and paired with the timeline in `ROADMAP.md`.
    - `time_logs` — the per-day table that turns "actual" from elapsed duration into effort.
