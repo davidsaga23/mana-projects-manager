@@ -22,6 +22,7 @@ function project_nav_items(int $projectId): array {
     return [
         ['key' => 'overview',  'label' => 'Overview',  'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => 'dashboard.php' . $p,          'group' => 'work'],
+        ['key' => 'production','label' => 'Production','href' => 'production.php' . $p,         'group' => 'work'],
         ['key' => 'timeline',  'label' => 'Timeline',  'href' => 'timeline.php' . $p,           'group' => 'work'],
         ['key' => 'schedule',  'label' => 'Schedule',  'href' => 'schedule.php' . $p,           'group' => 'work'],
         ['key' => 'tasks',     'label' => 'Tasks',     'href' => 'tasks.php' . $p,              'group' => 'work'],

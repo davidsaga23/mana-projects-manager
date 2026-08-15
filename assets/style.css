@@ -898,6 +898,115 @@ tr.row-overdue td { background: #fdf6f7; }
 .share-url button { margin-top: 0; flex-shrink: 0; }
 .share-url button.copied { background: #1e7e34; color: #fff; }
 
+/* ==========================================================================
+   TRACKING GRID / PRODUCTION (Phase 8)
+
+   STFC's Pre-prod screen, with the cell redesigned. There a tick was a boolean;
+   here it is a status, so the cell is a colour block and the legend above the
+   grid is load-bearing rather than decorative — a tick needs no key, eleven
+   colours do.
+   ========================================================================== */
+
+.legend-panel { padding: 12px 16px; }
+.legend-title { display: block; font-size: 13px; margin-bottom: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.legend-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  background: #e3f6e8; color: #1e7e34; border-radius: 8px; padding: 0 6px;
+}
+.legend-tag.warn { background: #fff3cd; color: #8a6d1a; }
+.legend-tag.muted-tag { background: #eceff1; color: #546e7a; }
+
+/* The cell. Square, small, and the same element in the legend as in the grid —
+   if they were styled separately they would eventually stop matching. */
+.cell-chip {
+  display: inline-block; width: 16px; height: 16px; border-radius: 3px;
+  border: 1px solid rgba(0,0,0,.14); padding: 0; margin: 0; vertical-align: middle;
+  background: #8a97a3;
+}
+button.cell-chip { cursor: default; }
+button.cell-chip.is-editable { cursor: pointer; }
+button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset: 1px; }
+.cell-none { background: #fff; border: 1px dashed #c3ccd4; }
+.cell-chip.is-saving { opacity: .45; }
+.cell-chip.just-saved { outline: 2px solid #1e7e34; outline-offset: 1px; }
+.cell-dash { color: #b6c2cd; }
+
+.bar-outer { height: 10px; background: #eef1f4; border: 1px solid #dde3e9; border-radius: 5px; overflow: hidden; }
+.bar-inner { height: 100%; background: #1e7e34; }
+
+.step-counters {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px; margin-top: 16px;
+}
+.counter-label { font-size: 12px; color: #5a6a7a; text-transform: uppercase; letter-spacing: .03em; }
+.counter-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.counter-of { font-size: 14px; color: #5a6a7a; font-weight: 400; }
+
+/* Donuts — one per group, drawn only for groups that exist. */
+.donut-row { display: flex; flex-wrap: wrap; gap: 18px; }
+.donut-card { margin: 0; text-align: center; }
+.donut-card figcaption { margin-top: 4px; display: flex; flex-direction: column; gap: 1px; }
+.donut { display: block; }
+.donut-seg { cursor: pointer; transition: opacity .12s; }
+.donut-seg:hover { opacity: .75; }
+.donut-num { font: 700 19px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
+.donut-cap { font: 400 10px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
+
+/* The grid itself. Horizontal scroll lives on the wrapper, so the sticky
+   heading rule the rest of the app relies on keeps working. */
+.grid-scroll { overflow-x: auto; }
+.track-table { min-width: 100%; }
+.track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
+.track-table th.track-done, .track-table td.track-done { text-align: right; white-space: nowrap; }
+.track-name { white-space: nowrap; font-weight: 500; }
+.track-row.is-ready .track-name { color: #1e7e34; }
+.track-row.is-ready td { background: #f4fbf6; }
+.ready-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  background: #e3f6e8; color: #1e7e34; border-radius: 8px; padding: 0 6px; margin-left: 6px;
+}
+.track-group td { background: #eef1f4; border-top: 2px solid #dde3e9; }
+.group-badge {
+  display: inline-block; background: #e3f0fb; color: #1c4f7c; border-radius: 9px;
+  padding: 1px 9px; font-size: 11px; font-weight: 700; letter-spacing: .04em; margin-right: 8px;
+}
+
+/* The status dropdown. Positioned against the document because the grid scrolls
+   inside its own container. */
+.status-menu {
+  position: absolute; z-index: 120; background: #fff;
+  border: 1px solid #c3ccd4; border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.16);
+  padding: 4px; min-width: 210px; max-height: 60vh; overflow-y: auto;
+}
+.status-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: 0; color: #1c2733; text-align: left;
+  padding: 6px 8px; margin: 0; border-radius: 4px; font-size: 14px; cursor: pointer;
+}
+.status-opt:hover { background: #eef4fa; }
+.status-opt.is-current { background: #e3f0fb; font-weight: 600; }
+
+/* tasks.php shows its modals by writing style.display; this screen uses the
+   `hidden` attribute, which is tidier but leaves display at its default block —
+   so the flex centring on .modal never applied. These two rules make `hidden`
+   work properly. They cannot disturb tasks.php: an inline style="display:none"
+   beats a stylesheet rule, so those modals stay shut until their JS opens them. */
+.modal[hidden] { display: none; }
+.modal:not([hidden]) { display: flex; }
+
+.slice-list { max-height: 55vh; overflow-y: auto; }
+.slice-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 6px 0; border-bottom: 1px solid #e4e8ec;
+}
+.stale-banner a { font-weight: 600; }
+
+/* A link styled as a secondary button, for the Assets / Shots toggle. */
+.button.secondary-link { background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; }
+.button.secondary-link:hover { background: #eef4fa; }
+
 /* Attachment lightbox — an image opens over the ticket rather than in a new tab,
    so looking at a reference doesn't cost you the page you were reading. */
 .lightbox {

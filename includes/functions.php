@@ -109,6 +109,20 @@ function fmt_num($v, int $decimals = 2): string {
     return rtrim(rtrim(number_format((float)$v, $decimals, '.', ''), '0'), '.');
 }
 
+/**
+ * The label for a shot, following the project's own episode setting.
+ *
+ * STFC could hardcode EP002_SH050 because that show is a series. Here `episodic`
+ * is a per-project flag (DECISIONS, 2026-08-11) and a commercial has one flat
+ * shot list — prefixing those with an empty episode would produce "_SH010".
+ */
+function shot_label(?string $episode, ?string $shotCode): string {
+    $episode  = trim((string)$episode);
+    $shotCode = trim((string)$shotCode);
+    if ($shotCode === '') return '';
+    return $episode !== '' ? $episode . '_' . $shotCode : $shotCode;
+}
+
 // Messages that survive a redirect. Every save reports what it did, what it
 // skipped and why — several STFC bugs looked like "nothing happened".
 function flash(string $type, string $msg): void {   // $type: ok | warn | err

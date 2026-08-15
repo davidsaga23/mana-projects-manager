@@ -821,6 +821,55 @@ address or be able to send mail. It also states plainly when `stream_socket_clie
 by the host — otherwise every row fails at "connect" with no explanation, which reads like
 wrong settings rather than an unwinnable fight.
 
+## 2026-08-14 — The tracking grid: a status COLOUR block, not a checkbox
+**Decision:** the Phase 8 tracking grid (ported from STFC's `preprod.php`) draws each cell as a
+small block filled with the status's own colour, not as a checkbox. Clicking one opens a
+dropdown of the project's statuses. A colour legend sits at the top of the screen.
+**Why the checkbox worked on STFC and cannot port unchanged:** David's own account of why it was
+good — *"it was clear and easy to read, is ready or not. If the row was all green then the asset
+was ready for production."* That reading is worth preserving, and it survives: green still means
+the same thing. But `preprod_progress.is_done` is literally a boolean there, whereas here a cell
+is a `status_id` pointing at an eleven-value vocabulary. A checkbox has **no inverse** in that
+model: ticking it could write "Completed", but unticking it has no defined destination —
+"Waiting to start"? "In progress"? "Retake"? — and whichever was chosen would silently destroy
+what the cell actually said. It would also flatten the two distinctions the dashboard already
+reports separately: On Hold is *blocked*, not merely unfinished, and Retake is neither.
+**Consequence:**
+- **Green keeps its exact STFC meaning.** There, a box was ticked only when Plaky said
+  *Completed* or *Final* — i.e. **ready for the next department to pick up**. Here that is
+  precisely `statuses.maps_to = 'approved'`, so the definition ports without being restated.
+- **A legend is mandatory, not decoration.** A checkbox needs no key; eleven colours do. It goes
+  at the top of the screen, built from the project's own `statuses` rows so it can never drift
+  from what the cells show.
+- The grid gains what a checkbox could not show: blocked and retake work is visible *as itself*
+  at a glance, rather than being indistinguishable from "not started".
+
+## 2026-08-14 — "All green" is a property worth surfacing outside the grid
+**Decision:** an item every one of whose applicable steps is `approved` is **ready for
+production**, and reads green wherever it is listed — starting with the Shots screen, which is
+renamed the **Production** tab.
+**Why:** this is what the STFC grid was really for. The row of ticks was a means; "this asset is
+finished and the next department can start on it" was the end, and on STFC you had to read the
+row to work it out. Making it a first-class state means the answer is available on any screen
+that lists items, not only on the grid.
+**Consequence:** "applicable" has to be computed, not assumed — a step counts for an item only
+when `applies_to` (and `applies_to_asset_type`) covers it and the item is not marked with an
+`is_excluded` status. Otherwise a character with no rig would never go green, and the one honest
+signal on the screen would be wrong in a way nobody could see.
+
+## 2026-08-14 — A pie per asset type, drawn only for types that exist
+**Decision:** the grid screen carries one pie chart per asset type, showing the spread of
+statuses within that type. A type with no assets gets **no chart at all** — no empty placeholder.
+Clicking a segment opens a list of the items in that type reporting that status.
+**Why:** David's framing — *"so we can easily visualize how many assets are missing"*. The
+per-step counters answer "how much of Rigging is done"; the pies answer the question a
+supervisor actually asks, which is "what state are the characters in". Rendering only the types
+that exist follows the same rule as everything else built from data here: a "Vehicles: 0" chart
+on a show with no vehicles is noise implying a gap that does not exist.
+**Consequence:** the click-through is what stops a chart being decorative — a segment reading
+"7 On Hold" is useless until it says *which seven*. Same principle as the unmatched-names report:
+a number that cannot be opened is a number nobody can act on.
+
 ---
 
 ## Still open

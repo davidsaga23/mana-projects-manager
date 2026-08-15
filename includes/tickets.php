@@ -294,20 +294,6 @@ function assignee_label(array $crew): string {
     return $crew['name'];
 }
 
-/**
- * The label for a shot, following the project's own episode setting.
- *
- * STFC could hardcode EP002_SH050 because that show is a series. Here `episodic`
- * is a per-project flag (DECISIONS, 2026-08-11) and a commercial has one flat
- * shot list — prefixing those with an empty episode would produce "_SH010".
- */
-function shot_label(?string $episode, ?string $shotCode): string {
-    $episode  = trim((string)$episode);
-    $shotCode = trim((string)$shotCode);
-    if ($shotCode === '') return '';
-    return $episode !== '' ? $episode . '_' . $shotCode : $shotCode;
-}
-
 /** Match a typed shot label back to a row in THIS project. Null when blank or unknown. */
 function resolve_shot_id(PDO $pdo, int $projectId, ?string $label): ?int {
     $label = trim((string)$label);

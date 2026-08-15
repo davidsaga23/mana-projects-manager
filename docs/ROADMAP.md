@@ -30,7 +30,65 @@ and both are large enough to stall the rest if started early.
 | Feature | Side | Depends on | Notes |
 |---|---|---|---|
 | Online version review (Frame.io / Dropbox Replay style) | P | media hosting | **Largest item. Read the caution below** |
-| Own tracking system — replacing Plaky | P | Phase 3 | The status grid, plus artist logins if artists update their own work. Phase 3 deliberately builds the status model so this becomes screens, not schema |
+| Own tracking system — replacing Plaky | P | Phase 3 | The status grid, plus artist logins if artists update their own work. Phase 3 deliberately builds the status model so this becomes screens, not schema. **The grid half is now specified below and is Phase 8** |
+
+---
+
+## Phase 8 — the tracking grid and the Production tab
+
+Specified 2026-08-14 from David's description of what made STFC's Pre-prod screen work. Ported
+from `preprod.php`, `preprod_api.php`, `assets/preprod.js` in
+`D:\Work\Mana\STFC2\stfc-dashboard\stfc-dashboard_v58\stfc-dashboard\`.
+
+**Read the three `2026-08-14` tracking-grid entries in `DECISIONS.md` first.** They settle the
+one thing that cannot port unchanged and say why.
+
+### No migration
+Everything it reads exists. `progress` holds `(project_id, step_id, shot_id/asset_id, item_key,
+status_id)`; `pipeline_steps.applies_to` and `applies_to_asset_type` say which steps cover which
+items; `statuses` carries `name`, `color`, `maps_to`, `is_blocked`, `is_excluded`. STFC needed
+three tables of its own; here it is screens plus one JSON endpoint. This is the payoff the
+2026-08-11 status-model decision was bought for.
+
+### The screen, top to bottom
+
+| Piece | Behaviour | Ported from |
+|---|---|---|
+| **Colour legend** | Every status in the project, its colour and its name. Built from `statuses`, so it cannot drift from the cells | New — a checkbox needed no key, eleven colours do |
+| **Overall bar** | "N / M cells done", percentage, "across X assets and Y steps" | STFC, unchanged |
+| **Per-step counters** | One per step: done / applicable | STFC, unchanged |
+| **Pies per asset type** | One chart per type, statuses within that type. **Only for types that exist** — no empty placeholders. Clicking a segment lists the items in that type with that status | New |
+| **The grid** | Rows = items grouped by type with subtotals, columns = steps. Cell = a small block in the status's colour. Click opens a dropdown of the project's statuses | STFC's shape, cell redesigned |
+| **Type filter** | Show one asset type at a time | STFC, unchanged |
+
+### The rules that carry meaning
+
+- **Green = `maps_to = 'approved'`.** On STFC a box was ticked only for Plaky's *Completed* or
+  *Final* — meaning **ready for the next department to pick up**. That definition ports exactly
+  onto `approved`, so it does not need restating in code.
+- **A dash means the step does not apply**, computed from `applies_to` /
+  `applies_to_asset_type`, or from an `is_excluded` status on that specific cell. STFC's dash
+  only meant "Plaky didn't send this"; here it can be structural, which is better.
+- **"All green" is a state, not a look.** An item whose every *applicable* step is approved is
+  **ready for production** and reads green wherever it is listed. Computing "applicable"
+  correctly is load-bearing: a character with no rig must still be able to go green.
+- **Shots too.** The same grid serves shots × steps, driven by `applies_to`. STFC had assets
+  only because it had no shot pipeline in that screen.
+
+### Renaming
+The **Shots** tab becomes the **Production** tab, and shows ready-for-production items in green.
+One label in `includes/project_nav.php`, plus the green state above.
+
+### Open questions for the build
+- Does clicking a cell write `progress.status_id` directly, or stage changes for a save? STFC
+  wrote immediately (`preprod_api.php`), which suits a grid. Immediate is probably right, but
+  every write must also recompute `is_delivered` / `is_approved` the way `statuses_edit.php`
+  already does — those flags are what the dashboard counts.
+- **Plaky still owns status** (2026-08-11). A hand-set status here is overwritten by the next
+  import, exactly as STFC's "toggle manually until next CSV upload" warned. Say so on screen.
+- Pie rendering: hand-rolled SVG, consistent with the workflow diagram, rather than a chart
+  library. No external dependency has been added to this codebase yet and none is needed for
+  a pie.
 
 ---
 

@@ -278,16 +278,25 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      `includes/timelog.php`. It is listed here only because the original build order
      misfiled it.
 
-8. **Next: run it against the real show.** Everything through Phase 7 is built; what none of
-   it has had is a week of Return to Club going through it. The specific things to watch,
-   in the order they will bite:
-   - **Apply migrations 015, 016 and 017** (`migrate.php`), then set SMTP in the server's
-     `config.php` — until that is filled in, every notification reports "email is not set up"
-     rather than sending. `config.example.php` already documents the settings; 465 = ssl,
-     587 = tls, and mixing them hangs.
+8. **Tracking grid + Production tab** — **NEXT.** Port from STFC's `preprod.php`,
+   `preprod_api.php` and `assets/preprod.js`. **Read the three `2026-08-14` tracking-grid
+   entries in `docs/DECISIONS.md` and the spec in `docs/ROADMAP.md` before starting** — the
+   shape is settled, and the one thing that cannot port unchanged is already reasoned out.
+   **No migration is needed.** `progress` already holds `(project_id, step_id,
+   shot_id/asset_id, status_id)` and `pipeline_steps.applies_to` already knows which steps
+   cover which items. This is screens and an API over data the importer is already writing —
+   which is exactly what the 2026-08-11 status-model decision was for.
+
+9. **Then: run it all against the real show.** The specific things still to watch:
    - Check the seeded board columns suit how the team actually works, on the Statuses screen.
    - `crew_absences` — now genuinely buildable and paired with the timeline in `ROADMAP.md`.
    - `time_logs` — the per-day table that turns "actual" from elapsed duration into effort.
+   - **Rotate the two database passwords** (`davideei_PM`, `davideei_stfc`) — both were pasted
+     into a chat transcript on 14 August. cPanel → MySQL Databases, then update each app's
+     `config.php` in the same sitting.
+   - STFC's `mail_from_name` was changed to "Anima | Project manager" by accident on
+     14 August. Put it back to "STFC Production Dashboard" or that show's ticket emails are
+     signed with the wrong product.
 
 **A separate track — the finance side.** Contracts, budgets, rates and invoices are
 *deliberately not in this codebase*. They belong to a separate application with its own
