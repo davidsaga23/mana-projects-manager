@@ -23,6 +23,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       · <a href="mytasks.php">My work</a>
       <?php if (is_admin()): ?>
         · <a href="users.php">Users</a>
+        · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
              if ($pendingMigrations > 0): ?><span class="pending-badge"><?= $pendingMigrations ?></span><?php endif;
            ?></a>

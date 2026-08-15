@@ -791,6 +791,36 @@ out to active crew whose role names it, and reports it when that finds nobody.
 **Consequence:** every notification path returns `[sent, message]` and every caller shows the
 message. There is no path that silently sends nothing.
 
+## 2026-08-14 — Email sends as `hi@davidsaga.com`, replies go to `@mana.tv`
+**Decision:** the platform uses **the same mailbox and the same settings as STFC** — sending as
+`hi@davidsaga.com`, a cPanel mailbox on this server, with `mail_reply_to` pointing at
+`david@mana.tv`. `config.example.php` now carries those values; only `smtp_pass` is blank, and
+only `mail_from_name` differs between the two apps (it is what recipients see as the sender).
+**Why not send as `@mana.tv` directly, which is what you would expect:** that needs a Google App
+Password, which needs 2-Step Verification, which is disabled org-wide by the Workspace admin.
+Sending from this server *claiming* to be `@mana.tv` fails SPF, carries no DKIM signature for
+that domain, and gets spam-foldered or rejected under DMARC. Sending as a mailbox that genuinely
+lives here means SPF and DKIM align, so the mail arrives; Reply-To then puts replies where they
+belong. **If 2-Step Verification is ever enabled at Mana, this indirection can be removed.**
+**Consequence:** setting the platform up is copying one password across from STFC's `config.php`,
+not creating anything. Both apps authenticate as the same mailbox, which is fine — SMTP has no
+per-application state to collide over.
+
+## 2026-08-14 — The email diagnostic is ported too, and it is admin-only
+**Decision:** `smtp_test.php`, ported from STFC's `smtp-diagnose.php`, with a real test send
+added. It probes seven host/port/encryption combinations and prints which authenticates, then
+sends a message through `SmtpMailer` — **the same class the notifications use**, because a test
+that sends by another route proves nothing about whether tickets work.
+**Why it earns its place:** "email doesn't work" has about six causes that look identical from
+the outside — blocked outbound SMTP, wrong port/encryption pairing, wrong password, a
+`disable_functions` entry, an unaligned From address. The page separates them by reporting the
+*stage* each attempt reached, which turns a day of guessing into a minute of reading.
+**Consequence:** STFC used `require_login()` for it; here it is `require_admin()`, because this
+codebase has viewer and editor roles that STFC does not and neither needs to see the sending
+address or be able to send mail. It also states plainly when `stream_socket_client` is disabled
+by the host — otherwise every row fails at "connect" with no explanation, which reads like
+wrong settings rather than an unwinnable fight.
+
 ---
 
 ## Still open
