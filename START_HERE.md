@@ -322,8 +322,9 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      their own user, which the production user has **no rights to** — so a bug in any ordinary
      query cannot reach one. `includes/money.php` is the only place that second connection is
      ever opened, and only behind `is_admin()`. **Keep it that way**, or the guarantee is gone.
-     Set it up with `finance_install.sql` + the `finance_db` block in `config.php`; until then
-     the person page says it isn't configured rather than showing a blank.
+     **Set up and live on the server as of 2026-08-15** — its own database, its own user, its
+     own password. On a fresh install use `finance_install.sql` + the `finance_db` block in
+     `config.php`; until that exists the person page says so rather than showing a blank.
      Read the three `2026-08-15` money entries in `docs/DECISIONS.md` before touching any of it.
    - **Pace per person is approximate and labelled as such.** History is recorded per step,
      not per person. Don't remove the caveats without building the history that would justify

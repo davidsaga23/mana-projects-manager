@@ -10,6 +10,7 @@
 require_once __DIR__ . '/names.php';
 require_once __DIR__ . '/statuses.php';
 require_once __DIR__ . '/pipeline.php';   // plaky_analyse matches against pipeline_steps
+require_once __DIR__ . '/activity.php';   // the status-change log (migration 021)
 
 const PLAKY_REQUIRED_COLUMNS = ['Group', 'Item Parent Id', 'Item/Subitem Id', 'Title', 'Status'];
 
@@ -358,6 +359,14 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
     $crewMap = $mapping['people'] ?? [];       // person name => crew_id (0/absent = unmatched)
     $skipChildless = !empty($mapping['skip_childless']);
 
+    // step id => name, for the change log. A log entry saying "step 412" is
+    // worthless once somebody renames or deletes that step, which is precisely
+    // when a log gets read (migration 021).
+    $stepNames = [];
+    $sn = $pdo->prepare('SELECT id, name FROM pipeline_steps WHERE project_id = ?');
+    $sn->execute([$projectId]);
+    foreach ($sn as $r) $stepNames[(int)$r['id']] = $r['name'];
+
     $report = [
         'shots_created' => 0, 'shots_updated' => 0,
         'assets_created' => 0, 'assets_updated' => 0,
@@ -385,10 +394,18 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
     $stmt->execute([$projectId]);
     foreach ($stmt as $r) $assetIds[mb_strtolower($r['name'])] = (int)$r['id'];
 
+    // id AND current status. The status is what makes the change log possible:
+    // once the UPDATE has run, what the row said before is gone forever, so it
+    // has to be read before the write, not after.
     $progressIds = [];
-    $stmt = $pdo->prepare('SELECT id, step_id, item_key FROM progress WHERE project_id = ?');
+    $progressWas = [];
+    $stmt = $pdo->prepare('SELECT id, step_id, item_key, status_id FROM progress WHERE project_id = ?');
     $stmt->execute([$projectId]);
-    foreach ($stmt as $r) $progressIds[$r['step_id'] . '|' . $r['item_key']] = (int)$r['id'];
+    foreach ($stmt as $r) {
+        $k = $r['step_id'] . '|' . $r['item_key'];
+        $progressIds[$k] = (int)$r['id'];
+        $progressWas[$k] = $r['status_id'] !== null ? (int)$r['status_id'] : null;
+    }
 
     if (!$dryRun) $pdo->beginTransaction();
     try {
@@ -602,6 +619,30 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             }
 
             if ($existingId) {
+                // Logged BEFORE the update, while the old status is still readable.
+                // A no-op when the status is unchanged, which is most rows on most
+                // imports — the log is for what moved, not for what was re-sent.
+                $wasId = $progressWas[$stepId . '|' . $itemKey] ?? null;
+                if ((int)$wasId !== (int)$statusId) {
+                    log_status_change($pdo, [
+                        'project_id'      => $projectId,
+                        'step_id'         => $stepId,
+                        'step_name'       => $stepNames[$stepId] ?? null,
+                        'item_key'        => $itemKey,
+                        'item_name'       => $parent['name'] ?? null,
+                        'shot_id'         => $parent['kind'] === 'shot'  ? $parent['id'] : null,
+                        'asset_id'        => $parent['kind'] === 'asset' ? $parent['id'] : null,
+                        'old_status_id'   => $wasId,
+                        'old_status_name' => $wasId ? ($statusRows[$wasId]['name'] ?? null) : null,
+                        'new_status_id'   => $statusId,
+                        'new_status_name' => $statusId ? ($statusRows[$statusId]['name'] ?? null) : null,
+                        'old_status'      => $wasId ? ($statusRows[$wasId] ?? null) : null,
+                        'new_status'      => $statusId ? ($statusRows[$statusId] ?? null) : null,
+                        'crew_id'         => $primaryCrew,
+                        'crew_name'       => $assigneeRaw,
+                        'source'          => 'import',
+                    ]);
+                }
                 $updProg->execute([
                     $statusText, $statusId, $flags['is_delivered'], $flags['is_approved'],
                     $primaryCrew, $assigneeRaw, $minutes, $existingId,

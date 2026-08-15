@@ -17,6 +17,7 @@ require __DIR__ . '/includes/statuses.php';
 require __DIR__ . '/includes/names.php';
 require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/timelog.php';
+require_once __DIR__ . '/includes/activity.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -63,6 +64,14 @@ $sched->execute([$projectId]);
 $plan = $sched->fetch();
 $planOver = ($delivery && $plan['e'] && $plan['e'] > $delivery)
           ? working_days_after($delivery, $plan['e']) : 0;
+
+// What moved today, grouped into the three phases Production tracking uses.
+// ?day= looks back; the picker only offers days that actually have something,
+// so an empty day is never mistaken for a broken screen.
+$activityDays = activity_days($pdo, $projectId, 30);
+$activityDay  = $_GET['day'] ?? ($activityDays[0]['log_date'] ?? $today);
+$activity     = activity_for_day($pdo, $projectId, $activityDay);
+$activityTotal = count($activity['asset']) + count($activity['shot']) + count($activity['project']);
 
 $pageTitle = 'Dashboard · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
@@ -274,6 +283,71 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
     rather than quietly picked.
   </p>
 <?php endif; ?>
+<?php endif; ?>
+
+<h3>Status changes<?= $activityTotal ? ' · ' . $activityTotal : '' ?></h3>
+
+<?php if (!activity_available($pdo)): ?>
+  <p class="muted">
+    Recording status changes needs migration <code>021</code>, which hasn't been applied yet.
+    <strong>Nothing before it runs can be recovered</strong> — the platform only ever stored the
+    current status, never the previous one — so this fills in from the day it is applied.
+    <?php if (is_admin()): ?><a href="migrate.php">Review and apply it →</a><?php endif; ?>
+  </p>
+<?php else: ?>
+
+  <form method="get" class="inline-form">
+    <input type="hidden" name="project" value="<?= $projectId ?>">
+    <label>Day
+      <select name="day" onchange="this.form.submit()">
+        <?php if (!$activityDays): ?>
+          <option><?= e($activityDay) ?></option>
+        <?php endif; ?>
+        <?php foreach ($activityDays as $d): ?>
+          <option value="<?= e($d['log_date']) ?>" <?= $d['log_date'] === $activityDay ? 'selected' : '' ?>>
+            <?= e(date('D j M Y', strtotime($d['log_date']))) ?> — <?= (int)$d['n'] ?> change<?= (int)$d['n'] === 1 ? '' : 's' ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+  </form>
+
+  <?php if (!$activityTotal): ?>
+    <p class="muted">Nothing changed status on <?= e($activityDay) ?>.</p>
+  <?php else: ?>
+    <?php foreach (['asset' => 'Pre-production', 'shot' => 'Production', 'project' => 'Post-production'] as $bucket => $label): ?>
+      <?php $rowsA = $activity[$bucket]; if (!$rowsA) continue; ?>
+      <h4 class="phase-head"><?= e($label) ?> <span class="muted small">· <?= count($rowsA) ?></span></h4>
+      <table class="activity-table">
+        <thead>
+          <tr><th><?= $bucket === 'shot' ? 'Shot' : ($bucket === 'asset' ? 'Asset' : 'Deliverable') ?></th>
+              <th>Step</th><th>Was</th><th></th><th>Now</th><th>Type</th><th>Who</th><th>Source</th></tr>
+        </thead>
+        <tbody>
+        <?php foreach ($rowsA as $a): ?>
+          <tr>
+            <td class="track-name"><?= e($a['display_name']) ?></td>
+            <td><span class="dot" style="background:<?= e($a['step_color'] ?: '#ccc') ?>"></span><?= e($a['step_name'] ?: '—') ?></td>
+            <td class="muted"><?= e($a['old_status_name'] ?: 'nothing recorded') ?></td>
+            <td class="muted">&rarr;</td>
+            <td><strong><?= e($a['new_status_name'] ?: 'cleared') ?></strong></td>
+            <td class="<?= e(change_type_class($a['change_type'])) ?>"><?= e(ucfirst($a['change_type'])) ?></td>
+            <td class="muted"><?= e($a['crew_name'] ?: '—') ?></td>
+            <td class="muted small"><?= e($a['source'] === 'import' ? 'Plaky import' : ($a['source'] === 'grid' ? 'Tracking grid' : 'Item page')) ?><?php
+              if (!empty($a['changed_by'])): ?> · <?= e($a['changed_by']) ?><?php endif; ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endforeach; ?>
+    <p class="muted small">
+      <strong>Type</strong> is worked out from your own status vocabulary, not from the words in
+      a name: <em>approved</em> and <em>delivered</em> follow <code>maps_to</code>, and
+      <em>retake</em> means the work had reached delivered or approved and is now neither —
+      so it is caught whatever the show happens to call that state.
+      <strong>Source</strong> separates an import moving 140 rows from a person moving one.
+    </p>
+  <?php endif; ?>
 <?php endif; ?>
 
 <h3>Who is carrying what</h3>

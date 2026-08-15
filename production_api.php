@@ -14,6 +14,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/grid.php';
+require_once __DIR__ . '/includes/activity.php';
 require_login_json();
 
 header('Content-Type: application/json');
@@ -85,6 +86,13 @@ try {
         throw new RuntimeException('"' . $step['name'] . '" does not apply to that item.');
     }
 
+    // Read the OLD status before writing. Once the upsert runs it is gone, and
+    // a log that cannot say what something changed FROM is half a log.
+    $was = $pdo->prepare('SELECT status_id FROM progress WHERE step_id = ? AND item_key = ?');
+    $was->execute([$stepId, $itemKey]);
+    $oldStatusId = $was->fetchColumn();
+    $oldStatusId = $oldStatusId === false || $oldStatusId === null ? null : (int)$oldStatusId;
+
     $flags = status_flags($status);
 
     // One row per (step, item), enforced by UNIQUE (step_id, item_key) and set by
@@ -106,6 +114,14 @@ try {
         $kind === 's' ? $itemId : null,
         $kind === 'a' ? $itemId : null,
         $itemKey, $statusId, $flags['is_delivered'], $flags['is_approved'],
+    ]);
+
+    log_status_change_by_id($pdo, $projectId, $step, $itemKey, $oldStatusId, $statusId, [
+        'item_name'  => null,
+        'shot_id'    => $kind === 's' ? $itemId : null,
+        'asset_id'   => $kind === 'a' ? $itemId : null,
+        'source'     => 'grid',
+        'changed_by' => current_user_display(),
     ]);
 
     echo json_encode([

@@ -79,7 +79,23 @@ three tables of its own; here it is screens plus one JSON endpoint. This is the 
 The **Shots** tab becomes the **Production** tab, and shows ready-for-production items in green.
 One label in `includes/project_nav.php`, plus the green state above.
 
-### Phase 8b — the item detail view (requested 2026-08-15, NOT built)
+### Phase 8b — the item detail view — **BUILT 2026-08-15** (`item.php`, migration 020)
+
+Everything below was the spec; it was built as written, with these settlements:
+- **Version is free text** (David's call). The cost is stated in migration 020's header: nothing
+  can sort or compare versions, because nothing can know v10 follows v9 rather than v1. Nothing
+  in the codebase does, and nothing should start without deciding a format first.
+- **`version` and `notes` are on `progress`**, not on the item — they describe a step's work on
+  a thing, not the thing. The importer never touches either, so a person's typing survives.
+- **Dates are shown but not edited here.** They come from `schedule`; the timeline is where they
+  are dragged, and it marks what it touches `is_manual = 1`. A second writer without that marker
+  would have the scheduler silently overwrite them.
+- One form, one Save, for the whole table — a save-per-row means five reloads to update one shot
+  after a review.
+
+Original spec follows.
+
+
 
 Clicking an asset or a shot in the tracking grid opens **that item's own page**: every step it
 passes through as a row, and per row the assignee, the due date, the status, a version number

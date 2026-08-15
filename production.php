@@ -261,7 +261,9 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
         <tr class="track-row <?= $row['ready'] ? 'is-ready' : '' ?>" data-group="<?= e($row['group']) ?>">
           <td class="track-name">
-            <?= e($row['name']) ?>
+            <?php // The obvious thing to click, and now it does something: the
+                  // item's own page, with every step opened up. ?>
+            <a href="item.php?project=<?= $projectId ?>&amp;item=<?= e(urlencode($row['item_key'])) ?>"><?= e($row['name']) ?></a>
             <?php if ($row['ready']): ?><span class="ready-tag" title="Every step that applies is approved">ready</span><?php endif; ?>
           </td>
           <?php foreach ($grid['steps'] as $st): $cell = $row['cells'][(int)$st['id']]; ?>

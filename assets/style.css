@@ -973,6 +973,23 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .trend-swatch.delivered { background: #2f6fb2; }
 .trend-swatch.target { background: repeating-linear-gradient(90deg, #b02a37 0 5px, transparent 5px 9px); }
 
+/* Status-change log on the dashboard. */
+.phase-head { margin: 18px 0 6px; font-size: 14px; }
+.activity-table td { vertical-align: middle; }
+.activity-table .track-name { white-space: nowrap; }
+
+/* Item detail — one row per step, editable in place. */
+.item-table td { vertical-align: top; }
+.item-table select { width: 100%; min-width: 130px; padding: 5px 7px; font-size: 14px; }
+.item-table .ver-input { width: 90px; padding: 5px 7px; font-size: 14px; }
+.item-table .notes-input {
+  width: 100%; min-width: 180px; padding: 5px 7px; font-size: 14px;
+  border: 1px solid #c3ccd4; border-radius: 4px; font-family: inherit; resize: vertical;
+}
+.item-table tr.is-done td { background: #f4fbf6; }
+.item-table tr.is-na td { opacity: .6; }
+.item-table small { display: block; margin-top: 2px; }
+
 /* People screens */
 .slot-tag {
   display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
