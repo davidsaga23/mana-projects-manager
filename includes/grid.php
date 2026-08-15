@@ -31,6 +31,11 @@ require_once __DIR__ . '/pipeline.php';
  */
 function step_covers_item(array $step, array $item, string $scope): bool {
     $appliesTo = $step['applies_to'] ?? 'shot';
+
+    // Whole-show deliverables — an animatic, a music track, the mix, the master
+    // (migration 006). They are their own view rather than a column against
+    // every shot, which is the mistake that migration existed to undo.
+    if ($scope === 'project') return $appliesTo === 'project';
     if ($appliesTo === 'project') return false;
 
     if ($scope === 'shot') {
@@ -48,6 +53,16 @@ function step_covers_item(array $step, array $item, string $scope): bool {
 
 /** The steps that can appear as columns for one scope, in pipeline order. */
 function grid_steps(PDO $pdo, int $projectId, string $scope): array {
+    if ($scope === 'project') {
+        $stmt = $pdo->prepare(
+            'SELECT * FROM pipeline_steps
+              WHERE project_id = ? AND applies_to = \'project\'
+              ORDER BY step_order, name'
+        );
+        $stmt->execute([$projectId]);
+        return $stmt->fetchAll();
+    }
+
     $stmt = $pdo->prepare(
         'SELECT * FROM pipeline_steps
           WHERE project_id = ? AND applies_to <> \'project\'
@@ -73,6 +88,22 @@ function grid_steps(PDO $pdo, int $projectId, string $scope): array {
  * caller never has to rebuild it and can never build it differently.
  */
 function grid_items(PDO $pdo, int $projectId, string $scope): array {
+    if ($scope === 'project') {
+        // One row: the show itself. `item_key = 'p<id>'` is the convention the
+        // Plaky importer already writes for whole-project deliverables, so this
+        // view reads exactly the rows the import creates rather than a parallel
+        // set of its own.
+        $stmt = $pdo->prepare('SELECT name FROM projects WHERE id = ?');
+        $stmt->execute([$projectId]);
+        return [[
+            'id'         => $projectId,
+            'item_key'   => 'p' . $projectId,
+            'name'       => (string)$stmt->fetchColumn(),
+            'group'      => 'Whole show',
+            'asset_type' => null,
+        ]];
+    }
+
     if ($scope === 'shot') {
         $stmt = $pdo->prepare(
             'SELECT id, episode, shot_code, placeholder_seconds

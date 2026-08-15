@@ -49,27 +49,39 @@ try {
     }
 
     // item_key is the convention the importer and the scheduler already use:
-    // 's' + shot id, 'a' + asset id. Parsed rather than trusted, and the row it
-    // names must be in this project.
+    // 's' + shot id, 'a' + asset id, 'p' + project id for a whole-show
+    // deliverable. Parsed rather than trusted, and the row it names must belong
+    // to this project.
     $kind = substr($itemKey, 0, 1);
     $itemId = (int)substr($itemKey, 1);
-    if (!in_array($kind, ['s', 'a'], true) || $itemId <= 0) {
+    if (!in_array($kind, ['s', 'a', 'p'], true) || $itemId <= 0) {
         throw new RuntimeException('That item reference is not one this screen can set.');
     }
-    $table = $kind === 's' ? 'shots' : 'assets';
-    $own = $pdo->prepare("SELECT id FROM {$table} WHERE id = ? AND project_id = ?");
-    $own->execute([$itemId, $projectId]);
-    if (!$own->fetchColumn()) throw new RuntimeException('That item is not part of this project.');
+
+    $scope = ['s' => 'shot', 'a' => 'asset', 'p' => 'project'][$kind];
+    $itemRow = ['asset_type' => null];
+
+    if ($kind === 'p') {
+        // The only valid whole-show key is this project's own.
+        if ($itemId !== $projectId) {
+            throw new RuntimeException('That deliverable belongs to a different project.');
+        }
+    } else {
+        $table = $kind === 's' ? 'shots' : 'assets';
+        $own = $pdo->prepare("SELECT id FROM {$table} WHERE id = ? AND project_id = ?");
+        $own->execute([$itemId, $projectId]);
+        if (!$own->fetchColumn()) throw new RuntimeException('That item is not part of this project.');
+
+        if ($kind === 'a') {
+            $t = $pdo->prepare('SELECT asset_type FROM assets WHERE id = ?');
+            $t->execute([$itemId]);
+            $itemRow['asset_type'] = $t->fetchColumn() ?: null;
+        }
+    }
 
     // Does the step actually cover this item? The grid greys those cells out, but
     // the check belongs here too — the screen is a convenience, not the guard.
-    $itemRow = ['asset_type' => null];
-    if ($kind === 'a') {
-        $t = $pdo->prepare('SELECT asset_type FROM assets WHERE id = ?');
-        $t->execute([$itemId]);
-        $itemRow['asset_type'] = $t->fetchColumn() ?: null;
-    }
-    if (!step_covers_item($step, $itemRow, $kind === 's' ? 'shot' : 'asset')) {
+    if (!step_covers_item($step, $itemRow, $scope)) {
         throw new RuntimeException('"' . $step['name'] . '" does not apply to that item.');
     }
 
@@ -87,6 +99,9 @@ try {
              is_delivered = VALUES(is_delivered),
              is_approved  = VALUES(is_approved)'
     )->execute([
+        // Both item columns stay NULL for a whole-show deliverable — it is
+        // neither a shot nor an asset, and item_key is what identifies it. Same
+        // shape the importer writes.
         $projectId, $stepId,
         $kind === 's' ? $itemId : null,
         $kind === 'a' ? $itemId : null,

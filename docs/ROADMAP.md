@@ -79,6 +79,41 @@ three tables of its own; here it is screens plus one JSON endpoint. This is the 
 The **Shots** tab becomes the **Production** tab, and shows ready-for-production items in green.
 One label in `includes/project_nav.php`, plus the green state above.
 
+### Phase 8b — the item detail view (requested 2026-08-15, NOT built)
+
+Clicking an asset or a shot in the tracking grid opens **that item's own page**: every step it
+passes through as a row, and per row the assignee, the due date, the status, a version number
+and notes.
+
+Today the grid answers "where is everything"; this answers "what is going on with *this* one",
+which is the question asked in a review when somebody stops on one shot. The grid gives it a
+natural front door — the item name in the first column is already the obvious thing to click.
+
+**What exists and what does not:**
+
+| Column | Source | Status |
+|---|---|---|
+| Step | `pipeline_steps` | There |
+| Status | `progress.status_id` | There |
+| Assignee | `progress.crew_id` + `progress_crew` for the second person | There |
+| Due date | `schedule.end_date` for that (step, item) | There — inclusive, per the global rule |
+| Notes | — | **Missing.** `shots.notes` and `assets.notes` are per ITEM, not per step |
+| Version number | — | **Missing entirely** |
+
+So it is mostly a reading screen over data already held, plus **one small migration** for the
+two missing fields. Both belong on `progress`, because they describe a step's work on an item
+rather than the item itself: `progress.version` and `progress.notes`.
+
+Worth settling before building: whether a version is a free string ("v003", "A_02") or an
+integer the app increments. Free text matches how the schema treats asset types and departments,
+and studios name versions differently — but an integer is what makes "which is newer" answerable.
+Leaning free text with the same reasoning as `asset_type`: a fixed rule is what forced a schema
+change on STFC when Props arrived.
+
+The related open item is **tickets**: a card can already name a shot, an asset and a step
+(`tickets.step_id`), so this page should list the open tickets against that item — which makes it
+the first screen where the ticket system and the tracking data meet.
+
 ### Open questions for the build
 - Does clicking a cell write `progress.status_id` directly, or stage changes for a save? STFC
   wrote immediately (`preprod_api.php`), which suits a grid. Immediate is probably right, but

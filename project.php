@@ -131,71 +131,25 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php endif; ?>
 
-<div class="hub-grid">
-  <a class="hub-card" href="wizard.php?project=<?= $projectId ?>&step=1">
-    <strong>Setup</strong>
-    <span class="muted">Details, pipeline, workflow, shots, assets, dates</span>
-  </a>
-  <a class="hub-card" href="schedule.php?project=<?= $projectId ?>">
-    <strong>Schedule</strong>
-    <span class="muted">
-      <?php if ($scheduled): ?>
-        <?= $scheduled ?> task<?= $scheduled === 1 ? '' : 's' ?> planned
-        <?php if ($scheduleEnd): ?>· finishes <?= e($scheduleEnd) ?><?php endif; ?>
-      <?php else: ?>
-        Work forwards from the pipeline to real dates
-      <?php endif; ?>
-    </span>
-  </a>
-  <a class="hub-card" href="dashboard.php?project=<?= $projectId ?>">
-    <strong>Dashboard</strong>
-    <span class="muted">Where this show stands, and what needs attention</span>
-  </a>
-  <a class="hub-card" href="timeline.php?project=<?= $projectId ?>">
-    <strong>Timeline</strong>
-    <span class="muted">
-      <?php if ($scheduled): ?>
-        Gantt view of the saved plan<?php if ($scheduleEnd): ?> · to <?= e($scheduleEnd) ?><?php endif; ?>
-      <?php else: ?>
-        Appears once a schedule is saved
-      <?php endif; ?>
-    </span>
-  </a>
-  <a class="hub-card" href="crew.php?project=<?= $projectId ?>">
-    <strong>Crew</strong>
-    <span class="muted">
-      <?php if ($slotCount): ?>
-        <?= $slotCount ?> slot<?= $slotCount === 1 ? '' : 's' ?><?php
-          if ($slotsUnfilled): ?> · <?= $slotsUnfilled ?> still a placeholder<?php endif; ?>
-      <?php else: ?>
-        Who is on this show — real people and planned slots
-      <?php endif; ?>
-    </span>
-  </a>
-  <a class="hub-card" href="import.php?project=<?= $projectId ?>">
-    <strong>Import progress</strong>
-    <span class="muted">Read a Plaky export and update what's tracked</span>
-  </a>
-  <a class="hub-card" href="statuses_edit.php?project=<?= $projectId ?>">
-    <strong>Statuses</strong>
-    <span class="muted">What each state means for reporting</span>
-  </a>
-  <a class="hub-card" href="export.php?project=<?= $projectId ?>">
-    <strong>Export setup (CSV)</strong>
-    <span class="muted">Work, days and headcount per step — the numbers an expense
-      projection is built from</span>
-  </a>
-  <a class="hub-card" href="aliases.php?project=<?= $projectId ?>">
-    <strong>Names &amp; aliases</strong>
-    <span class="muted">
-      <?php if ($unmatchedPeople || $unmappedStatuses): ?>
-        <span class="warn-text"><?= $unmatchedPeople + $unmappedStatuses ?> need attention</span>
-      <?php else: ?>
-        Everything matched
-      <?php endif; ?>
-    </span>
-  </a>
-</div>
+<?php // The card grid that used to sit here is gone (2026-08-15). It was built
+      // before the tab bar existed and duplicated it exactly — nine cards
+      // linking to nine tabs three centimetres above them. The two facts the
+      // cards carried that the tabs cannot (how much is scheduled, how many crew
+      // slots are still placeholders) are in the line below instead, which is
+      // where a number belongs rather than inside a navigation control. ?>
+<p class="muted small">
+  <?php if ($scheduled): ?>
+    <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled<?php
+      if ($scheduleEnd): ?>, finishing <?= e($scheduleEnd) ?><?php endif; ?>.
+  <?php else: ?>
+    Nothing scheduled yet — the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
+    screen works the pipeline forwards into real dates.
+  <?php endif; ?>
+  <?php if ($slotCount): ?>
+    <?= $slotCount ?> crew slot<?= $slotCount === 1 ? '' : 's' ?><?php
+      if ($slotsUnfilled): ?>, <strong><?= $slotsUnfilled ?></strong> still a placeholder<?php endif; ?>.
+  <?php endif; ?>
+</p>
 
 <h3>Progress by step</h3>
 <?php if (!$steps): ?>

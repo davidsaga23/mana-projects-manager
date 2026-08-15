@@ -959,6 +959,12 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .grid-scroll { overflow-x: auto; }
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
+/* The scope under a repeated step name — "Concept / Characters" vs
+   "Concept / Environments". Shown only where the name really is repeated. */
+.step-scope {
+  display: block; font-weight: 400; font-size: 10.5px; color: #5a6a7a;
+  text-transform: none; letter-spacing: 0; margin-top: 1px;
+}
 .track-table th.track-done, .track-table td.track-done { text-align: right; white-space: nowrap; }
 .track-name { white-space: nowrap; font-weight: 500; }
 .track-row.is-ready .track-name { color: #1e7e34; }

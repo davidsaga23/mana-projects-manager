@@ -19,20 +19,24 @@
  */
 function project_nav_items(int $projectId): array {
     $p = '?project=' . $projectId;
+    // Ordered by how a day actually runs, settled with David 2026-08-15: where
+    // the show stands, who is on it, when things happen, then the two screens
+    // work is tracked in. The setup and data-fixing screens follow behind the
+    // separator — opened occasionally, not daily.
     return [
-        ['key' => 'overview',  'label' => 'Overview',  'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
-        ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => 'dashboard.php' . $p,          'group' => 'work'],
-        ['key' => 'production','label' => 'Production','href' => 'production.php' . $p,         'group' => 'work'],
-        ['key' => 'timeline',  'label' => 'Timeline',  'href' => 'timeline.php' . $p,           'group' => 'work'],
-        ['key' => 'schedule',  'label' => 'Schedule',  'href' => 'schedule.php' . $p,           'group' => 'work'],
-        ['key' => 'tasks',     'label' => 'Tasks',     'href' => 'tasks.php' . $p,              'group' => 'work'],
-        ['key' => 'crew',      'label' => 'Crew',      'href' => 'crew.php' . $p,               'group' => 'work'],
-        ['key' => 'setup',     'label' => 'Setup',     'href' => 'wizard.php' . $p . '&step=1', 'group' => 'data'],
-        ['key' => 'import',    'label' => 'Import',    'href' => 'import.php' . $p,             'group' => 'data'],
-        ['key' => 'statuses',  'label' => 'Statuses',  'href' => 'statuses_edit.php' . $p,      'group' => 'data'],
-        ['key' => 'aliases',   'label' => 'Names',     'href' => 'aliases.php' . $p,            'group' => 'data'],
+        ['key' => 'overview',   'label' => 'Overview',            'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
+        ['key' => 'dashboard',  'label' => 'Dashboard',           'href' => 'dashboard.php' . $p,          'group' => 'work'],
+        ['key' => 'crew',       'label' => 'Crew',                'href' => 'crew.php' . $p,               'group' => 'work'],
+        ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],
+        ['key' => 'timeline',   'label' => 'Timeline',            'href' => 'timeline.php' . $p,           'group' => 'work'],
+        ['key' => 'production', 'label' => 'Production tracking', 'href' => 'production.php' . $p,         'group' => 'work'],
+        ['key' => 'tasks',      'label' => 'Tasks',               'href' => 'tasks.php' . $p,              'group' => 'work'],
+        ['key' => 'setup',      'label' => 'Setup',               'href' => 'wizard.php' . $p . '&step=1', 'group' => 'data'],
+        ['key' => 'import',     'label' => 'Import',              'href' => 'import.php' . $p,             'group' => 'data'],
+        ['key' => 'statuses',   'label' => 'Statuses',            'href' => 'statuses_edit.php' . $p,      'group' => 'data'],
+        ['key' => 'aliases',    'label' => 'Names',               'href' => 'aliases.php' . $p,            'group' => 'data'],
         // A download rather than a screen, marked so nobody expects a page.
-        ['key' => 'export',    'label' => 'Export ↓',  'href' => 'export.php' . $p,             'group' => 'data'],
+        ['key' => 'export',     'label' => 'Export ↓',            'href' => 'export.php' . $p,             'group' => 'data'],
     ];
 }
 
