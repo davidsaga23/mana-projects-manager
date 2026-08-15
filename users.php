@@ -119,6 +119,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        if ($action === 'set_crew_email' && $hasCrewLink) {
+            // The email lives on the CREW row, not on the login, because that is
+            // what a notification is addressed to — a person, not an account.
+            //
+            // It is editable here because there was nowhere else for it: crew.php
+            // manages a project's lanes, and its only email field appears when a
+            // planning SLOT is promoted to a real person. Somebody added straight
+            // to the crew list — a producer, a coordinator, anyone who owns
+            // tickets without being booked on a show — has no lane and so never
+            // appears there at all.
+            $id = (int)($_POST['user_id'] ?? 0);
+            $email = trim($_POST['crew_email'] ?? '');
+
+            $lookup = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
+            $lookup->execute([$id]);
+            $crewId = (int)$lookup->fetchColumn();
+            if (!$crewId) throw new RuntimeException('Link the account to a person first.');
+
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new RuntimeException('"' . $email . '" is not a valid email address — nothing was saved.');
+            }
+            $pdo->prepare('UPDATE crew SET email = ? WHERE id = ?')
+                ->execute([$email !== '' ? $email : null, $crewId]);
+            flash('ok', $email !== ''
+                ? 'Email saved. Notifications about their tickets will go to ' . $email . '.'
+                : 'Email cleared. They will no longer be notified about their tickets.');
+        }
+
         if ($action === 'delete') {
             $id = (int)($_POST['user_id'] ?? 0);
             if ($id === $currentUserId) {
@@ -139,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $users = $pdo->query(
     'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, u.last_login'
-    . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name' : '')
+    . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name, c.email AS crew_email' : '')
     . ' FROM users u'
     . ($hasCrewLink ? ' LEFT JOIN crew c ON c.id = u.crew_id' : '')
     . ' ORDER BY u.active DESC, u.created_at ASC'
@@ -179,7 +207,7 @@ require __DIR__ . '/includes/header.php';
 
 <table class="review-table">
   <thead>
-    <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><?php endif; ?><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
+    <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><th>Email for notifications</th><?php endif; ?><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($users as $u): $id = (int)$u['id']; $isSelf = $id === $currentUserId; ?>
@@ -204,6 +232,22 @@ require __DIR__ . '/includes/header.php';
             <?php endforeach; ?>
           </select>
         </form>
+      </td>
+      <td>
+        <?php if (empty($u['crew_id'])): ?>
+          <span class="muted small">— link a person first —</span>
+        <?php else: ?>
+          <form method="post" class="inline-form" style="margin:0;">
+            <input type="hidden" name="action" value="set_crew_email">
+            <input type="hidden" name="user_id" value="<?= $id ?>">
+            <input type="email" name="crew_email" value="<?= e($u['crew_email'] ?? '') ?>"
+                   placeholder="none — no notifications" style="min-width:190px;">
+            <button type="submit" class="secondary">Save</button>
+          </form>
+          <?php if (empty($u['crew_email'])): ?>
+            <small class="warn-text">Without one, tickets can be assigned but nobody is told.</small>
+          <?php endif; ?>
+        <?php endif; ?>
       </td>
       <?php endif; ?>
       <td>

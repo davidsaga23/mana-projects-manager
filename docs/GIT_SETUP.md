@@ -46,8 +46,16 @@ deploy folder. You need:
 - **Server** — e.g. `ftp.davidsaga.com`
 - **Username** — the full FTP username
 - **Password**
-- **Target directory** — where the site lives, e.g.
-  `/public_html/tools/ManaProjects/PLATFORM/` *(must end with a slash)*
+- **Target directory** — where the site lives. For this install it is
+  `/public_html/mana/` *(must end with a slash)*
+
+> **⚠ There are two folders called `mana` on this account.** The live site is
+> `/home2/davideei/public_html/mana`. A stray `/home2/davideei/mana/public_html/mana` holds the
+> abandoned first deploy of 11 August — it has a `config.example.php` but no `config.php`, and
+> nothing serves it. Typing `mana` into cPanel File Manager's "Go" box lands you in the wrong
+> one, because that box reads paths relative to your home directory. Type `public_html/mana`.
+> When in doubt, open `smtp_test.php` in the app: it prints the absolute path of the config
+> file the running application actually loaded.
 
 ### 4. Store them as GitHub secrets
 On github.com, open the repo → **Settings → Secrets and variables → Actions →

@@ -191,6 +191,40 @@ $disabledFns = array_values(array_filter(
 
 $configured = SmtpMailer::isConfigured($config);
 
+// Exactly which of the three required keys are blank. Named individually
+// because "not configured" sent people back to re-check all of them, and the
+// probe can authenticate perfectly well with smtp_host empty — it falls back to
+// this site's own hostname — so a page full of green ticks sat directly above a
+// disabled Send button with no stated connection between the two.
+$missingKeys = [];
+foreach (['smtp_host', 'smtp_user', 'smtp_pass'] as $k) {
+    if (empty($config[$k])) $missingKeys[] = $k;
+}
+$hostFallback = empty($config['smtp_host']);
+
+// DUPLICATE KEYS IN config.php — the trap that eats an evening.
+//
+// Pasting a corrected block into the file while leaving the original lines
+// below it produces an array literal with the same key twice. PHP takes the
+// LAST one silently, so a carefully pasted 'smtp_host' above an empty original
+// changes nothing whatsoever, and the page reports it as still empty. No error,
+// no warning, and the file looks obviously correct to anyone reading it.
+//
+// Read as TEXT, not by parsing: the parsed array cannot show a duplicate,
+// because by then one has already won. Key names only — no values are read out
+// of the file here, so the password never enters this page.
+$dupKeys = [];
+$configPath = __DIR__ . '/config.php';
+if (is_readable($configPath)) {
+    $raw = (string)file_get_contents($configPath);
+    foreach (['smtp_host','smtp_port','smtp_secure','smtp_user','smtp_pass','smtp_ehlo',
+              'smtp_verify_peer','mail_from','mail_from_name','mail_reply_to'] as $k) {
+        // Count assignments only, so the word appearing in a comment doesn't count.
+        $n = preg_match_all("/^\s*'" . preg_quote($k, '/') . "'\s*=>/m", $raw);
+        if ($n > 1) $dupKeys[$k] = $n;
+    }
+}
+
 $pageTitle = 'Email diagnostic';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -204,6 +238,37 @@ require __DIR__ . '/includes/header.php';
   works out which settings that mailbox needs, then proves them with a real message.
 </p>
 
+<?php if ($dupKeys): ?>
+  <div class="flash flash-err">
+    <strong>Some settings appear more than once in <code>config.php</code>,
+    and PHP silently uses the LAST one.</strong>
+    <ul style="margin:6px 0 0 18px;">
+      <?php foreach ($dupKeys as $k => $n): ?>
+        <li><code><?= e($k) ?></code> — <?= (int)$n ?> times</li>
+      <?php endforeach; ?>
+    </ul>
+    This is what happens when a corrected block is pasted in above the original lines. Open
+    <code>config.php</code>, and for each one listed above delete every copy except the one you
+    want kept. The values shown below are whatever the last copy says.
+  </div>
+<?php endif; ?>
+
+<?php if ($missingKeys): ?>
+  <div class="flash flash-err">
+    <strong>Email cannot send yet.</strong>
+    <?= count($missingKeys) === 1 ? 'This setting is' : 'These settings are' ?> empty in
+    <code>config.php</code>: <strong><?= e(implode(', ', $missingKeys)) ?></strong>.
+    Until <?= count($missingKeys) === 1 ? 'it is' : 'they are' ?> filled in, the Send button
+    below stays switched off and no ticket notification will go out.
+    <?php if ($hostFallback): ?>
+      <br><br>
+      Note that the probe below <em>will still work</em> with <code>smtp_host</code> empty — it
+      falls back to this site's own hostname to have something to try. So green ticks there do
+      not mean the app can send. They mean the username and password are right.
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <?php if ($disabledFns): ?>
   <div class="flash flash-err">
     Your host has disabled <strong><?= e(implode(', ', $disabledFns)) ?></strong>. Outbound email
@@ -211,6 +276,35 @@ require __DIR__ . '/includes/header.php';
     "connect" no matter what the settings say. Contact hosting support.
   </div>
 <?php endif; ?>
+
+<section class="panel">
+  <h2>Which file this app is actually reading</h2>
+  <p class="muted small">
+    There is more than one <code>config.php</code> on this server, and more than one folder called
+    <code>mana</code>. Rather than anyone navigating to the right one and hoping, this is the file
+    <em>this running application</em> loaded — resolved to its real absolute path.
+  </p>
+  <table>
+    <tr><th>Config file</th>
+        <td><code><?= e(realpath($configPath) ?: $configPath) ?></code></td></tr>
+    <tr><th>Last edited</th>
+        <td><?= is_file($configPath)
+              ? e(date('j M Y, H:i', (int)filemtime($configPath)))
+              : '<span class="err">file not found</span>' ?>
+          <span class="muted small">— if this isn't when you last saved, you edited a different file</span>
+        </td></tr>
+    <tr><th>Database in use</th>
+        <td><code><?= e((string)($config['db_name'] ?? '?')) ?></code>
+        <?php if (stripos((string)($config['db_name'] ?? ''), 'stfc') !== false): ?>
+          <span class="err">— that looks like STFC's database, not this platform's.
+          These two applications must never share one: their schemas both define
+          <code>shots</code>, <code>crew</code> and <code>users</code>.</span>
+        <?php endif; ?>
+        </td></tr>
+    <tr><th>Session name</th>
+        <td><code><?= e((string)($config['session_name'] ?? '?')) ?></code></td></tr>
+  </table>
+</section>
 
 <section class="panel">
   <h2>What config.php currently says</h2>
@@ -261,8 +355,12 @@ require __DIR__ . '/includes/header.php';
   <?php if ($ranProbe): ?>
     <?php $winner = null; foreach ($results as $r) { if ($r['ok']) { $winner = $r; break; } } ?>
     <?php if ($winner): ?>
-      <div class="flash flash-ok" style="margin-top:14px;">
+      <div class="flash flash-<?= $hostFallback ? 'warn' : 'ok' ?>" style="margin-top:14px;">
         <strong>Found a working combination.</strong> Put these into <code>config.php</code>:
+        <?php if ($hostFallback): ?>
+          <br><strong>This is the line you are missing</strong> — <code>smtp_host</code> is
+          currently empty, which is why the Send button below is switched off.
+        <?php endif; ?>
       </div>
       <pre class="ticket-body">'smtp_host'        => '<?= e($winner['host']) ?>',
 'smtp_port'        => <?= (int)$winner['port'] ?>,

@@ -15,10 +15,16 @@ without re-deriving context.
 - **⚠ Deploy state:** migrations **015**, **016** and **017** were written on 14 August and
   are probably not applied — open `migrate.php` and check before assuming departments or the
   tasks board are live. Everything up to 014 is applied.
-- **⚠ Email is off until configured.** The tickets phase sends notifications through
-  authenticated SMTP, and `smtp_host` is empty in `config.example.php`. Until the real values
-  are added to the server's `config.php`, every notification says so on screen rather than
-  failing quietly — but nobody gets an email.
+- **Email is live** (confirmed 2026-08-14): sending as `hi@davidsaga.com` through
+  `mana.davidsaga.com:465/ssl`, with Reply-To `david@mana.tv`. Same mailbox STFC uses — see
+  the 2026-08-14 email entries in `docs/DECISIONS.md` for why it does not send as `@mana.tv`.
+  `smtp_test.php` (top bar → **Email**, admin only) probes the settings and sends a real
+  test through the same code the notifications use.
+- **⚠ There are two folders called `mana` on the server.** The live one is
+  `/home2/davideei/public_html/mana`. A stray `/home2/davideei/mana/public_html/mana` holds an
+  abandoned 11 August copy from the first deploy, with no `config.php` — editing files there
+  changes nothing and has already cost an afternoon. `smtp_test.php` prints the absolute path
+  of the config file the app actually loaded, which settles it in one look.
 - **The reference implementation is STFC.** Settled 2026-08-14: *"everything we build from now
   on should also be informed by the STFC2 project — that's the MVP and we can add on top of
   it."* Read the equivalent screen there before designing a new one here. It is at
