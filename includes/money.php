@@ -114,11 +114,17 @@ function save_crew_terms(PDO $pdo, int $crewId, array $in): string {
 
     return $rateVal === null
         ? 'Terms saved — no rate recorded.'
-        : 'Terms saved: ' . fmt_rate($rateVal, $unit, $cur) . '.';
+        : 'Terms saved: ' . fmt_money($rateVal, $unit, $cur) . '.';
 }
 
-/** "1,200.00 USD / day". Never called for a non-admin, because the data never arrives. */
-function fmt_rate(?float $rate, string $unit = 'day', string $currency = 'USD'): string {
+/**
+ * "1,200.00 USD · per day". Never called for a non-admin, because the data never arrives.
+ *
+ * NOT fmt_rate() — quota.php already has one of those for a WORK rate (items per
+ * day), and defining a second fataled every page that loaded both. Different
+ * meanings deserve different names even when the English word is the same.
+ */
+function fmt_money(?float $rate, string $unit = 'day', string $currency = 'USD'): string {
     if ($rate === null) return '—';
     $per = $unit === 'flat' ? 'flat fee' : 'per ' . $unit;
     return number_format($rate, 2) . ' ' . $currency . ' · ' . $per;

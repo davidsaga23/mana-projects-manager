@@ -162,6 +162,15 @@ Hard-won, all from real incidents:
    prevent exactly that. Write it escaped as `<\/script>`, or say "a closing script tag" in
    prose. Only a hazard *inline*: inside a real `.js` file loaded with `<script src=…>` the
    sequence is harmless. (Phase 7 build, 2026-08-14.)
+13. **Two functions with the same name is a fatal, and only on the page that loads both.**
+   PHP has no namespaces here, so a second `function fmt_rate()` kills any request where both
+   files are included — while every other page keeps working, which makes it look like a bug
+   in the new screen rather than a collision with an old one. Cost `person.php` its first
+   load: `money.php` defined `fmt_rate()` for a PAY rate, `quota.php` already had one for a
+   WORK rate. Same English word, two meanings, one 500. **`tools/check_php_blocks.py` now
+   detects this** — it reports every duplicated function name across the codebase, which is
+   the closest thing to a linter available without a PHP binary. Run it before handing over.
+   (Phase 9 build, 2026-08-15.)
 
 ---
 

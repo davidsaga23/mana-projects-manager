@@ -155,3 +155,41 @@ for f in files:
             print('    ' + e)
 print('')
 print('%d files checked, %d with unbalanced alternation blocks' % (len(files), bad))
+
+
+# ---------------------------------------------------------------------------
+# Duplicate function names.
+#
+# A second definition of a name already declared is a FATAL error in PHP, so the
+# page 500s the moment both files are loaded together — and only then. Every
+# other page keeps working, which is what makes it look like a bug in the new
+# screen rather than a collision with an old one.
+#
+# Cost person.php its first load (2026-08-15): money.php defined fmt_rate() for a
+# PAY rate, quota.php already had one for a WORK rate. Same English word, two
+# meanings, one fatal.
+#
+# Checked here rather than in a separate script because START_HERE tells people
+# to run ONE command before handing over, and a check nobody runs is not a check.
+# ---------------------------------------------------------------------------
+FUNC = re.compile(r'^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', re.M)
+
+seen = {}
+for f in files:
+    text = io.open(f, encoding='utf-8', errors='replace').read()
+    code = php_code_only(text)
+    for m in FUNC.finditer(code):
+        name = m.group(1)
+        line = code[:m.start()].count(chr(10)) + 1
+        seen.setdefault(name.lower(), []).append((f, line))
+
+clashes = {n: w for n, w in seen.items() if len(w) > 1}
+if clashes:
+    print('')
+    print('DUPLICATE FUNCTION NAMES — PHP fatals when two of these load together:')
+    for name, where in sorted(clashes.items()):
+        print('  %s()' % name)
+        for f, line in where:
+            print('      %s:%d' % (f, line))
+print('')
+print('%d function names defined, %d duplicated' % (len(seen), len(clashes)))
