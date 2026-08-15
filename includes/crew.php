@@ -333,3 +333,45 @@ function unfilled_slot_count(PDO $pdo, int $projectId): int {
     $stmt->execute([$projectId]);
     return (int)$stmt->fetchColumn();
 }
+
+/**
+ * Tie a LOGIN to a PERSON, creating the crew row if there isn't one.
+ *
+ * `users` are logins and `crew` are people; a ticket is assigned to a person, so
+ * an account with no crew row cannot own anything and has no "My work" list.
+ * This is the one operation that fixes that, shared by users.php (an admin doing
+ * it for someone) and mytasks.php (someone doing it for themselves) so the two
+ * cannot drift into behaving differently.
+ *
+ * An EXACT name match reuses the existing row rather than creating a second copy
+ * of the same person — the same rule the status mapping and the alias layer
+ * follow. Anything less exact is left alone: two spellings are a job for the
+ * alias screen, not for a silent merge here.
+ *
+ * @return array{0:int, 1:string}  [crew id, a sentence saying what happened]
+ */
+function link_login_to_crew(PDO $pdo, int $userId, string $personName): array {
+    $personName = trim($personName);
+    if ($personName === '') {
+        throw new RuntimeException('That account has no name to create a crew member from.');
+    }
+
+    $find = $pdo->prepare('SELECT id FROM crew WHERE name = ? LIMIT 1');
+    $find->execute([$personName]);
+    $crewId = $find->fetchColumn();
+
+    if ($crewId) {
+        $pdo->prepare('UPDATE users SET crew_id = ? WHERE id = ?')->execute([(int)$crewId, $userId]);
+        return [(int)$crewId, "\"$personName\" was already in the crew list, so the account was linked "
+                            . 'to that person rather than a second copy being made.'];
+    }
+
+    $pdo->prepare('INSERT INTO crew (name, role, active, is_team) VALUES (?, NULL, 1, 0)')
+        ->execute([$personName]);
+    $crewId = (int)$pdo->lastInsertId();
+    $pdo->prepare('UPDATE users SET crew_id = ? WHERE id = ?')->execute([$crewId, $userId]);
+
+    return [$crewId, "Added \"$personName\" to the crew list and linked the account. Tickets can now "
+                   . 'be assigned to them on any project. Add an email address on a project Crew '
+                   . 'screen if they should be notified.'];
+}

@@ -17,6 +17,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/tickets.php';
+require_once __DIR__ . '/includes/crew.php';
 require_login();
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
@@ -24,11 +25,26 @@ $ready  = column_exists($pdo, 'tickets', 'id') && column_exists($pdo, 'users', '
 
 // --- claim a crew row -------------------------------------------------------
 if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])) {
-    $crewId = (int)$_POST['set_crew'] ?: null;
-    $pdo->prepare('UPDATE users SET crew_id = ? WHERE id = ?')->execute([$crewId, $userId]);
-    flash('ok', $crewId
-        ? 'Linked. This list now shows what is assigned to you.'
-        : 'Unlinked from a crew member.');
+    try {
+        if ($_POST['set_crew'] === 'new') {
+            // The case that made this screen a dead end: on a project whose crew
+            // is all placeholder slots, or before anyone has been added at all,
+            // the picker had nothing to offer and no way forward. Producers and
+            // coordinators are exactly the people who own tickets and are
+            // exactly the people not in an artist list.
+            $me = current_user();
+            [, $msg] = link_login_to_crew($pdo, $userId, (string)($me['display_name'] ?: $me['username']));
+            flash('ok', $msg);
+        } else {
+            $crewId = (int)$_POST['set_crew'] ?: null;
+            $pdo->prepare('UPDATE users SET crew_id = ? WHERE id = ?')->execute([$crewId, $userId]);
+            flash('ok', $crewId
+                ? 'Linked. This list now shows what is assigned to you.'
+                : 'Unlinked from a crew member.');
+        }
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
     header('Location: mytasks.php');
     exit;
 }
@@ -102,8 +118,14 @@ require __DIR__ . '/includes/header.php';
 
   <?php if (!$candidates): ?>
     <div class="empty-state">
-      <p>There are no active crew members to choose from yet.</p>
-      <p class="muted">Add people on a project's Crew screen first.</p>
+      <p><strong>Nobody is in the crew list yet — but you can add yourself.</strong></p>
+      <p class="muted">The crew list holds real people. Planning slots ("Animation 01") and
+         teams don't count, which is why this can be empty on a project that is fully planned.</p>
+      <form method="post">
+        <button type="submit" name="set_crew" value="new">
+          Add <?= e($me['display_name'] ?: $me['username']) ?> to the crew
+        </button>
+      </form>
     </div>
   <?php else: ?>
     <?php
@@ -134,6 +156,14 @@ require __DIR__ . '/includes/header.php';
         <small>Matched to your account name. Change it if that isn't you.</small>
       <?php endif; ?>
     </form>
+    <?php if (!$guess): ?>
+      <p class="muted small">Not in that list? Add yourself:</p>
+      <form method="post">
+        <button type="submit" name="set_crew" value="new" class="secondary">
+          Add <?= e($me['display_name'] ?: $me['username']) ?> to the crew
+        </button>
+      </form>
+    <?php endif; ?>
   <?php endif; ?>
 
 <?php else: ?>

@@ -264,14 +264,24 @@ function load_ticket(PDO $pdo, int $id): ?array {
  * notification helper reports it rather than doing nothing.
  */
 function ticket_assignees(PDO $pdo, int $projectId): array {
+    // Anyone with a login is an owner on EVERY project, not only shows they are
+    // booked on. `crew_projects` is a production allocation — it says who is
+    // working the show for scheduling and quota purposes. A producer or a
+    // coordinator oversees all of them and should not need a booking on each
+    // just to be handed a ticket. The column arrives in migration 017, so it is
+    // checked rather than assumed.
+    $loggedIn = column_exists($pdo, 'users', 'crew_id')
+        ? ' OR EXISTS (SELECT 1 FROM users u WHERE u.crew_id = c.id AND u.active = 1)'
+        : '';
+
     $stmt = $pdo->prepare(
         'SELECT DISTINCT c.id, c.name, c.role, c.email, c.is_team, c.is_placeholder
            FROM crew c
            LEFT JOIN crew_projects cp ON cp.crew_id = c.id AND cp.project_id = ?
            LEFT JOIN crew_lanes   cl ON cl.crew_id = c.id AND cl.project_id = ?
           WHERE c.active = 1
-            AND (cp.crew_id IS NOT NULL OR cl.crew_id IS NOT NULL OR c.is_team = 1)
-          ORDER BY c.is_team DESC, c.is_placeholder ASC, c.name'
+            AND (cp.crew_id IS NOT NULL OR cl.crew_id IS NOT NULL OR c.is_team = 1' . $loggedIn . ')
+          ORDER BY c.is_team ASC, COALESCE(c.is_placeholder, 0) ASC, c.name'
     );
     $stmt->execute([$projectId, $projectId]);
     return $stmt->fetchAll();

@@ -241,7 +241,13 @@ function render_attachment(array $a, bool $canDelete): void {
     $name = e($a['original_name']);
     echo '<div class="attachment">';
     if (attachment_is_image($a['mime_type'])) {
-        echo '<a href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
+        // The href is real and still works — ctrl-click, middle-click and a
+        // browser with JavaScript off all open the file directly. The click
+        // handler in tickets.js intercepts an ordinary click and shows the image
+        // full size over this page instead, so looking at a reference does not
+        // cost you the ticket you were reading.
+        echo '<a href="' . $url . '" class="att-zoom" data-name="' . $name . '"'
+           . ' target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
     } elseif (attachment_is_video($a['mime_type'])) {
         echo '<video src="' . $url . '" controls preload="metadata"></video>';
     } else {

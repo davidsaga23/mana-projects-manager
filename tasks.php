@@ -574,15 +574,29 @@ foreach ($cards as $sid => $list) {
 // Every card on screen, so the quick-edit modal can fill itself without a round
 // trip. Built from the same rows the board rendered, so the two cannot disagree.
 //
-// JSON_HEX_TAG matters and is not decoration: a card description containing
-// "</script>" would otherwise close this block and everything after it would be
-// parsed as HTML. Titles and descriptions are typed by people, and one of them
-// will eventually paste markup. The other three flags close the same door for
-// quotes and ampersands.
+// JSON_HEX_TAG matters and is not decoration: a card description holding a
+// closing script tag would otherwise end this block, and everything after it
+// would be parsed as page text. Titles and descriptions are typed by people, and
+// one of them will eventually paste markup. The other three flags close the same
+// door for quotes and ampersands.
+//
+// NOTE FOR ANYONE EDITING THIS COMMENT: do not write that tag out literally,
+// even inside a // comment. The HTML parser looks for the character sequence and
+// does not care that JavaScript considers it commented out — it ends the script
+// element on the spot. This exact comment shipped with the tag spelled out and
+// dumped the rest of the page to the screen as text. Identical in kind to
+// lesson 9 about '?>' inside a PHP comment: the parser acts on the characters,
+// not on your intent.
+// EVERY ONE OF THESE IS `window.x =`, NOT `const x =`. A top-level `const` (or
+// `let`) does NOT become a property of window — only `var` and a plain
+// assignment do. board.js reads them as window.CARDS / window.CAN_EDIT, so
+// declaring them with `const` left it seeing undefined: canEdit came out false,
+// dragCard bailed on its first line, and the board silently would not drag.
+// Nothing errored, which is what made it hard to see. Shipped that way once.
 <?php $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT; ?>
-const CARDS = <?= json_encode(array_values(array_merge(...array_values($cards ?: [[]]))), $jsonFlags) ?>;
-const PROJECT_URL = <?= json_encode($selfUrl, $jsonFlags) ?>;
-const CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
+window.CARDS = <?= json_encode(array_values(array_merge(...array_values($cards ?: [[]]))), $jsonFlags) ?>;
+window.PROJECT_URL = <?= json_encode($selfUrl, $jsonFlags) ?>;
+window.CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
 // Read by tickets.js as it initialises, so these MUST be set before that file
 // loads — not after it, which is a silent no-op that falls back to the defaults.
 window.TICKET_MAX_FILES = <?= (int)($config['upload_max_files'] ?? 5) ?>;

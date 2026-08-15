@@ -188,3 +188,74 @@
     document.querySelectorAll('form[data-ticket-form]').forEach(window.initTicketForm);
   });
 })();
+
+// ---------------------------------------------------------------------------
+// Attachment lightbox.
+//
+// Clicking a reference image used to open it in a new tab, which takes you away
+// from the ticket you were reading — and a browser cannot be made to open a tab
+// in the BACKGROUND from script, so "new tab but stay here" is not something the
+// web platform offers. Showing the image full size over the page is the version
+// that actually keeps you where you are, and it closes with Escape.
+//
+// The underlying link is left intact and functional: ctrl-click, middle-click,
+// "open in new tab" from the context menu, and a browser with scripting off all
+// still go straight to the file. This only intercepts a plain left click.
+// ---------------------------------------------------------------------------
+(function () {
+  let box = null;
+
+  function build() {
+    if (box) return box;
+    box = document.createElement('div');
+    box.className = 'lightbox';
+    box.innerHTML =
+      '<div class="lightbox-bar">' +
+        '<span class="lightbox-name"></span>' +
+        '<a class="lightbox-open" target="_blank" rel="noopener">Open in a new tab</a>' +
+        '<button type="button" class="lightbox-close" title="Close (Esc)">&times;</button>' +
+      '</div>' +
+      '<img alt="">';
+    document.body.appendChild(box);
+
+    // Clicking the backdrop closes; clicking the image itself does not, so
+    // zooming in on a detail doesn't dismiss the thing you're looking at.
+    box.addEventListener('click', (e) => {
+      if (e.target === box) close();
+    });
+    box.querySelector('.lightbox-close').addEventListener('click', close);
+    return box;
+  }
+
+  function open(src, name) {
+    const el = build();
+    el.querySelector('img').src = src;
+    el.querySelector('img').alt = name || '';
+    el.querySelector('.lightbox-name').textContent = name || '';
+    el.querySelector('.lightbox-open').href = src;
+    el.classList.add('is-open');
+    document.body.classList.add('lightbox-lock');
+  }
+
+  function close() {
+    if (!box) return;
+    box.classList.remove('is-open');
+    document.body.classList.remove('lightbox-lock');
+    // Drop the source so a large image isn't held in memory behind the page.
+    box.querySelector('img').src = '';
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest ? e.target.closest('a.att-zoom') : null;
+    if (!link) return;
+    // Leave every modified click alone — those are deliberate "open elsewhere"
+    // gestures and hijacking them is exactly the rudeness this is fixing.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    open(link.getAttribute('href'), link.dataset.name || '');
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+})();

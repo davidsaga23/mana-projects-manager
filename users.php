@@ -8,10 +8,21 @@
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/crew.php';
 require_admin();
 
 $currentUserId = (int)$_SESSION['user_id'];
 const USER_ROLES = ['admin', 'editor', 'viewer'];
+
+// Which PERSON a login is. Arrives with the tickets phase (migration 017);
+// hidden rather than breaking the screen if that hasn't run.
+//
+// Why this matters here rather than being a curiosity: a ticket is assigned to a
+// `crew` row, because that is what this schema means by a person. `users` are
+// logins. So until a login is tied to a crew row, that individual cannot own a
+// ticket and cannot have a "My work" list — which is exactly the state David and
+// Renata were in.
+$hasCrewLink = column_exists($pdo, 'users', 'crew_id');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -76,6 +87,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('ok', 'Password changed.');
         }
 
+        if ($action === 'set_crew' && $hasCrewLink) {
+            $id = (int)($_POST['user_id'] ?? 0);
+            $choice = $_POST['crew_id'] ?? '';
+
+            $nameStmt = $pdo->prepare('SELECT display_name, username FROM users WHERE id = ?');
+            $nameStmt->execute([$id]);
+            $u = $nameStmt->fetch();
+            if (!$u) throw new RuntimeException('That account no longer exists.');
+            $personName = trim($u['display_name'] ?: $u['username']);
+
+            if ($choice === 'new') {
+                // Shared with mytasks.php, where someone links themselves. One
+                // implementation so an admin doing it and a person doing it for
+                // themselves cannot end up behaving differently.
+                [, $msg] = link_login_to_crew($pdo, $id, $personName);
+                flash('ok', $msg);
+            } elseif ($choice === '' || $choice === '0') {
+                $pdo->prepare('UPDATE users SET crew_id = NULL WHERE id = ?')->execute([$id]);
+                flash('ok', 'Unlinked. Their "My work" list will ask again who they are.');
+            } else {
+                $crewId = (int)$choice;
+                $chk = $pdo->prepare('SELECT name FROM crew WHERE id = ? AND is_team = 0');
+                $chk->execute([$crewId]);
+                $crewName = $chk->fetchColumn();
+                if ($crewName === false) {
+                    throw new RuntimeException('That is not a person in the crew list.');
+                }
+                $pdo->prepare('UPDATE users SET crew_id = ? WHERE id = ?')->execute([$crewId, $id]);
+                flash('ok', "Linked the account to \"$crewName\".");
+            }
+        }
+
         if ($action === 'delete') {
             $id = (int)($_POST['user_id'] ?? 0);
             if ($id === $currentUserId) {
@@ -95,9 +138,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT id, username, display_name, role, active, created_at, last_login
-       FROM users ORDER BY active DESC, created_at ASC'
+    'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, u.last_login'
+    . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name' : '')
+    . ' FROM users u'
+    . ($hasCrewLink ? ' LEFT JOIN crew c ON c.id = u.crew_id' : '')
+    . ' ORDER BY u.active DESC, u.created_at ASC'
 )->fetchAll();
+
+// Real people only — a login belongs to a person, never to a team row or an
+// unfilled planning slot.
+$crewPeople = [];
+if ($hasCrewLink) {
+    $crewPeople = $pdo->query(
+        'SELECT id, name, role FROM crew
+          WHERE active = 1 AND is_team = 0 AND COALESCE(is_placeholder, 0) = 0
+          ORDER BY name'
+    )->fetchAll();
+}
+$unlinked = $hasCrewLink
+    ? count(array_filter($users, fn($u) => (int)$u['active'] === 1 && empty($u['crew_id'])))
+    : 0;
 
 $pageTitle = 'Users';
 require __DIR__ . '/includes/header.php';
@@ -107,9 +167,19 @@ require __DIR__ . '/includes/header.php';
 
 <p class="lead">Who can log in, and what they're allowed to do.</p>
 
+<?php if ($hasCrewLink && $unlinked > 0): ?>
+  <div class="flash flash-warn">
+    <strong><?= $unlinked ?></strong> active account<?= $unlinked === 1 ? '' : 's' ?>
+    <?= $unlinked === 1 ? 'is' : 'are' ?> not linked to a crew member yet.
+    <strong>A ticket is assigned to a person, not to a login</strong> — so until an account is
+    linked, that individual cannot be picked as an owner and has no "My work" list.
+    Use the <em>Is which person</em> column below.
+  </div>
+<?php endif; ?>
+
 <table class="review-table">
   <thead>
-    <tr><th>Username</th><th>Name</th><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
+    <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><?php endif; ?><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($users as $u): $id = (int)$u['id']; $isSelf = $id === $currentUserId; ?>
@@ -119,6 +189,23 @@ require __DIR__ . '/includes/header.php';
         <?php if ($isSelf): ?><span class="muted small">(you)</span><?php endif; ?>
       </td>
       <td><?= e($u['display_name'] ?: '—') ?></td>
+      <?php if ($hasCrewLink): ?>
+      <td>
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="set_crew">
+          <input type="hidden" name="user_id" value="<?= $id ?>">
+          <select name="crew_id" onchange="this.form.submit()">
+            <option value="0" <?= empty($u['crew_id']) ? 'selected' : '' ?>>— not linked —</option>
+            <option value="new">+ Add "<?= e($u['display_name'] ?: $u['username']) ?>" to the crew</option>
+            <?php foreach ($crewPeople as $cp): ?>
+              <option value="<?= (int)$cp['id'] ?>" <?= (int)($u['crew_id'] ?? 0) === (int)$cp['id'] ? 'selected' : '' ?>>
+                <?= e($cp['name']) ?><?= $cp['role'] ? ' · ' . e($cp['role']) : '' ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </form>
+      </td>
+      <?php endif; ?>
       <td>
         <form method="post" class="inline-form">
           <input type="hidden" name="action" value="set_role">

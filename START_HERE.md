@@ -146,6 +146,16 @@ Hard-won, all from real incidents:
    quietly not draw itself. **A feature that disables itself on a swallowed exception is
    indistinguishable from a feature that was never built.** If a catch decides something is
    unavailable, it has to say so on screen. (Phase 4 build, 2026-08-12.)
+12. **Never write a closing script tag inside an inline `<script>` block — not even in a
+   `//` comment.** The HTML parser scans for that character sequence and ends the script
+   element on the spot; it has no idea JavaScript considers the line commented out.
+   Everything after it renders on the page as text. This is lesson 9's twin — there PHP acts
+   on `?>` inside a `//` comment, here the HTML parser acts on `</` + `script>` — and both
+   teach the same thing: **a parser acts on characters, not on your intent.** Cost the tasks
+   board its first load, in a comment that was explaining why `JSON_HEX_TAG` is needed to
+   prevent exactly that. Write it escaped as `<\/script>`, or say "a closing script tag" in
+   prose. Only a hazard *inline*: inside a real `.js` file loaded with `<script src=…>` the
+   sequence is harmless. (Phase 7 build, 2026-08-14.)
 
 ---
 
