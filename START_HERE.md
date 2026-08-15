@@ -317,11 +317,14 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    `includes/{people,money}.php`, `team.php`, `person.php`, plus the trend chart on
    `step.php`. A **Team performance** tab lists everyone by unfinished work; a person page
    shows their load per step, required vs recent pace, logged time and open tickets.
-   - **⚠ This migration reverses the 2026-08-12 "money lives elsewhere" decision** — David's
-     call, made with the consequence stated. Read the 2026-08-15 entries in
-     `docs/DECISIONS.md` and the header of migration 018 **before touching anything to do
-     with rates**. `includes/money.php` is the ONLY door those four columns are read through
-     and it refuses for non-admins; keep it that way, or the replacement guarantee is gone too.
+   - **⚠ Pay data lives in a SEPARATE DATABASE.** Migration 018 briefly put rates on `crew`;
+     019 removes them again. Rates and contract links are in their own MySQL database with
+     their own user, which the production user has **no rights to** — so a bug in any ordinary
+     query cannot reach one. `includes/money.php` is the only place that second connection is
+     ever opened, and only behind `is_admin()`. **Keep it that way**, or the guarantee is gone.
+     Set it up with `finance_install.sql` + the `finance_db` block in `config.php`; until then
+     the person page says it isn't configured rather than showing a blank.
+     Read the three `2026-08-15` money entries in `docs/DECISIONS.md` before touching any of it.
    - **Pace per person is approximate and labelled as such.** History is recorded per step,
      not per person. Don't remove the caveats without building the history that would justify
      removing them.

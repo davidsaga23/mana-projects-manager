@@ -871,6 +871,11 @@ on a show with no vehicles is noise implying a gap that does not exist.
 a number that cannot be opened is a number nobody can act on.
 
 ## 2026-08-15 — Rates and contracts DO live here after all, behind one door
+> **Superseded the same day — see "Pay data gets its own database, read through one door"
+> below.** Migration 018 was applied before the change of mind, and migration 019 removes what
+> it added. The reasoning here is still worth reading: it is what the middle path was chosen
+> *instead of*. Don't act on this entry alone.
+
 **Reverses "Money lives in a separate application and a separate database" (2026-08-12).**
 That entry said in terms: *"`crew` does not gain a `rate` column."* Migration 018 adds
 `crew.day_rate`, `rate_unit`, `rate_currency` and `contract_url`.
@@ -897,6 +902,42 @@ away from failing. That is gone and cannot be got back by being careful.
 **Consequence:** if the finance app is ever built, these four columns move there and migration
 018's header is what explains why they were here. `DECIMAL`, never `FLOAT` — a rate is money and
 gets summed against an invoice, the same reasoning as storing time in whole minutes.
+
+## 2026-08-15 (later) — Pay data gets its own database, read through one door
+**Decision, settling the day's third position and the one that stands.** Rates and contract
+links live in a **separate MySQL database with a separate user**. The production user has no
+rights to it. The platform holds that second credential and opens it in exactly one place —
+`includes/money.php` — behind `is_admin()`. `finance_install.sql` creates the schema;
+migration 019 removes the columns 018 had added.
+**Why not either extreme:**
+- *Columns on `crew` with an app-level check* (what 018 did) leaves pay data readable by every
+  query the app runs. The guard holds only as long as nobody ever writes `SELECT day_rate`
+  somewhere else, and that is a promise about future people rather than a property of the system.
+- *A wholly separate application* (2026-08-12) is the strongest answer and remains the
+  destination, but it does not exist and has no date — and David wants the person page to carry
+  the full context in one screen, which is a real requirement rather than a convenience.
+**What the middle path actually buys, stated precisely so nobody over-trusts it:** a bug in any
+ordinary query — a bad `WHERE`, an injection, a join written at midnight — **cannot** reach a
+rate, because the connection it runs on is not permitted to see one. That is a property of the
+database server and holds for screens written years from now by people who never read this. It
+is **not** the 2026-08-12 guarantee: this app does hold a finance credential in the same
+`config.php`, so anyone who can read that file, or run code as this app, can reach the rates.
+What is defended against is the far likelier thing — an ordinary mistake in ordinary code.
+**Consequence:**
+- The two databases are joined on `crew.id`, with **no foreign key** — different databases,
+  different users, so the constraint cannot exist and claiming otherwise would be a comment that
+  lies. What keeps it safe is the 2026-08-12 rule that ids stay stable and are never reused.
+- `crew_terms.crew_name` is stored alongside the id, so a row opened directly in the finance
+  database is readable and an orphan is not an anonymous number. Same reasoning as
+  `progress.assignee_raw` and the estimate baseline copying step names.
+- **`crew_terms_log` is append-only.** Who changed a rate and when is the one question this kind
+  of data reliably attracts, and it cannot be reconstructed afterwards — the same asymmetry as
+  the daily snapshots.
+- The person page tells apart three states that would otherwise all render blank: not an admin,
+  finance not configured, and nobody has a rate on file. A connection failure is reported, never
+  swallowed (lesson 11).
+- **`crew.department` stayed** in migration 018 and is deliberately outside the money door. It
+  is not financial, and routing it through one would only make it look like it was.
 
 ## 2026-08-15 — Per-person pace is approximate, and says so
 **Decision:** the person and team screens report assignments, approvals and logged time as

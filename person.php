@@ -65,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
 // --- save the terms (admin only; the guard lives in money.php) --------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
     try {
-        flash('ok', save_crew_terms($pdo, $crewId, $_POST));
+        // Writes to the FINANCE database, not this one. money.php is the only
+        // place that connection is ever opened.
+        flash('ok', save_crew_terms($crewId, (string)$person['name'], $_POST, current_user_display()));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -75,7 +77,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
 
 $summary = person_summary($pdo, $projectId, $crewId);
 $pace    = person_pace($pdo, $projectId, $crewId, $summary['steps']);
-$terms   = crew_term($pdo, $crewId);          // [] / null for a non-admin
+// Reads the finance database. Null for a non-admin, for an unconfigured
+// install, or simply for somebody with no rate on file — the screen tells those
+// three apart rather than showing one blank either way.
+$terms = null; $termsError = null;
+try {
+    $terms = crew_term($crewId);
+} catch (Throwable $e) {
+    $termsError = $e->getMessage();
+}
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
 
@@ -229,23 +239,41 @@ require __DIR__ . '/includes/header.php';
 
 <?php // ---- ADMIN ONLY. money.php returns nothing at all for anyone else, so a
       // missing check here would render an empty box rather than leak. ---- ?>
+<?php // ---- ADMIN ONLY, and the data lives in a DIFFERENT DATABASE.
+      // includes/money.php is the only place that connection is opened, and it
+      // returns nothing at all for a non-admin — so a missing check here would
+      // render an empty box rather than leak. ---- ?>
 <?php if (can_see_money()): ?>
   <h3>Terms and contract <span class="admin-only-tag">administrators only</span></h3>
-  <?php if (!money_columns_exist($pdo)): ?>
-    <p class="flash flash-warn">These fields need migration <code>018</code>, which hasn't been
-      applied yet. <a href="migrate.php">Review and apply it →</a></p>
+
+  <?php if ($termsError !== null): ?>
+    <p class="flash flash-err"><?= e($termsError) ?></p>
+
+  <?php elseif (!finance_configured()): ?>
+    <div class="empty-state">
+      <p><strong>The finance database isn't set up yet.</strong></p>
+      <p class="muted">Rates and contracts live in their own database with their own MySQL
+         user, so that this application's ordinary connection has no rights to them at all —
+         a bug in any normal query cannot reach a rate, because the connection it runs on
+         isn't permitted to see one.</p>
+      <p class="muted">Import <code>finance_install.sql</code> into a new database, then add
+         the <code>finance_db</code> block to <code>config.php</code>. Both are documented in
+         that file.</p>
+    </div>
+
   <?php else: ?>
     <p class="muted small">
       Visible to administrators only — <?= e(current_user_display()) ?> is one. Editors and
-      view-only accounts do not see this section, and the data is never sent to their browser.
-      The contract itself stays in Google Drive, which enforces its own permissions.
+      view-only accounts never see this section and the data never reaches their browser.
+      It is stored in a <strong>separate database</strong>, and the contract itself stays in
+      Google Drive under Drive's own permissions.
     </p>
     <form method="post" class="stack">
       <input type="hidden" name="save_terms" value="1">
       <div class="row">
         <label>Rate
-          <input name="day_rate" value="<?= e($terms && $terms['day_rate'] !== null ? fmt_num((float)$terms['day_rate'], 2) : '') ?>"
-                 placeholder="e.g. 350.00" inputmode="decimal">
+          <input name="day_rate" inputmode="decimal" placeholder="e.g. 350.00"
+                 value="<?= e($terms && $terms['day_rate'] !== null ? fmt_num((float)$terms['day_rate'], 2) : '') ?>">
         </label>
         <label>Per
           <select name="rate_unit">
@@ -260,18 +288,40 @@ require __DIR__ . '/includes/header.php';
         </label>
       </div>
       <label>Contract link <span class="muted small">(Google Drive)</span>
-        <input type="url" name="contract_url" value="<?= e($terms['contract_url'] ?? '') ?>"
-               placeholder="https://drive.google.com/…">
+        <input type="url" name="contract_url" placeholder="https://drive.google.com/…"
+               value="<?= e($terms['contract_url'] ?? '') ?>">
       </label>
       <?php if (!empty($terms['contract_url'])): ?>
         <p><a href="<?= e($terms['contract_url']) ?>" target="_blank" rel="noopener">Open the contract →</a></p>
       <?php endif; ?>
       <div class="actions"><button type="submit">Save terms</button></div>
     </form>
-    <p class="muted small">
-      Rates were deliberately kept out of this database until 2026-08-15 — see migration 018 and
-      the decision log for what changed and what replaced the old guarantee.
-    </p>
+
+    <?php if (empty($terms)): ?>
+      <p class="muted small">Nothing on file for <?= e($person['name']) ?> yet.</p>
+    <?php else: ?>
+      <p class="muted small">
+        Last changed <?= e(substr((string)$terms['updated_at'], 0, 16)) ?><?php
+          if (!empty($terms['updated_by'])): ?> by <?= e($terms['updated_by']) ?><?php endif; ?>.
+      </p>
+    <?php endif; ?>
+
+    <?php $history = crew_terms_history($crewId, 5); if (count($history) > 1): ?>
+      <details>
+        <summary class="muted small">Recent changes (<?= count($history) ?>)</summary>
+        <table class="review-table">
+          <tr><th>When</th><th>Rate</th><th>By</th></tr>
+          <?php foreach ($history as $h): ?>
+            <tr>
+              <td class="muted small"><?= e(substr((string)$h['changed_at'], 0, 16)) ?></td>
+              <td><?= e(fmt_money($h['day_rate'] === null ? null : (float)$h['day_rate'],
+                                  $h['rate_unit'] ?: 'day', $h['rate_currency'] ?: 'USD')) ?></td>
+              <td class="muted"><?= e($h['changed_by'] ?: '—') ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      </details>
+    <?php endif; ?>
   <?php endif; ?>
 <?php endif; ?>
 

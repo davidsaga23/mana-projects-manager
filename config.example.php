@@ -78,6 +78,29 @@ return [
     'mail_reply_to'  => 'david@mana.tv',     // replies go to Mana, not the sending box
 
     // -------------------------------------------------------------------------
+    // FINANCE DATABASE — pay rates and contract links. Optional.
+    // -------------------------------------------------------------------------
+    // A SEPARATE database with a SEPARATE MySQL user. The point is that the
+    // production user above has no rights here at all, so a bug in any ordinary
+    // query on any ordinary screen cannot reach a rate — the connection it runs
+    // on is not permitted to see one. Only includes/money.php opens this, and
+    // only behind an is_admin() check.
+    //
+    // Set it up with finance_install.sql, which documents the cPanel steps.
+    // Leave db_name empty to switch the feature off: the person page then says
+    // it is not configured rather than showing a blank where a rate would be.
+    //
+    // Do NOT reuse the production password here. If both credentials are the
+    // same, an attacker who learns one has both, and the separation is theatre.
+    'finance_db' => [
+        'db_host'    => 'localhost',
+        'db_name'    => '',                  // e.g. yourcpaneluser_manafinance
+        'db_user'    => '',                  // e.g. yourcpaneluser_finance
+        'db_pass'    => '',
+        'db_charset' => 'utf8mb4',
+    ],
+
+    // -------------------------------------------------------------------------
     // Attachments (used from the tickets phase onward)
     // -------------------------------------------------------------------------
     'upload_max_bytes' => 25 * 1024 * 1024,  // 25 MB per file
