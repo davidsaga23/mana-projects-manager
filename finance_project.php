@@ -105,6 +105,15 @@ require __DIR__ . '/includes/header.php';
   <span class="admin-only-tag">administrators only</span>
 </h2>
 
+<?php if (function_exists('invoices_need_upgrade') && invoices_need_upgrade()): ?>
+  <div class="flash flash-warn">
+    <strong>The finance database needs <code>finance_install_03.sql</code>.</strong>
+    Until it is imported, an invoice cannot say which position it pays for, so actual costs
+    cannot appear on the expense projection. Everything else works. Import it into the finance
+    database via phpMyAdmin.
+  </div>
+<?php endif; ?>
+
 <?php if ($dbError !== null): ?>
   <div class="flash flash-err"><?= e($dbError) ?></div>
 <?php elseif (!$configured): ?>
@@ -268,6 +277,12 @@ require __DIR__ . '/includes/header.php';
     times a rate, which would be a second estimate rather than a fact. A dash in either means
     nothing was recorded, which is not the same as it having been free.
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
+    <?php if ($unattached > 0): ?>
+      The actual total here counts only invoices attached to a position, so it is
+      <?= e(fmt_money_plain($unattached, $cur)) ?> lower than the <em>Invoiced</em> figure at the
+      top of the page. That gap is the unattached invoices, and it is a real difference rather
+      than a rounding error — the money is spent either way, it just belongs to no row.
+    <?php endif; ?>
     A day is <?= e(fmt_num($proj['hours_per_day'], 1)) ?> hours on this project.
   </p>
 

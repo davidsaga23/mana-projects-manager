@@ -18,6 +18,7 @@ require_once __DIR__ . '/includes/timelog.php';
 require_once __DIR__ . '/includes/people.php';
 require_once __DIR__ . '/includes/money.php';
 require_once __DIR__ . '/includes/crew.php';
+require_once __DIR__ . '/includes/finance.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -88,6 +89,26 @@ try {
 }
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
+
+// What this person is projected to cost on THIS project: the days the plan asks
+// of them, times the rate saved below. Their rows out of the same
+// expense_projection() the Finance screen draws, so the two cannot disagree —
+// this is a slice of that table, not a second calculation of it.
+$myRows = []; $myDays = 0.0; $myCost = 0.0; $myUnpriced = false;
+if (can_see_money()) {
+    try {
+        foreach (expense_projection($pdo, $projectId)['rows'] as $r) {
+            if ((int)($r['crew_id'] ?? 0) !== $crewId) continue;
+            $myRows[] = $r;
+            $myDays += (float)$r['days'];
+            if ($r['cost'] === null) $myUnpriced = true;
+            else $myCost += (float)$r['cost'];
+        }
+    } catch (Throwable $e) {
+        // The projection is a convenience here, not the point of the page.
+        $myRows = [];
+    }
+}
 
 // Open tickets owned by this person on this project — the first screen where the
 // ticket system and the tracking data meet.
@@ -296,6 +317,62 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
       <div class="actions"><button type="submit">Save terms</button></div>
     </form>
+
+    <?php if ($myRows): ?>
+      <h4 style="margin:22px 0 6px;">Projected cost on this project</h4>
+      <p class="muted small">
+        The days the plan asks of <?= e($person['name']) ?> on this show, at the rate above.
+        Sliced out of the same projection the <a href="finance_project.php?project=<?= $projectId ?>">Finance
+        screen</a> draws, so the two cannot disagree. Save a new rate and this moves with it.
+      </p>
+      <table class="review-table">
+        <thead><tr><th>Position</th><th class="num">Days</th><th class="num">Months</th><th class="num">Projected</th></tr></thead>
+        <tbody>
+        <?php foreach ($myRows as $r): ?>
+          <tr>
+            <td class="wf-name">
+              <span class="dot" style="background:<?= e($r['step']['color'] ?: '#ccc') ?>"></span><?= e($r['role']) ?>
+            </td>
+            <td class="num"><?= e(fmt_num($r['days'], 2)) ?></td>
+            <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
+            <td class="num">
+              <?= $r['cost'] === null
+                    ? '<span class="warn-text">no rate yet</span>'
+                    : e(number_format($r['cost'], 2)) ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th>Total</th>
+            <th class="num"><?= e(fmt_num($myDays, 2)) ?></th>
+            <th class="num"><?= e(fmt_num($myDays / DAYS_PER_MONTH, 2)) ?></th>
+            <th class="num">
+              <?= $myCost > 0
+                    ? e(fmt_money_plain($myCost, $terms['rate_currency'] ?? 'USD'))
+                    : '<span class="muted">—</span>' ?>
+            </th>
+          </tr>
+        </tfoot>
+      </table>
+      <?php if ($myUnpriced): ?>
+        <p class="muted small warn-text">
+          Some positions above have no rate, so the total is lower than the real cost. It counts
+          only what it can price rather than treating the rest as free.
+        </p>
+      <?php endif; ?>
+      <p class="muted small">
+        Months is days ÷ <?= (int)DAYS_PER_MONTH ?>, the divisor the expense sheet uses.
+        These are <strong>planned</strong> days from the pipeline, not hours logged — actual cost
+        comes from the invoices attached to each position.
+      </p>
+    <?php elseif (can_see_money() && $isSlot): ?>
+      <p class="muted small" style="margin-top:16px;">
+        This slot holds no position on the current plan, so there is nothing to project a cost
+        against yet.
+      </p>
+    <?php endif; ?>
 
     <?php if (empty($terms)): ?>
       <p class="muted small">Nothing on file for <?= e($person['name']) ?> yet.</p>

@@ -48,6 +48,15 @@ require __DIR__ . '/includes/header.php';
   any normal query cannot reach them. Editors and view-only accounts cannot open this page at all.
 </p>
 
+<?php if (function_exists('invoices_need_upgrade') && invoices_need_upgrade()): ?>
+  <div class="flash flash-warn">
+    <strong>The finance database needs <code>finance_install_03.sql</code>.</strong>
+    Until it is imported, an invoice cannot say which position it pays for, so actual costs
+    cannot appear on the expense projection. Everything else works. Import it into the finance
+    database via phpMyAdmin.
+  </div>
+<?php endif; ?>
+
 <?php if ($dbError !== null): ?>
   <div class="flash flash-err"><?= e($dbError) ?></div>
 
@@ -74,8 +83,19 @@ require __DIR__ . '/includes/header.php';
     $cur = $b['currency'] ?? 'USD';
 
     // Computed live rather than stored — see includes/finance.php for why.
-    $proj = expense_projection($pdo, $pid);
-    $cost = $proj['total'];
+    //
+    // Wrapped per project, because it was not: a missing finance column threw on
+    // the FIRST row, and with display_errors off the page simply stopped after
+    // the table header. It looked like "there are no projects" rather than "one
+    // query failed", which is the most expensive kind of wrong. One bad project
+    // now shows its own error and the rest of the table still draws.
+    $projError = null; $proj = null; $cost = 0.0;
+    try {
+        $proj = expense_projection($pdo, $pid);
+        $cost = $proj['total'];
+    } catch (Throwable $e) {
+        $projError = $e->getMessage();
+    }
     $margin = ($budget !== null && $cost > 0) ? $budget - $cost : null;
   ?>
     <tr>
@@ -84,9 +104,13 @@ require __DIR__ . '/includes/header.php';
       <td><span class="status status-<?= e($p['status']) ?>"><?= e(str_replace('_', ' ', $p['status'])) ?></span></td>
       <td class="num"><?= $budget === null ? '<span class="muted">—</span>' : e(fmt_money_plain($budget, $cur)) ?></td>
       <td class="num">
-        <?= $cost > 0 ? e(fmt_money_plain($cost, $proj['currency'])) : '<span class="muted">—</span>' ?>
-        <?php if ($proj['unpriced_days'] > 0): ?>
-          <small class="warn-text"><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</small>
+        <?php if ($projError !== null): ?>
+          <span class="err small" title="<?= e($projError) ?>">could not be worked out</span>
+        <?php else: ?>
+          <?= $cost > 0 ? e(fmt_money_plain($cost, $proj['currency'])) : '<span class="muted">—</span>' ?>
+          <?php if ($proj['unpriced_days'] > 0): ?>
+            <small class="warn-text"><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</small>
+          <?php endif; ?>
         <?php endif; ?>
       </td>
       <td class="num <?= $margin !== null ? ($margin < 0 ? 'err' : 'ok') : '' ?>">

@@ -259,6 +259,10 @@ function invoiced_by_position(int $projectId): array {
     if (!can_see_money()) return [];
     $db = finance_db();
     if (!$db) return [];
+    // finance_install_03.sql may not have been imported yet. Without it there is
+    // no position on an invoice, so nothing can attach — reported by
+    // invoices_need_upgrade() rather than crashing the page.
+    if (!finance_column_exists('invoices', 'step_id')) return [];
     $q = $db->prepare(
         'SELECT crew_id, step_id, SUM(amount) AS billed
            FROM invoices
@@ -365,13 +369,12 @@ function save_invoice(array $in, array $project, string $who = ''): string {
         }
     }
 
+    $hasPosition = finance_column_exists('invoices', 'step_id');
     $id = (int)($in['invoice_id'] ?? 0);
     $args = [
         (int)$project['id'], $project['code'] ?? null,
         !empty($in['crew_id']) ? (int)$in['crew_id'] : null,
         trim((string)($in['crew_name'] ?? '')) ?: null,
-        !empty($in['step_id']) ? (int)$in['step_id'] : null,
-        trim((string)($in['step_name'] ?? '')) ?: null,
         trim((string)($in['invoice_ref'] ?? '')) ?: null,
         $amount, $cur,
         $date($in['period_start'] ?? ''), $date($in['period_end'] ?? ''),
@@ -381,11 +384,23 @@ function save_invoice(array $in, array $project, string $who = ''): string {
         $who,
     ];
 
+    if ($hasPosition) {
+        // Positioned after crew_name, matching the column order below.
+        array_splice($args, 4, 0, [
+            !empty($in['step_id']) ? (int)$in['step_id'] : null,
+            trim((string)($in['step_name'] ?? '')) ?: null,
+        ]);
+    }
+
+    $posCols = $hasPosition ? 'step_id = ?, step_name = ?,' : '';
+    $posIns  = $hasPosition ? 'step_id, step_name,' : '';
+    $posVals = $hasPosition ? '?, ?,' : '';
+
     if ($id > 0) {
         $args[] = $id;
         $db->prepare(
-            'UPDATE invoices SET project_id = ?, project_code = ?, crew_id = ?, crew_name = ?,
-                    step_id = ?, step_name = ?,
+            "UPDATE invoices SET project_id = ?, project_code = ?, crew_id = ?, crew_name = ?,
+                    {$posCols}
                     invoice_ref = ?, amount = ?, currency = ?, period_start = ?, period_end = ?,
                     issued_date = ?, due_date = ?, paid_date = ?, status = ?, document_url = ?,
                     notes = ?, updated_by = ? WHERE id = ?'
@@ -394,12 +409,12 @@ function save_invoice(array $in, array $project, string $who = ''): string {
     }
 
     $db->prepare(
-        'INSERT INTO invoices
-           (project_id, project_code, crew_id, crew_name, step_id, step_name,
+        "INSERT INTO invoices
+           (project_id, project_code, crew_id, crew_name, {$posIns}
             invoice_ref, amount, currency,
             period_start, period_end, issued_date, due_date, paid_date, status,
             document_url, notes, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, {$posVals} ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )->execute($args);
 
     return 'Invoice recorded: ' . fmt_money_plain($amount, $cur) . '.';
@@ -418,4 +433,10 @@ function delete_invoice(int $id): string {
 function fmt_money_plain(?float $amount, string $currency = 'USD'): string {
     if ($amount === null) return '—';
     return number_format($amount, 2) . ' ' . $currency;
+}
+
+/** Has finance_install_03.sql been imported? Invoices cannot name a position without it. */
+function invoices_need_upgrade(): bool {
+    if (!can_see_money() || !finance_configured()) return false;
+    return !finance_column_exists('invoices', 'step_id');
 }

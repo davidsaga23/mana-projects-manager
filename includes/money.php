@@ -84,6 +84,37 @@ function finance_db(): ?PDO {
     return $pdo;
 }
 
+/**
+ * Does a column exist in the FINANCE database?
+ *
+ * column_exists() asks the production connection and knows nothing about this
+ * one, so schema added by a later finance_install file had no guard — and a
+ * query naming a column that is not there is a fatal, not a warning. That took
+ * the Finance hub down: the page rendered its table header, hit the missing
+ * `invoices.step_id` on the first row, and stopped mid-output.
+ *
+ * Same shape as column_exists(): one SHOW per table, cached for the request,
+ * and NO placeholder — db.php disables emulated prepares, so a parameter in a
+ * SHOW statement is rejected by MySQL's protocol (START_HERE, lesson 11).
+ */
+function finance_column_exists(string $table, string $column): bool {
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    $db = finance_db();
+    if (!$db) return $cache[$key] = false;
+
+    $safe = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+    try {
+        $cols = $db->query('SHOW COLUMNS FROM `' . $safe . '`')->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        return $cache[$key] = false;
+    }
+    foreach ($cols as $c) $cache[$table . '.' . $c] = true;
+    return $cache[$key] = in_array($column, $cols, true);
+}
+
 /** Is finance set up at all? For telling "not configured" from "no rate recorded". */
 function finance_configured(): bool {
     global $config;
