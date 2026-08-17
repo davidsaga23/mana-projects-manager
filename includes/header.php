@@ -22,6 +22,9 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
             // project tab — the whole point is that it spans all of them. ?>
       · <a href="mytasks.php">My work</a>
       <?php if (is_admin()): ?>
+        <?php // Admin-only, and it reads a database ordinary screens have no
+              // credential for. In the global bar because it spans projects. ?>
+        · <a href="finance.php">Finance</a>
         · <a href="users.php">Users</a>
         · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php

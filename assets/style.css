@@ -1106,3 +1106,11 @@ body.lightbox-lock { overflow: hidden; }
   .board { grid-template-columns: 1fr !important; }
   .modal-row { grid-template-columns: 1fr; }
 }
+
+/* Project brief — prose, so the fields are wide and the measure stays readable. */
+.brief-form { max-width: 92ch; }
+.brief-form textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid #c3ccd4; border-radius: 4px;
+  font-family: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
+}
+.brief-form small { margin-top: 4px; }

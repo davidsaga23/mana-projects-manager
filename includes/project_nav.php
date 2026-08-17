@@ -25,6 +25,7 @@ function project_nav_items(int $projectId): array {
     // separator — opened occasionally, not daily.
     return [
         ['key' => 'overview',   'label' => 'Overview',            'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
+        ['key' => 'brief',      'label' => 'Brief',               'href' => 'brief.php' . $p,              'group' => 'work'],
         ['key' => 'dashboard',  'label' => 'Dashboard',           'href' => 'dashboard.php' . $p,          'group' => 'work'],
         ['key' => 'crew',       'label' => 'Crew',                'href' => 'crew.php' . $p,               'group' => 'work'],
         ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],

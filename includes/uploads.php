@@ -86,7 +86,29 @@ function human_size(int $bytes): string {
  * @return array{saved:int, errors:string[]}
  */
 function save_ticket_attachments(PDO $pdo, array $files, int $ticketId, ?int $commentId, int $userId): array {
+    return save_attachments($pdo, $files, 'ticket_attachments', 'ticket_id', $ticketId, $commentId, $userId);
+}
+
+/**
+ * Save files against ANY owner — a ticket or a project.
+ *
+ * Generalised when the project brief needed attachments (migration 023). One
+ * implementation on purpose: the validation below is the whole defence, and a
+ * second copy of it is a second place for someone to leave out the MIME check.
+ * Only the destination table and its foreign key differ.
+ *
+ * @param string $table    'ticket_attachments' or 'project_attachments'
+ * @param string $fkColumn the owning column in that table
+ */
+function save_attachments(PDO $pdo, array $files, string $table, string $fkColumn,
+                          int $ownerId, ?int $commentId, int $userId): array {
     global $config;
+
+    // Whitelisted, never interpolated from anything a request controls.
+    if (!in_array($table, ['ticket_attachments', 'project_attachments'], true)) {
+        return ['saved' => 0, 'errors' => ['Unknown attachment type — nothing was saved.']];
+    }
+    $hasComment = $table === 'ticket_attachments';
     $maxBytes = (int)($config['upload_max_bytes'] ?? 25 * 1024 * 1024);
     $maxFiles = (int)($config['upload_max_files'] ?? 5);
     $allowed = allowed_upload_types();
@@ -99,16 +121,20 @@ function save_ticket_attachments(PDO $pdo, array $files, int $ticketId, ?int $co
     // ticket rather than each submission.
     $existing = 0;
     if ($commentId === null) {
-        $c = $pdo->prepare('SELECT COUNT(*) FROM ticket_attachments WHERE ticket_id = ? AND comment_id IS NULL');
-        $c->execute([$ticketId]);
+        $sql = "SELECT COUNT(*) FROM {$table} WHERE {$fkColumn} = ?"
+             . ($hasComment ? ' AND comment_id IS NULL' : '');
+        $c = $pdo->prepare($sql);
+        $c->execute([$ownerId]);
         $existing = (int)$c->fetchColumn();
     }
 
-    $ins = $pdo->prepare(
-        'INSERT INTO ticket_attachments
-           (ticket_id, comment_id, stored_name, original_name, mime_type, file_size, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)'
-    );
+    $ins = $pdo->prepare($hasComment
+        ? "INSERT INTO {$table}
+             ({$fkColumn}, comment_id, stored_name, original_name, mime_type, file_size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)"
+        : "INSERT INTO {$table}
+             ({$fkColumn}, stored_name, original_name, mime_type, file_size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?)");
 
     foreach ($files as $f) {
         if (($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
@@ -146,7 +172,10 @@ function save_ticket_attachments(PDO $pdo, array $files, int $ticketId, ?int $co
             continue;
         }
 
-        $ins->execute([$ticketId, $commentId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId]);
+        $args = $hasComment
+            ? [$ownerId, $commentId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId]
+            : [$ownerId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId];
+        $ins->execute($args);
         $saved++;
     }
 

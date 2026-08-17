@@ -1,5 +1,54 @@
 # Requested features — where each one belongs
 
+## The production cycle, and what the platform covers
+
+David's own process for a new project, given 2026-08-16, mapped against what exists. **This is
+the list to check a new feature against** — anything that doesn't move a row here toward "built"
+is probably not the next thing.
+
+| # | Step | Coverage | Where |
+|---|---|---|---|
+| 1 | Timeline | **Built** | `schedule.php`, `timeline.php`, `.gan` both directions |
+| 2 | Budget | **Missing** | Finance side. Nothing exists |
+| 3 | New brief | **Missing** | Nothing exists — see below |
+| 4 | Breakdown | **Built** | Wizard (paste) + Plaky import |
+| 5 | Project expense | **Half** | `export.php` emits the production numbers a projection is built from; the projection itself is a spreadsheet |
+| 6 | Hiring | **Half** | Slots exist, and the scheduler reports the shortfall ("needs about 4; 3 planned"). Nothing tracks the hiring itself |
+| 7 | Detailed timeline | **Built** | Per-task Gantt, drag, regenerate |
+| 8 | Contracts | **Half** | A link per person in the finance database. No "who hasn't signed" |
+| 9 | Invoices | **Missing** | Finance side |
+| 10 | Budget reports | **Missing** | Finance side |
+
+### What that table says
+
+**Four of the ten steps are money** — budget, project expense, invoices, budget reports — and
+they are a chain, not four separate features. That is 40% of the process with no home, and it is
+what the spreadsheets are still doing. The production half of every one of them already exists:
+work units, days per unit, person-days, required headcount, all exported in the shape the
+reference sheet uses. The missing half is the money applied on the other side, which now has
+somewhere to live (the finance database, 2026-08-15).
+
+**The brief is step 3 and has nowhere to go.** A project currently starts at name, code, type,
+fps and dates. What the client actually asked for — deliverables, formats, reference, who the
+contact is — lives in email. It is the document people go looking for in week six, and
+everything downstream is derived from it.
+
+**Hiring is a gap you can see but not act on.** The platform knows a step is short-handed and
+which slots are unfilled. It has no idea who has been approached, what they quoted, or whether
+they said yes. Slots → hiring → contracts → invoices is one chain with the first link built and
+part of the third.
+
+### The step missing from the list itself
+
+**The client loop.** All ten steps are internal. Nothing records a DELIVERY — version X sent on
+date Y, notes back on Z, round 2 sent. There is an "In client review" status and retakes are
+tracked, but not what was sent or what came back. For an animation studio that is usually where
+a schedule actually dies: not in the work, but in three unacknowledged review rounds. The
+"online version review" item below is the ambitious version of this; a plain delivery log would
+carry most of the value.
+
+
+
 David's list, 2026-08-12, annotated with which side of the money boundary it
 falls on, what it depends on, and anything that changes its size.
 

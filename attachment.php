@@ -15,7 +15,13 @@ require_login();
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { http_response_code(400); exit('Bad request'); }
 
-$q = $pdo->prepare('SELECT stored_name, original_name, mime_type FROM ticket_attachments WHERE id = ?');
+// Two kinds of owner, one serving route. ?kind=project reads the brief's table;
+// anything else reads a ticket's. Whitelisted rather than interpolated — the
+// table name comes from this file, never from the request.
+$kind = ($_GET['kind'] ?? '') === 'project' ? 'project' : 'ticket';
+$table = $kind === 'project' ? 'project_attachments' : 'ticket_attachments';
+
+$q = $pdo->prepare("SELECT stored_name, original_name, mime_type FROM {$table} WHERE id = ?");
 $q->execute([$id]);
 $a = $q->fetch();
 if (!$a) { http_response_code(404); exit('Not found'); }
