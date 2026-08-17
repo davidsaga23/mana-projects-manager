@@ -150,62 +150,109 @@ require __DIR__ . '/includes/header.php';
 
 <h3>Expense projection</h3>
 <p class="muted small">
-  Computed from the current pipeline every time this page loads — person-days per step from the
-  same <code>step_quota()</code> the dashboard and the CSV export use, times the rate of whoever
-  holds each lane. <strong>Never stored</strong>, so it cannot disagree with the plan.
+  Laid out like <code>RTC_ExpenseProjection_v01.xlsx</code>: <strong>one row per person</strong>,
+  grouped by department with subtotals. Two artists on a step are two rows, because they are two
+  people who each get paid. Person-days come from the same <code>step_quota()</code> the dashboard
+  and the CSV export use; the rate comes from each person's page.
+  <strong>Computed every time this page loads</strong>, never stored, so it cannot disagree with the plan.
 </p>
 
 <?php if (!$proj['rows']): ?>
   <p class="muted">No pipeline steps yet.</p>
 <?php else: ?>
-  <table>
+  <div class="grid-scroll">
+  <table class="proj-table">
     <thead>
-      <tr><th>Step</th><th class="num">Person-days</th><th>Staffed by</th>
-          <th class="num">Cost</th><th></th></tr>
+      <tr>
+        <th>Role / Position</th><th>Artist</th><th>Rate</th>
+        <th class="num">Days</th><th class="num">Months</th><th class="num">Projected</th>
+        <th class="num">Units</th><th class="num">Actual days</th><th class="num">Actual</th>
+        <th class="num">Difference</th>
+      </tr>
     </thead>
     <tbody>
-    <?php foreach ($proj['rows'] as $r): $st = $r['step']; ?>
-      <tr>
-        <td class="wf-name">
-          <span class="dot" style="background:<?= e($st['color'] ?: '#ccc') ?>"></span><?= e($st['name']) ?>
-          <small class="muted"><?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></small>
-        </td>
-        <td class="num"><?= e(fmt_num($r['person_days'], 1)) ?></td>
-        <td>
-          <?php if ($r['no_lanes']): ?>
-            <span class="warn-text small">nobody assigned</span>
-          <?php else: foreach ($r['people'] as $pp): ?>
-            <div class="small">
-              <?= e($pp['name']) ?><?php if ($pp['is_slot']): ?><span class="slot-tag">slot</span><?php endif; ?>
-              <?php if ($pp['rate'] === null): ?>
-                <span class="warn-text">no rate</span>
-              <?php else: ?>
-                <span class="muted"><?= e(fmt_money($pp['rate'], $pp['unit'] ?: 'day', $pp['cur'] ?: 'USD')) ?></span>
-              <?php endif; ?>
-            </div>
-          <?php endforeach; endif; ?>
-        </td>
-        <td class="num"><?= $r['cost'] > 0 ? e(fmt_money_plain($r['cost'], $proj['currency'])) : '<span class="muted">—</span>' ?></td>
-        <td class="muted small">
-          <?php if ($r['unpriced']): ?>
-            <span class="warn-text"><?= (int)$r['unpriced'] ?> unpriced</span>
-          <?php endif; ?>
-        </td>
+    <?php foreach ($proj['by_department'] as $dept => $group): ?>
+      <tr class="track-group"><td colspan="10">
+        <span class="group-badge"><?= e(strtoupper($dept)) ?></span>
+        <span class="muted small"><?= count($group['rows']) ?> people ·
+          <?= e(fmt_num($group['days'], 1)) ?> days</span>
+      </td></tr>
+
+      <?php foreach ($group['rows'] as $r): ?>
+        <tr>
+          <td class="wf-name">
+            <span class="dot" style="background:<?= e($r['step']['color'] ?: '#ccc') ?>"></span><?= e($r['role']) ?>
+          </td>
+          <td>
+            <?php if ($r['crew_id']): ?>
+              <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>"><?= e($r['artist']) ?></a>
+              <?php if ($r['is_slot']): ?><span class="slot-tag">slot</span><?php endif; ?>
+            <?php else: ?>
+              <span class="warn-text small">nobody assigned</span>
+            <?php endif; ?>
+          </td>
+          <td class="small">
+            <?php if ($r['rate'] === null): ?>
+              <?php if ($r['crew_id']): ?>
+                <a class="warn-text" href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>"
+                   title="Set a day rate on their page and it feeds straight back into this total">set a rate →</a>
+              <?php else: ?><span class="muted">—</span><?php endif; ?>
+            <?php else: ?>
+              <?= e(number_format($r['rate'], 2) . ' ' . $r['currency']) ?>
+              <span class="muted">/ <?= e($r['rate_unit']) ?></span>
+            <?php endif; ?>
+          </td>
+          <td class="num"><?= e(fmt_num($r['days'], 2)) ?></td>
+          <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
+          <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?></td>
+          <td class="num muted"><?= e(fmt_num($r['units'], 0)) ?></td>
+          <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
+          <td class="num"><?= $r['actual_cost'] === null || $r['actual_days'] <= 0
+                ? '<span class="muted">—</span>' : e(number_format($r['actual_cost'], 2)) ?></td>
+          <td class="num <?= $r['variance'] !== null && $r['actual_days'] > 0
+                ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
+            <?= $r['variance'] === null || $r['actual_days'] <= 0
+                ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+
+      <tr class="subtotal">
+        <td colspan="5"><?= e($dept) ?> subtotal</td>
+        <td class="num"><strong><?= e(number_format($group['cost'], 2)) ?></strong></td>
+        <td></td><td></td>
+        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['actual'], 2)) : '—' ?></td>
+        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
     <tfoot>
-      <tr><th>Total</th><th class="num"></th><th></th>
-          <th class="num"><?= e(fmt_money_plain($proj['total'], $proj['currency'])) ?></th><th></th></tr>
+      <tr>
+        <th colspan="5">Total projected</th>
+        <th class="num"><?= e(fmt_money_plain($proj['total'], $proj['currency'])) ?></th>
+        <th></th><th></th>
+        <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
+        <th class="num"><?= $proj['actual_total'] > 0
+              ? e(number_format($proj['total'] - $proj['actual_total'], 2)) : '—' ?></th>
+      </tr>
     </tfoot>
   </table>
+  </div>
+
+  <p class="muted small">
+    <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
+    <strong>Actual</strong> comes from time logged against that person on that step — a dash means
+    nobody logged any, which is not the same as it having taken no time.
+    <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
+    A day is <?= e(fmt_num($proj['hours_per_day'], 1)) ?> hours on this project.
+  </p>
 
   <?php if ($proj['unpriced_days'] > 0): ?>
     <p class="flash flash-warn">
       <strong><?= e(fmt_num($proj['unpriced_days'], 1)) ?> person-days have no rate behind them</strong> —
-      usually lanes still held by unfilled slots. Those days are excluded from the total above
-      rather than counted as free, so the real cost is higher than it says. Set rates on each
-      person's page, or fill the slots.
+      mostly lanes still held by unfilled slots. Those days are <em>excluded</em> from the total
+      rather than counted as free, so the real cost is higher than it says. Click any
+      <em>set a rate</em> above to fix one; the total updates as soon as you save.
     </p>
   <?php endif; ?>
 <?php endif; ?>

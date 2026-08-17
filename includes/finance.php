@@ -90,43 +90,59 @@ function save_project_budget(int $projectId, array $project, array $in, string $
 }
 
 /**
- * The expense projection for one project, step by step.
+ * The expense projection — one row per PERSON, in the shape of David's own
+ * spreadsheet (RTC_ExpenseProjection_v01.xlsx, read 2026-08-18).
  *
- * For each step: how many person-days the plan calls for, who is in its lanes,
- * and what those people cost. A lane held by an unfilled slot has no rate — it
- * is counted as UNPRICED rather than as free, which is the difference between a
- * projection and a lie.
+ * That sheet is the specification, and its shape is deliberate: a row is not a
+ * step, it is a person on a step. "Layout (Environment)" with two artists is two
+ * rows, because they are two people who each get paid — and a step with three
+ * animators costs three times what one does. Grouping by department with
+ * subtotals is how the sheet gets read out loud in a budget meeting.
  *
- * Person-days come from the same `step_quota()` the dashboard and the CSV export
- * use, so this screen cannot disagree with them about how much work there is.
+ * Columns, mapped from the sheet:
+ *   Department      pipeline_steps.department (migration 015)
+ *   Role / Position step name + its scope — "Concept (Character)"
+ *   Artist Name     the crew row in that lane, a real hire or a planning slot
+ *   Rate type/Rate  crew_terms, from the finance database
+ *   Total days      that lane's share of the step's person-days
+ *   Total months    days / 22, the sheet's own divisor
+ *   Projected cost  rate x days
+ *   Units           how many items the step covers
+ *   Actual days     from time_logs, converted at the project's hours per day
+ *
+ * COMPUTED, NEVER STORED — see the file header.
  */
+
+/** Working days in a month, matching the sheet's own divisor (4 / 0.1818 = 22). */
+const DAYS_PER_MONTH = 22.0;
+
 function expense_projection(PDO $pdo, int $projectId): array {
     $steps = pipeline_steps($pdo, $projectId);
 
     // project_lanes() returns a FLAT list ordered by step; group it, because the
-    // projection walks step by step and a linear scan per step would be n².
+    // projection walks step by step and a linear scan per step would be n-squared.
     $lanes = [];
     foreach (project_lanes($pdo, $projectId) as $l) {
         $lanes[(int)$l['step_id']][] = $l;
     }
     $retake = project_retake_pct($pdo, $projectId);
     $estimates = project_estimates($pdo, $projectId);
+    $hoursPerDay = hours_per_day($pdo, $projectId);
 
-    // Every crew id staffing this project, so rates are fetched in one go.
     $crewIds = [];
     foreach ($lanes as $laneRows) {
         foreach ($laneRows as $l) if (!empty($l['crew_id'])) $crewIds[] = (int)$l['crew_id'];
     }
     $terms = crew_terms(array_values(array_unique($crewIds)));
+    $actual = actual_days_by_crew_step($pdo, $projectId, $hoursPerDay);
 
-    $rows = []; $total = 0.0; $unpricedDays = 0.0; $currency = null; $mixed = false;
+    $rows = []; $total = 0.0; $actualTotal = 0.0;
+    $unpricedDays = 0.0; $currency = null; $mixed = false;
 
     foreach ($steps as $step) {
         $stepId = (int)$step['id'];
         $quota = step_quota($pdo, $projectId, $step, null, $estimates, $retake);
 
-        // Person-days the plan calls for: work units × days per unit, retakes
-        // already applied by step_quota's own maths.
         $units = (float)($quota['units'] ?? 0);
         $daysPerUnit = (float)($step['days_per_unit'] ?: 0) * retake_factor($retake);
         $personDays = $units * $daysPerUnit;
@@ -135,63 +151,122 @@ function expense_projection(PDO $pdo, int $projectId): array {
         $laneCount = max(1, count($stepLanes));
         $daysPerLane = $personDays / $laneCount;
 
-        $stepCost = 0.0; $priced = 0; $unpriced = 0; $people = [];
-
-        foreach ($stepLanes as $lane) {
-            $cid = (int)($lane['crew_id'] ?? 0);
-            $t = $cid ? ($terms[$cid] ?? null) : null;
-            $rate = ($t && $t['day_rate'] !== null) ? (float)$t['day_rate'] : null;
-            $isSlot = (int)($lane['is_placeholder'] ?? 0) === 1;
-
-            if ($rate === null) {
-                $unpriced++;
-                $unpricedDays += $daysPerLane;
-            } else {
-                // An hourly rate is converted at the project's own hours-per-day,
-                // the same figure the dashboard uses to compare days with hours.
-                $perDay = ($t['rate_unit'] ?? 'day') === 'hour'
-                    ? $rate * hours_per_day($pdo, $projectId)
-                    : $rate;
-                // A flat fee is not multiplied by anything — that is what flat means.
-                $cost = ($t['rate_unit'] ?? 'day') === 'flat' ? $rate : $perDay * $daysPerLane;
-                $stepCost += $cost;
-                $priced++;
-
-                $cur = $t['rate_currency'] ?: 'USD';
-                if ($currency === null) $currency = $cur;
-                elseif ($currency !== $cur) $mixed = true;
-            }
-
-            $people[] = [
-                'name'   => $lane['name'] ?? ('Lane ' . (int)$lane['lane_no']),
-                'is_slot'=> $isSlot,
-                'rate'   => $rate,
-                'unit'   => $t['rate_unit'] ?? null,
-                'cur'    => $t['rate_currency'] ?? null,
-                'days'   => $daysPerLane,
-            ];
+        // A step with nobody on it still belongs in the sheet, as a row with no
+        // artist. Leaving it out would hide work somebody still has to be paid
+        // to do — the opposite of what a projection is for.
+        if (!$stepLanes) {
+            $stepLanes = [null];
+            $daysPerLane = $personDays;
         }
 
-        $total += $stepCost;
-        $rows[] = [
-            'step'        => $step,
-            'person_days' => $personDays,
-            'lanes'       => $laneCount,
-            'people'      => $people,
-            'cost'        => $stepCost,
-            'priced'      => $priced,
-            'unpriced'    => $unpriced,
-            'no_lanes'    => empty($stepLanes),
-        ];
+        foreach ($stepLanes as $lane) {
+            $cid = $lane ? (int)($lane['crew_id'] ?? 0) : 0;
+            $t = $cid ? ($terms[$cid] ?? null) : null;
+            $rate = ($t && $t['day_rate'] !== null) ? (float)$t['day_rate'] : null;
+            $unit = $t['rate_unit'] ?? 'day';
+            $cur  = $t['rate_currency'] ?? 'USD';
+
+            $cost = null;
+            if ($rate !== null) {
+                // Hourly converts at the project's own hours per day. A flat fee
+                // is not multiplied by anything, because that is what flat means.
+                if ($unit === 'flat')     $cost = $rate;
+                elseif ($unit === 'hour') $cost = $rate * $hoursPerDay * $daysPerLane;
+                else                      $cost = $rate * $daysPerLane;
+
+                $total += $cost;
+                if ($currency === null) $currency = $cur;
+                elseif ($currency !== $cur) $mixed = true;
+            } else {
+                $unpricedDays += $daysPerLane;
+            }
+
+            $actDays = $cid ? ($actual[$cid . '|' . $stepId] ?? 0.0) : 0.0;
+            $actCost = ($rate !== null && $unit !== 'flat')
+                ? ($unit === 'hour' ? $rate * $hoursPerDay * $actDays : $rate * $actDays)
+                : null;
+            if ($actCost !== null) $actualTotal += $actCost;
+
+            $rows[] = [
+                'department'  => trim((string)($step['department'] ?? '')) ?: 'Unassigned',
+                'step'        => $step,
+                'role'        => $step['name'] . ' (' . step_scope_tag($step) . ')',
+                'crew_id'     => $cid ?: null,
+                'artist'      => $lane ? ($lane['name'] ?? null) : null,
+                'is_slot'     => $lane ? (int)($lane['is_placeholder'] ?? 0) === 1 : false,
+                'rate'        => $rate,
+                'rate_unit'   => $rate !== null ? $unit : null,
+                'currency'    => $rate !== null ? $cur : null,
+                'days'        => $daysPerLane,
+                'months'      => $daysPerLane / DAYS_PER_MONTH,
+                'cost'        => $cost,
+                'units'       => $units,
+                'unit_label'  => $quota['unit_label'] ?? 'items',
+                'actual_days' => $actDays,
+                'actual_cost' => $actCost,
+                'variance'    => ($cost !== null && $actCost !== null) ? $cost - $actCost : null,
+            ];
+        }
+    }
+
+    // Department order as the sheet reads it, with anything unrecognised last.
+    $order = ['Above the line' => 1, 'Pre-production' => 2, 'Production' => 3, 'Post-production' => 4];
+    usort($rows, function ($a, $b) use ($order) {
+        $oa = $order[$a['department']] ?? 9;
+        $ob = $order[$b['department']] ?? 9;
+        if ($oa !== $ob) return $oa <=> $ob;
+        $s = (int)$a['step']['step_order'] <=> (int)$b['step']['step_order'];
+        return $s !== 0 ? $s : strcasecmp((string)$a['artist'], (string)$b['artist']);
+    });
+
+    $byDept = [];
+    foreach ($rows as $r) {
+        $d = $r['department'];
+        $byDept[$d] = $byDept[$d] ?? ['rows' => [], 'cost' => 0.0, 'days' => 0.0, 'actual' => 0.0];
+        $byDept[$d]['rows'][] = $r;
+        $byDept[$d]['cost']   += (float)($r['cost'] ?? 0);
+        $byDept[$d]['days']   += (float)$r['days'];
+        $byDept[$d]['actual'] += (float)($r['actual_cost'] ?? 0);
     }
 
     return [
-        'rows'          => $rows,
-        'total'         => $total,
-        'currency'      => $currency ?: 'USD',
-        'mixed_currency'=> $mixed,
-        'unpriced_days' => $unpricedDays,
+        'rows'           => $rows,
+        'by_department'  => $byDept,
+        'total'          => $total,
+        'actual_total'   => $actualTotal,
+        'currency'       => $currency ?: 'USD',
+        'mixed_currency' => $mixed,
+        'unpriced_days'  => $unpricedDays,
+        'hours_per_day'  => $hoursPerDay,
     ];
+}
+
+/**
+ * Days actually worked, per person per step, from `time_logs`.
+ *
+ * Keyed "crewId|stepId". Minutes convert to days at the project's own
+ * hours-per-day — the same figure the dashboard uses when it puts hours and days
+ * beside each other, so "3.2 days actual" here means what it means there.
+ *
+ * Empty until migration 022 has run and somebody has logged time. The screen
+ * shows a dash rather than a zero, because "nobody logged it" and "it took no
+ * time" are different facts.
+ */
+function actual_days_by_crew_step(PDO $pdo, int $projectId, float $hoursPerDay): array {
+    if (!time_logs_available($pdo) || $hoursPerDay <= 0) return [];
+    $stmt = $pdo->prepare(
+        'SELECT tl.crew_id, pr.step_id, SUM(tl.minutes) AS m
+           FROM time_logs tl
+           JOIN progress pr ON pr.id = tl.progress_id
+          WHERE tl.project_id = ? AND tl.progress_id IS NOT NULL
+          GROUP BY tl.crew_id, pr.step_id'
+    );
+    $stmt->execute([$projectId]);
+    $out = [];
+    foreach ($stmt as $r) {
+        $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = ((int)$r['m'] / 60) / $hoursPerDay;
+    }
+    return $out;
 }
 
 /** Invoices for one project, newest first. */

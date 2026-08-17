@@ -1114,3 +1114,10 @@ body.lightbox-lock { overflow: hidden; }
   font-family: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
 }
 .brief-form small { margin-top: 4px; }
+
+/* Expense projection — laid out like the studio's own spreadsheet. */
+.proj-table { min-width: 1000px; }
+.proj-table td, .proj-table th { padding: 6px 10px; }
+.proj-table tr.subtotal td { background: #f7f9fb; font-weight: 600; border-top: 1px solid #dde3e9; }
+.proj-table tfoot th { background: #eef1f4; font-size: 14px; }
+.proj-table .small { font-size: 12.5px; }
