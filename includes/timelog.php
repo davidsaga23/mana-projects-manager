@@ -142,3 +142,157 @@ function has_logged_time(PDO $pdo, int $projectId): bool {
     $stmt->execute([$projectId]);
     return (int)$stmt->fetchColumn() > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Per-day time entries (migration 022).
+//
+// Everything above this line reads progress.time_spent_minutes — the running
+// total Plaky sends. Everything below reads `time_logs`, which is what people
+// type here. Where both exist the entries win, and every figure says which it
+// is showing: two sources for one number is only a trap when nothing tells you
+// which one you are looking at.
+// ---------------------------------------------------------------------------
+
+/** Is per-day time logging switched on? */
+function time_logs_available(PDO $pdo): bool {
+    return column_exists($pdo, 'time_logs', 'id');
+}
+
+/**
+ * Record one entry. Returns a sentence for the flash message.
+ *
+ * @throws RuntimeException on anything that would store a number nobody meant
+ */
+function log_time(PDO $pdo, array $in): string {
+    if (!time_logs_available($pdo)) {
+        throw new RuntimeException('Time logging needs migration 022, which has not been applied yet.');
+    }
+
+    $crewId = (int)($in['crew_id'] ?? 0);
+    if ($crewId <= 0) throw new RuntimeException('Time has to be logged against a person.');
+
+    // Typed in HOURS, stored in MINUTES. "1.5", "1,5" and "90m" are all things
+    // people actually type; the first two mean the same thing and the third is
+    // already minutes.
+    $raw = trim((string)($in['hours'] ?? ''));
+    if ($raw === '') throw new RuntimeException('How long? Enter a number of hours.');
+
+    if (preg_match('/^\s*(\d+(?:[.,]\d+)?)\s*m(?:in)?\s*$/i', $raw, $m)) {
+        $minutes = (int)round((float)str_replace(',', '.', $m[1]));
+    } else {
+        $clean = str_replace(',', '.', preg_replace('/[^0-9.,]/', '', $raw));
+        if ($clean === '' || !is_numeric($clean)) {
+            throw new RuntimeException('"' . $raw . '" is not a number of hours — nothing was logged.');
+        }
+        $minutes = (int)round((float)$clean * 60);
+    }
+
+    if ($minutes <= 0) throw new RuntimeException('That works out as zero — nothing was logged.');
+    // A day has 24 hours in it, and somebody typing 800 meant 8.00. Refusing is
+    // better than storing a figure that quietly poisons every average built on it.
+    if ($minutes > 24 * 60) {
+        throw new RuntimeException('That is more than 24 hours in one entry — check the number.');
+    }
+
+    $day = trim((string)($in['log_date'] ?? ''));
+    if ($day === '') $day = date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) {
+        throw new RuntimeException('That date is not a real date — nothing was logged.');
+    }
+    if ($day > date('Y-m-d')) {
+        throw new RuntimeException('That day is in the future — time cannot be logged before it is worked.');
+    }
+
+    $pdo->prepare(
+        'INSERT INTO time_logs (project_id, progress_id, ticket_id, crew_id,
+                                log_date, minutes, notes, entered_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([
+        (int)$in['project_id'],
+        !empty($in['progress_id']) ? (int)$in['progress_id'] : null,
+        !empty($in['ticket_id'])   ? (int)$in['ticket_id']   : null,
+        $crewId, $day, $minutes,
+        trim((string)($in['notes'] ?? '')) ?: null,
+        !empty($in['entered_by']) ? (int)$in['entered_by'] : null,
+    ]);
+
+    return 'Logged ' . fmt_hours($minutes) . ' on ' . date('j M', strtotime($day)) . '.';
+}
+
+/** Remove one entry, if the person asking is allowed to. */
+function delete_time_log(PDO $pdo, int $id, int $userId, bool $isAdmin): string {
+    if (!time_logs_available($pdo)) return 'Nothing to remove.';
+    $q = $pdo->prepare('SELECT * FROM time_logs WHERE id = ?');
+    $q->execute([$id]);
+    $row = $q->fetch();
+    if (!$row) return 'That entry is already gone.';
+
+    // Whoever typed it, or an admin. An artist correcting their own slip should
+    // not have to ask; somebody else's hours are not theirs to edit.
+    if (!$isAdmin && (int)$row['entered_by'] !== $userId) {
+        throw new RuntimeException('You can only remove entries you made yourself.');
+    }
+    $pdo->prepare('DELETE FROM time_logs WHERE id = ?')->execute([$id]);
+    return 'Removed ' . fmt_hours((int)$row['minutes']) . '.';
+}
+
+/** Logged minutes per progress row, for a set of tasks. */
+function logged_by_progress(PDO $pdo, array $progressIds): array {
+    if (!$progressIds || !time_logs_available($pdo)) return [];
+    $ids = implode(',', array_map('intval', $progressIds));
+    $out = [];
+    foreach ($pdo->query(
+        "SELECT progress_id, SUM(minutes) AS m FROM time_logs
+          WHERE progress_id IN ({$ids}) GROUP BY progress_id"
+    ) as $r) {
+        $out[(int)$r['progress_id']] = (int)$r['m'];
+    }
+    return $out;
+}
+
+/** One person's entries, newest first. */
+function time_logs_for_crew(PDO $pdo, int $crewId, ?int $projectId = null, int $limit = 40): array {
+    if (!time_logs_available($pdo)) return [];
+    $limit = max(1, min(200, $limit));
+    $sql = "SELECT tl.*, ps.name AS step_name, s.episode, s.shot_code, a.name AS asset_name,
+                   t.seq AS ticket_seq, t.title AS ticket_title, p.code AS project_code
+              FROM time_logs tl
+              LEFT JOIN progress pr ON pr.id = tl.progress_id
+              LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+              LEFT JOIN shots  s ON s.id = pr.shot_id
+              LEFT JOIN assets a ON a.id = pr.asset_id
+              LEFT JOIN tickets t ON t.id = tl.ticket_id
+              LEFT JOIN projects p ON p.id = tl.project_id
+             WHERE tl.crew_id = ?" . ($projectId ? ' AND tl.project_id = ?' : '') . "
+             ORDER BY tl.log_date DESC, tl.id DESC LIMIT {$limit}";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($projectId ? [$crewId, $projectId] : [$crewId]);
+    return $stmt->fetchAll();
+}
+
+/** Total logged minutes for one person, optionally within a window. */
+function logged_total_for_crew(PDO $pdo, int $crewId, ?int $projectId = null,
+                               ?string $from = null, ?string $to = null): int {
+    if (!time_logs_available($pdo)) return 0;
+    $sql = 'SELECT COALESCE(SUM(minutes), 0) FROM time_logs WHERE crew_id = ?';
+    $args = [$crewId];
+    if ($projectId) { $sql .= ' AND project_id = ?'; $args[] = $projectId; }
+    if ($from) { $sql .= ' AND log_date >= ?'; $args[] = $from; }
+    if ($to)   { $sql .= ' AND log_date <= ?'; $args[] = $to; }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($args);
+    return (int)$stmt->fetchColumn();
+}
+
+/** A readable label for what an entry was against. */
+function time_log_target(array $row): string {
+    if (!empty($row['ticket_seq'])) {
+        return ($row['project_code'] ?? '') . '-' . (int)$row['ticket_seq']
+             . ' · ' . ($row['ticket_title'] ?? '');
+    }
+    $item = shot_label($row['episode'] ?? '', $row['shot_code'] ?? '');
+    if ($item === '') $item = (string)($row['asset_name'] ?? '');
+    $step = (string)($row['step_name'] ?? '');
+    if ($item === '' && $step === '') return 'General';
+    return trim($item . ($step !== '' ? ' · ' . $step : ''));
+}

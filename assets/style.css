@@ -973,6 +973,16 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .trend-swatch.delivered { background: #2f6fb2; }
 .trend-swatch.target { background: repeating-linear-gradient(90deg, #b02a37 0 5px, transparent 5px 9px); }
 
+/* My work — status and time entered in place, so a row stays one line. */
+.mywork-table td { vertical-align: middle; }
+.mywork-table small { display: block; margin-top: 2px; }
+.mywork-table select { width: auto; min-width: 140px; padding: 4px 6px; font-size: 13px; }
+.mywork-table form { margin: 0; }
+.log-form { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
+.log-form .hrs-input { width: 62px; padding: 4px 6px; font-size: 13px; }
+.log-form .day-input { width: 138px; padding: 4px 6px; font-size: 13px; }
+.log-form button { margin-top: 0; padding: 4px 10px; font-size: 13px; }
+
 /* Status-change log on the dashboard. */
 .phase-head { margin: 18px 0 6px; font-size: 14px; }
 .activity-table td { vertical-align: middle; }
