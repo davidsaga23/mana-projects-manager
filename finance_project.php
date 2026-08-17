@@ -56,6 +56,21 @@ if ($configured) {
 }
 
 $proj    = expense_projection($pdo, $projectId);
+
+// The positions an invoice can be attached to: every lane on the show, which is
+// exactly the set of rows the projection draws. Built from the same
+// project_lanes() the projection uses, so the picker and the table can never
+// offer different things.
+$positions = [];
+foreach (project_lanes($pdo, $projectId) as $l) {
+    $positions[] = [
+        'crew_id'   => (int)$l['crew_id'],
+        'step_id'   => (int)$l['step_id'],
+        'crew_name' => (string)$l['name'],
+        'step_name' => (string)$l['step_name'],
+        'label'     => $l['name'] . ' — ' . $l['step_name'],
+    ];
+}
 $people  = project_people($pdo, $projectId);
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
@@ -71,6 +86,13 @@ foreach ($invoices as $iv) {
     }
 }
 $margin = ($budgetAmount !== null && $proj['total'] > 0) ? $budgetAmount - $proj['total'] : null;
+
+// Invoices naming no position still count against the budget, but cannot appear
+// on a projection row. Reported rather than quietly dropped.
+$unattached = 0.0;
+foreach ($invoices as $iv) {
+    if (empty($iv['step_id']) || empty($iv['crew_id'])) $unattached += (float)$iv['amount'];
+}
 
 $pageTitle = 'Finance · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
@@ -241,8 +263,10 @@ require __DIR__ . '/includes/header.php';
 
   <p class="muted small">
     <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
-    <strong>Actual</strong> comes from time logged against that person on that step — a dash means
-    nobody logged any, which is not the same as it having taken no time.
+    <strong>Actual days</strong> comes from time logged against that person on that step.
+    <strong>Actual cost comes from the invoices</strong> attached to that position — not from days
+    times a rate, which would be a second estimate rather than a fact. A dash in either means
+    nothing was recorded, which is not the same as it having been free.
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
     A day is <?= e(fmt_num($proj['hours_per_day'], 1)) ?> hours on this project.
   </p>
@@ -257,12 +281,21 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($unattached > 0): ?>
+  <p class="flash flash-warn">
+    <strong><?= e(fmt_money_plain($unattached, $cur)) ?> of invoices name no position</strong> —
+    a kill fee, a one-off, or simply nobody picked one. That money counts against the budget but
+    cannot appear on a row above, because spreading it across rows would put a figure into a
+    subtotal that nobody agreed to. Edit those invoices to attach them, or leave them as they are.
+  </p>
+<?php endif; ?>
+
 <h3>Invoices <span class="muted">· <?= count($invoices) ?></span></h3>
 
 <?php if ($invoices): ?>
   <table>
     <thead>
-      <tr><th>Who</th><th>Ref</th><th>Period</th><th class="num">Amount</th>
+      <tr><th>Who</th><th>Position</th><th>Ref</th><th>Period</th><th class="num">Amount</th>
           <th>Issued</th><th>Due</th><th>Status</th><th></th></tr>
     </thead>
     <tbody>
@@ -270,6 +303,7 @@ require __DIR__ . '/includes/header.php';
       $late = !$iv['paid_date'] && $iv['due_date'] && $iv['due_date'] < $todayStr; ?>
       <tr class="<?= $late ? 'row-overdue' : '' ?>">
         <td><?= e($iv['crew_name'] ?: '—') ?></td>
+        <td class="muted small"><?= e($iv['step_name'] ?: '') ?: '<span class="warn-text">unattached</span>' ?></td>
         <td class="muted small">
           <?php if (!empty($iv['document_url'])): ?>
             <a href="<?= e($iv['document_url']) ?>" target="_blank" rel="noopener"><?= e($iv['invoice_ref'] ?: 'document') ?></a>
@@ -299,21 +333,34 @@ require __DIR__ . '/includes/header.php';
 <form method="post" class="stack">
   <input type="hidden" name="save_invoice" value="1">
   <div class="row">
-    <label>Who
-      <select name="crew_id" onchange="document.getElementById('invName').value = this.options[this.selectedIndex].dataset.name || '';">
-        <option value="" data-name="">— not a crew member —</option>
-        <?php foreach ($people as $pp): ?>
-          <option value="<?= (int)$pp['id'] ?>" data-name="<?= e($pp['name']) ?>"><?= e($pp['name']) ?></option>
+    <label>Position <span class="muted small">(what this invoice pays for)</span>
+      <select name="position" onchange="
+          var o = this.options[this.selectedIndex];
+          document.getElementById('invCrew').value = o.dataset.crew || '';
+          document.getElementById('invStep').value = o.dataset.step || '';
+          document.getElementById('invName').value = o.dataset.crewname || '';
+          document.getElementById('invStepName').value = o.dataset.stepname || '';">
+        <option value="">— no particular position —</option>
+        <?php foreach ($positions as $ps): ?>
+          <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
+                  data-crew="<?= (int)$ps['crew_id'] ?>" data-step="<?= (int)$ps['step_id'] ?>"
+                  data-crewname="<?= e($ps['crew_name']) ?>" data-stepname="<?= e($ps['step_name']) ?>">
+            <?= e($ps['label']) ?>
+          </option>
         <?php endforeach; ?>
       </select>
+      <small>Choosing one puts this invoice on that row of the projection above.</small>
     </label>
     <label>Name on the invoice
-      <input name="crew_name" id="invName" placeholder="Copied from the picker, or type one">
+      <input name="crew_name" id="invName" placeholder="Filled in by the picker, or type one">
     </label>
     <label>Their reference
       <input name="invoice_ref" placeholder="e.g. 2026-014">
     </label>
   </div>
+  <input type="hidden" name="crew_id" id="invCrew" value="">
+  <input type="hidden" name="step_id" id="invStep" value="">
+  <input type="hidden" name="step_name" id="invStepName" value="">
   <div class="row">
     <label>Amount <input name="amount" inputmode="decimal" required placeholder="e.g. 2400"></label>
     <label>Currency <input name="currency" maxlength="3" value="<?= e($cur) ?>" style="text-transform:uppercase"></label>

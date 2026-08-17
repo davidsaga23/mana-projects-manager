@@ -135,6 +135,10 @@ function expense_projection(PDO $pdo, int $projectId): array {
     }
     $terms = crew_terms(array_values(array_unique($crewIds)));
     $actual = actual_days_by_crew_step($pdo, $projectId, $hoursPerDay);
+    // ACTUAL COST COMES FROM INVOICES, not from days times a rate. That product
+    // is a second estimate wearing an actual's clothes; only an invoice records
+    // what was really billed (David, 2026-08-18).
+    $billedBy = invoiced_by_position($projectId);
 
     $rows = []; $total = 0.0; $actualTotal = 0.0;
     $unpricedDays = 0.0; $currency = null; $mixed = false;
@@ -182,9 +186,10 @@ function expense_projection(PDO $pdo, int $projectId): array {
             }
 
             $actDays = $cid ? ($actual[$cid . '|' . $stepId] ?? 0.0) : 0.0;
-            $actCost = ($rate !== null && $unit !== 'flat')
-                ? ($unit === 'hour' ? $rate * $hoursPerDay * $actDays : $rate * $actDays)
-                : null;
+            // Null means nothing has been invoiced against this position — which
+            // is not the same as it having cost nothing, so the screen shows a
+            // dash rather than a zero.
+            $actCost = $cid ? ($billedBy[$cid . '|' . $stepId] ?? null) : null;
             if ($actCost !== null) $actualTotal += $actCost;
 
             $rows[] = [
@@ -239,6 +244,31 @@ function expense_projection(PDO $pdo, int $projectId): array {
         'unpriced_days'  => $unpricedDays,
         'hours_per_day'  => $hoursPerDay,
     ];
+}
+
+/**
+ * What has actually been INVOICED, per position, keyed "crewId|stepId".
+ *
+ * This is the actual cost on the expense projection. An invoice with no step —
+ * a kill fee, a one-off, a bulk settlement — is deliberately excluded here: it
+ * belongs to no projection row, and spreading it across rows would put a
+ * fiction into a subtotal. It still counts in the project's invoiced total,
+ * and the screen says how much is unattached rather than losing it quietly.
+ */
+function invoiced_by_position(int $projectId): array {
+    if (!can_see_money()) return [];
+    $db = finance_db();
+    if (!$db) return [];
+    $q = $db->prepare(
+        'SELECT crew_id, step_id, SUM(amount) AS billed
+           FROM invoices
+          WHERE project_id = ? AND crew_id IS NOT NULL AND step_id IS NOT NULL
+          GROUP BY crew_id, step_id'
+    );
+    $q->execute([$projectId]);
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = (float)$r['billed'];
+    return $out;
 }
 
 /**
@@ -340,6 +370,8 @@ function save_invoice(array $in, array $project, string $who = ''): string {
         (int)$project['id'], $project['code'] ?? null,
         !empty($in['crew_id']) ? (int)$in['crew_id'] : null,
         trim((string)($in['crew_name'] ?? '')) ?: null,
+        !empty($in['step_id']) ? (int)$in['step_id'] : null,
+        trim((string)($in['step_name'] ?? '')) ?: null,
         trim((string)($in['invoice_ref'] ?? '')) ?: null,
         $amount, $cur,
         $date($in['period_start'] ?? ''), $date($in['period_end'] ?? ''),
@@ -353,6 +385,7 @@ function save_invoice(array $in, array $project, string $who = ''): string {
         $args[] = $id;
         $db->prepare(
             'UPDATE invoices SET project_id = ?, project_code = ?, crew_id = ?, crew_name = ?,
+                    step_id = ?, step_name = ?,
                     invoice_ref = ?, amount = ?, currency = ?, period_start = ?, period_end = ?,
                     issued_date = ?, due_date = ?, paid_date = ?, status = ?, document_url = ?,
                     notes = ?, updated_by = ? WHERE id = ?'
@@ -362,10 +395,11 @@ function save_invoice(array $in, array $project, string $who = ''): string {
 
     $db->prepare(
         'INSERT INTO invoices
-           (project_id, project_code, crew_id, crew_name, invoice_ref, amount, currency,
+           (project_id, project_code, crew_id, crew_name, step_id, step_name,
+            invoice_ref, amount, currency,
             period_start, period_end, issued_date, due_date, paid_date, status,
             document_url, notes, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute($args);
 
     return 'Invoice recorded: ' . fmt_money_plain($amount, $cur) . '.';
