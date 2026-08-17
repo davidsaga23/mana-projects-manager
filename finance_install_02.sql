@@ -63,6 +63,17 @@ CREATE TABLE IF NOT EXISTS invoices (
   crew_id INT DEFAULT NULL,
   crew_name VARCHAR(100) DEFAULT NULL,
 
+  -- WHICH POSITION the invoice is for. A person can hold lanes on two steps —
+  -- an artist doing both Layout and Color is two positions and two rates — so
+  -- "who" alone cannot say what an invoice paid for. crew_id + step_id together
+  -- are the lane, which is the row the expense projection draws.
+  --
+  -- Nullable: an invoice that covers no particular position (a kill fee, a
+  -- one-off) is real, and forcing a step onto it would be a lie that then sits
+  -- in a subtotal. Those simply do not attach to a projection row.
+  step_id INT DEFAULT NULL,
+  step_name VARCHAR(100) DEFAULT NULL,
+
   -- The artist's own reference, as printed on their document. Not generated
   -- here: it is their number, and inventing a second one guarantees the two
   -- disagree when somebody quotes one over email.
