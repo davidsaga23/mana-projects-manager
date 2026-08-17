@@ -7,14 +7,26 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status (end of 2026-08-14):** Phases 1–6 built and **in real use** on "Return to Club" at
-  <https://mana.davidsaga.com> — setup, Plaky import, scheduler, crew slots, timeline
-  (both charts, `.gan` both directions), dashboard and per-step detail. David is working in
-  it daily and reporting bugs from real data, which is how most of 14 August was spent.
-  **Phase 7 (tickets / tasks) is built but has not been used yet.**
-- **⚠ Deploy state:** migrations **015**, **016** and **017** were written on 14 August and
-  are probably not applied — open `migrate.php` and check before assuming departments or the
-  tasks board are live. Everything up to 014 is applied.
+- **Status (2026-08-17):** in real use on "Return to Club" at
+  <https://mana.davidsaga.com>. Built and deployed: setup, Plaky import, scheduler, crew slots,
+  timeline, dashboard, per-step detail, **tickets, the tracking grid, item detail, team and
+  person performance, per-day time logs, the project brief, the whole money side, and now
+  hiring and contracts**. **All ten steps of David's production cycle are covered** — see the
+  table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
+  thing left is the **client loop**, which was never on that list.
+- **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
+  run to **024**. Applied as of 17 August: up to **023** confirmed by David; **024 (hiring) is
+  new and pending** — it must be run before the Hiring tab does anything but report that it
+  cannot.
+- **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
+  `finance_install_02.sql`, `finance_install_03.sql` and **`finance_install_04.sql`**, imported
+  by hand via phpMyAdmin, never through `migrate.php` (that runner only touches the production
+  connection). The first three were imported by 18 August; **04 is new and pending** — quotes and
+  contract status are unavailable until it is imported, and every screen says so rather than
+  showing a blank. Its credential lives in the `finance_db` block of `config.php`, and
+  `includes/money.php` is the **only** place that connection is ever opened.
+  **⚠ Run each finance file ONCE** — there is no `schema_migrations` table on that side, so a
+  second import fails on "duplicate column". That failure is harmless and means it was done.
 - **Email is live** (confirmed 2026-08-14): sending as `hi@davidsaga.com` through
   `mana.davidsaga.com:465/ssl`, with Reply-To `david@mana.tv`. Same mailbox STFC uses — see
   the 2026-08-14 email entries in `docs/DECISIONS.md` for why it does not send as `@mana.tv`.
@@ -171,6 +183,16 @@ Hard-won, all from real incidents:
    detects this** — it reports every duplicated function name across the codebase, which is
    the closest thing to a linter available without a PHP binary. Run it before handing over.
    (Phase 9 build, 2026-08-15.)
+14. **A mismatched quote is a PARSE error, so it takes down every page that requires the file.**
+   `"UPDATE … WHERE id = ?'` opened with a double quote and closed with a single one.
+   `includes/finance.php` stopped compiling, and Finance, the project page and the person page
+   all 500'd together — which is the signature of a broken *include*, not a broken feature. It
+   presented as "there are no projects", because output stopped after the table header.
+   **`tools/check_php_blocks.py` now detects unterminated strings**, alongside unbalanced
+   `if:/endif;` and duplicate function names. Three classes, one command, no PHP binary needed.
+   **The narrower lesson is the useful one:** it was introduced by a scripted string replacement
+   that silently did not match. **Assert every replacement.** That batch asserted on every edit
+   but one, and that was the one that failed. (2026-08-18.)
 
 ---
 
@@ -333,21 +355,99 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      library has been added and none is needed.** It stays nearly empty until enough
      `daily_snapshots` accumulate — those only began on 13 August.
 
-10. **Then: run it all against the real show.** The specific things still to watch:
+10. **Money, the brief, and the change log** — **built 2026-08-15 → 18.** This closed seven of
+   the ten steps in David's production cycle (`docs/ROADMAP.md`, top of file — **read that table
+   first; it is what a new feature should be checked against**).
+   - **`brief.php`** (migration 023) — step 3, which had no home at all. Prose fields plus file
+     attachments. Its own table, not columns on `projects`: that row is loaded on every page just
+     to draw the nav bar.
+   - **`finance.php` / `finance_project.php`** — budget, expense projection, invoices, and the
+     report that is those three side by side. **ADMIN ONLY.**
+   - **`item.php`** (migration 020) — one shot or asset opened up, version and notes per step.
+   - **`includes/activity.php`** (migration 021) — the status-change log, written by the Plaky
+     import, the tracking grid and the item page. **Cannot be backfilled.**
+   - **`time_logs`** (migration 022) — per-day effort, entered from **My work**, which now carries
+     production tasks as well as tickets.
+
+   **The four things to know before touching any of it:**
+   - **The expense projection is COMPUTED, never stored** — every load, from the live pipeline.
+     Storing it creates a number that goes stale the moment a headcount changes. Unpriced lanes
+     are reported as unpriced, never treated as free.
+   - **Actual cost comes from INVOICES**, not days × rate. An invoice names a *position*
+     (crew + step), which is why `invoices.step_id` exists.
+   - **`RTC_ExpenseProjection_v01.xlsx` is the spec** for that screen's shape: one row per person,
+     grouped by department, months = days ÷ 22. It was read, not approximated.
+   - **`includes/money.php` is the only door to the finance database.** Keep it that way.
+
+11. ~~**Hiring and contracts**~~ — **built 2026-08-17.** `migrations/024_hiring.sql`,
+   `finance_install_04.sql`, `includes/hiring.php`, `hiring.php`, plus additions to
+   `includes/money.php`, `crew.php` and `person.php`. This closed the last two numbered steps of
+   the production cycle. Read the six `2026-08-17` entries in `docs/DECISIONS.md` before changing
+   any of it. In short:
+   - **⚠ There was NO STFC reference for this phase** — searched for, not assumed. STFC tracks a
+     show that was already crewed. Every screen since 14 August had a proven version to port from;
+     this one does not, which is worth knowing when something turns out to be wrong.
+   - **The conversation is planning data; the quote is not.** Candidates, stages and contacts are
+     in the production database where any editor sees them — a producer must be able to tell that a
+     slot already has somebody lined up. What they asked for is in the finance database behind
+     `money.php`, like every other rate. David's call, asked directly.
+   - **Hiring RENAMES the slot.** `hire_candidate()` hands off to `promote_placeholder()`, so the
+     crew id never changes and everything already planned for that slot becomes the new person's
+     with nothing moved. This is the moment the 2026-08-13 slot model pays off. Hiring into a slot
+     that already holds somebody refuses and says who.
+   - **A candidate is not a `crew` row** until they are hired — otherwise everyone ever approached
+     would sit in every assignee dropdown for ever. Records are never deleted: `hires.id` is the
+     join key to the finance side, and somebody who declined is the record worth having when the
+     other one falls through.
+   - **The agreed rate carries across on hire** and stops those days counting as unpriced on the
+     expense projection — but **never over a rate already on file**, and it says so when it
+     declines to.
+   - **`set_contract_state()` is a separate writer from `save_crew_terms()`** on purpose: the full
+     one writes the whole row, so chasing a signature through it would have stored a missing rate
+     as NULL and silently unpriced somebody.
+   - **Engagement dates are recorded and the scheduler ignores them.** `crew_projects.start_date`
+     / `end_date`, on the person card as David asked. Deferring the scheduling half is deliberate —
+     it belongs with `crew_absences` — but the gap is **reported**, not hidden: the person page
+     says how many tasks fall outside somebody's dates.
+
+12. **Next.** In rough order of value:
+   - **The client loop** — the step missing from David's own list, and now the only numbered gap
+     left in the cycle. Nothing records a delivery: version sent, notes back, round two. Usually
+     where a schedule actually dies.
+   - **`crew_absences` + engagement dates in the scheduler** — one phase, not two. A person is
+     unavailable before they start, after they finish, and on the days they are away, and those
+     are the same rule. The dates now exist and are visibly not being obeyed, which is the right
+     kind of pressure to build it.
+   - **Cross-project benchmarking** — estimated vs actual per step. Unblocked now that `time_logs`
+     exists; it is the reason the estimate baseline was captured.
+   - **Where hires come from** — `hires.source` is being recorded from now on. After a couple of
+     shows it answers "which of our sources actually produces people we keep", which nothing has
+     ever been able to say. Nothing to build yet; it needs the data first, like every other
+     history table here.
+
+13. **Then: run it all against the real show.** The specific things still to watch:
+   - **Apply migration 024 and import `finance_install_04.sql`** — the hiring phase needs both,
+     and they are applied in two different places by two different methods. Until then the
+     Hiring tab reports that it cannot work rather than half-working.
    - Check the seeded board columns suit how the team actually works, on the Statuses screen.
    - `crew_absences` — now genuinely buildable and paired with the timeline in `ROADMAP.md`.
    - `time_logs` — the per-day table that turns "actual" from elapsed duration into effort.
    - **Rotate the two database passwords** (`davideei_PM`, `davideei_stfc`) — both were pasted
      into a chat transcript on 14 August. cPanel → MySQL Databases, then update each app's
-     `config.php` in the same sitting.
+     `config.php` in the same sitting. **The finance user's password too**, if it was ever
+     pasted anywhere.
    - STFC's `mail_from_name` was changed to "Anima | Project manager" by accident on
      14 August. Put it back to "STFC Production Dashboard" or that show's ticket emails are
      signed with the wrong product.
 
-**A separate track — the finance side.** Contracts, budgets, rates and invoices are
-*deliberately not in this codebase*. They belong to a separate application with its own
-logins and its own database, which may read production data but never the reverse. Don't add
-a rate column to `crew` "just for now" — see `docs/DECISIONS.md`, 2026-08-12.
+**A separate track — the finance side.** Rates, contracts, budgets and invoices live in a
+**separate MySQL database with its own user**, which the production user has no rights to.
+`includes/money.php` is the only place that connection is ever opened, always behind
+`is_admin()`. **This is the middle path, settled 2026-08-15** — not the original 2026-08-12
+design, which kept money in a wholly separate application this codebase held no credential for.
+That remains the destination and has no date. What is defended against today is an ordinary
+mistake in ordinary code, not somebody who can read `config.php`. Don't add a rate column to
+`crew` "just for now" — migration 018 did exactly that and 019 took it back out.
 
 **Later, when Plaky is dropped:** a tracking grid (shots/assets × steps, status and assignee
 set in place) and — if artists update their own work rather than a coordinator doing it —

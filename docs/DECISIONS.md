@@ -955,6 +955,183 @@ a table reads as a fact unless the page says otherwise, so the page says otherwi
 `time_logs` fills for effort, and worth building at the same time — one writer, two questions
 answered.
 
+## 2026-08-18 — The money side is built, in the studio's own spreadsheet shape
+**Decision:** the four money steps of the production cycle — budget, project expense, invoices,
+budget reports — are `finance.php` (hub) and `finance_project.php` (detail), **admin only**,
+reading production numbers from this database and money from the separate finance one.
+`RTC_ExpenseProjection_v01.xlsx` is the specification; it was read and matched rather than
+approximated.
+**What the sheet dictated, and why each choice is not arbitrary:**
+- **A row is a PERSON, not a step.** "Layout (Environment)" with two artists is two rows,
+  because they are two people who each get paid, and a step with three animators costs three
+  times what one does. The first version had one row per step with people nested — readable, but
+  it does not add up the way a budget meeting reads.
+- **Grouped by department with subtotals**, in the sheet's order: Above the line, Pre-production,
+  Production, Post-production. From `pipeline_steps.department`, which migration 015 added for
+  exactly this.
+- **Months = days ÷ 22.** Derived from the sheet's own numbers (4 days → 0.1818), not invented.
+- Role reads "Concept (Character)" — step name plus scope, matching its column B.
+
+## 2026-08-18 — The expense projection is COMPUTED, never stored
+**Decision:** nothing about the projection is written down. Every page load recomputes it from
+the current pipeline: person-days per step from the same `step_quota()` the dashboard and CSV
+export use, times the rate of whoever holds each lane.
+**Why:** storing it creates a second number that goes stale the moment somebody changes a
+headcount, and the whole reason production and finance are joined on stable ids is so the money
+side reads the CURRENT truth rather than a copy of an old one. Only what cannot be derived is
+stored — the agreed budget, and what has actually been invoiced.
+**The consequence, which is deliberate and visible:** a lane held by an unfilled slot has no rate
+to multiply, so it is counted as **unpriced**, not free. The screen says "14.5 person-days have no
+rate behind them" instead of quietly totalling the part it could price. A cost that looks low
+because half of it is missing is worse than no cost at all — and it puts the hiring gap in money
+terms, which is where it will actually be felt.
+**Related:** mixed currencies are flagged, never converted. Inventing an exchange rate would be
+worse than saying so.
+
+## 2026-08-18 — Actual cost comes from INVOICES, not days × rate
+**Decision, David's correction and it was right.** The first version computed actual cost as
+logged days times the rate. That is a second estimate wearing an actual's clothes; only an
+invoice records what was really billed. `Actual days` still comes from `time_logs`; `Actual cost`
+comes from invoices attached to that position.
+**What it required:** an invoice has to name a **position**, not just a person. Somebody holding
+lanes on both Layout and Color is two positions at possibly two rates, and "who" alone cannot say
+which a payment was for. Hence `invoices.step_id` (finance_install_03.sql) — crew_id + step_id
+together are the lane, which is exactly a projection row.
+**The case that is handled rather than forced:** an invoice with no position — a kill fee, a
+one-off, a bulk settlement, or work from an earlier stage of the show (David's sheet has two:
+Iana on Animatic, Go Gap on CH designs). Those are real. They count in the project's invoiced
+total, are marked **unattached**, and are excluded from projection rows — because spreading them
+across rows would put a figure into a department subtotal nobody agreed to. The page reconciles
+the two totals out loud rather than letting the gap look like a bug.
+
+## 2026-08-18 — Per-person projected cost is a SLICE of the same projection
+**Decision:** the person page shows what that individual is projected to cost on the project —
+their positions, days, months, total — computed by filtering `expense_projection()` rather than
+by multiplying rate × days again.
+**Why:** two implementations of the same multiplication disagree within a week. This is the same
+rule as `step_quota()` being the single source for person-days: the Finance screen and the person
+page cannot show different numbers because there is only one calculation.
+**Consequence:** type a rate, save, and the number moves — on both screens at once. Every
+unpriced row on the projection links straight to the page where its rate is set.
+
+## 2026-08-18 — Three parse-level bugs, and the checker now catches all of them
+**Context:** there is no PHP binary on the workstation, so `php -l` is unavailable and
+`tools/check_php_blocks.py` is the only automated gate. It has now been extended twice in one
+week, each time after a bug it could not see:
+1. **Unbalanced `if:/endif;`** — the original purpose.
+2. **Duplicate function names** — a redeclaration is fatal, but only on a page that loads both
+   files. `money.php` defined `fmt_rate()` for a PAY rate; `quota.php` already had one for a WORK
+   rate. Cost `person.php` its first load.
+3. **Unterminated strings** — a string opened with `"` and closed with `'` is a PARSE error, so
+   the file never compiles and *every* page requiring it 500s. Took the whole Finance section
+   down; it presented as "there are no projects", because output stopped after the table header.
+**The narrower lesson, which is the useful one:** that bug was introduced by a scripted string
+replacement that silently did not match. **Assert every replacement.** The batch that broke it had
+asserts on every edit but one, and that was the one that failed.
+**Also fixed:** the Finance hub now wraps each project's projection in its own try/catch. One
+project that cannot be priced shows an error in its own cell; the rest of the table still draws.
+A single row taking down a whole page silently is the exact failure this codebase keeps writing
+rules against.
+
+## 2026-08-17 — Hiring: the conversation is planning data, the number is not
+**Decision, David's call asked directly.** The hiring record splits across the boundary. Who was
+approached, at what stage, from what source, and their contact details live in the **production**
+database (`hires`, migration 024) where any editor sees them. What they **quoted** lives in the
+**finance** database (`hire_quotes`, `finance_install_04.sql`) behind `includes/money.php` and
+`is_admin()`, like every other rate.
+**Why not put it all behind the money door,** which would have been the simpler boundary: a
+producer looking at the Crew screen has to be able to see that a slot already has somebody lined
+up, or they will chase a job that is already three conversations deep. That fact is not financial.
+**Why not put it all in production,** which would have been simpler still: a quoted day rate is
+pay data by any reading, and the whole 2026-08-15 arrangement exists so that an ordinary query on
+an ordinary screen cannot reach one.
+**Consequence:** this is exactly the `crew` / `crew_terms` split applied one stage earlier — before
+somebody is hired rather than after. The join key is `hires.id`, with no foreign key (different
+databases), so **the id-stability rule applies here too**: the application never deletes a `hires`
+row. A candidate who said no is marked `declined`, not removed — which is also the record worth
+having three weeks later when the other one falls through.
+
+## 2026-08-17 — Hiring RENAMES the slot; it never creates a person
+**Decision:** `hire_candidate()` hands off to `promote_placeholder()` rather than doing anything
+itself. With a slot, hiring renames it; the crew row's id never changes.
+**Why it matters enough to write down:** this is the moment the 2026-08-13 slot model pays off, and
+it would be very easy to build the obvious version instead — create a crew row for the new hire,
+then reassign the slot's work to them. That version has to move every scheduled task, every
+progress record and every history row, and it silently loses anything it forgets. Renaming moves
+nothing because nothing needs moving.
+**Consequence:**
+- A candidate is deliberately **not** a `crew` row while the conversation is happening. Giving them
+  one early would put them in every assignee dropdown in the app and leave the ones who declined in
+  the studio's permanent people list for ever.
+- Hiring into a slot that already holds a real person **refuses**, and says who is in it. Silently
+  replacing them would move their planned work onto somebody else with nobody asking for it.
+- A candidate with no slot gets a plain crew row and is added to the project, with the screen saying
+  they are not in a slot yet. An exact name match reuses the existing person rather than making a
+  second copy — the same rule the alias layer and `link_login_to_crew()` follow.
+- The finance write happens **outside** the production transaction, because one transaction cannot
+  span two connections. The hire commits first; if carrying the rate across fails, that is reported
+  and the hire stands. The reverse — rolling back a hire because a rate could not be copied — would
+  be much worse.
+
+## 2026-08-17 — An agreed rate is carried onto the person automatically, but never over an existing one
+**Decision:** `seed_terms_from_quote()` copies the quoted rate into `crew_terms` at the moment
+somebody is hired. If they already have a rate on file it does **nothing** and says so.
+**Why:** this is the loop the whole phase exists to close. The expense projection reports unfilled
+slots as *unpriced days* rather than as free (2026-08-18); agreeing a rate during hiring is
+precisely the fact that prices them. Making somebody retype it on the person page afterwards would
+guarantee the two numbers eventually disagree, which is the same reasoning that keeps the projection
+computed rather than stored.
+**Why it never overwrites:** somebody who has worked three shows has terms that were negotiated. A
+quote from one job silently replacing them would change what the studio pays a person, from a screen
+that is about something else.
+
+## 2026-08-17 — Contract state is an ENUM, and it gets its own writer
+**Decision:** `crew_terms` gains `contract_status` (none / draft / sent / signed / declined) with
+sent and signed dates. `set_contract_state()` is a **separate function** from `save_crew_terms()`.
+**Why an ENUM** when this codebase turns almost every vocabulary into rows: unlike a status or a
+department there is nothing studio-specific about it, and "who hasn't signed" has to be a `WHERE`
+clause rather than a judgement about what somebody typed. `invoices.status` and `tickets.priority`
+are already ENUMs on the same grounds.
+**Why its own writer, which is the part worth remembering:** `save_crew_terms()` writes the whole
+row. Hand it a form that carries only contract fields and it stores the missing rate as NULL —
+so chasing a signature would silently **unprice** somebody, and the expense projection would start
+reporting their days as unpriced with nothing on screen to explain why. A partial write needs its
+own function. Reusing the full one and trusting every caller to send every field is the shape of
+bug this codebase keeps writing rules against.
+**Consequence:** `declined` is deliberately not the same as `none` — one is a hole in the plan
+somebody has to fill, the other is the ordinary state of most of a project. Dates rather than
+booleans, for the reason `invoices.paid_date` is a date: a boolean can never answer "how long has
+that been sitting with them", which is the question that actually chases a contract.
+
+## 2026-08-17 — Engagement dates are recorded, and the scheduler does NOT read them yet
+**Decision:** `crew_projects` gains `start_date` and `end_date` (David's request: start and end
+dates on the person card). The scheduler ignores them. `engagement_conflicts()` compares them
+against `schedule` and the person page reports the difference.
+**Why on `crew_projects` and not on `crew`:** an engagement is per SHOW. The same compositor is on
+Return to Club from September and on the next thing from January, and a single pair of dates on the
+person would have to be wrong about one of them.
+**Why the scheduler is left alone, deliberately:** making a start date move a bar changes every date
+on every project the moment somebody types one. That is a phase of its own and it belongs with
+`crew_absences`, which has been designed in `ROADMAP.md` since 2026-08-12 and pairs with exactly
+this work.
+**What is NOT acceptable about deferring it, and what was done instead:** a column that looks like
+it is being obeyed and is not is the precise failure lesson 11 is about — a feature that quietly
+does nothing is indistinguishable from one that was never built. So the gap is **reported**: the
+person page says "the plan has 6 tasks for them before they start", and the form says in as many
+words that the scheduler does not use these dates yet. Recording the fact is worth having on its
+own; pretending it constrains anything would not be.
+
+## 2026-08-17 — The first screen since August 14 with no STFC reference
+**Worth recording because it suspends a standing rule.** Since 2026-08-14 every screen has been
+designed by reading the equivalent one in the STFC dashboard first, and that rule has earned its
+place — the timeline port took less time than the version invented from scratch and came out
+better. **There is no equivalent here.** STFC tracks a show that was already crewed; it has no
+hiring, no candidates and no contracts, confirmed by search rather than assumed.
+**Consequence:** this phase has no proven-in-anger version behind it, which is worth knowing when
+something about it turns out to be wrong. The parts that *are* borrowed are borrowed from this
+codebase rather than that one: dry-run-then-save, POST-redirect-GET with flash messages, a
+vocabulary that reports what it could not do, and one writer per kind of write.
+
 ---
 
 ## Still open
@@ -985,6 +1162,18 @@ answered.
 - **Crew days off** (`crew_absences`) — designed in `ROADMAP.md`. Now genuinely buildable,
   since scheduled tasks carry a `crew_id`: a slot's absences are as real a scheduling
   constraint as a public holiday. Worth doing with the timeline, so a bar visibly moves.
+  **Engagement dates joined this queue on 2026-08-17** — `crew_projects.start_date` /
+  `end_date` exist and are reported against the plan, but nothing schedules around them.
+  One phase should teach the scheduler both at once: a person is unavailable before they
+  start, after they finish, and on the days they are away, and those are the same rule.
+- **Whether a hire should notify anybody.** Tickets email their assignee; hiring emails
+  nobody. Probably right — the conversation happens by email already, and a notification
+  saying what somebody just typed is noise. Revisit if a coordinator starts doing the
+  hiring and a producer wants telling.
+- **Whether a candidate can be in the frame for two slots at once.** Today they are one
+  row per slot, so the same person approached for Layout and for Color is two records that
+  do not know about each other. Fine while hiring is per-slot; worth a thought if somebody
+  starts tracking generalists.
 - ~~**Which lane is which person**~~ — settled 2026-08-13 by the slot model above.
 - ~~**Capturing an estimate baseline**~~ — built 2026-08-13, see above.
 - **What "actual" means for the comparison.** The baseline records the estimate; the other half

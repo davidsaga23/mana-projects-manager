@@ -11,6 +11,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/crew.php';
+require_once __DIR__ . '/includes/hiring.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -161,6 +162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $lanes    = $schemaReady ? project_lanes($pdo, $projectId) : [];
 $people   = $schemaReady ? assignable_crew($pdo) : [];
 $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
+
+// Who is lined up for the empty slots. An unfilled slot with three candidates in
+// play and one with nobody at all look identical on this screen otherwise, and
+// they are completely different problems.
+$candidatesByLane = hiring_available($pdo) ? hires_by_lane($pdo, $projectId) : [];
 
 // Steps with a headcount but no slots yet — the reason to press Generate.
 $stmt = $pdo->prepare(
@@ -323,6 +329,26 @@ require __DIR__ . '/includes/header.php';
             <?php if ($isSurplus): ?>
               <div class="warn-text small">
                 Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this step.
+              </div>
+            <?php endif; ?>
+            <?php if ($isPh && $candidatesByLane):
+              $live = array_filter($candidatesByLane[(int)$l['id']] ?? [], function ($h) {
+                  return in_array($h['stage'], HIRE_STAGES_OPEN, true);
+              });
+              // Names, not just a count. "2 candidates" sends somebody to another
+              // screen to find out who; the names answer it here.
+              $names = array_map(function ($h) {
+                  return $h['candidate_name'] . ' (' . strtolower(hire_stage_label($h['stage'])) . ')';
+              }, $live);
+            ?>
+              <div class="muted small">
+                <?php if ($names): ?>
+                  Lined up: <?= e(implode(', ', $names)) ?> ·
+                  <a href="hiring.php?project=<?= $projectId ?>">Hiring →</a>
+                <?php else: ?>
+                  <span class="warn-text">Nobody lined up.</span>
+                  <a href="hiring.php?project=<?= $projectId ?>">Start looking →</a>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
           </td>

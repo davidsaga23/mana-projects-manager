@@ -19,6 +19,7 @@ require_once __DIR__ . '/includes/people.php';
 require_once __DIR__ . '/includes/money.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/finance.php';
+require_once __DIR__ . '/includes/hiring.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -58,6 +59,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
         $args[] = $crewId;
         $pdo->prepare($sql)->execute($args);
         flash('ok', 'Details saved.');
+
+        // The engagement dates are part of the SAME form and the same save. A
+        // separate form per field means a reload per field, which is the habit
+        // item.php was built to avoid.
+        //
+        // Only written when they actually CHANGED. Saving them unconditionally
+        // made every "Save details" announce "Engagement dates cleared." to
+        // somebody who had never set any — a message that is technically true,
+        // reads as though something was lost, and trains people to ignore the
+        // flash area.
+        if (engagement_dates_available($pdo)) {
+            $before   = engagement($pdo, $crewId, $projectId);
+            $newStart = trim((string)($_POST['start_date'] ?? ''));
+            $newEnd   = trim((string)($_POST['end_date'] ?? ''));
+            if ($newStart !== (string)($before['start_date'] ?? '')
+                || $newEnd !== (string)($before['end_date'] ?? '')) {
+                try {
+                    flash('ok', set_engagement_dates($pdo, $crewId, $projectId, $newStart, $newEnd));
+                } catch (Throwable $e) {
+                    flash('err', $e->getMessage());
+                }
+            }
+        }
     }
     header('Location: ' . $selfUrl);
     exit;
@@ -89,6 +113,26 @@ try {
 }
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
+
+// When they are on this show, and whether the plan agrees. The scheduler does
+// not read these dates yet (migration 024 says why), so the mismatch is REPORTED
+// rather than silently corrected — a column that looks like it is being obeyed
+// and is not is the failure this codebase keeps paying for.
+$engagement = engagement($pdo, $crewId, $projectId);
+$dateClash  = engagement_conflicts($pdo, $crewId, $projectId);
+
+// How this person came to be on the show, if they were hired through the
+// platform. Kept because "where do the people who work out actually come from"
+// is a question no spreadsheet here can currently answer.
+$hiredAs = null;
+if (hiring_available($pdo)) {
+    $h = $pdo->prepare(
+        'SELECT source, stage_changed_at, step_name FROM hires
+          WHERE crew_id = ? AND project_id = ? AND stage = ? ORDER BY id DESC LIMIT 1'
+    );
+    $h->execute([$crewId, $projectId, 'hired']);
+    $hiredAs = $h->fetch() ?: null;
+}
 
 // What this person is projected to cost on THIS project: the days the plan asks
 // of them, times the rate saved below. Their rows out of the same
@@ -167,7 +211,53 @@ require __DIR__ . '/includes/header.php';
   <div><span class="muted small">Planned until</span>
     <strong><?= e($summary['schedule']['last_end'] ?? '—') ?></strong>
     <span class="muted small"><?= (int)$summary['schedule']['remaining'] ?> task(s) still ahead</span></div>
+  <?php if (engagement_dates_available($pdo)): ?>
+    <div><span class="muted small">On the show</span>
+      <strong><?= e($engagement['start_date'] ?? '') ?: '—' ?></strong>
+      <span class="muted small">
+        <?php if (!empty($engagement['end_date'])): ?>
+          until <?= e($engagement['end_date']) ?>
+        <?php elseif (!empty($engagement['start_date'])): ?>
+          no end date set
+        <?php else: ?>
+          no dates set
+        <?php endif; ?>
+      </span>
+    </div>
+  <?php endif; ?>
 </div>
+
+<?php if ($dateClash !== null): ?>
+  <div class="flash flash-warn">
+    <strong>The plan asks for work outside <?= e($person['name']) ?>'s dates.</strong>
+    <?php if ((int)$dateClash['before'] > 0): ?>
+      <?= (int)$dateClash['before'] ?> task<?= (int)$dateClash['before'] === 1 ? '' : 's' ?>
+      start<?= (int)$dateClash['before'] === 1 ? 's' : '' ?> before
+      <?= e($dateClash['start']) ?> — the earliest is <?= e($dateClash['first_start']) ?>.
+    <?php endif; ?>
+    <?php if ((int)$dateClash['after'] > 0): ?>
+      <?= (int)$dateClash['after'] ?> task<?= (int)$dateClash['after'] === 1 ? '' : 's' ?>
+      finish<?= (int)$dateClash['after'] === 1 ? 'es' : '' ?> after
+      <?= e($dateClash['end']) ?> — the last is <?= e($dateClash['last_end']) ?>.
+    <?php endif; ?>
+    <div class="muted small" style="margin-top:6px;">
+      The scheduler does not yet take engagement dates into account, so it has planned this work
+      as though they were available throughout. Nothing here is wrong by itself — it is a
+      difference between the plan and the agreement that somebody has to resolve, by moving the
+      work on the <a href="timeline.php?project=<?= $projectId ?>">timeline</a> or by changing the
+      dates below.
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php if ($hiredAs !== null && (!empty($hiredAs['source']) || !empty($hiredAs['stage_changed_at']))): ?>
+  <p class="muted small">
+    Hired through the platform<?php
+      if (!empty($hiredAs['stage_changed_at'])): ?> on <?= e(substr((string)$hiredAs['stage_changed_at'], 0, 10)) ?><?php endif;
+      if (!empty($hiredAs['source'])): ?>, sourced via <?= e($hiredAs['source']) ?><?php endif; ?>.
+    <a href="hiring.php?project=<?= $projectId ?>">Hiring →</a>
+  </p>
+<?php endif; ?>
 
 <h3>Pace, step by step</h3>
 <p class="muted small">
@@ -254,6 +344,20 @@ require __DIR__ . '/includes/header.php';
     <label>Email <input type="email" name="email" value="<?= e($person['email'] ?? '') ?>"
            placeholder="Needed for ticket notifications"></label>
   </div>
+  <?php if (engagement_dates_available($pdo)): ?>
+    <div class="row">
+      <label>Starts on this show
+        <input type="date" name="start_date" value="<?= e($engagement['start_date'] ?? '') ?>"></label>
+      <label>Finishes on this show
+        <input type="date" name="end_date" value="<?= e($engagement['end_date'] ?? '') ?>"></label>
+    </div>
+    <p class="muted small">
+      Recorded per show, not per person — the same artist can be on this one from September and on
+      the next from January. Leave either blank while it is genuinely not settled; a guessed date
+      reads as a fact. <strong>The scheduler does not use these yet</strong>, so they do not move
+      any bar on the timeline — where the plan disagrees with them, this page says so above.
+    </p>
+  <?php endif; ?>
   <div class="actions"><button type="submit">Save details</button></div>
 </form>
 <?php endif; ?>
@@ -315,6 +419,43 @@ require __DIR__ . '/includes/header.php';
       <?php if (!empty($terms['contract_url'])): ?>
         <p><a href="<?= e($terms['contract_url']) ?>" target="_blank" rel="noopener">Open the contract →</a></p>
       <?php endif; ?>
+
+      <?php if (contracts_need_upgrade()): ?>
+        <p class="muted small warn-text">
+          Contract status needs <code>finance_install_04.sql</code>, which hasn't been imported
+          into the finance database yet. The link above works; whether it has been signed cannot
+          be recorded until it is.
+        </p>
+      <?php else: ?>
+        <div class="row">
+          <label>Contract status
+            <select name="contract_status">
+              <?php foreach (CONTRACT_STATES as $s): ?>
+                <option value="<?= e($s) ?>" <?= ($terms['contract_status'] ?? 'none') === $s ? 'selected' : '' ?>>
+                  <?= e($s === 'none' ? 'No contract yet' : ucfirst($s)) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>Sent
+            <input type="date" name="contract_sent_date" value="<?= e($terms['contract_sent_date'] ?? '') ?>"></label>
+          <label>Signed
+            <input type="date" name="contract_signed_date" value="<?= e($terms['contract_signed_date'] ?? '') ?>"></label>
+        </div>
+        <?php $waiting = $terms ? contract_days_waiting($terms) : null; ?>
+        <?php if ($waiting !== null && $waiting > 0): ?>
+          <p class="muted small warn-text">
+            Out for signature for <?= (int)$waiting ?> day<?= $waiting === 1 ? '' : 's' ?>.
+          </p>
+        <?php endif; ?>
+        <p class="muted small">
+          Marking it <em>sent</em> or <em>signed</em> fills in today's date if you leave the box
+          blank — a status with no date is a fact nobody can check later. <em>Declined</em> is
+          deliberately not the same as <em>no contract yet</em>: it is a hole in the plan somebody
+          has to fill.
+        </p>
+      <?php endif; ?>
+
       <div class="actions"><button type="submit">Save terms</button></div>
     </form>
 

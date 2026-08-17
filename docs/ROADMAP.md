@@ -9,34 +9,35 @@ is probably not the next thing.
 | # | Step | Coverage | Where |
 |---|---|---|---|
 | 1 | Timeline | **Built** | `schedule.php`, `timeline.php`, `.gan` both directions |
-| 2 | Budget | **Missing** | Finance side. Nothing exists |
-| 3 | New brief | **Missing** | Nothing exists — see below |
+| 2 | Budget | **Built** 2026-08-18 | `finance_project.php` — agreed amount, currency, terms |
+| 3 | New brief | **Built** 2026-08-18 | `brief.php` — the ask, deliverables, reference, files |
 | 4 | Breakdown | **Built** | Wizard (paste) + Plaky import |
-| 5 | Project expense | **Half** | `export.php` emits the production numbers a projection is built from; the projection itself is a spreadsheet |
-| 6 | Hiring | **Half** | Slots exist, and the scheduler reports the shortfall ("needs about 4; 3 planned"). Nothing tracks the hiring itself |
+| 5 | Project expense | **Built** 2026-08-18 | Expense projection, computed live in the shape of `RTC_ExpenseProjection_v01.xlsx` |
+| 6 | Hiring | **Built** 2026-08-17 | `hiring.php` — candidates per slot, stages, quotes (admin), and hiring renames the slot |
 | 7 | Detailed timeline | **Built** | Per-task Gantt, drag, regenerate |
-| 8 | Contracts | **Half** | A link per person in the finance database. No "who hasn't signed" |
-| 9 | Invoices | **Missing** | Finance side |
-| 10 | Budget reports | **Missing** | Finance side |
+| 8 | Contracts | **Built** 2026-08-17 | Status and dates per person, "who hasn't signed" per project, the Drive link as before |
+| 9 | Invoices | **Built** 2026-08-18 | Per position, with paid/overdue and unattached handling |
+| 10 | Budget reports | **Built** 2026-08-18 | Budget vs projected vs invoiced, per project and across all of them |
+| — | **Client loop** | **Missing** | The step the list itself does not have — see below |
 
-### What that table says
+### What that table says (revised 2026-08-17)
 
-**Four of the ten steps are money** — budget, project expense, invoices, budget reports — and
-they are a chain, not four separate features. That is 40% of the process with no home, and it is
-what the spreadsheets are still doing. The production half of every one of them already exists:
-work units, days per unit, person-days, required headcount, all exported in the shape the
-reference sheet uses. The missing half is the money applied on the other side, which now has
-somewhere to live (the finance database, 2026-08-15).
+**All ten numbered steps are built.** The money chain closed in a day on 18 August because the
+production half of every money screen already existed; hiring and contracts closed for the same
+reason, one layer up. Slots, lanes, person-days and unpriced days were all already computed — what
+was missing was the record of the conversation that turns a slot into a person, and that turned out
+to be one table, one screen and a hand-off to `promote_placeholder()`.
 
-**The brief is step 3 and has nowhere to go.** A project currently starts at name, code, type,
-fps and dates. What the client actually asked for — deliverables, formats, reference, who the
-contact is — lives in email. It is the document people go looking for in week six, and
-everything downstream is derived from it.
+**The chain is now complete end to end.** Slots → hiring → contracts → invoices: a headcount
+generates a slot, a slot gets candidates, a candidate agrees a rate, hiring renames the slot so all
+its planned work becomes theirs, the agreed rate lands on their terms so their days stop counting as
+unpriced, a contract is chased to signature, and invoices settle against the position. Every link is
+joined on ids that never move.
 
-**Hiring is a gap you can see but not act on.** The platform knows a step is short-handed and
-which slots are unfilled. It has no idea who has been approached, what they quoted, or whether
-they said yes. Slots → hiring → contracts → invoices is one chain with the first link built and
-part of the third.
+**What is deliberately still missing inside it:** the scheduler does not read engagement dates. A
+person's start and end dates are recorded and compared against the plan, but nothing moves a bar —
+see the 2026-08-17 entry in `DECISIONS.md`, and build it with `crew_absences`, which is the same
+rule wearing a different hat.
 
 ### The step missing from the list itself
 
