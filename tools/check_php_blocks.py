@@ -172,6 +172,75 @@ print('%d files checked, %d with unbalanced alternation blocks' % (len(files), b
 # Checked here rather than in a separate script because START_HERE tells people
 # to run ONE command before handing over, and a check nobody runs is not a check.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Unterminated string literals.
+#
+# A string opened with " and closed with ' (or vice versa) is a PHP PARSE error:
+# the file never compiles, so every page that requires it 500s — not just the one
+# feature. Cost the whole Finance section an evening, from one careless edit
+# where an opening quote was changed and the closing one was not.
+#
+# php_code_only() already walks strings and comments left to right to mask them.
+# If it reaches the end of a file still inside a string, the quotes do not
+# balance. That is a heuristic, not a parser, but it catches the mistake that
+# actually happens.
+# ---------------------------------------------------------------------------
+def unterminated_string(text):
+    """Return the 1-indexed line where an unclosed string starts, or None."""
+    i, n = 0, len(text)
+    in_php = False
+    while i < n:
+        if not in_php:
+            j = text.find('<?php', i)
+            k = text.find('<?=', i)
+            starts = [x for x in (j, k) if x != -1]
+            if not starts:
+                return None
+            i = min(starts)
+            in_php = True
+            i += 5 if i == j else 3
+            continue
+        c = text[i]
+        if c == '?' and text.startswith('?>', i):
+            in_php = False; i += 2; continue
+        if c == '/' and text.startswith('//', i):
+            e = text.find(chr(10), i); i = n if e == -1 else e; continue
+        if c == '#':
+            e = text.find(chr(10), i); i = n if e == -1 else e; continue
+        if c == '/' and text.startswith('/*', i):
+            e = text.find('*/', i + 2); i = n if e == -1 else e + 2; continue
+        if c in ('"', "'"):
+            start = i
+            quote = c
+            i += 1
+            while i < n:
+                if text[i] == chr(92):
+                    i += 2; continue
+                if text[i] == quote:
+                    break
+                i += 1
+            if i >= n:
+                return text[:start].count(chr(10)) + 1
+            i += 1
+            continue
+        i += 1
+    return None
+
+
+bad_str = 0
+for f in files:
+    text = io.open(f, encoding='utf-8', errors='replace').read()
+    line = unterminated_string(text)
+    if line is not None:
+        if bad_str == 0:
+            print('')
+            print('UNTERMINATED STRING — PHP will not parse these files at all:')
+        bad_str += 1
+        print('  %s: a string opened near line %d is never closed' % (f, line))
+print('')
+print('%d files checked for unterminated strings, %d suspect' % (len(files), bad_str))
+
+
 FUNC = re.compile(r'^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', re.M)
 
 seen = {}

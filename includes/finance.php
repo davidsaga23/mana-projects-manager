@@ -403,7 +403,7 @@ function save_invoice(array $in, array $project, string $who = ''): string {
                     {$posCols}
                     invoice_ref = ?, amount = ?, currency = ?, period_start = ?, period_end = ?,
                     issued_date = ?, due_date = ?, paid_date = ?, status = ?, document_url = ?,
-                    notes = ?, updated_by = ? WHERE id = ?'
+                    notes = ?, updated_by = ? WHERE id = ?"
         )->execute($args);
         return 'Invoice updated.';
     }
