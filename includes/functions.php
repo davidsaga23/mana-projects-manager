@@ -104,9 +104,30 @@ function column_exists(PDO $pdo, string $table, string $column): bool {
 
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
 // Empty string for null so it can fill a form field that means "not set".
+/**
+ * A number with its pointless trailing zeros removed: 2.50 -> "2.5", 2.00 -> "2".
+ *
+ * ⚠ THE strpos GUARD IS LOAD-BEARING. Without it the trims run on a string that
+ * has no decimal point to stop them, and they eat SIGNIFICANT digits:
+ *
+ *     fmt_num(0,   0)  ->  ""      (an empty cell where a zero belongs)
+ *     fmt_num(10,  0)  ->  "1"
+ *     fmt_num(100, 0)  ->  "1"
+ *
+ * That is the dangerous shape of wrong: not a blank page or an error, a
+ * PLAUSIBLE number. "1 of 38 approved" reads perfectly and is a tenth of the
+ * truth. It surfaced on the finance Overview, where Approved / Delivered /
+ * Blocked all rendered empty because they were legitimately zero (2026-08-17).
+ *
+ * At one decimal place or more the behaviour is unchanged, because
+ * number_format() always emits a '.' there and the '.' is what stopped the trim
+ * — which is why this survived from the beginning without being noticed: every
+ * caller until this week used the default of 2.
+ */
 function fmt_num($v, int $decimals = 2): string {
     if ($v === null || $v === '') return '';
-    return rtrim(rtrim(number_format((float)$v, $decimals, '.', ''), '0'), '.');
+    $s = number_format((float)$v, $decimals, '.', '');
+    return strpos($s, '.') !== false ? rtrim(rtrim($s, '0'), '.') : $s;
 }
 
 /**

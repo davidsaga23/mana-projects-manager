@@ -233,9 +233,17 @@ try {
       <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
   </div>
   <p class="muted small">
-    The same counts the <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a>
-    draws, from the same calculation — so the two screens cannot disagree about how far along the
-    show is.
+    A <strong>task</strong> is one item through one step — every shot and every asset multiplied by
+    the steps that apply to it — so <?= (int)$progress['applicable'] ?> is the whole show as a
+    count of things to finish, not a count of shots. The same figures the
+    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> draws, from the same
+    calculation, so the two screens cannot disagree about how far along the show is.
+    <?php // Worth saying here because the projection above can legitimately show a
+          // bigger unit count: step_quota() falls back to project_settings.estimated_*
+          // when a step has no real items yet, and labels those "est." — this panel
+          // only ever counts rows that exist. ?>
+    Where the expense projection shows more units than this, those are <em>estimates</em> standing
+    in for a breakdown that has not been entered yet.
   </p>
 <?php endif; ?>
 

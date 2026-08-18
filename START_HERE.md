@@ -186,6 +186,20 @@ Hard-won, all from real incidents:
    detects this** — it reports every duplicated function name across the codebase, which is
    the closest thing to a linter available without a PHP binary. Run it before handing over.
    (Phase 9 build, 2026-08-15.)
+16. **`rtrim` on a formatted number eats significant digits when there is no decimal point.**
+   `fmt_num()` ended with `rtrim(rtrim(number_format(...), '0'), '.')`, which turns "2.50" into
+   "2.5" and "2.00" into "2" — correct, and correct for four months, because every caller used the
+   default of two decimals and `number_format()` always emits a `.` there. **The `.` was the only
+   thing stopping the trim.** Called with 0 decimals it strips real zeros:
+   `fmt_num(0, 0)` → `""`, `fmt_num(10, 0)` → `"1"`, `fmt_num(100, 0)` → `"1"`.
+   It surfaced as blank Approved / Delivered / Blocked cells on the finance Overview, because those
+   were legitimately zero. **The blanks were the lucky part** — a project with 10 approved would
+   have read "1 of 38", which is a plausible sentence and a tenth of the truth. Fixed with a
+   `strpos($s, '.')` guard, which changes nothing at one decimal place or more.
+   **The general shape:** a formatting helper that is right for its original caller can be silently
+   wrong for the next one, and numbers are the worst place for that because a wrong one still looks
+   like a number. (2026-08-17.)
+
 15. **A checker that is wrong about the language is worse than no checker.**
    `tools/check_php_blocks.py` reported a healthy file as broken, because it treated a `//`
    comment as running to the end of the line. PHP does not: it acts on `?>` even inside a
