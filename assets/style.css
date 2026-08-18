@@ -132,6 +132,8 @@ label.inline input { width: auto; }
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .row label { flex: 1 1 150px; }
 .stack { max-width: 620px; }
+/* Splits the top bar's three main destinations from the occasional ones. */
+.nav-sep { margin: 0 8px; color: #b9c4cd; }
 
 /* The budget form reads as ONE horizontal line: amount, currency, terms, notes,
    save. Three things are needed for that and each fixes a real symptom.

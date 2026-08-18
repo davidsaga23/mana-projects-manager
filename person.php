@@ -53,7 +53,10 @@ if (!$person) {
 // once per person. A projection with fourteen unpriced rows made that fourteen
 // round trips (David, 2026-08-17).
 $from       = (($_GET['from'] ?? $_POST['from'] ?? '') === 'finance') ? 'finance' : '';
-$backUrl    = 'finance_project.php?project=' . $projectId;
+// The PROJECTION tab specifically, not the finance overview. That is the tab
+// the 'set a rate' link was clicked from, and returning to a different one would
+// reintroduce exactly the friction this whole round trip removed.
+$backUrl    = 'finance_project.php?project=' . $projectId . '&tab=projection';
 $selfUrl    = 'person.php?project=' . $projectId . '&crew=' . $crewId
             . ($from ? '&from=finance' : '');
 

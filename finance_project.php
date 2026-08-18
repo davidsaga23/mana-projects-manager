@@ -12,6 +12,9 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/people.php';
 require_once __DIR__ . '/includes/finance.php';
+require_once __DIR__ . '/includes/finance_nav.php';
+require_once __DIR__ . '/includes/standards.php';
+require_once __DIR__ . '/includes/dashboard.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -152,16 +155,18 @@ foreach ($invoices as $iv) {
     if (empty($iv['step_id']) || empty($iv['crew_id'])) $unattached += (float)$iv['amount'];
 }
 
+// Which tab. One file rather than four, because every tab needs the same
+// expense_projection() and the same POST handlers, and four files would each
+// have to rebuild that context — three more places for the money to come out
+// slightly differently. The tabs choose what RENDERS, never what is computed.
+$tab = (string)($_GET['tab'] ?? 'overview');
+if (!in_array($tab, finance_tabs(), true)) $tab = 'overview';
+
 $pageTitle = 'Finance · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="finance.php">← All finance</a> ·
-   <a href="project.php?id=<?= $projectId ?>">Open the project</a></p>
-<h2 class="wizard-title">
-  <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
-  <span class="admin-only-tag">administrators only</span>
-</h2>
+<?php finance_nav($project, $tab); ?>
 
 <?php if (function_exists('invoices_need_upgrade') && invoices_need_upgrade()): ?>
   <div class="flash flash-warn">
@@ -185,6 +190,56 @@ require __DIR__ . '/includes/header.php';
   <?php exit; ?>
 <?php endif; ?>
 
+<?php // ---- OVERVIEW ------------------------------------------------------ ?>
+<?php if ($tab === 'overview'): ?>
+
+<?php
+// How the SHOW is going, on the money screen. The same figures the production
+// dashboard draws, out of the same dashboard_overall() — not a second count of
+// anything. A budget read without knowing whether the work is half done is a
+// budget read blind, and walking to another tab to find out is how nobody
+// checks.
+$progress = null; $dashSteps = [];
+try {
+    $dashSteps = dashboard_steps($pdo, $projectId, $project['delivery_date'] ?? null);
+    $progress  = dashboard_overall($dashSteps, $project['delivery_date'] ?? null, null);
+} catch (Throwable $e) {
+    // A progress panel that cannot be worked out must not take the budget down
+    // with it — the same rule the Finance hub learned when one project's
+    // projection stopped the whole table drawing.
+    $progress = null;
+}
+?>
+
+<?php if ($progress && $progress['applicable'] > 0): ?>
+  <h3>Where the show is</h3>
+  <div class="dash-strip">
+    <div><span class="muted small">Approved</span>
+      <strong><?= e(fmt_num($progress['approved'], 0)) ?></strong>
+      <span class="muted small">of <?= e(fmt_num($progress['applicable'], 0)) ?></span></div>
+    <div><span class="muted small">Delivered</span>
+      <strong><?= e(fmt_num($progress['delivered'], 0)) ?></strong>
+      <span class="muted small"><?= $progress['pct_delivered'] !== null
+            ? e(fmt_num($progress['pct_delivered'], 0)) . '%' : '' ?></span></div>
+    <div><span class="muted small">Remaining</span>
+      <strong><?= e(fmt_num($progress['remaining'], 0)) ?></strong></div>
+    <div><span class="muted small">Blocked</span>
+      <strong class="<?= $progress['blocked'] ? 'warn-text' : '' ?>"><?= e(fmt_num($progress['blocked'], 0)) ?></strong></div>
+    <div><span class="muted small">Working days left</span>
+      <strong class="<?= !empty($progress['overdue']) ? 'err' : '' ?>">
+        <?= $progress['days_left'] !== null ? (int)$progress['days_left'] : '—' ?></strong>
+      <?php if (!empty($progress['overdue'])): ?><span class="err small">past delivery</span><?php endif; ?></div>
+    <div><span class="muted small">Delivery</span>
+      <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
+  </div>
+  <p class="muted small">
+    The same counts the <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a>
+    draws, from the same calculation — so the two screens cannot disagree about how far along the
+    show is.
+  </p>
+<?php endif; ?>
+
+<h3>The money</h3>
 <div class="dash-strip">
   <div><span class="muted small">Budget</span>
     <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong></div>
@@ -349,6 +404,12 @@ $hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
     if (!empty($budget['updated_by'])): ?> by <?= e($budget['updated_by']) ?><?php endif; ?>.</p>
 <?php endif; ?>
 
+<?php endif; ?>
+<?php // ---- end OVERVIEW -------------------------------------------------- ?>
+
+<?php // ---- EXPENSE PROJECTION -------------------------------------------- ?>
+<?php if ($tab === 'projection'): ?>
+
 <h3>Expense projection</h3>
 
 <p class="page-actions">
@@ -506,6 +567,151 @@ if ($retakePct <= 0):
     cannot appear on a row above, because spreading it across rows would put a figure into a
     subtotal that nobody agreed to. Edit those invoices to attach them, or leave them as they are.
   </p>
+<?php endif; ?>
+
+<?php
+// ---- MINIMUM vs IDEAL -------------------------------------------------------
+//
+// The question this answers, and nothing else in the platform could: IS THIS
+// BUDGET BUYING A PLAN THAT CAN BE DELIVERED?
+//
+// The two numbers come from opposite directions and neither is an opinion about
+// the other:
+//
+//   MINIMUM  what the deadline demands of one person per day. Derived from work
+//            remaining over working days left over headcount. Nobody types it
+//            and nobody can edit it — it is arithmetic on the dates and the
+//            progress, and it rises on its own every time either slips.
+//   IDEAL    what the studio says that work actually takes, for this kind of
+//            project. Typed on the base sheet from experience.
+//
+// A minimum ABOVE the ideal is the finding. It does not mean somebody is lazy;
+// it means the plan requires a pace the studio does not believe in, and the only
+// honest fixes are more people, more time, or less work. Reading it beside the
+// budget is the point — those three fixes all cost money, which is the screen
+// you are on.
+$quotaRows = [];
+$quotaOver = 0;
+if (standards_available($pdo)) {
+    $sheet = standards_for_type($pdo, (string)$project['type']);
+    if ($sheet) {
+        try {
+            foreach (dashboard_steps($pdo, $projectId, $project['delivery_date'] ?? null) as $ds) {
+                $st  = $ds['step'];
+                $std = $sheet[standard_key($st['name'], $st['applies_to'] ?? 'shot',
+                                           $st['applies_to_asset_type'] ?? '')] ?? null;
+                if ($std === null) continue;                 // no standard to compare against
+
+                $idealDays    = (float)$std['days_per_unit'];
+                $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
+                $minPerArtist = $ds['per_artist'] !== null ? (float)$ds['per_artist'] : null;
+
+                $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
+                      ? $minPerArtist / $idealPerDay : null;
+                if ($over !== null && $over > 1.05) $quotaOver++;
+
+                $quotaRows[] = [
+                    'ds' => $ds, 'step' => $st, 'std' => $std,
+                    'ideal_per_day' => $idealPerDay,
+                    'min_per_artist' => $minPerArtist,
+                    'over' => $over,
+                ];
+            }
+        } catch (Throwable $e) {
+            $quotaRows = [];
+        }
+    }
+}
+?>
+
+<h3>Minimum against ideal</h3>
+
+<p class="muted small">
+  Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
+  one person per day — remaining work over the working days left, divided by the people on it. It
+  is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
+  closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
+  from the <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
+  for <?= e($project['type']) ?> projects.
+</p>
+
+<?php if (!standards_available($pdo)): ?>
+  <p class="muted small warn-text">
+    Ideal quotas need migration <strong>026</strong>, which hasn't been applied, so there is
+    nothing to compare against yet.
+  </p>
+<?php elseif (!$quotaRows): ?>
+  <div class="empty-state">
+    <p>No step on this project has an ideal recorded for <?= e($project['type']) ?> projects yet.</p>
+    <p class="muted">Write them down on the
+      <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
+      this comparison fills in. It is the one thing that can tell you a budget is buying a plan
+      nobody can deliver.</p>
+  </div>
+<?php else: ?>
+
+  <?php if ($quotaOver > 0): ?>
+    <div class="flash flash-err">
+      <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
+      <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above the studio standard. That is not
+      an ambitious plan — it is one the people on it are not expected to hit. The three fixes are
+      more people, more time, or less work, and all three land on this page.
+    </div>
+  <?php endif; ?>
+
+  <div class="grid-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Step</th><th>Covers</th>
+        <th class="num">Remaining</th>
+        <th class="num">People</th>
+        <th class="num">Minimum / person / day</th>
+        <th class="num">Ideal / person / day</th>
+        <th>Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($quotaRows as $q):
+      $ds = $q['ds']; $over = $q['over'];
+      $cls = ($over === null) ? '' : ($over > 1.05 ? 'err' : ($over < 0.95 ? 'ok' : 'muted')); ?>
+      <tr class="<?= $over !== null && $over > 1.05 ? 'has-problem' : '' ?>">
+        <td class="wf-name">
+          <span class="dot" style="background:<?= e($q['step']['color'] ?: '#ccc') ?>"></span><?= e($q['step']['name']) ?>
+        </td>
+        <td class="muted small">
+          <?= e(applies_to_phrase($q['step']['applies_to'], $q['step']['applies_to_asset_type'] ?? null)) ?>
+        </td>
+        <td class="num"><?= e(fmt_num((float)$ds['remaining'], 1)) ?></td>
+        <td class="num muted"><?= $ds['headcount'] ? e(fmt_num((float)$ds['headcount'], 1)) : '—' ?></td>
+        <td class="num <?= $cls ?>">
+          <?= $q['min_per_artist'] !== null ? e(fmt_num($q['min_per_artist'], 2)) : '<span class="muted">—</span>' ?>
+        </td>
+        <td class="num"><?= $q['ideal_per_day'] !== null ? e(fmt_num($q['ideal_per_day'], 2)) : '—' ?></td>
+        <td class="small">
+          <?php if ($over === null): ?>
+            <span class="muted">No deadline on this step, so there is no pace to be behind.</span>
+          <?php elseif ($over > 1.05): ?>
+            <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the standard.</span>
+          <?php elseif ($over < 0.95): ?>
+            <span class="ok">Comfortable — <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
+          <?php else: ?>
+            <span class="muted">Right at the standard.</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="muted small">
+    Steps with no ideal recorded are left out rather than shown blank — a comparison against
+    nothing is not a row. The minimum here is the same figure the
+    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
+    <em>required</em>, from the same calculation, so the two cannot disagree.
+  </p>
+
 <?php endif; ?>
 
 <h3>Other expenses <span class="muted">· <?= count($proj['other'] ?? []) ?></span></h3>
@@ -689,6 +895,12 @@ if ($retakePct <= 0):
   <?php endif; ?>
 <?php endif; ?>
 
+<?php endif; ?>
+<?php // ---- end EXPENSE PROJECTION ----------------------------------------- ?>
+
+<?php // ---- INVOICES ------------------------------------------------------ ?>
+<?php if ($tab === 'invoices'): ?>
+
 <h3>Invoices <span class="muted">· <?= count($invoices) ?></span></h3>
 
 <?php if ($invoices): ?>
@@ -857,6 +1069,9 @@ function invAddRows() {
   Marking an invoice paid without a date fills in today: a status that cannot be checked later
   is not a record.
 </p>
+
+<?php endif; ?>
+<?php // ---- end INVOICES --------------------------------------------------- ?>
 
 </div>
 </body></html>

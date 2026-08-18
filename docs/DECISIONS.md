@@ -1479,6 +1479,53 @@ observed median for each row — written into `source`, offered, never applied. 
 David described closing: *"informed by experience and later on by comparing other projects too."*
 The prerequisite is real effort per step, which is `time_logs`, which now exists.
 
+## 2026-08-17 — Three ways in, and the finance side gets its own tabs
+**Decision, David's:** the top bar becomes **My work · Project management · Finance management**,
+and the business side of a project gains a tab bar of its own — Overview, Expense projection,
+Invoices, Hiring — mirroring `project_nav()`.
+**Why:** the bar had grown into a flat list of seven links where a project screen and a database
+migration read as equally likely destinations, which none of them are. Everything the studio does
+is one of three things: what is on my desk, how the shows are going, how the business is going.
+Each of the three now leads somewhere that has its own tabs, so the top bar stops trying to be a
+menu for the whole application. The setup and housekeeping screens sit behind a separator — the
+same split `project_nav()` already makes between its work tabs and its data tabs.
+**A bug fixed on the way:** "Ideal quotas" had been placed inside the `is_admin()` block. The
+screen itself is `require_login()` because it is production planning data, not money — so an
+editor could reach it and could not see the link to it.
+
+**One file, four tabs, not four files.** `finance_project.php` takes `?tab=`. Every tab needs the
+same `expense_projection()` and the same POST handlers, and four files would each have to rebuild
+that context — three more places for the money to come out slightly differently. The tabs choose
+what RENDERS, never what is computed.
+**The Hiring tab is the SAME screen the project side links to, not a copy.** Hiring is one
+conversation whether it is opened from the plan or from the budget, and the money on it is already
+admin-only inside `money.php`, so nothing needed hiding. Two copies would drift.
+**The Overview leads with progress, from `dashboard_overall()`** — the production dashboard's own
+figures, not a second count. A budget read without knowing whether the work is half done is a
+budget read blind, and walking to another tab to find out is how nobody checks.
+**Consequence:** the "set a rate" return from the person page now lands on `&tab=projection`
+specifically. Returning to the Overview instead would have reintroduced exactly the friction that
+round trip was built to remove.
+
+## 2026-08-17 — Minimum against ideal: does the budget buy a deliverable plan?
+**Decision:** the Expense projection tab carries a comparison between the **minimum** quota and the
+**ideal** one, per step.
+**Why it belongs on the money screen rather than the dashboard:** the two numbers come from
+opposite directions and neither is an opinion about the other. The minimum is arithmetic on the
+dates and the progress — remaining work over working days left over headcount — and **cannot be
+edited**, which is the property that makes it worth comparing against. The ideal is what the studio
+says the work takes. A minimum ABOVE the ideal does not mean anybody is slow; it means the plan
+requires a pace the studio does not believe in, and the only honest fixes are more people, more
+time, or less work. **All three cost money**, which is the screen you are standing on.
+**Consequence:**
+- Steps with no ideal recorded are left OUT rather than shown blank — a comparison against nothing
+  is not a row, and a table of dashes trains people to skim past the rows that matter.
+- The minimum shown is the same figure the production dashboard calls *required*, from the same
+  `dashboard_steps()`, so the two screens cannot disagree.
+- Both figures are per PERSON per day, which is the only comparison that means anything: the ideal
+  is one artist working on one item, so the minimum has to be divided by headcount before the two
+  can be set beside each other.
+
 ---
 
 ## Still open

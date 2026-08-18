@@ -18,14 +18,38 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     <div class="topbar-right">
       <span><?= e(current_user_display()) ?></span>
       <?php if (!can_edit()): ?><span class="role-badge">view only</span><?php endif; ?>
-      <?php // Cross-project, so it belongs in the global bar rather than on a
-            // project tab — the whole point is that it spans all of them. ?>
+      <?php
+      // THE THREE WAYS IN, settled with David 2026-08-17. Everything the studio
+      // does is one of: what is on MY desk, how the SHOWS are going, and how the
+      // BUSINESS is going. The bar had grown into a flat list of seven links
+      // where a project screen and a database migration read as equally likely
+      // destinations, which none of them are.
+      //
+      // Each of the three leads to a place that has its own tabs, so the top bar
+      // stops trying to be a menu for the whole application.
+      ?>
       · <a href="mytasks.php">My work</a>
+      · <a href="index.php">Project management</a>
       <?php if (is_admin()): ?>
-        <?php // Admin-only, and it reads a database ordinary screens have no
-              // credential for. In the global bar because it spans projects. ?>
-        · <a href="finance.php">Finance</a>
-        · <a href="standards.php">Ideal quotas</a>
+        <?php // Admin-only, and it opens a database ordinary screens hold no
+              // credential for — see includes/money.php. ?>
+        · <a href="finance.php">Finance management</a>
+      <?php endif; ?>
+
+      <?php
+      // The setup and housekeeping screens, behind a separator. Opened
+      // occasionally rather than daily — the same split project_nav() makes
+      // between its work tabs and its data tabs.
+      //
+      // Ideal quotas is NOT admin-only: it is production planning data, like
+      // pipeline_steps.department, and routing it through the money side would
+      // only make it look financial (DECISIONS, 2026-08-15). It was inside the
+      // admin block by accident, which meant an editor could reach the screen
+      // and could not see the link to it.
+      ?>
+      <span class="nav-sep" aria-hidden="true">|</span>
+      <a href="standards.php">Ideal quotas</a>
+      <?php if (is_admin()): ?>
         · <a href="users.php">Users</a>
         · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
