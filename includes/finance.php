@@ -420,6 +420,70 @@ function save_invoice(array $in, array $project, string $who = ''): string {
     return 'Invoice recorded: ' . fmt_money_plain($amount, $cur) . '.';
 }
 
+/**
+ * Record several invoices in one go, from the entry grid.
+ *
+ * Same shape and the same rules as save_hires_bulk(): one bad row never stops
+ * the rest, and every category of outcome is reported rather than inferred.
+ * A month's invoices arrive as a batch, so entering them one form-submit at a
+ * time was six page loads to do one afternoon's bookkeeping.
+ *
+ * ⚠ AN EMPTY ROW AND AN INCOMPLETE ROW ARE NOT THE SAME THING, and this is the
+ * part worth keeping. A row with nothing in it is one of the five that was not
+ * needed — skipped in silence, correctly. A row with a NAME and no AMOUNT is
+ * somebody who started typing and was interrupted, and skipping that quietly
+ * would lose work they believed they had saved. It is reported as an error
+ * against its row number.
+ *
+ * @param array $rows        each a field => value map
+ * @param array $positionMap "crewId:stepId" => ['crew_id','step_id','crew_name','step_name']
+ * @return array ['added' => int, 'errors' => array]
+ */
+function save_invoices_bulk(array $rows, array $project, array $positionMap, string $who = ''): array {
+    if (!can_see_money()) throw new RuntimeException('Only an administrator can record an invoice.');
+    $out = ['added' => 0, 'errors' => []];
+
+    foreach ($rows as $i => $row) {
+        $amount = trim((string)($row['amount'] ?? ''));
+
+        // What counts as "somebody typed in this row" — deliberately not the
+        // fields that carry a default (currency, issued date, status), which
+        // are filled on every row whether it is used or not.
+        $typed = '';
+        foreach (['crew_name', 'invoice_ref', 'notes', 'document_url', 'position',
+                  'period_start', 'period_end', 'due_date', 'paid_date'] as $f) {
+            $typed .= trim((string)($row[$f] ?? ''));
+        }
+
+        if ($amount === '') {
+            if ($typed !== '') {
+                $out['errors'][] = sprintf(
+                    'Row %d has details in it but no amount, so it was not recorded. '
+                    . 'Add the amount and save again.', $i + 1
+                );
+            }
+            continue;
+        }
+
+        // The picker's value is "crewId:stepId". Resolved HERE rather than
+        // trusted from hidden fields the browser filled in: three hidden inputs
+        // per row is three chances for the name and the id to disagree, and the
+        // id is the half that decides which projection row this lands on.
+        $pos = trim((string)($row['position'] ?? ''));
+        if ($pos !== '' && isset($positionMap[$pos])) {
+            $row = array_merge($row, $positionMap[$pos]);
+        }
+
+        try {
+            save_invoice($row, $project, $who);
+            $out['added']++;
+        } catch (Throwable $e) {
+            $out['errors'][] = sprintf('Row %d was not recorded: %s', $i + 1, $e->getMessage());
+        }
+    }
+    return $out;
+}
+
 /** Remove an invoice. */
 function delete_invoice(int $id): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');

@@ -1250,6 +1250,25 @@ visible**, or the screen that diagnosed it becomes the screen you have to keep r
 back on the projection also shows the figure appearing in the row it came from, which is the
 confirmation that actually matters — more than a flash message saying "saved".
 
+## 2026-08-17 — Bulk entry is now a pattern, and an empty row is not an incomplete one
+**Decision:** the invoice form on `finance_project.php` became a five-row grid, matching the
+hiring one. `save_invoices_bulk()` mirrors `save_hires_bulk()`: one bad row never stops the rest,
+and every outcome is reported rather than inferred.
+**Why:** David, on the real screen. A month's invoices arrive as a batch, and one form submit each
+was six page loads to do one afternoon's bookkeeping. The same argument that produced the hiring
+grid, on the screen next door.
+**The rule worth keeping, which is not obvious:** a blank row and a half-filled row are different
+facts and are treated differently. A row with nothing in it is one of the five that was not needed
+— skipped in silence, correctly. A row with a NAME and no AMOUNT is somebody who started typing and
+was interrupted, and skipping that quietly would lose work they believed they had saved. It is
+reported against its row number. Deciding what counts as typed matters too: currency, status and
+the issued date carry defaults on every row, so they are deliberately excluded from that test.
+**One thing the grid fixed rather than copied:** the old single form filled the name from the
+position picker with `document.getElementById`, which addresses exactly one field on the page —
+across five rows every pick would have written into the first row's name box. And the position is
+now re-resolved SERVER-side from the picker's crewId:stepId value rather than trusted from three
+hidden inputs, so a name and an id can never disagree about which lane an invoice belongs to.
+
 ---
 
 ## Still open

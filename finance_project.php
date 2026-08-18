@@ -31,6 +31,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['save_budget'])) {
             flash('ok', save_project_budget($projectId, $project, $_POST, $who));
+        } elseif (isset($_POST['save_invoices'])) {
+            // The picker sends "crewId:stepId"; the map turns that back into the
+            // four fields an invoice stores. Rebuilt here rather than trusted
+            // from the browser — see save_invoices_bulk().
+            $posMap = [];
+            foreach (project_lanes($pdo, $projectId) as $l) {
+                $posMap[(int)$l['crew_id'] . ':' . (int)$l['step_id']] = [
+                    'crew_id'   => (int)$l['crew_id'],
+                    'step_id'   => (int)$l['step_id'],
+                    'crew_name' => (string)$l['name'],
+                    'step_name' => (string)$l['step_name'],
+                ];
+            }
+            $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            $r = save_invoices_bulk($rows, $project, $posMap, $who);
+            if ($r['added']) {
+                flash('ok', sprintf('Recorded %d invoice%s.', $r['added'], $r['added'] === 1 ? '' : 's'));
+            }
+            foreach ($r['errors'] as $e) flash('err', $e);
+            if (!$r['added'] && !$r['errors']) {
+                flash('warn', 'No row had an amount in it, so nothing was recorded.');
+            }
+
         } elseif (isset($_POST['save_invoice'])) {
             flash('ok', save_invoice($_POST, $project, $who));
         } elseif (isset($_POST['delete_invoice'])) {
@@ -344,63 +367,127 @@ require __DIR__ . '/includes/header.php';
   <p class="muted">Nothing recorded yet.</p>
 <?php endif; ?>
 
-<h3>Record an invoice</h3>
-<form method="post" class="stack">
-  <input type="hidden" name="save_invoice" value="1">
-  <div class="row">
-    <label>Position <span class="muted small">(what this invoice pays for)</span>
-      <select name="position" onchange="
-          var o = this.options[this.selectedIndex];
-          document.getElementById('invCrew').value = o.dataset.crew || '';
-          document.getElementById('invStep').value = o.dataset.step || '';
-          document.getElementById('invName').value = o.dataset.crewname || '';
-          document.getElementById('invStepName').value = o.dataset.stepname || '';">
-        <option value="">— no particular position —</option>
-        <?php foreach ($positions as $ps): ?>
-          <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
-                  data-crew="<?= (int)$ps['crew_id'] ?>" data-step="<?= (int)$ps['step_id'] ?>"
-                  data-crewname="<?= e($ps['crew_name']) ?>" data-stepname="<?= e($ps['step_name']) ?>">
-            <?= e($ps['label']) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-      <small>Choosing one puts this invoice on that row of the projection above.</small>
-    </label>
-    <label>Name on the invoice
-      <input name="crew_name" id="invName" placeholder="Filled in by the picker, or type one">
-    </label>
-    <label>Their reference
-      <input name="invoice_ref" placeholder="e.g. 2026-014">
-    </label>
+<h3>Record invoices</h3>
+
+<p class="muted small">
+  One row per invoice, five at a time — a month's invoices arrive as a batch, and one form submit
+  each was six page loads to do one afternoon's bookkeeping. Only the <strong>amount</strong> is
+  required; blank rows are ignored. A row with details but no amount is <em>not</em> ignored — it
+  is reported, because that is somebody who was interrupted mid-typing rather than a row nobody
+  wanted.
+</p>
+
+<form method="post">
+  <input type="hidden" name="save_invoices" value="1">
+  <div class="grid-scroll">
+    <table class="grid-table" id="invoiceGrid">
+      <thead>
+        <tr>
+          <th>Position <span class="muted small">(what it pays for)</span></th>
+          <th>Name on the invoice</th>
+          <th>Their reference</th>
+          <th>Amount</th>
+          <th>Currency</th>
+          <th>Status</th>
+          <th>Period from</th>
+          <th>Period to</th>
+          <th>Issued</th>
+          <th>Due</th>
+          <th>Paid on</th>
+          <th>Document link</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php for ($r = 0; $r < 5; $r++): $n = 'rows[' . $r . ']'; ?>
+          <tr>
+            <td>
+              <select name="<?= $n ?>[position]" onchange="invPosition(this)">
+                <option value="">— no particular position —</option>
+                <?php foreach ($positions as $ps): ?>
+                  <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
+                          data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </td>
+            <td><input name="<?= $n ?>[crew_name]" size="16" placeholder="Filled in by the picker"></td>
+            <td><input name="<?= $n ?>[invoice_ref]" size="10" placeholder="2026-014"></td>
+            <td><input name="<?= $n ?>[amount]" inputmode="decimal" size="8" placeholder="2400"></td>
+            <td><input name="<?= $n ?>[currency]" maxlength="3" size="3"
+                       style="text-transform:uppercase" value="<?= e($cur) ?>"></td>
+            <td>
+              <select name="<?= $n ?>[status]">
+                <option value="received">received</option>
+                <option value="approved">approved</option>
+                <option value="paid">paid</option>
+                <option value="disputed">disputed</option>
+              </select>
+            </td>
+            <td><input type="date" name="<?= $n ?>[period_start]"></td>
+            <td><input type="date" name="<?= $n ?>[period_end]"></td>
+            <td><input type="date" name="<?= $n ?>[issued_date]" value="<?= $todayStr ?>"></td>
+            <td><input type="date" name="<?= $n ?>[due_date]"></td>
+            <td><input type="date" name="<?= $n ?>[paid_date]"></td>
+            <td><input type="url" name="<?= $n ?>[document_url]" size="16" placeholder="https://drive.google.com/…"></td>
+            <td><input name="<?= $n ?>[notes]" size="18"></td>
+          </tr>
+        <?php endfor; ?>
+      </tbody>
+    </table>
   </div>
-  <input type="hidden" name="crew_id" id="invCrew" value="">
-  <input type="hidden" name="step_id" id="invStep" value="">
-  <input type="hidden" name="step_name" id="invStepName" value="">
-  <div class="row">
-    <label>Amount <input name="amount" inputmode="decimal" required placeholder="e.g. 2400"></label>
-    <label>Currency <input name="currency" maxlength="3" value="<?= e($cur) ?>" style="text-transform:uppercase"></label>
-    <label>Status
-      <select name="status">
-        <option value="received">received</option>
-        <option value="approved">approved</option>
-        <option value="paid">paid</option>
-        <option value="disputed">disputed</option>
-      </select>
-    </label>
+
+  <div class="actions">
+    <button type="submit">Record invoices</button>
+    <button type="button" class="secondary" onclick="invAddRows()">Add 5 more rows</button>
   </div>
-  <div class="row">
-    <label>Period from <input type="date" name="period_start"></label>
-    <label>Period to <input type="date" name="period_end"></label>
-    <label>Issued <input type="date" name="issued_date" value="<?= $todayStr ?>"></label>
-    <label>Due <input type="date" name="due_date"></label>
-    <label>Paid on <input type="date" name="paid_date"></label>
-  </div>
-  <label>Document link <span class="muted small">(Google Drive)</span>
-    <input type="url" name="document_url" placeholder="https://drive.google.com/…">
-  </label>
-  <label>Notes <textarea name="notes" rows="2"></textarea></label>
-  <div class="actions"><button type="submit">Record invoice</button></div>
+  <p class="muted small">
+    Choosing a <strong>position</strong> puts that invoice on that row of the projection above —
+    crew and step together are the lane, which is why "who" alone cannot say what a payment was
+    for. Leaving it blank is a real answer: a kill fee or a one-off counts in the project total and
+    is listed as unattached, rather than being forced onto a row nobody agreed to.
+    Marking one <strong>paid</strong> without a date fills in today.
+  </p>
 </form>
+
+<script>
+// Fill the visible name from the position picker, within THIS row only.
+//
+// The old single form did this with document.getElementById, which addresses
+// exactly one field on the page — with five rows it would have written every
+// pick into the first row's name box. The id that actually matters is not sent
+// from here at all: the server re-resolves the position itself, so a name and
+// an id can never disagree about which lane an invoice belongs to.
+function invPosition(sel) {
+  var row = sel.closest('tr');
+  if (!row) { return; }
+  var name = row.querySelector('[name$="[crew_name]"]');
+  var picked = sel.options[sel.selectedIndex];
+  if (name && picked && (name.value === '' || name.dataset.auto === '1')) {
+    name.value = picked.dataset.crewname || '';
+    name.dataset.auto = '1';
+  }
+}
+
+function invAddRows() {
+  var body = document.querySelector('#invoiceGrid tbody');
+  if (!body) { return; }
+  for (var k = 0; k < 5; k++) {
+    var n = body.rows.length;
+    var copy = body.rows[n - 1].cloneNode(true);
+    var fields = copy.querySelectorAll('input, select');
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      f.name = f.name.replace(/rows\[\d+\]/, 'rows[' + n + ']');
+      // Currency and the issued date are defaults worth keeping on a new row;
+      // everything else starts empty.
+      var keep = /\[(currency|issued_date)\]$/.test(f.name);
+      if (f.tagName === 'SELECT') { f.selectedIndex = 0; }
+      else if (!keep) { f.value = ''; delete f.dataset.auto; }
+    }
+    body.appendChild(copy);
+  }
+}
+</script>
 
 <p class="muted small">
   The invoice document stays in Drive under Drive's own permissions; only the link is stored.
