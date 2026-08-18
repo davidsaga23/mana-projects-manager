@@ -31,6 +31,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['save_budget'])) {
             flash('ok', save_project_budget($projectId, $project, $_POST, $who));
+        } elseif (isset($_POST['save_departments'])) {
+            // Writes pipeline_steps.department on the ORDINARY production
+            // connection. It is a production fact, not a financial one — see
+            // save_step_departments().
+            $wanted = is_array($_POST['department'] ?? null) ? $_POST['department'] : [];
+            $r = save_step_departments($pdo, $projectId, $wanted);
+            if ($r['changed']) {
+                flash('ok', sprintf('Moved %d step%s: %s. Every figure below regroups immediately, '
+                                  . 'and the answer is remembered for future projects.',
+                      $r['changed'], $r['changed'] === 1 ? '' : 's', implode('; ', $r['moved'])));
+            } else {
+                flash('warn', 'Nothing changed — every step is already in the phase shown.');
+            }
+
         } elseif (isset($_POST['save_expenses'])) {
             $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
             $r = save_expenses_bulk($rows, $project, $who);
@@ -204,6 +218,108 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php endif; ?>
 
+<?php
+// The phase breakdown. Deliberately built to ADD UP to Projected cost above:
+// every labour department, plus the non-labour total, equals the grand total.
+// A breakdown whose parts do not reconcile with the headline is worse than no
+// breakdown, because somebody will trust one of the two and there is no way to
+// tell from the screen which.
+$phaseOrder = ['Above the line' => 1, 'Pre-production' => 2, 'Production' => 3, 'Post-production' => 4];
+$phases = $proj['by_department'];
+uksort($phases, function ($a, $b) use ($phaseOrder) {
+    $oa = $phaseOrder[$a] ?? 9; $ob = $phaseOrder[$b] ?? 9;
+    return $oa !== $ob ? $oa <=> $ob : strcasecmp($a, $b);
+});
+$hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
+?>
+
+<?php if ($phases || !empty($proj['other_total'])): ?>
+  <h3>Cost by phase</h3>
+  <div class="dash-strip">
+    <?php foreach ($phases as $dept => $group):
+      $pct = $grandTotal > 0 ? ($group['cost'] / $grandTotal) * 100 : 0; ?>
+      <div>
+        <span class="muted small"><?= e($dept) ?></span>
+        <strong><?= e(number_format($group['cost'], 2)) ?></strong>
+        <span class="muted small">
+          <?= e(fmt_num($pct, 0)) ?>% · <?= e(fmt_num($group['days'], 1)) ?> days
+          · <?= count($group['rows']) ?> <?= count($group['rows']) === 1 ? 'person' : 'people' ?>
+        </span>
+      </div>
+    <?php endforeach; ?>
+    <?php if (!empty($proj['other_total'])):
+      $pct = $grandTotal > 0 ? ($proj['other_total'] / $grandTotal) * 100 : 0; ?>
+      <div>
+        <span class="muted small">Other expenses</span>
+        <strong><?= e(number_format($proj['other_total'], 2)) ?></strong>
+        <span class="muted small">
+          <?= e(fmt_num($pct, 0)) ?>% · not somebody's time
+        </span>
+      </div>
+    <?php endif; ?>
+    <div>
+      <span class="muted small">Total</span>
+      <strong><?= e(fmt_money_plain($grandTotal, $proj['currency'])) ?></strong>
+      <span class="muted small">matches Projected cost above</span>
+    </div>
+  </div>
+
+  <?php if (isset($phases['Unassigned'])): ?>
+    <p class="muted small warn-text">
+      <strong><?= e(number_format($phases['Unassigned']['cost'], 2)) ?></strong> sits under
+      <em>Unassigned</em> because those steps have no phase set. Put them in one below and the
+      subtotals stop lying by omission.
+    </p>
+  <?php endif; ?>
+
+  <?php if (can_edit() && $hasDeptCol): ?>
+    <details class="inline-actions">
+      <summary>Which phase each step belongs to</summary>
+      <p class="muted small">
+        A step's phase is what groups it here, on the expense projection, and in the crew list —
+        so moving <em>Comp</em> to Post-production regroups every one of them at once. It is a
+        <strong>production</strong> fact rather than a financial one, and it is stored with the
+        step, not with the money.
+        <br>
+        The answer is also remembered against the step's <strong>name</strong>, so every future
+        project starts with it filled in rather than asking again. Free text: type a phase that
+        isn't listed and it becomes one.
+      </p>
+      <form method="post">
+        <input type="hidden" name="save_departments" value="1">
+        <table class="review-table">
+          <thead><tr><th>Step</th><th>Covers</th><th>Phase</th></tr></thead>
+          <tbody>
+          <?php foreach (pipeline_steps($pdo, $projectId) as $st): ?>
+            <tr>
+              <td class="wf-name">
+                <span class="dot" style="background:<?= e($st['color'] ?: '#ccc') ?>"></span><?= e($st['name']) ?>
+              </td>
+              <td class="muted small">
+                <?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?>
+              </td>
+              <td>
+                <input name="department[<?= (int)$st['id'] ?>]" list="phaseOptions"
+                       value="<?= e($st['department'] ?? '') ?>" placeholder="no phase set" size="20">
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <datalist id="phaseOptions">
+          <?php foreach (department_options($pdo) as $d): ?><option value="<?= e($d) ?>"></option><?php endforeach; ?>
+        </datalist>
+        <div class="actions"><button type="submit">Save phases</button></div>
+      </form>
+    </details>
+  <?php elseif (!$hasDeptCol): ?>
+    <p class="muted small warn-text">
+      Phases need migration <strong>015</strong>, which hasn't been applied — so everything groups
+      as <em>Unassigned</em>.
+    </p>
+  <?php endif; ?>
+<?php endif; ?>
+
 <h3>Budget</h3>
 <form method="post" class="money-form">
   <input type="hidden" name="save_budget" value="1">
@@ -234,6 +350,39 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <h3>Expense projection</h3>
+
+<p class="page-actions">
+  <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
+  <span class="muted small">
+    Built live from the numbers below, in the fifteen-column shape of
+    <code>RTC_ExpenseProjection_v01.xlsx</code> — department bands, subtotals, grand total and the
+    summary block. Because it comes out of the same calculation this page draws, the file and the
+    screen cannot disagree.
+  </span>
+</p>
+
+<?php
+// The retake allowance is the single reason a generated projection reads lower
+// than a sheet built by hand: the reference sheet applies "+10% RTK" to every
+// day-rate line and this project has no allowance set, so nothing is uplifted.
+// Said here rather than left to be discovered by comparing two files column by
+// column — which is how it was found.
+$retakePct = project_retake_pct($pdo, $projectId);
+if ($retakePct <= 0):
+?>
+  <div class="flash flash-warn">
+    <strong>No retake allowance is set on this project</strong>, so every figure below is the
+    work as estimated with nothing added for revisions. A hand-built sheet carrying
+    <em>+10% RTK</em> will read about 10% higher on every day-rate line, and that difference is
+    this setting rather than a disagreement about the maths.
+    <a href="wizard.php?project=<?= $projectId ?>&amp;step=1">Set it on the Basics screen →</a>
+  </div>
+<?php else: ?>
+  <p class="muted small">
+    A retake allowance of <strong>+<?= e(fmt_num($retakePct, 0)) ?>%</strong> is applied to days
+    per item, so these figures already include revision time.
+  </p>
+<?php endif; ?>
 <p class="muted small">
   Laid out like <code>RTC_ExpenseProjection_v01.xlsx</code>: <strong>one row per person</strong>,
   grouped by department with subtotals. Two artists on a step are two rows, because they are two

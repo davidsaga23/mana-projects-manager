@@ -19,6 +19,27 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 2);
     }
 
+    // Saving a template from THIS screen, added 2026-08-17. It shares its
+    // handler and its form with the Pipeline screen (template_save_from_post()
+    // and template_save_form(), both in includes/pipeline.php) rather than
+    // carrying a second copy — two copies would eventually disagree about
+    // `template_overwrite`, which is the tick that stops somebody replacing the
+    // house pipeline while believing they are creating a new one.
+    //
+    // The dependencies on screen are saved FIRST, so the template captures the
+    // graph as it is being looked at rather than as it was last written. That is
+    // the same reason the Pipeline screen applies its edits before saving one.
+    if (($_POST['action'] ?? '') === 'save_template') {
+        $wanted = [];
+        foreach ($steps as $s) {
+            $id = (int)$s['id'];
+            $wanted[$id] = array_map('intval', (array)($_POST['deps'][$id] ?? []));
+        }
+        save_dependencies($pdo, $projectId, $wanted);   // throws on a cycle; saves nothing
+        flash('ok', template_save_from_post($pdo, $projectId, $project));
+        return wizard_url($projectId, 3);
+    }
+
     $wanted = [];
     foreach ($steps as $s) {
         $id = (int)$s['id'];
@@ -106,6 +127,20 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
         <span class="spacer"></span>
         <button type="submit">Save and continue →</button>
       </div>
+
+      <?php
+      // INSIDE the dependency form, deliberately — see template_save_form().
+      // The ticks above are checkboxes, and unchecked boxes are not posted at
+      // all, so a separate form would carry no dependencies and saving would
+      // wipe the graph. Here the action rides on the button and the ticks come
+      // with it, which is also what makes the promise below true.
+      template_save_form($pdo, $project,
+          'Saves the steps AND this dependency graph — what waits for what, and therefore what '
+        . 'runs in parallel. Not dates or headcount, which belong to this project alone. The '
+        . 'ticks above are saved first, so the template captures the shape on screen rather than '
+        . 'the last one saved. New projects will be offered it alongside the built-in templates.',
+          true);
+      ?>
     </form>
 
     <p class="muted small">Ticking nothing means a step can begin on day one. A loop — two steps

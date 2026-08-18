@@ -1305,6 +1305,129 @@ non-labour cost, with a free-text **category** as the grouping David asked for.
 same as `step_library`. Which categories a studio actually spends against is worth comparing across
 shows, and a list rebuilt per project would make every new show start from nothing.
 
+## 2026-08-17 — "Save as template" on the Workflow screen, and the unchecked-box trap
+**Decision:** the Workflow step offers "Save as template" as well as the Pipeline step (David's
+request). Both share one handler and one form — `template_save_from_post()` and
+`template_save_form()`, in `includes/pipeline.php` — because each wizard step file is loaded on its
+own and step 3 never sees step 2's code.
+**Why shared rather than copied:** two copies would drift, and the field they would drift on is
+`template_overwrite`. The 2026-08-14 decision is that replacing a template is allowed but must be
+deliberate; a copy that quietly lost that tick would start overwriting the house pipeline for
+people who believed they were creating a new one.
+
+**The trap this turned up, which is the part worth keeping.** The first version put the template
+form on the Workflow screen as its own `<form>`, mirroring the Pipeline screen. On the Pipeline
+screen that is safe — the step edits are in a different form and `wizard_pipeline_apply_edits()`
+returns 0 when its fields are absent, so saving a template simply does not touch them.
+
+On the Workflow screen the same shape would have been **destructive**. Dependencies are checkboxes,
+and **unchecked boxes are not submitted at all** — so a separate form posting `save_template`
+carries no `deps` key whatsoever, which is byte-for-byte identical to "the user unticked
+everything". `save_dependencies()` would have **deleted the entire graph**, silently, while
+reporting that a template had been saved. On Return to Club that is every dependency on a
+seventeen-step pipeline.
+
+**The fix is a pattern this codebase already had:** the controls sit INSIDE the dependency form and
+the action rides on the submit button's `name`/`value`. That is precisely what the 2026-08-11
+entry describes for wizard row buttons — *"a single form saves pending edits and performs the
+action together — HTML forms cannot nest, and losing typed edits to a row button would be its own
+silent failure."* The same reasoning, one screen along.
+**Consequence:** `template_save_form()` takes `$inline`. Inline drops `required` from the name
+field, because a required field inside the main form would block "Save and continue" for anyone not
+saving a template; `create_template_from_project()` refuses an empty name server-side and
+`wizard.php` turns that into a flash message, so nothing is lost by moving the check.
+**The generalisable version:** *an absent checkbox array and a deliberately emptied one look
+identical in `$_POST`.* Any handler that writes a full set from checkboxes must be reached only by
+the form those checkboxes live in.
+
+## 2026-08-17 — Cost by phase, and phases become editable where they are read
+**Decision:** the Finance project screen gains a **Cost by phase** strip — every labour department
+plus the non-labour total — and a panel that moves any step to a different phase without going
+back into the setup wizard. Both David's request.
+
+**No schema for either.** `pipeline_steps.department` has existed since migration 015 and
+`expense_projection()` has returned `by_department` since the money side was built; this is the
+reading half and an editing surface, which is the same shape as "logged time was already imported;
+only the reading was missing" (2026-08-14).
+
+**The rule the breakdown is built to:** it must ADD UP to the Projected cost above it — every
+department, plus other expenses, equals the grand total, and the strip says so with a Total cell.
+A breakdown whose parts do not reconcile with the headline is worse than no breakdown, because
+somebody will trust one of the two and nothing on screen says which. `Unassigned` is therefore
+shown rather than hidden, with a line saying what it means: steps with no phase set, which is the
+one case where the grouping lies by omission.
+
+**Why the editor belongs on the Finance screen and not only in the wizard:** the question "should
+Comp be Post-production?" arises while reading a budget, which is where the phase subtotals are.
+Walking back into a seven-step setup wizard to change one dropdown is enough friction that the
+grouping simply stays wrong — and it groups the crew list and the timeline as well as the money.
+**Consequence:**
+- `save_step_departments()` writes on the **ordinary production connection**. `department` is a
+  production fact — how a crew list, a call sheet and a Gantt are all organised — and the
+  2026-08-15 entry is explicit that routing it through the money door "would only make it look
+  like it was". The Finance screen happens to be where it is edited; that does not make it money.
+- It calls `step_library_remember()` exactly as the wizard does, so the answer is given once and
+  every later project starts with it filled in. Two writers that remembered differently would make
+  the global library depend on which screen somebody happened to use.
+- Free text with the four usual phases suggested, per `department_options()` — a studio that wants
+  a fifth phase types it, and it joins the list. Same rule as asset types and hiring positions.
+
+## 2026-08-17 — The projection exports as a real .xlsx, written without a library
+**Decision:** `export_projection.php` builds an actual Excel file in the fifteen-column shape of
+`RTC_ExpenseProjection_v01.xlsx` — department bands, subtotals, grand total, summary block.
+`includes/xlsx.php` writes it: an .xlsx is a ZIP of XML parts and PHP ships both, so no dependency
+was added to a codebase that still has none.
+**Why not CSV**, which `export.php` already emits: David asked for a file *like the attached one*,
+and the attached one has bold headers, department bands, subtotals and money formatting. CSV has
+none of those.
+**What the writer deliberately refuses to grow into:** no formulas, no charts, no merged cells, no
+shared-string table — values are written as INLINE strings, which removes a second XML part that
+has to stay in sync with the sheet and is the classic way a hand-rolled xlsx becomes unopenable.
+Eight fixed styles, named by constant; a ninth means editing `styles.xml` on purpose. A general
+style engine is how this file would become the library it exists to avoid.
+**Verified as far as it can be here:** there is no PHP binary on the workstation, so the XML parts
+were extracted from the source and parsed independently, including checking that every `count`
+attribute in `styles.xml` matches its number of children. A mismatch there is exactly what makes
+Excel offer to repair a file instead of opening it.
+**ZipArchive can be absent on a hardened host**, so the endpoint checks and says so rather than
+streaming a corrupt download. A file that will not open is the worst version of "nothing failed
+visibly".
+
+## 2026-08-17 — Why the platform's projection read lower than the hand-built sheet
+**Diagnosed, not guessed** — the two files were compared row by row.
+
+**It is the retake allowance, and nothing else.** Every day-rate line in
+`RTC_ExpenseProjection_v01.xlsx` is exactly **1.1×** the platform's, on all ten rows that could be
+compared:
+
+| Row | Platform | Sheet |
+|---|---|---|
+| Animatic | 4 days | 4.4 |
+| Color Script | 5 | 5.5 |
+| Concept (Character) | 3.9 | 4.29 |
+| Character sheet | 5.07 | 5.58 |
+| Prop design | 0.4 | 0.44 |
+| FX design | 2 | 2.2 |
+| Concept (Environment) | 3 | 3.3 |
+| Layout (Environment) ×2 | 6 | 6.6 |
+| Color (Environment) ×2 | 9 | 9.9 |
+| Layout (Character) | 4.29 | 4.72 |
+
+The sheet carries "+10% RTK"; `project_settings.retake_pct` on Return to Club is **0**, so
+`step_quota()` applies no uplift. The maths agrees perfectly — one side simply has a setting the
+other does not. Set it on the wizard's Basics screen and the day figures match exactly.
+
+**The second difference is scope, not arithmetic.** The sheet has an *Above the line* department —
+Producer / Production, and an Art Director at 4,000 — which has no pipeline steps behind it in the
+platform, so the projection cannot see it. Those belong either as steps or, more likely, as **Other
+expenses**. The sheet's two "(old)" rows (Iana on Animatic 2,100, Go Gap on CH designs 200) are the
+same shape and are already entered that way.
+
+**Consequence:** the Finance screen now says on the page when no retake allowance is set, rather
+than leaving somebody to find it by comparing two spreadsheets column by column — which is how it
+was found. The exported file states the allowance it used, for the same reason: a reader holding
+both files needs to know which side applied it.
+
 ---
 
 ## Still open

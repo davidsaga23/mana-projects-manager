@@ -517,6 +517,165 @@ function step_library(PDO $pdo): array {
  *
  * Returns how many steps were saved.
  */
+/**
+ * Move steps between phases — "Comp belongs to Post-production".
+ *
+ * `pipeline_steps.department` is the phase, and until now it could only be set
+ * inside the setup wizard. That is the wrong place to be when the question
+ * arises: it arises reading a budget, where the phase subtotals are, and walking
+ * back into a seven-step wizard to fix one dropdown is enough friction that the
+ * grouping just stays wrong. (David, 2026-08-17.)
+ *
+ * ⚠ NOT financial, despite being called from the Finance screen. `department`
+ * is production data — how a crew list, a call sheet and a Gantt are all
+ * organised — and the 2026-08-15 entry is explicit that routing it through the
+ * money door "would only make it look like it was". It is written on the
+ * ORDINARY production connection.
+ *
+ * Each change also calls step_library_remember(), exactly as the wizard does, so
+ * the answer is given once and every later project starts with it filled in.
+ * Two writers that remembered differently would make the library depend on which
+ * screen somebody happened to use.
+ *
+ * @param array $wanted  step id => department
+ * @return array ['changed' => int, 'moved' => string[]]
+ */
+function save_step_departments(PDO $pdo, int $projectId, array $wanted): array {
+    $out = ['changed' => 0, 'moved' => []];
+    if (!column_exists($pdo, 'pipeline_steps', 'department')) {
+        throw new RuntimeException(
+            'Phases need migration 015, which has not been applied yet.'
+        );
+    }
+
+    $steps = [];
+    foreach (pipeline_steps($pdo, $projectId) as $s) $steps[(int)$s['id']] = $s;
+
+    $upd = $pdo->prepare('UPDATE pipeline_steps SET department = ? WHERE id = ? AND project_id = ?');
+
+    foreach ($wanted as $id => $dept) {
+        $id = (int)$id;
+        if (!isset($steps[$id])) continue;           // not this project's step
+        $dept = trim((string)$dept);
+        $before = trim((string)($steps[$id]['department'] ?? ''));
+        if ($dept === $before) continue;
+
+        $upd->execute([$dept, $id, $projectId]);
+        $out['changed']++;
+        $out['moved'][] = sprintf('%s: %s → %s',
+            $steps[$id]['name'],
+            $before !== '' ? $before : 'no phase',
+            $dept !== '' ? $dept : 'no phase');
+
+        step_library_remember(
+            $pdo, $steps[$id]['name'], $steps[$id]['applies_to'],
+            (int)($steps[$id]['tracks_seconds'] ?? 0), $steps[$id]['color'] ?? null, $dept
+        );
+    }
+    return $out;
+}
+
+/**
+ * Handle a posted "save as template", and return the sentence to flash.
+ *
+ * ⚠ SHARED BY TWO WIZARD STEPS, and that is the whole reason it exists here
+ * rather than inside one of them. The Pipeline screen has offered this since
+ * 2026-08-14; the Workflow screen wanted it too (David, 2026-08-17) because
+ * that is where parallelism is actually set, and a template records the
+ * dependency graph. Each wizard step file is loaded on its own — step 3 never
+ * sees step 2's code — so the alternative was a second copy of the handler and
+ * a second copy of the form.
+ *
+ * Two copies would drift, and the thing they would drift on is the one that
+ * matters: `template_overwrite`. The 2026-08-14 decision is that replacing a
+ * template is allowed but must be DELIBERATE, and a copy that quietly lost the
+ * tick would start overwriting the house pipeline for people who thought they
+ * were creating a new one.
+ *
+ * The caller decides where to redirect afterwards, because that differs per step.
+ */
+function template_save_from_post(PDO $pdo, int $projectId, array $project): string {
+    $name = trim($_POST['template_name'] ?? '');
+    $type = $_POST['template_type'] ?? $project['type'];
+    $overwrite = !empty($_POST['template_overwrite']);
+
+    $n = create_template_from_project($pdo, $projectId, $name, $type, $overwrite);
+
+    return ($overwrite ? "Replaced the template \"$name\"" : "Saved this pipeline as the template \"$name\"")
+         . " — $n step" . ($n === 1 ? '' : 's')
+         . ', including which of them run in parallel'
+         . (column_exists($pdo, 'pipeline_template_steps', 'department')
+            ? ' and which department each belongs to' : '')
+         . '. It will be offered on new projects.';
+}
+
+/**
+ * The "save as template" form. Rendered identically on Pipeline and Workflow.
+ *
+ * $note lets each screen say what is worth saying THERE — the pipeline screen
+ * talks about steps, the workflow screen about the graph — without the controls
+ * themselves being duplicated.
+ *
+ * ⚠ $inline EXISTS BECAUSE OF A REAL FOOTGUN, not for tidiness.
+ *
+ * On the Pipeline screen this is its own form, and that is safe: the step edits
+ * live in a different form, and wizard_pipeline_apply_edits() returns 0 when its
+ * fields are absent, so saving a template simply does not touch them.
+ *
+ * On the Workflow screen the equivalent would be catastrophic. The dependency
+ * ticks are checkboxes, and unchecked boxes are not submitted at all — so a
+ * SEPARATE form posting `save_template` carries no `deps` key whatsoever, which
+ * is indistinguishable from "the user unticked everything". Saving that would
+ * DELETE THE ENTIRE DEPENDENCY GRAPH, silently, while appearing to save a
+ * template.
+ *
+ * So on that screen the controls sit INSIDE the dependency form and the action
+ * travels in the submit button's value. That is the pattern the wizard already
+ * uses for its row buttons, for exactly this reason: "a single form saves
+ * pending edits and performs the action together — HTML forms cannot nest, and
+ * losing typed edits to a row button would be its own silent failure"
+ * (DECISIONS, 2026-08-11).
+ *
+ * The name field drops `required` when inline, because a required field inside
+ * the main form would block "Save and continue" for anyone not saving a
+ * template. create_template_from_project() refuses an empty name anyway, and
+ * wizard.php turns that into a flash message.
+ */
+function template_save_form(PDO $pdo, array $project, string $note = '', bool $inline = false): void {
+    $tag = $inline ? 'div' : 'form';
+    ?>
+    <<?= $tag ?><?= $inline ? '' : ' method="post"' ?> class="add-row">
+      <?php if (!$inline): ?>
+        <input type="hidden" name="action" value="save_template">
+      <?php endif; ?>
+      <strong>Save this pipeline as a template</strong>
+      <input name="template_name" list="template-names"
+             placeholder="e.g. 3D — Mana house pipeline" <?= $inline ? '' : 'required' ?> size="30">
+      <?php /* Existing names offered so replacing one is a pick rather than a
+               retype — a near-miss spelling would create a second template
+               instead of updating the one meant. */ ?>
+      <datalist id="template-names">
+        <?php foreach ($pdo->query('SELECT name FROM pipeline_templates ORDER BY name') as $t): ?>
+          <option value="<?= e($t['name']) ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
+      <select name="template_type">
+        <?php foreach (['2D','3D','Mixed','Other'] as $t): ?>
+          <option value="<?= $t ?>" <?= $project['type'] === $t ? 'selected' : '' ?>>for <?= $t ?> projects</option>
+        <?php endforeach; ?>
+      </select>
+      <label class="inline" title="Only needed when the name already exists">
+        <input type="checkbox" name="template_overwrite" value="1"> replace it if the name exists
+      </label>
+      <button type="submit" <?= $inline ? 'name="action" value="save_template"' : '' ?>
+              class="secondary">Save as template</button>
+      <small><?= $note !== '' ? e($note) : 'Saves the steps, their settings and which of them run in parallel — but not
+             dates or headcount, which belong to this project alone. New projects will be
+             offered it alongside the built-in templates.' ?></small>
+    </<?= $tag ?>>
+    <?php
+}
+
 function create_template_from_project(PDO $pdo, int $projectId, string $name, string $projectType,
                                       bool $overwrite = false): int {
     $name = trim($name);

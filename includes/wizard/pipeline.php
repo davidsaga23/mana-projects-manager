@@ -164,21 +164,11 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 
     if ($action === 'save_template') {
         // Save the edits first, so the template captures what's on screen rather
-        // than what was last written.
+        // than what was last written. Overwriting is allowed but only when the
+        // tick asks for it — template_save_from_post() carries that rule, and
+        // carries it for the Workflow screen too.
         wizard_pipeline_apply_edits($pdo, $projectId);
-        $name = trim($_POST['template_name'] ?? '');
-        $type = $_POST['template_type'] ?? $project['type'];
-        // Overwriting is allowed, but only when asked for explicitly — the point
-        // was never that templates are sacred, it was that one must not be
-        // replaced by someone who thought they were creating a new one.
-        $overwrite = !empty($_POST['template_overwrite']);
-        $n = create_template_from_project($pdo, $projectId, $name, $type, $overwrite);
-        flash('ok', ($overwrite ? "Replaced the template \"$name\"" : "Saved this pipeline as the template \"$name\"")
-                    . " — $n step" . ($n === 1 ? '' : 's') .
-                    ', including which of them run in parallel'
-                    . (column_exists($pdo, 'pipeline_template_steps', 'department')
-                       ? ' and which department each belongs to' : '')
-                    . '. It will be offered on new projects.');
+        flash('ok', template_save_from_post($pdo, $projectId, $project));
         return wizard_url($projectId, 2);
     }
 
@@ -481,32 +471,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       </label>
       <button type="submit" class="secondary">Add</button>
     </form>
-    <form method="post" class="add-row">
-      <input type="hidden" name="action" value="save_template">
-      <strong>Save this pipeline as a template</strong>
-      <input name="template_name" list="template-names"
-             placeholder="e.g. 3D — Mana house pipeline" required size="30">
-      <?php /* Existing names offered so replacing one is a pick rather than a
-               retype — a near-miss spelling would create a second template
-               instead of updating the one meant. */ ?>
-      <datalist id="template-names">
-        <?php foreach ($pdo->query('SELECT name FROM pipeline_templates ORDER BY name') as $t): ?>
-          <option value="<?= e($t['name']) ?>"></option>
-        <?php endforeach; ?>
-      </datalist>
-      <select name="template_type">
-        <?php foreach (['2D','3D','Mixed','Other'] as $t): ?>
-          <option value="<?= $t ?>" <?= $project['type'] === $t ? 'selected' : '' ?>>for <?= $t ?> projects</option>
-        <?php endforeach; ?>
-      </select>
-      <label class="inline" title="Only needed when the name already exists">
-        <input type="checkbox" name="template_overwrite" value="1"> replace it if the name exists
-      </label>
-      <button type="submit" class="secondary">Save as template</button>
-      <small>Saves the steps, their settings and which of them run in parallel — but not
-             dates or headcount, which belong to this project alone. New projects will be
-             offered it alongside the built-in templates.</small>
-    </form>
+    <?php template_save_form($pdo, $project); ?>
 
     <?php if ($library): ?>
       <p class="muted small">Start typing to see <?= count($library) ?> step
