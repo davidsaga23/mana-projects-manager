@@ -271,8 +271,14 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <th>Starts</th><th>Deadline</th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
+          <?php // Studio ideal sits BEFORE Duration because that is the order the
+                // cells are written in below. They were the other way round in the
+                // header from 2026-08-17 until David spotted it: every figure under
+                // both headings was being read as the other column. A header and its
+                // cells are two lists that have to be kept in step by hand, and
+                // nothing warns when they drift. ?>
+          <th title="What the studio says this step should take, from the Ideal quotas base sheet for this kind of project. Read-only here.">Studio ideal</th>
           <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
-          <th>Studio ideal</th>
           <th>Is that enough?</th>
         </tr>
         </thead>
