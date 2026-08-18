@@ -94,7 +94,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             foreach ($r['notes'] as $n)  flash('ok', $n);
             foreach ($r['errors'] as $e) flash('err', $e);
-            if (!$r['added'] && !$r['errors']) {
+            // A warning, not an error: pasting a block that overlaps people
+            // already entered is an ordinary thing to do, and it is the exact
+            // thing the name lookup exists to prevent happening unnoticed.
+            if ($r['duplicates']) {
+                flash('warn', sprintf(
+                    '%d row%s skipped because that person is already up for the same job: %s. '
+                    . 'Nothing was overwritten — open the existing record to update it.',
+                    count($r['duplicates']), count($r['duplicates']) === 1 ? ' was' : 's were',
+                    implode('; ', array_slice($r['duplicates'], 0, 8))
+                        . (count($r['duplicates']) > 8 ? ' …' : '')
+                ));
+            }
+            if (!$r['added'] && !$r['errors'] && !$r['duplicates']) {
                 flash('warn', 'Nothing had a name in it, so nothing was added.');
             }
 
@@ -226,6 +238,30 @@ require __DIR__ . '/includes/header.php';
   <?php if (can_edit()):
     $sugg = hire_suggestions($pdo, $projectId);
     $extras = hire_extras_available($pdo);
+    // Everybody ever recorded as a candidate, across every project, one row per
+    // person. `hires` is one row per candidate PER SLOT, so nothing in the table
+    // itself knows two rows are one human — this is what stops the same person
+    // being typed in twice under two spellings.
+    $known = known_candidates($pdo);
+    $knownMap = [];
+    foreach ($known as $k) {
+        $knownMap[mb_strtolower(trim($k['candidate_name']))] = [
+            'name'         => $k['candidate_name'],
+            'email'        => $k['email'] ?? '',
+            'phone'        => $k['phone'] ?? '',
+            'portfolio_url'=> $k['portfolio_url'] ?? '',
+            'source'       => $k['source'] ?? '',
+            'notes'        => $k['notes'] ?? '',
+            'location'     => $k['location'] ?? '',
+            'position'     => $k['position'] ?? '',
+            'seniority'    => $k['seniority'] ?? '',
+            'project_type' => $k['project_type'] ?? '',
+            'worked_with_us' => (int)($k['worked_with_us'] ?? 0),
+            'rating'       => $k['rating'] ?? '',
+            'seen_on'      => $k['project_code'] ?? '',
+            'stage'        => hire_stage_label($k['stage']),
+        ];
+    }
     // Only the unfilled slots are offered: putting a candidate forward for a
     // job somebody already holds is not a thing anyone means to do.
     $openSlots = array_filter($lanes, function ($l) { return (int)$l['is_placeholder'] === 1; });
@@ -266,7 +302,8 @@ require __DIR__ . '/includes/header.php';
             <tbody>
               <?php for ($r = 0; $r < 6; $r++): $n = 'rows[' . $r . ']'; ?>
                 <tr>
-                  <td><input name="<?= $n ?>[candidate_name]" placeholder="Who they are" size="18"></td>
+                  <td><input name="<?= $n ?>[candidate_name]" placeholder="Who they are" size="18"
+                             list="knownCandidates" autocomplete="off" oninput="hireLookup(this)"></td>
                   <?php if ($extras): ?>
                     <td><input name="<?= $n ?>[location]" list="hireLocations" size="10"></td>
                     <td><input name="<?= $n ?>[position]" list="hirePositions" size="14"></td>
@@ -354,6 +391,37 @@ require __DIR__ . '/includes/header.php';
           <div class="actions"><button type="submit">Add pasted rows</button></div>
         </form>
       </details>
+
+      <?php if ($known): ?>
+        <p class="muted small">
+          Start typing a name to see the <strong><?= count($known) ?></strong>
+          <?= count($known) === 1 ? 'person' : 'people' ?> already recorded on any project —
+          picking one fills in the rest of the row from the last time their details were entered,
+          without overwriting anything you have already typed. Somebody already up for the same
+          slot is reported and skipped rather than added twice.
+        </p>
+      <?php else: ?>
+        <p class="muted small">
+          Nobody is recorded yet, so there is nothing to pick from. Paste a batch out of the
+          freelancer spreadsheet below and the names become searchable here straight away.
+        </p>
+      <?php endif; ?>
+
+      <datalist id="knownCandidates">
+        <?php foreach ($known as $k): ?>
+          <option value="<?= e($k['candidate_name']) ?>"><?php
+            $bits = array_filter([$k['position'] ?? '', $k['location'] ?? '', $k['project_code'] ?? '']);
+            echo e($bits ? implode(' · ', $bits) : '');
+          ?></option>
+        <?php endforeach; ?>
+      </datalist>
+
+      <?php // The same shape the pipeline wizard uses for its step library: a
+            // JSON block rather than an inline assignment, escaped so that no
+            // value in it can close the script element (lesson 12). ?>
+      <script type="application/json" id="known-candidates-data"><?=
+          json_encode($knownMap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+      ?></script>
 
       <datalist id="hirePositions">
         <?php foreach ($sugg['position'] as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
@@ -649,6 +717,40 @@ require __DIR__ . '/includes/header.php';
 // Clones the last grid row five times, renumbering rows[N] as it goes. Inline
 // rather than a file in assets/ because inline script needs no cache-busting,
 // and a stale cached copy of a fix is a whole debugging round lost (lesson 2).
+// Fills a grid row from somebody already in the database.
+//
+// It only ever writes into fields that are EMPTY. Overwriting what somebody has
+// already typed would be the worst kind of help: the row would look like theirs
+// and hold last month's details, and nothing on screen would say a value had
+// been replaced.
+var MANA_KNOWN = null;
+function hireKnown() {
+  if (MANA_KNOWN === null) {
+    var el = document.getElementById('known-candidates-data');
+    try { MANA_KNOWN = el ? JSON.parse(el.textContent) : {}; }
+    catch (e) { MANA_KNOWN = {}; }
+  }
+  return MANA_KNOWN;
+}
+
+function hireLookup(input) {
+  var rec = hireKnown()[(input.value || '').trim().toLowerCase()];
+  var row = input.closest('tr');
+  if (!rec || !row) { if (row) { row.classList.remove('has-problem'); } return; }
+
+  Object.keys(rec).forEach(function (field) {
+    var f = row.querySelector('[name$="[' + field + ']"]');
+    if (!f) { return; }
+    if (f.type === 'checkbox') {
+      if (!f.checked && rec[field]) { f.checked = true; }
+    } else if (f.value === '' && rec[field] !== '' && rec[field] !== null) {
+      f.value = rec[field];
+    }
+  });
+  input.title = 'Already recorded' + (rec.seen_on ? ' on ' + rec.seen_on : '') +
+                ' at ' + rec.stage + '. The blank fields in this row were filled in from it.';
+}
+
 function hireAddRows() {
   var body = document.querySelector('#hireGrid tbody');
   if (!body) return;

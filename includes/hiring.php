@@ -181,6 +181,81 @@ function hire_suggestions(PDO $pdo, int $projectId): array {
     return $out;
 }
 
+/**
+ * Everybody this studio has ever recorded as a candidate — ONE ROW PER PERSON,
+ * across every project.
+ *
+ * ⚠ WHY THIS FUNCTION HAS TO EXIST, and it is worth understanding before
+ * changing it. `hires` is one row per candidate PER SLOT (migration 025), so
+ * the same animator approached for three jobs is three rows. That was the
+ * shape chosen, and the cost it carries is exactly this: nothing in the table
+ * knows that those three rows are one human. Without a deduplicated view,
+ * somebody filling in the entry grid retypes a person who is already there,
+ * with a slightly different spelling, and the two never meet again.
+ *
+ * The most RECENT row wins, on the assumption that the latest time somebody
+ * typed a person's details is the best version of them. Matching is on the
+ * lowercased name, which is the same rule the alias layer and the asset-type
+ * merge use — deliberately not fuzzy, because a silent near-match is the thing
+ * this codebase keeps refusing to do.
+ */
+function known_candidates(PDO $pdo): array {
+    if (!hiring_available($pdo)) return [];
+    return $pdo->query(
+        'SELECT h.*, p.code AS project_code, p.name AS project_name
+           FROM hires h
+           JOIN (SELECT MAX(id) AS id FROM hires GROUP BY LOWER(candidate_name)) latest
+                ON latest.id = h.id
+           LEFT JOIN projects p ON p.id = h.project_id
+          ORDER BY h.candidate_name'
+    )->fetchAll();
+}
+
+/**
+ * Is this person already a candidate for this same job?
+ *
+ * Same project AND the same slot AND (the same name OR the same email). The
+ * lane comparison uses `<=>`, MySQL's null-safe equality, so two records with
+ * no slot count as the same job rather than as two different NULLs — the same
+ * trap `item_key` exists for (2026-08-11).
+ *
+ * The same person on the same project for a DIFFERENT slot is deliberately not
+ * a duplicate: putting somebody forward for both Layout and Color is a real
+ * thing to do, and it is two conversations.
+ *
+ * @return array|null the existing record, with its slot named, or null
+ */
+function hire_duplicate(PDO $pdo, int $projectId, string $name, ?string $email,
+                        ?int $laneId, int $excludeId = 0): ?array {
+    if (!hiring_available($pdo)) return null;
+    $name = trim($name);
+    if ($name === '') return null;
+    $email = trim((string)$email);
+
+    $q = $pdo->prepare(
+        'SELECT h.*, cl.lane_no, c.name AS slot_name, ps.name AS slot_step
+           FROM hires h
+           LEFT JOIN crew_lanes cl     ON cl.id = h.lane_id
+           LEFT JOIN crew c            ON c.id  = cl.crew_id
+           LEFT JOIN pipeline_steps ps ON ps.id = cl.step_id
+          WHERE h.project_id = ?
+            AND (LOWER(h.candidate_name) = LOWER(?) OR (? <> \'\' AND h.email = ?))
+            AND h.lane_id <=> ?
+            AND h.id <> ?
+          LIMIT 1'
+    );
+    $q->execute([$projectId, $name, $email, $email, $laneId, $excludeId]);
+    return $q->fetch() ?: null;
+}
+
+/** "already up for Animation 02, at offer out" — for saying why a row was skipped. */
+function hire_duplicate_phrase(array $dup): string {
+    $where = !empty($dup['slot_name'])
+        ? 'up for ' . $dup['slot_name']
+        : 'on this project with no slot';
+    return $where . ', at ' . strtolower(hire_stage_label($dup['stage']));
+}
+
 /** Are the engagement date columns there? Same migration, checked separately. */
 function engagement_dates_available(PDO $pdo): bool {
     return column_exists($pdo, 'crew_projects', 'start_date');
@@ -360,6 +435,18 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
 
     $stage = in_array($in['stage'] ?? '', array_keys(HIRE_STAGES), true) ? $in['stage'] : 'lead';
     $id    = (int)($in['hire_id'] ?? 0);
+
+    // The same person, for the same job, twice. Refused rather than merged:
+    // this codebase detects near-duplicates and never resolves them silently
+    // (asset types, 2026-08-13), and a second record would split one person's
+    // history down the middle with nothing on screen to say why.
+    $dup = hire_duplicate($pdo, $projectId, $name, $email, $laneId, $id);
+    if ($dup !== null) {
+        throw new RuntimeException(sprintf(
+            '"%s" is already %s. Open that record and update it rather than adding a second one.',
+            $dup['candidate_name'], hire_duplicate_phrase($dup)
+        ));
+    }
 
     // Built as name => value rather than as two parallel lists, so the extra
     // freelancer columns can be spliced in without anybody having to keep a
@@ -806,15 +893,29 @@ function parse_hire_paste(string $text): array {
  * the slot is already taken — the RECORD is still kept, at the stage before
  * hired, and the reason is reported. Losing a typed row over it would be worse.
  *
+ * A row naming somebody already up for the same job is counted as a DUPLICATE
+ * rather than an error. Pasting a block that overlaps one already entered is an
+ * ordinary thing to do, and forty red lines saying so would bury the rows that
+ * did land.
+ *
  * @param array $rows  each a field => value map
- * @return array ['added' => int, 'hired' => int, 'errors' => array, 'notes' => array]
+ * @return array ['added' => int, 'hired' => int, 'errors' => array,
+ *                'notes' => array, 'duplicates' => array]
  */
 function save_hires_bulk(PDO $pdo, int $projectId, array $rows, string $who = ''): array {
-    $out = ['added' => 0, 'hired' => 0, 'errors' => [], 'notes' => []];
+    $out = ['added' => 0, 'hired' => 0, 'errors' => [], 'notes' => [], 'duplicates' => []];
 
     foreach ($rows as $i => $row) {
         $name = trim((string)($row['candidate_name'] ?? ''));
         if ($name === '') continue;          // a blank line in the grid is not an error
+
+        $dup = hire_duplicate($pdo, $projectId, $name,
+                              (string)($row['email'] ?? ''),
+                              (int)($row['lane_id'] ?? 0) ?: null);
+        if ($dup !== null) {
+            $out['duplicates'][] = $dup['candidate_name'] . ' (already ' . hire_duplicate_phrase($dup) . ')';
+            continue;
+        }
 
         $stage = in_array($row['stage'] ?? '', array_keys(HIRE_STAGES), true)
                ? $row['stage'] : 'lead';

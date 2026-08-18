@@ -1198,6 +1198,45 @@ real parse errors. The same blind spot could equally have hidden a genuine misma
 **Consequence:** the checker now leaves PHP mode at `?>` inside a line comment, and all 74 files
 still pass — so the fix removed a false positive without introducing a false negative.
 
+## 2026-08-17 — The entry grid looks people up, because the chosen shape cannot
+**Decision, and it is the mitigation the "all fields on `hires`" call needs to be safe.** The
+name field in the entry grid is a lookup over `known_candidates()` — every person ever recorded
+on any project, deduplicated to one row each, most recent details winning. Picking a name fills
+the rest of the row.
+**Why it is not optional:** David hit it within minutes of using the grid — *"I need to make sure
+I can select from the database, otherwise I might repeat the same candidate on another entry."*
+`hires` is one row per candidate PER SLOT, so nothing in the table knows that three rows are one
+human. Without a deduplicated view, the same person gets typed in twice under two spellings and
+the two records never meet again. The `freelancers` table that was declined would have made this
+free; this function is what buys it back.
+**Consequence, and the three rules it follows:**
+- **Autofill only ever writes into EMPTY fields.** Overwriting something already typed would leave
+  a row that looks like the typist's and holds last month's details, with nothing saying a value
+  had been replaced.
+- **Matching is exact on the lowercased name, never fuzzy.** Same rule as the alias layer and the
+  asset-type merge: near-matches are detected and offered, never resolved silently (2026-08-13).
+- **A true duplicate is refused, not merged.** Same project, same slot, same name or same email →
+  the row is skipped and the existing record is named, with its stage. In a bulk paste those are
+  counted as duplicates rather than errors, because pasting a block that overlaps one already
+  entered is an ordinary thing to do and forty red lines would bury the rows that did land.
+**Still true, and worth keeping in view:** this makes the duplication survivable, not absent. The
+same person on two projects is still two rows carrying two copies of their details, and correcting
+one corrects one.
+
+## 2026-08-17 — A screen that sends you somewhere to fix something brings you back
+**Decision:** the expense projection's "set a rate →" links carry `from=finance`. The person page
+then shows "← Back to the expense projection", its Save button reads *Save terms and go back*, and
+saving returns straight to the projection.
+**Why:** David, on the real screen — the projection had fourteen unpriced rows, each one a link to
+a different person's page, and every one of them was a dead end. Filling them in meant walking
+Finance → the project → scroll to the row, fourteen times.
+**The general rule, which is the part worth keeping:** this codebase deliberately sends people off
+to fix things — unpriced rows to a person page, unmatched names to the alias screen, surplus slots
+to the schedule. **A link that names a problem should also lead back to where the problem was
+visible**, or the screen that diagnosed it becomes the screen you have to keep re-finding. Landing
+back on the projection also shows the figure appearing in the row it came from, which is the
+confirmation that actually matters — more than a flash message saying "saved".
+
 ---
 
 ## Still open

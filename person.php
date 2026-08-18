@@ -45,7 +45,17 @@ if (!$person) {
     exit;
 }
 
-$selfUrl = 'person.php?project=' . $projectId . '&crew=' . $crewId;
+// Where this page was opened FROM, so it can offer the way back.
+//
+// The expense projection sends people here one at a time to fill in a missing
+// rate — "set a rate →" on every unpriced row. Without this they landed on the
+// person page with no way home and had to walk Finance → the project → scroll,
+// once per person. A projection with fourteen unpriced rows made that fourteen
+// round trips (David, 2026-08-17).
+$from       = (($_GET['from'] ?? $_POST['from'] ?? '') === 'finance') ? 'finance' : '';
+$backUrl    = 'finance_project.php?project=' . $projectId;
+$selfUrl    = 'person.php?project=' . $projectId . '&crew=' . $crewId
+            . ($from ? '&from=finance' : '');
 
 // --- save the non-financial details ----------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
@@ -93,6 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
         // Writes to the FINANCE database, not this one. money.php is the only
         // place that connection is ever opened.
         flash('ok', save_crew_terms($crewId, (string)$person['name'], $_POST, current_user_display()));
+        // Straight back to the projection when that is where this started. The
+        // rate was the errand; the person page was the means. Returning also
+        // shows the figure landing in the row it came from, which is the
+        // confirmation that actually matters.
+        if ($from === 'finance') {
+            header('Location: ' . $backUrl);
+            exit;
+        }
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -177,7 +195,15 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <?php project_nav($project, 'team'); ?>
-<p class="crumb"><a href="team.php?project=<?= $projectId ?>">← Back to the team</a></p>
+<p class="crumb">
+  <?php if ($from === 'finance'): ?>
+    <a href="<?= e($backUrl) ?>">← Back to the expense projection</a>
+    <span class="muted">·</span>
+    <a href="team.php?project=<?= $projectId ?>" class="muted">the team</a>
+  <?php else: ?>
+    <a href="team.php?project=<?= $projectId ?>">← Back to the team</a>
+  <?php endif; ?>
+</p>
 
 <h2 class="wizard-title">
   <?= e($person['name']) ?>
@@ -327,6 +353,7 @@ require __DIR__ . '/includes/header.php';
 <h3>Details</h3>
 <form method="post" class="stack">
   <input type="hidden" name="save_details" value="1">
+  <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
   <div class="row">
     <label>Name <input name="name" value="<?= e($person['name']) ?>" required></label>
     <label>Role <input name="role" value="<?= e($person['role'] ?? '') ?>" placeholder="e.g. Compositor"></label>
@@ -395,6 +422,7 @@ require __DIR__ . '/includes/header.php';
     </p>
     <form method="post" class="stack">
       <input type="hidden" name="save_terms" value="1">
+      <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
       <div class="row">
         <label>Rate
           <input name="day_rate" inputmode="decimal" placeholder="e.g. 350.00"
@@ -456,7 +484,13 @@ require __DIR__ . '/includes/header.php';
         </p>
       <?php endif; ?>
 
-      <div class="actions"><button type="submit">Save terms</button></div>
+      <div class="actions">
+        <button type="submit">Save terms<?= $from === 'finance' ? ' and go back' : '' ?></button>
+        <?php if ($from === 'finance'): ?>
+          <a href="<?= e($backUrl) ?>" class="muted small" style="margin-left:12px;">
+            back to the projection without saving</a>
+        <?php endif; ?>
+      </div>
     </form>
 
     <?php if ($myRows): ?>

@@ -216,7 +216,7 @@ require __DIR__ . '/includes/header.php';
           </td>
           <td>
             <?php if ($r['crew_id']): ?>
-              <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>"><?= e($r['artist']) ?></a>
+              <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>&amp;from=finance"><?= e($r['artist']) ?></a>
               <?php if ($r['is_slot']): ?><span class="slot-tag">slot</span><?php endif; ?>
             <?php else: ?>
               <span class="warn-text small">nobody assigned</span>
@@ -225,7 +225,7 @@ require __DIR__ . '/includes/header.php';
           <td class="small">
             <?php if ($r['rate'] === null): ?>
               <?php if ($r['crew_id']): ?>
-                <a class="warn-text" href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>"
+                <a class="warn-text" href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>&amp;from=finance"
                    title="Set a day rate on their page and it feeds straight back into this total">set a rate →</a>
               <?php else: ?><span class="muted">—</span><?php endif; ?>
             <?php else: ?>
