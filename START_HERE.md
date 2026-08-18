@@ -437,6 +437,16 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      says how many tasks fall outside somebody's dates.
 
 12. **Next.** In rough order of value:
+   - **What appears in each shot** — link assets (characters, props, vehicles, environments and
+     anything else) to the shot list. David asked for it on 2026-08-17 as a production need, and it
+     turns out to be **a live defect as well as a feature**. `shot_assets` has existed since v1 and
+     `includes/scheduler.php` already reads it — but **nothing in the codebase writes a single row**,
+     so the scheduler's per-shot asset dependency never fires and every shot falls back to waiting
+     for the WHOLE asset step. Every shot currently waits for the last character to be rigged,
+     including shots with no characters in them. The error is in the *pessimistic* direction, so
+     filling this in should SHORTEN the plan rather than lengthen it. No migration needed — read
+     the section in `docs/ROADMAP.md`, and re-run the schedule afterwards, because a saved schedule
+     is a stored snapshot and will not improve on its own.
    - **The client loop** — the step missing from David's own list, and now the only numbered gap
      left in the cycle. Nothing records a delivery: version sent, notes back, round two. Usually
      where a schedule actually dies.

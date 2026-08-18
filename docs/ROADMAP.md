@@ -48,6 +48,89 @@ a schedule actually dies: not in the work, but in three unacknowledged review ro
 "online version review" item below is the ambitious version of this; a plain delivery log would
 carry most of the value.
 
+---
+
+## What appears in each shot — linking assets to the shot list
+
+David, 2026-08-17: *"we need to link props, vehicles, characters, environments and any other
+asset to the shot list so the production team knows what is required to feature in each shot."*
+
+**This needs no migration, and it is not only a convenience — the scheduler is already worse
+without it.** That is the part to understand before planning the work.
+
+### What exists
+
+| Piece | Status |
+|---|---|
+| `shot_assets (shot_id, asset_id)` | **Built, in `install.sql`, since v1 (2026-08-11)** |
+| The scheduler reading it | **Built** — `scheduler_shot_assets()`, `includes/scheduler.php` |
+| Anything that WRITES a row into it | **Missing entirely.** Zero inserts in the codebase |
+
+One join table rather than STFC's `shot_characters` + `shot_environments` was a deliberate v1
+decision, and it is what makes David's *"and any other asset"* free: props, vehicles, FX, crowds
+and anything invented later are already the same shape. Adding Props to STFC needed a schema
+change; here it needs nothing.
+
+### What it costs today — the reason this is not merely a nice-to-have
+
+`includes/scheduler.php` resolves how long a shot must wait for the asset work it depends on, in
+three steps, most specific first:
+
+1. the same item in the step it waits for;
+2. **failing that, for a shot waiting on an ASSET step, the assets that shot actually uses
+   (`shot_assets`);**
+3. failing that, the whole step.
+
+Because nothing populates `shot_assets`, **step 2 never fires and every shot falls through to
+step 3.** So every shot waits for the *entire* asset step to finish — every shot on Return to Club
+waits for the last character to be modelled and rigged before its animation can start, including
+shots with no characters in them.
+
+That error is always in the **pessimistic** direction, which is the opposite of the studio-calendar
+bug (2026-08-12) but the same category: a scheduler input that silently is not there. It makes the
+plan longer than it needs to be, which reads as "we need more people" rather than as missing data.
+Filling this in is likely to *shorten* the critical path on a real show.
+
+### What it unlocks besides the schedule
+
+- **The production question David actually asked** — open a shot, see what has to be in it. That is
+  a call-sheet, and nothing in the platform can print one.
+- **The reverse, which is as useful** — open an asset and see which shots need it. "This prop is in
+  two shots" is the difference between building it properly and not building it at all.
+- **A real answer for "ready for production"** (2026-08-14). A shot is ready when the assets it
+  uses are approved. Today "all green" is computed per item against its own steps; with this it can
+  finally mean *this shot can start*.
+- **Coverage stops being a guess for some steps.** The `coverage_pct` band (2026-08-12) exists
+  because nobody knows WHICH shots have FX. Where the answer is an asset link, it becomes known.
+
+### The reference implementation, and what does not port
+
+STFC has `shot_assoc_api.php` plus the association UI on its shots screen. Read it first, per the
+2026-08-14 rule. **Two things about it must NOT come across:**
+
+- It stores **names**, not ids (`shot_characters.char_name`). That is the alias problem the
+  platform was built to avoid — `RomulanOfficer01` vs `Romulan Officer` is lesson 6. Here it is
+  `asset_id`, and the alias layer already exists for import.
+- It hardcodes **two kinds** in the API (`type must be character or environment`). The platform's
+  single join table is the whole reason "any other asset" needs no code change.
+
+The interaction model is worth keeping: add and remove one at a time, saved immediately, no
+staging. It is the same reasoning the tracking grid uses.
+
+### Where it would live
+
+- **The item page (`item.php`)** is the natural home for both directions — it already opens one
+  shot or one asset, and this is one more panel on it.
+- **Bulk entry matters more than the single case.** 188 shots × several assets each is not a job
+  for one-at-a-time clicking. The paste and grid pattern now used by hiring and invoices applies
+  directly: paste `SHOT, asset, asset, asset` per line, resolve names through the alias layer,
+  report what matched and what did not — which is exactly the unmatched-names report that already
+  exists.
+- **The Plaky import should populate it** if the board carries the association; worth checking a
+  real export before assuming it does not (`docs/PLAKY_EXPORT.md`).
+- After it is populated, **re-run the schedule** — saved schedules are stored snapshots and will
+  not improve on their own (the same caveat migration 014 carried).
+
 
 
 David's list, 2026-08-12, annotated with which side of the money boundary it
@@ -71,6 +154,7 @@ separate database — see `DECISIONS.md` 2026-08-12)
 | Budget simulator — "what if we add people?" | **F** | scheduler | Production already computes the hard half |
 | Payments / invoice tracking hub | **F** | invoice upload | Which invoices are paid |
 | Cross-project benchmarking — estimated vs actual per step | P | estimate baseline, time log | **Read the section below.** The capture half is urgent; the reporting half isn't |
+| **What appears in each shot** — link assets to shots | P | — | **Read the section below.** No schema needed: `shot_assets` has existed since v1 and the SCHEDULER ALREADY READS IT. Nothing writes it, so the scheduler is running degraded today |
 
 ### Deliberately last (decided 2026-08-12)
 
