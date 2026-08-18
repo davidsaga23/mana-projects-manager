@@ -15,11 +15,11 @@ without re-deriving context.
   table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
   thing left is the **client loop**, which was never on that list.
 - **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
-  run to **025**. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
-  Return to Club. **025 (the freelancer fields) is new and pending**: without it the entry grid
+  run to **026**. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
+  Return to Club. **025 (freelancer fields) and 026 (ideal quotas) are new and pending.** Without 025 the entry grid
   offers names, emails, phones, portfolios, sources and notes, but not location, position,
   seniority, project type, worked-with-us or rating — and it says so on screen rather than
-  silently dropping them.
+  silently dropping them. Without 026 the Ideal quotas screen reports that it cannot work.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that

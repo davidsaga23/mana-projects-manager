@@ -1428,6 +1428,57 @@ than leaving somebody to find it by comparing two spreadsheets column by column 
 was found. The exported file states the allowance it used, for the same reason: a reader holding
 both files needs to know which side applied it.
 
+## 2026-08-17 — The IDEAL quota: a base sheet per kind of project
+**Decision, David's request:** `quota_standards` (migration 026) holds what the work *should* take
+for each kind of project, edited on `standards.php` — a studio-wide reference, not a project
+setting. *"The ideal quotas, not the minimal quotas we currently have that are based on the head
+count and available time."*
+
+**There are now THREE numbers, and confusing them makes all three useless:**
+
+| | What it is | Who sets it |
+|---|---|---|
+| **Required** | what the deadline demands — remaining work ÷ working days left | Nobody. `step_quota()` derives it, and it moves when the date or the progress moves |
+| **Estimated** | what THIS project was planned at (`pipeline_steps.days_per_unit`) | Typed on Dates & headcount, frozen at kickoff into `step_estimate_baseline` |
+| **Ideal** | what the studio believes the work takes when done properly, for this KIND of project | Typed once on the base sheet, true across shows |
+
+**The ideal is the only one that can contradict the other two, and that is its entire value.** A
+required pace far above the ideal is not an ambitious plan, it is one the people on it cannot
+deliver — and until now that was discoverable only in week three. START_HERE has always said the
+review screen exists so "an unrealistic plan is visible at setup"; this is the number that makes
+that a judgement rather than a feeling.
+
+**Consequence — the design choices, each with a reason:**
+- **Keyed on `(project_type, name, applies_to, applies_to_asset_type)`.** The step-identity triple
+  ROADMAP names as the cross-project comparison key, plus the type. **Not on `step_library`**,
+  which is `UNIQUE (name)` alone — "Concept" for characters and "Concept" for environments are one
+  row there, and they are different jobs with different day rates. ROADMAP names that gap; storing
+  an ideal against a key that cannot tell them apart would average two unrelated numbers.
+- **Per project type, because ROADMAP already settled it:** comparing a 2D short with a 3D series
+  "would average away the signal". `standard_for_step()` therefore does NOT fall back to another
+  type — a borrowed standard is a number nobody agreed to.
+- **Stored as days per unit, shown both ways.** Everything it feeds is already in days per unit; a
+  stored reciprocal would need converting at every boundary. "Half a day each" and "two a day" are
+  the same fact and people say whichever suits the step.
+- **Nothing is applied automatically.** The planning screen shows the ideal beside the estimate and
+  flags an estimate that is *faster* than the standard — slower is somebody being careful and needs
+  no warning. A standard that quietly overwrote an estimate would stop being a reference and start
+  being a decision nobody made. Detection, never silent correction — the asset-type rule of
+  2026-08-13.
+- **`source` is a first-class column.** A figure somebody guessed and a figure measured across four
+  finished shows are both worth having and must never be mistaken for each other. The seed rows say
+  in as many words that they came from existing plans and are "not yet reviewed" — the same care
+  migration 013 takes in refusing to backfill a baseline from numbers that had already been edited.
+- **`quota_standards_log` is append-only.** "What did we think this took last year, and were we
+  right?" cannot be answered by a column that gets overwritten. Same asymmetry as the daily
+  snapshots and the estimate baseline.
+
+**Where it goes next, and it is already designed:** the cross-project benchmark in `ROADMAP.md`
+compares estimate against actual on exactly this step identity. When it exists it can propose an
+observed median for each row — written into `source`, offered, never applied. That is the loop
+David described closing: *"informed by experience and later on by comparing other projects too."*
+The prerequisite is real effort per step, which is `time_logs`, which now exists.
+
 ---
 
 ## Still open

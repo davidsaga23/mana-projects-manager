@@ -121,6 +121,13 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
 }
 
 function wizard_render_planning(PDO $pdo, ?array $project): void {
+    // The studio's ideal for THIS kind of project, shown beside each estimate.
+    // Read-only here on purpose: the base sheet is edited on its own screen, and
+    // a number that could be changed from two places would stop being a standard.
+    require_once __DIR__ . '/../standards.php';
+    $idealSheet = standards_available($pdo)
+        ? standards_for_type($pdo, (string)($project['type'] ?? ''))
+        : [];
     $projectId = (int)$project['id'];
     $steps = pipeline_steps($pdo, $projectId);
 
@@ -265,6 +272,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
           <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
+          <th>Studio ideal</th>
           <th>Is that enough?</th>
         </tr>
         </thead>
@@ -328,6 +336,35 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>
+          <?php
+          // The ideal for this step identity, if the studio has written one down.
+          // It is NOT applied and NOT defaulted in — a standard that quietly
+          // overwrote somebody's estimate would stop being a reference and start
+          // being a decision nobody made. Reported, and a person decides; the same
+          // rule the duplicate asset types follow.
+          $std = $idealSheet[standard_key($s['name'], $s['applies_to'] ?? 'shot',
+                                          $s['applies_to_asset_type'] ?? '')] ?? null;
+          $planned = (float)($s['days_per_unit'] ?: 0);
+          ?>
+          <td class="small">
+            <?php if ($std === null): ?>
+              <span class="muted">no standard</span>
+            <?php else:
+              $ideal = (float)$std['days_per_unit'];
+              $ratio = ($ideal > 0 && $planned > 0) ? $planned / $ideal : null;
+              // Faster than the studio standard is the direction worth flagging.
+              // Slower is somebody being careful, which needs no warning.
+              $cls = ($ratio !== null && $ratio < 0.95) ? 'err'
+                   : (($ratio !== null && $ratio > 1.05) ? 'muted' : 'ok'); ?>
+              <span class="<?= $cls ?>"><?= e(fmt_num($ideal, 2)) ?> d</span>
+              <div class="muted small"><?= e(fmt_num(1 / max(0.001, $ideal), 2)) ?> a day</div>
+              <?php if ($ratio !== null && $ratio < 0.95): ?>
+                <div class="err small">
+                  planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
+          </td>
           <?php /* Filled by wizard.js, like the verdict beside it — both are
                    recalculated as you type, so rendering a number here on load
                    would only be right until the first keystroke. */ ?>

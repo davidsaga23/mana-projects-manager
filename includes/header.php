@@ -25,6 +25,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
         <?php // Admin-only, and it reads a database ordinary screens have no
               // credential for. In the global bar because it spans projects. ?>
         · <a href="finance.php">Finance</a>
+        · <a href="standards.php">Ideal quotas</a>
         · <a href="users.php">Users</a>
         · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
