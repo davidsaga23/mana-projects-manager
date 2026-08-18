@@ -21,11 +21,12 @@ without re-deriving context.
   seniority, project type, worked-with-us or rating — and it says so on screen rather than
   silently dropping them.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
-  `finance_install_02.sql`, `finance_install_03.sql` and **`finance_install_04.sql`**, imported
-  by hand via phpMyAdmin, never through `migrate.php` (that runner only touches the production
-  connection). The first three were imported by 18 August; **04 is new and pending** — quotes and
-  contract status are unavailable until it is imported, and every screen says so rather than
-  showing a blank. Its credential lives in the `finance_db` block of `config.php`, and
+  `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
+  **`finance_install_05.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
+  runner only touches the production connection). The first three were imported by 18 August;
+  **04 (hiring quotes + contract status) and 05 (other expenses) are new and pending** — those
+  features are unavailable until each is imported, and every screen says so rather than showing a
+  blank. **Until 05 is in, Projected cost and Margin count people only.** Its credential lives in the `finance_db` block of `config.php`, and
   `includes/money.php` is the **only** place that connection is ever opened.
   **⚠ Run each finance file ONCE** — there is no `schema_migrations` table on that side, so a
   second import fails on "duplicate column". That failure is harmless and means it was done.

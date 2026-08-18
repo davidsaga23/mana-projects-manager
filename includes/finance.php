@@ -234,17 +234,254 @@ function expense_projection(PDO $pdo, int $projectId): array {
         $byDept[$d]['actual'] += (float)($r['actual_cost'] ?? 0);
     }
 
+    // Costs that are not somebody's day rate — software, render time, licences,
+    // travel. Folded in HERE rather than added on by each screen, because this
+    // function is the single source the hub, the project page and the person
+    // page all read. A total assembled separately on three screens is three
+    // totals that disagree within a week; that is the same rule that keeps the
+    // projection computed rather than stored.
+    $other = project_expenses($projectId);
+    $otherTotal = 0.0; $otherPaid = 0.0;
+    $byCategory = [];
+    foreach ($other as $e) {
+        $amt = (float)$e['amount'];
+        $otherTotal += $amt;
+        if (!empty($e['paid_date'])) $otherPaid += $amt;
+
+        $c = trim((string)$e['category']) ?: 'Other';
+        $byCategory[$c] = $byCategory[$c] ?? ['rows' => [], 'amount' => 0.0, 'paid' => 0.0];
+        $byCategory[$c]['rows'][] = $e;
+        $byCategory[$c]['amount'] += $amt;
+        if (!empty($e['paid_date'])) $byCategory[$c]['paid'] += $amt;
+
+        if ($currency === null) $currency = $e['currency'];
+        elseif ($currency !== $e['currency']) $mixed = true;
+    }
+    ksort($byCategory, SORT_NATURAL | SORT_FLAG_CASE);
+
     return [
         'rows'           => $rows,
         'by_department'  => $byDept,
+        // LABOUR only, deliberately. The projection table's own footer sums the
+        // rows above it, and a total larger than its own rows would be the kind
+        // of quietly-wrong figure this file exists to avoid.
         'total'          => $total,
         'actual_total'   => $actualTotal,
+        // Everything that is not a person on a step.
+        'other'          => $other,
+        'by_category'    => $byCategory,
+        'other_total'    => $otherTotal,
+        'other_paid'     => $otherPaid,
+        // What the show costs. THIS is the figure a margin is drawn against —
+        // budget minus labour alone was read as headroom and was not.
+        'grand_total'    => $total + $otherTotal,
         'currency'       => $currency ?: 'USD',
         'mixed_currency' => $mixed,
         'unpriced_days'  => $unpricedDays,
         'hours_per_day'  => $hoursPerDay,
     ];
 }
+
+/* ---------------------------------------------------------------------------
+ * Other expenses — costs with no lane behind them.
+ *
+ * WHERE THE LINE FALLS AGAINST `invoices`, because the two overlap and somebody
+ * will otherwise record the same cost twice:
+ *
+ *     invoices          a PERSON billing the show, and the actual cost of
+ *                       planned labour.
+ *     project_expenses  everything that is not a person's time — a vendor, a
+ *                       licence, a machine, a trip.
+ *
+ * Stated that way they never compete for the same row, and the screen says so.
+ * ------------------------------------------------------------------------- */
+
+/** Has finance_install_05.sql been imported? */
+function expenses_available(): bool {
+    return finance_column_exists('project_expenses', 'id');
+}
+
+/** Same shape as invoices_need_upgrade(), for telling "none yet" from "no table". */
+function expenses_need_upgrade(): bool {
+    if (!can_see_money() || !finance_configured()) return false;
+    return !expenses_available();
+}
+
+/** Every non-labour cost on a project, newest first within category. */
+function project_expenses(int $projectId): array {
+    if (!can_see_money()) return [];
+    $db = finance_db();
+    if (!$db || !expenses_available()) return [];
+    $q = $db->prepare(
+        'SELECT * FROM project_expenses WHERE project_id = ?
+          ORDER BY category, incurred_date IS NULL, incurred_date DESC, id DESC'
+    );
+    $q->execute([$projectId]);
+    return $q->fetchAll();
+}
+
+/** Non-labour totals for many projects at once, for the hub. Keyed by project id. */
+function expense_totals(array $projectIds): array {
+    if (!can_see_money() || !$projectIds) return [];
+    $db = finance_db();
+    if (!$db || !expenses_available()) return [];
+    $ids = implode(',', array_map('intval', $projectIds));
+    $out = [];
+    foreach ($db->query(
+        "SELECT project_id, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
+           FROM project_expenses WHERE project_id IN ({$ids}) GROUP BY project_id"
+    ) as $r) {
+        $out[(int)$r['project_id']] = $r;
+    }
+    return $out;
+}
+
+/**
+ * The categories to offer — the studio's own vocabulary plus a few starters.
+ *
+ * GLOBAL, not per project: which categories a studio actually spends against is
+ * worth being able to compare across shows, and a list rebuilt per project would
+ * make every new show start from nothing. Same reasoning as step_library.
+ */
+function expense_categories(): array {
+    $starters = [
+        'Software & licences', 'Render / cloud', 'Music & sound', 'Stock & assets',
+        'Equipment', 'Travel', 'Services', 'Contingency', 'Other',
+    ];
+    $seen = [];
+    foreach ($starters as $s) $seen[mb_strtolower($s)] = $s;
+
+    $db = can_see_money() ? finance_db() : null;
+    if ($db && expenses_available()) {
+        foreach ($db->query('SELECT DISTINCT category FROM project_expenses ORDER BY category') as $r) {
+            $c = trim((string)$r['category']);
+            if ($c !== '') $seen[mb_strtolower($c)] = $c;
+        }
+    }
+    $out = array_values($seen);
+    sort($out, SORT_NATURAL | SORT_FLAG_CASE);
+    return $out;
+}
+
+/**
+ * Record several expenses at once, from the entry grid.
+ *
+ * Same rules as save_invoices_bulk(): one bad row never stops the rest, and a
+ * BLANK row and an INCOMPLETE row are different facts. A row with a description
+ * and no amount is somebody interrupted mid-typing, and is reported against its
+ * row number rather than dropped.
+ *
+ * @return array ['added' => int, 'errors' => array]
+ */
+function save_expenses_bulk(array $rows, array $project, string $who = ''): array {
+    if (!can_see_money()) throw new RuntimeException('Only an administrator can record an expense.');
+    $db = finance_db();
+    if (!$db) throw new RuntimeException('The finance database is not set up yet — see finance_install.sql.');
+    if (!expenses_available()) {
+        throw new RuntimeException(
+            'Other expenses need finance_install_05.sql, which has not been imported into the '
+            . 'finance database yet.'
+        );
+    }
+
+    $out = ['added' => 0, 'errors' => []];
+    $asDate = function ($v) {
+        $v = trim((string)$v);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
+    };
+
+    $ins = $db->prepare(
+        'INSERT INTO project_expenses
+           (project_id, project_code, category, description, vendor, amount, currency,
+            status, incurred_date, paid_date, document_url, notes, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+
+    foreach ($rows as $i => $row) {
+        $desc   = trim((string)($row['description'] ?? ''));
+        $rawAmt = trim((string)($row['amount'] ?? ''));
+
+        // What counts as "typed in" excludes the fields that carry a default on
+        // every row — currency, status — or every blank row would be an error.
+        $typed = $desc . trim((string)($row['vendor'] ?? '')) . trim((string)($row['notes'] ?? ''))
+               . trim((string)($row['document_url'] ?? '')) . trim((string)($row['incurred_date'] ?? ''));
+
+        if ($rawAmt === '' && $typed === '') continue;          // an unused row
+
+        if ($desc === '') {
+            $out['errors'][] = sprintf('Row %d has no description, so it was not recorded — '
+                                     . 'a cost nobody can identify later is not a record.', $i + 1);
+            continue;
+        }
+        if ($rawAmt === '') {
+            $out['errors'][] = sprintf('Row %d ("%s") has no amount, so it was not recorded.',
+                                       $i + 1, $desc);
+            continue;
+        }
+
+        // Accept "1,200.00" and "$1200" — people paste from a receipt.
+        $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rawAmt));
+        if ($clean === '' || !is_numeric($clean)) {
+            $out['errors'][] = sprintf('Row %d ("%s"): "%s" is not an amount.', $i + 1, $desc, $rawAmt);
+            continue;
+        }
+        $amount = round((float)$clean, 2);
+        if ($amount <= 0) {
+            $out['errors'][] = sprintf('Row %d ("%s") must be for more than nothing.', $i + 1, $desc);
+            continue;
+        }
+
+        $cur = strtoupper(trim((string)($row['currency'] ?? 'USD')));
+        if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
+
+        $status = in_array($row['status'] ?? '', ['planned', 'committed', 'paid'], true)
+                ? $row['status'] : 'planned';
+        $paid = $asDate($row['paid_date'] ?? '');
+        // The same correction invoices apply: a state and its date must never
+        // contradict each other, because one of them is then a lie.
+        if ($status === 'paid' && $paid === null) $paid = date('Y-m-d');
+        if ($paid !== null && $status !== 'paid')  $status = 'paid';
+
+        $url = trim((string)($row['document_url'] ?? ''));
+        if ($url !== '') {
+            $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                $out['errors'][] = sprintf('Row %d ("%s"): a document link must start with '
+                                         . 'http:// or https://.', $i + 1, $desc);
+                continue;
+            }
+        }
+
+        try {
+            $ins->execute([
+                (int)$project['id'], $project['code'] ?? null,
+                trim((string)($row['category'] ?? '')) ?: 'Other',
+                $desc,
+                trim((string)($row['vendor'] ?? '')) ?: null,
+                $amount, $cur, $status,
+                $asDate($row['incurred_date'] ?? ''), $paid,
+                $url !== '' ? $url : null,
+                trim((string)($row['notes'] ?? '')) ?: null,
+                $who,
+            ]);
+            $out['added']++;
+        } catch (Throwable $e) {
+            $out['errors'][] = sprintf('Row %d ("%s") was not recorded: %s', $i + 1, $desc, $e->getMessage());
+        }
+    }
+    return $out;
+}
+
+/** Remove one expense. */
+function delete_expense(int $id): string {
+    if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    $db = finance_db();
+    if (!$db || !expenses_available()) throw new RuntimeException('The expenses table is not set up yet.');
+    $db->prepare('DELETE FROM project_expenses WHERE id = ?')->execute([$id]);
+    return 'Expense removed.';
+}
+
+/** Remove an invoice. */
 
 /**
  * What has actually been INVOICED, per position, keyed "crewId|stepId".

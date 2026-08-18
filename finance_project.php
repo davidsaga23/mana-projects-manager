@@ -31,6 +31,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['save_budget'])) {
             flash('ok', save_project_budget($projectId, $project, $_POST, $who));
+        } elseif (isset($_POST['save_expenses'])) {
+            $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            $r = save_expenses_bulk($rows, $project, $who);
+            if ($r['added']) {
+                flash('ok', sprintf('Recorded %d expense%s.', $r['added'], $r['added'] === 1 ? '' : 's'));
+            }
+            foreach ($r['errors'] as $e) flash('err', $e);
+            if (!$r['added'] && !$r['errors']) {
+                flash('warn', 'No row had anything in it, so nothing was recorded.');
+            }
+
+        } elseif (isset($_POST['delete_expense'])) {
+            flash('ok', delete_expense((int)$_POST['delete_expense']));
+
         } elseif (isset($_POST['save_invoices'])) {
             // The picker sends "crewId:stepId"; the map turns that back into the
             // four fields an invoice stores. Rebuilt here rather than trusted
@@ -108,7 +122,14 @@ foreach ($invoices as $iv) {
         if ($iv['due_date'] && $iv['due_date'] < $todayStr) $overdue++;
     }
 }
-$margin = ($budgetAmount !== null && $proj['total'] > 0) ? $budgetAmount - $proj['total'] : null;
+// Budget minus what the show ACTUALLY COSTS — labour plus everything else.
+//
+// This used to be budget minus $proj['total'], which is labour alone, and it was
+// read as headroom because that is what a figure called Margin means. On Return
+// to Club it showed 1,720.65 against a 35,000 budget while nothing non-labour
+// could be recorded at all. (2026-08-17.)
+$grandTotal = $proj['grand_total'] ?? $proj['total'];
+$margin = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grandTotal : null;
 
 // Invoices naming no position still count against the budget, but cannot appear
 // on a projection row. Reported rather than quietly dropped.
@@ -154,7 +175,13 @@ require __DIR__ . '/includes/header.php';
   <div><span class="muted small">Budget</span>
     <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong></div>
   <div><span class="muted small">Projected cost</span>
-    <strong><?= $proj['total'] > 0 ? e(fmt_money_plain($proj['total'], $proj['currency'])) : '—' ?></strong>
+    <strong><?= $grandTotal > 0 ? e(fmt_money_plain($grandTotal, $proj['currency'])) : '—' ?></strong>
+    <?php if (!empty($proj['other_total'])): ?>
+      <span class="muted small">
+        <?= e(number_format($proj['total'], 2)) ?> people
+        + <?= e(number_format($proj['other_total'], 2)) ?> other
+      </span>
+    <?php endif; ?>
     <?php if ($proj['unpriced_days'] > 0): ?>
       <span class="warn-text small"><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</span>
     <?php endif; ?></div>
@@ -286,7 +313,7 @@ require __DIR__ . '/includes/header.php';
     </tbody>
     <tfoot>
       <tr>
-        <th colspan="5">Total projected</th>
+        <th colspan="5">Total projected — people</th>
         <th class="num"><?= e(fmt_money_plain($proj['total'], $proj['currency'])) ?></th>
         <th></th><th></th>
         <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
@@ -330,6 +357,187 @@ require __DIR__ . '/includes/header.php';
     cannot appear on a row above, because spreading it across rows would put a figure into a
     subtotal that nobody agreed to. Edit those invoices to attach them, or leave them as they are.
   </p>
+<?php endif; ?>
+
+<h3>Other expenses <span class="muted">· <?= count($proj['other'] ?? []) ?></span></h3>
+
+<p class="muted small">
+  Costs with no lane behind them — software seats, render or cloud time, a music licence, stock,
+  equipment, travel. The projection above is computed from pipeline steps and can only ever contain
+  people; <strong>these are the rest of what a show spends</strong>, and they count toward the
+  Projected cost and Margin at the top of this page.
+  <br>
+  <strong>An invoice is a person billing you; an expense is everything that is not somebody's
+  time.</strong> Put a freelancer's bill in Invoices below and a vendor's in here, and the two can
+  never double-count the same money.
+</p>
+
+<?php if (expenses_need_upgrade()): ?>
+  <div class="flash flash-warn">
+    Other expenses need <code>finance_install_05.sql</code>, which hasn't been imported into the
+    finance database yet. Until it is, this section cannot record anything — and
+    <strong>Projected cost and Margin above are people only</strong>.
+  </div>
+<?php else: ?>
+
+  <?php if (!empty($proj['other'])): ?>
+    <div class="grid-scroll">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Description</th><th>Vendor</th><th class="num">Amount</th>
+          <th>Status</th><th>Incurred</th><th>Paid</th><th>Document</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      <?php foreach ($proj['by_category'] as $cat => $group): ?>
+        <tr class="phase-head">
+          <td colspan="8"><strong><?= e($cat) ?></strong>
+            <span class="muted small">
+              <?= count($group['rows']) ?> item<?= count($group['rows']) === 1 ? '' : 's' ?>
+            </span>
+          </td>
+        </tr>
+        <?php foreach ($group['rows'] as $ex): ?>
+          <tr>
+            <td><?= e($ex['description']) ?>
+              <?php if (!empty($ex['notes'])): ?>
+                <div class="muted small"><?= e($ex['notes']) ?></div>
+              <?php endif; ?>
+            </td>
+            <td class="muted small"><?= e($ex['vendor'] ?: '—') ?></td>
+            <td class="num"><?= e(number_format((float)$ex['amount'], 2)) ?>
+              <span class="muted small"><?= e($ex['currency']) ?></span></td>
+            <td class="small">
+              <span class="<?= $ex['status'] === 'paid' ? 'ok' : ($ex['status'] === 'planned' ? 'muted' : '') ?>">
+                <?= e($ex['status']) ?></span>
+            </td>
+            <td class="muted small"><?= e($ex['incurred_date'] ?: '—') ?></td>
+            <td class="muted small"><?= e($ex['paid_date'] ?: '—') ?></td>
+            <td class="small">
+              <?php if (!empty($ex['document_url'])): ?>
+                <a href="<?= e($ex['document_url']) ?>" target="_blank" rel="noopener">open →</a>
+              <?php else: ?><span class="muted">—</span><?php endif; ?>
+            </td>
+            <td class="row-actions">
+              <?php if (can_edit()): ?>
+                <form method="post" onsubmit="return confirm('Remove this expense?');">
+                  <button type="submit" name="delete_expense" value="<?= (int)$ex['id'] ?>"
+                          class="link-danger">remove</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <tr class="subtotal">
+          <td colspan="2"><?= e($cat) ?> subtotal</td>
+          <td class="num"><strong><?= e(number_format($group['amount'], 2)) ?></strong></td>
+          <td colspan="5" class="muted small">
+            <?= $group['paid'] > 0 ? e(number_format($group['paid'], 2)) . ' already paid' : '' ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">Total other expenses</th>
+          <th class="num"><?= e(fmt_money_plain($proj['other_total'], $proj['currency'])) ?></th>
+          <th colspan="5" class="muted small">
+            <?= $proj['other_paid'] > 0 ? e(number_format($proj['other_paid'], 2)) . ' paid so far' : '' ?>
+          </th>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+
+    <p class="summary-line">
+      <strong><?= e(number_format($proj['total'], 2)) ?></strong> people
+      + <strong><?= e(number_format($proj['other_total'], 2)) ?></strong> other
+      = <strong><?= e(fmt_money_plain($grandTotal, $proj['currency'])) ?></strong> projected
+      <?php if ($budgetAmount !== null): ?>
+        against a <?= e(fmt_money_plain($budgetAmount, $cur)) ?> budget
+      <?php endif; ?>
+    </p>
+  <?php else: ?>
+    <p class="muted">Nothing recorded yet. Anything the show pays for that is not somebody's day
+       rate belongs here.</p>
+  <?php endif; ?>
+
+  <?php if (can_edit()): ?>
+    <h4>Add expenses</h4>
+    <form method="post">
+      <input type="hidden" name="save_expenses" value="1">
+      <div class="grid-scroll">
+        <table class="grid-table" id="expenseGrid">
+          <thead>
+            <tr>
+              <th>Category</th><th>Description</th><th>Vendor</th><th>Amount</th>
+              <th>Currency</th><th>Status</th><th>Incurred</th><th>Paid on</th>
+              <th>Document link</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php for ($r = 0; $r < 5; $r++): $n = 'rows[' . $r . ']'; ?>
+              <tr>
+                <td><input name="<?= $n ?>[category]" list="expenseCategories" size="14"
+                           placeholder="e.g. Software"></td>
+                <td><input name="<?= $n ?>[description]" size="22" placeholder="What it is"></td>
+                <td><input name="<?= $n ?>[vendor]" size="14" placeholder="Who from"></td>
+                <td><input name="<?= $n ?>[amount]" inputmode="decimal" size="8" placeholder="1200"></td>
+                <td><input name="<?= $n ?>[currency]" maxlength="3" size="3"
+                           style="text-transform:uppercase" value="<?= e($cur) ?>"></td>
+                <td>
+                  <select name="<?= $n ?>[status]">
+                    <option value="planned">planned</option>
+                    <option value="committed">committed</option>
+                    <option value="paid">paid</option>
+                  </select>
+                </td>
+                <td><input type="date" name="<?= $n ?>[incurred_date]"></td>
+                <td><input type="date" name="<?= $n ?>[paid_date]"></td>
+                <td><input type="url" name="<?= $n ?>[document_url]" size="16"
+                           placeholder="https://drive.google.com/…"></td>
+                <td><input name="<?= $n ?>[notes]" size="18"></td>
+              </tr>
+            <?php endfor; ?>
+          </tbody>
+        </table>
+      </div>
+      <datalist id="expenseCategories">
+        <?php foreach (expense_categories() as $c): ?><option value="<?= e($c) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <div class="actions">
+        <button type="submit">Record expenses</button>
+        <button type="button" class="secondary" onclick="expenseAddRows()">Add 5 more rows</button>
+      </div>
+      <p class="muted small">
+        <strong>All three statuses count toward the projection</strong>, which is the point — a
+        projection is what the show will cost, not what it has cost so far. <em>Planned</em> is
+        budgeted, <em>committed</em> is ordered, <em>paid</em> is settled. Marking one paid without
+        a date fills in today. The category list grows as you use it and is shared across every
+        project, so the same words mean the same thing on the next show.
+      </p>
+    </form>
+
+    <script>
+    function expenseAddRows() {
+      var body = document.querySelector('#expenseGrid tbody');
+      if (!body) { return; }
+      for (var k = 0; k < 5; k++) {
+        var n = body.rows.length;
+        var copy = body.rows[n - 1].cloneNode(true);
+        var fields = copy.querySelectorAll('input, select');
+        for (var i = 0; i < fields.length; i++) {
+          var f = fields[i];
+          f.name = f.name.replace(/rows\[\d+\]/, 'rows[' + n + ']');
+          if (f.tagName === 'SELECT') { f.selectedIndex = 0; }
+          else if (!/\[currency\]$/.test(f.name)) { f.value = ''; }
+        }
+        body.appendChild(copy);
+      }
+    }
+    </script>
+  <?php endif; ?>
 <?php endif; ?>
 
 <h3>Invoices <span class="muted">· <?= count($invoices) ?></span></h3>

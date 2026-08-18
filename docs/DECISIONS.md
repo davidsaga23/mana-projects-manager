@@ -1269,6 +1269,42 @@ across five rows every pick would have written into the first row's name box. An
 now re-resolved SERVER-side from the picker's crewId:stepId value rather than trusted from three
 hidden inputs, so a name and an id can never disagree about which lane an invoice belongs to.
 
+## 2026-08-17 — Margin was budget minus LABOUR, and was being read as headroom
+**The bug behind the feature, and it is the part worth remembering.** David asked *"how can I
+currently add any other expenses that might not be tied to a specific pipeline step task?"* The
+honest answer was: you cannot. The expense projection is computed from pipeline steps, lanes and
+rates, so nothing without a lane could enter it — and **Margin was `budget − projected labour`**
+while being displayed under a word that means the money left over.
+
+On Return to Club that read **1,720.65 against a 35,000 budget** — 4.9% — with software, render
+time, licences, stock and travel all necessarily absent. Two or three ordinary non-labour lines
+would have erased it and nothing on the screen would have changed colour. That is the same class as
+the studio-calendar bug: not a wrong number, a number answering a narrower question than its label
+claims.
+
+**Decision:** `project_expenses` in the finance database (`finance_install_05.sql`) — one row per
+non-labour cost, with a free-text **category** as the grouping David asked for.
+**Consequence, and the four things that make it hold:**
+- **Folded into `expense_projection()`, not added on by each screen.** That function is the single
+  source the hub, the project page and the person page all read. A total assembled separately in
+  three places is three totals that disagree within a week — the same rule that keeps the projection
+  computed rather than stored.
+- **`total` still means LABOUR; `grand_total` is what a margin is drawn against.** The projection
+  table's footer sums the rows above it, and a footer larger than its own rows would be exactly the
+  quietly-wrong figure this file exists to prevent. Both the hub and the project page moved to
+  `grand_total` in the same change, or they would have contradicted each other.
+- **The line against `invoices` is stated on screen:** an invoice is a PERSON billing the show; an
+  expense is everything that is not somebody's time. Without saying that, the same render bill gets
+  entered as both, in different totals, and neither looks wrong.
+- **All three statuses — planned, committed, paid — count toward the projection**, because a
+  projection is what the show will cost and not what it has cost so far. `paid_date` is a date and
+  not a boolean, for the reason `invoices.paid_date` is: a boolean can never answer "when did that
+  go out".
+
+**The category vocabulary is global, not per project** — no `project_id` on the suggestion list,
+same as `step_library`. Which categories a studio actually spends against is worth comparing across
+shows, and a list rebuilt per project would make every new show start from nothing.
+
 ---
 
 ## Still open

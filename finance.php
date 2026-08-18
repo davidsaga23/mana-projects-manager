@@ -92,7 +92,10 @@ require __DIR__ . '/includes/header.php';
     $projError = null; $proj = null; $cost = 0.0;
     try {
         $proj = expense_projection($pdo, $pid);
-        $cost = $proj['total'];
+        // grand_total, not total: labour PLUS other expenses. The project page
+        // draws its margin against the same figure, and a hub that disagreed
+        // with the page it links to would be worse than no hub.
+        $cost = $proj['grand_total'] ?? $proj['total'];
     } catch (Throwable $e) {
         $projError = $e->getMessage();
     }
