@@ -132,6 +132,33 @@ label.inline input { width: auto; }
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .row label { flex: 1 1 150px; }
 .stack { max-width: 620px; }
+
+/* The budget form reads as ONE horizontal line: amount, currency, terms, notes,
+   save. Three things are needed for that and each fixes a real symptom.
+
+   `.stack` caps a form at 620px, which is right for a tall form and wrong for
+   four fields side by side — they wrapped. So this form does not use it.
+
+   There is no GLOBAL textarea width rule in this stylesheet: `input, select`
+   get `width: 100%` and textarea does not, because every other textarea here is
+   sized by its own form's class (.brief-form, .comment-form, .detail-form …).
+   Without a rule the notes box rendered at its default cols — a small square
+   sitting beside its label — which is what broke the line.
+
+   align-items: flex-end lines the inputs up with each other and with the
+   button, whose label has no text above it to push it down. */
+.money-form { max-width: none; }
+.money-form .row { align-items: flex-end; }
+/* Bottom-aligning is only true if nothing carries a bottom margin: the base
+   label rule adds 4px, which would leave the Save button sitting that much
+   lower than the inputs it lines up with. */
+.money-form .row label { margin-bottom: 0; }
+.money-form textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  font-family: inherit; font-size: 15px; height: 39px; resize: vertical;
+}
+.money-form .row-save { flex: 0 0 auto; }
+.money-form .row-save button { margin: 0; }
 .summary-line { background: #eef1f4; padding: 8px 12px; border-radius: 4px; }
 
 /* Flash messages — every save says what it did */

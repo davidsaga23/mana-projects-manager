@@ -178,24 +178,28 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <h3>Budget</h3>
-<form method="post" class="stack">
+<form method="post" class="money-form">
   <input type="hidden" name="save_budget" value="1">
   <div class="row">
     <label>Agreed amount
       <input name="budget_amount" inputmode="decimal" placeholder="e.g. 85000"
              value="<?= e($budgetAmount !== null ? fmt_num($budgetAmount, 2) : '') ?>">
     </label>
-    <label>Currency
+    <label style="flex:0 1 90px;">Currency
       <input name="currency" maxlength="3" style="text-transform:uppercase" value="<?= e($cur) ?>">
     </label>
     <label>Terms
       <input name="terms" placeholder="e.g. fixed fee, 50% on start" value="<?= e($budget['terms'] ?? '') ?>">
     </label>
+    <?php // Still a textarea, not an input: notes here can run to a paragraph
+          // about how a deal is structured, and switching to a single-line field
+          // would flatten any newlines already saved the next time somebody
+          // pressed Save. It is sized to match the inputs and drags taller. ?>
+    <label style="flex:2 1 220px;">Notes
+      <textarea name="notes" rows="1"><?= e($budget['notes'] ?? '') ?></textarea>
+    </label>
+    <div class="row-save"><button type="submit">Save budget</button></div>
   </div>
-  <label>Notes
-    <textarea name="notes" rows="2"><?= e($budget['notes'] ?? '') ?></textarea>
-  </label>
-  <div class="actions"><button type="submit">Save budget</button></div>
 </form>
 <?php if ($budget && !empty($budget['updated_at'])): ?>
   <p class="muted small">Last changed <?= e(substr((string)$budget['updated_at'], 0, 16)) ?><?php
