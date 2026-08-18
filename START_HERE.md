@@ -15,9 +15,11 @@ without re-deriving context.
   table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
   thing left is the **client loop**, which was never on that list.
 - **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
-  run to **024**. Applied as of 17 August: up to **023** confirmed by David; **024 (hiring) is
-  new and pending** — it must be run before the Hiring tab does anything but report that it
-  cannot.
+  run to **025**. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
+  Return to Club. **025 (the freelancer fields) is new and pending**: without it the entry grid
+  offers names, emails, phones, portfolios, sources and notes, but not location, position,
+  seniority, project type, worked-with-us or rating — and it says so on screen rather than
+  silently dropping them.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql` and **`finance_install_04.sql`**, imported
   by hand via phpMyAdmin, never through `migrate.php` (that runner only touches the production
@@ -183,6 +185,19 @@ Hard-won, all from real incidents:
    detects this** — it reports every duplicated function name across the codebase, which is
    the closest thing to a linter available without a PHP binary. Run it before handing over.
    (Phase 9 build, 2026-08-15.)
+15. **A checker that is wrong about the language is worse than no checker.**
+   `tools/check_php_blocks.py` reported a healthy file as broken, because it treated a `//`
+   comment as running to the end of the line. PHP does not: it acts on `?>` even inside a
+   comment — that is lesson 9 — ending PHP mode there and reading the rest as HTML. So
+   `<?php // ---- a note ---- ?>` followed by markup left the checker in PHP mode, where an
+   apostrophe in ordinary prose opened a string and swallowed eighty lines, `endif` included.
+   Every earlier use of that comment form in this codebase happens to be followed by more PHP,
+   which is why it had never shown. **Fixed in the tool rather than avoided in the code:** a
+   false alarm on the only gate this project has teaches people to ignore the one thing that
+   catches real parse errors, and the same blind spot could equally have hidden a genuine
+   mismatch. All 74 files still pass after the fix, so it removed a false positive without
+   adding a false negative. (2026-08-17.)
+
 14. **A mismatched quote is a PARSE error, so it takes down every page that requires the file.**
    `"UPDATE … WHERE id = ?'` opened with a double quote and closed with a single one.
    `includes/finance.php` stopped compiling, and Finance, the project page and the person page
@@ -405,6 +420,17 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    - **`set_contract_state()` is a separate writer from `save_crew_terms()`** on purpose: the full
      one writes the whole row, so chasing a signature through it would have stored a missing rate
      as NULL and silently unpriced somebody.
+   - **The entry screen is a GRID, plus a paste box** (migration 025, added 2026-08-17 after
+     David asked for it). Several candidates at once, in the column order of
+     `Mana_Freelancer_DataBase.xlsx`, so rows copied out of that sheet paste straight in. The
+     sheet's **Password** and **Rate** columns are read and deliberately discarded — naming them
+     is what keeps every later column from shifting one to the left — and the screen reports
+     both rather than dropping them quietly. Rates belong in the finance database; a plain-text
+     password column does not belong anywhere.
+   - **⚠ The freelancer fields are on `hires`, which is one row per candidate PER SLOT.** David's
+     call, with the alternative (a studio-wide `freelancers` table) offered and declined. The cost
+     is duplication when the same person is approached for several slots — see the 2026-08-17
+     entry in `docs/DECISIONS.md` for what the escape route looks like if it starts to bite.
    - **Engagement dates are recorded and the scheduler ignores them.** `crew_projects.start_date`
      / `end_date`, on the person card as David asked. Deferring the scheduling half is deliberate —
      it belongs with `crew_absences` — but the gap is **reported**, not hidden: the person page

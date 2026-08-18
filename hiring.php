@@ -50,6 +50,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             [, $said] = save_hire($pdo, $projectId, $_POST, $who);
             flash('ok', $said);
 
+        } elseif ($action === 'save_grid' || $action === 'paste') {
+            if ($action === 'paste') {
+                $parsed = parse_hire_paste((string)($_POST['paste'] ?? ''));
+                $rows   = $parsed['rows'];
+                // A pasted block carries no slot or stage of its own, so the
+                // two chosen above the box apply to every row in it.
+                foreach ($rows as $i => $r) {
+                    $rows[$i]['lane_id'] = $_POST['paste_lane_id'] ?? '';
+                    $rows[$i]['stage']   = $_POST['paste_stage'] ?? 'lead';
+                }
+                if ($parsed['header']) {
+                    flash('warn', 'The first line looked like the spreadsheet\'s header row, so it '
+                                . 'was skipped rather than becoming a candidate called "Artist".');
+                }
+                if ($parsed['skipped']) {
+                    flash('warn', $parsed['skipped'] . ' line(s) had no name in the first column '
+                                . 'and were skipped.');
+                }
+                // Reported rather than dropped in silence. Both are real columns
+                // in the sheet and neither belongs in this database.
+                if ($parsed['passwords']) {
+                    flash('warn', $parsed['passwords'] . ' row(s) carried a reel password. It was '
+                                . 'NOT stored — a plain-text password column is not something this '
+                                . 'database should have. Put it in the notes beside the link if it '
+                                . 'is needed to open the reel.');
+                }
+                if ($parsed['rates']) {
+                    flash('warn', 'A rate came across for ' . implode(', ', array_slice($parsed['rates'], 0, 6))
+                                . (count($parsed['rates']) > 6 ? ' and others' : '')
+                                . '. Rates are not stored here — they live in the finance database. '
+                                . 'Open the candidate and use "Save quote" to record one.');
+                }
+            } else {
+                $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            }
+
+            $r = save_hires_bulk($pdo, $projectId, $rows, $who);
+            if ($r['added']) {
+                flash('ok', sprintf('Added %d candidate%s%s.', $r['added'],
+                      $r['added'] === 1 ? '' : 's',
+                      $r['hired'] ? ', ' . $r['hired'] . ' of them hired straight in' : ''));
+            }
+            foreach ($r['notes'] as $n)  flash('ok', $n);
+            foreach ($r['errors'] as $e) flash('err', $e);
+            if (!$r['added'] && !$r['errors']) {
+                flash('warn', 'Nothing had a name in it, so nothing was added.');
+            }
+
         } elseif (preg_match('/^stage:(\d+)$/', $action, $m)) {
             flash('ok', set_hire_stage($pdo, $projectId, (int)$m[1],
                         (string)($_POST['stage'] ?? ''), (string)($_POST['note'] ?? ''), $who));
@@ -174,59 +222,160 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php endif; ?>
 
-  <?php // ---- add somebody ------------------------------------------------ ?>
-  <?php if (can_edit()): ?>
+  <?php // ---- add several at once ----------------------------------------- ?>
+  <?php if (can_edit()):
+    $sugg = hire_suggestions($pdo, $projectId);
+    $extras = hire_extras_available($pdo);
+    // Only the unfilled slots are offered: putting a candidate forward for a
+    // job somebody already holds is not a thing anyone means to do.
+    $openSlots = array_filter($lanes, function ($l) { return (int)$l['is_placeholder'] === 1; });
+  ?>
+    <?php if (!$extras): ?>
+      <div class="flash flash-warn">
+        The freelancer fields — location, position, seniority, project type, worked-with-us,
+        rating — need migration <strong>025</strong>, which hasn't been applied yet.
+        <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?>
+        Names, emails, portfolios and notes work without it.
+      </div>
+    <?php endif; ?>
+
     <details class="inline-actions" <?= $summary['open'] === 0 ? 'open' : '' ?>>
-      <summary>Add a candidate</summary>
-      <form method="post" class="stack">
-        <input type="hidden" name="action" value="save_hire">
-        <div class="row">
-          <label>Name <input name="candidate_name" required placeholder="Who they are"></label>
-          <label>For which slot
-            <select name="lane_id">
-              <option value="">— not tied to a slot yet —</option>
-              <?php foreach ($lanes as $l): if ((int)$l['is_placeholder'] !== 1) continue; ?>
-                <option value="<?= (int)$l['id'] ?>">
-                  <?= e($l['step_name']) ?> · <?= e($l['name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </label>
-          <label>Stage
-            <select name="stage">
-              <?php foreach (HIRE_STAGES as $k => $lbl): if (in_array($k, HIRE_STAGES_CLOSED, true)) continue; ?>
-                <option value="<?= e($k) ?>"><?= e($lbl) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </label>
+      <summary>Add candidates</summary>
+
+      <p class="muted small">
+        One row per person, in the same column order as <code>Mana_Freelancer_DataBase.xlsx</code>.
+        Fill in as many rows as you like and save them together — only the <strong>name</strong> is
+        required, and empty rows are ignored rather than complained about.
+      </p>
+
+      <form method="post">
+        <input type="hidden" name="action" value="save_grid">
+        <div class="grid-scroll">
+          <table class="grid-table" id="hireGrid">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <?php if ($extras): ?>
+                  <th>Location</th><th>Position</th><th>Seniority</th><th>Project type</th>
+                <?php endif; ?>
+                <th>Email</th><th>Phone</th><th>Portfolio / reel</th>
+                <?php if ($extras): ?><th>Worked<br>with us</th><th>Rating</th><?php endif; ?>
+                <th>Where from</th><th>Notes</th><th>For which slot</th><th>Stage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php for ($r = 0; $r < 6; $r++): $n = 'rows[' . $r . ']'; ?>
+                <tr>
+                  <td><input name="<?= $n ?>[candidate_name]" placeholder="Who they are" size="18"></td>
+                  <?php if ($extras): ?>
+                    <td><input name="<?= $n ?>[location]" list="hireLocations" size="10"></td>
+                    <td><input name="<?= $n ?>[position]" list="hirePositions" size="14"></td>
+                    <td><input name="<?= $n ?>[seniority]" list="hireSeniority" size="7"></td>
+                    <td><input name="<?= $n ?>[project_type]" list="hireProjectTypes" size="6"></td>
+                  <?php endif; ?>
+                  <td><input name="<?= $n ?>[email]" type="email" size="18"></td>
+                  <td><input name="<?= $n ?>[phone]" size="11"></td>
+                  <td><input name="<?= $n ?>[portfolio_url]" type="url" size="18" placeholder="https://…"></td>
+                  <?php if ($extras): ?>
+                    <td class="num"><input name="<?= $n ?>[worked_with_us]" type="checkbox" value="1"></td>
+                    <td><input name="<?= $n ?>[rating]" type="number" min="1" max="5" size="2" style="width:4em"></td>
+                  <?php endif; ?>
+                  <td><input name="<?= $n ?>[source]" list="hireSources" size="10"></td>
+                  <td><input name="<?= $n ?>[notes]" size="20"></td>
+                  <td>
+                    <select name="<?= $n ?>[lane_id]">
+                      <option value="">— none —</option>
+                      <?php foreach ($openSlots as $l): ?>
+                        <option value="<?= (int)$l['id'] ?>"><?= e($l['step_name'] . ' · ' . $l['name']) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </td>
+                  <td>
+                    <select name="<?= $n ?>[stage]">
+                      <?php foreach (HIRE_STAGES as $k => $lbl): ?>
+                        <option value="<?= e($k) ?>" <?= $k === 'lead' ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </td>
+                </tr>
+              <?php endfor; ?>
+            </tbody>
+          </table>
         </div>
-        <div class="row">
-          <label>Email <input type="email" name="email" placeholder="Optional"></label>
-          <label>Phone <input name="phone" placeholder="Optional"></label>
-          <label>Where they came from
-            <input name="source" list="hireSources" placeholder="e.g. referral, agency, reel">
-            <datalist id="hireSources">
-              <?php
-              // Built from what has actually been typed on this project, the same
-              // way asset types and departments build their suggestions.
-              $seen = [];
-              foreach ($byLane as $rows) foreach ($rows as $h) {
-                  if (!empty($h['source'])) $seen[$h['source']] = true;
-              }
-              foreach (array_keys($seen) as $s): ?>
-                <option value="<?= e($s) ?>"></option>
-              <?php endforeach; ?>
-            </datalist>
-          </label>
+
+        <div class="actions">
+          <button type="submit">Save all</button>
+          <button type="button" class="secondary" onclick="hireAddRows()">Add 5 more rows</button>
         </div>
-        <label>Portfolio or reel <input type="url" name="portfolio_url" placeholder="https://…"></label>
-        <label>Notes <textarea name="notes" rows="2" placeholder="What was said, what they are asking for"></textarea></label>
-        <div class="actions"><button type="submit">Add candidate</button></div>
+        <p class="muted small">
+          Choosing <strong>Hired</strong> does the real thing, not just a label: it names the slot
+          with that person, so everything already planned for the slot becomes theirs. Pick it when
+          somebody was taken on before they were ever entered here. If the slot is already filled the
+          row is still saved and the reason is reported.
+        </p>
       </form>
+
+      <?php // ---- paste straight from the spreadsheet ---------------------- ?>
+      <details>
+        <summary>Or paste rows from the freelancer spreadsheet</summary>
+        <form method="post" class="stack">
+          <input type="hidden" name="action" value="paste">
+          <p class="muted small">
+            Select rows in Excel, copy, and paste them here. The columns are read in the sheet's own
+            order — <em>Artist · Location · Position · Seniority · Project type · Email ·
+            Demo/portfolio · Password · Worked with us? · Notes · Rate · Rating</em> — so a whole-row
+            paste lines up without deleting anything first. A header row is spotted and skipped.
+          </p>
+          <p class="muted small">
+            Two of those columns are read and then deliberately <strong>not stored</strong>, and the
+            page will say so when it meets them: the <strong>password</strong>, which should not sit
+            in plain text in a shared database, and the <strong>rate</strong>, which belongs in the
+            finance database and is set per candidate.
+          </p>
+          <textarea name="paste" rows="7"
+                    placeholder="Hannry Pschera&#9;Brazil&#9;3D animator&#9;Lead&#9;3D&#9;hannry7@gmail.com&#9;https://…&#9;&#9;1&#9;"></textarea>
+          <div class="row">
+            <label>Put them all forward for
+              <select name="paste_lane_id">
+                <option value="">— no slot, just add them —</option>
+                <?php foreach ($openSlots as $l): ?>
+                  <option value="<?= (int)$l['id'] ?>"><?= e($l['step_name'] . ' · ' . $l['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>All at stage
+              <select name="paste_stage">
+                <?php foreach (HIRE_STAGES as $k => $lbl): ?>
+                  <option value="<?= e($k) ?>" <?= $k === 'lead' ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+          </div>
+          <div class="actions"><button type="submit">Add pasted rows</button></div>
+        </form>
+      </details>
+
+      <datalist id="hirePositions">
+        <?php foreach ($sugg['position'] as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <datalist id="hireLocations">
+        <?php foreach ($sugg['location'] as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <datalist id="hireSources">
+        <?php foreach ($sugg['source'] as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <datalist id="hireSeniority">
+        <?php foreach (HIRE_SENIORITY as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <datalist id="hireProjectTypes">
+        <?php foreach (HIRE_PROJECT_TYPES as $v): ?><option value="<?= e($v) ?>"></option><?php endforeach; ?>
+      </datalist>
+
       <?php if (can_see_money()): ?>
         <p class="muted small">
-          What they quoted is recorded separately, on the candidate once they exist — it lives in
-          the finance database and only administrators ever see it.
+          What somebody quoted is recorded on the candidate once they exist, through
+          <strong>Update → Save quote</strong>. It lives in the finance database and only
+          administrators ever see it.
         </p>
       <?php endif; ?>
     </details>
@@ -495,6 +644,29 @@ require __DIR__ . '/includes/header.php';
   </p>
 
 <?php endif; ?>
+
+<script>
+// Clones the last grid row five times, renumbering rows[N] as it goes. Inline
+// rather than a file in assets/ because inline script needs no cache-busting,
+// and a stale cached copy of a fix is a whole debugging round lost (lesson 2).
+function hireAddRows() {
+  var body = document.querySelector('#hireGrid tbody');
+  if (!body) return;
+  for (var k = 0; k < 5; k++) {
+    var n = body.rows.length;
+    var copy = body.rows[n - 1].cloneNode(true);
+    var fields = copy.querySelectorAll('input, select, textarea');
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      f.name = f.name.replace(/rows\[\d+\]/, 'rows[' + n + ']');
+      if (f.type === 'checkbox') { f.checked = false; }
+      else if (f.tagName !== 'SELECT') { f.value = ''; }
+      else { f.selectedIndex = 0; }
+    }
+    body.appendChild(copy);
+  }
+}
+</script>
 
 </div>
 </body></html>

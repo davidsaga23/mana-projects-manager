@@ -65,7 +65,20 @@ def php_code_only(text):
             hide(text[i]); hide(text[i + 1])
             i += 2
         elif text.startswith('//', i) or text[i] == '#':
+            # PHP acts on '?>' even inside a // or # comment: it ends PHP mode
+            # right there and the rest of the line is HTML. That is lesson 9 in
+            # START_HERE, and not modelling it made this checker itself wrong —
+            # the HTML after a `<?php // note ?>` line was read as PHP, an
+            # apostrophe in ordinary prose opened a string, and eighty lines of
+            # a healthy file vanished along with the endif in the middle of
+            # them. A false alarm on the only gate this project has is worse
+            # than no gate, because it teaches people to ignore it.
             while i < n and text[i] != '\n':
+                if text.startswith('?>', i):
+                    in_php = False
+                    hide(text[i]); hide(text[i + 1])
+                    i += 2
+                    break
                 hide(text[i]); i += 1
         elif text.startswith('/*', i):
             j = text.find('*/', i + 2)

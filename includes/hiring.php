@@ -79,6 +79,46 @@ const HIRE_STAGE_COLORS = [
     'passed'     => '#6b7280',
 ];
 
+/**
+ * The four seniorities in Mana's freelancer sheet, offered as suggestions.
+ *
+ * Suggestions, never a constraint — the column is VARCHAR. Studios differ past
+ * these four and a fixed list in code is what forced a schema change on STFC
+ * when Props arrived (2026-08-11).
+ */
+const HIRE_SENIORITY = ['Junior', 'Mid', 'Senior', 'Lead'];
+
+/** What a person works in, as the sheet says it. Note "2D/3D", not "Mixed". */
+const HIRE_PROJECT_TYPES = ['2D', '3D', '2D/3D'];
+
+/**
+ * Mana_Freelancer_DataBase.xlsx, COLUMN FOR COLUMN, including the two that are
+ * not stored.
+ *
+ * ⚠ THE UNDERSCORED ENTRIES ARE WHY THIS LIST LOOKS ODD, AND THEY MATTER MORE
+ * THAN THE REST. Somebody pasting from that sheet selects whole rows, so what
+ * arrives includes Password at position 8 and Rate at position 11. Leaving them
+ * out of this list would not skip them — it would shift Worked-with-us, Notes
+ * and everything after them one column to the LEFT, silently, storing a
+ * password as somebody's availability. Naming them and discarding them is what
+ * keeps a straight paste aligned.
+ *
+ * `_password` is never stored (migration 025's header says why) and `_rate` is
+ * money, which does not live in this database. Both are REPORTED when a paste
+ * contains them, rather than vanishing.
+ */
+const HIRE_SHEET_COLUMNS = [
+    'candidate_name', 'location', 'position', 'seniority', 'project_type',
+    'email', 'portfolio_url', '_password', 'worked_with_us', 'notes',
+    '_rate', 'rating',
+];
+
+/** The columns the entry grid offers, in the order the sheet reads. */
+const HIRE_GRID_COLUMNS = [
+    'candidate_name', 'location', 'position', 'seniority', 'project_type',
+    'email', 'phone', 'portfolio_url', 'worked_with_us', 'rating', 'source', 'notes',
+];
+
 function hire_stage_label(?string $stage): string {
     return HIRE_STAGES[$stage ?? ''] ?? ($stage ?: 'Unknown');
 }
@@ -90,6 +130,55 @@ function hire_stage_color(?string $stage): string {
 /** Has migration 024 been applied? Every screen checks before offering the feature. */
 function hiring_available(PDO $pdo): bool {
     return column_exists($pdo, 'hires', 'stage');
+}
+
+/** Are the freelancer-database columns there? Migration 025, checked separately. */
+function hire_extras_available(PDO $pdo): bool {
+    return column_exists($pdo, 'hires', 'position');
+}
+
+/**
+ * The freelancer fields, cleaned, keyed by COLUMN NAME so a caller can splice
+ * them straight into an INSERT or an UPDATE without restating the order.
+ */
+function hire_extra_values(array $in): array {
+    $rating = trim((string)($in['rating'] ?? ''));
+    return [
+        'location'     => trim((string)($in['location'] ?? '')) ?: null,
+        'position'     => trim((string)($in['position'] ?? '')) ?: null,
+        'seniority'    => trim((string)($in['seniority'] ?? '')) ?: null,
+        'project_type' => trim((string)($in['project_type'] ?? '')) ?: null,
+        // A checkbox that is absent from the POST means unticked, not unknown.
+        'worked_with_us' => !empty($in['worked_with_us']) ? 1 : 0,
+        // Clamped rather than rejected: a 7 typed into a 1-5 field is a slip,
+        // and losing the whole row over it would be worse than storing a 5.
+        'rating' => ($rating !== '' && is_numeric($rating))
+                      ? max(1, min(5, (int)round((float)$rating))) : null,
+    ];
+}
+
+/**
+ * What has already been typed on this project, for the datalists.
+ *
+ * Built from the data exactly as asset types and departments are — a studio's
+ * real vocabulary made visible, rather than a list somebody has to maintain.
+ */
+function hire_suggestions(PDO $pdo, int $projectId): array {
+    $out = ['position' => [], 'location' => [], 'source' => [], 'seniority' => HIRE_SENIORITY];
+    if (!hiring_available($pdo)) return $out;
+
+    $cols = ['source'];
+    if (hire_extras_available($pdo)) { $cols[] = 'position'; $cols[] = 'location'; }
+    foreach ($cols as $c) {
+        // The column name is from this literal list, never from input.
+        $q = $pdo->prepare(
+            "SELECT DISTINCT `{$c}` AS v FROM hires
+              WHERE project_id = ? AND `{$c}` IS NOT NULL AND `{$c}` <> '' ORDER BY v"
+        );
+        $q->execute([$projectId]);
+        $out[$c] = $q->fetchAll(PDO::FETCH_COLUMN);
+    }
+    return $out;
 }
 
 /** Are the engagement date columns there? Same migration, checked separately. */
@@ -272,14 +361,30 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
     $stage = in_array($in['stage'] ?? '', array_keys(HIRE_STAGES), true) ? $in['stage'] : 'lead';
     $id    = (int)($in['hire_id'] ?? 0);
 
-    $fields = [
-        $laneId, $stepId, $stepName, $name,
-        $email !== '' ? $email : null,
-        trim((string)($in['phone'] ?? '')) ?: null,
-        $portfolio,
-        trim((string)($in['source'] ?? '')) ?: null,
-        trim((string)($in['notes'] ?? '')) ?: null,
+    // Built as name => value rather than as two parallel lists, so the extra
+    // freelancer columns can be spliced in without anybody having to keep a
+    // column order and a placeholder count in step. Getting those two out of
+    // step is silent and stores every field one position to the left.
+    $set = [
+        'lane_id'        => $laneId,
+        'step_id'        => $stepId,
+        'step_name'      => $stepName,
+        'candidate_name' => $name,
+        'email'          => $email !== '' ? $email : null,
+        'phone'          => trim((string)($in['phone'] ?? '')) ?: null,
+        'portfolio_url'  => $portfolio,
+        'source'         => trim((string)($in['source'] ?? '')) ?: null,
+        'notes'          => trim((string)($in['notes'] ?? '')) ?: null,
     ];
+    // Only when migration 025 has run. Until then the screen does not offer the
+    // fields and this quietly stores the nine it has, rather than fataling on a
+    // column that is not there.
+    if (hire_extras_available($pdo)) {
+        $set = array_merge($set, hire_extra_values($in));
+    }
+
+    $cols = array_keys($set);
+    $vals = array_values($set);
 
     if ($id > 0) {
         $existing = get_hire($pdo, $id);
@@ -289,20 +394,16 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
         // The stage is NOT written here. It moves through set_hire_stage(), which
         // is the only thing that writes the log — a second path that changed a
         // stage without logging it would make the history quietly incomplete.
-        $pdo->prepare(
-            'UPDATE hires SET lane_id = ?, step_id = ?, step_name = ?, candidate_name = ?,
-                    email = ?, phone = ?, portfolio_url = ?, source = ?, notes = ?
-              WHERE id = ?'
-        )->execute(array_merge($fields, [$id]));
+        $assign = implode(', ', array_map(function ($c) { return $c . ' = ?'; }, $cols));
+        $pdo->prepare("UPDATE hires SET {$assign} WHERE id = ?")
+            ->execute(array_merge($vals, [$id]));
         return [$id, 'Saved "' . $name . '".'];
     }
 
     $pdo->prepare(
-        'INSERT INTO hires (project_id, lane_id, step_id, step_name, candidate_name,
-                            email, phone, portfolio_url, source, notes,
-                            stage, stage_changed_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)'
-    )->execute(array_merge([$projectId], $fields, [$stage, $who]));
+        'INSERT INTO hires (project_id, ' . implode(', ', $cols) . ', stage, stage_changed_at, created_by)
+         VALUES (?, ' . implode(', ', array_fill(0, count($cols), '?')) . ', ?, NOW(), ?)'
+    )->execute(array_merge([$projectId], $vals, [$stage, $who]));
     $id = (int)$pdo->lastInsertId();
 
     log_hire_stage($pdo, $id, $name, null, $stage, 'Added', $who);
@@ -334,11 +435,16 @@ function set_hire_stage(PDO $pdo, int $projectId, int $hireId, string $stage,
     if (!array_key_exists($stage, HIRE_STAGES)) {
         throw new RuntimeException('"' . $stage . '" is not a hiring stage.');
     }
+    // "Hired" is offered in the stage list, because somebody is often entered
+    // into the platform AFTER they were taken on — David, 2026-08-17. But it
+    // does not merely relabel the record: it runs the real hire, so the slot
+    // gets their name and the work planned for it becomes theirs. A record
+    // reading "hired" beside a slot still showing a placeholder would be the
+    // worst of both, and nothing on either screen would explain the mismatch.
     if ($stage === 'hired') {
-        throw new RuntimeException(
-            'Marking somebody hired also names the slot they fill, so it goes through the '
-            . 'Hire button rather than the stage list.'
-        );
+        return implode(' ', hire_candidate($pdo, $projectId, $hireId, [
+            'note' => $note,
+        ], $who));
     }
 
     $hire = get_hire($pdo, $hireId);
@@ -612,4 +718,132 @@ function project_engagements(PDO $pdo, int $projectId): array {
     );
     $stmt->execute([$projectId]);
     return $stmt->fetchAll();
+}
+
+/* -------------------------------------------------------------------------
+ * Adding several at once — the grid and the spreadsheet paste
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Read one pasted line into the fields of a hiring record.
+ *
+ * TABS ARE SPLIT ONE AT A TIME, NOT COLLAPSED. The wizard's paste helpers use
+ * `/[,;\t]+/`, which is right for two or three fields and wrong here: Excel
+ * emits an empty cell as two adjacent tabs, and the `+` would swallow the pair
+ * and shift every later column left. A twelve-column paste in which Location
+ * happens to be blank would then store the position as the location, quietly.
+ *
+ * A line with no tab in it is treated as hand-typed and split on commas —
+ * again singly, for the same reason.
+ *
+ * @return array|null  field => value, or null for a line with no name in it
+ */
+function parse_hire_paste_line(string $line): ?array {
+    $line = rtrim($line, "\r\n");
+    if (trim($line) === '') return null;
+
+    $parts = strpos($line, "\t") !== false
+        ? preg_split('/\t/', $line)
+        : preg_split('/[,;]/', $line);
+
+    $row = [];
+    foreach (HIRE_SHEET_COLUMNS as $i => $col) {
+        $row[$col] = trim((string)($parts[$i] ?? ''));
+    }
+    if ($row['candidate_name'] === '') return null;
+
+    // The sheet uses 1 and 0, but anybody retyping it writes yes. Anything
+    // unrecognised, blank included, reads as no.
+    $w = mb_strtolower($row['worked_with_us']);
+    $row['worked_with_us'] = in_array($w, ['1', 'y', 'yes', 'true'], true) ? 1 : 0;
+
+    return $row;
+}
+
+/**
+ * Turn a pasted block into rows, reporting what it decided rather than deciding
+ * quietly.
+ *
+ * @return array ['rows' => array, 'skipped' => int, 'header' => bool,
+ *                'passwords' => int, 'rates' => array]
+ */
+function parse_hire_paste(string $text): array {
+    $out = ['rows' => [], 'skipped' => 0, 'header' => false, 'passwords' => 0, 'rates' => []];
+
+    foreach (preg_split('/\R/', $text) as $n => $line) {
+        // Pasting the header row along with the data is the obvious mistake,
+        // and it would otherwise create a candidate called "Artist".
+        if ($n === 0 && preg_match('/^\s*artist\b/i', $line)) {
+            $out['header'] = true;
+            continue;
+        }
+        $row = parse_hire_paste_line($line);
+        if ($row === null) {
+            if (trim($line) !== '') $out['skipped']++;
+            continue;
+        }
+        if ($row['_password'] !== '') $out['passwords']++;
+        if ($row['_rate'] !== '') {
+            $out['rates'][] = $row['candidate_name'] . ' (' . $row['_rate'] . ')';
+        }
+        unset($row['_password'], $row['_rate']);
+        $out['rows'][] = $row;
+    }
+    return $out;
+}
+
+/**
+ * Save many candidates in one go, from the grid or from a paste.
+ *
+ * One row failing never stops the rest — a batch of twelve whose fourth has a
+ * malformed email should land eleven and say which one it could not, rather
+ * than refusing the lot. That is the rule the Plaky importer follows, and the
+ * one the Finance hub learned after a single project's projection took the
+ * whole page down.
+ *
+ * Rows whose stage is `hired` go through the real hire, so the slot they name
+ * gets their name and its planned work becomes theirs. If that part fails —
+ * the slot is already taken — the RECORD is still kept, at the stage before
+ * hired, and the reason is reported. Losing a typed row over it would be worse.
+ *
+ * @param array $rows  each a field => value map
+ * @return array ['added' => int, 'hired' => int, 'errors' => array, 'notes' => array]
+ */
+function save_hires_bulk(PDO $pdo, int $projectId, array $rows, string $who = ''): array {
+    $out = ['added' => 0, 'hired' => 0, 'errors' => [], 'notes' => []];
+
+    foreach ($rows as $i => $row) {
+        $name = trim((string)($row['candidate_name'] ?? ''));
+        if ($name === '') continue;          // a blank line in the grid is not an error
+
+        $stage = in_array($row['stage'] ?? '', array_keys(HIRE_STAGES), true)
+               ? $row['stage'] : 'lead';
+
+        try {
+            // Created at a non-final stage first and hired as a second step, so
+            // that a failed hire leaves an honest record rather than one
+            // claiming somebody is on the show when they are not.
+            $row['stage'] = $stage === 'hired' ? 'offer_out' : $stage;
+            list($hireId, ) = save_hire($pdo, $projectId, $row, $who);
+            $out['added']++;
+
+            if ($stage === 'hired') {
+                try {
+                    foreach (hire_candidate($pdo, $projectId, $hireId, $row, $who) as $said) {
+                        $out['notes'][] = $said;
+                    }
+                    $out['hired']++;
+                } catch (Throwable $e) {
+                    $out['errors'][] = sprintf(
+                        '"%s" was saved, but could not be hired into that slot: %s',
+                        $name, $e->getMessage()
+                    );
+                }
+            }
+        } catch (Throwable $e) {
+            $out['errors'][] = sprintf('Row %d ("%s") was not saved: %s',
+                                       $i + 1, $name, $e->getMessage());
+        }
+    }
+    return $out;
 }

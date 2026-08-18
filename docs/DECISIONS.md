@@ -1132,6 +1132,72 @@ something about it turns out to be wrong. The parts that *are* borrowed are borr
 codebase rather than that one: dry-run-then-save, POST-redirect-GET with flash messages, a
 vocabulary that reports what it could not do, and one writer per kind of write.
 
+## 2026-08-17 (later) — The freelancer fields go on `hires`, and what that costs
+**Decision, David's call with the alternative on the table.** `Mana_Freelancer_DataBase.xlsx` —
+377 people and 12 studios — is to merge into the platform eventually, so a candidate row now
+carries the sheet's columns: location, position, seniority, project type, worked-with-us, rating
+(migration 025).
+**The alternative that was offered and declined:** a studio-wide `freelancers` table with `hires`
+pointing into it — one row per human, which is the shape the sheet already has and the shape `crew`
+was given in 2026-08-11 for the identical reason ("crew is global, membership is per project").
+**What was chosen costs this, stated plainly rather than discovered later:** `hires` is one row per
+candidate PER SLOT. Approaching the same animator for three slots stores their country, seniority
+and portfolio three times, and fixing a typo fixes one of the three. When the sheet is merged in,
+those 377 people arrive as candidate rows rather than as a pool that exists whether or not a show
+currently needs anybody.
+**Why it is recorded and not argued with:** it is his studio's data and his risk, the same standing
+as the 2026-08-15 money reversal. **And it is not a trap:** the escape is a `freelancers` table plus
+a pass that collapses matching rows into it. That is more work than doing it now and it is not a
+migration of live production data in the dangerous sense, because `hires` would keep its own columns
+as the record of what was true when somebody was approached.
+
+## 2026-08-17 — "Hired" is in the stage list, and choosing it does the real thing
+**Decision, David's correction.** The first version kept `hired` out of the stage dropdown and
+behind a dedicated button, on the grounds that hiring is not a label change. He pointed out the case
+that breaks: *"sometimes I might have already hired them"* — somebody is entered into the platform
+after they were taken on, and being unable to say so is worse than the tidiness was worth.
+**What it does NOT mean:** `hired` is not a label. `set_hire_stage()` delegates to
+`hire_candidate()`, so picking it from the list runs the real hire — the slot gets their name and
+everything planned for it becomes theirs. A record reading "hired" beside a slot still showing a
+placeholder would be the worst of both, and nothing on either screen would explain the mismatch.
+**Consequence:** the bulk grid creates the row at a non-final stage FIRST and hires as a second
+step, so a hire that fails — the slot is already taken — leaves an honest record and a reported
+reason rather than losing the typed row or claiming somebody is on the show who is not.
+
+## 2026-08-17 — A spreadsheet paste is read in the SHEET's column order, discarded columns included
+**Decision:** `HIRE_SHEET_COLUMNS` lists all twelve columns of the freelancer sheet, including
+`_password` (position 8) and `_rate` (position 11), which are parsed and then thrown away.
+**Why the two throwaways have to be in the list, which is the whole point:** somebody pasting from
+Excel selects whole rows. Leaving Password out would not skip it — it would shift Worked-with-us,
+Notes and Rating one column to the LEFT and store a password as somebody's availability, silently.
+Naming a column you intend to discard is what keeps the rest aligned.
+**Two related details:**
+- **Tabs are split singly, not with `+`.** The wizard's paste helpers use `/[,;\t]+/`, which is
+  right for three fields and wrong for twelve: Excel emits an empty cell as two adjacent tabs, and
+  the `+` swallows the pair and shifts everything after it.
+- **Neither discarded column vanishes quietly.** A paste containing passwords says so and says why
+  they were not stored; a paste containing rates names the people and points at where a rate is
+  actually recorded. A silent discard is the failure this codebase keeps writing rules against.
+**On the password column specifically:** twelve rows of the sheet carry a code for viewing a private
+reel. No `password` column was created. A field of that name in a shared database gets reused for a
+real credential by somebody who never read the migration, and it would sit there in plain text.
+
+## 2026-08-17 — The block checker was itself wrong about lesson 9
+**Found by the checker reporting a healthy file as broken**, which is the failure mode that matters
+most for the only automated gate this project has.
+**What was wrong:** `php_code_only()` treated a `//` comment as running to the end of the line. PHP
+does not — it acts on `?>` even inside a comment, ends PHP mode there, and reads the rest as HTML.
+That is lesson 9, and the checker written to catch lesson-9-shaped bugs did not model it.
+**How it surfaced:** `<?php // ---- paste box ---- ?>` followed by HTML. The checker stayed in PHP
+mode, read the markup as code, met an apostrophe in ordinary prose, opened a string on it and
+swallowed eighty lines — including the `endif` in the middle of them. Every earlier use of that
+comment form in this codebase happens to be followed by more PHP, which is why it had never shown.
+**Why it was fixed rather than worked around** by changing the comment style: a false alarm on the
+only gate is worse than no gate, because it teaches people to ignore the one thing that catches
+real parse errors. The same blind spot could equally have hidden a genuine mismatch.
+**Consequence:** the checker now leaves PHP mode at `?>` inside a line comment, and all 74 files
+still pass — so the fix removed a false positive without introducing a false negative.
+
 ---
 
 ## Still open
