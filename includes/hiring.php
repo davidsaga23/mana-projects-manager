@@ -127,6 +127,21 @@ function hire_stage_color(?string $stage): string {
     return HIRE_STAGE_COLORS[$stage ?? ''] ?? '#8a97a3';
 }
 
+/**
+ * One option in a slot dropdown: "Color Script · Artie Rodriguez (filled)".
+ *
+ * Filled slots are LISTED, not hidden. Hiding them looked tidy and was wrong in
+ * both directions: somebody hired before they were ever entered here has to be
+ * recordable against the slot they already hold, and a producer looking for a
+ * replacement for somebody leaving needs that slot in the list too. A slot
+ * missing from a dropdown with no explanation reads as a bug, and did.
+ * (David, 2026-08-17, trying to record Artie Rodriguez on Color Script.)
+ */
+function slot_option_label(array $lane): string {
+    $label = trim((string)($lane['step_name'] ?? '')) . ' · ' . trim((string)($lane['name'] ?? ''));
+    return (int)($lane['is_placeholder'] ?? 0) === 1 ? $label : $label . ' (filled)';
+}
+
 /** Has migration 024 been applied? Every screen checks before offering the feature. */
 function hiring_available(PDO $pdo): bool {
     return column_exists($pdo, 'hires', 'stage');
@@ -604,13 +619,25 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                     . 'crew record kept its id.',
                     $slotRow['name'], $name
                 );
+            } elseif ($slotRow && mb_strtolower(trim((string)$slotRow['name'])) === mb_strtolower($name)) {
+                // The slot already holds THIS person. That is not a clash — it
+                // is a hiring record being written after the fact, for somebody
+                // put into the slot on the Crew screen weeks ago. Nothing is
+                // renamed and nothing moves, because nothing needs to: the
+                // record simply points at the person who is already there.
+                $out[] = sprintf(
+                    '%s already holds that slot, so nothing was renamed or moved — the hiring '
+                    . 'record now points at them and the slot is unchanged.',
+                    $slotRow['name']
+                );
             } else {
-                // Somebody is already in this slot. Refusing is right: silently
-                // replacing them would move their planned work onto a different
-                // person without anyone asking for it.
+                // A DIFFERENT person is in this slot. Refusing is right:
+                // silently replacing them would move their planned work onto
+                // somebody else without anyone asking for it.
                 throw new RuntimeException(sprintf(
-                    'That slot already holds %s, so it was not overwritten. Free the slot on the '
-                    . 'Crew screen first, or attach %s to a different one.',
+                    'That slot already holds %s, so it was not overwritten. If %s is replacing '
+                    . 'them, change who is in the slot on the Crew screen first — that is the '
+                    . 'screen that moves the planned work with it.',
                     $slotRow['name'] ?? 'somebody', $name
                 ));
             }

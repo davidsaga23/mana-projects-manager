@@ -1164,6 +1164,19 @@ placeholder would be the worst of both, and nothing on either screen would expla
 step, so a hire that fails — the slot is already taken — leaves an honest record and a reported
 reason rather than losing the typed row or claiming somebody is on the show who is not.
 
+**Two corrections the same day, both from the retroactive case biting again:**
+- **Filled slots are LISTED in the slot dropdown, marked `(filled)`.** They were filtered out on
+  the grounds that nobody puts a candidate forward for a job somebody already holds. Wrong in both
+  directions: a person hired before they were ever entered here has to be recordable against the
+  slot they already occupy — which is precisely what "Hired" in the stage list is for — and a
+  producer looking for a replacement needs that slot too. Worse, the slot was simply absent with
+  nothing on screen to say why, which reads as a bug and was reported as one.
+- **Hiring somebody into a slot THEY ALREADY HOLD is not a clash.** `hire_candidate()` compared
+  `is_placeholder` and refused anything else. It now checks the name: the same person means the
+  record just points at them, nothing is renamed and nothing moves. A *different* person is still
+  refused, and now says to use the Crew screen — the screen that moves planned work along with the
+  change, and therefore the right place for that decision.
+
 ## 2026-08-17 — A spreadsheet paste is read in the SHEET's column order, discarded columns included
 **Decision:** `HIRE_SHEET_COLUMNS` lists all twelve columns of the freelancer sheet, including
 `_password` (position 8) and `_rate` (position 11), which are parsed and then thrown away.

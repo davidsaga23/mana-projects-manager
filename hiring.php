@@ -262,9 +262,11 @@ require __DIR__ . '/includes/header.php';
             'stage'        => hire_stage_label($k['stage']),
         ];
     }
-    // Only the unfilled slots are offered: putting a candidate forward for a
-    // job somebody already holds is not a thing anyone means to do.
-    $openSlots = array_filter($lanes, function ($l) { return (int)$l['is_placeholder'] === 1; });
+    // EVERY slot, not just the empty ones — each one labelled with whether it is
+    // taken. Filtering to the unfilled ones hid the slot somebody was trying to
+    // record an existing hire against, with nothing on screen to say why it was
+    // missing. See slot_option_label().
+    $slotChoices = $lanes;
   ?>
     <?php if (!$extras): ?>
       <div class="flash flash-warn">
@@ -322,8 +324,8 @@ require __DIR__ . '/includes/header.php';
                   <td>
                     <select name="<?= $n ?>[lane_id]">
                       <option value="">— none —</option>
-                      <?php foreach ($openSlots as $l): ?>
-                        <option value="<?= (int)$l['id'] ?>"><?= e($l['step_name'] . ' · ' . $l['name']) ?></option>
+                      <?php foreach ($slotChoices as $l): ?>
+                        <option value="<?= (int)$l['id'] ?>"><?= e(slot_option_label($l)) ?></option>
                       <?php endforeach; ?>
                     </select>
                   </td>
@@ -347,8 +349,14 @@ require __DIR__ . '/includes/header.php';
         <p class="muted small">
           Choosing <strong>Hired</strong> does the real thing, not just a label: it names the slot
           with that person, so everything already planned for the slot becomes theirs. Pick it when
-          somebody was taken on before they were ever entered here. If the slot is already filled the
-          row is still saved and the reason is reported.
+          somebody was taken on before they were ever entered here.
+          <br>
+          Slots marked <strong>(filled)</strong> already have somebody in them, and are still
+          offered on purpose — recording the hire of the person <em>who is already in one</em>
+          changes nothing and simply gives them a hiring record. Naming a
+          <em>different</em> person for a filled slot is refused and says who holds it, because
+          moving their planned work is a decision for the
+          <a href="crew.php?project=<?= $projectId ?>">Crew screen</a>.
         </p>
       </form>
 
@@ -375,8 +383,8 @@ require __DIR__ . '/includes/header.php';
             <label>Put them all forward for
               <select name="paste_lane_id">
                 <option value="">— no slot, just add them —</option>
-                <?php foreach ($openSlots as $l): ?>
-                  <option value="<?= (int)$l['id'] ?>"><?= e($l['step_name'] . ' · ' . $l['name']) ?></option>
+                <?php foreach ($slotChoices as $l): ?>
+                  <option value="<?= (int)$l['id'] ?>"><?= e(slot_option_label($l)) ?></option>
                 <?php endforeach; ?>
               </select>
             </label>
