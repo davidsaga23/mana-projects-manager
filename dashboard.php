@@ -35,6 +35,16 @@ $delivery = $project['delivery_date'] ?: null;
 $episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
 
 $steps    = dashboard_steps($pdo, $projectId, $delivery);
+
+// The studio's ideal quotas for this KIND of project, read once for the whole
+// page. Set on the business side (Ideal quotas, admin only) and read here —
+// David's split, 2026-08-17: the number is a business decision and it is useless
+// unless the people running the show can see it. Read-only; nothing on this
+// screen can change a standard.
+require_once __DIR__ . '/includes/standards.php';
+$idealSheet = standards_available($pdo)
+    ? standards_for_type($pdo, (string)($project['type'] ?? ''))
+    : [];
 $visible  = array_values(array_filter($steps, function ($s) {
     return (int)($s['step']['show_in_dashboard'] ?? 1) === 1;
 }));
@@ -158,6 +168,22 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
           <?php else: ?>
             <div class="muted small">no headcount set</div>
           <?php endif; ?>
+          <?php
+          // The studio's ideal, read from the business side. Only shown when it
+          // DISAGREES with the required pace — a card that repeats "and the
+          // standard says the same" on every step is noise, and the one card
+          // where they differ is the one worth seeing.
+          $std = $idealSheet[standard_key($s['step']['name'], $s['step']['applies_to'] ?? 'shot',
+                                          $s['step']['applies_to_asset_type'] ?? '')] ?? null;
+          if ($std && $s['per_artist'] !== null && (float)$std['days_per_unit'] > 0):
+            $ideal = 1 / (float)$std['days_per_unit'];
+            $ratio = (float)$s['per_artist'] / $ideal;
+            if ($ratio > 1.05): ?>
+              <div class="warn-text small">
+                <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% above the studio standard
+                (<?= e(fmt_unit($ideal, $s['unit'])) ?>/day each)
+              </div>
+          <?php endif; endif; ?>
           <div class="muted small"><?= (int)$s['days_left'] ?> working days left</div>
         <?php endif; ?>
       </div>

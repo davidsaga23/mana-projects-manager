@@ -34,6 +34,12 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
         <?php // Admin-only, and it opens a database ordinary screens hold no
               // credential for — see includes/money.php. ?>
         · <a href="finance.php">Finance management</a>
+        <?php // Ideal quotas sit under the business heading because that is where
+              // they are DECIDED — "the ideal quotas will be defined from a
+              // business perspective" (David, 2026-08-17). They are still read
+              // all over the production side: the dashboard and every step
+              // detail show the ideal beside the pace the deadline demands. ?>
+        · <a href="standards.php">Ideal quotas</a>
       <?php endif; ?>
 
       <?php
@@ -48,9 +54,8 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       // and could not see the link to it.
       ?>
       <span class="nav-sep" aria-hidden="true">|</span>
-      <a href="standards.php">Ideal quotas</a>
       <?php if (is_admin()): ?>
-        · <a href="users.php">Users</a>
+        <a href="users.php">Users</a>
         · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
              if ($pendingMigrations > 0): ?><span class="pending-badge"><?= $pendingMigrations ?></span><?php endif;

@@ -161,6 +161,21 @@ require __DIR__ . '/includes/header.php';
     </div></div>
 </div>
 
+<?php
+// The studio's IDEAL for this step, beside the pace the deadline demands.
+//
+// Set on the business side (Ideal quotas, admin only) and READ here, which is
+// the split David asked for: the number is a business decision, and it is
+// useless unless the person running the step can see it. Nothing here can edit
+// it — this screen shows what the standard says and what the plan asks.
+require_once __DIR__ . '/includes/standards.php';
+$stdRow = standards_available($pdo)
+    ? standard_for_step($pdo, (string)$project['type'], $s['step'])
+    : null;
+$idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
+    ? 1 / (float)$stdRow['days_per_unit'] : null;
+?>
+
 <?php // --- the quota, per team and per artist ------------------------------ ?>
 <h3>The daily quota</h3>
 <?php if ($s['required_pace'] === null): ?>
@@ -185,7 +200,43 @@ require __DIR__ . '/includes/header.php';
       <strong class="status-<?= e($s['status']) ?>">
         <?= $s['actual_pace'] === null ? '—' : e(fmt_unit((float)$s['actual_pace'], $unit)) ?></strong>
       <span class="muted small">per day, measured over the last 7 days</span></div>
+    <?php if ($idealPerDay !== null): ?>
+      <div><span class="muted small">The studio standard is</span>
+        <strong><?= e(fmt_unit($idealPerDay, $unit)) ?></strong>
+        <span class="muted small">per person per day, for <?= e($project['type']) ?> projects</span></div>
+    <?php endif; ?>
   </div>
+
+  <?php
+  // The comparison, said in a sentence rather than left as two numbers to divide
+  // in your head. Above the standard is the finding: the plan is asking for a
+  // pace the studio does not claim is achievable, and the fixes are more people,
+  // more time, or less work.
+  if ($idealPerDay !== null && $s['per_artist'] !== null && $idealPerDay > 0):
+    $ratio = (float)$s['per_artist'] / $idealPerDay; ?>
+    <?php if ($ratio > 1.05): ?>
+      <div class="flash flash-err">
+        This step needs <strong><?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% more per person per
+        day</strong> than the studio standard for <?= e($project['type']) ?> projects. That is not
+        an ambitious target — it is one nobody is expected to hit. More people, more time, or less
+        work.
+      </div>
+    <?php elseif ($ratio < 0.95): ?>
+      <p class="muted small ok">
+        Comfortably inside the studio standard — <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% under.
+      </p>
+    <?php else: ?>
+      <p class="muted small">The deadline asks for almost exactly the studio standard.</p>
+    <?php endif; ?>
+  <?php elseif ($stdRow === null && standards_available($pdo)): ?>
+    <p class="muted small">
+      No studio standard recorded for this step yet, so there is nothing to compare the required
+      pace against.
+      <?php if (is_admin()): ?>
+        <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">Set one →</a>
+      <?php endif; ?>
+    </p>
+  <?php endif; ?>
   <p class="muted small">
     The team figure does not fall when people are added — the work needed to hit a date is
     fixed. Only each person's share of it moves.

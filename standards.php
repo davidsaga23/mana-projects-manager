@@ -30,6 +30,12 @@ $selfUrl = 'standards.php?type=' . urlencode($type);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        if (!is_admin()) {
+            throw new RuntimeException(
+                'Ideal quotas are set on the business side, so only an administrator can change '
+                . 'them. Everyone can read them.'
+            );
+        }
         if (!$ready) {
             throw new RuntimeException(
                 'The database updates this screen needs have not been applied yet (migration 026), '
@@ -118,7 +124,15 @@ require __DIR__ . '/includes/header.php';
     <?php endforeach; ?>
   </p>
 
-  <?php if (can_edit()): ?>
+  <?php
+  // ADMINS SET IT, EVERYONE READS IT. The standard is a business decision — what
+  // the studio is prepared to say the work takes — so editing sits with the
+  // people who own that call. Reading is deliberately open: it appears on the
+  // production dashboard and on every step detail beside the pace the deadline
+  // demands, and a number a producer cannot see is a number they cannot plan
+  // against.
+  ?>
+  <?php if (is_admin()): ?>
   <form method="post">
     <input type="hidden" name="project_type" value="<?= e($type) ?>">
     <div class="grid-scroll">
@@ -238,7 +252,7 @@ require __DIR__ . '/includes/header.php';
     </table>
   <?php endif; ?>
 
-  <?php if ($missing && can_edit()): ?>
+  <?php if ($missing && is_admin()): ?>
     <p class="muted small warn-text">
       <?= count($missing) ?> step identit<?= count($missing) === 1 ? 'y is' : 'ies are' ?>
       already in use on <?= e($type) ?> projects with no standard recorded — highlighted above,
