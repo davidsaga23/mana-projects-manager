@@ -1526,6 +1526,46 @@ time, or less work. **All three cost money**, which is the screen you are standi
   is one artist working on one item, so the minimum has to be divided by headcount before the two
   can be set beside each other.
 
+## 2026-08-17 (later) — The budget is computed from the IDEAL quota, not the project's estimate
+**Decision, David's, and it changes how money is worked out.** *"Ideal is what the studio or
+production head determines will budget the project based on."* `expense_projection()` now reaches
+for `quota_standards.days_per_unit` first, and falls back to `pipeline_steps.days_per_unit` only
+where no standard exists for that step identity.
+
+**This supersedes the arrangement of 2026-08-18**, where person-days came from the project's own
+estimate. The estimate is still typed, still frozen into `step_estimate_baseline`, and still drives
+the SCHEDULE — it simply no longer prices anything where a standard exists.
+
+**Why a fallback rather than refusing to cost the row:** a step with no standard recorded is a step
+nobody has written a rule for yet, not a step that takes no time. Costing it at zero would quietly
+shrink the budget, which is the failure this file exists to prevent.
+
+**Nothing about which source was used is left implicit**, because two steps of the same size can
+now cost differently and a reader is owed the reason:
+- the projection carries `days_source`, `ideal_days` and `estimate_days` on every row;
+- rows resting on a project estimate are tagged **est.** in the Days column;
+- a banner above the table counts them and links to the sheet that would fix it;
+- when every row is on a standard, the screen says that too.
+
+**⚠ THE SCHEDULE DOES NOT FOLLOW, and that is deliberate rather than forgotten.** Dates still come
+from `pipeline_steps.days_per_unit` through the scheduler. Changing that would move every bar on
+every timeline of every project the moment a standard was typed, which is a phase of its own. Where
+the two differ, the money and the calendar are answering with different day counts — the projection
+says which number it used, and reconciling them is a decision for whoever notices.
+
+## 2026-08-17 — Ideal quotas live INSIDE Finance management
+**Decision:** the base sheet is no longer a top-bar destination of its own. It is a tab on every
+project's finance bar — pre-filtered to that project's type — and a panel on the finance hub. The
+top bar's business group is one link again: **Finance management**.
+**Why:** it is where the number is decided and it is what the number prices. Every cost on every
+projection is now computed from it, so reaching it from the project whose budget it produced is how
+somebody actually gets there. A separate top-level link made it look like a settings screen.
+**Consequence:** it is still studio-wide data underneath — one sheet per project TYPE, not per
+project — so the tab is a link out rather than a `?tab=` of `finance_project.php`, and
+`finance_tabs()` deliberately does not list it. **Editing stays admin-only**, enforced server-side;
+reading stays open, because the dashboard and every step detail show the ideal beside the pace the
+deadline demands, and a number a producer cannot see is a number they cannot plan against.
+
 ---
 
 ## Still open

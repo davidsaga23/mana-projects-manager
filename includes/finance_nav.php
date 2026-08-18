@@ -15,7 +15,7 @@
  * The tabs, in the order the money is actually thought about: what was agreed,
  * what it will cost, what has been billed, and who still has to be found.
  */
-function finance_nav_items(int $projectId): array {
+function finance_nav_items(int $projectId, string $projectType = ''): array {
     $p = '?project=' . $projectId;
     return [
         ['key' => 'overview',   'label' => 'Overview',
@@ -29,6 +29,19 @@ function finance_nav_items(int $projectId): array {
         // budget, and two copies of it would drift — the money on it is already
         // admin-only inside includes/money.php, so nothing needs hiding here.
         ['key' => 'hiring',     'label' => 'Hiring', 'href' => 'hiring.php' . $p],
+        // The IDEAL QUOTA sheet — the number this project's budget is built on.
+        //
+        // It lives inside Finance management because that is where it is decided
+        // (David, 2026-08-17): the production head sets what the work should
+        // take, and every cost on the projection is computed from it. Reached
+        // from here pre-filtered to THIS project's type, because that is the
+        // sheet that priced the budget you are looking at.
+        //
+        // Studio-wide underneath, so it is not per-project data — but arriving
+        // at it from the project whose budget it produced is how somebody
+        // actually gets there.
+        ['key' => 'standards',  'label' => 'Ideal quotas',
+         'href' => 'standards.php' . ($projectType !== '' ? '?type=' . urlencode($projectType) : '')],
     ];
 }
 
@@ -55,7 +68,7 @@ function finance_nav(array $project, string $current = ''): void {
         <a href="project.php?id=<?= $projectId ?>" class="muted">Open the project →</a>
       </div>
       <nav class="proj-tabs">
-        <?php foreach (finance_nav_items($projectId) as $it): ?>
+        <?php foreach (finance_nav_items($projectId, (string)($project['type'] ?? '')) as $it): ?>
           <a href="<?= e($it['href']) ?>"
              class="proj-tab <?= $it['key'] === $current ? 'current' : '' ?> tab-work"
              <?= $it['key'] === $current ? 'aria-current="page"' : '' ?>><?= e($it['label']) ?></a>

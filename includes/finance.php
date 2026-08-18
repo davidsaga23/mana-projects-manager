@@ -25,6 +25,7 @@ require_once __DIR__ . '/money.php';
 require_once __DIR__ . '/quota.php';
 require_once __DIR__ . '/crew.php';
 require_once __DIR__ . '/timelog.php';   // hours_per_day(), for converting an hourly rate
+require_once __DIR__ . '/standards.php'; // the IDEAL quota, which the budget is built on
 
 /** The agreed budget for one project, or null. Empty for a non-admin. */
 function project_budget(int $projectId): ?array {
@@ -119,6 +120,29 @@ const DAYS_PER_MONTH = 22.0;
 function expense_projection(PDO $pdo, int $projectId): array {
     $steps = pipeline_steps($pdo, $projectId);
 
+    // ---- THE NUMBER THE BUDGET IS BUILT ON --------------------------------
+    //
+    // David, 2026-08-17: *"Ideal is what the studio or production head
+    // determines will budget the project based on."* So the projection reaches
+    // for the studio standard FIRST, and only falls back to what this project
+    // happened to be planned at.
+    //
+    // Why a fallback rather than zero: a step with no standard recorded is a
+    // step nobody has written a rule for yet, not a step that takes no time.
+    // Costing it at nothing would quietly shrink the budget, which is the
+    // failure this file exists to avoid — and the fallback is reported per row
+    // rather than assumed, so a projection can always say which of its rows are
+    // resting on a studio decision and which on one project's guess.
+    //
+    // ⚠ THE SCHEDULE DOES NOT FOLLOW. Dates still come from
+    // pipeline_steps.days_per_unit through the scheduler, because changing that
+    // moves every bar on every timeline. Where the two differ the money and the
+    // calendar are answering with different day counts, and the screen says so.
+    $ptype = (string)$pdo->query(
+        'SELECT type FROM projects WHERE id = ' . (int)$projectId
+    )->fetchColumn();
+    $standards = standards_available($pdo) ? standards_for_type($pdo, $ptype) : [];
+
     // project_lanes() returns a FLAT list ordered by step; group it, because the
     // projection walks step by step and a linear scan per step would be n-squared.
     $lanes = [];
@@ -142,14 +166,29 @@ function expense_projection(PDO $pdo, int $projectId): array {
 
     $rows = []; $total = 0.0; $actualTotal = 0.0;
     $unpricedDays = 0.0; $currency = null; $mixed = false;
+    // How much of the plan is costed against a studio standard rather than one
+    // project's estimate. Counted so the screen can report it in one line
+    // instead of making somebody read every row.
+    $onIdeal = 0; $onEstimate = 0;
 
     foreach ($steps as $step) {
         $stepId = (int)$step['id'];
         $quota = step_quota($pdo, $projectId, $step, null, $estimates, $retake);
 
         $units = (float)($quota['units'] ?? 0);
-        $daysPerUnit = (float)($step['days_per_unit'] ?: 0) * retake_factor($retake);
-        $personDays = $units * $daysPerUnit;
+
+        // The studio standard wins; the project's own estimate is the fallback.
+        $std = $standards[standard_key($step['name'], $step['applies_to'] ?? 'shot',
+                                       $step['applies_to_asset_type'] ?? '')] ?? null;
+        $idealDays    = ($std && (float)$std['days_per_unit'] > 0) ? (float)$std['days_per_unit'] : null;
+        $estimateDays = (float)($step['days_per_unit'] ?: 0);
+        $baseDays     = $idealDays !== null ? $idealDays : $estimateDays;
+        $daysSource   = $idealDays !== null ? 'ideal' : 'estimate';
+
+        // Retakes scale days-per-item whichever source it came from — a revision
+        // takes as long on a standard as on a guess (DECISIONS, 2026-08-12).
+        $daysPerUnit = $baseDays * retake_factor($retake);
+        $personDays  = $units * $daysPerUnit;
 
         $stepLanes = $lanes[$stepId] ?? [];
         $laneCount = max(1, count($stepLanes));
@@ -192,6 +231,8 @@ function expense_projection(PDO $pdo, int $projectId): array {
             $actCost = $cid ? ($billedBy[$cid . '|' . $stepId] ?? null) : null;
             if ($actCost !== null) $actualTotal += $actCost;
 
+            if ($daysSource === 'ideal') $onIdeal++; else $onEstimate++;
+
             $rows[] = [
                 'department'  => trim((string)($step['department'] ?? '')) ?: 'Unassigned',
                 'step'        => $step,
@@ -204,6 +245,12 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'currency'    => $rate !== null ? $cur : null,
                 'days'        => $daysPerLane,
                 'months'      => $daysPerLane / DAYS_PER_MONTH,
+                // Which number this row's cost rests on, so the screen can say
+                // so rather than leaving a reader to wonder why two steps of the
+                // same size cost differently.
+                'days_source'   => $daysSource,
+                'ideal_days'    => $idealDays,
+                'estimate_days' => $estimateDays ?: null,
                 'cost'        => $cost,
                 'units'       => $units,
                 'unit_label'  => $quota['unit_label'] ?? 'items',
@@ -279,6 +326,11 @@ function expense_projection(PDO $pdo, int $projectId): array {
         'mixed_currency' => $mixed,
         'unpriced_days'  => $unpricedDays,
         'hours_per_day'  => $hoursPerDay,
+        // The mix of sources behind the cost above.
+        'rows_on_ideal'    => $onIdeal,
+        'rows_on_estimate' => $onEstimate,
+        'standards_ready'  => standards_available($pdo),
+        'project_type'     => $ptype,
     ];
 }
 

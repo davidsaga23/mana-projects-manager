@@ -604,6 +604,35 @@ if (standards_available($pdo)) {
 
 <?php endif; ?>
 
+<?php
+// WHERE THE DAYS CAME FROM. The budget is built on the IDEAL quota — the studio
+// standard for this kind of project — and falls back to what this project was
+// planned at only where no standard exists. Said here in one line rather than
+// left to be worked out from the per-row marks below.
+$onIdeal    = (int)($proj['rows_on_ideal'] ?? 0);
+$onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
+?>
+<?php if (!($proj['standards_ready'] ?? false)): ?>
+  <div class="flash flash-warn">
+    <strong>Ideal quotas are not available</strong> (migration 026 has not been applied), so every
+    figure below is costed from this project's own estimates instead of the studio standard.
+  </div>
+<?php elseif ($onEstimate > 0): ?>
+  <div class="flash flash-warn">
+    <strong><?= $onEstimate ?></strong> of <?= $onIdeal + $onEstimate ?> rows have
+    <strong>no studio standard</strong> for <?= e($proj['project_type'] ?? '') ?> projects, so they
+    are costed from what this project was planned at. Those are marked
+    <em>est.</em> below.
+    <a href="standards.php?type=<?= urlencode((string)($proj['project_type'] ?? '')) ?>">Set the
+    ideal quotas →</a>
+  </div>
+<?php elseif ($onIdeal > 0): ?>
+  <p class="muted small ok">
+    Every row below is costed from the studio's ideal quota for
+    <?= e($proj['project_type'] ?? '') ?> projects.
+  </p>
+<?php endif; ?>
+
 <p class="page-actions">
   <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
   <span class="muted small">
@@ -689,7 +718,14 @@ if ($retakePct <= 0):
               <span class="muted">/ <?= e($r['rate_unit']) ?></span>
             <?php endif; ?>
           </td>
-          <td class="num"><?= e(fmt_num($r['days'], 2)) ?></td>
+          <td class="num"><?= e(fmt_num($r['days'], 2)) ?>
+            <?php // Which number produced these days. An unmarked row rests on a
+                  // studio decision; an "est." row rests on one project's guess,
+                  // and the difference matters the moment a budget is queried. ?>
+            <?php if (($r['days_source'] ?? '') === 'estimate'): ?>
+              <span class="est-tag" title="No studio standard for this step, so this row is costed from the project's own estimate">est.</span>
+            <?php endif; ?>
+          </td>
           <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
           <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?></td>
           <td class="num muted"><?= e(fmt_num($r['units'], 0)) ?></td>

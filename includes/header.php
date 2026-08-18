@@ -33,13 +33,13 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       <?php if (is_admin()): ?>
         <?php // Admin-only, and it opens a database ordinary screens hold no
               // credential for — see includes/money.php. ?>
+        <?php // Ideal quotas are NOT a separate destination up here. They live
+              // INSIDE Finance management — a tab on every project's finance bar
+              // and a panel on the hub — because that is where they are decided
+              // and what they price (David, 2026-08-17). They are still READ all
+              // over the production side: the dashboard and every step detail
+              // show the ideal beside the pace the deadline demands. ?>
         · <a href="finance.php">Finance management</a>
-        <?php // Ideal quotas sit under the business heading because that is where
-              // they are DECIDED — "the ideal quotas will be defined from a
-              // business perspective" (David, 2026-08-17). They are still read
-              // all over the production side: the dashboard and every step
-              // detail show the ideal beside the pace the deadline demands. ?>
-        · <a href="standards.php">Ideal quotas</a>
       <?php endif; ?>
 
       <?php

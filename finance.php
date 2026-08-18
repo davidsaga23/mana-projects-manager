@@ -42,6 +42,18 @@ require __DIR__ . '/includes/header.php';
 <p class="crumb"><a href="index.php">← All projects</a></p>
 <h2 class="wizard-title">Finance <span class="admin-only-tag">administrators only</span></h2>
 
+<?php // The base sheets live in here because this is where they are decided and
+      // what they price: every cost on every projection is computed from them.
+      // One sheet per kind of project, studio-wide. ?>
+<p class="page-actions">
+  <a class="button" href="standards.php">Ideal quotas — the base sheets</a>
+  <span class="muted small">
+    What the work <strong>should</strong> take, per kind of project. This is the number every
+    budget below is built on: person-days come from the ideal quota, and only fall back to a
+    project&rsquo;s own estimate where no standard has been set.
+  </span>
+</p>
+
 <p class="lead">
   Budgets, what the plan will cost, and what has been billed. Rates and invoices live in a
   <strong>separate database</strong> whose credential ordinary screens do not hold — so a bug in
