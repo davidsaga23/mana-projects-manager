@@ -448,6 +448,162 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 <?php endif; ?>
 
 
+<?php
+// ---- ABOVE the table, deliberately ------------------------------------------
+//
+// This sat below the projection until 2026-08-17, and David could not find it:
+// the table it followed runs to forty-odd rows on a real show, so the one block
+// that says whether the budget is DELIVERABLE was permanently past the fold.
+//
+// It belongs first. The order a budget is actually built in is: can the plan be
+// done at all, then what does it cost. Reading the cost of a plan nobody can
+// deliver is answering the second question having skipped the first.
+?>
+<?php
+// ---- MINIMUM vs IDEAL -------------------------------------------------------
+//
+// The question this answers, and nothing else in the platform could: IS THIS
+// BUDGET BUYING A PLAN THAT CAN BE DELIVERED?
+//
+// The two numbers come from opposite directions and neither is an opinion about
+// the other:
+//
+//   MINIMUM  what the deadline demands of one person per day. Derived from work
+//            remaining over working days left over headcount. Nobody types it
+//            and nobody can edit it — it is arithmetic on the dates and the
+//            progress, and it rises on its own every time either slips.
+//   IDEAL    what the studio says that work actually takes, for this kind of
+//            project. Typed on the base sheet from experience.
+//
+// A minimum ABOVE the ideal is the finding. It does not mean somebody is lazy;
+// it means the plan requires a pace the studio does not believe in, and the only
+// honest fixes are more people, more time, or less work. Reading it beside the
+// budget is the point — those three fixes all cost money, which is the screen
+// you are on.
+$quotaRows = [];
+$quotaOver = 0;
+if (standards_available($pdo)) {
+    $sheet = standards_for_type($pdo, (string)$project['type']);
+    if ($sheet) {
+        try {
+            foreach (dashboard_steps($pdo, $projectId, $project['delivery_date'] ?? null) as $ds) {
+                $st  = $ds['step'];
+                $std = $sheet[standard_key($st['name'], $st['applies_to'] ?? 'shot',
+                                           $st['applies_to_asset_type'] ?? '')] ?? null;
+                if ($std === null) continue;                 // no standard to compare against
+
+                $idealDays    = (float)$std['days_per_unit'];
+                $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
+                $minPerArtist = $ds['per_artist'] !== null ? (float)$ds['per_artist'] : null;
+
+                $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
+                      ? $minPerArtist / $idealPerDay : null;
+                if ($over !== null && $over > 1.05) $quotaOver++;
+
+                $quotaRows[] = [
+                    'ds' => $ds, 'step' => $st, 'std' => $std,
+                    'ideal_per_day' => $idealPerDay,
+                    'min_per_artist' => $minPerArtist,
+                    'over' => $over,
+                ];
+            }
+        } catch (Throwable $e) {
+            $quotaRows = [];
+        }
+    }
+}
+?>
+
+<h3>Minimum against ideal</h3>
+
+<p class="muted small">
+  Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
+  one person per day — remaining work over the working days left, divided by the people on it. It
+  is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
+  closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
+  from the <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
+  for <?= e($project['type']) ?> projects.
+</p>
+
+<?php if (!standards_available($pdo)): ?>
+  <p class="muted small warn-text">
+    Ideal quotas need migration <strong>026</strong>, which hasn't been applied, so there is
+    nothing to compare against yet.
+  </p>
+<?php elseif (!$quotaRows): ?>
+  <div class="empty-state">
+    <p>No step on this project has an ideal recorded for <?= e($project['type']) ?> projects yet.</p>
+    <p class="muted">Write them down on the
+      <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
+      this comparison fills in. It is the one thing that can tell you a budget is buying a plan
+      nobody can deliver.</p>
+  </div>
+<?php else: ?>
+
+  <?php if ($quotaOver > 0): ?>
+    <div class="flash flash-err">
+      <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
+      <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above the studio standard. That is not
+      an ambitious plan — it is one the people on it are not expected to hit. The three fixes are
+      more people, more time, or less work, and all three land on this page.
+    </div>
+  <?php endif; ?>
+
+  <div class="grid-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Step</th><th>Covers</th>
+        <th class="num">Remaining</th>
+        <th class="num">People</th>
+        <th class="num">Minimum / person / day</th>
+        <th class="num">Ideal / person / day</th>
+        <th>Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($quotaRows as $q):
+      $ds = $q['ds']; $over = $q['over'];
+      $cls = ($over === null) ? '' : ($over > 1.05 ? 'err' : ($over < 0.95 ? 'ok' : 'muted')); ?>
+      <tr class="<?= $over !== null && $over > 1.05 ? 'has-problem' : '' ?>">
+        <td class="wf-name">
+          <span class="dot" style="background:<?= e($q['step']['color'] ?: '#ccc') ?>"></span><?= e($q['step']['name']) ?>
+        </td>
+        <td class="muted small">
+          <?= e(applies_to_phrase($q['step']['applies_to'], $q['step']['applies_to_asset_type'] ?? null)) ?>
+        </td>
+        <td class="num"><?= e(fmt_num((float)$ds['remaining'], 1)) ?></td>
+        <td class="num muted"><?= $ds['headcount'] ? e(fmt_num((float)$ds['headcount'], 1)) : '—' ?></td>
+        <td class="num <?= $cls ?>">
+          <?= $q['min_per_artist'] !== null ? e(fmt_num($q['min_per_artist'], 2)) : '<span class="muted">—</span>' ?>
+        </td>
+        <td class="num"><?= $q['ideal_per_day'] !== null ? e(fmt_num($q['ideal_per_day'], 2)) : '—' ?></td>
+        <td class="small">
+          <?php if ($over === null): ?>
+            <span class="muted">No deadline on this step, so there is no pace to be behind.</span>
+          <?php elseif ($over > 1.05): ?>
+            <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the standard.</span>
+          <?php elseif ($over < 0.95): ?>
+            <span class="ok">Comfortable — <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
+          <?php else: ?>
+            <span class="muted">Right at the standard.</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="muted small">
+    Steps with no ideal recorded are left out rather than shown blank — a comparison against
+    nothing is not a row. The minimum here is the same figure the
+    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
+    <em>required</em>, from the same calculation, so the two cannot disagree.
+  </p>
+
+<?php endif; ?>
+
 <p class="page-actions">
   <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
   <span class="muted small">
@@ -603,151 +759,6 @@ if ($retakePct <= 0):
     cannot appear on a row above, because spreading it across rows would put a figure into a
     subtotal that nobody agreed to. Edit those invoices to attach them, or leave them as they are.
   </p>
-<?php endif; ?>
-
-<?php
-// ---- MINIMUM vs IDEAL -------------------------------------------------------
-//
-// The question this answers, and nothing else in the platform could: IS THIS
-// BUDGET BUYING A PLAN THAT CAN BE DELIVERED?
-//
-// The two numbers come from opposite directions and neither is an opinion about
-// the other:
-//
-//   MINIMUM  what the deadline demands of one person per day. Derived from work
-//            remaining over working days left over headcount. Nobody types it
-//            and nobody can edit it — it is arithmetic on the dates and the
-//            progress, and it rises on its own every time either slips.
-//   IDEAL    what the studio says that work actually takes, for this kind of
-//            project. Typed on the base sheet from experience.
-//
-// A minimum ABOVE the ideal is the finding. It does not mean somebody is lazy;
-// it means the plan requires a pace the studio does not believe in, and the only
-// honest fixes are more people, more time, or less work. Reading it beside the
-// budget is the point — those three fixes all cost money, which is the screen
-// you are on.
-$quotaRows = [];
-$quotaOver = 0;
-if (standards_available($pdo)) {
-    $sheet = standards_for_type($pdo, (string)$project['type']);
-    if ($sheet) {
-        try {
-            foreach (dashboard_steps($pdo, $projectId, $project['delivery_date'] ?? null) as $ds) {
-                $st  = $ds['step'];
-                $std = $sheet[standard_key($st['name'], $st['applies_to'] ?? 'shot',
-                                           $st['applies_to_asset_type'] ?? '')] ?? null;
-                if ($std === null) continue;                 // no standard to compare against
-
-                $idealDays    = (float)$std['days_per_unit'];
-                $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
-                $minPerArtist = $ds['per_artist'] !== null ? (float)$ds['per_artist'] : null;
-
-                $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
-                      ? $minPerArtist / $idealPerDay : null;
-                if ($over !== null && $over > 1.05) $quotaOver++;
-
-                $quotaRows[] = [
-                    'ds' => $ds, 'step' => $st, 'std' => $std,
-                    'ideal_per_day' => $idealPerDay,
-                    'min_per_artist' => $minPerArtist,
-                    'over' => $over,
-                ];
-            }
-        } catch (Throwable $e) {
-            $quotaRows = [];
-        }
-    }
-}
-?>
-
-<h3>Minimum against ideal</h3>
-
-<p class="muted small">
-  Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
-  one person per day — remaining work over the working days left, divided by the people on it. It
-  is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
-  closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
-  from the <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
-  for <?= e($project['type']) ?> projects.
-</p>
-
-<?php if (!standards_available($pdo)): ?>
-  <p class="muted small warn-text">
-    Ideal quotas need migration <strong>026</strong>, which hasn't been applied, so there is
-    nothing to compare against yet.
-  </p>
-<?php elseif (!$quotaRows): ?>
-  <div class="empty-state">
-    <p>No step on this project has an ideal recorded for <?= e($project['type']) ?> projects yet.</p>
-    <p class="muted">Write them down on the
-      <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
-      this comparison fills in. It is the one thing that can tell you a budget is buying a plan
-      nobody can deliver.</p>
-  </div>
-<?php else: ?>
-
-  <?php if ($quotaOver > 0): ?>
-    <div class="flash flash-err">
-      <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
-      <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above the studio standard. That is not
-      an ambitious plan — it is one the people on it are not expected to hit. The three fixes are
-      more people, more time, or less work, and all three land on this page.
-    </div>
-  <?php endif; ?>
-
-  <div class="grid-scroll">
-  <table class="grid-table">
-    <thead>
-      <tr>
-        <th>Step</th><th>Covers</th>
-        <th class="num">Remaining</th>
-        <th class="num">People</th>
-        <th class="num">Minimum / person / day</th>
-        <th class="num">Ideal / person / day</th>
-        <th>Verdict</th>
-      </tr>
-    </thead>
-    <tbody>
-    <?php foreach ($quotaRows as $q):
-      $ds = $q['ds']; $over = $q['over'];
-      $cls = ($over === null) ? '' : ($over > 1.05 ? 'err' : ($over < 0.95 ? 'ok' : 'muted')); ?>
-      <tr class="<?= $over !== null && $over > 1.05 ? 'has-problem' : '' ?>">
-        <td class="wf-name">
-          <span class="dot" style="background:<?= e($q['step']['color'] ?: '#ccc') ?>"></span><?= e($q['step']['name']) ?>
-        </td>
-        <td class="muted small">
-          <?= e(applies_to_phrase($q['step']['applies_to'], $q['step']['applies_to_asset_type'] ?? null)) ?>
-        </td>
-        <td class="num"><?= e(fmt_num((float)$ds['remaining'], 1)) ?></td>
-        <td class="num muted"><?= $ds['headcount'] ? e(fmt_num((float)$ds['headcount'], 1)) : '—' ?></td>
-        <td class="num <?= $cls ?>">
-          <?= $q['min_per_artist'] !== null ? e(fmt_num($q['min_per_artist'], 2)) : '<span class="muted">—</span>' ?>
-        </td>
-        <td class="num"><?= $q['ideal_per_day'] !== null ? e(fmt_num($q['ideal_per_day'], 2)) : '—' ?></td>
-        <td class="small">
-          <?php if ($over === null): ?>
-            <span class="muted">No deadline on this step, so there is no pace to be behind.</span>
-          <?php elseif ($over > 1.05): ?>
-            <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the standard.</span>
-          <?php elseif ($over < 0.95): ?>
-            <span class="ok">Comfortable — <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
-          <?php else: ?>
-            <span class="muted">Right at the standard.</span>
-          <?php endif; ?>
-        </td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  </div>
-
-  <p class="muted small">
-    Steps with no ideal recorded are left out rather than shown blank — a comparison against
-    nothing is not a row. The minimum here is the same figure the
-    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
-    <em>required</em>, from the same calculation, so the two cannot disagree.
-  </p>
-
 <?php endif; ?>
 
 <h3>Other expenses <span class="muted">· <?= count($proj['other'] ?? []) ?></span></h3>
