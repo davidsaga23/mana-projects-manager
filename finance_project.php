@@ -162,6 +162,11 @@ foreach ($invoices as $iv) {
 $tab = (string)($_GET['tab'] ?? 'overview');
 if (!in_array($tab, finance_tabs(), true)) $tab = 'overview';
 
+// Needed by two tabs — Overview draws the phase breakdown, Projection edits the
+// phases — so it is worked out once here rather than inside whichever block
+// happens to run.
+$hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
+
 $pageTitle = 'Finance · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
@@ -293,7 +298,6 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
     $oa = $phaseOrder[$a] ?? 9; $ob = $phaseOrder[$b] ?? 9;
     return $oa !== $ob ? $oa <=> $ob : strcasecmp($a, $b);
 });
-$hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
 ?>
 
 <?php if ($phases || !empty($proj['other_total'])): ?>
@@ -335,50 +339,16 @@ $hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
     </p>
   <?php endif; ?>
 
-  <?php if (can_edit() && $hasDeptCol): ?>
-    <details class="inline-actions">
-      <summary>Which phase each step belongs to</summary>
-      <p class="muted small">
-        A step's phase is what groups it here, on the expense projection, and in the crew list —
-        so moving <em>Comp</em> to Post-production regroups every one of them at once. It is a
-        <strong>production</strong> fact rather than a financial one, and it is stored with the
-        step, not with the money.
-        <br>
-        The answer is also remembered against the step's <strong>name</strong>, so every future
-        project starts with it filled in rather than asking again. Free text: type a phase that
-        isn't listed and it becomes one.
-      </p>
-      <form method="post">
-        <input type="hidden" name="save_departments" value="1">
-        <table class="review-table">
-          <thead><tr><th>Step</th><th>Covers</th><th>Phase</th></tr></thead>
-          <tbody>
-          <?php foreach (pipeline_steps($pdo, $projectId) as $st): ?>
-            <tr>
-              <td class="wf-name">
-                <span class="dot" style="background:<?= e($st['color'] ?: '#ccc') ?>"></span><?= e($st['name']) ?>
-              </td>
-              <td class="muted small">
-                <?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?>
-              </td>
-              <td>
-                <input name="department[<?= (int)$st['id'] ?>]" list="phaseOptions"
-                       value="<?= e($st['department'] ?? '') ?>" placeholder="no phase set" size="20">
-              </td>
-            </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-        <datalist id="phaseOptions">
-          <?php foreach (department_options($pdo) as $d): ?><option value="<?= e($d) ?>"></option><?php endforeach; ?>
-        </datalist>
-        <div class="actions"><button type="submit">Save phases</button></div>
-      </form>
-    </details>
-  <?php elseif (!$hasDeptCol): ?>
+  <?php if (!$hasDeptCol): ?>
     <p class="muted small warn-text">
       Phases need migration <strong>015</strong>, which hasn't been applied — so everything groups
       as <em>Unassigned</em>.
+    </p>
+  <?php elseif (can_edit()): ?>
+    <p class="muted small">
+      Which phase each step belongs to is set at the top of the
+      <a href="finance_project.php?project=<?= $projectId ?>&amp;tab=projection">Expense
+      projection</a> — beside the table it regroups.
     </p>
   <?php endif; ?>
 <?php endif; ?>
@@ -419,6 +389,64 @@ $hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
 <?php if ($tab === 'projection'): ?>
 
 <h3>Expense projection</h3>
+
+<?php
+// The phase editor sits HERE rather than on the Overview, at David's request.
+// It belongs beside the thing it regroups: this table's department bands, its
+// subtotals and the export built from them all key on pipeline_steps.department,
+// so the question "should Comp be Post-production?" is asked while looking at
+// this page and answered without leaving it.
+//
+// Still a production fact, not a financial one — it is written on the ordinary
+// connection and it regroups the crew list and the timeline too.
+?>
+<?php if ($hasDeptCol && can_edit()): ?>
+  <details class="inline-actions">
+    <summary>Which phase each step belongs to</summary>
+    <p class="muted small">
+      A step's phase is what groups it here, on the expense projection, and in the crew list —
+      so moving <em>Comp</em> to Post-production regroups every one of them at once. It is a
+      <strong>production</strong> fact rather than a financial one, and it is stored with the
+      step, not with the money.
+      <br>
+      The answer is also remembered against the step's <strong>name</strong>, so every future
+      project starts with it filled in rather than asking again. Free text: type a phase that
+      isn't listed and it becomes one.
+    </p>
+    <form method="post">
+      <input type="hidden" name="save_departments" value="1">
+      <table class="review-table">
+        <thead><tr><th>Step</th><th>Covers</th><th>Phase</th></tr></thead>
+        <tbody>
+        <?php foreach (pipeline_steps($pdo, $projectId) as $st): ?>
+          <tr>
+            <td class="wf-name">
+              <span class="dot" style="background:<?= e($st['color'] ?: '#ccc') ?>"></span><?= e($st['name']) ?>
+            </td>
+            <td class="muted small">
+              <?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?>
+            </td>
+            <td>
+              <input name="department[<?= (int)$st['id'] ?>]" list="phaseOptions"
+                     value="<?= e($st['department'] ?? '') ?>" placeholder="no phase set" size="20">
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      <datalist id="phaseOptions">
+        <?php foreach (department_options($pdo) as $d): ?><option value="<?= e($d) ?>"></option><?php endforeach; ?>
+      </datalist>
+      <div class="actions"><button type="submit">Save phases</button></div>
+    </form>
+  </details>
+<?php elseif (!$hasDeptCol): ?>
+  <p class="muted small warn-text">
+    Phases need migration <strong>015</strong>, which hasn't been applied, so every row below
+    groups as <em>Unassigned</em>.
+  </p>
+<?php endif; ?>
+
 
 <p class="page-actions">
   <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
