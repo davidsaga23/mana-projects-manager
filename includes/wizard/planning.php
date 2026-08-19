@@ -14,6 +14,24 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
     $projectId = (int)$project['id'];
     $action = $_POST['action'] ?? 'save';
 
+    // The retake allowance, editable here as well as on Basics (David,
+    // 2026-08-17). It is the one project-wide number that changes every figure
+    // on this screen, and walking back to step 1 to try 5% instead of 10% is
+    // enough friction that nobody does it.
+    //
+    // Saved before the action branches, so it lands whichever button was
+    // pressed — including "spread", which posts the same form.
+    //
+    // ⚠ THE CAP IS THE SAME 200% BASICS APPLIES, deliberately duplicated rather
+    // than trusted to one screen: a mistyped 1000 would silently multiply every
+    // person-day on the project by eleven, and the two entry points must not
+    // disagree about what is allowed (DECISIONS, 2026-08-12).
+    if (isset($_POST['retake_pct'])) {
+        $r = trim((string)$_POST['retake_pct']);
+        set_project_setting($pdo, $projectId, 'retake_pct',
+            (string)min(200, max(0, $r === '' ? 0 : (float)$r)));
+    }
+
     if ($action === 'spread') {
         $start = $project['start_date'] ?: date('Y-m-d');
         $end   = $project['delivery_date'];
@@ -275,6 +293,22 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       // dates, and a script block would be a second thing to keep in step.
       $holidayList = implode(',', array_keys(non_working_days($pdo)));
       ?>
+      <?php
+      // Above the table because it applies to every row in it. Everything below
+      // — the minimum, the duration, the crew a date needs — moves when this
+      // moves, which is exactly why it belongs where the effect is visible.
+      ?>
+      <p class="retake-bar">
+        <label for="retake-pct"><strong>Retake allowance</strong></label>
+        <input type="number" id="retake-pct" name="retake_pct" min="0" max="200" step="any"
+               value="<?= e(fmt_num($retakePct)) ?>"> %
+        <span class="muted small">
+          added to the time each item takes, never to the number of items — 22 assets are still
+          22 assets after a revision, they just take longer. Every figure below includes it, and
+          the <strong>Retakes</strong> column shows what it comes to in days.
+        </span>
+      </p>
+
       <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>"
              data-retake="<?= e(fmt_num($retakePct)) ?>"
              data-holidays="<?= e($holidayList) ?>">
@@ -312,6 +346,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           ?>
           <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
           <th title="How long the step takes at these settings: the work divided by the people on it. The line under it compares that against the working days left between today and the deadline.">Duration<div class="muted small">at these settings</div></th>
+          <?php // What the percentage above actually costs this step, in days.
+                // A percentage is easy to nod at; the days it becomes are what
+                // somebody has to find room for. ?>
+          <th title="What the retake allowance adds to this step, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
           <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
@@ -407,6 +445,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // it — all three are recalculated as you type. ?>
           <td class="minimum"><span class="muted">—</span></td>
           <td class="duration"><span class="muted">—</span></td>
+          <td class="retake-days"><span class="muted">—</span></td>
           <td class="verdict"><span class="muted">—</span></td>
           <?php // Filled by wizard.js in exactly the format the Minimum cell uses,
                 // so the two read as the same kind of number rather than as two

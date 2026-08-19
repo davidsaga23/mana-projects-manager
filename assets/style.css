@@ -139,6 +139,17 @@ label.inline input { width: auto; }
    is about the show in front of you and most of it is editable; everything right
    of it is the base sheet's opinion, set under Finance management and read-only
    here. Mixing the two is what let a studio standard be read as a duration. */
+/* The retake allowance, above the table it governs. Editable here because it
+   changes every figure below it, and walking back to step 1 to try 5% instead
+   of 10% is enough friction that nobody does it. */
+.retake-bar {
+  background: #fffbee; border: 1px solid #e8d9a8; border-radius: 4px;
+  padding: 9px 12px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap;
+}
+.retake-bar input { width: 6em; }
+.retake-bar label { display: inline; margin: 0; }
+
 .planning-table th.col-sep,
 .planning-table td.col-sep { border-left: 2px solid #b9c4cd; }
 

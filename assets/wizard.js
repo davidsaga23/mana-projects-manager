@@ -78,9 +78,23 @@
   var table = document.getElementById('planning-table');
   if (!table) return;
   var today = table.getAttribute('data-today');
+
   // Retakes scale how long each item takes, so they scale the crew a date needs.
   // Must match project_retake_pct() / retake_factor() in includes/quota.php.
-  var retakeFactor = 1 + ((parseFloat(table.getAttribute('data-retake')) || 0) / 100);
+  //
+  // Read from the FIELD, not once from the table, because the allowance is now
+  // editable on this screen — a value captured at load would leave every figure
+  // below describing the old percentage while the box showed the new one, which
+  // is the worst kind of stale: it looks live.
+  var retakeInput = document.getElementById('retake-pct');
+  function retakePct() {
+    if (retakeInput) {
+      var v = parseFloat(retakeInput.value);
+      if (!isNaN(v)) return Math.min(200, Math.max(0, v));   // the same cap PHP applies
+    }
+    return parseFloat(table.getAttribute('data-retake')) || 0;
+  }
+  function retakeFactor() { return 1 + (retakePct() / 100); }
 
   // NEVER new Date('2026-08-05') — that parses as UTC and reads back a day
   // earlier in a UTC-6 timezone. Building from parts gives local midnight.
@@ -193,13 +207,29 @@
 
       // Retakes lengthen each item, exactly as in step_quota(). A duration that
       // ignored them would disagree with the verdict in the next column.
-      var personDays = units * (perUnit > 0 ? perUnit : 1) * retakeFactor;
+      var personDays = units * (perUnit > 0 ? perUnit : 1) * retakeFactor();
 
       if (head === null || head <= 0) {
         return sayDuration(
           '<span class="muted">' + fmtRate(personDays) + ' person-days</span>'
           + '<div class="muted small">set people to get a duration</div>'
         );
+      }
+
+      // What the allowance costs THIS step, in days. A percentage is easy to
+      // nod at; the days it becomes are what somebody has to find room for.
+      var bare = units * (perUnit > 0 ? perUnit : 1);
+      var retakeDays = personDays - bare;
+      var retakeCell = row.querySelector('.retake-days');
+      if (retakeCell) {
+        if (retakeDays <= 0.0001) {
+          retakeCell.innerHTML = '<span class="muted">none</span>';
+        } else {
+          retakeCell.innerHTML = '<strong>' + fmtRate(retakeDays) + '</strong>'
+            + '<div class="muted small">person-days'
+            + (head > 0 ? ' · ' + fmtRate(retakeDays / head) + ' on the duration' : '')
+            + '</div>';
+        }
       }
 
       var elapsed = personDays / head;
@@ -254,7 +284,7 @@
     updateDuration(days);
 
     var teamPerDay = units / days;
-    var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor;
+    var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor();
     var needed = Math.ceil(required);
 
     // ---- the minimum, and how it compares with the studio ideal ------------
@@ -329,8 +359,8 @@
     if (head !== null && head > 0) {
       line2 = fmtRate(teamPerDay / head) + ' ' + label + '/day each · ' + line2;
     }
-    if (retakeFactor > 1) {
-      line2 += ' · includes ' + fmtRate((retakeFactor - 1) * 100) + '% retakes';
+    if (retakeFactor() > 1) {
+      line2 += ' · includes ' + fmtRate(retakePct()) + '% retakes';
     }
     if (estimated) line2 += ' · from the pre-production estimate';
 
@@ -350,6 +380,13 @@
     var row = e.target.closest('tr');
     if (row) recalc(row);
   });
+
+  // The allowance applies to every row, so editing it re-runs all of them
+  // rather than the one that happens to be focused.
+  if (retakeInput) {
+    retakeInput.addEventListener('input', recalcAll);
+    retakeInput.addEventListener('change', recalcAll);
+  }
 
   recalcAll();
 })();
