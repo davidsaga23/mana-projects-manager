@@ -261,8 +261,23 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
     <form method="post">
       <button type="submit" name="action" value="save" hidden></button>
       <?php $retakePct = project_retake_pct($pdo, $projectId); ?>
+      <?php
+      // ⚠ THE HOLIDAYS HAVE TO REACH THE BROWSER, or this screen lies.
+      //
+      // working_days_between() on the server subtracts non_working_days; the
+      // live check in wizard.js only skipped weekends. So every window spanning
+      // a studio holiday showed MORE available days here than the scheduler
+      // would use — "1 is enough" on a plan the server thinks is short. The
+      // error was always in the OPTIMISTIC direction, which is exactly what the
+      // 2026-08-12 calendar entry calls the worst one for a deadline.
+      //
+      // Passed as a plain comma-separated list rather than JSON: it is a set of
+      // dates, and a script block would be a second thing to keep in step.
+      $holidayList = implode(',', array_keys(non_working_days($pdo)));
+      ?>
       <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>"
-             data-retake="<?= e(fmt_num($retakePct)) ?>">
+             data-retake="<?= e(fmt_num($retakePct)) ?>"
+             data-holidays="<?= e($holidayList) ?>">
         <thead>
         <tr>
           <th>Step</th>
@@ -277,7 +292,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // both headings was being read as the other column. A header and its
                 // cells are two lists that have to be kept in step by hand, and
                 // nothing warns when they drift. ?>
-          <th title="What the studio says this step should take, from the Ideal quotas base sheet for this kind of project. Read-only here.">Studio ideal</th>
+          <?php // Minimum sits immediately before the ideal so the two can be read
+                // against each other without moving your eyes across the row. It is
+                // the arithmetic one: work left over working days left over people,
+                // and nothing on this screen can edit it. ?>
+          <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
+          <th title="What the studio says one item should take, from the Ideal quotas base sheet for this kind of project. Read-only here — set it under Finance management.">Studio ideal<div class="muted small">per item</div></th>
           <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
           <th>Is that enough?</th>
         </tr>
@@ -291,9 +311,17 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         // tag on its own line: a closing PHP tag written inside a one-line
         // comment still ends PHP mode (lesson 9 in START_HERE).
         ?>
+        <?php
+        // The studio ideal for this step, as a data attribute so the live check
+        // can compare it against the minimum as you type. Rendering the verdict
+        // server-side would only be right until the first keystroke.
+        $rowStd = $idealSheet[standard_key($s['name'], $s['applies_to'] ?? 'shot',
+                                           $s['applies_to_asset_type'] ?? '')] ?? null;
+        ?>
         <tr data-units="<?= e(fmt_num($work['units_raw'] ?? $work['units'], 3)) ?>"
             data-label="<?= e($work['label']) ?>"
-            data-estimated="<?= !empty($work['estimated']) ? '1' : '0' ?>">
+            data-estimated="<?= !empty($work['estimated']) ? '1' : '0' ?>"
+            data-ideal="<?= $rowStd ? e(fmt_num((float)$rowStd['days_per_unit'], 4)) : '' ?>">
           <td class="wf-name">
             <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span>
             <?= e($s['name']) ?>
@@ -352,7 +380,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                                           $s['applies_to_asset_type'] ?? '')] ?? null;
           $planned = (float)($s['days_per_unit'] ?: 0);
           ?>
-          <td class="small">
+          <?php // Filled by wizard.js, like the duration and the verdict beside
+                // it — all three are recalculated as you type. ?>
+          <td class="minimum"><span class="muted">—</span></td>
+          <td class="small ideal-cell">
             <?php if ($std === null): ?>
               <span class="muted">no standard</span>
             <?php else:

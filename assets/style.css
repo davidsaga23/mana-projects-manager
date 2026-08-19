@@ -132,6 +132,12 @@ label.inline input { width: auto; }
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .row label { flex: 1 1 150px; }
 .stack { max-width: 620px; }
+/* The studio ideal cannot keep up with what the deadline demands. Red because it
+   is not a preference — the plan is asking for more per person per day than the
+   studio says the work allows. */
+.quota-short { background: #fdf0f1; }
+.quota-short strong, .quota-short .ok { color: #8f222c; }
+
 /* Splits the top bar's three main destinations from the occasional ones. */
 .nav-sep { margin: 0 8px; color: #b9c4cd; }
 

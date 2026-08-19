@@ -90,14 +90,39 @@
     return new Date(+p[0], +p[1] - 1, +p[2]);
   }
 
-  // Mon–Fri between two dates, both ends INCLUSIVE — the platform-wide rule.
+  // The studio calendar, handed over by planning.php in data-holidays.
+  //
+  // ⚠ THIS SET IS WHY THE FUNCTION BELOW AGREES WITH THE SERVER. Without it the
+  // live check counted every weekday, including the days the studio is closed,
+  // so a window spanning a holiday showed more available days here than
+  // working_days_between() would allow — "1 is enough" on a plan the scheduler
+  // thinks is short. Always in the OPTIMISTIC direction, which the 2026-08-12
+  // calendar entry names as the worst one for a deadline. (Fixed 2026-08-17.)
+  var holidays = {};
+  (function () {
+    var raw = (table.getAttribute('data-holidays') || '').split(',');
+    for (var i = 0; i < raw.length; i++) {
+      var d = raw[i].trim();
+      if (d) holidays[d] = true;
+    }
+  })();
+
+  function ymd(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  // Mon–Fri MINUS the studio calendar, both ends INCLUSIVE — the platform-wide
+  // rule, and the same one working_days_between() applies in PHP. These two must
+  // move together; a screen that disagrees with the scheduler about how many
+  // days there are is worse than one that shows nothing.
   function workingDays(fromStr, toStr) {
     var d = parseDate(fromStr), end = parseDate(toStr);
     if (!d || !end || end < d) return 0;
     var n = 0, guard = 0;
     while (d <= end && guard++ < 20000) {
       var dow = d.getDay();               // 0 = Sunday, 6 = Saturday
-      if (dow !== 0 && dow !== 6) n++;
+      if (dow !== 0 && dow !== 6 && !holidays[ymd(d)]) n++;
       d.setDate(d.getDate() + 1);
     }
     return n;
@@ -231,6 +256,41 @@
     var teamPerDay = units / days;
     var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor;
     var needed = Math.ceil(required);
+
+    // ---- the minimum, and how it compares with the studio ideal ------------
+    //
+    // Both are ITEMS PER PERSON PER DAY, which is the only comparison that
+    // means anything: the ideal describes one artist working on one item, so
+    // the team rate has to be divided by the people on it first.
+    //
+    // The minimum is arithmetic — work left, over working days left, over
+    // people — and nothing on this screen can edit it. That is exactly what
+    // makes it worth measuring the ideal against.
+    var minPerArtist = (head !== null && head > 0) ? (teamPerDay / head) : null;
+    var minCell = row.querySelector('.minimum');
+    if (minCell) {
+      if (minPerArtist === null) {
+        minCell.innerHTML = '<span class="muted">set people</span>';
+      } else {
+        minCell.innerHTML = '<strong>' + fmtRate(minPerArtist) + '</strong>'
+          + '<div class="muted small">' + label + '/day each</div>';
+      }
+    }
+
+    // The ideal is stored as DAYS PER ITEM; its pace is the reciprocal. Red when
+    // the studio's pace cannot keep up with what the deadline demands — the plan
+    // is then asking for more per person per day than the studio says the work
+    // allows, and no amount of goodwill closes that. More people, more time, or
+    // less work.
+    var idealDays = parseFloat(row.getAttribute('data-ideal'));
+    var idealCell = row.querySelector('.ideal-cell');
+    if (idealCell) {
+      idealCell.classList.remove('quota-short');
+      if (idealDays > 0 && minPerArtist !== null) {
+        var idealPerDay = 1 / idealDays;
+        if (idealPerDay < minPerArtist - 0.0001) idealCell.classList.add('quota-short');
+      }
+    }
 
     var line1, cls = '';
     if (head === null || head <= 0) {
