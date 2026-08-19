@@ -89,6 +89,15 @@ function standards_list(PDO $pdo, string $projectType): array {
     if (!standards_available($pdo)) return [];
     $stmt = $pdo->prepare(
         'SELECT qs.*,
+                (SELECT ps.color
+                   FROM pipeline_steps ps
+                   JOIN projects p ON p.id = ps.project_id
+                  WHERE p.type = qs.project_type
+                    AND ps.name = qs.step_name
+                    AND ps.applies_to = qs.applies_to
+                    AND COALESCE(ps.applies_to_asset_type, \'\') = qs.applies_to_asset_type
+                  ORDER BY ps.step_order LIMIT 1
+                ) AS color,
                 (SELECT MIN(ps.step_order)
                    FROM pipeline_steps ps
                    JOIN projects p ON p.id = ps.project_id
@@ -241,14 +250,19 @@ function standards_drift(PDO $pdo, array $project): array {
                 $verdict = 'Planned at the studio standard.';
                 $state   = 'ok';
             } elseif ($ratio < 1) {
-                $verdict = sprintf('Planned %s%% FASTER than the standard — %s a day against %s.',
+                // Under the money, whatever else it is. Deliverability is a
+                // separate question and a separate warning.
+                $verdict = sprintf('Planned %s%% faster than the standard — %s a day against %s.',
                     fmt_num((1 - $ratio) * 100, 0),
                     fmt_num($planned > 0 ? 1 / $planned : 0, 2),
                     fmt_num(1 / $ideal, 2));
                 $state   = 'fast';
             } else {
-                $verdict = sprintf('Planned %s%% slower than the standard, which is the safe direction.',
-                    fmt_num(($ratio - 1) * 100, 0));
+                // The budget is built on the standard, so slower than it is
+                // spending days nobody costed — not "the safe direction", which
+                // is what this said before David corrected it (2026-08-17).
+                $verdict = sprintf('Planned %s%% SLOWER than the standard — beyond the days the '
+                                 . 'budget was built on.', fmt_num(($ratio - 1) * 100, 0));
                 $state   = 'slow';
             }
         }

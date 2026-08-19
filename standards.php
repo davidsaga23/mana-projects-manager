@@ -75,6 +75,7 @@ if ($ready) {
     $stmt = $pdo->prepare(
         'SELECT ps.name, ps.applies_to, COALESCE(ps.applies_to_asset_type, \'\') AS asset_type,
                 COUNT(DISTINCT ps.project_id) AS projects,
+                MIN(ps.color) AS color,
                 ROUND(AVG(NULLIF(ps.days_per_unit, 0)), 2) AS avg_days
            FROM pipeline_steps ps
            JOIN projects p ON p.id = ps.project_id
@@ -148,19 +149,22 @@ require __DIR__ . '/includes/header.php';
     // columns give up the width.
     ?>
     <table class="grid-table standards-table">
+      <?php
+      // Covers and Asset type stopped being columns: with the scope printed under
+      // the step name — the way Dates & headcount prints it — they were the same
+      // fact written twice, in three columns instead of one.
+      ?>
       <colgroup>
-        <col style="width:14%"> <?php // Step ?>
-        <col style="width:10%"> <?php // Covers ?>
-        <col style="width:12%"> <?php // Asset type ?>
-        <col style="width:9%">  <?php // Days per item ?>
-        <col style="width:8%">  <?php // Which is ?>
-        <col style="width:9%">  <?php // Typical headcount ?>
-        <col style="width:21%"> <?php // Where the number came from ?>
-        <col style="width:17%"> <?php // Notes ?>
+        <col style="width:22%"> <?php // Step + scope ?>
+        <col style="width:10%"> <?php // Days per item ?>
+        <col style="width:9%">  <?php // Which is ?>
+        <col style="width:11%"> <?php // Typical headcount ?>
+        <col style="width:26%"> <?php // Where the number came from ?>
+        <col style="width:22%"> <?php // Notes ?>
       </colgroup>
         <thead>
           <tr>
-            <th>Step</th><th>Covers</th><th>Asset type</th>
+            <th>Step</th>
             <th>Days per item</th><th>Which is</th>
             <th>Typical headcount</th><th>Where the number came from</th><th>Notes</th>
           </tr>
@@ -173,19 +177,25 @@ require __DIR__ . '/includes/header.php';
         // never written down what it takes".
         $r = 0;
         foreach ($standards as $s): $n = 'rows[' . $r++ . ']'; ?>
+          <?php
+          // ⚠ THE STEP IS AN IDENTITY, NOT A FIELD. Editing the name here would not
+          // rename anything — it is half of the key this row is stored under
+          // (project type + name + scope), so a changed name silently creates a
+          // SECOND standard and orphans the first, which then goes on pricing
+          // nothing. Shown, carried in hidden inputs, and not typeable.
+          //
+          // Drawn exactly as Dates & headcount draws it — the step's own colour,
+          // its name, and the scope underneath — because the two screens are read
+          // against each other and should look like they describe the same thing.
+          ?>
           <tr>
-            <td><input name="<?= $n ?>[step_name]" value="<?= e($s['step_name']) ?>" size="18"></td>
-            <td>
-              <select name="<?= $n ?>[applies_to]">
-                <?php foreach (['shot' => 'shots', 'asset' => 'assets', 'both' => 'both',
-                                'project' => 'whole project'] as $k => $lbl): ?>
-                  <option value="<?= $k ?>" <?= $s['applies_to'] === $k ? 'selected' : '' ?>><?= $lbl ?></option>
-                <?php endforeach; ?>
-              </select>
+            <td class="wf-name">
+              <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['step_name']) ?>
+              <div class="muted small step-scope"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?: null)) ?></div>
+              <input type="hidden" name="<?= $n ?>[step_name]" value="<?= e($s['step_name']) ?>">
+              <input type="hidden" name="<?= $n ?>[applies_to]" value="<?= e($s['applies_to']) ?>">
+              <input type="hidden" name="<?= $n ?>[applies_to_asset_type]" value="<?= e($s['applies_to_asset_type']) ?>">
             </td>
-            <td><input name="<?= $n ?>[applies_to_asset_type]"
-                       value="<?= e($s['applies_to_asset_type']) ?>" size="12"
-                       placeholder="any"></td>
             <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"
                        value="<?= e(fmt_num((float)$s['days_per_unit'], 2)) ?>"></td>
             <td class="muted small"><?= e(fmt_num(1 / max(0.001, (float)$s['days_per_unit']), 2)) ?> a day</td>
@@ -198,18 +208,17 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
 
         <?php foreach ($missing as $m): $n = 'rows[' . $r++ . ']'; ?>
+          <?php // Same identity treatment as the rows above: these come straight
+                // out of real pipelines, so their name and scope are facts rather
+                // than fields. Only the standard itself is typed. ?>
           <tr class="has-problem">
-            <td><input name="<?= $n ?>[step_name]" value="<?= e($m['name']) ?>" size="18"></td>
-            <td>
-              <select name="<?= $n ?>[applies_to]">
-                <?php foreach (['shot' => 'shots', 'asset' => 'assets', 'both' => 'both',
-                                'project' => 'whole project'] as $k => $lbl): ?>
-                  <option value="<?= $k ?>" <?= $m['applies_to'] === $k ? 'selected' : '' ?>><?= $lbl ?></option>
-                <?php endforeach; ?>
-              </select>
+            <td class="wf-name">
+              <span class="dot" style="background:<?= e($m['color'] ?: '#ccc') ?>"></span><?= e($m['name']) ?>
+              <div class="muted small step-scope"><?= e(applies_to_phrase($m['applies_to'], $m['asset_type'] ?: null)) ?></div>
+              <input type="hidden" name="<?= $n ?>[step_name]" value="<?= e($m['name']) ?>">
+              <input type="hidden" name="<?= $n ?>[applies_to]" value="<?= e($m['applies_to']) ?>">
+              <input type="hidden" name="<?= $n ?>[applies_to_asset_type]" value="<?= e($m['asset_type']) ?>">
             </td>
-            <td><input name="<?= $n ?>[applies_to_asset_type]"
-                       value="<?= e($m['asset_type']) ?>" size="12"></td>
             <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6" placeholder=""></td>
             <td class="muted small">
               planned at <?= e(fmt_num((float)$m['avg_days'], 2)) ?> on
@@ -222,17 +231,21 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
 
         <?php for ($k = 0; $k < 5; $k++): $n = 'rows[' . $r++ . ']'; ?>
+          <?php // The blank rows DO keep their fields — this is the only way to
+                // write a standard for a step no project runs yet, and there is no
+                // identity to display because there isn't one until it is typed.
+                // All three parts stack into the one Step column. ?>
           <tr>
-            <td><input name="<?= $n ?>[step_name]" size="18" placeholder="A step"></td>
             <td>
-              <select name="<?= $n ?>[applies_to]">
+              <input name="<?= $n ?>[step_name]" placeholder="A new step">
+              <select name="<?= $n ?>[applies_to]" class="new-standard-scope">
                 <option value="shot">shots</option>
                 <option value="asset">assets</option>
                 <option value="both">both</option>
                 <option value="project">whole project</option>
               </select>
+              <input name="<?= $n ?>[applies_to_asset_type]" placeholder="asset type — any">
             </td>
-            <td><input name="<?= $n ?>[applies_to_asset_type]" size="12" placeholder="any"></td>
             <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"></td>
             <td class="muted small">—</td>
             <td><input name="<?= $n ?>[typical_headcount]" inputmode="decimal" size="5"></td>

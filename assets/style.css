@@ -162,6 +162,13 @@ label.inline input { width: auto; }
 }
 .standards-table th, .standards-table td { padding: 7px 6px; }
 .standards-table td { vertical-align: middle; word-break: break-word; }
+/* The step identity, drawn like Dates & headcount: colour, name, scope beneath.
+   Overrides .wf-name nowrap, which would force this column wide again. */
+.standards-table .wf-name { white-space: normal; vertical-align: top; }
+.standards-table .step-scope { font-weight: 400; margin-top: 2px; }
+/* The blank rows stack three fields into the Step column, so they need room
+   between them. */
+.standards-table .new-standard-scope { margin: 3px 0; }
 
 /* The retake allowance, above the table it governs. Editable here because it
    changes every figure below it, and walking back to step 1 to try 5% instead

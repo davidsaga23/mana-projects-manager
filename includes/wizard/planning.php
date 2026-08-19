@@ -504,14 +504,26 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
             <?php else: ?>
               <strong><?= e(fmt_num((float)$std['days_per_unit'], 2)) ?></strong>
               <?php
-              // Planned FASTER than the studio standard is the direction worth
-              // flagging. Slower is somebody being careful and needs no warning.
+              // ⚠ SLOWER IS THE RED ONE, AND THE REASON IS THE BUDGET.
+              //
+              // This read the other way round until David corrected it
+              // (2026-08-17), and the correction follows from a change made the
+              // same day: the expense projection is now computed from the IDEAL,
+              // not from the days typed here. So a step planned SLOWER than the
+              // standard spends days the budget never bought — the schedule and
+              // the money disagree, and the money is the one that was signed.
+              //
+              // Planning FASTER is not a warning on this axis: it comes in under
+              // the money. Whether it can actually be delivered is a different
+              // question, and the Studio ideal cell beside this one answers it by
+              // reddening when that pace cannot meet the deadline.
               if ($planned > 0 && (float)$std['days_per_unit'] > 0):
                   $ratio = $planned / (float)$std['days_per_unit'];
-                  if ($ratio < 0.95): ?>
-                    <div class="err small">planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster</div>
-                  <?php elseif ($ratio > 1.05): ?>
-                    <div class="muted small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower</div>
+                  if ($ratio > 1.05): ?>
+                    <div class="err small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower
+                      — beyond the budgeted days</div>
+                  <?php elseif ($ratio < 0.95): ?>
+                    <div class="muted small">planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster</div>
                   <?php endif;
               endif; ?>
             <?php endif; ?>
