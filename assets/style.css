@@ -276,7 +276,10 @@ label.inline input { width: auto; }
 .planning-table th,
 .planning-table td { padding: 7px 5px; }
 
-.planning-table { width: 100%; font-size: 14px; }
+/* fixed, so the colgroup above actually governs. Under the default `auto` the
+   browser sizes columns from their content and treats width as advice — which is
+   why compressing one column and expanding another did nothing at all. */
+.planning-table { width: 100%; font-size: 14px; table-layout: fixed; }
 .planning-table td { vertical-align: top; }
 .planning-table th { vertical-align: bottom; }
 
@@ -284,16 +287,19 @@ label.inline input { width: auto; }
    the "= 4.0 deliverable/day" note up with the notes in the columns beside it:
    they are all the second line of their cell, so they only agree if the first
    lines are the same height. */
-.planning-table input { padding: 3px 5px; font-size: 13px; line-height: 1.3; }
-.planning-table input[type="number"] { width: 4.6em; }
-.planning-table input[type="date"]   { width: 8.4em; }
+/* Under a fixed layout an input wider than its column overflows it rather than
+   widening it, so every input is told to be exactly its column instead. */
+.planning-table input {
+  padding: 3px 5px; font-size: 13px; line-height: 1.3;
+  width: 100%; box-sizing: border-box; min-width: 0;
+}
 /* Stacked, so the column costs one date's width instead of two. */
 .planning-table .date-pair input { display: block; }
 .planning-table .date-pair input + input { margin-top: 3px; }
 
 /* The step name and its scope, stacked. Overrides .wf-name's nowrap, which is
    right on the workflow screen and is exactly what made this column too wide. */
-.planning-table .wf-name { white-space: normal; min-width: 8.5em; }
+.planning-table .wf-name { white-space: normal; word-break: break-word; }
 .planning-table .step-scope { font-weight: 400; margin-top: 2px; }
 
 /* Every annotation column wraps freely and is kept narrow. */
@@ -301,8 +307,8 @@ label.inline input { width: auto; }
 .planning-table .retake-days,
 .planning-table .duration,
 .planning-table .ideal-cell,
-.planning-table .ideal-days { white-space: normal; width: 5em; }
-.planning-table .verdict    { white-space: normal; min-width: 11em; }
+.planning-table .ideal-days,
+.planning-table .verdict { white-space: normal; word-break: break-word; }
 .planning-table .dpu-hint   { margin-top: 3px; white-space: normal; }
 
 /* Header labels wrap too — "Minimum / per person / day" is three short lines
@@ -439,7 +445,7 @@ label.inline input { width: auto; }
    verdict is prose and wraps happily; it only needs enough width not to break
    after every word. Kept BELOW the fitting block above so this is the rule that
    actually applies — equal specificity, later wins. */
-.planning-table .verdict { font-size: 12.5px; line-height: 1.4; min-width: 0; width: 15em; }
+.planning-table .verdict { font-size: 12.5px; line-height: 1.4; }
 .planning-table .verdict-short { background: #fdf0f1; color: #8f222c; }
 .planning-table .verdict-ok    { background: #f0faf2; color: #1a5c28; }
 .planning-table .verdict .muted { font-size: 11.5px; }

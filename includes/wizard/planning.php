@@ -312,6 +312,36 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>"
              data-retake="<?= e(fmt_num($retakePct)) ?>"
              data-holidays="<?= e($holidayList) ?>">
+        <?php
+        // ⚠ WIDTHS ONLY BIND UNDER table-layout: fixed, which the stylesheet sets
+        // for this table. With the default `auto` a browser reads `width` as a
+        // suggestion and then ignores it in favour of the content — which is why
+        // squeezing one column and widening another had no visible effect until
+        // this colgroup existed.
+        //
+        // Twelve percentages, summing to 100. Tuned to David's reading of the
+        // screen (2026-08-17): Step, Work and Days-per-item give space up;
+        // Retakes, Duration and the verdict take it. Changing one means changing
+        // another — that is the point of percentages, and the reason the sum is
+        // written down here rather than discovered by trial.
+        //
+        //   Step 9 · Covers 6 · Work 6 · Dates 11 · Days/item 7 · People 5
+        //   Minimum 8 · Retakes 9 · Duration 9 · Enough? 18 · Ideal 6 · Days 6
+        ?>
+        <colgroup>
+          <col style="width:9%">   <?php // Step ?>
+          <col style="width:6%">   <?php // Covers ?>
+          <col style="width:6%">   <?php // Work ?>
+          <col style="width:11%">  <?php // Dates ?>
+          <col style="width:7%">   <?php // Days per item ?>
+          <col style="width:5%">   <?php // People ?>
+          <col style="width:8%">   <?php // Minimum ?>
+          <col style="width:9%">   <?php // Retakes ?>
+          <col style="width:9%">   <?php // Duration ?>
+          <col style="width:18%">  <?php // Is that enough? ?>
+          <col style="width:6%">   <?php // Studio ideal ?>
+          <col style="width:6%">   <?php // Ideal days ?>
+        </colgroup>
         <thead>
         <tr>
           <th>Step</th>
