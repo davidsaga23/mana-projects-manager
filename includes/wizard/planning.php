@@ -345,11 +345,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           // made a studio standard read as this project's duration.
           ?>
           <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
-          <th title="How long the step takes at these settings: the work divided by the people on it. The line under it compares that against the working days left between today and the deadline.">Duration<div class="muted small">at these settings</div></th>
-          <?php // What the percentage above actually costs this step, in days.
-                // A percentage is easy to nod at; the days it becomes are what
-                // somebody has to find room for. ?>
+          <?php // Retakes sits BEFORE Duration because it is one of the things the
+                // duration is made of: work, plus the allowance, divided by people.
+                // Reading it after the total it feeds is reading the sum before its
+                // parts. ?>
           <th title="What the retake allowance adds to this step, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
+          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days left between today and the deadline.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
           <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
@@ -444,8 +445,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <?php // Filled by wizard.js, like the duration and the verdict beside
                 // it — all three are recalculated as you type. ?>
           <td class="minimum"><span class="muted">—</span></td>
-          <td class="duration"><span class="muted">—</span></td>
           <td class="retake-days"><span class="muted">—</span></td>
+          <td class="duration"><span class="muted">—</span></td>
           <td class="verdict"><span class="muted">—</span></td>
           <?php // Filled by wizard.js in exactly the format the Minimum cell uses,
                 // so the two read as the same kind of number rather than as two
