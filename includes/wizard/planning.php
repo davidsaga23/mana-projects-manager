@@ -296,8 +296,14 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // against each other without moving your eyes across the row. It is
                 // the arithmetic one: work left over working days left over people,
                 // and nothing on this screen can edit it. ?>
+          <?php // Minimum and Studio ideal are deliberately in the SAME unit and
+                // worded the same way, because the whole point is reading one
+                // against the other. Days per item gets its own column rather
+                // than being crammed under the ideal in a second unit — two
+                // numbers in one cell is what made "0.3 d" read as a duration. ?>
           <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
-          <th title="What the studio says one item should take, from the Ideal quotas base sheet for this kind of project. Read-only here — set it under Finance management.">Studio ideal<div class="muted small">per item</div></th>
+          <th title="The pace the studio's ideal implies, in the same unit as the minimum beside it, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
+          <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
           <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
           <th>Is that enough?</th>
         </tr>
@@ -383,28 +389,32 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <?php // Filled by wizard.js, like the duration and the verdict beside
                 // it — all three are recalculated as you type. ?>
           <td class="minimum"><span class="muted">—</span></td>
-          <td class="small ideal-cell">
+          <?php // Filled by wizard.js in exactly the format the Minimum cell uses,
+                // so the two read as the same kind of number rather than as two
+                // different measurements. Rendering it server-side would only be
+                // right until the first keystroke — the unit label follows the
+                // Work column, which the coverage box can change. ?>
+          <td class="ideal-cell"><span class="muted">&mdash;</span></td>
+          <?php // Static: the base sheet does not move as you type on this screen,
+                // and it is read-only here because it is set on the business side. ?>
+          <td class="small ideal-days">
             <?php if ($std === null): ?>
               <span class="muted">no standard</span>
-            <?php else:
-              $ideal = (float)$std['days_per_unit'];
-              $ratio = ($ideal > 0 && $planned > 0) ? $planned / $ideal : null;
-              // Faster than the studio standard is the direction worth flagging.
-              // Slower is somebody being careful, which needs no warning.
-              $cls = ($ratio !== null && $ratio < 0.95) ? 'err'
-                   : (($ratio !== null && $ratio > 1.05) ? 'muted' : 'ok'); ?>
-              <span class="<?= $cls ?>"><?= e(fmt_num($ideal, 2)) ?> d</span>
-              <div class="muted small"><?= e(fmt_num(1 / max(0.001, $ideal), 2)) ?> a day</div>
-              <?php if ($ratio !== null && $ratio < 0.95): ?>
-                <div class="err small">
-                  planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster
-                </div>
-              <?php endif; ?>
+            <?php else: ?>
+              <strong><?= e(fmt_num((float)$std['days_per_unit'], 2)) ?></strong>
+              <?php
+              // Planned FASTER than the studio standard is the direction worth
+              // flagging. Slower is somebody being careful and needs no warning.
+              if ($planned > 0 && (float)$std['days_per_unit'] > 0):
+                  $ratio = $planned / (float)$std['days_per_unit'];
+                  if ($ratio < 0.95): ?>
+                    <div class="err small">planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster</div>
+                  <?php elseif ($ratio > 1.05): ?>
+                    <div class="muted small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower</div>
+                  <?php endif;
+              endif; ?>
             <?php endif; ?>
           </td>
-          <?php /* Filled by wizard.js, like the verdict beside it — both are
-                   recalculated as you type, so rendering a number here on load
-                   would only be right until the first keystroke. */ ?>
           <td class="duration"><span class="muted">—</span></td>
           <td class="verdict"><span class="muted">—</span></td>
         </tr>

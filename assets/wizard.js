@@ -286,9 +286,19 @@
     var idealCell = row.querySelector('.ideal-cell');
     if (idealCell) {
       idealCell.classList.remove('quota-short');
-      if (idealDays > 0 && minPerArtist !== null) {
+      if (!(idealDays > 0)) {
+        idealCell.innerHTML = '<span class="muted">no standard</span>';
+      } else {
         var idealPerDay = 1 / idealDays;
-        if (idealPerDay < minPerArtist - 0.0001) idealCell.classList.add('quota-short');
+        // Written in EXACTLY the shape the Minimum cell uses — same formatter,
+        // same label, same two lines — because the two columns exist to be read
+        // against each other and any difference in presentation reads as a
+        // difference in kind.
+        idealCell.innerHTML = '<strong>' + fmtRate(idealPerDay) + '</strong>'
+          + '<div class="muted small">' + label + '/day each</div>';
+        if (minPerArtist !== null && idealPerDay < minPerArtist - 0.0001) {
+          idealCell.classList.add('quota-short');
+        }
       }
     }
 
