@@ -150,18 +150,6 @@ label.inline input { width: auto; }
 
    nowrap on the annotation columns stops "deliverable/day each" folding onto a
    third line and pushing that row's notes out of step with the rest. */
-.planning-table td { vertical-align: top; }
-.planning-table input[type="number"],
-.planning-table input[type="date"] {
-  padding: 3px 6px; font-size: 14px; line-height: 1.3;
-}
-.planning-table .minimum,
-.planning-table .retake-days,
-.planning-table .ideal-cell,
-.planning-table .ideal-days,
-.planning-table .duration { white-space: nowrap; }
-.planning-table .dpu-hint { margin-top: 3px; white-space: nowrap; }
-
 /* The retake allowance, above the table it governs. Editable here because it
    changes every figure below it, and walking back to step 1 to try 5% instead
    of 10% is enough friction that nobody does it. */
@@ -267,6 +255,59 @@ label.inline input { width: auto; }
 .planning-table input { padding: 5px 7px; font-size: 14px; }
 .step-table input[type=color] { padding: 1px; height: 30px; width: 44px; }
 .step-table td, .workflow-table td, .planning-table td { vertical-align: middle; }
+
+/* =========================================================================
+   Dates & headcount — fitting fourteen columns in a window.
+   =========================================================================
+   ⚠ THIS BLOCK HAS TO SIT AFTER THE TWO RULES ABOVE. An earlier attempt put it
+   near the top of the file, where `vertical-align: middle` on the line above and
+   the `.planning-table input` padding a few lines up both overrode it silently —
+   same specificity, later wins. The screen looked untouched and the CSS looked
+   correct, which is the worst pair.
+
+   THE STRATEGY IS HEIGHT, NOT WIDTH. There are fourteen columns and no amount of
+   trimming makes them all fit on one line each, so every annotation is allowed
+   to wrap onto a second and third line and the columns are squeezed to the width
+   of their widest unbreakable word. A row is taller; nothing is off-screen.  */
+
+/* The base rule is `padding: 8px 12px`, which across thirteen columns is over
+   300px of nothing — more than any single column of content. Trimming it is the
+   largest single win in getting this table inside a window. */
+.planning-table th,
+.planning-table td { padding: 7px 5px; }
+
+.planning-table { width: 100%; font-size: 14px; }
+.planning-table td { vertical-align: top; }
+.planning-table th { vertical-align: bottom; }
+
+/* Inputs shrunk to about the height of a line of text, which is also what lines
+   the "= 4.0 deliverable/day" note up with the notes in the columns beside it:
+   they are all the second line of their cell, so they only agree if the first
+   lines are the same height. */
+.planning-table input { padding: 3px 5px; font-size: 13px; line-height: 1.3; }
+.planning-table input[type="number"] { width: 4.6em; }
+.planning-table input[type="date"]   { width: 8.4em; }
+/* Stacked, so the column costs one date's width instead of two. */
+.planning-table .date-pair input { display: block; }
+.planning-table .date-pair input + input { margin-top: 3px; }
+
+/* The step name and its scope, stacked. Overrides .wf-name's nowrap, which is
+   right on the workflow screen and is exactly what made this column too wide. */
+.planning-table .wf-name { white-space: normal; min-width: 8.5em; }
+.planning-table .step-scope { font-weight: 400; margin-top: 2px; }
+
+/* Every annotation column wraps freely and is kept narrow. */
+.planning-table .minimum,
+.planning-table .retake-days,
+.planning-table .duration,
+.planning-table .ideal-cell,
+.planning-table .ideal-days { white-space: normal; width: 5em; }
+.planning-table .verdict    { white-space: normal; min-width: 11em; }
+.planning-table .dpu-hint   { margin-top: 3px; white-space: normal; }
+
+/* Header labels wrap too — "Minimum / per person / day" is three short lines
+   rather than one long one. */
+.planning-table th { white-space: normal; }
 .drag-handle {
   cursor: grab; user-select: none; white-space: nowrap;
   color: #8a97a3; padding-right: 4px;
@@ -394,7 +435,11 @@ label.inline input { width: auto; }
 
 .pct-field { white-space: nowrap; color: #5a6a7a; font-size: 13px; }
 .pct-field input { width: 62px; padding: 5px 6px; font-size: 14px; margin-right: 2px; }
-.planning-table .verdict { font-size: 13px; line-height: 1.45; min-width: 260px; }
+/* 260px here used to force the table wider than the window on its own. The
+   verdict is prose and wraps happily; it only needs enough width not to break
+   after every word. Kept BELOW the fitting block above so this is the rule that
+   actually applies — equal specificity, later wins. */
+.planning-table .verdict { font-size: 12.5px; line-height: 1.4; min-width: 0; width: 15em; }
 .planning-table .verdict-short { background: #fdf0f1; color: #8f222c; }
 .planning-table .verdict-ok    { background: #f0faf2; color: #1a5c28; }
 .planning-table .verdict .muted { font-size: 11.5px; }

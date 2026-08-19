@@ -317,7 +317,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <th>Step</th>
           <th title="How much of its scope this step actually touches. FX might only land on a third of the running time.">Covers</th>
           <th title="The amount of work the quota is calculated from, after the coverage percentage is applied.">Work</th>
-          <th>Starts</th><th>Deadline</th>
+          <?php // Two date columns became one, stacked. A native date input cannot
+                // be made much narrower than the text it holds, so two of them side
+                // by side were ~250px of the table's width for two values that are
+                // always read together. Stacked they cost one column and a little
+                // height — which is the trade this whole screen now makes. ?>
+          <th>Dates<div class="muted small">start / deadline</div></th>
           <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
           <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
           <?php // Studio ideal sits BEFORE Duration because that is the order the
@@ -376,10 +381,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
             data-label="<?= e($work['label']) ?>"
             data-estimated="<?= !empty($work['estimated']) ? '1' : '0' ?>"
             data-ideal="<?= $rowStd ? e(fmt_num((float)$rowStd['days_per_unit'], 4)) : '' ?>">
+          <?php // The scope goes on its own line under the name rather than beside
+                // it. "Concept Character assets" on one unbreakable line is what
+                // made this column wide enough to push the table off the screen;
+                // stacked, the column needs the width of the longer of the two. ?>
           <td class="wf-name">
-            <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span>
-            <?= e($s['name']) ?>
-            <span class="muted small"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?><?= $s['tracks_seconds'] ? ' · seconds' : '' ?></span>
+            <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?>
+            <div class="muted small step-scope"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?><?= $s['tracks_seconds'] ? ' · seconds' : '' ?></div>
           </td>
           <td>
             <?php if ($s['applies_to'] === 'project'): ?>
@@ -405,8 +413,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
               <div><span class="est-tag">est.</span></div>
             <?php endif; ?>
           </td>
-          <td><input type="date" name="start_date[<?= $id ?>]" value="<?= e($s['start_date'] ?? '') ?>"></td>
-          <td><input type="date" name="deadline[<?= $id ?>]" value="<?= e($s['deadline'] ?? '') ?>"></td>
+          <td class="date-pair">
+            <input type="date" name="start_date[<?= $id ?>]" value="<?= e($s['start_date'] ?? '') ?>"
+                   title="Starts">
+            <input type="date" name="deadline[<?= $id ?>]" value="<?= e($s['deadline'] ?? '') ?>"
+                   title="Deadline">
+          </td>
           <?php /* step="any" rather than a fixed increment — real estimates land on
                    awkward numbers like 1.5 days or 2.5 people, and the browser
                    should not reject them. */ ?>
