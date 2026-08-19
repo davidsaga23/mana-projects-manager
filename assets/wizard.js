@@ -266,6 +266,16 @@
     // The minimum is arithmetic — work left, over working days left, over
     // people — and nothing on this screen can edit it. That is exactly what
     // makes it worth measuring the ideal against.
+    // What the typed days-per-item actually means, said the other way round.
+    // The field is days / item, so 0.25 is a quarter of a day each — which reads
+    // as "four days" to most people until something says otherwise.
+    var dpuHint = row.querySelector('.dpu-hint');
+    if (dpuHint) {
+      dpuHint.textContent = (perUnit > 0)
+        ? '= ' + fmtRate(1 / perUnit) + ' ' + label + '/day'
+        : '';
+    }
+
     var minPerArtist = (head !== null && head > 0) ? (teamPerDay / head) : null;
     var minCell = row.querySelector('.minimum');
     if (minCell) {

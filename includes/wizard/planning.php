@@ -301,11 +301,20 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // against the other. Days per item gets its own column rather
                 // than being crammed under the ideal in a second unit — two
                 // numbers in one cell is what made "0.3 d" read as a duration. ?>
+          <?php
+          // THIS PROJECT first, then a rule, then THE STUDIO'S VIEW.
+          //
+          // Everything left of the separator is about the show in front of you —
+          // what the dates demand, how long the work takes, whether the people
+          // cover it. Everything right of it is the base sheet's opinion, which
+          // is set elsewhere and cannot be edited here. Mixing the two is what
+          // made a studio standard read as this project's duration.
+          ?>
           <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
-          <th title="The pace the studio's ideal implies, in the same unit as the minimum beside it, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
-          <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
-          <th title="How long the step actually takes at these settings: the work divided by the people on it. Compare it against the gap between Starts and Deadline.">Duration</th>
+          <th title="How long the step takes at these settings: the work divided by the people on it. The line under it compares that against the working days left between today and the deadline.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
+          <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
+          <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
         </tr>
         </thead>
         <tbody>
@@ -372,6 +381,14 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
             <?php if ($s['tracks_seconds']): ?>
               <div class="muted small">per second</div>
             <?php endif; ?>
+            <?php
+            // ⚠ THIS FIELD IS DAYS PER ITEM, AND IT READS BACKWARDS TO PEOPLE.
+            // 0.25 is a QUARTER OF A DAY each, not four days each — and it was
+            // misread that way twice before this hint existed. The reciprocal is
+            // filled in live by wizard.js, in the same words the Minimum and
+            // Studio ideal columns use, so the two readings sit together.
+            ?>
+            <div class="muted small dpu-hint"></div>
           </td>
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
@@ -389,12 +406,14 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <?php // Filled by wizard.js, like the duration and the verdict beside
                 // it — all three are recalculated as you type. ?>
           <td class="minimum"><span class="muted">—</span></td>
+          <td class="duration"><span class="muted">—</span></td>
+          <td class="verdict"><span class="muted">—</span></td>
           <?php // Filled by wizard.js in exactly the format the Minimum cell uses,
                 // so the two read as the same kind of number rather than as two
                 // different measurements. Rendering it server-side would only be
                 // right until the first keystroke — the unit label follows the
                 // Work column, which the coverage box can change. ?>
-          <td class="ideal-cell"><span class="muted">&mdash;</span></td>
+          <td class="ideal-cell col-sep"><span class="muted">&mdash;</span></td>
           <?php // Static: the base sheet does not move as you type on this screen,
                 // and it is read-only here because it is set on the business side. ?>
           <td class="small ideal-days">
@@ -415,8 +434,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
               endif; ?>
             <?php endif; ?>
           </td>
-          <td class="duration"><span class="muted">—</span></td>
-          <td class="verdict"><span class="muted">—</span></td>
+
         </tr>
         <?php endforeach; ?>
         </tbody>

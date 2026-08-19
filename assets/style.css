@@ -135,6 +135,13 @@ label.inline input { width: auto; }
 /* The studio ideal cannot keep up with what the deadline demands. Red because it
    is not a preference — the plan is asking for more per person per day than the
    studio says the work allows. */
+/* Divides THIS PROJECT's numbers from THE STUDIO'S. Everything left of the rule
+   is about the show in front of you and most of it is editable; everything right
+   of it is the base sheet's opinion, set under Finance management and read-only
+   here. Mixing the two is what let a studio standard be read as a duration. */
+.planning-table th.col-sep,
+.planning-table td.col-sep { border-left: 2px solid #b9c4cd; }
+
 .quota-short { background: #fdf0f1; }
 .quota-short strong, .quota-short .ok { color: #8f222c; }
 
