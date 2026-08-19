@@ -67,12 +67,40 @@ function standards_for_type(PDO $pdo, string $projectType): array {
     return $out;
 }
 
-/** The same list, in display order rather than keyed. */
+/**
+ * The same list, IN PIPELINE ORDER — the order a show is actually made in.
+ *
+ * Alphabetical put Animatic next to CH sheet next to Cleanup, which is three
+ * different phases of production filed by first letter. This sheet is read
+ * beside the Dates & headcount screen, and the two disagreeing about the order
+ * of the same steps makes comparing them a hunting exercise (David, 2026-08-17).
+ *
+ * ⚠ THE ORDER HAS TO BE BORROWED, because this table has none of its own. It is
+ * studio-wide — one row per step identity per project TYPE — while step_order
+ * lives on a project's own pipeline. So each standard takes the EARLIEST position
+ * that identity holds on any project of that type, which is what "where this step
+ * comes in a show of this kind" means when there are several shows.
+ *
+ * Identities no project currently uses have no position to borrow. They sort last,
+ * alphabetically, rather than being dropped or guessed at — a standard written for
+ * a step nobody runs yet is still a standard.
+ */
 function standards_list(PDO $pdo, string $projectType): array {
     if (!standards_available($pdo)) return [];
     $stmt = $pdo->prepare(
-        'SELECT * FROM quota_standards WHERE project_type = ?
-          ORDER BY step_name, applies_to, applies_to_asset_type'
+        'SELECT qs.*,
+                (SELECT MIN(ps.step_order)
+                   FROM pipeline_steps ps
+                   JOIN projects p ON p.id = ps.project_id
+                  WHERE p.type = qs.project_type
+                    AND ps.name = qs.step_name
+                    AND ps.applies_to = qs.applies_to
+                    AND COALESCE(ps.applies_to_asset_type, \'\') = qs.applies_to_asset_type
+                ) AS pipeline_order
+           FROM quota_standards qs
+          WHERE qs.project_type = ?
+          ORDER BY pipeline_order IS NULL, pipeline_order,
+                   qs.step_name, qs.applies_to, qs.applies_to_asset_type'
     );
     $stmt->execute([$projectType]);
     return $stmt->fetchAll();

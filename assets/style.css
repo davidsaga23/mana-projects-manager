@@ -150,6 +150,19 @@ label.inline input { width: auto; }
 
    nowrap on the annotation columns stops "deliverable/day each" folding onto a
    third line and pushing that row's notes out of step with the rest. */
+/* Ideal quotas. Fixed layout so the colgroup binds — the same lesson the
+   planning table taught: under `auto` a browser reads width as advice and sizes
+   from content instead. Inputs are told to be their column, since under a fixed
+   layout one that is wider overflows rather than widening it. */
+.standards-table { width: 100%; table-layout: fixed; }
+.standards-table input,
+.standards-table select {
+  width: 100%; box-sizing: border-box; min-width: 0;
+  padding: 4px 6px; font-size: 13px;
+}
+.standards-table th, .standards-table td { padding: 7px 6px; }
+.standards-table td { vertical-align: middle; word-break: break-word; }
+
 /* The retake allowance, above the table it governs. Editable here because it
    changes every figure below it, and walking back to step 1 to try 5% instead
    of 10% is enough friction that nobody does it. */

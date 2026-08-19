@@ -80,7 +80,7 @@ if ($ready) {
            JOIN projects p ON p.id = ps.project_id
           WHERE p.type = ?
           GROUP BY ps.name, ps.applies_to, COALESCE(ps.applies_to_asset_type, \'\')
-          ORDER BY ps.name'
+          ORDER BY MIN(ps.step_order), ps.name'
     );
     $stmt->execute([$type]);
     foreach ($stmt as $r) {
@@ -135,8 +135,29 @@ require __DIR__ . '/includes/header.php';
   <?php if (is_admin()): ?>
   <form method="post">
     <input type="hidden" name="project_type" value="<?= e($type) ?>">
-    <div class="grid-scroll">
-      <table class="grid-table">
+    <?php
+    // ⚠ NO .grid-scroll WRAPPER HERE, and that is the whole reason the heading
+    // sticks. `overflow-x: auto` creates a scrolling box, and `position: sticky`
+    // sticks to the nearest scrolling ancestor — so inside that wrapper the
+    // heading stuck to a box that never scrolls vertically, which looks exactly
+    // like sticky being broken. The global `th { position: sticky }` rule was
+    // there the whole time.
+    //
+    // Without a scroller the table has to fit on its own, which is what the
+    // colgroup below is for. Eight columns is comfortable; the two free-text
+    // columns give up the width.
+    ?>
+    <table class="grid-table standards-table">
+      <colgroup>
+        <col style="width:14%"> <?php // Step ?>
+        <col style="width:10%"> <?php // Covers ?>
+        <col style="width:12%"> <?php // Asset type ?>
+        <col style="width:9%">  <?php // Days per item ?>
+        <col style="width:8%">  <?php // Which is ?>
+        <col style="width:9%">  <?php // Typical headcount ?>
+        <col style="width:21%"> <?php // Where the number came from ?>
+        <col style="width:17%"> <?php // Notes ?>
+      </colgroup>
         <thead>
           <tr>
             <th>Step</th><th>Covers</th><th>Asset type</th>
@@ -220,8 +241,7 @@ require __DIR__ . '/includes/header.php';
           </tr>
         <?php endfor; ?>
         </tbody>
-      </table>
-    </div>
+    </table>
     <div class="actions"><button type="submit">Save the <?= e($type) ?> sheet</button></div>
     <p class="muted small">
       <strong>Days per item</strong> is the number; the column beside it shows the same fact the
