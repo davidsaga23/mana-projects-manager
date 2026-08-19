@@ -480,28 +480,55 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 // honest fixes are more people, more time, or less work. Reading it beside the
 // budget is the point — those three fixes all cost money, which is the screen
 // you are on.
+// ⚠ THE MINIMUM COMES FROM step_quota(), NOT FROM dashboard_steps().
+//
+// This used the dashboard's figure until David noticed the two screens giving
+// different answers for the same step: Dates & headcount said 0.85 a day for
+// CH sheet, this table said 1.86. Both were arithmetically correct and they were
+// answering different questions.
+//
+//   step_quota()      applies coverage_pct — 39% of 13 characters is 5.1 items —
+//                     and counts working days from the step's own START DATE.
+//   dashboard_steps() ignores coverage by design (2026-08-12: real N/A markings
+//                     beat the coverage estimate) and counts from TODAY.
+//
+// The dashboard's reading is right for a show in flight, where items have been
+// marked N/A and what matters is the pace from here. It is wrong for THIS table,
+// which asks whether the plan as drawn can be delivered — where coverage is the
+// only statement of scope there is, and a step that has not started yet has its
+// own start date rather than beginning this morning. Counting all 13 characters
+// through a step that touches 5 overstates the required pace by two and a half
+// times, and counting from today rather than the start quietly adds a day.
+//
+// So it now uses exactly what the Dates & headcount screen uses, and the two
+// screens agree — which is the rule this codebase keeps having to relearn.
 $quotaRows = [];
 $quotaOver = 0;
 if (standards_available($pdo)) {
     $sheet = standards_for_type($pdo, (string)$project['type']);
     if ($sheet) {
         try {
-            foreach (dashboard_steps($pdo, $projectId, $project['delivery_date'] ?? null) as $ds) {
-                $st  = $ds['step'];
+            $qEstimates = project_estimates($pdo, $projectId);
+            $qRetake    = project_retake_pct($pdo, $projectId);
+
+            foreach (pipeline_steps($pdo, $projectId) as $st) {
                 $std = $sheet[standard_key($st['name'], $st['applies_to'] ?? 'shot',
                                            $st['applies_to_asset_type'] ?? '')] ?? null;
                 if ($std === null) continue;                 // no standard to compare against
 
+                $q = step_quota($pdo, $projectId, $st, null, $qEstimates, $qRetake);
+
                 $idealDays    = (float)$std['days_per_unit'];
                 $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
-                $minPerArtist = $ds['per_artist'] !== null ? (float)$ds['per_artist'] : null;
+                $minPerArtist = isset($q['per_artist_day']) && $q['per_artist_day'] !== null
+                              ? (float)$q['per_artist_day'] : null;
 
                 $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
                       ? $minPerArtist / $idealPerDay : null;
                 if ($over !== null && $over > 1.05) $quotaOver++;
 
                 $quotaRows[] = [
-                    'ds' => $ds, 'step' => $st, 'std' => $std,
+                    'q' => $q, 'step' => $st, 'std' => $std,
                     'ideal_per_day' => $idealPerDay,
                     'min_per_artist' => $minPerArtist,
                     'over' => $over,
@@ -563,7 +590,7 @@ if (standards_available($pdo)) {
     </thead>
     <tbody>
     <?php foreach ($quotaRows as $q):
-      $ds = $q['ds']; $over = $q['over'];
+      $qq = $q['q']; $over = $q['over'];
       $cls = ($over === null) ? '' : ($over > 1.05 ? 'err' : ($over < 0.95 ? 'ok' : 'muted')); ?>
       <tr class="<?= $over !== null && $over > 1.05 ? 'has-problem' : '' ?>">
         <td class="wf-name">
@@ -572,8 +599,11 @@ if (standards_available($pdo)) {
         <td class="muted small">
           <?= e(applies_to_phrase($q['step']['applies_to'], $q['step']['applies_to_asset_type'] ?? null)) ?>
         </td>
-        <td class="num"><?= e(fmt_num((float)$ds['remaining'], 1)) ?></td>
-        <td class="num muted"><?= $ds['headcount'] ? e(fmt_num((float)$ds['headcount'], 1)) : '—' ?></td>
+        <?php // The work this step actually covers, after coverage — the same
+              // figure the Dates & headcount screen shows in its Work column. ?>
+        <td class="num"><?= e(fmt_num((float)($qq['units'] ?? 0), 1)) ?>
+          <div class="muted small"><?= e($qq['unit_label'] ?? '') ?></div></td>
+        <td class="num muted"><?= !empty($qq['headcount']) ? e(fmt_num((float)$qq['headcount'], 1)) : '—' ?></td>
         <td class="num <?= $cls ?>">
           <?= $q['min_per_artist'] !== null ? e(fmt_num($q['min_per_artist'], 2)) : '<span class="muted">—</span>' ?>
         </td>
