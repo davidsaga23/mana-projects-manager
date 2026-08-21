@@ -115,6 +115,77 @@ function standards_list(PDO $pdo, string $projectType): array {
     return $stmt->fetchAll();
 }
 
+/* ---------------------------------------------------------------------------
+ * THE ONE NUMBER THE PLAN RUNS ON
+ *
+ * David, 2026-08-17: *"Let's plan with the ideal quotas."* So the studio standard
+ * is not a comparison any more — it IS days-per-item, everywhere. The value typed
+ * on Dates & headcount is the fallback for steps the base sheet has no answer for.
+ *
+ * ⚠ EVERY CALCULATION GOES THROUGH effective_days_per_unit(). Before this there
+ * were six separate readers of `pipeline_steps.days_per_unit` — the quota, the
+ * scheduler, the budget, the time-log comparison, the CSV export and the estimate
+ * baseline — and the budget had already been switched to the ideal on its own.
+ * That is how the Dates & headcount screen and the expense projection came to
+ * disagree about the same step. One reader, one answer.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * standards_for_type() memoised per request.
+ *
+ * The helper below is called once per step inside loops that already run per
+ * step, so the uncached version turned one query into thirty. Static rather than
+ * a cache table: it is only ever right for the length of one request anyway.
+ */
+function standards_cached(PDO $pdo, string $projectType): array {
+    static $byType = [];
+    if (!array_key_exists($projectType, $byType)) {
+        $byType[$projectType] = standards_for_type($pdo, $projectType);
+    }
+    return $byType[$projectType];
+}
+
+/** A project's type, memoised — the helper needs it and callers have an id. */
+function project_type_of(PDO $pdo, int $projectId): string {
+    static $types = [];
+    if (!array_key_exists($projectId, $types)) {
+        $stmt = $pdo->prepare('SELECT type FROM projects WHERE id = ?');
+        $stmt->execute([$projectId]);
+        $types[$projectId] = (string)($stmt->fetchColumn() ?: '');
+    }
+    return $types[$projectId];
+}
+
+/** The standard governing one step, or null. */
+function step_standard(PDO $pdo, int $projectId, array $step): ?array {
+    if (!standards_available($pdo)) return null;
+    $sheet = standards_cached($pdo, project_type_of($pdo, $projectId));
+    if (!$sheet) return null;
+    return $sheet[standard_key($step['name'] ?? '', $step['applies_to'] ?? 'shot',
+                               $step['applies_to_asset_type'] ?? '')] ?? null;
+}
+
+/**
+ * Days per item for planning: the studio ideal, or the typed estimate when the
+ * base sheet has nothing to say about this step.
+ *
+ * ⚠ NOT retake-adjusted. Retakes are applied by the caller, because not every
+ * caller applies them the same way — a per-second COST must not be inflated by
+ * them (the seconds delivered do not change) while the DAYS must be. Folding the
+ * retake in here would make that distinction impossible to express.
+ */
+function effective_days_per_unit(PDO $pdo, int $projectId, array $step): float {
+    $std = step_standard($pdo, $projectId, $step);
+    if ($std !== null && (float)$std['days_per_unit'] > 0) return (float)$std['days_per_unit'];
+    return (float)($step['days_per_unit'] ?: 1.0);
+}
+
+/** 'ideal' or 'estimate' — which of the two the figure above came from. */
+function effective_days_source(PDO $pdo, int $projectId, array $step): string {
+    $std = step_standard($pdo, $projectId, $step);
+    return ($std !== null && (float)$std['days_per_unit'] > 0) ? 'ideal' : 'estimate';
+}
+
 /**
  * The ideal for one step of one project, or null.
  *

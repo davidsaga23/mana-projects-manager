@@ -6,6 +6,7 @@
 // an unrealistic plan should be visible at setup, not discovered in week three.
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/standards.php';   // effective_days_per_unit()
 require_once __DIR__ . '/db.php';        // project_setting(), for the early estimates
 
 /**
@@ -193,7 +194,9 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
 
     // Retakes make each item take longer, so they scale days-per-item — not the
     // amount of work, which is fixed by the breakdown.
-    $daysPerUnit = (float)($step['days_per_unit'] ?: 1.0) * retake_factor($retakePct);
+    // The studio ideal where there is one; the typed estimate otherwise. One
+    // reader for the whole codebase — see effective_days_per_unit().
+    $daysPerUnit = effective_days_per_unit($pdo, $projectId, $step) * retake_factor($retakePct);
     $out['required_exact']     = $out['team_per_day'] * $daysPerUnit;
     $out['required_headcount'] = (int)ceil($out['required_exact']);
 

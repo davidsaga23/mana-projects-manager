@@ -1566,6 +1566,63 @@ project — so the tab is a link out rather than a `?tab=` of `finance_project.p
 reading stays open, because the dashboard and every step detail show the ideal beside the pace the
 deadline demands, and a number a producer cannot see is a number they cannot plan against.
 
+## 2026-08-17 (final) — The plan runs on the IDEAL, through exactly one function
+**Decision, David's:** *"Let's plan with the ideal quotas."* `quota_standards.days_per_unit` is now
+days-per-item everywhere — the quota, the scheduler, the budget, the time-log comparison, the CSV
+export and the estimate baseline. The value typed on Dates & headcount is the fallback for steps the
+base sheet has no answer for.
+
+**The bug this closes, which is the reason it was worth doing.** The budget was switched to the
+ideal on its own earlier the same day, and everything else kept reading
+`pipeline_steps.days_per_unit`. That is precisely how Dates & headcount came to say 0.85 a day for
+CH sheet while the expense projection said 1.86 — two screens, two numbers, both arithmetically
+correct, describing different plans.
+
+**`effective_days_per_unit()` is the single reader.** There were SIX before it:
+`includes/quota.php`, `includes/scheduler.php`, `includes/finance.php`, `includes/timelog.php`,
+`export.php` and `includes/baseline.php`, plus the live check in `assets/wizard.js`. Every one of
+them now calls the helper, and the JS applies the same rule so the screen cannot describe a plan the
+server would not build.
+**Consequence, and the details that matter:**
+- **The helper is NOT retake-adjusted.** Callers apply the allowance themselves, because they do not
+  all apply it the same way — a per-second COST must not be inflated by retakes while the DAYS must
+  be. Folding it in would make that impossible to express.
+- **Two lookups are memoised** (`standards_cached()`, `project_type_of()`), because the helper runs
+  once per step inside loops that already run per step.
+- **The estimate baseline records the EFFECTIVE number**, not the raw column. Freezing a figure the
+  plan never used would make "what we believed at kickoff versus what happened" meaningless.
+- **The typed field says when it is not in charge.** Where a standard exists the Days per item box
+  reads *"not in use — planning on the studio ideal of N d"*. A field that silently does nothing is
+  worse than one that admits it.
+- **Template copying still reads the raw column** (`includes/pipeline.php`), correctly: that is
+  moving data between a template and a project, not planning with it.
+
+## 2026-08-17 — Paying by the second, and why retakes do not touch it
+**Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
+animation, tie-down, cleanup — quoted per second of screen time.
+**Almost none of it was arithmetic.** The platform already thought in seconds for those steps:
+`units` IS total seconds and `days_per_unit` is days PER SECOND, so person-days and the even split
+across lanes were already right. The only gap was a way to say the RATE was per second, so those
+artists were entered as day rates and costed as days × day-rate.
+
+**⚠ RETAKES INFLATE THE DAYS AND NOT THE SECONDS — David, asked directly, and it follows from the
+standing rule.** A retake allowance multiplies days-per-item and never work units (2026-08-12): 22
+assets are still 22 assets after a revision. Applied here, 380 seconds of footage is 380 seconds
+however often it is revised. So a per-second cost is **flat** while its duration grows.
+
+That is not a gap in the model, it is what buying by the second *means*: the price is capped and the
+revision risk sits with the artist. If a contract ever bills retakes on top, that is a different deal
+and wants its own flag rather than a change to this rule.
+**Consequence:**
+- **Guarded on the step actually tracking seconds.** On a step measured in shots, `units` is an item
+  count — a per-second rate times 41 shots would be a confident wrong number that nothing on screen
+  would question. Those rows are reported as a mismatch and counted with the unpriced days, never as
+  free.
+- The Excel formula becomes `E×I` (rate × units) rather than `E×F` (rate × days), so a per-second row
+  stays live and editable in the sheet.
+- `crew_terms_log.rate_unit` is already VARCHAR and needed no change; the history simply starts
+  recording the new word.
+
 ---
 
 ## Still open

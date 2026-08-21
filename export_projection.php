@@ -124,13 +124,21 @@ foreach ($proj['by_department'] as $dept => $group) {
         $rn = $r + 1;
         $E = 'E' . $rn; $F = 'F' . $rn; $H = 'H' . $rn; $L = 'L' . $rn;
 
-        // A DAY rate is the only one where cost = rate x days, so it is the only
-        // one that gets the formula. A flat fee is not multiplied by anything —
-        // that is what flat means — and an hourly rate goes through the
-        // project's hours-per-day, which is not a column in this sheet. Writing
-        // E*F on those would produce a confidently wrong number the moment
-        // somebody edited the rate.
-        $liveCost = ($rate !== null && $rateUnit === 'day');
+        // Which rows get a LIVE formula, and why the others do not.
+        //
+        //   day     cost = rate x days      -> E*F
+        //   second  cost = rate x seconds   -> E*I, because column I holds the
+        //                                      units and on a footage step the
+        //                                      units ARE the seconds
+        //   hour    goes through the project's hours-per-day, which is not a
+        //           column here
+        //   flat    is not multiplied by anything — that is what flat means
+        //
+        // Writing E*F on an hourly or flat row would produce a confidently wrong
+        // number the moment somebody edited the rate.
+        $liveCost   = ($rate !== null && $rateUnit === 'day');
+        $liveSecond = ($rate !== null && $rateUnit === 'second'
+                       && (int)($row['tracks_seconds'] ?? 0) === 1);
 
         $cells = [];
         $cells[COL_DEPT]     = ['v' => $dept, 's' => xlsx_alt(XLSX_TEXT, $shade)];
@@ -148,6 +156,13 @@ foreach ($proj['by_department'] as $dept => $group) {
 
         if ($liveCost) {
             $cells[COL_COST] = ['f' => 'IFERROR(' . $E . '*' . $F . ',0)',
+                                'v' => round((float)$row['cost'], 2),
+                                's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
+        } elseif ($liveSecond) {
+            // Rate times FOOTAGE. Deliberately not times days: a retake allowance
+            // lengthens the days and never the seconds, so a per-second cost is
+            // flat while its duration grows (DECISIONS, 2026-08-17).
+            $cells[COL_COST] = ['f' => 'IFERROR(' . $E . '*I' . $rn . ',0)',
                                 'v' => round((float)$row['cost'], 2),
                                 's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
         } else {
@@ -169,12 +184,19 @@ foreach ($proj['by_department'] as $dept => $group) {
             ? ['f' => 'IFERROR(' . $E . '*22,0)', 'v' => round((float)$rate * 22, 2),
                's' => xlsx_alt(XLSX_MONEY_CALC, $shade)]
             : ['v' => '', 's' => xlsx_alt(XLSX_MONEY, $shade)];
-        $cells[COL_NOTES] = ['v' => $rate === null
-                                ? 'No rate on file — unpriced, not free'
-                                : ($rateUnit === 'hour'
-                                    ? 'Hourly, converted at ' . fmt_num($hoursDay, 1) . ' h/day'
-                                    : ($rateUnit === 'flat' ? 'Flat fee — not rate x days' : '')),
-                             's' => xlsx_alt(XLSX_NOTE, $shade)];
+        $note = '';
+        if ($rate === null) {
+            $note = 'No rate on file — unpriced, not free';
+        } elseif ($rateUnit === 'hour') {
+            $note = 'Hourly, converted at ' . fmt_num($hoursDay, 1) . ' h/day';
+        } elseif ($rateUnit === 'flat') {
+            $note = 'Flat fee — not rate x days';
+        } elseif ($rateUnit === 'second') {
+            $note = $liveSecond
+                ? 'Per second of footage — retakes lengthen the days, not the seconds'
+                : 'Per-second rate on a step not measured in seconds — cannot be priced';
+        }
+        $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];
 
         ksort($cells);
         $landed = $put($cells);

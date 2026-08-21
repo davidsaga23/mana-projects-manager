@@ -170,7 +170,35 @@
 
     var start = startEl ? startEl.value : '';
     var deadline = deadlineEl ? deadlineEl.value : '';
-    var perUnit = parseFloat(perUnitEl ? perUnitEl.value : '') || 0;
+    // ⚠ THE IDEAL WINS, matching effective_days_per_unit() on the server.
+    //
+    // Since 2026-08-17 the plan runs on the studio standard where one exists and
+    // on the typed estimate only where it does not. If this line kept reading the
+    // input, the live check would describe a plan the server would never build —
+    // the same disagreement that had Dates & headcount and the expense projection
+    // showing different quotas for one step.
+    var typedPerUnit = parseFloat(perUnitEl ? perUnitEl.value : '') || 0;
+    var idealPerUnit = parseFloat(row.getAttribute('data-ideal'));
+    var usingIdeal   = (idealPerUnit > 0);
+    var perUnit      = usingIdeal ? idealPerUnit : typedPerUnit;
+
+    // Written HERE rather than further down, because everything below returns
+    // early when a step has no deadline or no work yet — and those are exactly
+    // the rows where somebody is still typing and most needs to be told that the
+    // number they are typing is not the one in force.
+    var dpuHint = row.querySelector('.dpu-hint');
+    if (dpuHint) {
+      if (usingIdeal) {
+        // The typed number is not what the plan uses, and a field that quietly
+        // does nothing is worse than one that says so.
+        dpuHint.innerHTML = '<span class="warn-text">not in use</span>'
+          + '<div>planning on the studio ideal of ' + trimNum(idealPerUnit) + ' d</div>';
+      } else if (perUnit > 0) {
+        dpuHint.textContent = '= ' + fmtRate(1 / perUnit) + ' ' + label + '/day';
+      } else {
+        dpuHint.textContent = '';
+      }
+    }
     var headRaw = headEl ? headEl.value.trim() : '';
     var head = headRaw === '' ? null : (parseFloat(headRaw) || 0);
 
@@ -299,12 +327,6 @@
     // What the typed days-per-item actually means, said the other way round.
     // The field is days / item, so 0.25 is a quarter of a day each — which reads
     // as "four days" to most people until something says otherwise.
-    var dpuHint = row.querySelector('.dpu-hint');
-    if (dpuHint) {
-      dpuHint.textContent = (perUnit > 0)
-        ? '= ' + fmtRate(1 / perUnit) + ' ' + label + '/day'
-        : '';
-    }
 
     var minPerArtist = (head !== null && head > 0) ? (teamPerDay / head) : null;
     var minCell = row.querySelector('.minimum');

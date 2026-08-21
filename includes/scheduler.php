@@ -24,6 +24,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/calendar.php';
+require_once __DIR__ . '/standards.php';   // effective_days_per_unit()
 require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/quota.php';
 
@@ -345,7 +346,10 @@ function scheduler_schedule_step(
     $stepId    = (int)$step['id'];
     $stepName  = $step['name'];
     $projectId = (int)$project['id'];
-    $dpu       = (float)($step['days_per_unit'] ?: 1.0);
+    // Dates run on the same number the budget and the quota do (2026-08-17).
+    // Before this the scheduler used the typed estimate while the projection used
+    // the ideal, so the calendar and the money described different plans.
+    $dpu       = effective_days_per_unit($pdo, $projectId, $step);
     if ($dpu <= 0) $dpu = 1.0;
     // Retakes lengthen each item, so they scale days-per-item — NOT the item
     // count. Exactly what step_quota() does. Without this the schedule ran

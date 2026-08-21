@@ -97,7 +97,9 @@ fputcsv($out, [
 foreach ($quotas as $q) {
     $s = $q['step'];
     $units      = (float)$q['units'];
-    $perUnit    = (float)($s['days_per_unit'] ?? 1);
+    // The number the plan runs on, not the raw column — this file feeds an
+    // expense projection and must agree with the one on screen.
+    $perUnit    = effective_days_per_unit($pdo, $projectId, $s);
     $baseDays   = $units * $perUnit;
     $personDays = $baseDays * $retake;   // retakes lengthen each item, see quota.php
     $head       = $q['headcount'];
@@ -141,7 +143,7 @@ foreach ($quotas as $q) {
 // "what does the whole thing come to?".
 $baseTotal = 0.0;
 foreach ($quotas as $q) {
-    $baseTotal += (float)$q['units'] * (float)($q['step']['days_per_unit'] ?? 1);
+    $baseTotal += (float)$q['units'] * effective_days_per_unit($pdo, $projectId, $q['step']);
 }
 $totalDays = $baseTotal * $retake;
 fputcsv($out, []);

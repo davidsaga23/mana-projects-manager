@@ -45,7 +45,12 @@ function capture_baseline(PDO $pdo, int $projectId, string $reason = 'setup comp
             $ins->execute([
                 $projectId, (int)$s['id'], $s['name'],
                 $s['applies_to'], $s['applies_to_asset_type'] ?? '', (int)$s['tracks_seconds'],
-                (float)($s['days_per_unit'] ?: 1), (float)($s['coverage_pct'] ?? 100),
+                // What the project was actually PLANNED against, which since
+                // 2026-08-17 is the studio ideal wherever one exists. Recording
+                // the raw column would freeze a number the plan never used, and
+                // the whole point of a baseline is comparing what was believed
+                // with what happened.
+                effective_days_per_unit($pdo, $projectId, $s), (float)($s['coverage_pct'] ?? 100),
                 $s['planned_headcount'] !== null ? (float)$s['planned_headcount'] : null,
                 $retakePct,
                 (float)$work['units'], (string)$work['label'], !empty($work['estimated']) ? 1 : 0,
@@ -121,7 +126,8 @@ function baseline_drift(PDO $pdo, int $projectId): array {
         // Compared with a tolerance, not ==: these are DECIMALs coming back as
         // strings, and 2.00 vs 2 is not a change anybody made.
         $pairs = [
-            'days_per_unit'     => [(float)$b['days_per_unit'],  (float)($s['days_per_unit'] ?: 1)],
+            'days_per_unit'     => [(float)$b['days_per_unit'],
+                                    effective_days_per_unit($pdo, $projectId, $s)],
             'coverage_pct'      => [(float)$b['coverage_pct'],   (float)($s['coverage_pct'] ?? 100)],
             'planned_headcount' => [
                 $b['planned_headcount'] === null ? null : (float)$b['planned_headcount'],

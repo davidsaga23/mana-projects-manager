@@ -557,7 +557,8 @@ require __DIR__ . '/includes/header.php';
                             <input name="offered_rate" inputmode="decimal" placeholder="We offer"
                                    value="<?= e($q && $q['offered_rate'] !== null ? fmt_num((float)$q['offered_rate'], 2) : '') ?>">
                             <select name="rate_unit">
-                              <?php foreach (['day' => 'per day', 'hour' => 'per hour', 'flat' => 'flat fee'] as $k => $lbl): ?>
+                              <?php foreach (['day' => 'per day', 'hour' => 'per hour',
+                                              'second' => 'per second', 'flat' => 'flat fee'] as $k => $lbl): ?>
                                 <option value="<?= $k ?>" <?= ($q['rate_unit'] ?? 'day') === $k ? 'selected' : '' ?>><?= $lbl ?></option>
                               <?php endforeach; ?>
                             </select>

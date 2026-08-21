@@ -177,13 +177,15 @@ function expense_projection(PDO $pdo, int $projectId): array {
 
         $units = (float)($quota['units'] ?? 0);
 
-        // The studio standard wins; the project's own estimate is the fallback.
+        // The same helper the quota and the scheduler use, rather than a second
+        // copy of the rule here — a duplicated lookup is how this file and the
+        // planning screen came to disagree in the first place.
         $std = $standards[standard_key($step['name'], $step['applies_to'] ?? 'shot',
                                        $step['applies_to_asset_type'] ?? '')] ?? null;
         $idealDays    = ($std && (float)$std['days_per_unit'] > 0) ? (float)$std['days_per_unit'] : null;
         $estimateDays = (float)($step['days_per_unit'] ?: 0);
-        $baseDays     = $idealDays !== null ? $idealDays : $estimateDays;
-        $daysSource   = $idealDays !== null ? 'ideal' : 'estimate';
+        $baseDays     = effective_days_per_unit($pdo, $projectId, $step);
+        $daysSource   = effective_days_source($pdo, $projectId, $step);
 
         // Retakes scale days-per-item whichever source it came from — a revision
         // takes as long on a standard as on a guess (DECISIONS, 2026-08-12).
@@ -193,6 +195,18 @@ function expense_projection(PDO $pdo, int $projectId): array {
         $stepLanes = $lanes[$stepId] ?? [];
         $laneCount = max(1, count($stepLanes));
         $daysPerLane = $personDays / $laneCount;
+
+        // ---- paying by the second -----------------------------------------
+        // For a footage step `units` IS seconds, so one lane's share of the work
+        // is one lane's share of the footage.
+        //
+        // ⚠ NOT retake-adjusted, unlike $daysPerLane above. A retake allowance
+        // lengthens the work; it does not create more footage. 380 seconds stays
+        // 380 seconds however often it is revised, so a per-second cost is flat
+        // while its duration grows — which is what buying by the second means
+        // (DECISIONS, 2026-08-17).
+        $tracksSeconds = (int)($step['tracks_seconds'] ?? 0) === 1;
+        $unitsPerLane  = $units / $laneCount;
 
         // A step with nobody on it still belongs in the sheet, as a row with no
         // artist. Leaving it out would hide work somebody still has to be paid
@@ -210,16 +224,39 @@ function expense_projection(PDO $pdo, int $projectId): array {
             $cur  = $t['rate_currency'] ?? 'USD';
 
             $cost = null;
+            $rateMismatch = false;
             if ($rate !== null) {
                 // Hourly converts at the project's own hours per day. A flat fee
                 // is not multiplied by anything, because that is what flat means.
-                if ($unit === 'flat')     $cost = $rate;
-                elseif ($unit === 'hour') $cost = $rate * $hoursPerDay * $daysPerLane;
-                else                      $cost = $rate * $daysPerLane;
+                if ($unit === 'flat') {
+                    $cost = $rate;
+                } elseif ($unit === 'hour') {
+                    $cost = $rate * $hoursPerDay * $daysPerLane;
+                } elseif ($unit === 'second') {
+                    // ⚠ GUARDED ON THE STEP ACTUALLY TRACKING SECONDS. On a step
+                    // measured in shots or assets, `units` is an ITEM COUNT — a
+                    // per-second rate times 41 shots would be a confident, wrong
+                    // number that nothing on screen would question. Reported as a
+                    // mismatch and left unpriced instead.
+                    if ($tracksSeconds) {
+                        $cost = $rate * $unitsPerLane;
+                    } else {
+                        $cost = null;
+                        $rateMismatch = true;
+                    }
+                } else {
+                    $cost = $rate * $daysPerLane;
+                }
 
-                $total += $cost;
-                if ($currency === null) $currency = $cur;
-                elseif ($currency !== $cur) $mixed = true;
+                if ($cost !== null) {
+                    $total += $cost;
+                    if ($currency === null) $currency = $cur;
+                    elseif ($currency !== $cur) $mixed = true;
+                } else {
+                    // Priced at a unit this step cannot be measured in — counted
+                    // with the unpriced days rather than as free.
+                    $unpricedDays += $daysPerLane;
+                }
             } else {
                 $unpricedDays += $daysPerLane;
             }
@@ -249,6 +286,11 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 // so rather than leaving a reader to wonder why two steps of the
                 // same size cost differently.
                 'days_source'   => $daysSource,
+                // The export needs to know whether a per-second rate can price
+                // this row, and the screen needs it to explain when one cannot.
+                'tracks_seconds' => $tracksSeconds,
+                'units_per_lane' => $unitsPerLane,
+                'rate_mismatch'  => $rateMismatch,
                 'ideal_days'    => $idealDays,
                 'estimate_days' => $estimateDays ?: null,
                 'cost'        => $cost,

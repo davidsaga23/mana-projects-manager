@@ -433,7 +433,14 @@ require __DIR__ . '/includes/header.php';
         </label>
         <label>Per
           <select name="rate_unit">
-            <?php foreach (['day' => 'day', 'hour' => 'hour', 'flat' => 'flat fee'] as $k => $lbl): ?>
+            <?php // 'second' is for footage steps — rough animation, tie-down,
+                  // cleanup — quoted per second of screen time. It only prices a
+                  // step that actually tracks seconds; on any other step the
+                  // projection reports it as a mismatch rather than multiplying
+                  // by an item count. ?>
+            <?php foreach (['day' => 'per day', 'hour' => 'per hour',
+                            'second' => 'per second of footage',
+                            'flat' => 'flat fee'] as $k => $lbl): ?>
               <option value="<?= $k ?>" <?= ($terms['rate_unit'] ?? 'day') === $k ? 'selected' : '' ?>><?= $lbl ?></option>
             <?php endforeach; ?>
           </select>

@@ -11,6 +11,7 @@
 // against an invoice.
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/standards.php';   // effective_days_per_unit()
 
 /** "16 h", "7.5 h", "—". Never a bare number: the unit is the whole point. */
 function fmt_hours(?int $minutes): string {
@@ -68,7 +69,10 @@ function timelog_by_step(PDO $pdo, int $projectId, array $steps): array {
         $minutes = (int)($row['minutes'] ?? 0);
 
         $work = step_work_units($pdo, $projectId, $s, $estimates);
-        $estDays  = $work['units'] * (float)($s['days_per_unit'] ?: 1) * $retake;
+        // Estimated days must be measured against the number the plan actually
+        // ran on, or "estimated vs actual" compares actual work to a figure
+        // nothing was planned from.
+        $estDays  = $work['units'] * effective_days_per_unit($pdo, $projectId, $s) * $retake;
         $estHours = $estDays * $hpd;
 
         $out[] = [

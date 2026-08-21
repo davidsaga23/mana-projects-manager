@@ -752,6 +752,13 @@ if ($retakePct <= 0):
             <?php // Which number produced these days. An unmarked row rests on a
                   // studio decision; an "est." row rests on one project's guess,
                   // and the difference matters the moment a budget is queried. ?>
+            <?php if (!empty($r['rate_mismatch'])): ?>
+              <?php // A per-second rate on a step that is not measured in seconds.
+                    // There is nothing to multiply it by, so the row is unpriced
+                    // rather than costed against an item count — which would be a
+                    // confident wrong number nothing on screen would question. ?>
+              <div class="err small">rate is per second, this step is not</div>
+            <?php endif; ?>
             <?php if (($r['days_source'] ?? '') === 'estimate'): ?>
               <span class="est-tag" title="No studio standard for this step, so this row is costed from the project's own estimate">est.</span>
             <?php endif; ?>

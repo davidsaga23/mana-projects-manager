@@ -178,7 +178,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         if ($rateVal < 0) throw new RuntimeException('A rate cannot be negative.');
     }
 
-    $unit = in_array($in['rate_unit'] ?? '', ['day', 'hour', 'flat'], true) ? $in['rate_unit'] : 'day';
+    $unit = in_array($in['rate_unit'] ?? '', RATE_UNITS, true) ? $in['rate_unit'] : 'day';
 
     $cur = strtoupper(trim((string)($in['rate_currency'] ?? 'USD')));
     if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
@@ -272,6 +272,16 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
  * `declined` is deliberately not the same as `none`: one is a hole in the plan
  * somebody has to fill, the other is the ordinary state of most of a project.
  */
+/**
+ * The units a rate can be quoted in.
+ *
+ * 'second' is for footage-based steps — rough animation, tie-down, cleanup — where
+ * the deal is per second of screen time rather than per day. Needs
+ * finance_install_06.sql; a per-second rate saved without it is rejected by the
+ * ENUM rather than stored wrong.
+ */
+const RATE_UNITS = ['day', 'hour', 'flat', 'second'];
+
 const CONTRACT_STATES = ['none', 'draft', 'sent', 'signed', 'declined'];
 
 /** "signed on 2026-09-03", "out for signature since 2026-08-20", "not drafted yet". */
@@ -493,7 +503,7 @@ function save_hire_quote(int $hireId, string $candidateName, ?int $projectId, ar
     $quoted  = $num($in['quoted_rate'] ?? '', 'rate');
     $offered = $num($in['offered_rate'] ?? '', 'rate');
 
-    $unit = in_array($in['rate_unit'] ?? '', ['day', 'hour', 'flat'], true) ? $in['rate_unit'] : 'day';
+    $unit = in_array($in['rate_unit'] ?? '', RATE_UNITS, true) ? $in['rate_unit'] : 'day';
     $cur  = strtoupper(trim((string)($in['rate_currency'] ?? 'USD')));
     if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
 

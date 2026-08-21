@@ -15,16 +15,16 @@ without re-deriving context.
   table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
   thing left is the **client loop**, which was never on that list.
 - **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
-  run to **026**. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
+  run to **026** (024 hiring, 025 freelancer fields, 026 ideal quotas). **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
   Return to Club. **025 (freelancer fields) and 026 (ideal quotas) are new and pending.** Without 025 the entry grid
   offers names, emails, phones, portfolios, sources and notes, but not location, position,
   seniority, project type, worked-with-us or rating — and it says so on screen rather than
   silently dropping them. Without 026 the Ideal quotas screen reports that it cannot work.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
-  **`finance_install_05.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
+  **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
   runner only touches the production connection). The first three were imported by 18 August;
-  **04 (hiring quotes + contract status) and 05 (other expenses) are new and pending** — those
+  **04 (hiring quotes + contract status), 05 (other expenses) and 06 (per-second rates) are new and pending** — those
   features are unavailable until each is imported, and every screen says so rather than showing a
   blank. **Until 05 is in, Projected cost and Margin count people only.** Its credential lives in the `finance_db` block of `config.php`, and
   `includes/money.php` is the **only** place that connection is ever opened.
@@ -451,7 +451,57 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      it belongs with `crew_absences` — but the gap is **reported**, not hidden: the person page
      says how many tasks fall outside somebody's dates.
 
-12. **Next.** In rough order of value:
+12. **⚠ THE PLAN AND THE BUDGET BOTH RUN ON THE IDEAL QUOTA. Read this before touching
+    either.** Settled 2026-08-17, and it replaces the split that existed for part of that day.
+
+   **`effective_days_per_unit()` in `includes/standards.php` is the ONLY reader of
+   days-per-item.** The studio standard wins; `pipeline_steps.days_per_unit` is the
+   fallback for steps the base sheet has no answer for. Six separate readers were folded
+   into it — the quota, the scheduler, the budget, the time-log comparison, the CSV export
+   and the estimate baseline — plus the live check in `assets/wizard.js`, which applies the
+   same rule so the screen cannot describe a plan the server would not build.
+   **If you add a seventh caller, route it through the helper.** Two readers is how Dates &
+   headcount and the expense projection came to report 0.85 and 1.86 for the same step.
+   It is deliberately NOT retake-adjusted — callers apply the allowance, because a
+   per-second cost must not be inflated by it while the days must be.
+
+   **Per-second rates are live** (`finance_install_06.sql`). Footage steps can be paid by the
+   second, and **retakes lengthen the days without adding seconds**, so those costs are flat
+   while their durations grow. That is what buying by the second means. A per-second rate on
+   a step not measured in seconds is reported as a mismatch and counted unpriced — never
+   multiplied by an item count.
+
+   **Still open, and NOT decided:** nothing. The two questions that were open here have been
+   answered above.
+
+   **(a) Seconds-based rates — designed, not built.** For steps with `tracks_seconds`
+   the day maths is already correct: `units` is total seconds, `days_per_unit` is days
+   PER SECOND, so person-days come out right and dividing by lanes distributes evenly.
+   What is missing is only the RATE — `crew_terms.rate_unit` is `ENUM('day','hour','flat')`
+   with no per-second option, so those artists are entered as day rates and costed as
+   days × day-rate. To build: `finance_install_06.sql` adding `'second'` to that enum and
+   to `hire_quotes`; a per-second branch in `expense_projection()` **guarded so it only
+   fires on steps that genuinely track seconds** (a per-second rate on a step measured in
+   shots would multiply by the shot count and produce a confident, wrong number); the
+   rate dropdowns on `person.php` and `hiring.php`; and the Excel formula moving from
+   `E×F` to `E×I`.
+   **The question David has not answered:** does a retake allowance inflate a per-second
+   cost? The standing rule (2026-08-12) is that retakes scale DAYS and never UNITS — so
+   the days rise 10% and the seconds do not, and the cost stays flat. That is usually the
+   point of a per-second deal: it caps the price and moves revision risk to the artist.
+   The alternative is billing retakes on top. **Do not guess this one** — it is a
+   commercial term, and on 380 seconds at $8/second it is the difference between $3,040
+   and $3,344.
+
+   **(b) The plan and the budget run on different numbers.** Since 2026-08-17 the expense
+   projection is computed from the IDEAL quota (`quota_standards`), while Duration, the
+   minimum quota and the SCHEDULER still run on `pipeline_steps.days_per_unit`. That is
+   why the Dates & headcount screen needs a "planned slower — beyond the budgeted days"
+   warning at all: if both used the same number there would be nothing to disagree about.
+   Driving everything from the ideal was offered and not chosen; it moves every date on
+   every timeline, so it wants to be deliberate rather than a side effect.
+
+13. **Next.** In rough order of value:
    - **What appears in each shot** — link assets (characters, props, vehicles, environments and
      anything else) to the shot list. David asked for it on 2026-08-17 as a production need, and it
      turns out to be **a live defect as well as a feature**. `shot_assets` has existed since v1 and
@@ -476,7 +526,7 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      ever been able to say. Nothing to build yet; it needs the data first, like every other
      history table here.
 
-13. **Then: run it all against the real show.** The specific things still to watch:
+14. **Then: run it all against the real show.** The specific things still to watch:
    - **Apply migration 024 and import `finance_install_04.sql`** — the hiring phase needs both,
      and they are applied in two different places by two different methods. Until then the
      Hiring tab reports that it cannot work rather than half-working.
