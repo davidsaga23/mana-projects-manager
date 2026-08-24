@@ -576,8 +576,24 @@ if (standards_available($pdo)) {
     </div>
   <?php endif; ?>
 
-  <div class="grid-scroll">
-  <table class="grid-table">
+  <?php
+  // ⚠ NO .grid-scroll WRAPPER — that is what stopped the header sticking.
+  // overflow-x:auto makes the div the nearest scrolling ancestor, and
+  // position:sticky sticks to THAT box, not the page. The box itself never
+  // scrolls vertically, so the header looked frozen rather than stuck. Same
+  // fix as standards.php the same day: drop the wrapper, give the table a
+  // colgroup so it lays out in the page width without needing one.
+  ?>
+  <table class="grid-table quota-compare-table">
+    <colgroup>
+      <col style="width:16%"> <?php // Step ?>
+      <col style="width:12%"> <?php // Covers ?>
+      <col style="width:10%"> <?php // Remaining ?>
+      <col style="width:8%">  <?php // People ?>
+      <col style="width:12%"> <?php // Minimum / person / day ?>
+      <col style="width:12%"> <?php // Ideal / person / day ?>
+      <col style="width:30%"> <?php // Verdict ?>
+    </colgroup>
     <thead>
       <tr>
         <th>Step</th><th>Covers</th>
@@ -623,7 +639,6 @@ if (standards_available($pdo)) {
     <?php endforeach; ?>
     </tbody>
   </table>
-  </div>
 
   <p class="muted small">
     Steps with no ideal recorded are left out rather than shown blank — a comparison against

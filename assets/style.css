@@ -170,6 +170,13 @@ label.inline input { width: auto; }
    between them. */
 .standards-table .new-standard-scope { margin: 3px 0; }
 
+/* The Minimum-against-ideal table on the Expense projection tab. Read-only, so
+   this is simpler than .standards-table — fixed layout for the colgroup to
+   bind, and the two prose columns (Covers, Verdict) allowed to wrap. */
+.quota-compare-table { width: 100%; table-layout: fixed; }
+.quota-compare-table th, .quota-compare-table td { padding: 7px 6px; }
+.quota-compare-table td { vertical-align: top; word-break: break-word; }
+
 /* The retake allowance, above the table it governs. Editable here because it
    changes every figure below it, and walking back to step 1 to try 5% instead
    of 10% is enough friction that nobody does it. */
@@ -1101,8 +1108,23 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .donut-num { font: 700 19px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
 .donut-cap { font: 400 10px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
 
-/* The grid itself. Horizontal scroll lives on the wrapper, so the sticky
-   heading rule the rest of the app relies on keeps working. */
+/* ⚠ THE COMMENT THIS REPLACED WAS WRONG, and confidently so — it claimed this
+   wrapper keeps the sticky heading rule working. It does the opposite.
+   `overflow-x: auto` makes the div a SCROLL CONTAINER (the CSS Overflow spec
+   forces the computed overflow-y away from `visible` the moment overflow-x is
+   anything else), and `position: sticky` resolves against the nearest scroll
+   container ancestor — not the viewport. A .grid-scroll div normally has no
+   fixed height and never itself scrolls vertically, so a `<th>` stuck to ITS
+   scrollport just sits in normal flow while the page scrolls past it: sticky
+   in name, motionless in practice. This is not conditional on whether the
+   table is ever wide enough to actually need horizontal scroll — every table
+   wrapped in .grid-scroll has this, all the time.
+   Found and fixed on two tables so far (standards.php, the quota-compare
+   table in finance_project.php) by dropping the wrapper and giving the table
+   a colgroup instead, which is the fix wherever a table needs both a sticky
+   header and to fit the page width. Six more tables still use this wrapper as
+   of 2026-08-17 and were not touched — this comment is now honest about what
+   it does, not a claim that they are fine. */
 .grid-scroll { overflow-x: auto; }
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
