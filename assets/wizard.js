@@ -170,6 +170,22 @@
 
     var start = startEl ? startEl.value : '';
     var deadline = deadlineEl ? deadlineEl.value : '';
+
+    // ---- the dates the wrong way round ------------------------------------
+    //
+    // A step whose start is AFTER its deadline is not a tight plan, it is a typo
+    // — and nothing on this screen used to say so. The old check further down
+    // only compared the deadline against max(today, start), so a step starting
+    // 31 Aug with a 25 Aug deadline reported "deadline has passed" even though
+    // that deadline is a week in the FUTURE. Right that the row is broken,
+    // wrong about why, and pointing at the wrong field to fix.
+    //
+    // Marked here rather than at the point of failure below, because everything
+    // after this returns early on several paths — and the mark has to be CLEARED
+    // on every one of them too, or a row stays red after being corrected.
+    var datesBackwards = !!(start && deadline && deadline < start);
+    var dateCell = row.querySelector('.date-pair');
+    if (dateCell) dateCell.classList.toggle('dates-backwards', datesBackwards);
     // ⚠ THE IDEAL WINS, matching effective_days_per_unit() on the server.
     //
     // Since 2026-08-17 the plan runs on the studio standard where one exists and
@@ -295,6 +311,15 @@
     if (!deadline) {
       updateDuration(0);
       return say('<span class="muted">set a deadline</span>');
+    }
+
+    // Checked BEFORE the "has it passed" test below, because that test compares
+    // against max(today, start) and so reports a perfectly future deadline as
+    // passed whenever the start is later still. Two different faults, two
+    // different fixes — and only one of them is about today's date.
+    if (datesBackwards) {
+      updateDuration(0);
+      return say('<span class="err">the deadline is before the start date</span>');
     }
 
     var from = (start && start > today) ? start : today;

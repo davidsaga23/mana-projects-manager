@@ -324,6 +324,16 @@ label.inline input { width: auto; }
 .planning-table .date-pair input { display: block; }
 .planning-table .date-pair input + input { margin-top: 3px; }
 
+/* Start date after the deadline — a typo rather than a tight plan. Toggled live
+   by wizard.js as either date is edited. The border goes on the inputs
+   themselves, not just the cell, so it is obvious WHICH pair of fields is
+   contradictory when several rows are on screen. */
+.planning-table .date-pair.dates-backwards { background: #fdf0f1; }
+.planning-table .date-pair.dates-backwards input {
+  border-color: #b02a37;
+  background: #fff;
+}
+
 /* The step name and its scope, stacked. Overrides .wf-name's nowrap, which is
    right on the workflow screen and is exactly what made this column too wide. */
 .planning-table .wf-name { white-space: normal; word-break: break-word; }
@@ -1108,24 +1118,32 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .donut-num { font: 700 19px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
 .donut-cap { font: 400 10px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
 
-/* ⚠ THE COMMENT THIS REPLACED WAS WRONG, and confidently so — it claimed this
-   wrapper keeps the sticky heading rule working. It does the opposite.
-   `overflow-x: auto` makes the div a SCROLL CONTAINER (the CSS Overflow spec
+/* ⚠ THE max-height IS WHAT MAKES THE STICKY HEADER WORK. Do not remove it
+   thinking it is cosmetic.
+
+   `overflow-x: auto` makes this div a SCROLL CONTAINER — the CSS Overflow spec
    forces the computed overflow-y away from `visible` the moment overflow-x is
-   anything else), and `position: sticky` resolves against the nearest scroll
-   container ancestor — not the viewport. A .grid-scroll div normally has no
-   fixed height and never itself scrolls vertically, so a `<th>` stuck to ITS
-   scrollport just sits in normal flow while the page scrolls past it: sticky
-   in name, motionless in practice. This is not conditional on whether the
-   table is ever wide enough to actually need horizontal scroll — every table
-   wrapped in .grid-scroll has this, all the time.
-   Found and fixed on two tables so far (standards.php, the quota-compare
-   table in finance_project.php) by dropping the wrapper and giving the table
-   a colgroup instead, which is the fix wherever a table needs both a sticky
-   header and to fit the page width. Six more tables still use this wrapper as
-   of 2026-08-17 and were not touched — this comment is now honest about what
-   it does, not a claim that they are fine. */
-.grid-scroll { overflow-x: auto; }
+   anything else — and `position: sticky` resolves against the nearest scroll
+   container ancestor rather than the viewport. So a `<th>` in here sticks to
+   THIS box, not the page.
+
+   With no height bound the box is exactly as tall as its table and therefore
+   never scrolls vertically, so the header has nothing to stick against: it sits
+   in normal flow and slides away as the page scrolls. Sticky in name, motionless
+   in practice, on every table wrapped in this — regardless of whether the table
+   is ever wide enough to need the horizontal scroll it was added for.
+
+   Giving the box a max-height makes it scroll vertically once the table is
+   taller than that, which is precisely when a sticky header earns its keep, and
+   the header then pins to the top of the box. Short tables never reach the bound
+   and are unaffected.
+
+   The alternative fix — drop the wrapper and give the table a colgroup so it
+   fits the page width — is used where a table does NOT need horizontal scroll
+   (standards.php, and the quota-compare table in finance_project.php). Use that
+   one for read-only tables that fit; use this one for wide entry grids that
+   genuinely need to scroll sideways. */
+.grid-scroll { overflow: auto; max-height: 78vh; }
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
 /* Trend chart on the step page. Hand-rolled SVG — no chart library. */
