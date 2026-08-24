@@ -233,7 +233,7 @@ $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
       No studio standard recorded for this step yet, so there is nothing to compare the required
       pace against.
       <?php if (is_admin()): ?>
-        <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">Set one →</a>
+        <a href="standards.php?from=<?= (int)$project['id'] ?>&amp;type=<?= urlencode((string)$project['type']) ?>">Set one →</a>
       <?php endif; ?>
     </p>
   <?php endif; ?>

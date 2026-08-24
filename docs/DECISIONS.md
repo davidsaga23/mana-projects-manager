@@ -1623,6 +1623,43 @@ and wants its own flag rather than a change to this rule.
 - `crew_terms_log.rate_unit` is already VARCHAR and needed no change; the history simply starts
   recording the new word.
 
+## 2026-08-17 — One home; the two managements move INSIDE a project
+**Decision:** the top bar carries **My work · Projects** and nothing else about a show.
+"Project management" and "Finance management" stop being top-level destinations and become a
+**section switcher** drawn on every project screen, above the tab bar. `finance.php` survives as
+a report — *Finance across all projects* — reached from the project list, not as a rival to it.
+
+**Why:** both top-bar links led to a list of the same projects, so the first thing the app asked
+of you was a question you could not answer yet: which lens, before you had said which show.
+Worse, the two lists looked alike, so which one you were on was a guess. David, looking at it:
+*"There should be only one 'home' where you can see all the projects."*
+
+**How "you are here" is answered**, since one bar could not do it:
+- the **switcher** says which side of the project you are on — run it, or pay for it;
+- the **tabs** under it say which screen;
+- both mark themselves, and the finance side tints its lit section and current tab with the
+  administrators-only red, so the money side never reads as another production screen.
+
+**Consequences:**
+- `project_section_nav()` in `includes/project_nav.php` is the single renderer of the identity
+  line and the switcher. `project_nav()` and `finance_nav()` both call it, so the 21 screens
+  calling the former needed no change at all.
+- The switcher is **only drawn when there is a choice** — an editor has no finance credential
+  (`includes/money.php`), so they see the tabs alone rather than a lit button that leads nowhere.
+- `hiring.php` is on both bars deliberately, and now takes `&section=finance` so the tab that was
+  clicked is the tab that lights up when it lands. Carried through its save redirect.
+- `standards.php` is studio-wide, so it cannot carry a project's nav; it takes `&from=<project>`
+  and draws a crumb back instead — to the finance screen for an admin, to the project for an
+  editor, because the sheet is *not* admin-only and must not point anyone at a door that would
+  turn them away. Carried through saves and type switches.
+- Missing-project redirects on `finance_project.php` and `export_projection.php` now land on
+  `index.php`. A project that is gone is gone from both sides.
+
+**What it cost:** a fatal. The `standards.php` crumb was written with its own `<?php` in a region
+that was still executing PHP — a parse error that would have 500'd the screen, and that none of
+the three existing checks could see. `tools/check_php_blocks.py` gained a fourth pass for it, and
+the pass was verified by reintroducing the bug and watching it fire.
+
 ---
 
 ## Still open

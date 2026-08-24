@@ -28,7 +28,9 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // one conversation whether it is opened from the plan or from the
         // budget, and two copies of it would drift — the money on it is already
         // admin-only inside includes/money.php, so nothing needs hiding here.
-        ['key' => 'hiring',     'label' => 'Hiring', 'href' => 'hiring.php' . $p],
+        // &section=finance tells that screen which bar to draw, so the tab that
+        // was clicked is the tab that lights up when it lands.
+        ['key' => 'hiring',     'label' => 'Hiring', 'href' => 'hiring.php' . $p . '&section=finance'],
         // The IDEAL QUOTA sheet — the number this project's budget is built on.
         //
         // It lives inside Finance management because that is where it is decided
@@ -40,8 +42,12 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // Studio-wide underneath, so it is not per-project data — but arriving
         // at it from the project whose budget it produced is how somebody
         // actually gets there.
+        // &from= is how the sheet gets a way back. It is studio-wide, so it
+        // cannot carry a project's nav — the crumb it draws instead is the
+        // difference between a tab and a trapdoor.
         ['key' => 'standards',  'label' => 'Ideal quotas',
-         'href' => 'standards.php' . ($projectType !== '' ? '?type=' . urlencode($projectType) : '')],
+         'href' => 'standards.php?from=' . $projectId
+                   . ($projectType !== '' ? '&type=' . urlencode($projectType) : '')],
     ];
 }
 
@@ -54,19 +60,17 @@ function finance_tabs(): array {
 function finance_nav(array $project, string $current = ''): void {
     $projectId = (int)$project['id'];
     ?>
-    <div class="proj-bar">
-      <div class="proj-bar-title">
-        <a href="finance.php" class="muted">All finance</a>
-        <span class="muted">/</span>
-        <a href="finance_project.php?project=<?= $projectId ?>"><strong><?= e($project['name']) ?></strong></a>
-        <span class="muted">(<?= e($project['code']) ?>)</span>
-        <span class="admin-only-tag">administrators only</span>
-        <?php // The way back to the production side of the same show. Without it
-              // the finance tabs are a cul-de-sac, which is the complaint the
-              // "set a rate" links already earned once. ?>
-        <span class="muted">·</span>
-        <a href="project.php?id=<?= $projectId ?>" class="muted">Open the project →</a>
-      </div>
+    <?php // proj-bar-finance tints the lit section and the current tab with the
+          // administrators-only red, so the money side of a project is never
+          // mistaken at a glance for another production screen. ?>
+    <div class="proj-bar proj-bar-finance">
+      <?php // The identity line, the crumb home, and the switch back to the
+            // production side of the same show all come from the shared
+            // renderer in project_nav.php — the finance tabs used to carry
+            // their own copy, and an "Open the project →" link tucked at the
+            // end of a sentence is a poorer way to say "you are on the money
+            // side of this project" than a lit button that says so. ?>
+      <?php project_section_nav($project, 'finance'); ?>
       <nav class="proj-tabs">
         <?php foreach (finance_nav_items($projectId, (string)($project['type'] ?? '')) as $it): ?>
           <a href="<?= e($it['href']) ?>"

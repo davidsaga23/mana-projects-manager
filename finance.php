@@ -39,15 +39,21 @@ $pageTitle = 'Finance';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb"><a href="index.php">← All projects</a></p>
-<h2 class="wizard-title">Finance <span class="admin-only-tag">administrators only</span></h2>
+<p class="crumb"><a href="index.php">← Projects</a></p>
+<h2 class="wizard-title">Finance across all projects <span class="admin-only-tag">administrators only</span></h2>
+
+<?php // A REPORT, not a home (David, 2026-08-17). This screen used to be a
+      // top-bar destination, which made it a second list of the same projects
+      // competing with index.php — you had to pick a lens before you had picked
+      // a show. One project's money is now reached by opening the project and
+      // switching to Finance management. What is genuinely only possible here is
+      // the comparison ACROSS projects, so that is what it is for. ?>
 
 <?php // NO "Ideal quotas" button here, deliberately (David, 2026-08-17). The
-      // sheet is reached from INSIDE a project — Finance management → a project
+      // sheet is reached from INSIDE a project — a project → Finance management
       // → the Ideal quotas tab — because that is the moment it matters: you are
       // looking at a budget and want to know, or change, the number that priced
-      // it. A button on this hub competed with the project list, which is the
-      // one thing this screen is for. ?>
+      // it. ?>
 
 <p class="lead">
   Budgets, what the plan will cost, and what has been billed. Rates and invoices live in a

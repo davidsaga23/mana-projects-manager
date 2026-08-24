@@ -46,6 +46,62 @@ function project_nav_items(int $projectId): array {
 }
 
 /**
+ * The identity line and the SECTION SWITCHER, drawn above the tabs on every
+ * screen that belongs to a project — production and finance alike.
+ *
+ * Settled with David 2026-08-17. The two managements used to be top-bar links,
+ * and each led to its own list of the same projects; you had to choose a lens
+ * before you had chosen a show. Now the top bar has one way in, and the choice
+ * lives here, where you have already said which project you are looking at.
+ *
+ * Two levels of "you are here", because one bar could not carry both: the
+ * switcher says which SIDE of the project you are on (run it / pay for it), the
+ * tabs under it say which SCREEN. Both mark themselves.
+ *
+ * $section is 'project' or 'finance'.
+ */
+function project_section_nav(array $project, string $section): void {
+    $projectId = (int)$project['id'];
+    $sections = [
+        ['key' => 'project', 'label' => 'Project management',
+         'href' => 'project.php?id=' . $projectId],
+    ];
+    // Finance opens a database ordinary screens hold no credential for — see
+    // includes/money.php — so an editor is not offered a door that would only
+    // turn them away.
+    if (is_admin()) {
+        $sections[] = ['key' => 'finance', 'label' => 'Finance management',
+                       'href' => 'finance_project.php?project=' . $projectId . '&tab=overview'];
+    }
+    ?>
+    <div class="proj-bar-title">
+      <a href="index.php" class="muted">Projects</a>
+      <span class="muted">/</span>
+      <strong><?= e($project['name']) ?></strong>
+      <span class="muted">(<?= e($project['code']) ?>)</span>
+      <?php if (isset($project['status'])): ?>
+        <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
+      <?php endif; ?>
+      <?php if ($section === 'finance'): ?>
+        <span class="admin-only-tag">administrators only</span>
+      <?php endif; ?>
+    </div>
+    <?php // Only drawn when there is a choice to make. A viewer sees one
+          // section, and a lone highlighted button that leads nowhere is
+          // furniture, not navigation. ?>
+    <?php if (count($sections) > 1): ?>
+      <nav class="proj-sections" aria-label="Project section">
+        <?php foreach ($sections as $s): ?>
+          <a href="<?= e($s['href']) ?>"
+             class="proj-section <?= $s['key'] === $section ? 'current' : '' ?>"
+             <?= $s['key'] === $section ? 'aria-current="true"' : '' ?>><?= e($s['label']) ?></a>
+        <?php endforeach; ?>
+      </nav>
+    <?php endif; ?>
+    <?php
+}
+
+/**
  * Render the bar. $current is the key of the page drawing it — step.php passes
  * 'dashboard' because it is a drill-down of that screen, not a tab of its own.
  */
@@ -54,13 +110,7 @@ function project_nav(array $project, string $current = ''): void {
     $items = project_nav_items($projectId);
     ?>
     <div class="proj-bar">
-      <div class="proj-bar-title">
-        <a href="index.php" class="muted">All projects</a>
-        <span class="muted">/</span>
-        <a href="project.php?id=<?= $projectId ?>"><strong><?= e($project['name']) ?></strong></a>
-        <span class="muted">(<?= e($project['code']) ?>)</span>
-        <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
-      </div>
+      <?php project_section_nav($project, 'project'); ?>
       <nav class="proj-tabs">
         <?php $lastGroup = null; foreach ($items as $it): ?>
           <?php if ($lastGroup !== null && $it['group'] !== $lastGroup): ?>

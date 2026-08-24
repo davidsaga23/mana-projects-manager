@@ -219,10 +219,21 @@ Hard-won, all from real incidents:
    all 500'd together — which is the signature of a broken *include*, not a broken feature. It
    presented as "there are no projects", because output stopped after the table header.
    **`tools/check_php_blocks.py` now detects unterminated strings**, alongside unbalanced
-   `if:/endif;` and duplicate function names. Three classes, one command, no PHP binary needed.
+   `if:/endif;` and duplicate function names.
    **The narrower lesson is the useful one:** it was introduced by a scripted string replacement
    that silently did not match. **Assert every replacement.** That batch asserted on every edit
    but one, and that was the one that failed. (2026-08-18.)
+
+15. **A PHP file is mostly HTML, so you cannot tell by looking whether a line is in PHP mode.**
+   A comment block was pasted above `$pageTitle = …` in `standards.php` complete with its own
+   `<?php` — but the file had opened PHP ninety lines earlier and had not closed it. `<?php`
+   inside PHP is not a tag, it is the characters `<` and `?` and a word, and the file stops
+   compiling. Same signature as lesson 14: every page requiring it 500s, not just the screen
+   being worked on. None of the other three checks could see it — braces balanced, strings
+   closed, no duplicate names. **`tools/check_php_blocks.py` gained a fourth pass**, and the
+   pass was verified by putting the bug back and watching it fire, because a check nobody has
+   seen fail is a check nobody knows works. **Before adding a block, look up the file for the
+   nearest unmatched `<?php` or `?>` — not at the indentation.** (2026-08-17.)
 
 ---
 
@@ -576,10 +587,12 @@ Ship each phase end-to-end before starting the next.
 
 - Start by reading this file and `docs/ARCHITECTURE.md`.
 - **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
-  binary on the dev machine, so no `php -l`; this catches the one mistake that is both easy
-  to make here and invisible until a page renders blank — a missing `endif;` or an
-  `endforeach;` closing the wrong block. Counting braces with grep is *not* a substitute and
-  produced false alarms on healthy files; `tools/README.md` says why.
+  binary on the dev machine, so no `php -l`; this is the only gate. It makes four passes,
+  each earned by a bug that actually shipped: unbalanced `endif;`/`endforeach;`, unterminated
+  strings, a `<?php` opened while already in PHP mode, and duplicate function names. The last
+  three are outright parse errors — the file never compiles, so *every* page requiring it
+  500s, not just the feature being worked on. Counting braces with grep is *not* a substitute
+  and produced false alarms on healthy files; `tools/README.md` says why.
 - Work **one phase per conversation**, not one feature — related work should share context.
 - Use `/compact` when a chat gets long rather than starting over.
 - Update `docs/DECISIONS.md` whenever something is settled, so it survives context loss.

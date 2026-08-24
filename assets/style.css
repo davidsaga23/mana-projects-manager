@@ -683,6 +683,31 @@ button.linkish:hover { background: none; color: #1d4e80; }
 /* The set-up-and-fix screens read one notch quieter than the daily ones. */
 .proj-tab.tab-data { color: #5a6a7a; font-size: 13px; }
 .proj-tab-sep { width: 1px; height: 18px; background: #dfe4e9; margin: 0 8px; }
+
+/* SECTION SWITCHER — the level ABOVE the tabs: which side of the project you
+   are on, run it or pay for it.
+   A segmented control rather than more tabs, deliberately. Two rows of
+   underlined tabs read as one long bar that happened to wrap, and then neither
+   row says where you are — which is the whole job of this one. A control with a
+   visible frame and exactly one filled cell says "two modes, you are in this
+   one" before a word of it is read. */
+.proj-sections {
+  display: inline-flex; gap: 2px; margin-bottom: 10px; padding: 2px;
+  background: #f2f5f8; border: 1px solid #e0e6eb; border-radius: 5px;
+}
+.proj-section {
+  display: inline-block; padding: 5px 16px; font-size: 13px; font-weight: 600;
+  color: #5a6a7a; border-radius: 3px; line-height: 1.5; white-space: nowrap;
+}
+.proj-section:hover { background: #e6edf4; color: #2f6fb2; text-decoration: none; }
+.proj-section.current { background: #2f6fb2; color: #fff; }
+.proj-section.current:hover { background: #2f6fb2; color: #fff; }
+/* Money wears the administrators-only red, so the finance side of a project is
+   never mistaken at a glance for another production screen. */
+.proj-bar-finance .proj-section.current,
+.proj-bar-finance .proj-section.current:hover { background: #8f222c; color: #fff; }
+.proj-bar-finance .proj-tab.current { border-bottom-color: #8f222c; }
+
 @media print { .proj-bar { display: none; } }
 
 /* Dashboard — hero, primary step, KPI tiles, step cards, breakdown grid */

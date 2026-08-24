@@ -26,10 +26,14 @@ TOKEN = re.compile(
 )
 
 
-def php_code_only(text):
+def php_code_only(text, nested_opens=None):
     """Blank HTML, strings, heredocs and comments; keep executable PHP in place.
 
     Newlines are preserved throughout so reported line numbers match the file.
+
+    If a list is passed as `nested_opens`, the line number of every '<?php' or
+    '<?=' that appears while ALREADY in PHP mode is appended to it — see the
+    fourth check at the bottom of this file for why that matters.
     """
     out = []
     i = 0
@@ -60,7 +64,18 @@ def php_code_only(text):
             continue
 
         # --- inside PHP ---
-        if text.startswith('?>', i):
+        if text.startswith('<?php', i) or text.startswith('<?=', i):
+            # Already in PHP mode, so this is not an opening tag — it is the
+            # characters '<', '?' and a word, which PHP cannot parse. Recorded
+            # rather than acted on: masking it would hide a fatal, and keeping
+            # it verbatim would spray fake tokens into the alternation walk.
+            if nested_opens is not None:
+                nested_opens.append(text.count('\n', 0, i) + 1)
+            width = 5 if text.startswith('<?php', i) else 3
+            for c in text[i:i + width]:
+                hide(c)
+            i += width
+        elif text.startswith('?>', i):
             in_php = False
             hide(text[i]); hide(text[i + 1])
             i += 2
@@ -252,6 +267,36 @@ for f in files:
         print('  %s: a string opened near line %d is never closed' % (f, line))
 print('')
 print('%d files checked for unterminated strings, %d suspect' % (len(files), bad_str))
+
+
+# ---------------------------------------------------------------------------
+# A '<?php' opened while ALREADY in PHP mode.
+#
+# Another PARSE error, so the file never compiles and every page requiring it
+# 500s. It happens when a block of code is pasted into a spot that looks like
+# HTML but is not — the file opened PHP forty lines earlier and has not closed
+# it, and nothing on screen says so.
+#
+# Cost the Ideal quotas screen a fatal on 2026-08-17: a comment block was added
+# above `$pageTitle = ...` complete with its own opening tag, in the middle of a
+# region that was still executing PHP. None of the three checks above saw it —
+# braces balanced, strings closed, no duplicate names — which is exactly why it
+# is worth its own pass.
+# ---------------------------------------------------------------------------
+bad_nested = 0
+for f in files:
+    text = io.open(f, encoding='utf-8', errors='replace').read()
+    opens = []
+    php_code_only(text, nested_opens=opens)
+    if opens:
+        if bad_nested == 0:
+            print('')
+            print('PHP TAG OPENED INSIDE PHP — these files will not parse:')
+        bad_nested += 1
+        for line in opens[:8]:
+            print('  %s:%d: <?php or <?= while already in PHP mode' % (f, line))
+print('')
+print('%d files checked for nested PHP open tags, %d suspect' % (len(files), bad_nested))
 
 
 FUNC = re.compile(r'^\s*function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(', re.M)

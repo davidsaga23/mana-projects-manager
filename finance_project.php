@@ -23,7 +23,9 @@ $stmt->execute([$projectId]);
 $project = $stmt->fetch();
 if (!$project) {
     flash('err', 'That project no longer exists.');
-    header('Location: finance.php');
+    // The one home, not the finance report — a project that is gone is gone from
+    // both sides of the app, and the list of the ones that remain is here.
+    header('Location: index.php');
     exit;
 }
 
@@ -548,7 +550,7 @@ if (standards_available($pdo)) {
   one person per day — remaining work over the working days left, divided by the people on it. It
   is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
   closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
-  from the <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
+  from the <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
   for <?= e($project['type']) ?> projects.
 </p>
 
@@ -561,7 +563,7 @@ if (standards_available($pdo)) {
   <div class="empty-state">
     <p>No step on this project has an ideal recorded for <?= e($project['type']) ?> projects yet.</p>
     <p class="muted">Write them down on the
-      <a href="standards.php?type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
+      <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
       this comparison fills in. It is the one thing that can tell you a budget is buying a plan
       nobody can deliver.</p>
   </div>
@@ -668,7 +670,7 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
     <strong>no studio standard</strong> for <?= e($proj['project_type'] ?? '') ?> projects, so they
     are costed from what this project was planned at. Those are marked
     <em>est.</em> below.
-    <a href="standards.php?type=<?= urlencode((string)($proj['project_type'] ?? '')) ?>">Set the
+    <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)($proj['project_type'] ?? '')) ?>">Set the
     ideal quotas →</a>
   </div>
 <?php elseif ($onIdeal > 0): ?>

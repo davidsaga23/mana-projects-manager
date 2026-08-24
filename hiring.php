@@ -32,7 +32,13 @@ if (!$project) {
     exit;
 }
 
-$selfUrl = 'hiring.php?project=' . $projectId;
+// Which bar this screen wears, carried through every save. All the forms below
+// post to the current URL, so it survives the round trip on its own — but the
+// redirect after a successful save builds a fresh URL, and dropping it there
+// would silently move the reader to the other section mid-task.
+$section = ($_GET['section'] ?? '') === 'finance' ? '&section=finance' : '';
+
+$selfUrl = 'hiring.php?project=' . $projectId . $section;
 $ready   = hiring_available($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -186,7 +192,21 @@ $pageTitle = 'Hiring · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<?php project_nav($project, 'hiring'); ?>
+<?php
+// ONE screen, TWO sections. Hiring is listed on both bars deliberately — it is
+// the same conversation whether it is opened from the plan or from the budget,
+// and two copies of it would drift. But the bar it draws must match the door the
+// reader came through: arriving from Finance management and finding Project
+// management lit is precisely the "which tab am I on" confusion the switcher
+// exists to end. So the caller says, and this screen obeys.
+$fromFinance = ($_GET['section'] ?? '') === 'finance' && is_admin();
+if ($fromFinance) {
+    require_once __DIR__ . '/includes/finance_nav.php';
+    finance_nav($project, 'hiring');
+} else {
+    project_nav($project, 'hiring');
+}
+?>
 
 <h2 class="wizard-title">Hiring <span class="muted">· <?= e($project['name']) ?></span></h2>
 

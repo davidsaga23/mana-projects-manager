@@ -26,7 +26,13 @@ $types = standard_project_types($pdo);
 $type = (string)($_GET['type'] ?? $_POST['project_type'] ?? '');
 if (!in_array($type, $types, true)) $type = $types[0] ?? '3D';
 
-$selfUrl = 'standards.php?type=' . urlencode($type);
+// Where the project's finance tabs sent us, carried through every save and type
+// switch — a redirect that dropped it would strand the reader on the first save,
+// which is the moment they are most likely to want to go back.
+$fromId = (int)($_GET['from'] ?? $_POST['from'] ?? 0);
+$fromQs = $fromId > 0 ? '&from=' . $fromId : '';
+
+$selfUrl = 'standards.php?type=' . urlencode($type) . $fromQs;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -91,9 +97,38 @@ if ($ready) {
     }
 }
 
+// The project whose finance tabs sent us here, if any. This sheet is studio-wide
+// — it belongs to a KIND of project, not to one show — so it cannot sit inside a
+// project's nav. But it is reached from a project's Finance management tabs, and
+// a screen you can only arrive at and not leave is the cul-de-sac complaint the
+// person page already earned once. The crumb below is the way back.
+$fromProject = null;
+if ($fromId > 0) {
+    $st = $pdo->prepare('SELECT id, name, code FROM projects WHERE id = ?');
+    $st->execute([$fromId]);
+    $fromProject = $st->fetch() ?: null;
+}
+
 $pageTitle = 'Ideal quotas · ' . $type;
 require __DIR__ . '/includes/header.php';
 ?>
+
+<p class="crumb">
+  <?php if ($fromProject): ?>
+    <?php // Back to the side of the project the reader can actually open. This
+          // sheet is not admin-only — it is production planning data — so an
+          // editor reaching it from a step detail must not be pointed at a
+          // finance screen that would turn them away at the door. ?>
+    <?php if (is_admin()): ?>
+      <a href="finance_project.php?project=<?= (int)$fromProject['id'] ?>&tab=overview">←
+        Finance management · <?= e($fromProject['name']) ?></a>
+    <?php else: ?>
+      <a href="project.php?id=<?= (int)$fromProject['id'] ?>">← <?= e($fromProject['name']) ?></a>
+    <?php endif; ?>
+  <?php else: ?>
+    <a href="index.php">← Projects</a>
+  <?php endif; ?>
+</p>
 
 <h2 class="wizard-title">Ideal quotas <span class="muted">· base sheet for <?= e($type) ?> projects</span></h2>
 
@@ -121,7 +156,7 @@ require __DIR__ . '/includes/header.php';
   <p class="page-actions">
     <?php foreach ($types as $t): ?>
       <a class="proj-tab <?= $t === $type ? 'current' : '' ?>"
-         href="standards.php?type=<?= urlencode($t) ?>"><?= e($t) ?></a>
+         href="standards.php?type=<?= urlencode($t) ?><?= e($fromQs) ?>"><?= e($t) ?></a>
     <?php endforeach; ?>
   </p>
 

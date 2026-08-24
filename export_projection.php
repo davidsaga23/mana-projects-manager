@@ -33,7 +33,7 @@ $stmt->execute([$projectId]);
 $project = $stmt->fetch();
 if (!$project) {
     flash('err', 'That project no longer exists.');
-    header('Location: finance.php');
+    header('Location: index.php');
     exit;
 }
 

@@ -22,9 +22,18 @@ $pageTitle = 'Projects';
 require __DIR__ . '/includes/header.php';
 ?>
 
+<?php // THE one front door (David, 2026-08-17). Finance used to have a rival
+      // list of these same projects reached from the top bar, so the first
+      // choice the app asked for was one you could not answer yet. Both
+      // managements now live INSIDE a project, on the switcher project_nav()
+      // and finance_nav() share; what is left here is the portfolio-wide money
+      // report, which is a report and not a second home. ?>
 <div class="page-actions">
   <a class="button" href="wizard.php">+ New project</a>
   <a href="mytasks.php" style="margin-left:12px;">My work across all projects →</a>
+  <?php if (is_admin()): ?>
+    <a href="finance.php" style="margin-left:12px;">Finance across all projects →</a>
+  <?php endif; ?>
 </div>
 
 <?php if (!$projects): ?>
@@ -56,6 +65,13 @@ require __DIR__ . '/includes/header.php';
           <a href="wizard.php?project=<?= (int)$p['id'] ?>&step=<?= max(1, (int)($p['wizard_step'] ?: 1)) ?>">Resume setup →</a>
         <?php else: ?>
           <a href="project.php?id=<?= (int)$p['id'] ?>">Open →</a>
+          <?php // Straight to the money side of the same show, for the admin who
+                // came here to look at a budget. Opening the project first and
+                // then switching works too — this saves the hop, it does not
+                // replace the switcher. ?>
+          <?php if (is_admin()): ?>
+            <a href="finance_project.php?project=<?= (int)$p['id'] ?>&tab=overview" class="muted">Finance →</a>
+          <?php endif; ?>
         <?php endif; ?>
       </td>
     </tr>
