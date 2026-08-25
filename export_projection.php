@@ -118,7 +118,23 @@ foreach ($proj['by_department'] as $dept => $group) {
         $shade = !$shade;                       // alternate the row fill
         $rateUnit = $row['rate_unit'] ?: 'day';
         $rate     = $row['rate'];
-        $days     = round((float)$row['days'], 2);
+
+        // FULL PRECISION, because this cell is MULTIPLIED, not just read.
+        //
+        // The cost beside it is a live `=E*F` and the workbook carries
+        // fullCalcOnLoad, so Excel recomputes rate x THIS VALUE the moment the
+        // file opens — the cached cost is overwritten by whatever this holds.
+        // Rounded to 2 decimals it was answering a different sum from the one
+        // the platform did: 7.1775 days became 7.18, and 200 x 7.18 is 1,436.00
+        // against a true 1,435.50. Small per row, and every row carries it the
+        // same direction, so the sheet drifted about 10 against the screen it
+        // was exported from — which is the "they're not matching 100% in the
+        // amounts" this export was built to answer.
+        //
+        // Nothing is lost on screen: the column's number format (165, "0.00")
+        // still SHOWS two decimals. Display rounding is what a number format is
+        // for; rounding the stored value corrupts the arithmetic instead.
+        $days     = round((float)$row['days'], 6);
 
         // The row number this will land on, needed by its own formulas.
         $rn = $r + 1;
