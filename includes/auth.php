@@ -163,7 +163,24 @@ function require_login(): void {
         if (function_exists('flash')) {
             flash('err', 'Your account has view-only access, so that change was not saved.');
         }
-        header('Location: ' . ($_SERVER['REQUEST_URI'] ?? 'index.php'));
+        // Back to the same screen as a GET, so the reader sees the page and the
+        // message rather than a dead POST.
+        //
+        // REQUEST_URI comes from the request line, so it is the CALLER's text,
+        // not ours. "POST //evil.com/ HTTP/1.1" makes it "//evil.com/", and a
+        // protocol-relative Location sends the browser off this host entirely —
+        // an open redirect wearing the app's own domain in the link. Only a path
+        // beginning with a single slash is ours to return to.
+        $back   = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $second = $back[1] ?? '';
+        // chr(92) is a backslash. Written this way because a literal one
+        // inside a single-quoted PHP string is an escape, and getting that
+        // wrong here would break the file rather than the check.
+        if ($back === '' || $back[0] !== '/'
+            || $second === '/' || $second === chr(92)) {
+            $back = 'index.php';
+        }
+        header('Location: ' . $back);
         exit;
     }
 }

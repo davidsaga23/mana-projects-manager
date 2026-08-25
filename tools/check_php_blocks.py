@@ -320,3 +320,36 @@ if clashes:
             print('      %s:%d' % (f, line))
 print('')
 print('%d function names defined, %d duplicated' % (len(seen), len(clashes)))
+
+# ---------------------------------------------------------------------------
+# JavaScript syntax, when node is on the machine.
+#
+# The browser files had NO gate at all: a stray brace in wizard.js or board.js
+# breaks a screen silently — the page renders, the script never runs, and the
+# feature simply does nothing. That is the same class of failure this file was
+# built for on the PHP side, and it was going unchecked purely because nobody
+# had noticed `node` was installed.
+#
+# `node --check` parses without executing, so it is safe to run over anything.
+# Skipped with a note where node is absent, because a checker that fails on a
+# machine without an optional tool is a checker people stop running.
+# ---------------------------------------------------------------------------
+import shutil
+import subprocess
+
+node = shutil.which('node')
+jsfiles = sorted(glob.glob('assets/*.js'))
+print('')
+if not node:
+    print('node not found, so %d JavaScript file(s) were NOT checked.' % len(jsfiles))
+else:
+    bad_js = 0
+    for f in jsfiles:
+        r = subprocess.run([node, '--check', f], capture_output=True, text=True)
+        if r.returncode != 0:
+            if bad_js == 0:
+                print('JAVASCRIPT SYNTAX ERRORS - these files will not run in the browser:')
+            bad_js += 1
+            first = (r.stderr or '').strip().splitlines()
+            print('  %s: %s' % (f, first[0] if first else 'failed to parse'))
+    print('%d JavaScript files checked, %d with syntax errors' % (len(jsfiles), bad_js))

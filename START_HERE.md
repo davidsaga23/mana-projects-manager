@@ -587,11 +587,13 @@ Ship each phase end-to-end before starting the next.
 
 - Start by reading this file and `docs/ARCHITECTURE.md`.
 - **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
-  binary on the dev machine, so no `php -l`; this is the only gate. It makes four passes,
+  binary on the dev machine, so no `php -l`; this is the only gate. It makes five passes,
   each earned by a bug that actually shipped: unbalanced `endif;`/`endforeach;`, unterminated
-  strings, a `<?php` opened while already in PHP mode, and duplicate function names. The last
-  three are outright parse errors — the file never compiles, so *every* page requiring it
-  500s, not just the feature being worked on. Counting braces with grep is *not* a substitute
+  strings, a `<?php` opened while already in PHP mode, duplicate function names, and — where
+  `node` is installed — `node --check` over `assets/*.js`. Four of those are outright parse
+  errors: the file never compiles, so *every* page requiring it 500s, not just the feature
+  being worked on. A broken .js is quieter and worse — the page renders, the script never
+  runs, and the feature simply does nothing. Counting braces with grep is *not* a substitute
   and produced false alarms on healthy files; `tools/README.md` says why.
 - Work **one phase per conversation**, not one feature — related work should share context.
 - Use `/compact` when a chat gets long rather than starting over.
