@@ -152,6 +152,14 @@ foreach ($proj['by_department'] as $dept => $group) {
         //
         // Writing E*F on an hourly or flat row would produce a confidently wrong
         // number the moment somebody edited the rate.
+        //
+        // ROUND(...,2) wraps both live formulas so that a sheet somebody edits
+        // keeps adding up. expense_projection() rounds each cost to cents; if
+        // the formula did not, Excel would recompute the raw product on open and
+        // silently reintroduce the fractions of a cent the projection had just
+        // removed — the rows would show one thing and the total another again,
+        // which is the whole complaint. Type a new day rate into E and the row,
+        // its subtotal and the grand total all move together, still in cents.
         $liveCost   = ($rate !== null && $rateUnit === 'day');
         $liveSecond = ($rate !== null && $rateUnit === 'second'
                        && (int)($row['tracks_seconds'] ?? 0) === 1);
@@ -171,14 +179,14 @@ foreach ($proj['by_department'] as $dept => $group) {
                                 's' => xlsx_alt(XLSX_NUM_CALC, $shade)];
 
         if ($liveCost) {
-            $cells[COL_COST] = ['f' => 'IFERROR(' . $E . '*' . $F . ',0)',
+            $cells[COL_COST] = ['f' => 'IFERROR(ROUND(' . $E . '*' . $F . ',2),0)',
                                 'v' => round((float)$row['cost'], 2),
                                 's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
         } elseif ($liveSecond) {
             // Rate times FOOTAGE. Deliberately not times days: a retake allowance
             // lengthens the days and never the seconds, so a per-second cost is
             // flat while its duration grows (DECISIONS, 2026-08-17).
-            $cells[COL_COST] = ['f' => 'IFERROR(' . $E . '*I' . $rn . ',0)',
+            $cells[COL_COST] = ['f' => 'IFERROR(ROUND(' . $E . '*I' . $rn . ',2),0)',
                                 'v' => round((float)$row['cost'], 2),
                                 's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
         } else {
@@ -186,7 +194,14 @@ foreach ($proj['by_department'] as $dept => $group) {
                                 's' => xlsx_alt(XLSX_MONEY, $shade)];
         }
 
-        $cells[COL_UNITS] = ['v' => $row['units'] > 0 ? round((float)$row['units'], 2) : '',
+        // FULL PRECISION for the same reason COL_DAYS carries it: on a
+        // per-second row this cell is the I in `=E*I`, so Excel multiplies the
+        // rate by whatever is stored here. Rounding it to 2 decimals made the
+        // sheet answer a different sum from the projection, exactly as the days
+        // column did. Harmless on a day-rate row, wrong on a footage one, and
+        // there is no reason to keep the hazard for the sake of a display that
+        // the number format already handles.
+        $cells[COL_UNITS] = ['v' => $row['units'] > 0 ? round((float)$row['units'], 6) : '',
                              's' => xlsx_alt(XLSX_NUM, $shade)];
         $cells[COL_ARATE] = ['v' => '', 's' => xlsx_alt(XLSX_MONEY, $shade)];
         $cells[COL_ADAYS] = ['v' => $row['actual_days'] > 0 ? round((float)$row['actual_days'], 2) : '',

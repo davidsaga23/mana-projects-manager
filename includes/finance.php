@@ -248,6 +248,27 @@ function expense_projection(PDO $pdo, int $projectId): array {
                     $cost = $rate * $daysPerLane;
                 }
 
+                // MONEY IS CENTS, and it becomes cents HERE — once, in the one
+                // place a cost is worked out — so every reader of this array
+                // agrees by construction.
+                //
+                // Without it a lane cost carried a fraction of a cent (230 x
+                // 2.45025 = 563.5575), every screen and the export DISPLAYED
+                // 563.56, and every total SUMMED 563.5575. The document did not
+                // add up: six departments showed rows totalling 14,922.05 under
+                // a grand total of 14,922.02.
+                //
+                // The error is per ROW, not per amount, so it grows with the
+                // size of the sheet rather than the size of the budget — about
+                // half a cent a row, which is a whole unit on a 200-line
+                // projection and the reason this is worth fixing rather than
+                // living with (David, 2026-08-18).
+                //
+                // The sum of the line items IS the budget: there is no truer
+                // total hiding behind the rounding, because nobody can be paid
+                // 563.5575.
+                if ($cost !== null) $cost = round($cost, 2);
+
                 if ($cost !== null) {
                     $total += $cost;
                     if ($currency === null) $currency = $cur;
