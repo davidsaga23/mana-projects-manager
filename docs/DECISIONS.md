@@ -1660,6 +1660,29 @@ that was still executing PHP — a parse error that would have 500'd the screen,
 the three existing checks could see. `tools/check_php_blocks.py` gained a fourth pass for it, and
 the pass was verified by reintroducing the bug and watching it fire.
 
+## 2026-08-18 — Money is rounded to cents at the point it is computed
+**Decision:** `expense_projection()` rounds every lane cost to 2 decimals as it works it out,
+and both live Excel formulas wrap in `ROUND(...,2)` to match. The sum of the line items IS the
+budget.
+
+**Why:** a lane cost is a rate times a fractional number of days, so it lands on fractions of a
+cent — 230 x 2.45025 = 563.5575. Everything DISPLAYED 563.56 and every total SUMMED 563.5575,
+so a projection did not add up: six departments showed rows totalling 14,922.05 under a grand
+total of 14,922.02. David found it comparing a real export against a hand calculation.
+
+**Why it mattered enough to fix:** the error is per ROW, not per amount — roughly half a cent a
+row — so it scales with the size of the sheet rather than the size of the budget. Three cents on
+seventeen rows; a whole unit on two hundred. *"I could live with it but with bigger numbers this
+variation might be problematic."*
+
+**Consequences:**
+- Rounded once, at the single point a cost is worked out, so the screen, the hub, the person
+  page, the export and the margin agree by construction rather than by each rounding to taste.
+- The Excel formulas had to round too. Without it Excel recomputes the raw product on open —
+  `fullCalcOnLoad` — and silently puts the fractions back, so the sheet would disagree with
+  itself again the moment it was opened.
+- There is no truer total hiding behind the rounding: nobody can be paid 563.5575.
+
 ---
 
 ## Still open
