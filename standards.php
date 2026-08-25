@@ -231,8 +231,18 @@ require __DIR__ . '/includes/header.php';
               <input type="hidden" name="<?= $n ?>[applies_to]" value="<?= e($s['applies_to']) ?>">
               <input type="hidden" name="<?= $n ?>[applies_to_asset_type]" value="<?= e($s['applies_to_asset_type']) ?>">
             </td>
+            <?php // THREE decimals, matching DECIMAL(6,3) exactly — not a display
+                  // preference, a correctness requirement. This is an EDITABLE
+                  // field, so whatever it renders is what comes back on the next
+                  // save. At two decimals a stored 0.435 rendered "0.44", and
+                  // saving the form without touching the row wrote 0.44 back:
+                  // a 1.15% budget increase nobody typed, on every re-save.
+                  //
+                  // fmt_num strips trailing zeros, so the clean values still read
+                  // clean — 0.500 shows as 0.5, not 0.500. Only the values that
+                  // genuinely need the third decimal show it. ?>
             <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"
-                       value="<?= e(fmt_num((float)$s['days_per_unit'], 2)) ?>"></td>
+                       value="<?= e(fmt_num((float)$s['days_per_unit'], 3)) ?>"></td>
             <td class="muted small"><?= e(fmt_num(1 / max(0.001, (float)$s['days_per_unit']), 2)) ?> a day</td>
             <td><input name="<?= $n ?>[typical_headcount]" inputmode="decimal" size="5"
                        value="<?= $s['typical_headcount'] !== null ? e(fmt_num((float)$s['typical_headcount'], 2)) : '' ?>"></td>
