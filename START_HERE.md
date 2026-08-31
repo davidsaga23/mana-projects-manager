@@ -7,29 +7,31 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status (2026-08-17):** in real use on "Return to Club" at
+- **Status (2026-08-31):** in real use on "Return to Club" at
   <https://mana.davidsaga.com>. Built and deployed: setup, Plaky import, scheduler, crew slots,
   timeline, dashboard, per-step detail, **tickets, the tracking grid, item detail, team and
   person performance, per-day time logs, the project brief, the whole money side, and now
   hiring and contracts**. **All ten steps of David's production cycle are covered** — see the
   table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
   thing left is the **client loop**, which was never on that list.
-- **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
-  run to **027** (024 hiring, 025 freelancer fields, 026 ideal quotas, 027 archived projects).
-  **027 adds an `archived` status** so a project can leave the front door without being
-  destroyed; until it is applied the list simply does not offer the option. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
-  Return to Club. **025 (freelancer fields) and 026 (ideal quotas) are new and pending.** Without 025 the entry grid
-  offers names, emails, phones, portfolios, sources and notes, but not location, position,
-  seniority, project type, worked-with-us or rating — and it says so on screen rather than
-  silently dropping them. Without 026 the Ideal quotas screen reports that it cannot work.
+  Since 17 August: the navigation was rebuilt around **one home** with Project/Finance
+  management as sections inside a project; the projection and its Excel export were corrected
+  to agree to the cent (see the 2026-08-18 money entries in `docs/DECISIONS.md`); and the
+  projects list gained **status, rename, archive and delete**.
+- **✅ Deploy state (2026-08-31): everything is applied.** Migrations run to **027** and
+  **all of them are in**, confirmed by David — 024 hiring, 025 freelancer fields, 026 ideal
+  quotas, 027 archived projects. Nothing is pending on the production side. Still open
+  `migrate.php` and look before assuming, rather than trusting this line: it is only ever as
+  fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
-  runner only touches the production connection). The first three were imported by 18 August;
-  **04 (hiring quotes + contract status), 05 (other expenses) and 06 (per-second rates) are new and pending** — those
-  features are unavailable until each is imported, and every screen says so rather than showing a
-  blank. **Until 05 is in, Projected cost and Margin count people only.** Its credential lives in the `finance_db` block of `config.php`, and
-  `includes/money.php` is the **only** place that connection is ever opened.
+  runner only touches the production connection). **✅ All six are imported as of 2026-08-31**,
+  confirmed by David — 01–03 by 18 August, then 04 (hiring quotes + contract status),
+  05 (other expenses) and 06 (per-second rates). So Projected cost and Margin now count
+  non-labour costs too, and every finance feature is live. Its credential lives in the
+  `finance_db` block of `config.php`, and `includes/money.php` is the **only** place that
+  connection is ever opened.
   **⚠ Run each finance file ONCE** — there is no `schema_migrations` table on that side, so a
   second import fails on "duplicate column". That failure is harmless and means it was done.
 - **Email is live** (confirmed 2026-08-14): sending as `hi@davidsaga.com` through
