@@ -320,7 +320,15 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $isSurplus ? 'has-problem' : '' ?>">
           <td class="col-num muted"><?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?></td>
           <td>
-            <strong><?= e($l['name']) ?></strong>
+            <?php // Straight to that person's page — their workload, their pace
+                  // and their days. The name was the one thing on this row that
+                  // read like a link and was not one (David, 2026-08-31).
+                  //
+                  // Placeholders link too. person.php knows what a slot is and
+                  // says so, and team.php has always listed them the same way —
+                  // "what is Rough 02 carrying?" is a fair question before
+                  // anyone is hired into it. ?>
+            <strong><a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$l['crew_id'] ?>"><?= e($l['name']) ?></a></strong>
             <?php if ($isPh): ?>
               <span class="est-tag">placeholder</span>
             <?php elseif (!$l['active']): ?>
