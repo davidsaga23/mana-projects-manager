@@ -21,6 +21,61 @@ function api_fail(string $msg, int $code = 400): void {
 }
 
 $action = $_GET['action'] ?? '';
+
+// ---------------------------------------------------------------------------
+// STEP DATES — the general timeline's bars, which ARE Dates & headcount.
+//
+// A different table from everything below: this writes pipeline_steps, not
+// schedule. It lives here anyway because it is the same screen's save endpoint,
+// and one door with two actions is easier to keep honest than two doors that
+// have to agree about auth, scoping and error shape.
+//
+// Deliberately NOT dependency-checked. David plans the general timeline to the
+// dates and accepts that a dependency-respecting schedule may run longer
+// (2026-08-31); a violated arrow is drawn red in the browser and that is all.
+// Refusing the drag here would be a wall where a warning was asked for.
+// ---------------------------------------------------------------------------
+if ($action === 'step_dates') {
+    $stepId    = (int)($_POST['step_id'] ?? 0);
+    $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+
+    $start = trim((string)($_POST['start_date'] ?? ''));
+    $end   = trim((string)($_POST['end_date'] ?? ''));
+    // Y-m-d and a real calendar date, not just the right shape: 2026-02-31
+    // matches any regex and is not a day.
+    foreach ([$start, $end] as $d) {
+        $parts = explode('-', $d);
+        if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
+            api_fail('That is not a date this app can store.');
+        }
+    }
+    if ($end < $start) api_fail('A step cannot end before it starts.');
+
+    // Scoped to the project the caller names, exactly as the task update below
+    // is — a step id from another show must not be writable from this page.
+    $chk = $pdo->prepare('SELECT name FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $chk->execute([$stepId, $projectId]);
+    $name = $chk->fetchColumn();
+    if ($name === false) api_fail('That step is not on this project.');
+
+    $upd = $pdo->prepare(
+        'UPDATE pipeline_steps SET start_date = ?, deadline = ? WHERE id = ? AND project_id = ?'
+    );
+    $upd->execute([$start, $end, $stepId, $projectId]);
+
+    echo json_encode([
+        'ok'    => true,
+        'step'  => $name,
+        'start' => $start,
+        'end'   => $end,
+        // Said back so the browser can show what it actually changed rather than
+        // assuming the write matched the drag.
+        'note'  => $name . ': ' . $start . ' to ' . $end,
+    ]);
+    exit;
+}
+
 if ($action !== 'update') api_fail('Unknown action.');
 
 $id = (int)($_POST['id'] ?? 0);

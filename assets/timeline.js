@@ -97,6 +97,87 @@
     svg.appendChild(text);
   }
 
+  // --- dependencies on the general chart --------------------------------------
+  //
+  // DRAWN, NOT ENFORCED. The arrows come from the workflow graph so the shape of
+  // the pipeline is visible while planning; a violated one turns red and the bar
+  // stays exactly where it was dropped. David plans the general timeline to the
+  // dates and accepts that a dependency-respecting schedule may run longer
+  // (2026-08-31) -- so this is a warning, never a wall.
+
+  function generalById(id) {
+    if (!window.GENERAL_TASKS) return null;
+    for (var i = 0; i < window.GENERAL_TASKS.length; i++) {
+      if (String(window.GENERAL_TASKS[i].id) === String(id)) return window.GENERAL_TASKS[i];
+    }
+    return null;
+  }
+
+  /** Names of the steps this one is planned to start before the finish of. */
+  function violationsFor(id) {
+    var t = generalById(id);
+    if (!t || !t.dependencies) return [];
+    var out = [];
+    t.dependencies.split(',').forEach(function (depId) {
+      depId = depId.trim();
+      if (!depId) return;
+      var d = generalById(depId);
+      // Compared as YYYY-MM-DD strings, which sort correctly as text and avoid
+      // constructing Date objects entirely -- see rule 2 at the top of this file.
+      if (d && t.start <= d.end) out.push(String(d.name).split(' · ')[0]);
+    });
+    return out;
+  }
+
+  /**
+   * Colour the arrows. Frappe 0.6.1 keeps them on gantt.arrows, each with the
+   * two tasks it joins and its own <path>. Reading a library's internals is a
+   * liability, so every step of it is guarded: a version that renames this
+   * simply draws no red rather than throwing and taking the chart with it.
+   */
+  function paintDependencies() {
+    if (!generalGantt || !generalGantt.arrows) return;
+    generalGantt.arrows.forEach(function (a) {
+      if (!a || !a.element || !a.from_task || !a.to_task) return;
+      var from = a.from_task.task || a.from_task;
+      var to   = a.to_task.task   || a.to_task;
+      if (!from || !to) return;
+      // from = the dependency, to = the step that waits for it.
+      var f = generalById(from.id), t = generalById(to.id);
+      var broken = !!(f && t && t.start <= f.end);
+      a.element.classList.toggle('dep-broken', broken);
+    });
+  }
+
+  var stepSaveTimer = null;
+  /** Says what was written, in the words the server used, then fades. */
+  function stepSaved(msg) {
+    var el = $('stepSaveNote');
+    if (!el) return;
+    el.textContent = 'Saved — ' + msg;
+    el.hidden = false;
+    clearTimeout(stepSaveTimer);
+    stepSaveTimer = setTimeout(function () { el.hidden = true; }, 4000);
+  }
+
+  function saveStepDates(stepId, start, end) {
+    var body = new URLSearchParams();
+    body.append('step_id', stepId);
+    body.append('start_date', start);
+    body.append('end_date', end);
+    return fetch('schedule_api.php?action=step_dates&project=' + window.TL_PROJECT,
+                 { method: 'POST', body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { alert(d.error || 'Save failed.'); throw new Error(d.error || 'failed'); }
+        return d;
+      })
+      .catch(function (err) {
+        if (err instanceof SyntaxError) alert('Save failed — try reloading the page.');
+        throw err;
+      });
+  }
+
   // --- general chart ---------------------------------------------------------
   function renderGeneral() {
     var el = $('generalGantt');
@@ -111,16 +192,44 @@
       language: 'en',
       popup_trigger: 'mouseover',
       custom_popup_html: function (t) {
-        var src = window.GENERAL_TASKS.find(function (x) { return x.id === t.id; }) || {};
-        var late = src.late ? '<br><span style="color:#8a6d1a">past its deadline of '
-                            + src.deadline + '</span>' : '';
+        var src = generalById(t.id) || {};
+        var late = src.late ? '<br><span style="color:#8a6d1a">past the delivery date of '
+                            + src.delivery + '</span>' : '';
+        var brk = violationsFor(t.id);
+        var dep = brk.length
+          ? '<br><span style="color:#b02a37">starts before ' + escapeHtml(brk.join(', '))
+            + ' finishes</span>'
+          : '';
         return '<div class="tl-popup"><strong>' + escapeHtml(t.name) + '</strong><br>'
-             + t.start + ' → ' + t.end + late + '</div>';
+             + t.start + ' → ' + t.end + late + dep + '</div>';
+      },
+      // THE BAR IS THE PLAN. These are pipeline_steps.start_date / deadline --
+      // the same two fields Dates & headcount edits -- so dragging here edits
+      // that screen graphically. Nothing is checked against the dependency
+      // arrows: they are drawn as a warning, and a violated one turns red
+      // rather than snapping the bar back (David, 2026-08-31).
+      on_date_change: function (task, start, end) {
+        if (!window.TL_CAN_EDIT) { renderGeneral(); return; }
+        var src = generalById(task.id);
+        if (!src) return;
+        var s = fmtDate(start), e = fmtDate(end);
+        var wasStart = src.start, wasEnd = src.end;
+        // Optimistic, so the arrows recolour under the cursor rather than after
+        // the round trip; rolled back below if the save is refused.
+        src.start = s; src.end = e;
+        paintDependencies();
+        saveStepDates(src.step_id, s, e).then(function (d) {
+          stepSaved(d.note || 'Saved.');
+        }).catch(function () {
+          src.start = wasStart; src.end = wasEnd;
+          renderGeneral();
+        });
       }
     });
     applyWidth(generalGantt, z.w);
     setTimeout(function () {
       paintBars(el, window.GENERAL_TASKS);
+      paintDependencies();
       addTodayLine(generalGantt, el);
       // This chart scrolls too — nineteen steps overflow its height — so its
       // header has to float as well, or the months scroll away and the bars

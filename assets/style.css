@@ -1367,3 +1367,18 @@ body.lightbox-lock { overflow: hidden; }
    rather than sharing it evenly with a name and a type that do not need it. */
 .asset-table .asset-note { width: 100%; min-width: 220px; }
 .asset-table td:nth-child(4) { width: 40%; }
+
+/* --- dependency arrows on the general timeline -----------------------------
+   Frappe's own stylesheet is linked from the CDN inside timeline.php, i.e.
+   AFTER this file, so an equally specific rule of ours would lose on order.
+   Its arrow rule is `.gantt .arrow` (two classes); everything here carries
+   three or more so specificity decides it and load order stops mattering. */
+.tl-chart .gantt .arrow { stroke: #b6c2cd; stroke-width: 1.4; }
+
+/* Planned to start before the thing it waits for has finished. Deliberately
+   loud: it is the one thing on this chart that is not simply a fact. */
+.tl-chart .gantt .arrow.dep-broken { stroke: #b02a37; stroke-width: 2.2; }
+
+.tl-note { max-width: 78ch; margin-top: 10px; line-height: 1.5; }
+.dep-legend { color: #b02a37; }
+.tl-saved { margin-left: 8px; color: #1e7e34; font-weight: 600; }

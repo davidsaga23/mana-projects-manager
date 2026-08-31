@@ -116,29 +116,54 @@ ksort($episodes);
 $episodes = array_keys($episodes);
 
 // --- the general chart: one bar per pipeline step ----------------------------
-// Spans what is actually scheduled for that step, falling back to its planned
-// dates when nothing is. A step with neither is left out rather than drawn as a
-// zero-width sliver nobody can click.
-$spanStmt = $pdo->prepare(
-    'SELECT MIN(start_date) AS s, MAX(end_date) AS e FROM schedule WHERE step_id = ?'
-);
+//
+// THE PLAN, NOT THE SCHEDULE (David, 2026-08-31). This used to span
+// MIN/MAX(schedule) for the step and fall back to its planned dates only when
+// nothing was scheduled. That made the bar a DERIVED value, which is why
+// dragging it never stuck: there was nothing to write to, and a reload
+// recomputed it from the scheduled items.
+//
+// Now the bar IS pipeline_steps.start_date / deadline — the same two fields the
+// Dates & headcount screen edits. Drag it and you are editing that screen
+// graphically; edit that screen and the bar moves. One number, two ways in.
+//
+// The detailed chart below still shows where work actually landed, which is the
+// half this one deliberately no longer answers.
+$depsMap = step_dependencies_map($pdo, $projectId);
+
 $general = [];
+$undated = [];          // steps with no window yet: reported, never silently dropped
 foreach ($steps as $s) {
-    $spanStmt->execute([(int)$s['id']]);
-    $span = $spanStmt->fetch();
-    $start = $span['s'] ?: ($s['start_date'] ?: null);
-    $end   = $span['e'] ?: ($s['deadline'] ?: null);
-    if (!$start || !$end) continue;
+    $start = $s['start_date'] ?: null;
+    $end   = $s['deadline'] ?: null;
+    if (!$start || !$end) { $undated[] = $s['name']; continue; }
+    // A backwards pair would draw as a negative-width bar. The planning screen
+    // already flags it in red; here it is simply clamped so the chart still draws.
     if ($end < $start) $end = $start;
+
+    // DEPENDENCIES ARE DRAWN, NOT ENFORCED. The arrows come from the workflow
+    // graph so the shape is visible while you drag, but nothing here blocks a
+    // move and nothing snaps back — David plans the general timeline to the
+    // dates, and accepts that a dependency-respecting schedule may run longer.
+    // A violated arrow turns red in the browser and that is the whole of it.
+    $depIds = [];
+    foreach ($depsMap[(int)$s['id']] ?? [] as $d) $depIds[] = 'step-' . (int)$d;
+
     $general[] = [
-        'id'       => 'step-' . (int)$s['id'],
-        'name'     => $s['name'] . ' · ' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null),
-        'start'    => $start,
-        'end'      => $end,
-        'progress' => 0,
-        'color'    => $s['color'] ?: '#4A90D9',
-        'deadline' => $s['deadline'] ?: null,
-        'late'     => ($s['deadline'] && $end > $s['deadline']) ? 1 : 0,
+        'id'         => 'step-' . (int)$s['id'],
+        'step_id'    => (int)$s['id'],
+        'name'       => $s['name'] . ' · ' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null),
+        'start'      => $start,
+        'end'        => $end,
+        'progress'   => 0,
+        'color'      => $s['color'] ?: '#4A90D9',
+        // Frappe 0.6.1 reads this as a comma-separated list of task ids.
+        'dependencies' => implode(',', $depIds),
+        // Late now means "past the DELIVERY date". It used to mean "the schedule
+        // ran past the step's own deadline", which cannot happen any more: the
+        // bar and the deadline are the same field.
+        'delivery'   => $project['delivery_date'] ?: null,
+        'late'       => ($project['delivery_date'] && $end > $project['delivery_date']) ? 1 : 0,
     ];
 }
 
@@ -183,14 +208,31 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php endif; ?>
 
-<?php if (!$rows): ?>
+<?php // The GENERAL chart no longer needs a schedule to exist: it draws the
+      // planned window from Dates & headcount. So the page is only empty when
+      // there is neither a plan nor a schedule — it used to hide both charts
+      // whenever nothing had been scheduled, which hid a perfectly good plan. ?>
+<?php if (!$rows && !$general): ?>
   <div class="empty-state">
-    <h2>Nothing scheduled yet</h2>
-    <p>The timeline draws the schedule that has been saved.</p>
-    <p><a class="button" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
+    <h2>Nothing planned or scheduled yet</h2>
+    <p>The general chart draws each step's planned dates; the detailed one draws the
+       saved schedule. Neither exists yet.</p>
+    <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set the dates →</a>
+       <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
   </div>
 <?php else: ?>
 
+<?php if ($undated): ?>
+  <div class="flash flash-warn">
+    <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no start or
+    deadline yet, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn below:
+    <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
+      if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
+    <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set them on Dates &amp; headcount →</a>
+  </div>
+<?php endif; ?>
+
+<?php if ($general): ?>
 <section class="tl-section">
   <div class="tl-head">
     <h3>General · pipeline steps</h3>
@@ -205,8 +247,26 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
   <div id="generalGantt" class="tl-chart"></div>
+  <?php if (can_edit()): ?>
+    <p class="muted small tl-note">
+      Drag a bar to change that step's dates — it saves straight into
+      <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Dates &amp; headcount</a>,
+      so the two always agree. Arrows show what the
+      <a href="<?= e('wizard.php?project=' . $projectId . '&step=3') ?>">workflow</a> says waits
+      for what; a <strong class="dep-legend">red one</strong> means you have planned a step to
+      start before the thing it waits for has finished. That is allowed here — it is a warning,
+      not a wall — but the schedule will not be able to honour it.
+      <?php // A drag here writes to a screen you are not looking at, which is
+            // exactly when a silent save feels like a lost one. Elsewhere in
+            // this file saving is silent because the bar you moved is the thing
+            // that changed; here it is not. ?>
+      <span id="stepSaveNote" class="tl-saved" hidden></span>
+    </p>
+  <?php endif; ?>
 </section>
+<?php endif; ?>
 
+<?php if ($rows): ?>
 <section class="tl-section">
   <div class="tl-head">
     <h3>Detailed schedule</h3>
@@ -286,6 +346,7 @@ require __DIR__ . '/includes/header.php';
   </p>
   <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
 </section>
+<?php endif; ?>   <?php // closes: the detailed chart needs a saved schedule ?>
 
 <div id="taskEditor" class="tl-modal" style="display:none;">
   <div class="tl-modal-box">
