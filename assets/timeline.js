@@ -544,7 +544,12 @@
       // Built from local parts for the same reason as every other date here.
       var d = new Date();
       var stamp = fmtDate(d);
-      var filename = base + '_' + stamp + '.' + format;
+      // CODE _ WHAT _ WHEN — "RTC_GeneralTimeline_2026-08-31.png" (David,
+      // 2026-08-31). The code comes first because a downloads folder sorts by
+      // name: every export for one show lands together, and the descriptive
+      // part is identical across projects so the date still sorts within it.
+      var code = window.TL_CODE ? window.TL_CODE + '_' : '';
+      var filename = code + base + '_' + stamp + '.' + format;
 
       if (format === 'png') {
         var link = document.createElement('a');

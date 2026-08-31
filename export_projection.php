@@ -391,4 +391,6 @@ try {
     exit;
 }
 
-xlsx_send($bytes, $project['code'] . '_ExpenseProjection_' . date('Ymd') . '.xlsx');
+// date('Y-m-d'), not 'Ymd': every other export in this app writes the date
+// with hyphens, and 20260831 is the one nobody can read at a glance.
+xlsx_send($bytes, $project['code'] . '_ExpenseProjection_' . date('Y-m-d') . '.xlsx');

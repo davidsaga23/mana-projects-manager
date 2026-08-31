@@ -242,8 +242,8 @@ require __DIR__ . '/includes/header.php';
         <span id="generalZoomLabel" class="zoom-label">Week</span>
         <button type="button" class="secondary zoom-btn" onclick="zoomGeneral(1)" title="Zoom in">+</button>
       </span>
-      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','png')">PNG</button>
-      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','general-timeline','pdf')">PDF</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','GeneralTimeline','png')">PNG</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('generalGantt','GeneralTimeline','pdf')">PDF</button>
     </div>
   </div>
   <div id="generalGantt" class="tl-chart"></div>
@@ -321,8 +321,8 @@ require __DIR__ . '/includes/header.php';
         <button type="button" class="secondary zoom-btn" onclick="zoomChange(1)" title="Zoom in">+</button>
       </span>
 
-      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','detailed-timeline','png')">PNG</button>
-      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','detailed-timeline','pdf')">PDF</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','DetailedTimeline','png')">PNG</button>
+      <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','DetailedTimeline','pdf')">PDF</button>
       <button type="button" class="secondary" onclick="downloadGan()"
               title="Download as a GanttProject file, honouring the filters above">.gan ↓</button>
       <a class="tl-linkbtn" href="timeline_import.php?project=<?= $projectId ?>"
@@ -382,6 +382,12 @@ require __DIR__ . '/includes/header.php';
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 window.TL_PROJECT   = <?= (int)$projectId ?>;
+<?php // The project code, for naming downloads. Reduced to characters a filename
+      // can carry on every operating system rather than trusted — it is typed by
+      // a person and could hold a slash or a colon. ?>
+window.TL_CODE      = <?= json_encode(
+    trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$project['code']), '-') ?: 'project'
+) ?>;
 window.TL_CAN_EDIT  = <?= can_edit() ? 'true' : 'false' ?>;
 window.GENERAL_TASKS = <?= json_encode($general, JSON_UNESCAPED_UNICODE) ?>;
 window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;

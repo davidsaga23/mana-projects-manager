@@ -56,7 +56,10 @@ $svg = workflow_diagram_svg($steps, $depsMap, true, $caption);
 $slug = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$project['code']);
 $slug = trim($slug, '-');
 if ($slug === '') $slug = 'project';
-$filename = $slug . '-workflow-' . date('Y-m-d') . '.svg';
+// CODE_Descriptive_YYYY-MM-DD, the scheme every export in this app uses
+// (David, 2026-08-31). Code first because a downloads folder sorts by name:
+// everything for one show lands together, and the date still sorts within it.
+$filename = $slug . '_Workflow_' . date('Y-m-d') . '.svg';
 
 header('Content-Type: image/svg+xml; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');

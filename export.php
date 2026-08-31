@@ -39,7 +39,8 @@ if (!in_array($what, ['steps', 'items'], true)) $what = 'steps';
 
 $stamp = date('Y-m-d');
 $name  = preg_replace('/[^A-Za-z0-9_-]/', '', $project['code']) ?: 'project';
-$file  = $name . '_' . $what . '_' . $stamp . '.csv';
+// Capitalised to match the other exports: RTC_Steps_2026-08-31.csv.
+$file  = $name . '_' . ucfirst($what) . '_' . $stamp . '.csv';
 
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $file . '"');
