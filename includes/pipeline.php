@@ -798,7 +798,17 @@ function workflow_levels(array $steps, array $depsMap): array {
  * saying "waits for X" is accurate but you can't see the shape of a pipeline in
  * it, which is the whole reason to look.
  */
-function workflow_diagram_svg(array $steps, array $depsMap): string {
+/**
+ * $standalone emits a FILE rather than a fragment: an XML prolog, the four
+ * style rules the diagram needs carried inside it, and a white ground.
+ *
+ * The on-page version inherits .wf-edge / .wf-box / .wf-label / .wf-sub from
+ * assets/style.css. A downloaded copy has no stylesheet to inherit from, so
+ * without this it opens as black text on transparency with no boxes and no
+ * connectors — technically the right shapes, unreadable as a picture.
+ */
+function workflow_diagram_svg(array $steps, array $depsMap,
+                              bool $standalone = false, string $caption = ''): string {
     if (!$steps) return '';
 
     $levels = workflow_levels($steps, $depsMap);
@@ -822,9 +832,9 @@ function workflow_diagram_svg(array $steps, array $depsMap): string {
     $width  = $padX * 2 + count($columns) * $boxW + (count($columns) - 1) * $colGap;
     $height = $padY * 2 + $maxRows * $boxH + max(0, $maxRows - 1) * $rowGap;
 
-    $svg  = '<svg class="wf-diagram" viewBox="0 0 ' . $width . ' ' . $height . '" '
-          . 'width="' . $width . '" height="' . $height . '" xmlns="http://www.w3.org/2000/svg" '
-          . 'role="img" aria-label="Pipeline workflow diagram">';
+    // The body is accumulated on its own so a standalone file can shift it down
+    // to make room for a caption without every coordinate above being redone.
+    $svg = '';
 
     // Edges first so boxes sit on top of them.
     foreach ($depsMap as $stepId => $deps) {
@@ -863,7 +873,42 @@ function workflow_diagram_svg(array $steps, array $depsMap): string {
               . '</g>';
     }
 
-    return $svg . '</svg>';
+    if (!$standalone) {
+        return '<svg class="wf-diagram" viewBox="0 0 ' . $width . ' ' . $height . '" '
+             . 'width="' . $width . '" height="' . $height . '" '
+             . 'xmlns="http://www.w3.org/2000/svg" role="img" '
+             . 'aria-label="Pipeline workflow diagram">' . $svg . '</svg>';
+    }
+
+    // ---- the downloadable file ------------------------------------------
+    // Copied from assets/style.css rather than read from it: a file that has
+    // left the building cannot follow a stylesheet, and four rules inlined here
+    // are cheaper than a build step. If those rules change, change these.
+    $css = '.wf-edge{fill:none;stroke:#b6c2cd;stroke-width:1.6}'
+         . '.wf-box{fill:#f7f9fb;stroke:#dbe2e8;stroke-width:1}'
+         . '.wf-label{font:600 12px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#1c2733}'
+         . '.wf-sub{font:400 10.5px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#7b8894}'
+         . '.wf-cap{font:600 13px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#43535f}';
+
+    $head = $caption !== '' ? 36 : 0;
+    $full = $height + $head;
+
+    $out = '<?xml version="1.0" encoding="UTF-8"?>'
+         . '<svg viewBox="0 0 ' . $width . ' ' . $full . '" '
+         . 'width="' . $width . '" height="' . $full . '" '
+         . 'xmlns="http://www.w3.org/2000/svg" role="img" '
+         . 'aria-label="Pipeline workflow diagram">'
+         . '<title>' . e($caption !== '' ? $caption : 'Pipeline workflow') . '</title>'
+         . '<style>' . $css . '</style>'
+         // Painted, not assumed. A transparent SVG dropped into a dark slide
+         // deck loses every label it has.
+         . '<rect x="0" y="0" width="' . $width . '" height="' . $full . '" fill="#ffffff"/>';
+
+    if ($caption !== '') {
+        $out .= '<text x="' . $padX . '" y="22" class="wf-cap">' . e($caption) . '</text>';
+    }
+
+    return $out . '<g transform="translate(0,' . $head . ')">' . $svg . '</g></svg>';
 }
 
 /** Human-readable "waits for X and Y" for the review screen. */

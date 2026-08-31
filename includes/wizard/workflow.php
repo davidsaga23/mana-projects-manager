@@ -79,7 +79,17 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
        on the same things run <strong>side by side</strong> — you never set that directly,
        it's simply what the picture shows.</p>
 
-    <h3>The shape of it</h3>
+    <div class="wf-diagram-head">
+      <h3>The shape of it</h3>
+      <?php // The diagram is WIDER THAN THE SCREEN and scrolls sideways, so the
+            // first thing anyone wants is all of it at once — to print, to put
+            // in a deck, or to send to somebody who does not have a login.
+            // SVG because it stays sharp at any size and needs no image
+            // library on the server. ?>
+      <a href="export_workflow.php?project=<?= $projectId ?>" class="wf-export">
+        Download the diagram ↓
+      </a>
+    </div>
     <div class="wf-diagram-wrap">
       <?= workflow_diagram_svg($steps, $depsMap) ?>
     </div>
