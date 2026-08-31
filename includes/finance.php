@@ -416,6 +416,54 @@ function expenses_available(): bool {
     return finance_column_exists('project_expenses', 'id');
 }
 
+/**
+ * What a project owns in the OTHER database — budget, invoices, expenses, quotes.
+ *
+ * Exists for ONE caller: deleting a project. Production cascades cleanly (every
+ * one of the twenty tables carrying project_id has ON DELETE CASCADE), but the
+ * money lives in a separate database with a separate user and NO foreign key
+ * back to projects. A delete cannot reach it, so those rows would survive their
+ * project as records nothing can explain.
+ *
+ * Worse than untidy: `projects.id` is the only thing joining the two databases,
+ * and DECISIONS says it must never be reused. A future project handed a dead
+ * project's id would silently inherit its budget and its invoices.
+ *
+ * 'reachable' is the important field. FALSE means we could not look — the
+ * finance side is configured but would not open, or the caller is not an admin.
+ * A delete must refuse on false rather than assume zero, because "I could not
+ * check" and "there is nothing there" are the same shape and only one is safe.
+ */
+function project_finance_footprint(int $projectId): array {
+    $out = ['budget' => 0, 'invoices' => 0, 'expenses' => 0, 'quotes' => 0,
+            'total' => 0, 'reachable' => true];
+
+    // No finance database configured at all, so there is definitively nothing
+    // keyed to this project on that side.
+    if (!finance_configured()) return $out;
+
+    if (!can_see_money()) { $out['reachable'] = false; return $out; }
+    $db = finance_db();
+    if (!$db) { $out['reachable'] = false; return $out; }
+
+    // Table names are literals from the line below, never input. Each is guarded
+    // by finance_column_exists() because 04 and 05 are imported by hand and may
+    // legitimately not be there yet.
+    $count = function (string $table) use ($db, $projectId): int {
+        if (!finance_column_exists($table, 'project_id')) return 0;
+        $q = $db->prepare('SELECT COUNT(*) FROM ' . $table . ' WHERE project_id = ?');
+        $q->execute([$projectId]);
+        return (int)$q->fetchColumn();
+    };
+
+    $out['budget']   = $count('project_budgets');
+    $out['invoices'] = $count('invoices');
+    $out['expenses'] = $count('project_expenses');
+    $out['quotes']   = $count('hire_quotes');
+    $out['total']    = $out['budget'] + $out['invoices'] + $out['expenses'] + $out['quotes'];
+    return $out;
+}
+
 /** Same shape as invoices_need_upgrade(), for telling "none yet" from "no table". */
 function expenses_need_upgrade(): bool {
     if (!can_see_money() || !finance_configured()) return false;

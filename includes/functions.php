@@ -102,6 +102,43 @@ function column_exists(PDO $pdo, string $table, string $column): bool {
     return $cache[$key] = in_array($column, $cols, true);
 }
 
+/**
+ * Does an ENUM column accept this value yet?
+ *
+ * Same job as column_exists() one level finer, and for the same reason: a
+ * migration that widens an ENUM may not have been run, and a screen that offers
+ * a value the column would reject is a save that fails for no visible reason.
+ * MySQL in strict mode rejects it outright; without strict mode it silently
+ * stores the empty string, which is worse.
+ *
+ * Cached per table.column, so a list drawing one dropdown per row costs one
+ * query, not one per row.
+ */
+function enum_has_value(PDO $pdo, string $table, string $column, string $value): bool {
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (!array_key_exists($key, $cache)) {
+        // Whitelisted for the same reason column_exists() does it: an identifier
+        // cannot be bound as a parameter. Every caller passes a literal.
+        $safe = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+        $cache[$key] = [];
+        try {
+            foreach ($pdo->query('SHOW COLUMNS FROM `' . $safe . '`') as $row) {
+                if (($row['Field'] ?? '') !== $column) continue;
+                if (preg_match_all("/'((?:[^']|'')*)'/", (string)($row['Type'] ?? ''), $m)) {
+                    $cache[$key] = array_map(function ($v) {
+                        return str_replace("''", "'", $v);
+                    }, $m[1]);
+                }
+                break;
+            }
+        } catch (PDOException $e) {
+            $cache[$key] = [];          // table itself does not exist yet
+        }
+    }
+    return in_array($value, $cache[$key], true);
+}
+
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
 // Empty string for null so it can fill a form field that means "not set".
 /**

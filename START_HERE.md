@@ -15,7 +15,9 @@ without re-deriving context.
   table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
   thing left is the **client loop**, which was never on that list.
 - **⚠ Deploy state:** open `migrate.php` and check before assuming anything is live. Migrations
-  run to **026** (024 hiring, 025 freelancer fields, 026 ideal quotas). **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
+  run to **027** (024 hiring, 025 freelancer fields, 026 ideal quotas, 027 archived projects).
+  **027 adds an `archived` status** so a project can leave the front door without being
+  destroyed; until it is applied the list simply does not offer the option. **024 (hiring) is applied**, confirmed by David — the Hiring tab is live on
   Return to Club. **025 (freelancer fields) and 026 (ideal quotas) are new and pending.** Without 025 the entry grid
   offers names, emails, phones, portfolios, sources and notes, but not location, position,
   seniority, project type, worked-with-us or rating — and it says so on screen rather than
