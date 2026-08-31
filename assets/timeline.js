@@ -31,8 +31,39 @@
     { mode: 'Day',         w: 38,  label: 'Day' },
     { mode: 'Half Day',    w: 38,  label: 'Half day' }
   ];
-  var zoomIdx = 3;                       // Week, comfortable default
-  var generalZoomIdx = 2;
+  // --- remembering the zoom ---------------------------------------------------
+  //
+  // Kept in localStorage rather than the database: this is a preference about
+  // one person's screen, not a fact about the show. Two people looking at the
+  // same project should not be changing each other's view, and it needs no
+  // round trip to apply.
+  //
+  // Keyed PER PROJECT as well as per chart, because the right zoom follows the
+  // length of the thing: a six-week short reads at Day, a two-year series does
+  // not. Coming back to a project should restore the view you left it in.
+  //
+  // Every access is wrapped: localStorage throws outright in some privacy modes
+  // rather than returning null, and a view preference must never be the reason
+  // the timeline fails to draw.
+  function zoomKey(chart) {
+    return 'anima.tl.zoom.' + (window.TL_PROJECT || 0) + '.' + chart;
+  }
+  function loadZoom(chart, fallback) {
+    try {
+      var v = window.localStorage.getItem(zoomKey(chart));
+      if (v === null) return fallback;
+      var n = parseInt(v, 10);
+      // Clamped, not trusted: the ladder can gain or lose a rung between
+      // releases and a stored 8 would then be off the end of it.
+      return (isNaN(n) || n < 0 || n >= ZOOM.length) ? fallback : n;
+    } catch (e) { return fallback; }
+  }
+  function saveZoom(chart, idx) {
+    try { window.localStorage.setItem(zoomKey(chart), String(idx)); } catch (e) { /* ignore */ }
+  }
+
+  var zoomIdx = loadZoom('detailed', 3);         // Week, comfortable default
+  var generalZoomIdx = loadZoom('general', 2);
   var detailedGantt = null;
   var generalGantt = null;
 
@@ -240,6 +271,7 @@
 
   window.zoomGeneral = function (delta) {
     generalZoomIdx = Math.max(0, Math.min(ZOOM.length - 1, generalZoomIdx + delta));
+    saveZoom('general', generalZoomIdx);
     renderGeneral();
   };
 
@@ -435,6 +467,7 @@
   window.zoomChange = function (delta) {
     // The ladder runs widest-span first, so + (zoom in) moves UP the index.
     zoomIdx = Math.max(0, Math.min(ZOOM.length - 1, zoomIdx + delta));
+    saveZoom('detailed', zoomIdx);
     renderDetailed();
   };
 
