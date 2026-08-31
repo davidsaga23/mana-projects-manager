@@ -47,12 +47,18 @@ function wizard_assets_apply_edits(PDO $pdo, int $projectId): int {
     $names = $_POST['name'] ?? [];
     if (!is_array($names) || !$names) return 0;
 
-    $stmt = $pdo->prepare('SELECT id, name, asset_type FROM assets WHERE project_id = ?');
+    $stmt = $pdo->prepare('SELECT id, name, asset_type, notes FROM assets WHERE project_id = ?');
     $stmt->execute([$projectId]);
     $existing = [];
     foreach ($stmt as $row) $existing[(int)$row['id']] = $row;
 
-    $upd = $pdo->prepare('UPDATE assets SET name = ?, asset_type = ? WHERE id = ? AND project_id = ?');
+    // assets.notes has existed since install.sql and nothing has ever written to
+    // it. Surfaced 2026-08-31 at David's request: the breakdown is where you
+    // know a thing about an asset -- "hero prop, needs a rig", "reuse from ep2"
+    // -- and until now there was nowhere to put it.
+    $upd = $pdo->prepare(
+        'UPDATE assets SET name = ?, asset_type = ?, notes = ? WHERE id = ? AND project_id = ?'
+    );
     $changed = 0;
     foreach ($names as $id => $name) {
         $id = (int)$id;
@@ -62,12 +68,20 @@ function wizard_assets_apply_edits(PDO $pdo, int $projectId): int {
             flash('warn', 'An asset was left with a blank name, so its old name was kept.');
             continue;
         }
-        $type = trim($_POST['type'][$id] ?? '');
+        $type  = trim($_POST['type'][$id] ?? '');
+        // Absent, not blank, when the field was never on screen: only rows drawn
+        // with a notes box post one, so a screen rendered before this feature
+        // must not read as "the note was cleared".
+        $notes = array_key_exists($id, (array)($_POST['notes'] ?? []))
+               ? trim((string)$_POST['notes'][$id])
+               : (string)($existing[$id]['notes'] ?? '');
         $before = $existing[$id];
-        if ($before['name'] === $name && ($before['asset_type'] ?? '') === $type) continue;
+        if ($before['name'] === $name && ($before['asset_type'] ?? '') === $type
+            && (string)($before['notes'] ?? '') === $notes) continue;
 
         try {
-            $upd->execute([$name, $type !== '' ? $type : null, $id, $projectId]);
+            $upd->execute([$name, $type !== '' ? $type : null,
+                           $notes !== '' ? $notes : null, $id, $projectId]);
             $changed++;
         } catch (PDOException $e) {
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
@@ -88,18 +102,38 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         foreach (wizard_asset_types($pdo) as $t) $knownTypes[mb_strtolower($t)] = true;
 
         $lines = preg_split('/\R/', $_POST['paste'] ?? '');
-        $ins = $pdo->prepare('INSERT INTO assets (project_id, name, asset_type) VALUES (?, ?, ?)');
+        $ins = $pdo->prepare(
+            'INSERT INTO assets (project_id, name, asset_type, notes) VALUES (?, ?, ?, ?)'
+        );
         $added = 0; $dupes = []; $bad = 0; $invented = [];
         foreach ($lines as $line) {
             $line = trim($line);
             if ($line === '') continue;
-            $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\t]+/', $line)),
-                                               function ($p) { return $p !== ''; }));
-            if (!$parts) { $bad++; continue; }
-            $name = $parts[0];
-            $type = $parts[1] ?? $defaultType;
+            // NAME, TYPE, NOTE -- and the note keeps any commas of its own.
+            //
+            // The limit of 3 is the whole trick: "Phaser, Prop, hero prop needs
+            // a rig, reuse the ep2 model" has to leave the note intact rather
+            // than shredding it into fields nothing reads.
+            //
+            // Split POSITIONALLY, and NOT on runs -- the pattern deliberately
+            // has no +. With a third column the position IS the meaning, so
+            // an empty middle field has to stay empty: "Bridge,,reuse from
+            // ep2" means no type and a note, and collapsing the pair of
+            // commas would promote the note to a type and invent a junk
+            // asset type from it.
+            //
+            // It is also how a spreadsheet actually pastes: copy three
+            // columns out of Excel with the middle cell blank and you get
+            // exactly "Name<tab><tab>Note".
+            $line  = ltrim($line, ", ;\t");
+            $parts = array_map('trim', preg_split('/[,;\t]/', $line, 3));
+            $name  = $parts[0] ?? '';
+            if ($name === '') { $bad++; continue; }
+            $type  = ($parts[1] ?? '') !== '' ? $parts[1] : $defaultType;
+            $note  = $parts[2] ?? '';
             try {
-                $ins->execute([$projectId, $name, $type !== '' ? $type : null]);
+                $ins->execute([$projectId, $name, $type !== '' ? $type : null,
+                               $note !== '' ? $note : null]);
                 $added++;
                 if ($type !== '' && !isset($knownTypes[mb_strtolower($type)])) {
                     $invented[$type] = true;
@@ -279,7 +313,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
           <thead>
             <tr>
               <th><label class="inline"><input type="checkbox" data-check-all="asset-rows"></label></th>
-              <th>Name</th><th>Type</th><th></th>
+              <th>Name</th><th>Type</th><th>Notes</th><th></th>
             </tr>
           </thead>
           <tbody id="asset-rows">
@@ -292,6 +326,12 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
                   <?= wizard_asset_type_options($types, $a['asset_type'] ?? '') ?>
                 </select>
               </td>
+              <?php // One line, not a textarea: this is a grid, and a box that
+                    // grows would push every other row out of alignment. Long
+                    // notes still store in full -- the column is TEXT. ?>
+              <td><input name="notes[<?= $id ?>]" class="asset-note"
+                         value="<?= e($a['notes'] ?? '') ?>"
+                         placeholder="anything worth knowing"></td>
               <td class="row-actions">
                 <button type="submit" name="action" value="del:<?= $id ?>" class="danger" title="Remove"
                         onclick="return confirm('Remove <?= e(addslashes($a['name'])) ?>?');">✕</button>
@@ -303,7 +343,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
 
         <div class="actions">
           <button type="submit" name="action" value="save" class="secondary">Save and stay here</button>
-          <span class="hint">keeps your name and type edits, leaves you on this screen</span>
+          <span class="hint">keeps your name, type and note edits, leaves you on this screen</span>
           <span class="spacer"></span>
           <button type="submit" name="action" value="continue">Save and continue →</button>
         </div>
@@ -324,9 +364,11 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
       <form method="post" class="tool">
         <input type="hidden" name="action" value="paste">
         <strong>Paste a list</strong>
-        <textarea name="paste" rows="6" placeholder="Romulan Officer&#10;Bridge&#10;Phaser"></textarea>
-        <small><strong>One asset per line.</strong> A comma on a line means the part after it
-               is the <em>type</em>, not another asset — so put each name on its own line.</small>
+        <textarea name="paste" rows="6" placeholder="Romulan Officer, Character&#10;Bridge, Environment, reuse from ep2&#10;Phaser, Prop, hero prop, needs a rig"></textarea>
+        <small><strong>One asset per line.</strong> Commas split a line into
+               <em>name, type, note</em> — so <code>Phaser, Prop, hero prop</code> sets all three,
+               and anything after the second comma stays in the note, commas and all.
+               A comma is never a second asset: put each name on its own line.</small>
         <label>Type for these assets
           <select name="paste_type"><?= wizard_asset_type_options($types) ?></select>
         </label>

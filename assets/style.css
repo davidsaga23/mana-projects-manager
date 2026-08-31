@@ -1361,3 +1361,9 @@ body.lightbox-lock { overflow: hidden; }
 .project-edit { margin-top: 6px; white-space: normal; }
 .project-edit .inline-form { margin: 0 0 8px; gap: 8px; }
 .project-edit .danger-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
+
+/* The notes column on the asset breakdown. Given the room it needs: a note is
+   the widest thing on the row and the only free text, so it takes the slack
+   rather than sharing it evenly with a name and a type that do not need it. */
+.asset-table .asset-note { width: 100%; min-width: 220px; }
+.asset-table td:nth-child(4) { width: 40%; }
