@@ -532,14 +532,52 @@
     var original = btn ? btn.textContent : null;
     if (btn) { btn.disabled = true; btn.textContent = 'Rendering…'; }
 
+    // THE WHOLE CHART, not the window onto it.
+    //
+    // .tl-chart is `overflow: auto; max-height: 420px`, so what you see is a
+    // porthole over a much taller and wider drawing. Passing width/height to
+    // html2canvas only sizes the CANVAS — the element itself is still cropped by
+    // its own CSS, which is why exports arrived with the first and last steps
+    // sliced off and a field of white where the rest should have been.
+    //
+    // The fix is to un-crop it, but in the CLONE html2canvas renders rather than
+    // on the live page: touching the real element would make the chart jump out
+    // of its box and shove the page around for the second it takes to render.
+    var svg   = el.querySelector('svg');
+    var box   = svg ? svg.getBoundingClientRect() : null;
+    var fullW = Math.max(el.scrollWidth,  box ? Math.ceil(box.width)  : 0);
+    var fullH = Math.max(el.scrollHeight, box ? Math.ceil(box.height) : 0);
+
+    // Browsers cap a canvas at about 16384px a side and will hand back a blank
+    // one past that, with no error. A wide chart loses resolution rather than
+    // the export; only below 1x is it worth saying so.
+    var scale = 2;
+    while (scale > 0.5 && (fullW * scale > 16000 || fullH * scale > 16000)) scale -= 0.25;
+    if (scale < 1 && !confirm(
+          'This chart is ' + fullW + '×' + fullH + ' pixels, which is near the largest image a '
+        + 'browser can make. It will be exported at reduced sharpness. Continue?')) {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+      return;
+    }
+
     html2canvas(el, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: scale,
       useCORS: true,
       scrollX: 0, scrollY: 0,
-      windowWidth: el.scrollWidth,
-      width: el.scrollWidth,
-      height: el.scrollHeight
+      x: 0, y: 0,
+      windowWidth: fullW,
+      windowHeight: fullH,
+      width: fullW,
+      height: fullH,
+      onclone: function (doc) {
+        var c = doc.getElementById(elementId);
+        if (!c) return;
+        c.style.overflow  = 'visible';
+        c.style.maxHeight = 'none';
+        c.style.height    = fullH + 'px';
+        c.style.width     = fullW + 'px';
+      }
     }).then(function (canvas) {
       // Built from local parts for the same reason as every other date here.
       var d = new Date();
