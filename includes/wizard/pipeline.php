@@ -90,6 +90,21 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     }
 
     if ($action === 'add') {
+        // FIRST, before anything can throw. Every row's name, scope, colour and
+        // department is posted with this button too, so returning without this
+        // silently discarded them: rename three steps, add a fourth, and the
+        // three renames were gone with no error and no warning — the page just
+        // came back showing the old names (David, 2026-08-31).
+        //
+        // fill_departments and save_template already did this. Add did not, and
+        // it is the one people press most.
+        //
+        // Before the insert rather than after, so the duplicate-name check below
+        // compares against the names as they now ARE: renaming "Design" and then
+        // adding a new step called "Design" is legal, and the other order would
+        // reject it against a name that no longer exists.
+        wizard_pipeline_apply_edits($pdo, $projectId);
+
         $name = trim($_POST['new_name'] ?? '');
         if ($name === '') throw new RuntimeException('Give the new step a name.');
         [$appliesTo, $assetType] = parse_applies_to($_POST['new_applies_to'] ?? 'shot');
