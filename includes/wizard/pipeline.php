@@ -73,6 +73,15 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     $projectId = (int)$project['id'];
     $action = $_POST['action'] ?? 'save';
 
+    // The "add a step" box now shares the edit form, so its contents arrive with
+    // every button on this screen. Only Add acts on them — say so, rather than
+    // letting a typed name disappear on Save the way the renames used to.
+    if ($action !== 'add' && trim($_POST['new_name'] ?? '') !== '') {
+        flash('warn', 'You had typed "' . trim($_POST['new_name']) . '" in the "Add a step" box '
+                    . 'but pressed a different button, so it was not added. Everything else was '
+                    . 'saved — type it again and press Add.');
+    }
+
     // Copy a template in. Only offered while the pipeline is empty.
     if ($action === 'template') {
         $templateId = (int)($_POST['template_id'] ?? 0);
@@ -446,7 +455,6 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         <span class="spacer"></span>
         <button type="submit" name="action" value="continue">Save and continue →</button>
       </div>
-    </form>
 
     <?php
     // Every remembered step name, including ones already in this project: the
@@ -465,11 +473,23 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         ];
     }
     ?>
-    <form method="post" class="add-row">
-      <input type="hidden" name="action" value="add">
+    <?php // INSIDE the edit form, not beside it (David, 2026-08-31).
+          //
+          // The step names are inputs in the form above. A browser posts only
+          // the form whose button was pressed, so while this was a form of its
+          // own, typing three renames and then clicking Add sent the new step
+          // and NOTHING ELSE — the renames never left the page, and it came
+          // back showing the old names with no error to explain it.
+          //
+          // Same reasoning that already put the template controls inside the
+          // dependency form on the Workflow screen. `required` comes off for
+          // the same reason it is off there: it would block Save and every row
+          // button too, since HTML5 validates the whole form. The empty case is
+          // caught server-side, where it can say something useful. ?>
+    <div class="add-row">
       <strong>Add a step</strong>
       <input name="new_name" id="new-step-name" placeholder="Step name"
-             list="step-library-names" autocomplete="off" required>
+             list="step-library-names" autocomplete="off">
       <datalist id="step-library-names">
         <?php foreach ($library as $l): ?>
           <option value="<?= e($l['name']) ?>"<?= $l['times_used'] > 0
@@ -484,9 +504,13 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       <label class="inline">
         <input type="checkbox" name="new_tracks_seconds" id="new-step-seconds" value="1"> measured in seconds
       </label>
-      <button type="submit" class="secondary">Add</button>
+      <button type="submit" name="action" value="add" class="secondary">Add</button>
+    </div>
+    <?php // Inline for the same reason, so saving a template captures the names
+          // on screen rather than the ones last written — which is exactly what
+          // its own note promises. ?>
+    <?php template_save_form($pdo, $project, '', true); ?>
     </form>
-    <?php template_save_form($pdo, $project); ?>
 
     <?php if ($library): ?>
       <p class="muted small">Start typing to see <?= count($library) ?> step
