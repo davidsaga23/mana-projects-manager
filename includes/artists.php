@@ -71,7 +71,14 @@ function artists_positions(PDO $pdo): array {
     return $out;
 }
 
-function artists_list(PDO $pdo, string $q, array $extra, array $positions = []): array {
+/**
+ * $withApproaches costs a second query over every name on the page. The grid
+ * stopped showing that column on 2026-08-31, and gathering three hundred and
+ * seventy-seven people's job history to display none of it is a round trip for
+ * nothing.
+ */
+function artists_list(PDO $pdo, string $q, array $extra, array $positions = [],
+                      bool $withApproaches = false): array {
     if (!hiring_available($pdo)) return [[], []];
 
     $cols = 'h.id, h.candidate_name, h.email, h.phone, h.portfolio_url, h.source, h.notes,
@@ -122,7 +129,9 @@ function artists_list(PDO $pdo, string $q, array $extra, array $positions = []):
     // Every approach for the people on screen, in ONE query. Two hundred artists
     // would otherwise be two hundred round trips to draw one column.
     $approaches = [];
-    $names = array_map(function ($p) { return mb_strtolower(trim($p['candidate_name'])); }, $people);
+    $names = $withApproaches
+        ? array_map(function ($p) { return mb_strtolower(trim($p['candidate_name'])); }, $people)
+        : [];
     if ($names) {
         $in = implode(',', array_fill(0, count($names), '?'));
         $ap = $pdo->prepare(

@@ -1460,9 +1460,25 @@ body.lightbox-lock { overflow: hidden; }
   padding: 3px 5px; font-size: 13px; margin: 0;
 }
 .artist-grid .a-name { font-weight: 600; }
-/* A row you have touched, so it is obvious what Save is about to write. */
-.artist-grid tr.is-dirty td { background: #fffbe6; }
-.artist-grid tr.is-dirty .a-name { border-color: #d9a406; }
-.reel-open { margin-left: 4px; text-decoration: none; }
-.ms-positions { display: inline-flex; flex-direction: column; gap: 2px; }
-.ms-positions select { min-width: 200px; }
+/* Saved as you go, said per row: a page-wide message cannot name which row
+   failed, and a failure nobody can find is an edit somebody believes they made. */
+.artist-grid tr.is-saving td { background: #fffbe6; }
+.artist-grid tr.is-saved  td { background: #f2fbf4; }
+.artist-grid tr.is-failed td { background: #fdf0f1; }
+.a-status { font-size: 11px; white-space: nowrap; color: #7b8894; }
+.a-status.saved  { color: #1e7e34; }
+.a-status.failed { color: #b02a37; font-weight: 700; }
+
+/* The reel reads as a link and edits on double-click. */
+.reel-link { display: inline-block; max-width: 230px; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* Positions as a panel of ticks: sixty of them in a six-row scrolling list means
+   reading a handful at a time and holding ctrl to keep what you picked. In
+   columns they are legible at once and each is one click. */
+.pos-filter { border: 1px solid #dbe2e8; border-radius: 4px; padding: 8px 10px; margin: 10px 0; }
+.pos-filter legend { font-size: 12px; color: #5a6a7a; padding: 0 4px; }
+.pos-all { display: block; margin-bottom: 6px; }
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+            gap: 2px 14px; max-height: 210px; overflow-y: auto; }
+.pos-grid label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

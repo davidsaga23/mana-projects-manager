@@ -216,14 +216,7 @@ $pageTitle = 'Artists';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<h2 class="wizard-title">Artists <span class="muted">· everyone ever put up for a job</span></h2>
-
-<p class="lead">
-  Built from what you type into <strong>Add candidates</strong> on any project's Hiring screen,
-  and from the box at the bottom of this page — the same list that already stops you entering
-  somebody twice, now readable and editable. One row per person, with every job they have been
-  up for beside them.
-</p>
+<h2 class="wizard-title">Artist database</h2>
 
 <?php if (!$ready): ?>
   <div class="flash flash-err">
@@ -246,17 +239,22 @@ require __DIR__ . '/includes/header.php';
       <?php // Submits on change, like the role picker on users.php — a filter
             // you have to press a second button to apply is a filter people
             // stop using. ?>
-      <?php // MULTIPLE, so "Layout or BG Layout or CH Layout" is one question.
-            // No submit-on-change, unlike the single-value version it replaces:
-            // picking a second entry would reload the page before you got there. ?>
-      <label class="ms-positions">
-        <span class="muted small">Positions &mdash; ctrl/cmd-click for several</span>
-        <select name="position[]" multiple size="6">
+      <?php // CHECKBOXES IN A PANEL, not a multi-select list. Sixty positions in
+            // a six-row scrolling box means reading them a handful at a time and
+            // holding ctrl to keep what you already picked; laid out in columns
+            // they are all legible at once and each is one click.
+            //
+            // Still ORed, still exact matches. ?>
+      <fieldset class="pos-filter">
+        <legend>Positions</legend>
+        <label class="pos-all"><input type="checkbox" id="posAll"> <strong>See all</strong></label>
+        <div class="pos-grid">
           <?php foreach ($positions as $o): ?>
-            <option value="<?= e($o) ?>" <?= in_array($o, $pos, true) ? 'selected' : '' ?>><?= e($o) ?></option>
+            <label><input type="checkbox" name="position[]" value="<?= e($o) ?>"
+                          <?= in_array($o, $pos, true) ? 'checked' : '' ?>> <?= e($o) ?></label>
           <?php endforeach; ?>
-        </select>
-      </label>
+        </div>
+      </fieldset>
     <?php endif; ?>
     <button type="submit" class="secondary">Search</button>
     <?php if ($q !== '' || $pos): ?><a href="artists.php">Clear</a><?php endif; ?>
@@ -307,7 +305,7 @@ require __DIR__ . '/includes/header.php';
               <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
               <th>Where from</th><th>Notes</th>
               <?php if ($has('worked_with_us')): ?><th>Worked</th><?php endif; ?>
-              <th>Up for</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -352,13 +350,23 @@ require __DIR__ . '/includes/header.php';
                          size="20" maxlength="190"></td>
               <td><input name="<?= $n ?>[phone]" value="<?= e($p['phone'] ?? '') ?>"
                          size="12" maxlength="50"></td>
-              <td class="reel-cell">
+              <?php // A LINK YOU CAN CLICK, with the field behind it. Every other
+                    // cell is an input because every other cell is only ever
+                    // typed into; this one you mostly want to OPEN, and an input
+                    // cannot be clicked through to the site.
+                    //
+                    // So the anchor is what shows, and double-clicking the cell
+                    // swaps in the input — the same gesture that edits a
+                    // milestone on the timeline. The input is only hidden, never
+                    // disabled, so its value posts either way and a row saved
+                    // without ever opening this cell keeps its address. ?>
+              <td class="reel-cell" data-reel>
+                <a class="reel-link" href="<?= e($p['portfolio_url'] ?: '#') ?>"
+                   target="_blank" rel="noopener"
+                   title="<?= e($p['portfolio_url'] ?: '') ?> — double-click to edit"><?=
+                   e($p['portfolio_url'] ?: '—') ?></a>
                 <input name="<?= $n ?>[portfolio_url]" value="<?= e($p['portfolio_url'] ?? '') ?>"
-                       size="22" maxlength="500" title="<?= e($p['portfolio_url'] ?? '') ?>">
-                <?php if (!empty($p['portfolio_url'])): ?>
-                  <a href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener"
-                     class="reel-open" title="Open in a new tab">&#8599;</a>
-                <?php endif; ?>
+                       size="22" maxlength="500" class="reel-input" hidden>
               </td>
               <?php if ($has('portfolio_password')): ?>
                 <td><input name="<?= $n ?>[portfolio_password]" size="10" maxlength="120"
@@ -371,17 +379,10 @@ require __DIR__ . '/includes/header.php';
                 <td class="num"><input type="checkbox" name="<?= $n ?>[worked_with_us]" value="1"
                        <?= !empty($p['worked_with_us']) ? 'checked' : '' ?>></td>
               <?php endif; ?>
-              <td class="small">
-                <?php foreach (($approaches[$key] ?? []) as $a): ?>
-                  <div>
-                    <?php if (!empty($a['project_id'])): ?>
-                      <a href="hiring.php?project=<?= (int)$a['project_id'] ?>"><?= e($a['project_code'] ?: 'project') ?></a>
-                    <?php endif; ?>
-                    <?= e($a['step_name'] ?: '') ?>
-                    <span class="muted">&middot; <?= e(hire_stage_label($a['stage'])) ?></span>
-                  </div>
-                <?php endforeach; ?>
-              </td>
+              <?php // Per row, because a page-wide "saved" cannot say WHICH row
+                    // failed — and a failure nobody can locate is an edit
+                    // somebody believes they made. ?>
+              <td class="a-status"></td>
             </tr>
           <?php endforeach; ?>
           </tbody>
@@ -397,8 +398,10 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
 
       <div class="actions">
-        <button type="submit">Save changes</button>
-        <span class="hint" id="dirtyCount">nothing changed yet</span>
+        <?php // Saved as you go. This button is the path for a browser with no
+              // JavaScript, where the sentinel below still guards the post. ?>
+        <span class="hint" id="dirtyCount">Changes save themselves as you leave each field.</span>
+        <button type="submit" class="secondary">Save changes</button>
         <span class="spacer"></span>
         <?php // LAST FIELD IN THE FORM, deliberately. If PHP drops the tail of a
               // large post this never arrives, and the save refuses rather than

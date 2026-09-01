@@ -1,16 +1,16 @@
-// The Artists grid: every field is editable in the row, and ONLY the rows you
-// actually touched are sent.
+// The Artists grid: every field editable in the row, and SAVED AS YOU GO.
 //
-// That is correctness, not economy. PHP's max_input_vars defaults to 1000 and
-// silently discards everything past it — no error, no warning, just a POST that
-// arrives half empty. This grid is about thirteen fields a row, so seventy-odd
-// rows would reach the limit, and a save over a full list would quietly write
-// nothing for most of it.
+// One row per request, which is what makes PHP's max_input_vars a non-issue
+// rather than something to work around: the ceiling is a thousand values and a
+// row is thirteen. A page-wide form post of three hundred and seventy-seven
+// people would have been five thousand, and PHP drops the tail of that with no
+// error at all — a save that looks like it worked and writes half.
 //
-// Disabling the untouched rows before submitting means an ordinary edit posts a
-// few dozen fields instead of five thousand. The form's trailing sentinel is the
-// backstop: if PHP still cut the tail, the server sees it missing and refuses
-// rather than writing whatever survived.
+// It also keeps the page still. A form post reloads, and a reload on a filtered,
+// scrolled list loses your place every time you correct an email.
+//
+// The form and its Save button remain for a browser with no JavaScript, where
+// the server-side sentinel still guards against a truncated post.
 (function () {
   'use strict';
 
@@ -18,11 +18,10 @@
   if (!form) return;
 
   var counter = document.getElementById('dirtyCount');
-  var dirty = Object.create(null);
+  var pending = Object.create(null);          // row key -> timer
+  var inflight = 0;
 
-  function rowOf(el) {
-    return el.closest ? el.closest('tr') : null;
-  }
+  function rowOf(el) { return el.closest ? el.closest('tr') : null; }
 
   /** A row's key is the id in its field names — rows[123][email]. */
   function keyOf(row) {
@@ -32,46 +31,167 @@
     return m ? m[1] : null;
   }
 
-  function count() {
-    if (!counter) return;
-    var n = Object.keys(dirty).length;
-    counter.textContent = n === 0
-      ? 'nothing changed yet'
-      : n + (n === 1 ? ' person changed' : ' people changed') + ' — Save to write them';
-  }
+  function say(msg) { if (counter) counter.textContent = msg; }
 
-  // One listener on the form rather than one per input: five thousand listeners
-  // is how a page becomes slow to open.
-  function mark(ev) {
-    var row = rowOf(ev.target);
-    if (!row) return;
-    var k = keyOf(row);
-    if (!k || dirty[k]) return;
-    dirty[k] = true;
-    row.classList.add('is-dirty');
-    count();
-  }
-  form.addEventListener('input', mark);
-  form.addEventListener('change', mark);
-
-  form.addEventListener('submit', function (ev) {
-    if (!Object.keys(dirty).length) {
-      // Nothing to say to the server. Stopping here also avoids a reload that
-      // would look like a save.
-      ev.preventDefault();
-      if (counter) counter.textContent = 'nothing changed, so nothing was sent';
-      return;
+  function status(row, state, text) {
+    var cell = row.querySelector('.a-status');
+    if (cell) {
+      cell.className = 'a-status ' + state;
+      cell.textContent = text;
     }
-    // Disabled fields are not submitted, which is exactly what is wanted — and
-    // it is reversible, so a failed submit leaves the page usable.
-    Array.prototype.forEach.call(form.querySelectorAll('tbody tr'), function (row) {
-      var k = keyOf(row);
-      if (k && dirty[k]) return;
-      Array.prototype.forEach.call(row.querySelectorAll('input, select, textarea'), function (f) {
-        f.disabled = true;
-      });
+    row.classList.toggle('is-saving', state === 'saving');
+    row.classList.toggle('is-saved', state === 'saved');
+    row.classList.toggle('is-failed', state === 'failed');
+  }
+
+  /**
+   * Send ONE row.
+   *
+   * A row at a time is what makes max_input_vars a non-issue: the ceiling is a
+   * thousand values and a row is thirteen. It also keeps the page still — a form
+   * post would reload a filtered, scrolled list of hundreds every time an email
+   * is corrected.
+   */
+  function save(row) {
+    var key = keyOf(row);
+    if (!key) return;
+
+    var body = new URLSearchParams();
+    body.append('id', key);
+    Array.prototype.forEach.call(row.querySelectorAll('[name^="rows["]'), function (f) {
+      var m = /^rows\[\d+\]\[([a-z_]+)\]$/.exec(f.getAttribute('name'));
+      if (!m) return;
+      // An unchecked checkbox posts nothing, which is how "no" is spelt.
+      if (f.type === 'checkbox') { if (f.checked) body.append(m[1], f.value); return; }
+      body.append(m[1], f.value);
     });
+
+    inflight++;
+    status(row, 'saving', 'saving…');
+    say('saving…');
+
+    fetch('artists_api.php?action=save_row', { method: 'POST', body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.error || 'failed');
+        status(row, 'saved', d.warning ? 'saved, rate not' : 'saved');
+        if (d.warning) say(d.warning);
+        // The name may now differ from what the next save must match on.
+        var orig = row.querySelector('[name$="[orig_name]"]');
+        var name = row.querySelector('.a-name');
+        if (orig && name) orig.value = name.value;
+      })
+      .catch(function (err) {
+        // Left visible and NOT cleared: an edit that failed silently is an edit
+        // somebody believes they made.
+        status(row, 'failed', 'not saved');
+        say('Could not save ' + (row.querySelector('.a-name') || {}).value + ' — ' + err.message);
+      })
+      .then(function () {
+        inflight--;
+        if (inflight === 0 && !Object.keys(pending).length) {
+          setTimeout(function () { if (inflight === 0) say('all changes saved'); }, 150);
+        }
+      });
+  }
+
+  /** Saved shortly after you stop typing, and at once when you leave the field. */
+  function queue(row, delay) {
+    var key = keyOf(row);
+    if (!key) return;
+    clearTimeout(pending[key]);
+    pending[key] = setTimeout(function () {
+      delete pending[key];
+      save(row);
+    }, delay);
+  }
+
+  form.addEventListener('input', function (ev) {
+    var row = rowOf(ev.target);
+    if (row) queue(row, 900);
   });
+  // change covers leaving a text field, and fires at once for a tick or a pick.
+  form.addEventListener('change', function (ev) {
+    var row = rowOf(ev.target);
+    if (row) queue(row, 0);
+  });
+
+  // The button is the no-JavaScript path. With JS the rows have already gone,
+  // so pressing it would reload the page to do nothing.
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    say(inflight ? 'still saving…' : 'all changes saved — nothing to send');
+  });
+
+  // Anything still queued goes before the page does.
+  window.addEventListener('beforeunload', function (ev) {
+    if (!inflight && !Object.keys(pending).length) return;
+    ev.preventDefault();
+    ev.returnValue = '';
+  });
+
+  // --- the reel cell ----------------------------------------------------------
+  //
+  // Shows a link, because a reel is something you OPEN far more often than you
+  // retype, and an input cannot be clicked through to the site. Double-clicking
+  // the cell swaps in the field — the same gesture that edits a milestone.
+  //
+  // The input is hidden, never disabled, so its value posts either way: a row
+  // saved without ever touching this cell keeps its address.
+  document.addEventListener('dblclick', function (ev) {
+    var cell = ev.target.closest ? ev.target.closest('[data-reel]') : null;
+    if (!cell) return;
+    ev.preventDefault();
+    var link = cell.querySelector('.reel-link');
+    var box  = cell.querySelector('.reel-input');
+    if (!link || !box) return;
+    link.hidden = true;
+    box.hidden = false;
+    box.focus();
+    box.select();
+  });
+
+  // Back to a link on the way out, with the address it now holds — so what you
+  // see is what will be saved rather than what was there when the page loaded.
+  document.addEventListener('focusout', function (ev) {
+    var box = ev.target;
+    if (!box.classList || !box.classList.contains('reel-input')) return;
+    var cell = box.closest('[data-reel]');
+    var link = cell ? cell.querySelector('.reel-link') : null;
+    if (!link) return;
+    var url = box.value.trim();
+    link.textContent = url || '—';
+    link.setAttribute('href', url || '#');
+    link.setAttribute('title', url + ' — double-click to edit');
+    box.hidden = true;
+    link.hidden = false;
+  });
+
+  // --- see all ----------------------------------------------------------------
+  var posAll = document.getElementById('posAll');
+  if (posAll) {
+    var boxes = document.querySelectorAll('.pos-grid input[type=checkbox]');
+    function syncAll() {
+      var on = 0;
+      Array.prototype.forEach.call(boxes, function (b) { if (b.checked) on++; });
+      // Unticked means "no filter", which shows everyone — so an empty panel and
+      // a full one mean the same thing, and the box reflects that rather than
+      // pretending they differ.
+      posAll.checked = (on === 0 || on === boxes.length);
+      posAll.indeterminate = (on > 0 && on < boxes.length);
+    }
+    posAll.addEventListener('change', function () {
+      // Clearing them all is what "see all" means: no filter at all, rather than
+      // every box ticked, which would send sixty values to say "no filter".
+      Array.prototype.forEach.call(boxes, function (b) { b.checked = false; });
+      posAll.indeterminate = false;
+      posAll.checked = true;
+    });
+    Array.prototype.forEach.call(boxes, function (b) {
+      b.addEventListener('change', syncAll);
+    });
+    syncAll();
+  }
 
   // Leaving with unsaved edits is worth one question. The browser decides the
   // wording; all that matters is that it asks.
