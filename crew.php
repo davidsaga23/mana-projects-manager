@@ -473,23 +473,37 @@ require __DIR__ . '/includes/header.php';
             <?php $work = $laneWork[(int)$l['step_id'] . '|' . (int)$l['lane_no']]
                         ?? ['n' => 0, 'locked' => 0]; ?>
             <div class="slot-row">
+            <?php // A BUTTON, matching the filled rows. An empty slot used to
+                  // offer "Someone has been hired for this" as a line of text,
+                  // so the two states of the same row looked like two different
+                  // screens. "Register hire" is what it does (David,
+                  // 2026-08-31), and it is the only action an empty slot has
+                  // besides removing it. ?>
             <?php if (can_edit() && $isPh): ?>
-              <details class="inline-actions">
-                <summary>Someone has been hired for this</summary>
-                <form method="post" class="inline-form">
-                  <input name="real_name[<?= (int)$l['crew_id'] ?>]" placeholder="Their real name" required>
-                  <input name="real_email[<?= (int)$l['crew_id'] ?>]" type="email" placeholder="Email (optional)">
-                  <button type="submit" name="action" value="promote:<?= (int)$l['crew_id'] ?>">Name them</button>
-                </form>
-                <form method="post" class="inline-form">
-                  <select name="assign_crew[<?= (int)$l['id'] ?>]">
-                    <option value="">— or pick someone already on the books —</option>
-                    <?php foreach ($people as $p): ?>
-                      <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Put them in this slot</button>
-                </form>
+              <details class="slot-change">
+                <summary class="slot-btn">Register hire</summary>
+                <div class="slot-change-bar slot-hire">
+                  <?php // TWO WAYS IN, because there are two situations. Somebody
+                        // new to the studio is typed; somebody already on the
+                        // books is picked, and picking carries their existing
+                        // record rather than making a second one under the same
+                        // name. ?>
+                  <form method="post" class="hire-row">
+                    <input name="real_name[<?= (int)$l['crew_id'] ?>]" placeholder="Their name" required>
+                    <input name="real_email[<?= (int)$l['crew_id'] ?>]" type="email" placeholder="Email (optional)">
+                    <button type="submit" name="action" value="promote:<?= (int)$l['crew_id'] ?>">Register</button>
+                  </form>
+                  <form method="post" class="hire-row">
+                    <select name="assign_crew[<?= (int)$l['id'] ?>]">
+                      <option value="">— or somebody already on the books —</option>
+                      <?php foreach ($people as $p): ?>
+                        <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                      <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Put them in</button>
+                  </form>
+                  <button type="button" class="popover-close" aria-label="Close">&times;</button>
+                </div>
               </details>
             <?php elseif (can_edit()): ?>
               <?php // BUTTONS, not a line of small print (David, 2026-08-31).
@@ -515,6 +529,9 @@ require __DIR__ . '/includes/header.php';
                     <?php endforeach; ?>
                   </select>
                   <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Save</button>
+                  <?php // type=button, so it dismisses rather than submitting the
+                        // form it happens to sit inside. ?>
+                  <button type="button" class="popover-close" aria-label="Close">&times;</button>
                 </form>
               </details>
 
@@ -568,19 +585,14 @@ require __DIR__ . '/includes/header.php';
       </table>
     <?php endforeach; ?>
 
-    <p class="muted small">
-      Naming a slot keeps its identity: the crew record's id never changes, so every scheduled
-      task and every progress record already pointing at it follows automatically. The old slot
-      name is kept as an alias, so an import that still says "Animation 02" resolves to the
-      right person.
-      <?php if ($unfilled): ?>
-        Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a> after filling
-        slots so the names on the plan are up to date.
-      <?php endif; ?>
-    </p>
 
   <?php endif; ?>
 <?php endif; ?>
+
+<?php // Closing the popovers: an ×, a click outside, or Escape. The opening is
+      // plain <details> and needs nothing, so a browser without this file still
+      // works — it just closes by pressing the button again. ?>
+<script src="assets/crew.js<?= asset_ver('crew.js') ?>"></script>
 
 </div>
 </body></html>

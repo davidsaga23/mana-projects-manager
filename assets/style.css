@@ -1572,6 +1572,13 @@ body.lightbox-lock { overflow: hidden; }
 .slot-change-bar select { width: auto; min-width: 220px; flex: 0 1 auto; }
 .slot-change-bar button { margin-top: 0; }
 
+/* The hire popover holds TWO forms — type a new person, or pick one already on
+   the books — so it stacks where the assignee picker is a single line. */
+.slot-hire { flex-direction: column; align-items: stretch; gap: 8px; }
+.slot-hire .hire-row { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; margin: 0; }
+.slot-hire input, .slot-hire select { width: auto; flex: 1 1 auto; min-width: 150px; }
+.slot-hire button { flex: 0 0 auto; }
+
 
 /* Removing the SLOT is a rarer, larger act than removing its assignee, and the
    two are one row apart — so it stays quiet text while those are buttons. */
@@ -1581,3 +1588,14 @@ body.lightbox-lock { overflow: hidden; }
    secondary, and a third in plain blue would read as the safe choice. */
 button.secondary.danger { background: #f3d9dc; color: #8f222c; }
 button.secondary.danger:hover { background: #e9c2c7; }
+/* The popover's dismiss. Small and quiet — it is the way out, not an action. */
+.popover-close {
+  margin: 0 0 0 2px; padding: 2px 7px; line-height: 1;
+  background: none; color: #7b8894; font-size: 17px; border: 0; cursor: pointer;
+  align-self: center;
+}
+.popover-close:hover { background: #eef1f4; color: #1c2733; border-radius: 3px; }
+/* In the hire popover it sits in the corner rather than in either row, since
+   neither of those two lines is the one it belongs to. */
+.slot-hire { position: relative; padding-right: 26px; }
+.slot-hire .popover-close { position: absolute; top: 4px; right: 4px; }
