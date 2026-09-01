@@ -1429,6 +1429,10 @@ body.lightbox-lock { overflow: hidden; }
    clear of the diamond and given a plate, because on a row it lands over the
    grid stripes and sometimes over a bar. */
 .tl-chart .tl-ms-g.on-row .tl-ms-label { paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+/* Dropped into the strip under its bar, where nothing else is written: no
+   outline needed, and one size down so a row of them reads as annotation
+   rather than competing with the bar names. */
+.tl-chart .tl-ms-g.label-below .tl-ms-label { stroke: none; font-size: 10.5px; }
 
 /* Dated before the step it reviews has finished: the thing being reviewed will
    not exist yet. The same red the broken dependency arrows use, for the same

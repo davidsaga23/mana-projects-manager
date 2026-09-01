@@ -260,6 +260,7 @@
     // from the character count: "Animatic review" and "WWW" do not occupy the
     // same space in a proportional font.
     var tierEnd = [];               // tier -> x where its last label finished
+    var gapEnd  = {};               // step row -> x where its last GAP label ended
     var TIER_H  = 20;
 
     // WHERE A LINKED MILESTONE SITS: on the row of the step it reviews.
@@ -269,11 +270,20 @@
     // bar ids are schedule rows, not steps, so nothing matches and every
     // milestone falls back to stacking at the top — which is correct there,
     // since a step has no single row on that chart.
-    var rowY = {};
+    var rowY = {}, rowBar = {};
     (g.bars || []).forEach(function (b) {
       var id = b && b.task ? b.task.id : null;
       var el = b && b.$bar ? b.$bar : null;
-      if (id && el) rowY[String(id)] = parseFloat(el.getAttribute('y'));
+      if (!id || !el) return;
+      rowY[String(id)] = parseFloat(el.getAttribute('y'));
+      // Kept so a label can tell whether it is about to land ON this bar, where
+      // the bar's own name already is.
+      rowBar[String(id)] = {
+        x: parseFloat(el.getAttribute('x')),
+        y: parseFloat(el.getAttribute('y')),
+        w: parseFloat(el.getAttribute('width')),
+        h: parseFloat(el.getAttribute('height'))
+      };
     });
 
     // Date order, so "the previous label" means the one to the left. The array
@@ -340,12 +350,42 @@
       // On its step's row when it has one and that step is drawn; stacked at
       // the top when it is a whole-project date, or when the step has no dates
       // and therefore no bar to sit beside.
-      var ty, onRow = m.step_id ? rowY['step-' + m.step_id] : undefined;
+      var ty, labelY, onRow = m.step_id ? rowY['step-' + m.step_id] : undefined;
       if (onRow !== undefined && !isNaN(onRow)) {
         // Centred on the bar rather than above it, so the marker reads as
         // belonging to that row and not to the one above.
         ty = onRow - 3;
         grp.classList.add('on-row');
+
+        // THE LABEL STEPS OUT OF THE BAR'S WAY, and only when it has to.
+        //
+        // A review at the END of a step -- which most are -- has clear space to
+        // its right and stays beside its diamond. One landing mid-bar would sit
+        // on top of the bar's own name: "Layout review I" written across
+        // "Layout · Environment assets", two labels in one place.
+        //
+        // So that one alone drops into the gap beneath the bar. The diamond
+        // stays put, so which row it belongs to is never in doubt; only the
+        // name moves, by about the height of one line.
+        //
+        // Conditional rather than always-below, because moving every label down
+        // would separate the common case from its marker for no gain.
+        var bar = rowBar['step-' + m.step_id];
+        if (bar) {
+          var lx = x + 14, lr = lx + w;
+          var key = 'step-' + m.step_id;
+          if (lx < bar.x + bar.w && lr > bar.x) {
+            // The strip under a bar is one line tall — Frappe's row padding —
+            // so a second label cannot simply go below the first. Where two
+            // would collide down there, the later one stays beside its diamond
+            // instead: over the bar, but readable on its white outline, and
+            // one label over a bar beats two written across each other.
+            if ((gapEnd[key] || -Infinity) < lx - 4) {
+              labelY = bar.y + bar.h + 11;
+              gapEnd[key] = lr + 8;
+            }
+          }
+        }
       } else {
         var tier = 0;
         while (tier < tierEnd.length && tierEnd[tier] > x - 12) tier++;
@@ -361,7 +401,8 @@
         x + ',' + (ty + 1), (x + 10) + ',' + (ty + 11),
         x + ',' + (ty + 21), (x - 10) + ',' + (ty + 11)
       ].join(' '));
-      text.setAttribute('y', ty + 15);
+      text.setAttribute('y', labelY !== undefined ? labelY : ty + 15);
+      if (labelY !== undefined) grp.classList.add('label-below');
 
       if (!window.TL_CAN_EDIT) return;
       grp.classList.add('is-draggable');
