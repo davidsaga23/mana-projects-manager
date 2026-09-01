@@ -363,7 +363,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // nothing warns when they drift. ?>
           <?php // Minimum sits immediately before the ideal so the two can be read
                 // against each other without moving your eyes across the row. It is
-                // the arithmetic one: work left over working days left over people,
+                // the arithmetic one: work over working days in the window over people,
                 // and nothing on this screen can edit it. ?>
           <?php // Minimum and Studio ideal are deliberately in the SAME unit and
                 // worded the same way, because the whole point is reading one
@@ -385,7 +385,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // Reading it after the total it feeds is reading the sum before its
                 // parts. ?>
           <th title="What the retake allowance adds to this step, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
-          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days left between today and the deadline.">Duration<div class="muted small">at these settings</div></th>
+          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this step's own start and deadline — this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
           <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>

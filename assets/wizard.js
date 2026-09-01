@@ -70,8 +70,12 @@
 
 // Live "is that enough?" check on the dates & headcount screen.
 //
-// Mirrors includes/quota.php exactly. If that maths ever changes, change it here
-// too — a check that disagrees with the review screen is worse than no check.
+// Mirrors includes/quota.php, with ONE deliberate exception: the window is the
+// step's own start-to-deadline here, where quota.php counts from today. See the
+// long note at `var from` below before touching it. Everything else — coverage,
+// the retake factor, the ideal-wins rule, the holiday calendar — must stay in
+// step; a check that disagrees with the review screen by accident is worse than
+// no check.
 (function () {
   'use strict';
 
@@ -322,7 +326,35 @@
       return say('<span class="err">the deadline is before the start date</span>');
     }
 
-    var from = (start && start > today) ? start : today;
+    // ---- the window this step is judged against ----------------------------
+    //
+    // THE STEP'S OWN DATES: start to deadline. Today is not in it.
+    //
+    // This screen PLANS; it does not track progress. The question it answers is
+    // whether the work fits between the two dates you typed, and that answer
+    // must not depend on when you happen to open the page.
+    //
+    // Anchoring on today made a plan rot while you looked at it. A step running
+    // 31 Aug to 3 Sep was judged on 4 working days over the weekend and 3 on the
+    // Tuesday, so rows went red as the week passed with nothing about the plan
+    // having changed — and the fix they implied (add a person) was for a problem
+    // that did not exist.
+    //
+    // ⚠ DELIBERATELY DIFFERENT FROM step_quota() IN includes/quota.php, which
+    // still counts from today. THIS IS NOT DRIFT — do not reconcile them by
+    // changing one to match the other. They answer different questions:
+    //
+    //   here            is this plan possible in the time it has been given?
+    //   quota.php       can we still make it from where we stand today?
+    //
+    // The dashboard and the review screen ask the second one, and a step that
+    // has burnt half its window SHOULD go red there. That is the whole value of
+    // having both, and it is why the mirror note at the top of this file no
+    // longer covers this one line.
+    //
+    // Today still anchors a step with NO start date, because then there is no
+    // window to measure and today is the only honest place to begin.
+    var from = start || today;
     if (deadline < from) {
       updateDuration(0);
       return say('<span class="warn-text">deadline has passed</span>');
@@ -331,7 +363,9 @@
     var days = workingDays(from, deadline);
     if (days <= 0) {
       updateDuration(0);
-      return say('<span class="warn-text">no working days left</span>');
+      // "in that window", not "left" — nothing has run out, the two dates just
+      // have no working day between them.
+      return say('<span class="warn-text">no working days between those dates</span>');
     }
 
     updateDuration(days);
