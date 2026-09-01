@@ -375,32 +375,26 @@ require __DIR__ . '/includes/header.php';
         <table>
           <tr><th>Date</th><th>Milestone</th><th>Notes</th><th></th></tr>
           <?php foreach ($milestones as $m): ?>
-            <?php // Edited IN THE ROW rather than behind a disclosure. There
-                  // are only ever a handful of these, and the whole reason to
-                  // open the panel is to move a date — asking for a click before
-                  // the field appears would be a click on every visit. ?>
+            <?php // A LIST, not a form. Editing happens in one place now — the
+                  // modal a double-click opens — and three input boxes per row
+                  // repeating that was the clutter David asked to lose.
+                  //
+                  // The row still OPENS that modal, though, rather than being
+                  // inert text: a milestone dated before the chart begins is not
+                  // drawn, so the chart cannot always be the way in to one. ?>
             <tr>
-              <?php if (can_edit()): ?>
-                <td colspan="4">
-                  <form method="post" class="inline-form">
-                    <input type="date" name="ms_date" value="<?= e($m['date']) ?>">
-                    <input name="ms_name" value="<?= e($m['name']) ?>" size="22" maxlength="120" required>
-                    <input name="ms_notes" value="<?= e($m['notes']) ?>" size="24"
-                           maxlength="255" placeholder="Notes (optional)">
-                    <button type="submit" class="secondary" name="milestone_action"
-                            value="edit:<?= (int)$m['id'] ?>">Save</button>
-                    <button type="submit" class="linkish link-danger" name="milestone_action"
-                            value="remove:<?= (int)$m['id'] ?>"
-                            onclick="return confirm('Remove the milestone <?= e(addslashes($m['name'])) ?>?');"
-                            formnovalidate>Remove</button>
-                  </form>
-                </td>
-              <?php else: ?>
-                <td><?= e($m['date']) ?></td>
-                <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
-                <td class="muted"><?= e($m['notes']) ?></td>
-                <td></td>
-              <?php endif; ?>
+              <td><?= e($m['date']) ?></td>
+              <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
+              <td class="muted"><?= e($m['notes']) ?></td>
+              <td class="row-actions">
+                <?php if (can_edit()): ?>
+                  <?php // The id only — the modal reads the rest from the same
+                        // array the chart draws from, so a name with a quote in
+                        // it needs no escaping into an onclick. ?>
+                  <button type="button" class="linkish ms-edit"
+                          data-ms="<?= (int)$m['id'] ?>">Edit</button>
+                <?php endif; ?>
+              </td>
             </tr>
           <?php endforeach; ?>
         </table>

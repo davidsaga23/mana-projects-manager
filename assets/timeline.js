@@ -357,6 +357,21 @@
     if (box) box.style.display = 'none';
   };
 
+  // The Edit buttons in the panel below the chart open the SAME modal, so there
+  // is one editor rather than two that could disagree. Delegated from the
+  // document because the panel is ordinary server-rendered HTML that never
+  // re-renders — and looked up by id, so a milestone named O'Brien needs no
+  // escaping into an inline handler.
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.ms-edit') : null;
+    if (!btn) return;
+    var id = String(btn.getAttribute('data-ms'));
+    var m = (window.MILESTONES || []).filter(function (x) {
+      return String(x.id) === id;
+    })[0];
+    if (m) openMsEditor(m);
+  });
+
   function saveMilestoneDate(id, date) {
     var body = new URLSearchParams();
     body.append('id', id);
