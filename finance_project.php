@@ -778,7 +778,13 @@ if ($retakePct <= 0):
       <tr>
         <th>Role / Position</th><th>Artist</th><th>Rate</th>
         <th class="num">Days</th><th class="num">Months</th><th class="num">Projected</th>
-        <th class="num">Units</th><th class="num">Actual days</th><th class="num">Actual</th>
+        <?php // Says WHOLE STEP because it is the one column here that is not
+              // per-row: Days, Months and Projected are all one person's share,
+              // and reading this as theirs too is what made the export charge
+              // every animator for all of the footage. ?>
+        <th class="num" title="The step's total. Days, Months and Projected are one person's share of it.">Units
+          <span class="muted">(step)</span></th>
+        <th class="num">Actual days</th><th class="num">Actual</th>
         <th class="num">Difference</th>
       </tr>
     </thead>
@@ -848,7 +854,12 @@ if ($retakePct <= 0):
           </td>
           <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
           <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?></td>
-          <td class="num muted"><?= e(fmt_num($r['units'], 0)) ?></td>
+          <?php // 1dp, not 0. Whole numbers still print clean because fmt_num()
+                // trims the trailing zero, but 40.5 seconds of footage was
+                // rendering as "41" — overstating the show and disagreeing with
+                // the export, which writes the column at full precision. ?>
+          <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
+                e(fmt_num($r['units'], 1)) ?></td>
           <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
           <td class="num"><?= $r['actual_cost'] === null || $r['actual_days'] <= 0
                 ? '<span class="muted">—</span>' : e(number_format($r['actual_cost'], 2)) ?></td>

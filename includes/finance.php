@@ -311,6 +311,12 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 // this row, and the screen needs it to explain when one cannot.
                 'tracks_seconds' => $tracksSeconds,
                 'units_per_lane' => $unitsPerLane,
+                // HOW MANY WAYS THE STEP IS SPLIT. The Units column carries the
+                // whole step's footage while Days carries one lane's share, so a
+                // per-second cost needs this to reconcile the two. The export
+                // wrote `rate x units` without it and charged all 40.5 seconds to
+                // each of three animators.
+                'lane_count'     => $laneCount,
                 'rate_mismatch'  => $rateMismatch,
                 'ideal_days'    => $idealDays,
                 'estimate_days' => $estimateDays ?: null,

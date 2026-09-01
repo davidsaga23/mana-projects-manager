@@ -69,7 +69,10 @@ const COL_COUNT = 15;
 
 $header = [
     'Department', 'Role / Position', 'Artist Name', 'Rate Type', 'Day Rate (' . $cur . ')',
-    'Total Days', 'Total Months', 'Projected Cost (' . $cur . ')', 'Total units count',
+    // "step total" spelt out on the header, because this is the only column on
+    // the row that is NOT one person's share — and reading it as theirs is the
+    // mistake the per-second formula used to make.
+    'Total Days', 'Total Months', 'Projected Cost (' . $cur . ')', 'Units (step total)',
     'Actual day rate', 'Actual Days', 'Actual Cost (' . $cur . ')', 'Projection vs actuals',
     'Monthly cost (ref)', 'Notes',
 ];
@@ -164,6 +167,11 @@ foreach ($proj['by_department'] as $dept => $group) {
         $liveSecond = ($rate !== null && $rateUnit === 'second'
                        && (int)($row['tracks_seconds'] ?? 0) === 1);
 
+        // HOW MANY PEOPLE SHARE THE STEP. Needed because the two columns the
+        // per-second formula sits between are measured differently: COL_DAYS is
+        // ONE LANE'S share of the work, COL_UNITS is the WHOLE STEP's footage.
+        $laneCount = max(1, (int)($row['lane_count'] ?? 1));
+
         $cells = [];
         $cells[COL_DEPT]     = ['v' => $dept, 's' => xlsx_alt(XLSX_TEXT, $shade)];
         $cells[COL_ROLE]     = ['v' => $row['role'], 's' => xlsx_alt(XLSX_TEXT, $shade)];
@@ -186,7 +194,19 @@ foreach ($proj['by_department'] as $dept => $group) {
             // Rate times FOOTAGE. Deliberately not times days: a retake allowance
             // lengthens the days and never the seconds, so a per-second cost is
             // flat while its duration grows (DECISIONS, 2026-08-17).
-            $cells[COL_COST] = ['f' => 'IFERROR(ROUND(' . $E . '*I' . $rn . ',2),0)',
+            //
+            // ⚠ DIVIDED BY THE LANE COUNT, because column I holds the whole
+            // step's footage and this row is one person's share of it. Without
+            // the divisor every animator on a three-way split was charged all
+            // 40.5 seconds: the sheet said 4,860 a row where the projection said
+            // 1,620, and a 19,681.88 production stage totalled 51,919.88.
+            //
+            // It only ever showed up on OPENING the file. The cached 'v' below
+            // was right all along; fullCalcOnLoad recomputed the formula over
+            // the top of it, so nothing was visibly wrong until Excel had it.
+            $mul = $E . '*I' . $rn;
+            if ($laneCount > 1) $mul .= '/' . $laneCount;
+            $cells[COL_COST] = ['f' => 'IFERROR(ROUND(' . $mul . ',2),0)',
                                 'v' => round((float)$row['cost'], 2),
                                 's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
         } else {
@@ -223,8 +243,14 @@ foreach ($proj['by_department'] as $dept => $group) {
         } elseif ($rateUnit === 'flat') {
             $note = 'Flat fee — not rate x days';
         } elseif ($rateUnit === 'second') {
+            // The split is SPELT OUT rather than left as a bare /3 in the
+            // formula bar. A divisor nobody can account for is the kind of thing
+            // that gets 'corrected' out of a sheet by the next person to open it.
             $note = $liveSecond
-                ? 'Per second of footage — retakes lengthen the days, not the seconds'
+                ? ($laneCount > 1
+                    ? 'Per second of footage — column I is the whole step, shared '
+                      . $laneCount . ' ways, so this row is one share'
+                    : 'Per second of footage — retakes lengthen the days, not the seconds')
                 : 'Per-second rate on a step not measured in seconds — cannot be priced';
         }
         $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];
