@@ -118,9 +118,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             assign_crew_to_lane($pdo, $projectId, (int)$m[1], $crewId);
             flash('ok', 'Slot filled. Any work already scheduled on that track moved with it.');
 
-        } elseif (preg_match('/^remove:(\d+)$/', $action, $m)) {
-            // Only ever removes the SLOT, never the person: a real crew member
-            // belongs to the studio, not to one show.
+        } elseif (preg_match('/^remove_work:(\d+)$/', $action, $m)) {
+            // THE WAY THROUGH. remove: refuses while a slot carries scheduled
+            // work, and for two of the three reasons it can be blocked there is
+            // no re-run that would ever clear it — see the refusal below. Left
+            // at that, the slot could not be removed at all.
+            //
+            // So this removes the slot AND the work on it, in one transaction,
+            // and the button that reaches it says how many tasks that is and
+            // how many are hand-locked. Destructive and named as such: auto
+            // tasks come back on the next Regenerate, hand-planned dates do not.
             $laneId = (int)$m[1];
             $stmt = $pdo->prepare(
                 'SELECT cl.*, c.is_placeholder, c.name FROM crew_lanes cl
@@ -131,15 +138,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lane = $stmt->fetch();
             if (!$lane) throw new RuntimeException('That slot no longer exists.');
 
+            $pdo->beginTransaction();
+            try {
+                $del = $pdo->prepare(
+                    'DELETE FROM schedule WHERE project_id = ? AND step_id = ? AND lane = ?'
+                );
+                $del->execute([$projectId, (int)$lane['step_id'], (int)$lane['lane_no']]);
+                $gone = $del->rowCount();
+
+                $pdo->prepare('DELETE FROM crew_lanes WHERE id = ?')->execute([$laneId]);
+                if ((int)$lane['is_placeholder'] === 1) {
+                    $pdo->prepare(
+                        'DELETE FROM crew WHERE id = ? AND is_placeholder = 1
+                          AND NOT EXISTS (SELECT 1 FROM crew_lanes WHERE crew_id = crew.id)'
+                    )->execute([(int)$lane['crew_id']]);
+                }
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            flash('ok', sprintf('Removed the slot "%s" and %d scheduled task%s from it. '
+                              . 'Regenerate to replan that work across the slots that remain.',
+                                $lane['name'], $gone, $gone === 1 ? '' : 's'));
+
+        } elseif (preg_match('/^remove:(\d+)$/', $action, $m)) {
+            // Only ever removes the SLOT, never the person: a real crew member
+            // belongs to the studio, not to one show.
+            $laneId = (int)$m[1];
+            $stmt = $pdo->prepare(
+                'SELECT cl.*, c.is_placeholder, c.name, ps.planned_headcount
+                   FROM crew_lanes cl
+                   JOIN crew c ON c.id = cl.crew_id
+                   JOIN pipeline_steps ps ON ps.id = cl.step_id
+                  WHERE cl.id = ? AND cl.project_id = ?'
+            );
+            $stmt->execute([$laneId, $projectId]);
+            $lane = $stmt->fetch();
+            if (!$lane) throw new RuntimeException('That slot no longer exists.');
+
+            // WHY THIS REFUSAL HAD TO LEARN THE CASES (David, 2026-08-31).
+            //
+            // It used to say "re-run the schedule first so that work moves
+            // elsewhere" for every blocked slot. That advice is only true for
+            // one of the three, and sends you round a loop in the other two:
+            //
+            //   * a HAND-LOCKED task survives every re-run by design —
+            //     commit_schedule only deletes is_manual = 0 — so re-running
+            //     can never clear it, however many times you try;
+            //   * a lane WITHIN the headcount is rebuilt by the next run, which
+            //     allocates max(1, ceil(headcount)) lanes. Lane 01 therefore
+            //     always comes back, so that advice could never work for it;
+            //   * only a SURPLUS lane carrying auto tasks is actually freed by
+            //     re-running, which is the case the old message described.
             $used = $pdo->prepare(
-                'SELECT COUNT(*) FROM schedule WHERE step_id = ? AND lane = ? AND project_id = ?'
+                'SELECT COUNT(*) AS n, COALESCE(SUM(is_manual), 0) AS locked
+                   FROM schedule WHERE step_id = ? AND lane = ? AND project_id = ?'
             );
             $used->execute([(int)$lane['step_id'], (int)$lane['lane_no'], $projectId]);
-            $n = (int)$used->fetchColumn();
+            $u = $used->fetch();
+            $n = (int)($u['n'] ?? 0);
+            $locked = (int)($u['locked'] ?? 0);
+
             if ($n > 0) {
+                $isSurplus = (int)$lane['lane_no'] > step_slot_count($lane);
+                $why = $locked > 0
+                    ? ($locked === $n ? 'Re-running the schedule will not move it: it is hand-locked, '
+                                      . 'and a re-run leaves locked tasks exactly where they are.'
+                                      : $locked . ' of them are hand-locked, and a re-run leaves those '
+                                      . 'exactly where they are.')
+                    : (!$isSurplus
+                        ? 'Re-running the schedule will not help either: this slot is still within the '
+                        . 'headcount planned for the step, so the next run fills it again. Lower the '
+                        . 'headcount on Dates & headcount first if the slot is not wanted.'
+                        : 'Re-running the schedule would move this work elsewhere, since the slot is '
+                        . 'beyond the planned headcount.');
                 throw new RuntimeException(
                     "\"{$lane['name']}\" has $n scheduled task" . ($n === 1 ? '' : 's') .
-                    ' on it. Re-run the schedule first so that work moves elsewhere, then remove the slot.'
+                    ' on it. ' . $why .
+                    ' To remove the slot and that work together, use "Remove slot and its work".'
                 );
             }
             $pdo->prepare('DELETE FROM crew_lanes WHERE id = ?')->execute([$laneId]);
@@ -160,6 +237,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $lanes    = $schemaReady ? project_lanes($pdo, $projectId) : [];
+
+// How much scheduled work sits on each slot, and how much of it is hand-locked.
+// ONE grouped query rather than one per row: thirty-seven slots would otherwise
+// be thirty-seven round trips to draw a button label.
+//
+// Needed on the way IN, not just when a removal is refused: whether "Remove
+// slot" will work at all is exactly what you want to know before pressing it.
+$laneWork = [];
+if ($schemaReady) {
+    $lw = $pdo->prepare(
+        'SELECT step_id, lane, COUNT(*) AS n, COALESCE(SUM(is_manual), 0) AS locked
+           FROM schedule WHERE project_id = ? GROUP BY step_id, lane'
+    );
+    $lw->execute([$projectId]);
+    foreach ($lw as $r) {
+        $laneWork[(int)$r['step_id'] . '|' . (int)$r['lane']] =
+            ['n' => (int)$r['n'], 'locked' => (int)$r['locked']];
+    }
+}
 $people   = $schemaReady ? assignable_crew($pdo) : [];
 $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 
@@ -395,11 +491,28 @@ require __DIR__ . '/includes/header.php';
                 </form>
               </details>
             <?php endif; ?>
-            <?php if (can_edit()): ?>
-              <form method="post" class="inline-form"
-                    onsubmit="return confirm('Remove this slot? The person stays on the studio crew list.');">
-                <button type="submit" class="linkish" name="action" value="remove:<?= (int)$l['id'] ?>">Remove slot</button>
-              </form>
+            <?php if (can_edit()):
+              $work = $laneWork[(int)$l['step_id'] . '|' . (int)$l['lane_no']] ?? ['n' => 0, 'locked' => 0];
+            ?>
+              <?php if ($work['n'] === 0): ?>
+                <form method="post" class="inline-form"
+                      onsubmit="return confirm('Remove this slot? The person stays on the studio crew list.');">
+                  <button type="submit" class="linkish" name="action" value="remove:<?= (int)$l['id'] ?>">Remove slot</button>
+                </form>
+              <?php else: ?>
+                <?php // Said BEFORE the click, not after. "Remove slot" used to
+                      // look available on every row and then refuse with advice
+                      // that, for most blocked slots, could never work. ?>
+                <form method="post" class="inline-form"
+                      onsubmit="return confirm('Remove this slot AND delete the <?= (int)$work['n'] ?> task<?= $work['n'] === 1 ? '' : 's' ?> scheduled on it?<?= $work['locked'] > 0 ? ' ' . (int)$work['locked'] . ' of them are hand-planned and will not come back from a Regenerate.' : ' They are auto-scheduled, so a Regenerate will replan them across the slots that remain.' ?>');">
+                  <button type="submit" class="linkish link-danger" name="action"
+                          value="remove_work:<?= (int)$l['id'] ?>">Remove slot and its work</button>
+                </form>
+                <div class="muted small">
+                  <?= (int)$work['n'] ?> scheduled task<?= $work['n'] === 1 ? '' : 's' ?><?php
+                    if ($work['locked'] > 0): ?>, <?= (int)$work['locked'] ?> hand-locked<?php endif; ?>
+                </div>
+              <?php endif; ?>
             <?php endif; ?>
           </td>
         </tr>
