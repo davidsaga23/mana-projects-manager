@@ -300,7 +300,8 @@ if ($msReady) {
     $ms = $pdo->prepare(
         $msSteps
             ? 'SELECT m.id, m.name, m.milestone_date, m.notes, m.step_id,
-                      ps.name AS step_name, ps.deadline AS step_end
+                      ps.name AS step_name, ps.deadline AS step_end,
+                      ps.applies_to AS step_applies, ps.applies_to_asset_type AS step_asset_type
                  FROM project_milestones m
                  LEFT JOIN pipeline_steps ps ON ps.id = m.step_id
                 WHERE m.project_id = ? ORDER BY m.milestone_date, m.id'
@@ -318,7 +319,13 @@ if ($msReady) {
             // The bar id the general chart uses, so the browser can put the
             // marker on that row without a second lookup.
             'step_id'   => isset($m['step_id']) && $m['step_id'] ? (int)$m['step_id'] : null,
-            'step_name' => $m['step_name'] ?? '',
+            // Named the same way in the chart tooltip and the panel as it is in
+            // the picker, so "reviews Concept" can never mean a different
+            // Concept from the one that was chosen.
+            'step_name' => isset($m['step_name']) && $m['step_name'] !== null
+                ? $m['step_name'] . ' · ' . applies_to_phrase($m['step_applies'],
+                                                              $m['step_asset_type'] ?? null)
+                : '',
             // EARLY means the step it reviews has not finished by then, so the
             // thing being reviewed will not exist. Worked out here because the
             // step's dates are already to hand.
@@ -481,8 +488,13 @@ require __DIR__ . '/includes/header.php';
           <?php if ($msSteps): ?>
             <select name="ms_step">
               <option value="">— not tied to a step —</option>
+              <?php // The scope, not just the name. A pipeline legitimately has
+                    // Concept for characters, for environments and for props —
+                    // three options reading "Concept" is a guess, and the same
+                    // applies_to_phrase() the bars are labelled with settles it. ?>
               <?php foreach ($steps as $st): ?>
-                <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+                <option value="<?= (int)$st['id'] ?>"><?= e($st['name'] . ' · '
+                    . applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></option>
               <?php endforeach; ?>
             </select>
           <?php endif; ?>
@@ -597,7 +609,8 @@ require __DIR__ . '/includes/header.php';
           <select name="ms_step" id="msStep">
             <option value="">— not tied to a step —</option>
             <?php foreach ($steps as $st): ?>
-              <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+              <option value="<?= (int)$st['id'] ?>"><?= e($st['name'] . ' · '
+                  . applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></option>
             <?php endforeach; ?>
           </select>
           <small>Puts the marker on that step's row, and warns if the date falls before
