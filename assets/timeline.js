@@ -246,7 +246,29 @@
     }
     function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
-    window.MILESTONES.forEach(function (m) {
+    // STACKED SO THE LABELS STOP COLLIDING. Two reviews four days apart wrote
+    // their names over each other into an unreadable smear.
+    //
+    // Automatic rather than a position you have to set: the only thing a manual
+    // up/down would decide is which of two labels sits higher, and that is a
+    // question the chart can answer for itself every time the dates change --
+    // whereas a stored row would have to be re-tidied by hand after every drag.
+    //
+    // Each marker takes the highest tier whose last label has already ended
+    // before this one begins, so a lone milestone stays at the top and only a
+    // genuine overlap pushes anything down. Widths are MEASURED, not guessed
+    // from the character count: "Animatic review" and "WWW" do not occupy the
+    // same space in a proportional font.
+    var tierEnd = [];               // tier -> x where its last label finished
+    var TIER_H  = 20;
+
+    // Date order, so "the previous label" means the one to the left. The array
+    // arrives sorted from PHP, but a drag rewrites a date in place.
+    var msSorted = window.MILESTONES.slice().sort(function (a, b) {
+      return String(a.date) < String(b.date) ? -1 : (String(a.date) > String(b.date) ? 1 : 0);
+    });
+
+    msSorted.forEach(function (m) {
       var p = String(m.date).split('-');
       if (p.length !== 3) return;
       var d = new Date(+p[0], +p[1] - 1, +p[2]);
@@ -278,16 +300,11 @@
       // you can take hold of rather than a tick you might have imagined.
       var dia = document.createElementNS(ns, 'polygon');
       dia.setAttribute('class', 'tl-ms tl-ms-dia');
-      dia.setAttribute('points', [
-        x + ',' + (top + 1), (x + 10) + ',' + (top + 11),
-        x + ',' + (top + 21), (x - 10) + ',' + (top + 11)
-      ].join(' '));
       grp.appendChild(dia);
 
       var text = document.createElementNS(ns, 'text');
       text.setAttribute('class', 'tl-ms-label');
       text.setAttribute('x', x + 14);
-      text.setAttribute('y', top + 15);
       text.textContent = m.name;
       grp.appendChild(text);
 
@@ -296,6 +313,22 @@
                         + (window.TL_CAN_EDIT ? ' · drag to move, double-click to edit' : '');
       grp.appendChild(title);
       svg.appendChild(grp);
+
+      // Measured only once it is in the document — getComputedTextLength()
+      // returns 0 on a detached node.
+      var w = 0;
+      try { w = text.getComputedTextLength(); } catch (e) { w = m.name.length * 6; }
+
+      var tier = 0;
+      while (tier < tierEnd.length && tierEnd[tier] > x - 12) tier++;
+      tierEnd[tier] = x + 14 + w + 8;         // 8px of air before the next one
+
+      var ty = top + tier * TIER_H;
+      dia.setAttribute('points', [
+        x + ',' + (ty + 1), (x + 10) + ',' + (ty + 11),
+        x + ',' + (ty + 21), (x - 10) + ',' + (ty + 11)
+      ].join(' '));
+      text.setAttribute('y', ty + 15);
 
       if (!window.TL_CAN_EDIT) return;
       grp.classList.add('is-draggable');
