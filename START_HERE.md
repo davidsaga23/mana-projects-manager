@@ -19,8 +19,8 @@ without re-deriving context.
   to agree to the cent (see the 2026-08-18 money entries in `docs/DECISIONS.md`); and the
   projects list gained **status, rename, archive and delete**.
 - **⚠ Deploy state (2026-08-31):** 024–027 are all applied, confirmed by David — hiring,
-  freelancer fields, ideal quotas, archived projects. **028 (timeline milestones) is NEW and
-  pending.** Until it is applied the timeline says so and the panel is inert; everything else
+  freelancer fields, ideal quotas, archived projects. **028 (timeline milestones) and 029
+  (tying a milestone to a step) are NEW and pending.** Until it is applied the timeline says so and the panel is inert; everything else
   works. Still open `migrate.php` and look before assuming, rather than trusting this line: it
   is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,

@@ -30,6 +30,21 @@ if (!$project) {
     exit;
 }
 
+/**
+ * A step id that really belongs to this project, or null.
+ *
+ * Never trusted from the form: an id from another show would attach a review to
+ * a bar this chart cannot draw, and the milestone would then be invisible with
+ * no way to see why.
+ */
+function ms_step_or_null(PDO $pdo, int $projectId, $raw): ?int {
+    $id = (int)$raw;
+    if ($id <= 0) return null;
+    $q = $pdo->prepare('SELECT id FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $q->execute([$id, $projectId]);
+    return $q->fetchColumn() === false ? null : $id;
+}
+
 // ---------------------------------------------------------------------------
 // MILESTONES — dates the plan has to bend around: a client review, a delivery,
 // a lock. Added by hand and never derived, so the scheduler cannot move them.
@@ -38,6 +53,9 @@ if (!$project) {
 // question about a review date is which bars cross it.
 // ---------------------------------------------------------------------------
 $msReady = column_exists($pdo, 'project_milestones', 'id');
+// 029 adds the link to a pipeline step. Checked separately so the screen keeps
+// working on a database where 028 has run and 029 has not.
+$msSteps = $msReady && column_exists($pdo, 'project_milestones', 'step_id');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) {
     try {
@@ -61,10 +79,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) 
             if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
                 throw new RuntimeException('Give the milestone a date.');
             }
-            $pdo->prepare(
-                'INSERT INTO project_milestones (project_id, name, milestone_date, notes)
-                 VALUES (?, ?, ?, ?)'
-            )->execute([$projectId, $name, $date, $note !== '' ? mb_substr($note, 0, 255) : null]);
+            // Verified against THIS project's steps rather than trusted: a step
+            // id from another show would otherwise attach a review to a bar
+            // this chart cannot draw.
+            $stepId = ms_step_or_null($pdo, $projectId, $_POST['ms_step'] ?? '');
+            if ($msSteps) {
+                $pdo->prepare(
+                    'INSERT INTO project_milestones (project_id, step_id, name, milestone_date, notes)
+                     VALUES (?, ?, ?, ?, ?)'
+                )->execute([$projectId, $stepId, $name, $date,
+                            $note !== '' ? mb_substr($note, 0, 255) : null]);
+            } else {
+                $pdo->prepare(
+                    'INSERT INTO project_milestones (project_id, name, milestone_date, notes)
+                     VALUES (?, ?, ?, ?)'
+                )->execute([$projectId, $name, $date, $note !== '' ? mb_substr($note, 0, 255) : null]);
+            }
             flash('ok', sprintf('Added "%s" on %s.', $name, $date));
 
         } elseif (preg_match('/^edit:(\d+)$/', $act, $mm)) {
@@ -76,13 +106,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) 
             if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
                 throw new RuntimeException('A milestone needs a date.');
             }
-            $upd = $pdo->prepare(
-                'UPDATE project_milestones SET name = ?, milestone_date = ?, notes = ?
-                  WHERE id = ? AND project_id = ?'
-            );
-            $upd->execute([mb_substr($name, 0, 120), $date,
-                           $note !== '' ? mb_substr($note, 0, 255) : null,
-                           (int)$mm[1], $projectId]);
+            if ($msSteps) {
+                $stepId = ms_step_or_null($pdo, $projectId, $_POST['ms_step'] ?? '');
+                $upd = $pdo->prepare(
+                    'UPDATE project_milestones SET name = ?, milestone_date = ?, notes = ?, step_id = ?
+                      WHERE id = ? AND project_id = ?'
+                );
+                $upd->execute([mb_substr($name, 0, 120), $date,
+                               $note !== '' ? mb_substr($note, 0, 255) : null, $stepId,
+                               (int)$mm[1], $projectId]);
+            } else {
+                $upd = $pdo->prepare(
+                    'UPDATE project_milestones SET name = ?, milestone_date = ?, notes = ?
+                      WHERE id = ? AND project_id = ?'
+                );
+                $upd->execute([mb_substr($name, 0, 120), $date,
+                               $note !== '' ? mb_substr($note, 0, 255) : null,
+                               (int)$mm[1], $projectId]);
+            }
             flash('ok', sprintf('Updated "%s" — now on %s.', $name, $date));
 
         } elseif (preg_match('/^remove:(\d+)$/', $act, $mm)) {
@@ -257,16 +298,32 @@ $stale = $freshCount !== $storedCount;
 $milestones = [];
 if ($msReady) {
     $ms = $pdo->prepare(
-        'SELECT id, name, milestone_date, notes FROM project_milestones
-          WHERE project_id = ? ORDER BY milestone_date, id'
+        $msSteps
+            ? 'SELECT m.id, m.name, m.milestone_date, m.notes, m.step_id,
+                      ps.name AS step_name, ps.deadline AS step_end
+                 FROM project_milestones m
+                 LEFT JOIN pipeline_steps ps ON ps.id = m.step_id
+                WHERE m.project_id = ? ORDER BY m.milestone_date, m.id'
+            : 'SELECT id, name, milestone_date, notes FROM project_milestones
+                WHERE project_id = ? ORDER BY milestone_date, id'
     );
     $ms->execute([$projectId]);
     foreach ($ms as $m) {
+        $stepEnd = $m['step_end'] ?? null;
         $milestones[] = [
             'id'    => (int)$m['id'],
             'name'  => $m['name'],
             'date'  => $m['milestone_date'],
             'notes' => $m['notes'] ?? '',
+            // The bar id the general chart uses, so the browser can put the
+            // marker on that row without a second lookup.
+            'step_id'   => isset($m['step_id']) && $m['step_id'] ? (int)$m['step_id'] : null,
+            'step_name' => $m['step_name'] ?? '',
+            // EARLY means the step it reviews has not finished by then, so the
+            // thing being reviewed will not exist. Worked out here because the
+            // step's dates are already to hand.
+            'early' => ($stepEnd && $m['milestone_date'] < $stepEnd) ? 1 : 0,
+            'step_end' => $stepEnd,
         ];
     }
 }
@@ -366,8 +423,13 @@ require __DIR__ . '/includes/header.php';
         other way about.
         <?php if (can_edit()): ?>
           <br><strong>Drag a marker</strong> on the chart to move it, or
-          <strong>double-click</strong> it to change its name and notes — the same gestures the
-          task bars use. Grab it anywhere down the line, not just the diamond.
+          <strong>double-click</strong> it to change it — the same gestures the task bars use.
+          Grab it anywhere down the line, not just the diamond.
+          <?php if ($msSteps): ?>
+            <br>Tie one to a step and its marker sits on <strong>that step's row</strong> instead
+            of at the top, and turns <strong class="err">red</strong> if the date falls before
+            that step finishes — a review of work that will not exist yet.
+          <?php endif; ?>
         <?php endif; ?>
       </p>
 
@@ -385,7 +447,16 @@ require __DIR__ . '/includes/header.php';
             <tr>
               <td><?= e($m['date']) ?></td>
               <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
-              <td class="muted"><?= e($m['notes']) ?></td>
+              <td class="muted">
+                <?php if (!empty($m['step_name'])): ?>
+                  <span class="ms-onstep">reviews <?= e($m['step_name']) ?></span>
+                  <?php if (!empty($m['early'])): ?>
+                    <span class="err small">— that step runs to <?= e($m['step_end']) ?></span>
+                  <?php endif; ?>
+                  <?= $m['notes'] !== '' ? ' · ' : '' ?>
+                <?php endif; ?>
+                <?= e($m['notes']) ?>
+              </td>
               <td class="row-actions">
                 <?php if (can_edit()): ?>
                   <?php // The id only — the modal reads the rest from the same
@@ -407,6 +478,14 @@ require __DIR__ . '/includes/header.php';
           <input name="ms_name" placeholder="e.g. Client review 01" size="24" maxlength="120">
           <input type="date" name="ms_date" value="<?= e($project['delivery_date'] ?: '') ?>">
           <input name="ms_notes" placeholder="Notes (optional)" size="26" maxlength="255">
+          <?php if ($msSteps): ?>
+            <select name="ms_step">
+              <option value="">— not tied to a step —</option>
+              <?php foreach ($steps as $st): ?>
+                <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          <?php endif; ?>
           <button type="submit" class="secondary" name="milestone_action" value="add">Add milestone</button>
         </form>
       <?php endif; ?>
@@ -513,6 +592,17 @@ require __DIR__ . '/includes/header.php';
       <label>Name <input name="ms_name" id="msName" maxlength="120" required></label>
       <label>Date <input type="date" name="ms_date" id="msDate" required></label>
       <label>Notes <input name="ms_notes" id="msNotes" maxlength="255"></label>
+      <?php if ($msSteps): ?>
+        <label>Reviews which step
+          <select name="ms_step" id="msStep">
+            <option value="">— not tied to a step —</option>
+            <?php foreach ($steps as $st): ?>
+              <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small>Puts the marker on that step's row, and warns if the date falls before
+                 the step finishes.</small></label>
+      <?php endif; ?>
       <div class="actions">
         <button type="button" class="secondary" onclick="closeMsEditor()">Cancel</button>
         <?php // formnovalidate so a half-typed name cannot block the delete. ?>

@@ -262,6 +262,20 @@
     var tierEnd = [];               // tier -> x where its last label finished
     var TIER_H  = 20;
 
+    // WHERE A LINKED MILESTONE SITS: on the row of the step it reviews.
+    //
+    // Read off the rendered bars rather than recomputed from bar_height and
+    // padding, so it stays right if either changes. On the DETAILED chart the
+    // bar ids are schedule rows, not steps, so nothing matches and every
+    // milestone falls back to stacking at the top — which is correct there,
+    // since a step has no single row on that chart.
+    var rowY = {};
+    (g.bars || []).forEach(function (b) {
+      var id = b && b.task ? b.task.id : null;
+      var el = b && b.$bar ? b.$bar : null;
+      if (id && el) rowY[String(id)] = parseFloat(el.getAttribute('y'));
+    });
+
     // Date order, so "the previous label" means the one to the left. The array
     // arrives sorted from PHP, but a drag rewrites a date in place.
     var msSorted = window.MILESTONES.slice().sort(function (a, b) {
@@ -309,7 +323,11 @@
       grp.appendChild(text);
 
       var title = document.createElementNS(ns, 'title');
-      title.textContent = m.name + ' · ' + m.date + (m.notes ? ' · ' + m.notes : '')
+      title.textContent = m.name + ' · ' + m.date
+                        + (m.step_name ? ' · reviews ' + m.step_name : '')
+                        + (m.early ? ' · WARNING: ' + m.step_name + ' does not finish until '
+                                     + m.step_end : '')
+                        + (m.notes ? ' · ' + m.notes : '')
                         + (window.TL_CAN_EDIT ? ' · drag to move, double-click to edit' : '');
       grp.appendChild(title);
       svg.appendChild(grp);
@@ -319,11 +337,26 @@
       var w = 0;
       try { w = text.getComputedTextLength(); } catch (e) { w = m.name.length * 6; }
 
-      var tier = 0;
-      while (tier < tierEnd.length && tierEnd[tier] > x - 12) tier++;
-      tierEnd[tier] = x + 14 + w + 8;         // 8px of air before the next one
+      // On its step's row when it has one and that step is drawn; stacked at
+      // the top when it is a whole-project date, or when the step has no dates
+      // and therefore no bar to sit beside.
+      var ty, onRow = m.step_id ? rowY['step-' + m.step_id] : undefined;
+      if (onRow !== undefined && !isNaN(onRow)) {
+        // Centred on the bar rather than above it, so the marker reads as
+        // belonging to that row and not to the one above.
+        ty = onRow - 3;
+        grp.classList.add('on-row');
+      } else {
+        var tier = 0;
+        while (tier < tierEnd.length && tierEnd[tier] > x - 12) tier++;
+        tierEnd[tier] = x + 14 + w + 8;       // 8px of air before the next one
+        ty = top + tier * TIER_H;
+      }
 
-      var ty = top + tier * TIER_H;
+      // A review dated before the step it reviews has finished: the thing being
+      // reviewed will not exist yet. Same kind of warning as a red dependency
+      // arrow — said, not enforced.
+      if (m.early) grp.classList.add('is-early');
       dia.setAttribute('points', [
         x + ',' + (ty + 1), (x + 10) + ',' + (ty + 11),
         x + ',' + (ty + 21), (x - 10) + ',' + (ty + 11)
@@ -380,6 +413,9 @@
     $('msName').value  = m.name  || '';
     $('msDate').value  = m.date  || '';
     $('msNotes').value = m.notes || '';
+    // Absent until migration 029 has run, so never assumed.
+    var sel = $('msStep');
+    if (sel) sel.value = m.step_id ? String(m.step_id) : '';
     $('msSave').value   = 'edit:' + m.id;
     $('msRemove').value = 'remove:' + m.id;
     box.style.display = 'flex';

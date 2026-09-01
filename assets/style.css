@@ -1425,3 +1425,14 @@ body.lightbox-lock { overflow: hidden; }
    placed now rather than merely marking a date. */
 .tl-chart .tl-ms-g.is-dragging .tl-ms { stroke-dasharray: none; stroke-width: 2.4; }
 .tl-chart .tl-ms-g.is-dragging .tl-ms-label { fill: #4d2374; }
+/* A milestone sitting on the row of the step it reviews. The label is nudged
+   clear of the diamond and given a plate, because on a row it lands over the
+   grid stripes and sometimes over a bar. */
+.tl-chart .tl-ms-g.on-row .tl-ms-label { paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+
+/* Dated before the step it reviews has finished: the thing being reviewed will
+   not exist yet. The same red the broken dependency arrows use, for the same
+   reason — it is the one thing here that is not simply a fact. */
+.tl-chart .tl-ms-g.is-early .tl-ms { stroke: #b02a37; fill: #b02a37; }
+.tl-chart .tl-ms-g.is-early .tl-ms-label { fill: #b02a37; }
+.ms-onstep { color: #7b3fb8; }
