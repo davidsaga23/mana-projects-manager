@@ -1510,3 +1510,47 @@ body.lightbox-lock { overflow: hidden; }
 /* The grid fills the page rather than shrinking to its contents. min-width keeps
    the columns readable when the window is narrow, and the wrapper scrolls. */
 .artist-grid { width: 100%; }
+
+/* --- the crew slot row -----------------------------------------------------
+   Two real buttons rather than a line of small print: change who is in the
+   slot, and take them out of it. Scoped to .review-table so the shared
+   .row-actions (nowrap, on a dozen other screens) is not disturbed. */
+.review-table .row-actions {
+  display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; white-space: normal;
+}
+/* Pushed to the far end, because it is the destructive one of the pair and
+   should not sit under the reader's thumb next to the one they meant. */
+.review-table .slot-unassign { margin-left: auto; }
+.review-table .slot-unassign button { margin-top: 0; }
+
+/* <details> gives a fold with no JavaScript, so the summary IS the button — but
+   it is a <summary>, and this stylesheet's button rules are `button.secondary`
+   and `a.button`, both element-qualified. Neither reaches it, so the look is
+   spelled out here rather than borrowed. */
+.slot-btn {
+  display: inline-block; padding: 9px 18px; border-radius: 4px; font-size: 15px;
+  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+  cursor: pointer; user-select: none; list-style: none;
+}
+.slot-btn:hover { background: #eef4fa; border-color: #2f6fb2; }
+/* Both spellings, because the marker is a pseudo-element in one engine and a
+   ::marker in the other, and a stray triangle inside a button looks like a bug. */
+.slot-btn::-webkit-details-marker { display: none; }
+.slot-btn::marker { content: ''; }
+/* Held down while the picker is open, so it reads as the thing that opened it. */
+.slot-change[open] > .slot-btn { background: #eef4fa; border-color: #2f6fb2; }
+
+/* The picker sits BESIDE its Save — "a bar, and the save to its right".
+   width:auto is load-bearing: the global `input, select { width: 100% }` would
+   otherwise fill the row and push Save onto a line of its own. */
+.slot-change-bar { margin: 8px 0 0; gap: 8px; }
+.slot-change-bar select { width: auto; min-width: 220px; flex: 0 1 auto; }
+
+/* Removing the SLOT is a rarer, larger act than removing its assignee, and the
+   two are one row apart — so it stays quiet text while those are buttons. */
+.review-table .row-actions form.inline-form:not(.slot-change-bar):not(.slot-unassign) { margin: 0; }
+
+/* A danger button that is still a button: the row already has a primary and a
+   secondary, and a third in plain blue would read as the safe choice. */
+button.secondary.danger { background: #f3d9dc; color: #8f222c; }
+button.secondary.danger:hover { background: #e9c2c7; }

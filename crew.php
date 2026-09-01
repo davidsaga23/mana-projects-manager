@@ -118,6 +118,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             assign_crew_to_lane($pdo, $projectId, (int)$m[1], $crewId);
             flash('ok', 'Slot filled. Any work already scheduled on that track moved with it.');
 
+        } elseif (preg_match('/^unassign:(\d+)$/', $action, $m)) {
+            // Empties the slot without removing it — see unassign_lane() for why
+            // that is a placeholder going back in rather than a NULL.
+            flash('ok', unassign_lane($pdo, $projectId, (int)$m[1]));
+
         } elseif (preg_match('/^remove_work:(\d+)$/', $action, $m)) {
             // THE WAY THROUGH. remove: refuses while a slot carries scheduled
             // work, and for two of the three reasons it can be blocked there is
@@ -476,9 +481,20 @@ require __DIR__ . '/includes/header.php';
                 </form>
               </details>
             <?php elseif (can_edit()): ?>
-              <details class="inline-actions">
-                <summary>Change who is in this slot</summary>
-                <form method="post" class="inline-form">
+              <?php // BUTTONS, not a line of small print (David, 2026-08-31).
+                    // These are the two things done to a filled slot, and they
+                    // were previously a disclosure summary and a link — both
+                    // reading as text on a row where everything else is text.
+                    //
+                    // The picker stays folded until asked for. A select naming
+                    // every person on the books, drawn open on thirty-five rows,
+                    // is a wall; behind a button it is one click when wanted and
+                    // invisible otherwise. <details> does that with no
+                    // JavaScript, which is why the summary IS the button rather
+                    // than a script toggling a panel. ?>
+              <details class="slot-change">
+                <summary class="slot-btn">Change assignee</summary>
+                <form method="post" class="inline-form slot-change-bar">
                   <select name="assign_crew[<?= (int)$l['id'] ?>]">
                     <option value="">— pick somebody —</option>
                     <?php foreach ($people as $p): ?>
@@ -490,6 +506,21 @@ require __DIR__ . '/includes/header.php';
                   <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Save</button>
                 </form>
               </details>
+
+              <?php // TAKING THE PERSON OUT IS NOT REMOVING THE SLOT, and the two
+                    // sit side by side, so the difference has to be in the words
+                    // rather than left to be discovered. Removing a slot says the
+                    // plan no longer needs this job done; taking the assignee out
+                    // says it does, and somebody else will do it.
+                    //
+                    // The slot stays, its scheduled work stays on it, and the
+                    // person stays on the studio crew list. Only shown where
+                    // there is somebody to take out. ?>
+              <form method="post" class="slot-unassign"
+                    onsubmit="return confirm('Take <?= e(addslashes($l['name'])) ?> out of this slot? The slot stays, its scheduled work stays on it, and they stay on the studio crew list.');">
+                <button type="submit" class="secondary danger" name="action"
+                        value="unassign:<?= (int)$l['id'] ?>">Remove assignee</button>
+              </form>
             <?php endif; ?>
             <?php if (can_edit()):
               $work = $laneWork[(int)$l['step_id'] . '|' . (int)$l['lane_no']] ?? ['n' => 0, 'locked' => 0];

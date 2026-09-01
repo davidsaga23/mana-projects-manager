@@ -315,6 +315,71 @@ function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId)
  * other projects are excluded — borrowing another show's empty slot would be
  * meaningless.
  */
+/**
+ * Take the person out of a slot, and leave the SLOT standing.
+ *
+ * A different thing from removing the slot, and the difference is the whole
+ * point. Removing a slot says the plan no longer needs this job done; taking the
+ * assignee out says it does, and somebody else will do it. One is a change to
+ * the plan, the other to the casting.
+ *
+ * Done by putting a fresh PLACEHOLDER back in the lane, which is what the slot
+ * held before anybody was hired into it, rather than by nulling crew_lanes.crew_id
+ * — that column is NOT NULL, and a lane with no crew row would have no name to
+ * draw and nothing for the scheduler to assign against.
+ *
+ * The scheduled work MOVES WITH THE SLOT, because assign_crew_to_lane() carries
+ * it. That is the behaviour wanted: the days were planned for this job, not for
+ * this person, and they should still be there for whoever comes next.
+ *
+ * The person is never deleted. They belong to the studio, not to one show —
+ * the same rule the "remove slot" path has always followed.
+ */
+function unassign_lane(PDO $pdo, int $projectId, int $laneId): string {
+    $stmt = $pdo->prepare(
+        'SELECT cl.*, c.name AS person, c.is_placeholder, ps.name AS step_name,
+                ps.applies_to, ps.applies_to_asset_type, ps.planned_headcount
+           FROM crew_lanes cl
+           JOIN crew c ON c.id = cl.crew_id
+           JOIN pipeline_steps ps ON ps.id = cl.step_id
+          WHERE cl.id = ? AND cl.project_id = ?'
+    );
+    $stmt->execute([$laneId, $projectId]);
+    $lane = $stmt->fetch();
+    if (!$lane) throw new RuntimeException('That slot no longer exists.');
+    if ((int)$lane['is_placeholder'] === 1) {
+        throw new RuntimeException('That slot has nobody in it yet, so there is nobody to take out.');
+    }
+
+    // Named exactly as sync_project_lanes() would have named it, so a slot
+    // emptied by hand is indistinguishable from one that was never filled.
+    $name = placeholder_name(
+        (string)$lane['step_name'], (int)$lane['lane_no'],
+        step_slot_count($lane), step_scope_tag([
+            'applies_to' => $lane['applies_to'],
+            'applies_to_asset_type' => $lane['applies_to_asset_type'] ?? null,
+        ])
+    );
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('INSERT INTO crew (name, role, is_placeholder, active) VALUES (?, NULL, 1, 1)')
+            ->execute([$name]);
+        $newId = (int)$pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+
+    // Its own transaction, and it carries the scheduled work across.
+    assign_crew_to_lane($pdo, $projectId, $laneId, $newId);
+
+    return sprintf('%s is no longer in "%s". The slot is still there, and everything scheduled '
+                 . 'on it is waiting for whoever takes it next. %s stays on the studio crew list.',
+                   $lane['person'], $name, $lane['person']);
+}
+
 function assignable_crew(PDO $pdo): array {
     return $pdo->query(
         'SELECT id, name, role, email, active, is_team
