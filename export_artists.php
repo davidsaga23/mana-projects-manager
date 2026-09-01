@@ -50,7 +50,7 @@ foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us',
 // The same search the screen was showing, so what downloads is what you were
 // looking at rather than everything regardless.
 $q   = trim((string)($_GET['q'] ?? ''));
-$pos = trim((string)($_GET['position'] ?? ''));
+$pos = array_values(array_filter(array_map('strval', (array)($_GET['position'] ?? []))));
 [$people] = artists_list($pdo, $q, $extra, $pos);
 if (!$people) {
     flash('err', $q !== '' ? 'Nothing matches that search, so there was nothing to export.'

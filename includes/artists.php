@@ -71,7 +71,7 @@ function artists_positions(PDO $pdo): array {
     return $out;
 }
 
-function artists_list(PDO $pdo, string $q, array $extra, string $position = ''): array {
+function artists_list(PDO $pdo, string $q, array $extra, array $positions = []): array {
     if (!hiring_available($pdo)) return [[], []];
 
     $cols = 'h.id, h.candidate_name, h.email, h.phone, h.portfolio_url, h.source, h.notes,
@@ -86,12 +86,15 @@ function artists_list(PDO $pdo, string $q, array $extra, string $position = ''):
     $args  = [];
     $where = [];
 
-    // Position is an exact match, not a search: it is a pick from a list of what
-    // is actually in the database, so a LIKE would only let "Layout" quietly
-    // include "BG Layout" and make the count wrong.
-    if ($position !== '' && in_array('position', $extra, true)) {
-        $where[] = 'h.position = ?';
-        $args[]  = $position;
+    // SEVERAL positions, ORed together: "Layout or BG Layout or CH Layout" is one
+    // question, and a studio's list separates those three by department rather
+    // than by seniority. Exact matches, not LIKE — they are picks from a list of
+    // what is actually in the database, and a LIKE would let "Layout" quietly
+    // swallow the other two and make the count wrong.
+    if ($positions && in_array('position', $extra, true)) {
+        $marks = implode(',', array_fill(0, count($positions), '?'));
+        $where[] = 'h.position IN (' . $marks . ')';
+        foreach ($positions as $one) $args[] = $one;
     }
 
     if ($q !== '') {

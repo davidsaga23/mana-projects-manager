@@ -1453,3 +1453,16 @@ body.lightbox-lock { overflow: hidden; }
 .reel-cell a { display: inline-block; max-width: 100%; overflow: hidden;
                text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .reel-pw { background: #eef1f4; padding: 1px 5px; border-radius: 3px; user-select: all; }
+/* The artists grid: every cell an input. Compact, because thirteen columns of
+   full-size fields would be a page nobody can scan. */
+.artist-grid td, .artist-grid th { padding: 4px 6px; vertical-align: middle; }
+.artist-grid input:not([type=checkbox]), .artist-grid select {
+  padding: 3px 5px; font-size: 13px; margin: 0;
+}
+.artist-grid .a-name { font-weight: 600; }
+/* A row you have touched, so it is obvious what Save is about to write. */
+.artist-grid tr.is-dirty td { background: #fffbe6; }
+.artist-grid tr.is-dirty .a-name { border-color: #d9a406; }
+.reel-open { margin-left: 4px; text-decoration: none; }
+.ms-positions { display: inline-flex; flex-direction: column; gap: 2px; }
+.ms-positions select { min-width: 200px; }

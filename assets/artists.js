@@ -1,68 +1,83 @@
-// The Artists screen's one editor.
+// The Artists grid: every field is editable in the row, and ONLY the rows you
+// actually touched are sent.
 //
-// Every field on a person is edited here rather than inline: that table already
-// scrolls sideways, and turning twelve columns into twelve inputs would put the
-// last of them somewhere nobody scrolls to.
+// That is correctness, not economy. PHP's max_input_vars defaults to 1000 and
+// silently discards everything past it — no error, no warning, just a POST that
+// arrives half empty. This grid is about thirteen fields a row, so seventy-odd
+// rows would reach the limit, and a save over a full list would quietly write
+// nothing for most of it.
+//
+// Disabling the untouched rows before submitting means an ordinary edit posts a
+// few dozen fields instead of five thousand. The form's trailing sentinel is the
+// backstop: if PHP still cut the tail, the server sees it missing and refuses
+// rather than writing whatever survived.
 (function () {
   'use strict';
-  function $(id) { return document.getElementById(id); }
 
-  function set(id, value) {
-    var el = $(id);
-    if (el) el.value = value === null || value === undefined ? '' : String(value);
+  var form = document.getElementById('artistGrid');
+  if (!form) return;
+
+  var counter = document.getElementById('dirtyCount');
+  var dirty = Object.create(null);
+
+  function rowOf(el) {
+    return el.closest ? el.closest('tr') : null;
   }
 
-  // Delegated, and the record is read from a data attribute the server already
-  // JSON-encoded — so a name with a quote in it needs no escaping into an
-  // inline handler.
-  document.addEventListener('click', function (ev) {
-    var btn = ev.target.closest ? ev.target.closest('.artist-edit') : null;
-    if (!btn) return;
+  /** A row's key is the id in its field names — rows[123][email]. */
+  function keyOf(row) {
+    var input = row.querySelector('[name^="rows["]');
+    if (!input) return null;
+    var m = /^rows\[(\d+)\]/.exec(input.getAttribute('name'));
+    return m ? m[1] : null;
+  }
 
-    var a;
-    try { a = JSON.parse(btn.getAttribute('data-artist')); } catch (e) { return; }
-    var box = $('artistEditor');
-    if (!box) return;
+  function count() {
+    if (!counter) return;
+    var n = Object.keys(dirty).length;
+    counter.textContent = n === 0
+      ? 'nothing changed yet'
+      : n + (n === 1 ? ' person changed' : ' people changed') + ' — Save to write them';
+  }
 
-    // orig_name is what the UPDATE matches on, so it must be the name as it is
-    // STORED, not whatever gets typed into the box next.
-    set('aOrig', a.candidate_name);
-    set('aHireId', a.id);
-    set('aName', a.candidate_name);
-    set('aPosition', a.position);
-    set('aSeniority', a.seniority);
-    set('aLocation', a.location);
-    set('aType', a.project_type);
-    set('aEmail', a.email);
-    set('aPhone', a.phone);
-    set('aReel', a.portfolio_url);
-    set('aReelPw', a.portfolio_password);
-    set('aSource', a.source);
-    set('aRating', a.rating);
-    set('aNotes', a.notes);
+  // One listener on the form rather than one per input: five thousand listeners
+  // is how a page becomes slow to open.
+  function mark(ev) {
+    var row = rowOf(ev.target);
+    if (!row) return;
+    var k = keyOf(row);
+    if (!k || dirty[k]) return;
+    dirty[k] = true;
+    row.classList.add('is-dirty');
+    count();
+  }
+  form.addEventListener('input', mark);
+  form.addEventListener('change', mark);
 
-    var worked = $('aWorked');
-    if (worked) worked.checked = !!Number(a.worked_with_us);
-
-    // The rate comes from the OTHER database and is only present for an admin.
-    var q = a.quote || {};
-    set('aRate', q.quoted_rate);
-    set('aUnit', q.rate_unit || 'day');
-    set('aCur', q.rate_currency || 'USD');
-
-    var scope = $('artistScope');
-    if (scope) {
-      scope.textContent = 'Changes here apply to every record of this person, on every '
-                        + 'project they have been put up for.';
+  form.addEventListener('submit', function (ev) {
+    if (!Object.keys(dirty).length) {
+      // Nothing to say to the server. Stopping here also avoids a reload that
+      // would look like a save.
+      ev.preventDefault();
+      if (counter) counter.textContent = 'nothing changed, so nothing was sent';
+      return;
     }
-
-    box.style.display = 'flex';
-    var name = $('aName');
-    if (name) name.focus();
+    // Disabled fields are not submitted, which is exactly what is wanted — and
+    // it is reversible, so a failed submit leaves the page usable.
+    Array.prototype.forEach.call(form.querySelectorAll('tbody tr'), function (row) {
+      var k = keyOf(row);
+      if (k && dirty[k]) return;
+      Array.prototype.forEach.call(row.querySelectorAll('input, select, textarea'), function (f) {
+        f.disabled = true;
+      });
+    });
   });
 
-  window.closeArtistEditor = function () {
-    var box = $('artistEditor');
-    if (box) box.style.display = 'none';
-  };
+  // Leaving with unsaved edits is worth one question. The browser decides the
+  // wording; all that matters is that it asks.
+  window.addEventListener('beforeunload', function (ev) {
+    if (!Object.keys(dirty).length) return;
+    ev.preventDefault();
+    ev.returnValue = '';
+  });
 }());

@@ -58,21 +58,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (!$ready) throw new RuntimeException('The hiring database updates have not been applied yet.');
 
-        if ($action === 'save_artist') {
-            $orig = trim((string)($_POST['orig_name'] ?? ''));
-            $name = trim((string)($_POST['candidate_name'] ?? ''));
-            if ($orig === '') throw new RuntimeException('No artist named.');
-            if ($name === '') throw new RuntimeException('An artist needs a name.');
+        if ($action === 'save_grid') {
+            // TRUNCATION IS CHECKED FIRST, before anything is written. PHP drops
+            // everything past max_input_vars (1000 by default) with no error at
+            // all, so a large post arrives looking complete and half empty. The
+            // sentinel is the last field in the form: if it did not arrive, the
+            // tail was cut and what did arrive must not be trusted.
+            if (!isset($_POST['_end'])) {
+                throw new RuntimeException(
+                    'That save was too large for the server to accept whole, so NOTHING was '
+                    . 'written. Filter to fewer people and save again, or ask the host to raise '
+                    . 'max_input_vars.'
+                );
+            }
+            $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            $saved = 0;
 
-            $n = artists_save_person($pdo, $orig, $_POST, $extra);
-            flash('ok', sprintf('Saved %s across %d record%s.', $name, $n, $n === 1 ? '' : 's'));
+            foreach ($rows as $hid => $row) {
+                if (!is_array($row)) continue;
+                $orig = trim((string)($row['orig_name'] ?? ''));
+                $name = trim((string)($row['candidate_name'] ?? ''));
+                if ($orig === '') continue;
+                if ($name === '') {
+                    flash('warn', '"' . $orig . '" was left with a blank name, so it was not changed.');
+                    continue;
+                }
+                artists_save_person($pdo, $orig, $row, $extra);
+                $saved++;
 
-            // The rate goes through the one door, onto their most recent
-            // approach — a quote belongs to a conversation, and the latest one
-            // is what they are asking now.
-            if (can_see_money() && array_key_exists('quoted_rate', $_POST)) {
-                $hid = (int)($_POST['hire_id'] ?? 0);
-                if ($hid > 0) flash('ok', save_hire_quote($hid, $name, null, $_POST, current_user_display()));
+                // Through the one door, onto that person's most recent approach.
+                // Never written from here into `hires`.
+                if (can_see_money() && array_key_exists('quoted_rate', $row)) {
+                    try {
+                        save_hire_quote((int)$hid, $name, null,
+                                        ['quoted_rate' => $row['quoted_rate'], 'rate_unit' => 'day',
+                                         'rate_currency' => 'USD'], current_user_display());
+                    } catch (Throwable $e) {
+                        // One unreadable number must not lose the rest of the row.
+                        flash('warn', $name . ': ' . $e->getMessage());
+                    }
+                }
+            }
+            if ($saved) {
+                flash('ok', sprintf('Saved %d artist%s. Each change applies to every record of '
+                                  . 'that person, on every project.',
+                                  $saved, $saved === 1 ? '' : 's'));
+            } else {
+                flash('warn', 'Nothing had changed, so nothing was saved.');
             }
 
         } elseif ($action === 'add_artists') {
@@ -164,11 +196,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $q   = trim((string)($_GET['q'] ?? ''));
-$pos = trim((string)($_GET['position'] ?? ''));
 $positions = $ready ? artists_positions($pdo) : [];
-// A position that no longer exists would silently show nobody, so it is dropped
-// rather than left filtering against nothing.
-if ($pos !== '' && !in_array($pos, $positions, true)) $pos = '';
+// SEVERAL at once. Anything that is not a position this database actually holds
+// is dropped rather than left filtering against nothing — a stale bookmark
+// should not look like an empty database.
+$pos = (array)($_GET['position'] ?? []);
+$pos = array_values(array_intersect(array_map('strval', $pos), $positions));
 
 [$people, $approaches] = $ready ? artists_list($pdo, $q, $extra, $pos) : [[], []];
 
@@ -213,18 +246,23 @@ require __DIR__ . '/includes/header.php';
       <?php // Submits on change, like the role picker on users.php — a filter
             // you have to press a second button to apply is a filter people
             // stop using. ?>
-      <select name="position" onchange="this.form.submit()">
-        <option value="">All positions</option>
-        <?php foreach ($positions as $o): ?>
-          <option value="<?= e($o) ?>" <?= $pos === $o ? 'selected' : '' ?>><?= e($o) ?></option>
-        <?php endforeach; ?>
-      </select>
+      <?php // MULTIPLE, so "Layout or BG Layout or CH Layout" is one question.
+            // No submit-on-change, unlike the single-value version it replaces:
+            // picking a second entry would reload the page before you got there. ?>
+      <label class="ms-positions">
+        <span class="muted small">Positions &mdash; ctrl/cmd-click for several</span>
+        <select name="position[]" multiple size="6">
+          <?php foreach ($positions as $o): ?>
+            <option value="<?= e($o) ?>" <?= in_array($o, $pos, true) ? 'selected' : '' ?>><?= e($o) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
     <?php endif; ?>
     <button type="submit" class="secondary">Search</button>
-    <?php if ($q !== '' || $pos !== ''): ?><a href="artists.php">Clear</a><?php endif; ?>
+    <?php if ($q !== '' || $pos): ?><a href="artists.php">Clear</a><?php endif; ?>
     <span class="muted small">
       <?= count($people) ?> <?= count($people) === 1 ? 'person' : 'people' ?><?php
-        if ($pos !== ''): ?> in <?= e($pos) ?><?php endif; ?><?php
+        if ($pos): ?> in <?= e(implode(', ', $pos)) ?><?php endif; ?><?php
         if ($q !== ''): ?> matching &ldquo;<?= e($q) ?>&rdquo;<?php endif; ?>
     </span>
   </form>
@@ -237,112 +275,137 @@ require __DIR__ . '/includes/header.php';
             : 'Add some below, or enter them from a project\'s Hiring screen.' ?></p>
     </div>
   <?php else: ?>
-    <div class="grid-scroll">
-      <table class="artist-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <?php if ($has('position')):  ?><th>Position</th><?php endif; ?>
-            <?php if ($has('seniority')): ?><th>Seniority</th><?php endif; ?>
-            <?php if ($has('location')):  ?><th>Location</th><?php endif; ?>
-            <?php // Between Location and Type, where David asked for it. Shown
-                  // only to an administrator, because it is the finance
-                  // database's number and nobody else can see that connection. ?>
-            <?php if (can_see_money()): ?><th class="num">Day rate</th><?php endif; ?>
-            <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
-            <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
-            <th>Contact</th>
-            <th>Reel</th>
-            <th>Where from</th>
-            <th>Up for</th>
-            <?php if (can_edit()): ?><th></th><?php endif; ?>
-          </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($people as $p): $key = mb_strtolower(trim($p['candidate_name']));
-          $qt = $quotes[(int)$p['id']] ?? null; ?>
-          <tr>
-            <td>
-              <strong><?= e($p['candidate_name']) ?></strong>
-              <?php if (!empty($p['worked_with_us'])): ?>
-                <span class="ready-tag">worked with us</span>
-              <?php endif; ?>
-              <?php if (!empty($p['notes'])): ?>
-                <div class="muted small"><?= e($p['notes']) ?></div>
-              <?php endif; ?>
-            </td>
-            <?php if ($has('position')):  ?><td><?= e($p['position'] ?? '') ?></td><?php endif; ?>
-            <?php if ($has('seniority')): ?><td><?= e($p['seniority'] ?? '') ?></td><?php endif; ?>
-            <?php if ($has('location')):  ?><td><?= e($p['location'] ?? '') ?></td><?php endif; ?>
-            <?php if (can_see_money()): ?>
-              <td class="num">
-                <?= $qt && $qt['quoted_rate'] !== null
-                      ? e(fmt_money((float)$qt['quoted_rate'], $qt['rate_unit'] ?? 'day',
-                                    $qt['rate_currency'] ?? 'USD'))
-                      : '<span class="muted">—</span>' ?>
+    <?php // EVERY FIELD IS AN INPUT, edited in the row (David, 2026-08-31:
+          // "all the fields should be editable from this view without having to
+          // click on Edit"). One form over the whole table, one Save.
+          //
+          // ⚠ ONLY CHANGED ROWS ARE POSTED, and that is correctness rather than
+          // polish. PHP's max_input_vars defaults to 1000; this grid is about
+          // thirteen fields a row, so seventy-odd rows fills it and everything
+          // past that is dropped SILENTLY — a save that looks like it worked and
+          // wrote nothing. assets/artists.js disables untouched rows before
+          // submitting, so an ordinary edit posts a handful of fields, and the
+          // sentinel at the end of the form catches a truncated post rather
+          // than trusting it. ?>
+    <form method="post" id="artistGrid">
+      <input type="hidden" name="action" value="save_grid">
+      <div class="grid-scroll">
+        <table class="artist-table artist-grid">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <?php if ($has('position')):  ?><th>Position</th><?php endif; ?>
+              <?php if ($has('seniority')): ?><th>Seniority</th><?php endif; ?>
+              <?php if ($has('location')):  ?><th>Location</th><?php endif; ?>
+              <?php // Between Location and Type, where David asked for it. Admin
+                    // only: it is the finance database's number, and no other
+                    // account can open that connection. ?>
+              <?php if (can_see_money()): ?><th>Day rate</th><?php endif; ?>
+              <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
+              <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
+              <th>Email</th><th>Phone</th><th>Reel</th>
+              <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
+              <th>Where from</th><th>Notes</th>
+              <?php if ($has('worked_with_us')): ?><th>Worked</th><?php endif; ?>
+              <th>Up for</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach ($people as $p): $key = mb_strtolower(trim($p['candidate_name']));
+            $id = (int)$p['id'];
+            $n  = 'rows[' . $id . ']';
+            $qt = $quotes[$id] ?? null; ?>
+            <tr>
+              <td>
+                <?php // The name AS STORED, carried hidden, because that is what
+                      // the update matches on — renaming somebody must still
+                      // find their other records. ?>
+                <input type="hidden" name="<?= $n ?>[orig_name]" value="<?= e($p['candidate_name']) ?>">
+                <input name="<?= $n ?>[candidate_name]" value="<?= e($p['candidate_name']) ?>"
+                       size="20" maxlength="120" class="a-name">
               </td>
-            <?php endif; ?>
-            <?php if ($has('project_type')): ?><td><?= e($p['project_type'] ?? '') ?></td><?php endif; ?>
-            <?php if ($has('rating')): ?>
-              <td class="num"><?= $p['rating'] !== null && $p['rating'] !== ''
-                    ? str_repeat('★', max(0, min(5, (int)$p['rating'])))
-                    : '<span class="muted">—</span>' ?></td>
-            <?php endif; ?>
-            <td class="small">
-              <?php if (!empty($p['email'])): ?>
-                <a href="mailto:<?= e($p['email']) ?>"><?= e($p['email']) ?></a><br>
+              <?php if ($has('position')): ?>
+                <td><input name="<?= $n ?>[position]" value="<?= e($p['position'] ?? '') ?>"
+                           size="14" maxlength="80" list="position-list"></td>
               <?php endif; ?>
-              <?= e($p['phone'] ?? '') ?>
-            </td>
-            <td class="small reel-cell">
-              <?php // THE ADDRESS, not the word "reel". Which site somebody's
-                    // work is on is half of what you want to know before
-                    // clicking — behance, vimeo, an artstation — and a link
-                    // reading "reel" hides exactly that. Truncated in CSS
-                    // rather than in PHP so the whole thing stays selectable
-                    // and copyable, and the title carries it in full. ?>
-              <?php if (!empty($p['portfolio_url'])): ?>
-                <a href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener"
-                   title="<?= e($p['portfolio_url']) ?>"><?= e($p['portfolio_url']) ?></a>
+              <?php if ($has('seniority')): ?>
+                <td><?= artists_seniority_select($n . '[seniority]', $p['seniority'] ?? null) ?></td>
               <?php endif; ?>
-              <?php if (!empty($p['portfolio_password'])): ?>
-                <?php // Shown, because a reel password that has to be looked up
-                      // somewhere else is no better than not having it. It opens
-                      // the artist's own showreel page and nothing of Mana's —
-                      // see migration 031. ?>
-                <div class="muted">pw <code class="reel-pw"><?= e($p['portfolio_password']) ?></code></div>
+              <?php if ($has('location')): ?>
+                <td><input name="<?= $n ?>[location]" value="<?= e($p['location'] ?? '') ?>"
+                           size="10" maxlength="80"></td>
               <?php endif; ?>
-            </td>
-            <td class="muted small"><?= e($p['source'] ?? '') ?></td>
-            <td class="small">
-              <?php // Every approach, newest first — seeing that Layout already
-                    // spoke to this person on another show is the point. ?>
-              <?php foreach (($approaches[$key] ?? []) as $a): ?>
-                <div>
-                  <?php if (!empty($a['project_id'])): ?>
-                    <a href="hiring.php?project=<?= (int)$a['project_id'] ?>"><?= e($a['project_code'] ?: 'project') ?></a>
-                  <?php else: ?>
-                    <span class="muted">no project</span>
-                  <?php endif; ?>
-                  <?= e($a['step_name'] ?: '') ?>
-                  <span class="muted">· <?= e(hire_stage_label($a['stage'])) ?></span>
-                </div>
-              <?php endforeach; ?>
-            </td>
-            <?php if (can_edit()): ?>
-              <td class="row-actions">
-                <?php // A modal rather than twelve inputs in the row. This table
-                      // already scrolls sideways; making every field an input
-                      // would put the last of them somewhere nobody scrolls to. ?>
-                <button type="button" class="linkish artist-edit"
-                        data-artist="<?= e(json_encode($p + ['quote' => $qt], JSON_UNESCAPED_UNICODE)) ?>">Edit</button>
+              <?php if (can_see_money()): ?>
+                <td><input name="<?= $n ?>[quoted_rate]" inputmode="decimal" size="7"
+                           value="<?= $qt && $qt['quoted_rate'] !== null
+                                      ? e(fmt_num((float)$qt['quoted_rate'], 2)) : '' ?>"
+                           title="Stored in the finance database, not this one"></td>
+              <?php endif; ?>
+              <?php if ($has('project_type')): ?>
+                <td><input name="<?= $n ?>[project_type]" value="<?= e($p['project_type'] ?? '') ?>"
+                           size="6" maxlength="20"></td>
+              <?php endif; ?>
+              <?php if ($has('rating')): ?>
+                <td><?= artists_rating_select($n . '[rating]', $p['rating'] ?? null) ?></td>
+              <?php endif; ?>
+              <td><input type="email" name="<?= $n ?>[email]" value="<?= e($p['email'] ?? '') ?>"
+                         size="20" maxlength="190"></td>
+              <td><input name="<?= $n ?>[phone]" value="<?= e($p['phone'] ?? '') ?>"
+                         size="12" maxlength="50"></td>
+              <td class="reel-cell">
+                <input name="<?= $n ?>[portfolio_url]" value="<?= e($p['portfolio_url'] ?? '') ?>"
+                       size="22" maxlength="500" title="<?= e($p['portfolio_url'] ?? '') ?>">
+                <?php if (!empty($p['portfolio_url'])): ?>
+                  <a href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener"
+                     class="reel-open" title="Open in a new tab">&#8599;</a>
+                <?php endif; ?>
               </td>
-            <?php endif; ?>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
+              <?php if ($has('portfolio_password')): ?>
+                <td><input name="<?= $n ?>[portfolio_password]" size="10" maxlength="120"
+                           value="<?= e($p['portfolio_password'] ?? '') ?>"></td>
+              <?php endif; ?>
+              <td><input name="<?= $n ?>[source]" value="<?= e($p['source'] ?? '') ?>"
+                         size="12" maxlength="100"></td>
+              <td><input name="<?= $n ?>[notes]" value="<?= e($p['notes'] ?? '') ?>" size="24"></td>
+              <?php if ($has('worked_with_us')): ?>
+                <td class="num"><input type="checkbox" name="<?= $n ?>[worked_with_us]" value="1"
+                       <?= !empty($p['worked_with_us']) ? 'checked' : '' ?>></td>
+              <?php endif; ?>
+              <td class="small">
+                <?php foreach (($approaches[$key] ?? []) as $a): ?>
+                  <div>
+                    <?php if (!empty($a['project_id'])): ?>
+                      <a href="hiring.php?project=<?= (int)$a['project_id'] ?>"><?= e($a['project_code'] ?: 'project') ?></a>
+                    <?php endif; ?>
+                    <?= e($a['step_name'] ?: '') ?>
+                    <span class="muted">&middot; <?= e(hire_stage_label($a['stage'])) ?></span>
+                  </div>
+                <?php endforeach; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+
+      <?php // Offered once for every position box on the page, so a position is
+            // picked from what already exists rather than retyped into a new one. ?>
+      <?php if ($positions): ?>
+        <datalist id="position-list">
+          <?php foreach ($positions as $o): ?><option value="<?= e($o) ?>"></option><?php endforeach; ?>
+        </datalist>
+      <?php endif; ?>
+
+      <div class="actions">
+        <button type="submit">Save changes</button>
+        <span class="hint" id="dirtyCount">nothing changed yet</span>
+        <span class="spacer"></span>
+        <?php // LAST FIELD IN THE FORM, deliberately. If PHP drops the tail of a
+              // large post this never arrives, and the save refuses rather than
+              // writing whatever happened to survive. ?>
+        <input type="hidden" name="_end" value="1">
+      </div>
+    </form>
   <?php endif; ?>
 
   <?php // ---- the spreadsheet, in and out ----------------------------------- ?>
@@ -351,7 +414,7 @@ require __DIR__ . '/includes/header.php';
       <?php // Carries the search, so what downloads is what you were looking
             // at rather than everything regardless. ?>
       <a class="button secondary"
-         href="export_artists.php<?= ($q !== '' || $pos !== '')
+         href="export_artists.php<?= ($q !== '' || $pos)
               ? '?' . http_build_query(array_filter(['q' => $q, 'position' => $pos]))
               : '' ?>">Download as Excel ↓</a>
       <span class="muted small">Same layout as the studio's freelancer sheet — the same columns,
@@ -444,89 +507,6 @@ require __DIR__ . '/includes/header.php';
 
   <?php // ---- the one editor ------------------------------------------------ ?>
   <?php if (can_edit()): ?>
-    <div id="artistEditor" class="tl-modal" style="display:none;">
-      <div class="tl-modal-box">
-        <h3>Edit artist</h3>
-        <p class="muted small" id="artistScope"></p>
-        <form method="post">
-          <input type="hidden" name="action" value="save_artist">
-          <input type="hidden" name="orig_name" id="aOrig">
-          <input type="hidden" name="hire_id" id="aHireId">
-          <div class="row">
-            <label>Name <input name="candidate_name" id="aName" maxlength="120" required></label>
-            <?php if ($has('position')): ?>
-              <label>Position <input name="position" id="aPosition" maxlength="80"></label>
-            <?php endif; ?>
-          </div>
-          <div class="row">
-            <?php if ($has('seniority')): ?>
-              <label>Seniority <?= artists_seniority_select('seniority', '', 'aSeniority') ?></label>
-            <?php endif; ?>
-            <?php if ($has('location')): ?>
-              <label>Location <input name="location" id="aLocation" maxlength="80"></label>
-            <?php endif; ?>
-            <?php if ($has('project_type')): ?>
-              <label>Type <input name="project_type" id="aType" maxlength="20"
-                                 placeholder="2D / 3D / 2D-3D"></label>
-            <?php endif; ?>
-          </div>
-          <div class="row">
-            <label>Email <input type="email" name="email" id="aEmail" maxlength="190"></label>
-            <label>Phone <input name="phone" id="aPhone" maxlength="50"></label>
-          </div>
-          <div class="row">
-            <label>Reel <input name="portfolio_url" id="aReel" maxlength="500"></label>
-            <?php if ($has('portfolio_password')): ?>
-              <label>Reel password <input name="portfolio_password" id="aReelPw" maxlength="120">
-                <small>The one the artist puts on their own page so people can watch it.
-                       Not a login for anything here.</small></label>
-            <?php endif; ?>
-            <label>Where from <input name="source" id="aSource" maxlength="100"></label>
-          </div>
-          <div class="row">
-            <?php if ($has('rating')): ?>
-              <label>Rating <?= artists_rating_select('rating', null, 'aRating') ?></label>
-            <?php endif; ?>
-            <?php if ($has('worked_with_us')): ?>
-              <label class="inline"><input type="checkbox" name="worked_with_us" id="aWorked" value="1">
-                Has worked with us</label>
-            <?php endif; ?>
-          </div>
-          <label>Notes <input name="notes" id="aNotes"></label>
-
-          <?php if (can_see_money()): ?>
-            <?php // The only field on this form that is NOT in the production
-                  // database. It goes through includes/money.php onto their most
-                  // recent approach, and no editor ever sees this block. ?>
-            <div class="row">
-              <label>Day rate <input name="quoted_rate" id="aRate" inputmode="decimal"
-                                     placeholder="what they ask"></label>
-              <label>Per
-                <select name="rate_unit" id="aUnit">
-                  <?php foreach (['day' => 'day', 'hour' => 'hour', 'second' => 'second',
-                                  'flat' => 'flat fee'] as $k => $lbl): ?>
-                    <option value="<?= $k ?>"><?= $lbl ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </label>
-              <label>Currency <input name="rate_currency" id="aCur" maxlength="3" size="4"
-                                     style="text-transform:uppercase" value="USD"></label>
-            </div>
-            <p class="muted small">
-              Stored in the separate finance database, never here, and visible only to
-              administrators. Recorded against their most recent approach — a quote belongs to
-              a conversation.
-            </p>
-          <?php endif; ?>
-
-          <div class="actions">
-            <button type="button" class="secondary" onclick="closeArtistEditor()">Cancel</button>
-            <span class="spacer"></span>
-            <button type="submit">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
     <script src="assets/artists.js<?= asset_ver('artists.js') ?>"></script>
   <?php endif; ?>
 
