@@ -41,7 +41,10 @@ rule wearing a different hat.
 
 ### The step missing from the list itself
 
-**The client loop.** All ten steps are internal. Nothing records a DELIVERY — version X sent on
+**The client loop.** *(First piece built 2026-08-31: **milestones** on the timeline — migration
+028 — so a client review DATE can be put on the chart and the plan built around it. That is the
+"when is it due" half. What was sent and what came back is still missing, and is the larger
+part.)* All ten steps are internal. Nothing records a DELIVERY — version X sent on
 date Y, notes back on Z, round 2 sent. There is an "In client review" status and retakes are
 tracked, but not what was sent or what came back. For an animation studio that is usually where
 a schedule actually dies: not in the work, but in three unacknowledged review rounds. The

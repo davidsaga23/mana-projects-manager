@@ -18,11 +18,11 @@ without re-deriving context.
   management as sections inside a project; the projection and its Excel export were corrected
   to agree to the cent (see the 2026-08-18 money entries in `docs/DECISIONS.md`); and the
   projects list gained **status, rename, archive and delete**.
-- **✅ Deploy state (2026-08-31): everything is applied.** Migrations run to **027** and
-  **all of them are in**, confirmed by David — 024 hiring, 025 freelancer fields, 026 ideal
-  quotas, 027 archived projects. Nothing is pending on the production side. Still open
-  `migrate.php` and look before assuming, rather than trusting this line: it is only ever as
-  fresh as the last person who edited it.
+- **⚠ Deploy state (2026-08-31):** 024–027 are all applied, confirmed by David — hiring,
+  freelancer fields, ideal quotas, archived projects. **028 (timeline milestones) is NEW and
+  pending.** Until it is applied the timeline says so and the panel is inert; everything else
+  works. Still open `migrate.php` and look before assuming, rather than trusting this line: it
+  is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that

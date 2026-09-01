@@ -128,6 +128,65 @@
     svg.appendChild(text);
   }
 
+  // --- milestones -------------------------------------------------------------
+  //
+  // Client reviews, deliveries, locks: dates the plan has to be ready for. Drawn
+  // as a line DOWN the chart rather than a bar on it, because the useful question
+  // about a review date is which bars cross it.
+  //
+  // Same geometry as the today line above, on BOTH charts -- a review date is as
+  // relevant to a shot as it is to a department.
+  function addMilestones(g, container) {
+    if (!g || !g.gantt_start || !g.options) return;
+    if (!window.MILESTONES || !window.MILESTONES.length) return;
+    var svg = container.querySelector('svg.gantt');
+    if (!svg) return;
+    svg.querySelectorAll('.tl-ms, .tl-ms-label').forEach(function (n) { n.remove(); });
+
+    var h    = svg.getAttribute('height') || svg.getBoundingClientRect().height;
+    var head = svg.querySelector('.grid-header');
+    var top  = head ? (parseFloat(head.getAttribute('height')) || 60) : 0;
+    var ns   = 'http://www.w3.org/2000/svg';
+
+    window.MILESTONES.forEach(function (m) {
+      // Parsed from parts, never `new Date("2026-09-15")` -- that is read as UTC
+      // and lands on the previous day west of Greenwich. Rule 2 at the top.
+      var p = String(m.date).split('-');
+      if (p.length !== 3) return;
+      var d = new Date(+p[0], +p[1] - 1, +p[2]);
+      d.setHours(0, 0, 0, 0);
+      var hours = (d - g.gantt_start) / 3600000;
+      if (hours < 0) return;                    // before the chart starts
+      var x = (hours / g.options.step) * g.options.column_width;
+
+      var line = document.createElementNS(ns, 'line');
+      line.setAttribute('class', 'tl-ms');
+      line.setAttribute('x1', x); line.setAttribute('x2', x);
+      line.setAttribute('y1', top); line.setAttribute('y2', h);
+      svg.appendChild(line);
+
+      // A diamond at the top, which is what a milestone looks like on every
+      // other Gantt anybody has used.
+      var dia = document.createElementNS(ns, 'polygon');
+      dia.setAttribute('class', 'tl-ms');
+      dia.setAttribute('points', [
+        x + ',' + (top + 2), (x + 5) + ',' + (top + 7),
+        x + ',' + (top + 12), (x - 5) + ',' + (top + 7)
+      ].join(' '));
+      svg.appendChild(dia);
+
+      var text = document.createElementNS(ns, 'text');
+      text.setAttribute('class', 'tl-ms-label');
+      text.setAttribute('x', x + 8);
+      text.setAttribute('y', top + 11);
+      text.textContent = m.name;
+      var title = document.createElementNS(ns, 'title');
+      title.textContent = m.name + ' · ' + m.date + (m.notes ? ' · ' + m.notes : '');
+      text.appendChild(title);
+      svg.appendChild(text);
+    });
+  }
+
   // --- dependencies on the general chart --------------------------------------
   //
   // DRAWN, NOT ENFORCED. The arrows come from the workflow graph so the shape of
@@ -262,6 +321,7 @@
       paintBars(el, window.GENERAL_TASKS);
       paintDependencies();
       addTodayLine(generalGantt, el);
+      addMilestones(generalGantt, el);
       // This chart scrolls too — nineteen steps overflow its height — so its
       // header has to float as well, or the months scroll away and the bars
       // below have nothing to be read against.
@@ -365,6 +425,7 @@
     setTimeout(function () {
       decorate();
       addTodayLine(detailedGantt, el);
+      addMilestones(detailedGantt, el);
       // Last, so the floating header paints over the bars and the today line
       // rather than under them.
       stickyHeader(el);

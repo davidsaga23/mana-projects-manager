@@ -30,6 +30,58 @@ if (!$project) {
     exit;
 }
 
+// ---------------------------------------------------------------------------
+// MILESTONES — dates the plan has to bend around: a client review, a delivery,
+// a lock. Added by hand and never derived, so the scheduler cannot move them.
+//
+// Drawn as a line DOWN the chart rather than a bar on it, because the useful
+// question about a review date is which bars cross it.
+// ---------------------------------------------------------------------------
+$msReady = column_exists($pdo, 'project_milestones', 'id');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) {
+    try {
+        if (!$msReady) {
+            throw new RuntimeException(
+                'The database update that adds milestones has not been applied yet (migration '
+              . '028), so nothing was saved. An administrator can apply it from Migrations.'
+            );
+        }
+        $act = (string)$_POST['milestone_action'];
+
+        if ($act === 'add') {
+            $name = trim((string)($_POST['ms_name'] ?? ''));
+            $date = trim((string)($_POST['ms_date'] ?? ''));
+            $note = trim((string)($_POST['ms_notes'] ?? ''));
+            if ($name === '') throw new RuntimeException('Give the milestone a name.');
+            if (mb_strlen($name) > 120) $name = mb_substr($name, 0, 120);
+            // A real calendar date, not just the right shape: 2026-02-31 matches
+            // any pattern and is not a day.
+            $parts = explode('-', $date);
+            if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
+                throw new RuntimeException('Give the milestone a date.');
+            }
+            $pdo->prepare(
+                'INSERT INTO project_milestones (project_id, name, milestone_date, notes)
+                 VALUES (?, ?, ?, ?)'
+            )->execute([$projectId, $name, $date, $note !== '' ? mb_substr($note, 0, 255) : null]);
+            flash('ok', sprintf('Added "%s" on %s.', $name, $date));
+
+        } elseif (preg_match('/^remove:(\d+)$/', $act, $mm)) {
+            $del = $pdo->prepare('DELETE FROM project_milestones WHERE id = ? AND project_id = ?');
+            $del->execute([(int)$mm[1], $projectId]);
+            flash('ok', $del->rowCount() ? 'Milestone removed.' : 'That milestone no longer exists.');
+
+        } else {
+            throw new RuntimeException('Unknown action.');
+        }
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: timeline.php?project=' . $projectId);
+    exit;
+}
+
 // Regenerate: recompute and save, without leaving the timeline.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regenerate'])) {
     try {
@@ -183,6 +235,24 @@ $freshCount  = count($fresh['tasks']);
 $storedCount = count($rows);
 $stale = $freshCount !== $storedCount;
 
+// The milestones themselves, for the charts and the panel below them.
+$milestones = [];
+if ($msReady) {
+    $ms = $pdo->prepare(
+        'SELECT id, name, milestone_date, notes FROM project_milestones
+          WHERE project_id = ? ORDER BY milestone_date, id'
+    );
+    $ms->execute([$projectId]);
+    foreach ($ms as $m) {
+        $milestones[] = [
+            'id'    => (int)$m['id'],
+            'name'  => $m['name'],
+            'date'  => $m['milestone_date'],
+            'notes' => $m['notes'] ?? '',
+        ];
+    }
+}
+
 $pageTitle = 'Timeline · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
@@ -262,6 +332,55 @@ require __DIR__ . '/includes/header.php';
             // that changed; here it is not. ?>
       <span id="stepSaveNote" class="tl-saved" hidden></span>
     </p>
+  <?php endif; ?>
+
+  <?php // ---- milestones ------------------------------------------------- ?>
+  <?php if (!$msReady): ?>
+    <p class="muted small">Milestones need database update <strong>028</strong>.
+      <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
+  <?php else: ?>
+    <div class="ms-panel">
+      <h4>Milestones <span class="muted">· client reviews, deliveries, locks</span></h4>
+      <p class="muted small">
+        A date the plan has to be ready for, drawn as a
+        <span class="ms-flag">dashed line</span> down both charts. Typed by hand and never moved
+        by the scheduler — the point of a review date is that the work bends around it, not the
+        other way about.
+      </p>
+
+      <?php if ($milestones): ?>
+        <table>
+          <tr><th>Date</th><th>Milestone</th><th>Notes</th><th></th></tr>
+          <?php foreach ($milestones as $m): ?>
+            <tr>
+              <td><?= e($m['date']) ?></td>
+              <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
+              <td class="muted"><?= e($m['notes']) ?></td>
+              <td class="row-actions">
+                <?php if (can_edit()): ?>
+                  <form method="post" class="inline-form"
+                        onsubmit="return confirm('Remove the milestone <?= e(addslashes($m['name'])) ?>?');">
+                    <button type="submit" class="linkish" name="milestone_action"
+                            value="remove:<?= (int)$m['id'] ?>">Remove</button>
+                  </form>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php else: ?>
+        <p class="muted small">None yet.</p>
+      <?php endif; ?>
+
+      <?php if (can_edit()): ?>
+        <form method="post" class="inline-form">
+          <input name="ms_name" placeholder="e.g. Client review 01" size="24" maxlength="120">
+          <input type="date" name="ms_date" value="<?= e($project['delivery_date'] ?: '') ?>">
+          <input name="ms_notes" placeholder="Notes (optional)" size="26" maxlength="255">
+          <button type="submit" class="secondary" name="milestone_action" value="add">Add milestone</button>
+        </form>
+      <?php endif; ?>
+    </div>
   <?php endif; ?>
 </section>
 <?php endif; ?>
@@ -389,6 +508,7 @@ window.TL_CODE      = <?= json_encode(
     trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$project['code']), '-') ?: 'project'
 ) ?>;
 window.TL_CAN_EDIT  = <?= can_edit() ? 'true' : 'false' ?>;
+window.MILESTONES   = <?= json_encode($milestones, JSON_UNESCAPED_UNICODE) ?>;
 window.GENERAL_TASKS = <?= json_encode($general, JSON_UNESCAPED_UNICODE) ?>;
 window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;
 </script>

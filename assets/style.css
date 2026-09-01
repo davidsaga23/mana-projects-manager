@@ -1386,3 +1386,16 @@ body.lightbox-lock { overflow: hidden; }
 .closed-cands { margin-top: 6px; }
 .closed-cands > summary { cursor: pointer; font-size: 13px; color: #5a6a7a; }
 .closed-cands[open] > summary { margin-bottom: 6px; }
+/* --- milestones on the timeline --------------------------------------------
+   A dashed line so it never reads as a bar, and a colour of its own so it is
+   not confused with the solid red "today". Frappe's stylesheet loads from the
+   CDN after this file, so these carry the container class to win on
+   specificity rather than on order. */
+.tl-chart .tl-ms { stroke: #7b3fb8; stroke-width: 1.6; stroke-dasharray: 5 4; fill: #7b3fb8; }
+.tl-chart .tl-ms-label {
+  font: 600 11px -apple-system, "Segoe UI", Roboto, sans-serif;
+  fill: #7b3fb8;
+}
+.ms-panel { margin-top: 12px; }
+.ms-panel table { margin: 8px 0; }
+.ms-flag { color: #7b3fb8; font-weight: 700; }
