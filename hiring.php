@@ -517,6 +517,10 @@ if ($fromFinance) {
 
       <?php if (can_see_money()): ?>
         <p class="muted small">
+          Everyone entered here also collects into the studio-wide
+          <a href="artists.php">Artists list</a>, so the next show can find them.
+        </p>
+        <p class="muted small">
           What somebody quoted is recorded on the candidate once they exist, through
           <strong>Update → Save quote</strong>. It lives in the finance database and only
           administrators ever see it.

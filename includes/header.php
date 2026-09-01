@@ -32,6 +32,15 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       ?>
       · <a href="mytasks.php">My work</a>
       · <a href="index.php">Projects</a>
+      <?php // ARTISTS is up here, not inside a project, because a freelancer is
+            // not the property of the show that first spoke to them — the whole
+            // value of writing them down is that the NEXT show can find them.
+            // Same reasoning as the step library and the ideal quotas.
+            //
+            // A third link rather than a fourth: what is on my desk, the shows,
+            // and the people. Everything about one show is still reached by
+            // picking it from Projects. ?>
+      · <a href="artists.php">Artists</a>
 
       <?php
       // The setup and housekeeping screens, behind a separator. Opened

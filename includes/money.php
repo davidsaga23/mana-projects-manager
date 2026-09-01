@@ -430,8 +430,16 @@ function contract_states(array $crewIds): array {
  * and it is David's call of 2026-08-17.
  *
  * Keyed on `hires.id`, with no foreign key — different database, different user.
- * The id-stability rule that protects crew_terms.crew_id protects this too,
- * which is why the application never deletes a `hires` row.
+ * The id-stability rule that protects crew_terms.crew_id protects this too.
+ *
+ * ⚠ THE RULE CHANGED ON 2026-08-31, and this comment used to state the old one:
+ * that the application never deletes a `hires` row at all. It does now —
+ * hiring.php can remove a candidate entered by mistake — so the rule is the
+ * narrower and more honest version: a `hires` row is never deleted WITHOUT
+ * delete_hire_quote() removing its quote in the same operation. Left behind, the
+ * quote outlives the person it was for, keyed to an id a later candidate could
+ * be handed. That is why the delete is admin-only: can_see_money() IS is_admin(),
+ * so an editor could not clear the half they cannot see.
  * ------------------------------------------------------------------------- */
 
 /** Is the hiring-quote table there at all? */
