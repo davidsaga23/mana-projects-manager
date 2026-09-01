@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // column on 2026-08-17.
             if ($r['passwords']) {
                 flash('ok', sprintf('%d row%s carried a reel password, saved beside the link. It '
-                                  . 'opens the artist's own showreel page, nothing of ours.',
+                                  . 'opens their own showreel page, nothing of ours.',
                                   $r['passwords'], $r['passwords'] === 1 ? '' : 's'));
             }
             // The rates go through the one door, and only for somebody who can

@@ -353,3 +353,55 @@ else:
             first = (r.stderr or '').strip().splitlines()
             print('  %s: %s' % (f, first[0] if first else 'failed to parse'))
     print('%d JavaScript files checked, %d with syntax errors' % (len(jsfiles), bad_js))
+
+# ---------------------------------------------------------------------------
+# English prose that escaped a string literal.
+#
+# The unterminated-string pass above only catches a quote that is never closed.
+# It cannot catch the commoner version: an apostrophe INSIDE a single-quoted
+# string, which closes it early and leaves the rest of the sentence sitting in
+# the file as code. The quotes re-pair further down, so the file looks balanced
+# and that check says nothing -- but PHP will not parse it.
+#
+# Took artists.php and hiring.php down on 2026-08-31, both 500ing while every
+# other page was fine. The line read:
+#
+#     . 'opens the artist's own showreel page, nothing of ours.',
+#
+# Introduced by a scripted edit whose escaping was mangled in transit, and the
+# assertion guarding that edit checked the ANCHOR MATCHED rather than the RESULT
+# BEING SOUND -- lesson 14's 'assert every replacement' one step short of where
+# it needed to be.
+#
+# The signature is unmistakable once strings are masked: `s own showreel page`
+# survives as bare words where only PHP should be. Three or more plain words in
+# a row, none of them keywords, is not something valid PHP contains.
+# ---------------------------------------------------------------------------
+PHP_WORDS = set('''
+if else elseif endif while endwhile for endfor foreach endforeach as switch case
+default break continue return function fn use global static public private protected
+const new clone echo print require require_once include include_once try catch finally
+throw class interface trait extends implements instanceof namespace and or xor not
+true false null array list isset unset empty exit die yield match enum readonly
+abstract final var declare int float string bool void mixed callable iterable object
+self parent this
+'''.split())
+
+PROSE = re.compile(r'[A-Za-z_][A-Za-z0-9_]*(?:[ 	]+[A-Za-z_][A-Za-z0-9_]*){2,}')
+
+bad_prose = 0
+for f in files:
+    code = php_code_only(io.open(f, encoding='utf-8', errors='replace').read())
+    for m in PROSE.finditer(code):
+        words = m.group(0).split()
+        if sum(1 for w in words if w.lower() not in PHP_WORDS) < 3:
+            continue
+        if bad_prose == 0:
+            print('')
+            print('PROSE IN CODE - a quote closed early; PHP will not parse these:')
+        bad_prose += 1
+        line = code[:m.start()].count(chr(10)) + 1
+        print('  %s:%d: %s' % (f, line, ' '.join(words)[:60]))
+print('')
+print('%d files checked for prose leaking out of strings, %d suspect'
+      % (len(files), bad_prose))

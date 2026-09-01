@@ -229,6 +229,20 @@ Hard-won, all from real incidents:
    that silently did not match. **Assert every replacement.** That batch asserted on every edit
    but one, and that was the one that failed. (2026-08-18.)
 
+16. **An apostrophe inside a single-quoted string is a PARSE ERROR the balance checks cannot
+   see.** `. 'opens the artist's own showreel page'` closes at "artist" and leaves `s own
+   showreel page` sitting in the file as code. The quotes re-pair further down, so the file
+   looks balanced and the unterminated-string pass says nothing — but PHP will not compile it.
+   Took `artists.php` and `hiring.php` down together on 2026-08-31 while every other page
+   stayed up, which is the signature: **two pages 500, the shared includes fine.** Bisect by
+   curling several pages, not by reading.
+   **The narrower lesson, and the one that matters:** it came from a scripted edit whose
+   escaping was mangled in transit, and the assertion guarding that edit checked THE ANCHOR
+   MATCHED, not THE RESULT WAS SOUND. Lesson 14 said assert every replacement; this says assert
+   what came out, not what went in. `tools/check_php_blocks.py` gained a sixth pass for it,
+   verified by putting the bug back and watching it fire. **Where a string needs an apostrophe,
+   reword it** — "their own showreel" needs no escape and cannot be mangled. (2026-08-31.)
+
 15. **A PHP file is mostly HTML, so you cannot tell by looking whether a line is in PHP mode.**
    A comment block was pasted above `$pageTitle = …` in `standards.php` complete with its own
    `<?php` — but the file had opened PHP ninety lines earlier and had not closed it. `<?php`
@@ -592,13 +606,15 @@ Ship each phase end-to-end before starting the next.
 
 - Start by reading this file and `docs/ARCHITECTURE.md`.
 - **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
-  binary on the dev machine, so no `php -l`; this is the only gate. It makes five passes,
+  binary on the dev machine, so no `php -l`; this is the only gate. It makes six passes,
   each earned by a bug that actually shipped: unbalanced `endif;`/`endforeach;`, unterminated
   strings, a `<?php` opened while already in PHP mode, duplicate function names, and — where
   `node` is installed — `node --check` over `assets/*.js`. Four of those are outright parse
   errors: the file never compiles, so *every* page requiring it 500s, not just the feature
   being worked on. A broken .js is quieter and worse — the page renders, the script never
-  runs, and the feature simply does nothing. Counting braces with grep is *not* a substitute
+  runs, and the feature simply does nothing. The sixth pass catches **English prose that
+  escaped a string** — an apostrophe inside `'...'` closing it early — which the
+  unterminated-string pass cannot see, because the quotes re-pair further down the file. Counting braces with grep is *not* a substitute
   and produced false alarms on healthy files; `tools/README.md` says why.
 - Work **one phase per conversation**, not one feature — related work should share context.
 - Use `/compact` when a chat gets long rather than starting over.

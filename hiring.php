@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // silent: somebody who pasted this column when it was being
                     // refused should know the answer has changed.
                     flash('ok', $parsed['passwords'] . ' row(s) carried a reel password, and it '
-                              . 'was saved beside the link. It opens the artist's own showreel '
+                              . 'was saved beside the link. It opens their own showreel '
                               . 'page, nothing of ours.');
                 }
                 if ($parsed['rates']) {
