@@ -20,8 +20,8 @@ without re-deriving context.
   projects list gained **status, rename, archive and delete**.
 - **⚠ Deploy state (2026-08-31):** 024–027 are all applied, confirmed by David — hiring,
   freelancer fields, ideal quotas, archived projects. **028 (timeline milestones), 029
-  (tying a milestone to a step) and 030 (an artist can exist without a project) are NEW and
-  pending.** Until it is applied the timeline says so and the panel is inert; everything else
+  (tying a milestone to a step) 030 (an artist can exist without a project) and 031 (the reel
+  password) are NEW and pending.** Until it is applied the timeline says so and the panel is inert; everything else
   works. Still open `migrate.php` and look before assuming, rather than trusting this line: it
   is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,

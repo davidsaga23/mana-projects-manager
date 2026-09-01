@@ -36,6 +36,7 @@
     set('aEmail', a.email);
     set('aPhone', a.phone);
     set('aReel', a.portfolio_url);
+    set('aReelPw', a.portfolio_password);
     set('aSource', a.source);
     set('aRating', a.rating);
     set('aNotes', a.notes);

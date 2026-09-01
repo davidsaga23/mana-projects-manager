@@ -103,13 +103,17 @@ const HIRE_PROJECT_TYPES = ['2D', '3D', '2D/3D'];
  * password as somebody's availability. Naming them and discarding them is what
  * keeps a straight paste aligned.
  *
- * `_password` is never stored (migration 025's header says why) and `_rate` is
- * money, which does not live in this database. Both are REPORTED when a paste
- * contains them, rather than vanishing.
+ * The PASSWORD column is now kept, since migration 031 — it is the password an
+ * artist puts on their own reel page, not a credential for anything here, and
+ * that migration carries the reasoning for reversing the earlier refusal. It is
+ * stored only where the column exists, so a paste still works before 031.
+ *
+ * `_rate` is money, which does not live in this database at all. It is REPORTED
+ * when a paste contains one, rather than vanishing.
  */
 const HIRE_SHEET_COLUMNS = [
     'candidate_name', 'location', 'position', 'seniority', 'project_type',
-    'email', 'portfolio_url', '_password', 'worked_with_us', 'notes',
+    'email', 'portfolio_url', 'portfolio_password', 'worked_with_us', 'notes',
     '_rate', 'rating',
 ];
 
@@ -483,6 +487,11 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
     // column that is not there.
     if (hire_extras_available($pdo)) {
         $set = array_merge($set, hire_extra_values($in));
+    }
+    // 031, probed on its own: a database with 025 and not 031 keeps working.
+    if (column_exists($pdo, 'hires', 'portfolio_password')) {
+        $set['portfolio_password'] =
+            mb_substr(trim((string)($in['portfolio_password'] ?? '')), 0, 120) ?: null;
     }
 
     $cols = array_keys($set);
@@ -896,11 +905,11 @@ function parse_hire_paste(string $text): array {
             if (trim($line) !== '') $out['skipped']++;
             continue;
         }
-        if ($row['_password'] !== '') $out['passwords']++;
+        if (($row['portfolio_password'] ?? '') !== '') $out['passwords']++;
         if ($row['_rate'] !== '') {
             $out['rates'][] = $row['candidate_name'] . ' (' . $row['_rate'] . ')';
         }
-        unset($row['_password'], $row['_rate']);
+        unset($row['_rate']);
         $out['rows'][] = $row;
     }
     return $out;

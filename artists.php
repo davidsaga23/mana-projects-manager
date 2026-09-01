@@ -43,7 +43,8 @@ $ready = hiring_available($pdo);
 // optional. Both are probed rather than assumed, so the screen degrades one
 // feature at a time instead of failing whole.
 $extra = [];
-foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating'] as $c) {
+foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
+          'portfolio_password'] as $c) {
     if (column_exists($pdo, 'hires', $c)) $extra[] = $c;
 }
 $canAddFree = $ready && column_is_nullable($pdo, 'hires', 'project_id');
@@ -118,11 +119,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Reported, never stored. Same answer the paste parser gave this
             // column on 2026-08-17.
             if ($r['passwords']) {
-                flash('warn', sprintf('%d row%s carried a reel PASSWORD. It was not imported — a '
-                                    . 'plain-text password column is not something this database '
-                                    . 'should have. Put it in the notes beside the link if it is '
-                                    . 'needed to open the reel.',
-                                    $r['passwords'], $r['passwords'] === 1 ? '' : 's'));
+                flash('ok', sprintf('%d row%s carried a reel password, saved beside the link. It '
+                                  . 'opens the artist's own showreel page, nothing of ours.',
+                                  $r['passwords'], $r['passwords'] === 1 ? '' : 's'));
             }
             // The rates go through the one door, and only for somebody who can
             // open it.
@@ -164,8 +163,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$q = trim((string)($_GET['q'] ?? ''));
-[$people, $approaches] = $ready ? artists_list($pdo, $q, $extra) : [[], []];
+$q   = trim((string)($_GET['q'] ?? ''));
+$pos = trim((string)($_GET['position'] ?? ''));
+$positions = $ready ? artists_positions($pdo) : [];
+// A position that no longer exists would silently show nobody, so it is dropped
+// rather than left filtering against nothing.
+if ($pos !== '' && !in_array($pos, $positions, true)) $pos = '';
+
+[$people, $approaches] = $ready ? artists_list($pdo, $q, $extra, $pos) : [[], []];
 
 // Their quotes, for the rate column. One query for the page, admin only —
 // finance_db() hands a non-admin nothing, so this is empty for everyone else.
@@ -204,10 +209,22 @@ require __DIR__ . '/includes/header.php';
   <form method="get" class="inline-form">
     <input name="q" value="<?= e($q) ?>" size="30"
            placeholder="Search name, email, source, notes<?= $extra ? ', location, position' : '' ?>">
+    <?php if ($positions): ?>
+      <?php // Submits on change, like the role picker on users.php — a filter
+            // you have to press a second button to apply is a filter people
+            // stop using. ?>
+      <select name="position" onchange="this.form.submit()">
+        <option value="">All positions</option>
+        <?php foreach ($positions as $o): ?>
+          <option value="<?= e($o) ?>" <?= $pos === $o ? 'selected' : '' ?>><?= e($o) ?></option>
+        <?php endforeach; ?>
+      </select>
+    <?php endif; ?>
     <button type="submit" class="secondary">Search</button>
-    <?php if ($q !== ''): ?><a href="artists.php">Clear</a><?php endif; ?>
+    <?php if ($q !== '' || $pos !== ''): ?><a href="artists.php">Clear</a><?php endif; ?>
     <span class="muted small">
       <?= count($people) ?> <?= count($people) === 1 ? 'person' : 'people' ?><?php
+        if ($pos !== ''): ?> in <?= e($pos) ?><?php endif; ?><?php
         if ($q !== ''): ?> matching &ldquo;<?= e($q) ?>&rdquo;<?php endif; ?>
     </span>
   </form>
@@ -235,6 +252,7 @@ require __DIR__ . '/includes/header.php';
             <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
             <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
             <th>Contact</th>
+            <th>Reel</th>
             <th>Where from</th>
             <th>Up for</th>
             <?php if (can_edit()): ?><th></th><?php endif; ?>
@@ -275,8 +293,24 @@ require __DIR__ . '/includes/header.php';
                 <a href="mailto:<?= e($p['email']) ?>"><?= e($p['email']) ?></a><br>
               <?php endif; ?>
               <?= e($p['phone'] ?? '') ?>
+            </td>
+            <td class="small reel-cell">
+              <?php // THE ADDRESS, not the word "reel". Which site somebody's
+                    // work is on is half of what you want to know before
+                    // clicking — behance, vimeo, an artstation — and a link
+                    // reading "reel" hides exactly that. Truncated in CSS
+                    // rather than in PHP so the whole thing stays selectable
+                    // and copyable, and the title carries it in full. ?>
               <?php if (!empty($p['portfolio_url'])): ?>
-                <br><a href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener">reel</a>
+                <a href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener"
+                   title="<?= e($p['portfolio_url']) ?>"><?= e($p['portfolio_url']) ?></a>
+              <?php endif; ?>
+              <?php if (!empty($p['portfolio_password'])): ?>
+                <?php // Shown, because a reel password that has to be looked up
+                      // somewhere else is no better than not having it. It opens
+                      // the artist's own showreel page and nothing of Mana's —
+                      // see migration 031. ?>
+                <div class="muted">pw <code class="reel-pw"><?= e($p['portfolio_password']) ?></code></div>
               <?php endif; ?>
             </td>
             <td class="muted small"><?= e($p['source'] ?? '') ?></td>
@@ -317,7 +351,9 @@ require __DIR__ . '/includes/header.php';
       <?php // Carries the search, so what downloads is what you were looking
             // at rather than everything regardless. ?>
       <a class="button secondary"
-         href="export_artists.php<?= $q !== '' ? '?q=' . urlencode($q) : '' ?>">Download as Excel ↓</a>
+         href="export_artists.php<?= ($q !== '' || $pos !== '')
+              ? '?' . http_build_query(array_filter(['q' => $q, 'position' => $pos]))
+              : '' ?>">Download as Excel ↓</a>
       <span class="muted small">Same layout as the studio's freelancer sheet — the same columns,
         the red title bar, Arial throughout.</span>
     </p>
@@ -328,8 +364,8 @@ require __DIR__ . '/includes/header.php';
     <p class="muted small">
       Reads <code>Mana_Freelancer_DataBase.xlsx</code> as it is: Artist, Location, Position,
       Seniority, Project type, Email, Demo link, Password, Worked with us, Notes, Rate, Rating.
-      The <strong>password column is never imported</strong> and the <strong>rate</strong> goes to
-      the finance database, not this one. Anyone already here is left alone unless you say
+      The <strong>password</strong> is kept beside the link, and the <strong>rate</strong> goes to
+      the finance database rather than this one. Anyone already here is left alone unless you say
       otherwise.
     </p>
     <form method="post" enctype="multipart/form-data" class="inline-form">
@@ -367,7 +403,9 @@ require __DIR__ . '/includes/header.php';
                 <?php if ($has('location')):  ?><th>Location</th><?php endif; ?>
                 <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
                 <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
-                <th>Email</th><th>Phone</th><th>Reel</th><th>Where from</th><th>Notes</th>
+                <th>Email</th><th>Phone</th><th>Reel</th>
+                <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
+                <th>Where from</th><th>Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -387,6 +425,9 @@ require __DIR__ . '/includes/header.php';
                 <td><input type="email" name="<?= $n ?>[email]" size="20" maxlength="190"></td>
                 <td><input name="<?= $n ?>[phone]" size="12" maxlength="50"></td>
                 <td><input name="<?= $n ?>[portfolio_url]" size="16" maxlength="500"></td>
+                <?php if ($has('portfolio_password')): ?>
+                  <td><input name="<?= $n ?>[portfolio_password]" size="10" maxlength="120"></td>
+                <?php endif; ?>
                 <td><input name="<?= $n ?>[source]" size="12" maxlength="100"></td>
                 <td><input name="<?= $n ?>[notes]" size="22"></td>
               </tr>
@@ -435,6 +476,11 @@ require __DIR__ . '/includes/header.php';
           </div>
           <div class="row">
             <label>Reel <input name="portfolio_url" id="aReel" maxlength="500"></label>
+            <?php if ($has('portfolio_password')): ?>
+              <label>Reel password <input name="portfolio_password" id="aReelPw" maxlength="120">
+                <small>The one the artist puts on their own page so people can watch it.
+                       Not a login for anything here.</small></label>
+            <?php endif; ?>
             <label>Where from <input name="source" id="aSource" maxlength="100"></label>
           </div>
           <div class="row">

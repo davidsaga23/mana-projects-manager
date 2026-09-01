@@ -20,7 +20,7 @@ require_once __DIR__ . '/hiring.php';
 
 /** The person-level columns — everything that is true of them, not of one job. */
 const ARTIST_FIELDS = [
-    'candidate_name', 'email', 'phone', 'portfolio_url', 'source', 'notes',
+    'candidate_name', 'email', 'phone', 'portfolio_url', 'portfolio_password', 'source', 'notes',
     'location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
 ];
 
@@ -59,7 +59,19 @@ function artists_rating_select(string $name, $value, ?string $id = null): string
  *
  * Returns [people, approaches] where approaches is keyed by lowercased name.
  */
-function artists_list(PDO $pdo, string $q, array $extra): array {
+/** Every position anyone has been filed under, for the filter. */
+function artists_positions(PDO $pdo): array {
+    if (!hiring_available($pdo) || !column_exists($pdo, 'hires', 'position')) return [];
+    $out = [];
+    foreach ($pdo->query("SELECT DISTINCT position FROM hires
+                           WHERE position IS NOT NULL AND position <> ''
+                           ORDER BY position") as $r) {
+        $out[] = $r['position'];
+    }
+    return $out;
+}
+
+function artists_list(PDO $pdo, string $q, array $extra, string $position = ''): array {
     if (!hiring_available($pdo)) return [[], []];
 
     $cols = 'h.id, h.candidate_name, h.email, h.phone, h.portfolio_url, h.source, h.notes,
@@ -71,19 +83,33 @@ function artists_list(PDO $pdo, string $q, array $extra): array {
               JOIN (SELECT MAX(id) AS id FROM hires GROUP BY LOWER(candidate_name)) latest
                    ON latest.id = h.id
               LEFT JOIN projects p ON p.id = h.project_id";
-    $args = [];
+    $args  = [];
+    $where = [];
+
+    // Position is an exact match, not a search: it is a pick from a list of what
+    // is actually in the database, so a LIKE would only let "Layout" quietly
+    // include "BG Layout" and make the count wrong.
+    if ($position !== '' && in_array('position', $extra, true)) {
+        $where[] = 'h.position = ?';
+        $args[]  = $position;
+    }
+
     if ($q !== '') {
         // The fields somebody actually remembers a person by. Bound, never
         // interpolated — the column list above is built from a fixed whitelist,
         // the search term never is.
-        $like  = '%' . $q . '%';
-        $where = ['h.candidate_name LIKE ?', 'h.email LIKE ?', 'h.source LIKE ?', 'h.notes LIKE ?'];
-        $args  = [$like, $like, $like, $like];
+        $like = '%' . $q . '%';
+        $any  = ['h.candidate_name LIKE ?', 'h.email LIKE ?', 'h.source LIKE ?', 'h.notes LIKE ?'];
+        $args = array_merge($args, [$like, $like, $like, $like]);
         foreach (['location', 'position'] as $c) {
-            if (in_array($c, $extra, true)) { $where[] = 'h.`' . $c . '` LIKE ?'; $args[] = $like; }
+            if (in_array($c, $extra, true)) { $any[] = 'h.`' . $c . '` LIKE ?'; $args[] = $like; }
         }
-        $sql .= ' WHERE (' . implode(' OR ', $where) . ')';
+        // The search is an OR across fields, but it is ANDed with the position:
+        // filtering to Layout and searching "brazil" means Layout artists in
+        // Brazil, not everyone in Brazil.
+        $where[] = '(' . implode(' OR ', $any) . ')';
     }
+    if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
     $sql .= ' ORDER BY h.candidate_name';
 
     $stmt = $pdo->prepare($sql);
@@ -119,6 +145,11 @@ function artists_values(array $in, array $extra): array {
         'source'         => mb_substr(trim((string)($in['source'] ?? '')), 0, 100) ?: null,
         'notes'          => trim((string)($in['notes'] ?? '')) ?: null,
     ];
+    // Arrives with migration 031, so probed like the 025 columns rather than
+    // assumed — the screen works either way.
+    if (in_array('portfolio_password', $extra, true)) {
+        $v['portfolio_password'] = mb_substr(trim((string)($in['portfolio_password'] ?? '')), 0, 120) ?: null;
+    }
     if (in_array('location', $extra, true)) {
         $v['location'] = mb_substr(trim((string)($in['location'] ?? '')), 0, 80) ?: null;
     }
@@ -275,7 +306,7 @@ function artists_import_rows(PDO $pdo, array $rows, array $extra, bool $overwrit
         if (isset($seen[$key])) { $out['dupes'][] = $name; continue; }
         $seen[$key] = true;
 
-        if ($get(FL_PASSWORD) !== '') $out['passwords']++;
+        if ($get(FL_PASSWORD) !== '') $out['passwords']++;   // counted, and now kept
 
         $in = [
             'candidate_name' => $name,
@@ -285,6 +316,9 @@ function artists_import_rows(PDO $pdo, array $rows, array $extra, bool $overwrit
             'project_type'   => $get(FL_TYPE),
             'email'          => $get(FL_EMAIL),
             'portfolio_url'  => $get(FL_REEL),
+            // Column H. Imported since 031 — see that migration for why the
+            // earlier refusal was too broad.
+            'portfolio_password' => $get(FL_PASSWORD),
             'notes'          => $get(FL_NOTES),
             'rating'         => $get(FL_RATING),
             // The sheet writes 1 for yes and leaves it blank for no.

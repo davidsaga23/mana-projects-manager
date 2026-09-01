@@ -8,11 +8,10 @@
 // same place the old one lived and every formula pointing at column F still
 // finds the email.
 //
-// ⚠ THE PASSWORD COLUMN IS WRITTEN EMPTY, and that is deliberate rather than an
-// omission. Column H exists so the shape matches, but this database has never
-// held a reel password and will not start by exporting one — the same answer the
-// paste parser and the importer give it. The header is still there so nobody
-// wonders whether the column was lost.
+// Column H, the reel password, is written since migration 031 — which reversed
+// an earlier and too-broad refusal to hold it at all. It is the password an
+// artist puts on their own Vimeo or Behance page so people can watch their work,
+// not a credential for anything of Mana's. That migration carries the reasoning.
 //
 // The RATE comes from the finance database through includes/money.php, so an
 // editor's download simply has that column blank. Nobody is shown a number their
@@ -43,14 +42,16 @@ if (!hiring_available($pdo)) {
 }
 
 $extra = [];
-foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating'] as $c) {
+foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
+          'portfolio_password'] as $c) {
     if (column_exists($pdo, 'hires', $c)) $extra[] = $c;
 }
 
 // The same search the screen was showing, so what downloads is what you were
 // looking at rather than everything regardless.
-$q = trim((string)($_GET['q'] ?? ''));
-[$people] = artists_list($pdo, $q, $extra);
+$q   = trim((string)($_GET['q'] ?? ''));
+$pos = trim((string)($_GET['position'] ?? ''));
+[$people] = artists_list($pdo, $q, $extra, $pos);
 if (!$people) {
     flash('err', $q !== '' ? 'Nothing matches that search, so there was nothing to export.'
                            : 'There are no artists to export yet.');
@@ -94,8 +95,9 @@ foreach ($people as $p) {
         // hyperlink: a real one needs a rels part per cell, and the address is
         // the useful half.
         ['v' => $reel, 's' => $reel !== '' ? XLSX_FL_LINK : XLSX_FL_TEXT],
-        // Column H — the password. Present, and empty. See the note at the top.
-        ['v' => '', 's' => XLSX_FL_TEXT],
+        // Column H — the reel password. Written since migration 031; it opens
+        // the artist's own showreel page and nothing of Mana's.
+        ['v' => $val($p, 'portfolio_password'), 's' => XLSX_FL_TEXT],
         ['v' => !empty($p['worked_with_us']) ? 1 : '', 's' => XLSX_FL_TEXT],
         ['v' => $val($p, 'notes'),  's' => XLSX_FL_TEXT],
         ['v' => $rate,              's' => $rate === '' ? XLSX_FL_TEXT : XLSX_FL_NUM],

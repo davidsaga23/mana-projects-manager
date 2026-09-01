@@ -1445,3 +1445,11 @@ body.lightbox-lock { overflow: hidden; }
 .artist-table { min-width: 1100px; }
 .artist-table td, .artist-table th { padding: 7px 10px; vertical-align: top; }
 .artist-table .small { font-size: 12.5px; }
+/* The reel address, shown rather than hidden behind the word "reel" — which
+   site somebody's work is on is half of what you want before clicking.
+   Truncated in CSS, not in PHP, so the whole address stays selectable and
+   copyable and the tooltip carries it in full. */
+.reel-cell { max-width: 260px; }
+.reel-cell a { display: inline-block; max-width: 100%; overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.reel-pw { background: #eef1f4; padding: 1px 5px; border-radius: 3px; user-select: all; }

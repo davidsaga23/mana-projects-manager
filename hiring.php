@@ -77,10 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Reported rather than dropped in silence. Both are real columns
                 // in the sheet and neither belongs in this database.
                 if ($parsed['passwords']) {
-                    flash('warn', $parsed['passwords'] . ' row(s) carried a reel password. It was '
-                                . 'NOT stored — a plain-text password column is not something this '
-                                . 'database should have. Put it in the notes beside the link if it '
-                                . 'is needed to open the reel.');
+                    // Kept since migration 031, and said so rather than left
+                    // silent: somebody who pasted this column when it was being
+                    // refused should know the answer has changed.
+                    flash('ok', $parsed['passwords'] . ' row(s) carried a reel password, and it '
+                              . 'was saved beside the link. It opens the artist's own showreel '
+                              . 'page, nothing of ours.');
                 }
                 if ($parsed['rates']) {
                     flash('warn', 'A rate came across for ' . implode(', ', array_slice($parsed['rates'], 0, 6))
