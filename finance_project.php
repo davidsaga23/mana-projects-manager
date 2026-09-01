@@ -29,12 +29,57 @@ if (!$project) {
     exit;
 }
 
+// Back to the SAME TAB after a save. The form has no action, so it posts to the
+// current URL and ?tab= is still in it — which is how a redirect can know where
+// the reader was. Without this every save landed on Overview, and the inline
+// rate boxes would have thrown you out of the table on every single one.
 $selfUrl = 'finance_project.php?project=' . $projectId;
+$fromTab = (string)($_GET['tab'] ?? '');
+if (in_array($fromTab, finance_tabs(), true)) $selfUrl .= '&tab=' . $fromTab;
+
 $who = current_user_display();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (isset($_POST['save_budget'])) {
+        if (isset($_POST['set_rate'])) {
+            // A DAY RATE, SET FROM THE PROJECTION. Previously this meant leaving
+            // for person.php and coming back for each one — a dozen round trips
+            // to fill in a dozen slots.
+            //
+            // ⚠ MERGED OVER WHAT IS ALREADY STORED, never sent alone.
+            // save_crew_terms() writes every column through ON DUPLICATE KEY
+            // UPDATE ... = VALUES(...), so a payload carrying only day_rate
+            // would blank contract_url and reset contract_status to 'none' —
+            // silently deleting the record that somebody signed.
+
+            // WHO, checked against the lanes on this show rather than trusted.
+            // crew_id arrives from the browser and crew_terms has no foreign key
+            // to reach it with — the two live in different databases — so a
+            // mistyped or tampered id would otherwise write a pay rate against
+            // somebody who does not exist, in a table nothing would ever clean up.
+            //
+            // project_lanes() is the same source the table itself is drawn from,
+            // so every row on screen passes by construction and nothing else can.
+            $crewId = (int)($_POST['crew_id'] ?? 0);
+            $name = '';
+            foreach (project_lanes($pdo, $projectId) as $l) {
+                if ((int)$l['crew_id'] === $crewId) { $name = (string)$l['name']; break; }
+            }
+            if ($crewId <= 0 || $name === '') {
+                throw new RuntimeException('That person is not on this project, so no rate was saved.');
+            }
+
+            // SELECT * from crew_terms, so the keys here are the column names
+            // save_crew_terms() reads — contract_url, contract_status and the two
+            // contract dates come back out exactly as they went in. Only the rate
+            // is overwritten. The unit and currency are NOT posted at all: this
+            // column edits one number, and a hidden field carrying the other two
+            // would be a second copy of them, free to drift.
+            $existing = crew_term($crewId) ?? [];
+            $merged = array_merge($existing, ['day_rate' => $_POST['day_rate'] ?? '']);
+            flash('ok', save_crew_terms($crewId, $name, $merged, $who));
+
+        } elseif (isset($_POST['save_budget'])) {
             flash('ok', save_project_budget($projectId, $project, $_POST, $who));
         } elseif (isset($_POST['save_departments'])) {
             // Writes pipeline_steps.department on the ORDINARY production
@@ -718,6 +763,10 @@ if ($retakePct <= 0):
   people who each get paid. Person-days come from the same <code>step_quota()</code> the dashboard
   and the CSV export use; the rate comes from each person's page.
   <strong>Computed every time this page loads</strong>, never stored, so it cannot disagree with the plan.
+  <br><strong>A rate belongs to the PERSON, not to this row or this project.</strong> Type one in the
+  Rate column and it saves against them everywhere — the other rows they appear on here, and every
+  future show they are booked on. A rate set on a <em>slot</em> is the exception: a slot exists only
+  on this project, so its rate goes when the slot does.
 </p>
 
 <?php if (!$proj['rows']): ?>
@@ -754,16 +803,33 @@ if ($retakePct <= 0):
               <span class="warn-text small">nobody assigned</span>
             <?php endif; ?>
           </td>
+          <?php // EDITABLE HERE. A rate belongs to a PERSON, not to this row —
+                // crew_terms is keyed on crew_id alone — so setting it here sets
+                // it everywhere that person appears, on this project and every
+                // other. The note under the table says so, because two rows for
+                // the same artist changing together would otherwise look like a
+                // bug.
+                //
+                // It posts and reloads rather than saving in the background: the
+                // Projected column, the subtotals, the grand total and the margin
+                // all move with it, and every one of them comes from
+                // expense_projection(). Recomputing them in the browser would be
+                // a second implementation of the money, free to disagree with
+                // the first. ?>
           <td class="small">
-            <?php if ($r['rate'] === null): ?>
-              <?php if ($r['crew_id']): ?>
-                <a class="warn-text" href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>&amp;from=finance"
-                   title="Set a day rate on their page and it feeds straight back into this total">set a rate →</a>
-              <?php else: ?><span class="muted">—</span><?php endif; ?>
-            <?php else: ?>
-              <?= e(number_format($r['rate'], 2) . ' ' . $r['currency']) ?>
-              <span class="muted">/ <?= e($r['rate_unit']) ?></span>
-            <?php endif; ?>
+            <?php if ($r['crew_id']): ?>
+              <form method="post" class="rate-edit">
+                <input type="hidden" name="set_rate" value="1">
+                <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">
+                <?php // Saves on leaving the field, the same submit-on-change the
+                      // role picker and the status dropdown use. ?>
+                <input name="day_rate" inputmode="decimal" size="6" onchange="this.form.submit()"
+                       value="<?= $r['rate'] !== null ? e(fmt_num((float)$r['rate'], 2)) : '' ?>"
+                       placeholder="set" aria-label="Day rate for <?= e((string)$r['artist']) ?>"
+                       class="<?= $r['rate'] === null ? 'rate-unset' : '' ?>">
+                <span class="muted"><?= e($r['currency'] ?: 'USD') ?> / <?= e($r['rate_unit'] ?: 'day') ?></span>
+              </form>
+            <?php else: ?><span class="muted">—</span><?php endif; ?>
           </td>
           <td class="num"><?= e(fmt_num($r['days'], 2)) ?>
             <?php // Which number produced these days. An unmarked row rests on a
@@ -836,8 +902,8 @@ if ($retakePct <= 0):
     <p class="flash flash-warn">
       <strong><?= e(fmt_num($proj['unpriced_days'], 1)) ?> person-days have no rate behind them</strong> —
       mostly lanes still held by unfilled slots. Those days are <em>excluded</em> from the total
-      rather than counted as free, so the real cost is higher than it says. Click any
-      <em>set a rate</em> above to fix one; the total updates as soon as you save.
+      rather than counted as free, so the real cost is higher than it says. Type one into the
+      <strong>Rate</strong> column above and every figure on this page moves with it.
     </p>
   <?php endif; ?>
 <?php endif; ?>

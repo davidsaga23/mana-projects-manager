@@ -1599,3 +1599,13 @@ button.secondary.danger:hover { background: #e9c2c7; }
    neither of those two lines is the one it belongs to. */
 .slot-hire { position: relative; padding-right: 26px; }
 .slot-hire .popover-close { position: absolute; top: 4px; right: 4px; }
+/* The editable rate in the expense projection. Narrow, because the column is,
+   and the currency sits beside it as text rather than in a second control. */
+.rate-edit { display: flex; align-items: center; gap: 6px; margin: 0; }
+.rate-edit input { width: 5.5em; padding: 4px 6px; font-size: 13px; text-align: right; }
+/* "USD / day" on ONE line. Left to wrap it broke over two, which sets the height
+   of every row in the table — the widest cell wins, and this one is in every row. */
+.rate-edit .muted { white-space: nowrap; font-size: 11px; line-height: 1.2; }
+/* Unpriced rows are the ones the warning under the table is about, so the empty
+   box says so rather than looking like any other blank field. */
+.rate-edit input.rate-unset { border-color: #d9a406; background: #fffbe6; }
