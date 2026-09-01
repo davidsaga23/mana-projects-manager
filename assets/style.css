@@ -1476,9 +1476,37 @@ body.lightbox-lock { overflow: hidden; }
 /* Positions as a panel of ticks: sixty of them in a six-row scrolling list means
    reading a handful at a time and holding ctrl to keep what you picked. In
    columns they are legible at once and each is one click. */
-.pos-filter { border: 1px solid #dbe2e8; border-radius: 4px; padding: 8px 10px; margin: 10px 0; }
+/* FULL WIDTH, and that flex-basis is the whole point of this rule. The filter
+   sits inside .inline-form, which is display:flex — as an ordinary flex item the
+   fieldset shrinks to its content, the auto-fill grid inside it resolves to a
+   single column, and sixty positions become a narrow strip with two scrollbars
+   and no room for the labels. Taking a whole flex line gives the grid the width
+   it needs to lay out in columns. */
+.pos-filter {
+  flex: 1 1 100%; width: 100%; box-sizing: border-box;
+  border: 1px solid #dbe2e8; border-radius: 4px; padding: 10px 14px; margin: 10px 0;
+}
 .pos-filter legend { font-size: 12px; color: #5a6a7a; padding: 0 4px; }
-.pos-all { display: block; margin-bottom: 6px; }
-.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-            gap: 2px 14px; max-height: 210px; overflow-y: auto; }
-.pos-grid label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-all { display: block; margin-bottom: 8px; }
+.pos-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 3px 18px; max-height: 260px; overflow-y: auto;
+  /* Never sideways: the columns reflow to the width available, so a horizontal
+     scrollbar here would only ever mean the layout had failed. */
+  overflow-x: hidden;
+}
+.pos-grid label {
+  font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* The global `input, select { width: 100% }` above catches checkboxes too, so a
+   tick stretched to the full width of its label and shoved the name out past
+   the edge, where overflow:hidden clipped it — a panel of nameless boxes. The
+   same fix .chip, .asset-table and .tl-controls each already carry; it is worth
+   knowing this rule bites every new checkbox in this stylesheet. */
+.pos-grid input[type=checkbox],
+.pos-all input[type=checkbox] { width: auto; padding: 0; margin: 0 6px 0 0; vertical-align: -1px; }
+.artist-grid input[type=checkbox] { width: auto; padding: 0; margin: 0; }
+
+/* The grid fills the page rather than shrinking to its contents. min-width keeps
+   the columns readable when the window is narrow, and the wrapper scrolls. */
+.artist-grid { width: 100%; }
