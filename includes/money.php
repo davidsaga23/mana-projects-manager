@@ -465,6 +465,29 @@ function hire_quote(int $hireId): ?array {
 }
 
 /**
+ * Remove a candidate's quote, for when the candidate record itself is going.
+ *
+ * hire_quotes.hire_id points at hires.id in the PRODUCTION database with no
+ * foreign key — the two live on separate connections and neither can cascade
+ * into the other. So deleting a candidate has to come through here as well, or
+ * the quote outlives the person it was for, keyed to an id that a later
+ * candidate could be handed.
+ *
+ * Returns the number of rows removed: 0 is a perfectly good answer, meaning
+ * nobody ever recorded a rate for them.
+ */
+function delete_hire_quote(int $hireId): int {
+    if (!can_see_money()) {
+        throw new RuntimeException('Only an administrator can change what a candidate quoted.');
+    }
+    $db = finance_db();
+    if (!$db || !hire_quotes_available()) return 0;
+    $q = $db->prepare('DELETE FROM hire_quotes WHERE hire_id = ?');
+    $q->execute([$hireId]);
+    return $q->rowCount();
+}
+
+/**
  * Save what a candidate quoted. Returns a sentence for the flash message.
  *
  * @throws RuntimeException when the caller may not do this, or the input is bad

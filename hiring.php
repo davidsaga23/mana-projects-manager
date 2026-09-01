@@ -120,6 +120,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('ok', set_hire_stage($pdo, $projectId, (int)$m[1],
                         (string)($_POST['stage'] ?? ''), (string)($_POST['note'] ?? ''), $who));
 
+        } elseif (preg_match('/^drop:(\d+)$/', $action, $m)) {
+            // DELETING the record, not closing it out. Declined and Passed
+            // already exist for "we spoke and it went nowhere", and those are
+            // kept on purpose — the person you did not hire this time is the
+            // first person you call next time.
+            //
+            // This is for the other thing: a duplicate, a typo, a name pasted
+            // onto the wrong slot. Keeping those forever is not history, it is
+            // litter, and it buries the records that are history.
+            $hireId = (int)$m[1];
+            $hq = $pdo->prepare('SELECT * FROM hires WHERE id = ? AND project_id = ?');
+            $hq->execute([$hireId, $projectId]);
+            $h = $hq->fetch();
+            if (!$h) throw new RuntimeException('That candidate is no longer on the list.');
+
+            if ($h['stage'] === 'hired') {
+                throw new RuntimeException(
+                    '"' . $h['candidate_name'] . '" has been hired, so this record is how the '
+                  . 'crew member on that slot got there. Removing it would leave the person with '
+                  . 'no explanation. Take them out on the Crew screen instead.'
+                );
+            }
+
+            // The quote lives in the OTHER database, keyed to this row's id with
+            // no foreign key, so it has to be removed deliberately or it outlives
+            // the candidate it was for. Only an admin can reach it — an editor
+            // who cannot check must not delete the half they can see.
+            $quoted = 0;
+            if (function_exists('finance_configured') && finance_configured()) {
+                if (!can_see_money()) {
+                    throw new RuntimeException(
+                        'A candidate may have a quoted rate recorded in the finance database, which '
+                      . 'this account cannot see or remove. Ask an administrator to delete the '
+                      . 'candidate, or move them to Passed instead — that keeps the record and '
+                      . 'takes them out of play.'
+                    );
+                }
+                $quoted = delete_hire_quote($hireId);
+            }
+
+            // hire_stage_log is ON DELETE CASCADE from hires, so its history
+            // goes with it rather than being left pointing at nothing.
+            $pdo->prepare('DELETE FROM hires WHERE id = ? AND project_id = ?')
+                ->execute([$hireId, $projectId]);
+
+            flash('ok', sprintf('Removed "%s" from this slot%s.', $h['candidate_name'],
+                                $quoted > 0 ? ', along with the rate recorded for them' : ''));
+
         } elseif (preg_match('/^hire:(\d+)$/', $action, $m)) {
             foreach (hire_candidate($pdo, $projectId, (int)$m[1], $_POST, $who) as $said) {
                 flash('ok', $said);
@@ -524,7 +572,37 @@ if ($fromFinance) {
               <?php if (!$cands): ?>
                 <span class="muted small">None yet.</span>
               <?php else: ?>
-                <?php foreach ($cands as $h): $c = hire_stage_color($h['stage']); ?>
+                <?php
+                // CLOSED CANDIDATES FOLD AWAY. Declined and Passed are kept on
+                // purpose — the person you did not hire this time is the first
+                // person you call next time — but kept is not the same as kept
+                // in front of you. Left inline they pile up under every slot
+                // until the two people actually in play are the hard ones to
+                // find, which is the opposite of what this screen is for.
+                //
+                // Hired counts as live: it is the outcome, not a dead end.
+                $isLive = function ($h) {
+                    return in_array($h['stage'], HIRE_STAGES_OPEN, true) || $h['stage'] === 'hired';
+                };
+                $liveCands   = array_values(array_filter($cands, $isLive));
+                $closedCands = array_values(array_filter($cands, function ($h) use ($isLive) {
+                    return !$isLive($h);
+                }));
+                // One loop over both, rather than the body written out twice:
+                // the disclosure opens at the boundary and closes after.
+                $ordered   = array_merge($liveCands, $closedCands);
+                $liveCount = count($liveCands);
+                $foldOpen  = false;
+                ?>
+                <?php if (!$liveCands): ?>
+                  <p class="muted small">Nobody in play — everyone here has declined or been passed on.</p>
+                <?php endif; ?>
+                <?php foreach ($ordered as $ci => $h): $c = hire_stage_color($h['stage']); ?>
+                  <?php if (!$foldOpen && $closedCands && $ci >= $liveCount): $foldOpen = true; ?>
+                    <details class="closed-cands">
+                      <summary><?= count($closedCands) ?> closed
+                        <span class="muted">· declined or passed on</span></summary>
+                  <?php endif; ?>
                   <div class="cat-row">
                     <span class="status-chip"
                           style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
@@ -607,10 +685,23 @@ if ($fromFinance) {
                             <button type="submit" name="action" value="hire:<?= (int)$h['id'] ?>">Hire into this slot</button>
                           </div>
                         </form>
+
+                        <?php // For a duplicate, a typo, or a name pasted onto
+                              // the wrong slot. Somebody who was really spoken
+                              // to belongs at Declined or Passed in the dropdown
+                              // above — that keeps the record and takes them out
+                              // of play, which is what the stage list is for. ?>
+                        <form method="post" class="inline-form"
+                              onsubmit="return confirm('Remove <?= e(addslashes($h['candidate_name'])) ?> from this slot entirely? Use Declined or Passed instead if you actually spoke to them — this deletes the record.');">
+                          <button type="submit" class="linkish link-danger"
+                                  name="action" value="drop:<?= (int)$h['id'] ?>">Remove this candidate</button>
+                          <small class="muted">Deletes the record. For someone you really approached, move them to Passed.</small>
+                        </form>
                       </details>
                     <?php endif; ?>
                   </div>
                 <?php endforeach; ?>
+                <?php if ($foldOpen): ?></details><?php endif; ?>
               <?php endif; ?>
             </td>
           </tr>

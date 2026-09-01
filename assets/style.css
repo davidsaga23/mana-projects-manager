@@ -1382,3 +1382,7 @@ body.lightbox-lock { overflow: hidden; }
 .tl-note { max-width: 78ch; margin-top: 10px; line-height: 1.5; }
 .dep-legend { color: #b02a37; }
 .tl-saved { margin-left: 8px; color: #1e7e34; font-weight: 600; }
+/* Declined and passed candidates, folded under the ones still in play. */
+.closed-cands { margin-top: 6px; }
+.closed-cands > summary { cursor: pointer; font-size: 13px; color: #5a6a7a; }
+.closed-cands[open] > summary { margin-bottom: 6px; }
