@@ -397,17 +397,26 @@ require __DIR__ . '/includes/header.php';
         </datalist>
       <?php endif; ?>
 
-      <div class="actions">
-        <?php // Saved as you go. This button is the path for a browser with no
-              // JavaScript, where the sentinel below still guards the post. ?>
-        <span class="hint" id="dirtyCount">Changes save themselves as you leave each field.</span>
-        <button type="submit" class="secondary">Save changes</button>
-        <span class="spacer"></span>
-        <?php // LAST FIELD IN THE FORM, deliberately. If PHP drops the tail of a
-              // large post this never arrives, and the save refuses rather than
-              // writing whatever happened to survive. ?>
-        <input type="hidden" name="_end" value="1">
-      </div>
+      <?php // NO SAVE BUTTON. Every row writes itself through artists_api.php as
+            // you leave a field, and each says so in its own status cell, so a
+            // button could only ever be pressed after the work was already done.
+            //
+            // The <form> stays because the field names and the row grouping hang
+            // off it, and because a browser may still submit on Enter — which
+            // artists.js cancels, and which the handler in this file would
+            // otherwise have to survive. The sentinel goes with it for the same
+            // reason: if that path is ever taken and PHP truncates the post, the
+            // save refuses rather than writing whatever happened to arrive.
+            //
+            // The cost, stated: with JavaScript off this grid cannot be saved at
+            // all. Accepted deliberately (David, 2026-08-31) -- it is one studio
+            // on modern browsers, and a button nobody needs on every page view
+            // is a worse trade than a path nobody takes. ?>
+      <input type="hidden" name="_end" value="1">
+      <?php // Silent until something fails. Each row reports itself in its own
+            // cell, which is better because it names which row — but a cell
+            // cannot carry a reason, and a failure has to be able to give one. ?>
+      <p id="dirtyCount" class="flash flash-err" hidden></p>
     </form>
   <?php endif; ?>
 
@@ -427,13 +436,6 @@ require __DIR__ . '/includes/header.php';
 
   <?php if (can_edit() && $canAddFree): ?>
     <h3>Import the freelancer spreadsheet</h3>
-    <p class="muted small">
-      Reads <code>Mana_Freelancer_DataBase.xlsx</code> as it is: Artist, Location, Position,
-      Seniority, Project type, Email, Demo link, Password, Worked with us, Notes, Rate, Rating.
-      The <strong>password</strong> is kept beside the link, and the <strong>rate</strong> goes to
-      the finance database rather than this one. Anyone already here is left alone unless you say
-      otherwise.
-    </p>
     <form method="post" enctype="multipart/form-data" class="inline-form">
       <input type="file" name="sheet" accept=".xlsx" required>
       <label class="inline"><input type="checkbox" name="overwrite" value="1">

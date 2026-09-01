@@ -9,8 +9,11 @@
 // It also keeps the page still. A form post reloads, and a reload on a filtered,
 // scrolled list loses your place every time you correct an email.
 //
-// The form and its Save button remain for a browser with no JavaScript, where
-// the server-side sentinel still guards against a truncated post.
+// There is no Save button: every row writes itself, and each says so in its own
+// status cell. The <form> remains because the field names hang off it and
+// because Enter can still submit one — cancelled below.
+//
+// The cost, stated plainly: with JavaScript off, this grid cannot be saved.
 (function () {
   'use strict';
 
@@ -31,7 +34,19 @@
     return m ? m[1] : null;
   }
 
-  function say(msg) { if (counter) counter.textContent = msg; }
+  /**
+   * The page-level line, shown ONLY when something went wrong.
+   *
+   * There is no permanent status text any more — each row reports itself in its
+   * own cell, which is better anyway because it names WHICH row. But a failure
+   * needs to say why, and "not saved" in a cell cannot carry a reason. So this
+   * stays hidden until there is one, then holds it until the next success.
+   */
+  function say(msg) {
+    if (!counter) return;
+    counter.textContent = msg || '';
+    counter.hidden = !msg;
+  }
 
   function status(row, state, text) {
     var cell = row.querySelector('.a-status');
@@ -68,14 +83,13 @@
 
     inflight++;
     status(row, 'saving', 'saving…');
-    say('saving…');
 
     fetch('artists_api.php?action=save_row', { method: 'POST', body: body })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) throw new Error(d.error || 'failed');
         status(row, 'saved', d.warning ? 'saved, rate not' : 'saved');
-        if (d.warning) say(d.warning);
+        say(d.warning || '');
         // The name may now differ from what the next save must match on.
         var orig = row.querySelector('[name$="[orig_name]"]');
         var name = row.querySelector('.a-name');
@@ -87,12 +101,7 @@
         status(row, 'failed', 'not saved');
         say('Could not save ' + (row.querySelector('.a-name') || {}).value + ' — ' + err.message);
       })
-      .then(function () {
-        inflight--;
-        if (inflight === 0 && !Object.keys(pending).length) {
-          setTimeout(function () { if (inflight === 0) say('all changes saved'); }, 150);
-        }
-      });
+      .then(function () { inflight--; });
   }
 
   /** Saved shortly after you stop typing, and at once when you leave the field. */
@@ -116,11 +125,11 @@
     if (row) queue(row, 0);
   });
 
-  // The button is the no-JavaScript path. With JS the rows have already gone,
-  // so pressing it would reload the page to do nothing.
+  // There is no Save button any more, but a browser can still submit a form on
+  // Enter. Cancelled, because the rows have already written themselves and a
+  // reload would only lose the reader's place in a list of hundreds.
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
-    say(inflight ? 'still saving…' : 'all changes saved — nothing to send');
   });
 
   // Anything still queued goes before the page does.
