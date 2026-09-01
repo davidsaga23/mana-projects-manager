@@ -1515,13 +1515,22 @@ body.lightbox-lock { overflow: hidden; }
    Two real buttons rather than a line of small print: change who is in the
    slot, and take them out of it. Scoped to .review-table so the shared
    .row-actions (nowrap, on a dozen other screens) is not disturbed. */
-.review-table .row-actions {
-  display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; white-space: normal;
+/* THREE BUTTONS ON ONE LINE, right-aligned. justify-content does the aligning
+   rather than margin-left:auto on one of them, so the group moves together and
+   the order reads left to right: change, take out, remove. */
+.slot-actions {
+  text-align: right; white-space: normal;
 }
-/* Pushed to the far end, because it is the destructive one of the pair and
-   should not sit under the reader's thumb next to the one they meant. */
-.review-table .slot-unassign { margin-left: auto; }
-.review-table .slot-unassign button { margin-top: 0; }
+/* flex-start, not center: when the picker opens it hangs BELOW its own button
+   inside that <details>, and the other two should stay on the top line rather
+   than drifting down to the middle of a taller neighbour. */
+.slot-row {
+  display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+}
+/* .review-table sets `form { display: inline }`; a flex child is blockified
+   regardless, so only the button margin has to go. */
+.slot-actions button { margin-top: 0; white-space: nowrap; }
+.slot-note { margin-top: 6px; }
 
 /* <details> gives a fold with no JavaScript, so the summary IS the button — but
    it is a <summary>, and this stylesheet's button rules are `button.secondary`
@@ -1540,11 +1549,29 @@ body.lightbox-lock { overflow: hidden; }
 /* Held down while the picker is open, so it reads as the thing that opened it. */
 .slot-change[open] > .slot-btn { background: #eef4fa; border-color: #2f6fb2; }
 
-/* The picker sits BESIDE its Save — "a bar, and the save to its right".
-   width:auto is load-bearing: the global `input, select { width: 100% }` would
-   otherwise fill the row and push Save onto a line of its own. */
-.slot-change-bar { margin: 8px 0 0; gap: 8px; }
+/* The picker OVERLAYS rather than taking space in the row. Left in the flow it
+   widened its own <details>, which is a flex item, and pushed "Remove slot"
+   onto a second line the moment it opened — the three buttons stopped being
+   three buttons exactly when somebody was using them.
+   Absolute, so opening it changes nothing about the row behind it. */
+.slot-change { position: relative; }
+.slot-change-bar {
+  /* max-content, or the popover shrink-fits to its containing block — which is
+     the width of the button it hangs from — and wraps Save under the picker
+     however firmly flex-wrap says not to. */
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; width: max-content;
+  /* nowrap overrides .inline-form's flex-wrap:wrap — inherited, it put Save
+     under the picker instead of beside it, which is the one thing this bar has
+     to get right. */
+  margin: 0; gap: 8px; display: flex; align-items: center; flex-wrap: nowrap;
+  background: #fff; border: 1px solid #dbe2e8; border-radius: 4px;
+  padding: 8px 10px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
+}
+/* width:auto is load-bearing: the global `input, select { width: 100% }` would
+   fill the popover and push Save beneath the picker. */
 .slot-change-bar select { width: auto; min-width: 220px; flex: 0 1 auto; }
+.slot-change-bar button { margin-top: 0; }
+
 
 /* Removing the SLOT is a rarer, larger act than removing its assignee, and the
    two are one row apart — so it stays quiet text while those are buttons. */

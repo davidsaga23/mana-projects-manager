@@ -461,7 +461,18 @@ require __DIR__ . '/includes/header.php';
               </div>
             <?php endif; ?>
           </td>
-          <td>
+          <?php // THREE BUTTONS ON ONE LINE, right-aligned (David, 2026-08-31).
+                // They stacked before, because <details> is a block and the task
+                // count sat under it — three controls in a column reading as a
+                // list of unrelated things rather than the row's actions.
+                //
+                // The count moves under the row: still said BEFORE the click,
+                // which is the whole reason it is on screen, but out of the line
+                // the buttons make. ?>
+          <td class="slot-actions">
+            <?php $work = $laneWork[(int)$l['step_id'] . '|' . (int)$l['lane_no']]
+                        ?? ['n' => 0, 'locked' => 0]; ?>
+            <div class="slot-row">
             <?php if (can_edit() && $isPh): ?>
               <details class="inline-actions">
                 <summary>Someone has been hired for this</summary>
@@ -516,34 +527,40 @@ require __DIR__ . '/includes/header.php';
                     // The slot stays, its scheduled work stays on it, and the
                     // person stays on the studio crew list. Only shown where
                     // there is somebody to take out. ?>
-              <form method="post" class="slot-unassign"
+              <form method="post"
                     onsubmit="return confirm('Take <?= e(addslashes($l['name'])) ?> out of this slot? The slot stays, its scheduled work stays on it, and they stay on the studio crew list.');">
                 <button type="submit" class="secondary danger" name="action"
                         value="unassign:<?= (int)$l['id'] ?>">Remove assignee</button>
               </form>
             <?php endif; ?>
-            <?php if (can_edit()):
-              $work = $laneWork[(int)$l['step_id'] . '|' . (int)$l['lane_no']] ?? ['n' => 0, 'locked' => 0];
-            ?>
-              <?php if ($work['n'] === 0): ?>
-                <form method="post" class="inline-form"
-                      onsubmit="return confirm('Remove this slot? The person stays on the studio crew list.');">
-                  <button type="submit" class="linkish" name="action" value="remove:<?= (int)$l['id'] ?>">Remove slot</button>
-                </form>
-              <?php else: ?>
-                <?php // Said BEFORE the click, not after. "Remove slot" used to
-                      // look available on every row and then refuse with advice
-                      // that, for most blocked slots, could never work. ?>
-                <form method="post" class="inline-form"
-                      onsubmit="return confirm('Remove this slot AND delete the <?= (int)$work['n'] ?> task<?= $work['n'] === 1 ? '' : 's' ?> scheduled on it?<?= $work['locked'] > 0 ? ' ' . (int)$work['locked'] . ' of them are hand-planned and will not come back from a Regenerate.' : ' They are auto-scheduled, so a Regenerate will replan them across the slots that remain.' ?>');">
-                  <button type="submit" class="linkish link-danger" name="action"
-                          value="remove_work:<?= (int)$l['id'] ?>">Remove slot and its work</button>
-                </form>
-                <div class="muted small">
-                  <?= (int)$work['n'] ?> scheduled task<?= $work['n'] === 1 ? '' : 's' ?><?php
-                    if ($work['locked'] > 0): ?>, <?= (int)$work['locked'] ?> hand-locked<?php endif; ?>
-                </div>
-              <?php endif; ?>
+            <?php // ONE LABEL, "Remove slot". It always takes the work with it —
+                  // that is what removing a slot means — so spelling it out in
+                  // the button only made the row longer. The CONFIRMATION still
+                  // says exactly what will go, including how much of it cannot
+                  // come back from a Regenerate, which is where that detail is
+                  // actually read. ?>
+            <?php if (can_edit()): ?>
+              <form method="post" class="slot-remove"
+                    onsubmit="return confirm('<?= $work['n'] === 0
+                        ? 'Remove this slot? The person stays on the studio crew list.'
+                        : 'Remove this slot AND delete the ' . (int)$work['n'] . ' task'
+                          . ($work['n'] === 1 ? '' : 's') . ' scheduled on it?'
+                          . ($work['locked'] > 0
+                              ? ' ' . (int)$work['locked'] . ' of them are hand-planned and will not come back from a Regenerate.'
+                              : ' They are auto-scheduled, so a Regenerate will replan them across the slots that remain.') ?>');">
+                <button type="submit" class="secondary danger" name="action"
+                        value="<?= $work['n'] === 0 ? 'remove:' : 'remove_work:' ?><?= (int)$l['id'] ?>">Remove slot</button>
+              </form>
+            <?php endif; ?>
+            </div>
+
+            <?php // Under the buttons rather than among them, so the line of
+                  // three stays a line of three. Still before the click. ?>
+            <?php if ($work['n'] > 0): ?>
+              <div class="muted small slot-note">
+                <?= (int)$work['n'] ?> scheduled task<?= $work['n'] === 1 ? '' : 's' ?><?php
+                  if ($work['locked'] > 0): ?>, <?= (int)$work['locked'] ?> hand-locked<?php endif; ?>
+              </div>
             <?php endif; ?>
           </td>
         </tr>
