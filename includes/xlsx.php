@@ -55,6 +55,22 @@ const XLSX_NOTE        = 21;  // small grey
 const XLSX_NOTE_ALT    = 22;
 const XLSX_WARN        = 23;  // bold red, for anything unpriced
 
+/* ---- the freelancer sheet's own look ------------------------------------
+ * Taken from Mana_Freelancer_DataBase.xlsx by opening it and reading its
+ * styles.xml, not by eye: bold Arial 16 on FFE06666 for the title, bold Arial
+ * for the headers, plain Arial for the body, blue underlined for a reel link.
+ * Nothing to do with the orange expense-projection palette above, which is why
+ * it gets its own slots rather than borrowing approximate ones.
+ *
+ * APPENDED, deliberately. Every index above is referenced by
+ * export_projection.php, so inserting anything in the middle would silently
+ * repaint that entire sheet. */
+const XLSX_FL_TITLE = 24;   // bold 16 on red
+const XLSX_FL_HEAD  = 25;   // bold
+const XLSX_FL_TEXT  = 26;
+const XLSX_FL_LINK  = 27;   // blue, underlined
+const XLSX_FL_NUM   = 28;   // 2 decimals, for a rate
+
 /** Pick the shaded variant of a style on alternate rows. */
 function xlsx_alt(int $style, bool $shaded): int {
     if (!$shaded) return $style;
@@ -260,7 +276,7 @@ function xlsx_styles_xml(): string {
         .   '<numFmt numFmtId="165" formatCode="0.00;(0.00);-"/>'
         .   '<numFmt numFmtId="166" formatCode="0;(0);-"/>'
         . '</numFmts>'
-        . '<fonts count="9">'
+        . '<fonts count="13">'
         .   '<font><sz val="11"/><name val="Calibri"/></font>'                                        // 0
         .   '<font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'               // 1 title
         .   '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'               // 2 header
@@ -270,8 +286,12 @@ function xlsx_styles_xml(): string {
         .   '<font><b/><sz val="11"/><name val="Arial"/></font>'                                      // 6 subtotal
         .   '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>'               // 7 grand
         .   '<font><sz val="9"/><color rgb="FF595959"/><name val="Arial"/></font>'                    // 8 note
+        .   '<font><b/><sz val="16"/><name val="Arial"/></font>'                                      // 9  freelancer title
+        .   '<font><b/><sz val="11"/><name val="Arial"/></font>'                                      // 10 freelancer header
+        .   '<font><sz val="11"/><name val="Arial"/></font>'                                          // 11 freelancer body
+        .   '<font><u/><sz val="11"/><color rgb="FF0000FF"/><name val="Arial"/></font>'                // 12 reel link
         . '</fonts>'
-        . '<fills count="7">'
+        . '<fills count="8">'
         .   '<fill><patternFill patternType="none"/></fill>'
         .   '<fill><patternFill patternType="gray125"/></fill>'
         .   '<fill><patternFill patternType="solid"><fgColor rgb="FFB85C00"/><bgColor indexed="64"/></patternFill></fill>'
@@ -279,6 +299,7 @@ function xlsx_styles_xml(): string {
         .   '<fill><patternFill patternType="solid"><fgColor rgb="FFD97706"/><bgColor indexed="64"/></patternFill></fill>'
         .   '<fill><patternFill patternType="solid"><fgColor rgb="FFFDEBD3"/><bgColor indexed="64"/></patternFill></fill>'
         .   '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill>'
+        .   '<fill><patternFill patternType="solid"><fgColor rgb="FFE06666"/><bgColor indexed="64"/></patternFill></fill>'  // 7 freelancer title
         . '</fills>'
         . '<borders count="2">'
         .   '<border><left/><right/><top/><bottom/><diagonal/></border>'
@@ -286,7 +307,7 @@ function xlsx_styles_xml(): string {
         .     '<bottom style="thin"><color rgb="FFB85C00"/></bottom><diagonal/></border>'
         . '</borders>'
         . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-        . '<cellXfs count="24">'
+        . '<cellXfs count="29">'
         // 0 default
         .   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
         // 1 title  2 header  3 band
@@ -323,6 +344,12 @@ function xlsx_styles_xml(): string {
         .   '<xf numFmtId="0" fontId="8" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
         // 23 warn
         .   '<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        // 24-28: the freelancer sheet
+        .   '<xf numFmtId="0" fontId="9"  fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
+        .   '<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        .   '<xf numFmtId="0" fontId="11" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        .   '<xf numFmtId="0" fontId="12" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+        .   '<xf numFmtId="165" fontId="11" fillId="0" borderId="0" xfId="0" applyFont="1" applyNumberFormat="1"/>'
         . '</cellXfs>'
         . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
         . '</styleSheet>';
@@ -336,4 +363,112 @@ function xlsx_send(string $bytes, string $filename): void {
     header('Content-Length: ' . strlen($bytes));
     header('Cache-Control: no-store');
     echo $bytes;
+}
+
+/* ---------------------------------------------------------------------------
+ * READING one back.
+ *
+ * The writer above has had no counterpart: an .xlsx could be produced and never
+ * consumed. Needed so the studio's existing freelancer spreadsheet — a thousand
+ * people already typed once — can be imported rather than retyped.
+ *
+ * Minimal on purpose, matching the writer: a sheet is a ZIP of XML, and the two
+ * parts that matter are the shared-string table and the first worksheet. It
+ * reads VALUES, not formatting, and it does not evaluate formulas — a cached
+ * value is used where one exists, which is what Excel leaves behind.
+ *
+ * Regexes rather than a DOM parse for the same reason the writer emits strings:
+ * no library, and these documents are machine-generated and regular. Written
+ * without a single backslash so that no amount of shell or editor mangling can
+ * quietly turn a character class into something else.
+ * ------------------------------------------------------------------------- */
+
+/** Column letters to a 0-based index: A->0, Z->25, AA->26. */
+function xlsx_col_index(string $ref): int {
+    $n = 0;
+    for ($i = 0; $i < strlen($ref); $i++) {
+        $c = ord($ref[$i]);
+        if ($c < 65 || $c > 90) break;
+        $n = $n * 26 + ($c - 64);
+    }
+    return $n - 1;
+}
+
+/**
+ * Every row of the first worksheet as a flat array of strings.
+ *
+ * Blank cells are filled in, so a row is positional and column D is always
+ * index 3 — a sheet that skips an empty cell would otherwise shift every value
+ * after it one place left, which is the failure that silently puts an email in
+ * the seniority column.
+ *
+ * @throws RuntimeException when the file is not a readable workbook
+ */
+function xlsx_read_rows(string $path, int $maxRows = 5000): array {
+    if (!xlsx_available()) {
+        throw new RuntimeException('This server has no ZipArchive extension, so it cannot read '
+                                 . 'an Excel file. Ask the host to enable php-zip.');
+    }
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('That file could not be opened as a spreadsheet. If it is an '
+                                 . 'older .xls, open it in Excel and save as .xlsx first.');
+    }
+
+    $shared = [];
+    $sx = $zip->getFromName('xl/sharedStrings.xml');
+    if ($sx !== false) {
+        if (preg_match_all('~<si>(.*?)</si>~s', $sx, $m)) {
+            foreach ($m[1] as $si) {
+                // A single <si> can hold several <t> runs when part of the text
+                // is styled differently; joined, or a bolded first name would
+                // arrive without its surname.
+                $t = '';
+                if (preg_match_all('~<t[^>]*>(.*?)</t>~s', $si, $tm)) $t = implode('', $tm[1]);
+                $shared[] = html_entity_decode($t, ENT_QUOTES | ENT_XML1, 'UTF-8');
+            }
+        }
+    }
+
+    $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->close();
+    if ($sheet === false) throw new RuntimeException('That workbook has no first worksheet.');
+
+    $rows = [];
+    if (preg_match_all('~<row[^>]*>(.*?)</row>~s', $sheet, $rm)) {
+        foreach ($rm[1] as $body) {
+            if (count($rows) >= $maxRows) break;
+            $cells = [];
+            if (preg_match_all('~<c ([^>]*?)(?:/>|>(.*?)</c>)~s', $body, $cm, PREG_SET_ORDER)) {
+                foreach ($cm as $c) {
+                    $attr = $c[1];
+                    $inner = $c[2] ?? '';
+                    $idx = 0;
+                    if (preg_match('~r="([A-Z]+)~', $attr, $r)) $idx = xlsx_col_index($r[1]);
+
+                    $type = '';
+                    if (preg_match('~t="([a-zA-Z]+)"~', $attr, $t)) $type = $t[1];
+
+                    $val = '';
+                    if ($type === 'inlineStr') {
+                        if (preg_match('~<t[^>]*>(.*?)</t>~s', $inner, $v)) $val = $v[1];
+                    } elseif (preg_match('~<v>(.*?)</v>~s', $inner, $v)) {
+                        $val = $v[1];
+                        if ($type === 's') {
+                            $val = $shared[(int)$val] ?? '';
+                        }
+                    }
+                    if ($type !== 's') $val = html_entity_decode($val, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                    $cells[$idx] = trim($val);
+                }
+            }
+            if (!$cells) { $rows[] = []; continue; }
+            // Filled to the widest index so the row stays positional.
+            $wide = max(array_keys($cells));
+            $flat = [];
+            for ($i = 0; $i <= $wide; $i++) $flat[] = $cells[$i] ?? '';
+            $rows[] = $flat;
+        }
+    }
+    return $rows;
 }

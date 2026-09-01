@@ -103,6 +103,33 @@ function column_exists(PDO $pdo, string $table, string $column): bool {
 }
 
 /**
+ * Does this column accept NULL?
+ *
+ * Same job as column_exists() and enum_has_value(): a migration may not have
+ * run, and a screen that offers something the column would reject is a save
+ * that fails for no visible reason. Used where a feature depends on a column
+ * having been WIDENED rather than added — migration 030 makes hires.project_id
+ * nullable so an artist can exist before any show wants them.
+ */
+function column_is_nullable(PDO $pdo, string $table, string $column): bool {
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    $safe = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+    try {
+        foreach ($pdo->query('SHOW COLUMNS FROM `' . $safe . '`') as $row) {
+            if (($row['Field'] ?? '') === $column) {
+                return $cache[$key] = (strtoupper((string)($row['Null'] ?? '')) === 'YES');
+            }
+        }
+    } catch (PDOException $e) {
+        return $cache[$key] = false;
+    }
+    return $cache[$key] = false;
+}
+
+/**
  * Does an ENUM column accept this value yet?
  *
  * Same job as column_exists() one level finer, and for the same reason: a
