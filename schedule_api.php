@@ -76,6 +76,39 @@ if ($action === 'step_dates') {
     exit;
 }
 
+// ---------------------------------------------------------------------------
+// MILESTONE DATE — a dragged marker on the general chart.
+//
+// Date only. The name and notes are edited in the modal, which posts to
+// timeline.php and reloads; a drag must not reload, or the gesture would end
+// with the chart jumping back to the top at a different scroll and zoom.
+// ---------------------------------------------------------------------------
+if ($action === 'milestone_date') {
+    $msId      = (int)($_POST['id'] ?? 0);
+    $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
+    if ($msId <= 0 || $projectId <= 0) api_fail('No milestone given.');
+
+    $date  = trim((string)($_POST['date'] ?? ''));
+    $parts = explode('-', $date);
+    if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
+        api_fail('That is not a date this app can store.');
+    }
+
+    // Scoped to the project named, exactly as the two actions below are: an id
+    // from another show must not be writable from this page.
+    $upd = $pdo->prepare(
+        'UPDATE project_milestones SET milestone_date = ? WHERE id = ? AND project_id = ?'
+    );
+    $upd->execute([$date, $msId, $projectId]);
+    if ($upd->rowCount() === 0) {
+        // Either it is gone or it belongs elsewhere. Both are "not yours to
+        // move", and saying which would tell a caller what exists.
+        api_fail('That milestone is not on this project.');
+    }
+    echo json_encode(['ok' => true, 'date' => $date]);
+    exit;
+}
+
 if ($action !== 'update') api_fail('Unknown action.');
 
 $id = (int)($_POST['id'] ?? 0);

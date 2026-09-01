@@ -364,6 +364,11 @@ require __DIR__ . '/includes/header.php';
         <span class="ms-flag">dashed line</span> down both charts. Typed by hand and never moved
         by the scheduler — the point of a review date is that the work bends around it, not the
         other way about.
+        <?php if (can_edit()): ?>
+          <br><strong>Drag a marker</strong> on the chart to move it, or
+          <strong>double-click</strong> it to change its name and notes — the same gestures the
+          task bars use. Grab it anywhere down the line, not just the diamond.
+        <?php endif; ?>
       </p>
 
       <?php if ($milestones): ?>
@@ -497,6 +502,35 @@ require __DIR__ . '/includes/header.php';
   <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
 </section>
 <?php endif; ?>   <?php // closes: the detailed chart needs a saved schedule ?>
+
+<?php // Opened by DOUBLE-CLICKING a milestone marker, the same gesture that
+      // opens a task. Posts to this page rather than the JSON API: a drag must
+      // not reload, but finishing an edit may, and reusing the server-side
+      // validation that already exists beats a second copy of it. ?>
+<?php if ($msReady && can_edit()): ?>
+<div id="msEditor" class="tl-modal" style="display:none;">
+  <div class="tl-modal-box">
+    <h3>Edit milestone</h3>
+    <form method="post">
+      <?php // The action rides on whichever button is pressed, set by the JS
+            // that opens this. A hidden field of the same name would also be
+            // posted, and PHP takes the last occurrence — so which one won
+            // would depend on document order rather than on what was clicked. ?>
+      <label>Name <input name="ms_name" id="msName" maxlength="120" required></label>
+      <label>Date <input type="date" name="ms_date" id="msDate" required></label>
+      <label>Notes <input name="ms_notes" id="msNotes" maxlength="255"></label>
+      <div class="actions">
+        <button type="button" class="secondary" onclick="closeMsEditor()">Cancel</button>
+        <?php // formnovalidate so a half-typed name cannot block the delete. ?>
+        <button type="submit" class="linkish link-danger" id="msRemove"
+                name="milestone_action" value="" formnovalidate>Remove</button>
+        <span class="spacer"></span>
+        <button type="submit" id="msSave" name="milestone_action" value="">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
 
 <div id="taskEditor" class="tl-modal" style="display:none;">
   <div class="tl-modal-box">

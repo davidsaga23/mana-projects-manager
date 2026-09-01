@@ -1416,3 +1416,12 @@ body.lightbox-lock { overflow: hidden; }
 /* Saturday and Sunday named as such, so the letters agree with the shading
    rather than leaving you to match them up. */
 .tl-chart .tl-dow-end { fill: #5a6a7a; }
+/* Milestone markers: grabbable, and big enough to look it. */
+.tl-chart .tl-ms-hit { fill: transparent; }
+.tl-chart .tl-ms-g.is-draggable { cursor: ew-resize; }
+.tl-chart .tl-ms-g.is-draggable:hover .tl-ms { stroke-width: 2.4; }
+.tl-chart .tl-ms-g.is-draggable:hover .tl-ms-dia { stroke: #4d2374; stroke-width: 1.5; }
+/* While dragging, the dashes stop and the marker goes solid: it is being
+   placed now rather than merely marking a date. */
+.tl-chart .tl-ms-g.is-dragging .tl-ms { stroke-dasharray: none; stroke-width: 2.4; }
+.tl-chart .tl-ms-g.is-dragging .tl-ms-label { fill: #4d2374; }

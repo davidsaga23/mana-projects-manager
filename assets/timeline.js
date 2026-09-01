@@ -219,50 +219,159 @@
     if (!window.MILESTONES || !window.MILESTONES.length) return;
     var svg = container.querySelector('svg.gantt');
     if (!svg) return;
-    svg.querySelectorAll('.tl-ms, .tl-ms-label').forEach(function (n) { n.remove(); });
+    svg.querySelectorAll('.tl-ms-g').forEach(function (n) { n.remove(); });
 
-    var h    = svg.getAttribute('height') || svg.getBoundingClientRect().height;
+    var h    = parseFloat(svg.getAttribute('height')) || svg.getBoundingClientRect().height;
     var head = svg.querySelector('.grid-header');
     var top  = head ? (parseFloat(head.getAttribute('height')) || 60) : 0;
     var ns   = 'http://www.w3.org/2000/svg';
+    var cw   = g.options.column_width;
+    var step = g.options.step;
+
+    // x <-> date, both directions. The forward one is the today line's; the
+    // inverse is what a drag needs, and it SNAPS TO A WHOLE DAY -- in Month or
+    // Year view a column is not a day, so without rounding a milestone would
+    // land on an hour nobody chose.
+    function xOf(d) {
+      return (((d - g.gantt_start) / 3600000) / step) * cw;
+    }
+    function dayAt(x) {
+      var days = Math.round(((x / cw) * step) / 24);
+      var d = new Date(g.gantt_start.getFullYear(), g.gantt_start.getMonth(),
+                       g.gantt_start.getDate() + days);
+      return d;
+    }
+    function iso(d) {
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
     window.MILESTONES.forEach(function (m) {
-      // Parsed from parts, never `new Date("2026-09-15")` -- that is read as UTC
-      // and lands on the previous day west of Greenwich. Rule 2 at the top.
       var p = String(m.date).split('-');
       if (p.length !== 3) return;
       var d = new Date(+p[0], +p[1] - 1, +p[2]);
       d.setHours(0, 0, 0, 0);
-      var hours = (d - g.gantt_start) / 3600000;
-      if (hours < 0) return;                    // before the chart starts
-      var x = (hours / g.options.step) * g.options.column_width;
+      if (d < g.gantt_start) return;                 // before the chart starts
+      var x = xOf(d);
+
+      var grp = document.createElementNS(ns, 'g');
+      grp.setAttribute('class', 'tl-ms-g');
+      grp.setAttribute('data-id', m.id);
+
+      // A WIDE INVISIBLE HANDLE over the whole line, not just the diamond.
+      // The diamond sits near the top and scrolls out of view on a long chart;
+      // the line is what stays on screen, so the line is what you grab.
+      var hit = document.createElementNS(ns, 'rect');
+      hit.setAttribute('class', 'tl-ms-hit');
+      hit.setAttribute('x', x - 7); hit.setAttribute('y', top);
+      hit.setAttribute('width', 14);
+      hit.setAttribute('height', Math.max(0, h - top));
+      grp.appendChild(hit);
 
       var line = document.createElementNS(ns, 'line');
       line.setAttribute('class', 'tl-ms');
       line.setAttribute('x1', x); line.setAttribute('x2', x);
       line.setAttribute('y1', top); line.setAttribute('y2', h);
-      svg.appendChild(line);
+      grp.appendChild(line);
 
-      // A diamond at the top, which is what a milestone looks like on every
-      // other Gantt anybody has used.
+      // Bigger than it was: 20px across rather than 10, so it reads as a marker
+      // you can take hold of rather than a tick you might have imagined.
       var dia = document.createElementNS(ns, 'polygon');
-      dia.setAttribute('class', 'tl-ms');
+      dia.setAttribute('class', 'tl-ms tl-ms-dia');
       dia.setAttribute('points', [
-        x + ',' + (top + 2), (x + 5) + ',' + (top + 7),
-        x + ',' + (top + 12), (x - 5) + ',' + (top + 7)
+        x + ',' + (top + 1), (x + 10) + ',' + (top + 11),
+        x + ',' + (top + 21), (x - 10) + ',' + (top + 11)
       ].join(' '));
-      svg.appendChild(dia);
+      grp.appendChild(dia);
 
       var text = document.createElementNS(ns, 'text');
       text.setAttribute('class', 'tl-ms-label');
-      text.setAttribute('x', x + 8);
-      text.setAttribute('y', top + 11);
+      text.setAttribute('x', x + 14);
+      text.setAttribute('y', top + 15);
       text.textContent = m.name;
+      grp.appendChild(text);
+
       var title = document.createElementNS(ns, 'title');
-      title.textContent = m.name + ' · ' + m.date + (m.notes ? ' · ' + m.notes : '');
-      text.appendChild(title);
-      svg.appendChild(text);
+      title.textContent = m.name + ' · ' + m.date + (m.notes ? ' · ' + m.notes : '')
+                        + (window.TL_CAN_EDIT ? ' · drag to move, double-click to edit' : '');
+      grp.appendChild(title);
+      svg.appendChild(grp);
+
+      if (!window.TL_CAN_EDIT) return;
+      grp.classList.add('is-draggable');
+
+      grp.addEventListener('dblclick', function (ev) {
+        ev.preventDefault();
+        openMsEditor(m);
+      });
+
+      // --- drag ---------------------------------------------------------
+      // Snapped to a day and previewed by translating the whole group, so the
+      // line, diamond and label move together and nothing is rebuilt per pixel.
+      grp.addEventListener('mousedown', function (ev) {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        var startX = ev.clientX, moved = 0, snapped = 0;
+        grp.classList.add('is-dragging');
+
+        function onMove(e) {
+          moved = e.clientX - startX;
+          // Snap as it goes, so what you see is where it will land.
+          snapped = Math.round(moved / (cw * 24 / step)) * (cw * 24 / step);
+          grp.setAttribute('transform', 'translate(' + snapped + ',0)');
+        }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          grp.classList.remove('is-dragging');
+          if (!snapped) { grp.removeAttribute('transform'); return; }
+
+          var newDate = iso(dayAt(x + snapped));
+          saveMilestoneDate(m.id, newDate).then(function () {
+            m.date = newDate;                 // keep the in-memory copy honest
+            renderGeneral();
+            renderDetailed();
+          }).catch(function () {
+            grp.removeAttribute('transform');
+          });
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
     });
+  }
+
+  function openMsEditor(m) {
+    var box = $('msEditor');
+    if (!box) return;
+    $('msName').value  = m.name  || '';
+    $('msDate').value  = m.date  || '';
+    $('msNotes').value = m.notes || '';
+    $('msSave').value   = 'edit:' + m.id;
+    $('msRemove').value = 'remove:' + m.id;
+    box.style.display = 'flex';
+    $('msName').focus();
+  }
+  window.closeMsEditor = function () {
+    var box = $('msEditor');
+    if (box) box.style.display = 'none';
+  };
+
+  function saveMilestoneDate(id, date) {
+    var body = new URLSearchParams();
+    body.append('id', id);
+    body.append('date', date);
+    return fetch('schedule_api.php?action=milestone_date&project=' + window.TL_PROJECT,
+                 { method: 'POST', body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { alert(d.error || 'Save failed.'); throw new Error(d.error || 'failed'); }
+        return d;
+      })
+      .catch(function (err) {
+        if (err instanceof SyntaxError) alert('Save failed — try reloading the page.');
+        throw err;
+      });
   }
 
   // --- dependencies on the general chart --------------------------------------
