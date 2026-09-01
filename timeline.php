@@ -67,6 +67,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) 
             )->execute([$projectId, $name, $date, $note !== '' ? mb_substr($note, 0, 255) : null]);
             flash('ok', sprintf('Added "%s" on %s.', $name, $date));
 
+        } elseif (preg_match('/^edit:(\d+)$/', $act, $mm)) {
+            $name = trim((string)($_POST['ms_name'] ?? ''));
+            $date = trim((string)($_POST['ms_date'] ?? ''));
+            $note = trim((string)($_POST['ms_notes'] ?? ''));
+            if ($name === '') throw new RuntimeException('A milestone needs a name.');
+            $parts = explode('-', $date);
+            if (count($parts) !== 3 || !checkdate((int)$parts[1], (int)$parts[2], (int)$parts[0])) {
+                throw new RuntimeException('A milestone needs a date.');
+            }
+            $upd = $pdo->prepare(
+                'UPDATE project_milestones SET name = ?, milestone_date = ?, notes = ?
+                  WHERE id = ? AND project_id = ?'
+            );
+            $upd->execute([mb_substr($name, 0, 120), $date,
+                           $note !== '' ? mb_substr($note, 0, 255) : null,
+                           (int)$mm[1], $projectId]);
+            flash('ok', sprintf('Updated "%s" — now on %s.', $name, $date));
+
         } elseif (preg_match('/^remove:(\d+)$/', $act, $mm)) {
             $del = $pdo->prepare('DELETE FROM project_milestones WHERE id = ? AND project_id = ?');
             $del->execute([(int)$mm[1], $projectId]);
@@ -352,19 +370,32 @@ require __DIR__ . '/includes/header.php';
         <table>
           <tr><th>Date</th><th>Milestone</th><th>Notes</th><th></th></tr>
           <?php foreach ($milestones as $m): ?>
+            <?php // Edited IN THE ROW rather than behind a disclosure. There
+                  // are only ever a handful of these, and the whole reason to
+                  // open the panel is to move a date — asking for a click before
+                  // the field appears would be a click on every visit. ?>
             <tr>
-              <td><?= e($m['date']) ?></td>
-              <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
-              <td class="muted"><?= e($m['notes']) ?></td>
-              <td class="row-actions">
-                <?php if (can_edit()): ?>
-                  <form method="post" class="inline-form"
-                        onsubmit="return confirm('Remove the milestone <?= e(addslashes($m['name'])) ?>?');">
-                    <button type="submit" class="linkish" name="milestone_action"
-                            value="remove:<?= (int)$m['id'] ?>">Remove</button>
+              <?php if (can_edit()): ?>
+                <td colspan="4">
+                  <form method="post" class="inline-form">
+                    <input type="date" name="ms_date" value="<?= e($m['date']) ?>">
+                    <input name="ms_name" value="<?= e($m['name']) ?>" size="22" maxlength="120" required>
+                    <input name="ms_notes" value="<?= e($m['notes']) ?>" size="24"
+                           maxlength="255" placeholder="Notes (optional)">
+                    <button type="submit" class="secondary" name="milestone_action"
+                            value="edit:<?= (int)$m['id'] ?>">Save</button>
+                    <button type="submit" class="linkish link-danger" name="milestone_action"
+                            value="remove:<?= (int)$m['id'] ?>"
+                            onclick="return confirm('Remove the milestone <?= e(addslashes($m['name'])) ?>?');"
+                            formnovalidate>Remove</button>
                   </form>
-                <?php endif; ?>
-              </td>
+                </td>
+              <?php else: ?>
+                <td><?= e($m['date']) ?></td>
+                <td><strong class="ms-flag"><?= e($m['name']) ?></strong></td>
+                <td class="muted"><?= e($m['notes']) ?></td>
+                <td></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
         </table>

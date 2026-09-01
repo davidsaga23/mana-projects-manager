@@ -162,6 +162,7 @@
     // the bars and arrows, which are drawn in later groups. Appended to the svg
     // instead it would paint over the work.
     var grid = svg.querySelector('.grid') || svg;
+    var dateLayer = svg.querySelector('.date') || svg;
 
     // Where Frappe put the day numbers, so the letters sit directly above them
     // rather than at a height guessed from the header.
@@ -193,7 +194,15 @@
       t.setAttribute('x', x + cw / 2);
       t.setAttribute('y', ly - 11);
       t.textContent = LETTERS[dow];
-      svg.appendChild(t);
+      // INTO THE DATE LAYER, not onto the svg. stickyHeader() runs after this
+      // and MOVES the opaque .grid-header rect and the .date group into a
+      // tl-sticky group appended last, so anything left on the svg root ends up
+      // painted over by that header — which is exactly what happened to these
+      // letters, and the same reason the today line starts below the header.
+      //
+      // In the date layer they travel with it, so they also stay put while the
+      // chart scrolls, which is what you want from a column heading anyway.
+      dateLayer.appendChild(t);
     });
   }
 
