@@ -128,6 +128,75 @@
     svg.appendChild(text);
   }
 
+  // --- the calendar header: weekends, and what day each column is --------------
+  //
+  // A row of numbers does not tell you which of them are Saturdays, and on an
+  // animation schedule that is the first thing you want: whether a bar that
+  // "takes five days" is really crossing a weekend and landing on the Tuesday.
+  //
+  // Both only make sense per-day, so both are skipped in Week, Month and Year
+  // view where a column is not a day. The letters are skipped again on a narrow
+  // column, where M T W T F S S would simply overlap into a smear.
+  //
+  // Weekend shading only. Studio holidays are known -- the wizard collects them
+  // -- but they are not on this page yet, and shading only some non-working days
+  // would be worse than shading none: it would read as "these are the days off".
+  function decorateCalendar(g, container) {
+    if (!g || !g.dates || !g.options) return;
+    var svg = container.querySelector('svg.gantt');
+    if (!svg) return;
+    svg.querySelectorAll('.tl-weekend, .tl-dow').forEach(function (n) { n.remove(); });
+
+    var mode = g.options.view_mode;
+    if (mode !== 'Day' && mode !== 'Half Day') return;
+
+    var ns   = 'http://www.w3.org/2000/svg';
+    var cw   = g.options.column_width;
+    var head = svg.querySelector('.grid-header');
+    var top  = head ? (parseFloat(head.getAttribute('height')) || 60) : 0;
+    var bg   = svg.querySelector('.grid-background');
+    var h    = bg ? parseFloat(bg.getAttribute('height'))
+                  : parseFloat(svg.getAttribute('height') || 0);
+
+    // Into the grid group, so the shading sits over the row stripes and UNDER
+    // the bars and arrows, which are drawn in later groups. Appended to the svg
+    // instead it would paint over the work.
+    var grid = svg.querySelector('.grid') || svg;
+
+    // Where Frappe put the day numbers, so the letters sit directly above them
+    // rather than at a height guessed from the header.
+    var lower = svg.querySelector('.lower-text');
+    var ly    = lower ? parseFloat(lower.getAttribute('y')) : top - 8;
+    var showLetters = cw >= 20;
+
+    var LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    g.dates.forEach(function (d, i) {
+      var dow = d.getDay();
+      var x = i * cw;
+
+      if (dow === 0 || dow === 6) {
+        var r = document.createElementNS(ns, 'rect');
+        r.setAttribute('class', 'tl-weekend');
+        r.setAttribute('x', x);
+        r.setAttribute('y', top);
+        r.setAttribute('width', cw);
+        r.setAttribute('height', Math.max(0, h - top));
+        grid.appendChild(r);
+      }
+
+      // In Half Day view every second column is noon; the letter belongs on the
+      // one that starts the day, not on both.
+      if (!showLetters || d.getHours() !== 0) return;
+      var t = document.createElementNS(ns, 'text');
+      t.setAttribute('class', 'tl-dow' + (dow === 0 || dow === 6 ? ' tl-dow-end' : ''));
+      t.setAttribute('x', x + cw / 2);
+      t.setAttribute('y', ly - 11);
+      t.textContent = LETTERS[dow];
+      svg.appendChild(t);
+    });
+  }
+
   // --- milestones -------------------------------------------------------------
   //
   // Client reviews, deliveries, locks: dates the plan has to be ready for. Drawn
@@ -322,6 +391,7 @@
       paintDependencies();
       addTodayLine(generalGantt, el);
       addMilestones(generalGantt, el);
+      decorateCalendar(generalGantt, el);
       // This chart scrolls too — nineteen steps overflow its height — so its
       // header has to float as well, or the months scroll away and the bars
       // below have nothing to be read against.
@@ -426,6 +496,7 @@
       decorate();
       addTodayLine(detailedGantt, el);
       addMilestones(detailedGantt, el);
+      decorateCalendar(detailedGantt, el);
       // Last, so the floating header paints over the bars and the today line
       // rather than under them.
       stickyHeader(el);

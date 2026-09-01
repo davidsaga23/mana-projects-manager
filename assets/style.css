@@ -1399,3 +1399,20 @@ body.lightbox-lock { overflow: hidden; }
 .ms-panel { margin-top: 12px; }
 .ms-panel table { margin: 8px 0; }
 .ms-flag { color: #7b3fb8; font-weight: 700; }
+/* --- the calendar header ----------------------------------------------------
+   Weekend columns and the day-of-week letter above each date. Carrying the
+   container class for the usual reason: Frappe's stylesheet is linked from the
+   CDN after this file and would win on order otherwise. */
+
+/* Very light, and NOT a colour that means anything else on this chart. A
+   weekend is context, not a warning -- it must sit behind the work without
+   competing with a red deadline or a purple milestone for attention. */
+.tl-chart .tl-weekend { fill: #1c2733; fill-opacity: .045; pointer-events: none; }
+
+.tl-chart .tl-dow {
+  font: 600 9px -apple-system, "Segoe UI", Roboto, sans-serif;
+  fill: #9aa6b2; text-anchor: middle; pointer-events: none;
+}
+/* Saturday and Sunday named as such, so the letters agree with the shading
+   rather than leaving you to match them up. */
+.tl-chart .tl-dow-end { fill: #5a6a7a; }
