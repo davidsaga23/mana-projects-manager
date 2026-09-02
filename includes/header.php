@@ -42,6 +42,23 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
             // picking it from Projects. ?>
       · <a href="artists.php">Artists</a>
 
+      <?php // THE RECORDS. David, 2026-09-01: "I'll need from time to time, to
+            // check the records and see what we used to charge certain slots or
+            // quotas." Both sit beside Artists rather than inside a project for
+            // the same reason it does — the value of a record is that the NEXT
+            // show can read it, and neither is about any one show.
+            //
+            // Two links rather than one History page with tabs, because they are
+            // reached for separately: a quota is a production question asked
+            // while planning, a fee is a money question asked while budgeting.
+            //
+            // Fees are admin-only, like every other screen carrying a rate.
+            // Quotas are not: days per item and headcount are production facts. ?>
+      · <a href="history_quotas.php">Historic quotas</a>
+      <?php if (is_admin()): ?>
+        · <a href="history_fees.php">Historic fees</a>
+      <?php endif; ?>
+
       <?php
       // The setup and housekeeping screens, behind a separator. Opened
       // occasionally rather than daily — the same split project_nav() makes

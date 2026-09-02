@@ -1609,3 +1609,57 @@ button.secondary.danger:hover { background: #e9c2c7; }
 /* Unpriced rows are the ones the warning under the table is about, so the empty
    box says so rather than looking like any other blank field. */
 .rate-edit input.rate-unset { border-color: #d9a406; background: #fffbe6; }
+
+/* ---- the history screens ---------------------------------------------------
+   Long lists of small tables under repeated headings. The headings have to
+   carry the grouping on their own, because there is no other structure: rules
+   above them do the work a card border would, without boxing every table. */
+.history-dept {
+  margin: 32px 0 4px; padding-bottom: 6px;
+  border-bottom: 2px solid #c3ccd4;
+  font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: #44515e;
+}
+.history-head {
+  margin: 20px 0 6px; font-size: 15px; font-weight: 600;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.history-head .muted { font-weight: 400; }
+/* Tight, because these are reference tables read by scanning down one column
+   rather than worked in. */
+.history-table { margin-bottom: 4px; table-layout: fixed; width: 100%; }
+.history-table td, .history-table th { padding: 5px 8px; }
+/* FIXED COLUMNS so the blocks line up with each other.
+   Every capture and every step draws its own table, and a table that sizes to
+   its own contents puts Days per item in a different place in every block —
+   which defeats reading down a column, the one way these pages get used.
+   Three shapes, three column sets; the percentages are what the content wants
+   at a normal window, and fixed layout wraps rather than truncates when it is
+   narrower. */
+.h-cap th:nth-child(1) { width: 19%; } .h-cap th:nth-child(2) { width: 16%; }
+.h-cap th:nth-child(3) { width: 11%; } .h-cap th:nth-child(4) { width: 10%; }
+.h-cap th:nth-child(5) { width:  9%; } .h-cap th:nth-child(6) { width:  8%; }
+.h-cap th:nth-child(7) { width:  9%; } .h-cap th:nth-child(8) { width: 18%; }
+
+.h-step th:nth-child(1) { width: 16%; } .h-step th:nth-child(2) { width: 13%; }
+.h-step th:nth-child(3) { width: 15%; } .h-step th:nth-child(4) { width: 26%; }
+.h-step th:nth-child(5) { width: 12%; } .h-step th:nth-child(6) { width: 18%; }
+
+.h-fee th:nth-child(1) { width: 17%; } .h-fee th:nth-child(2) { width: 30%; }
+.h-fee th:nth-child(3) { width: 16%; } .h-fee th:nth-child(4) { width: 21%; }
+.h-fee th:nth-child(5) { width: 16%; }
+/* Marks a placeholder seat — the rows whose rate is genuinely this project's. */
+.slot-tag {
+  background: #e8eaf6; color: #3949ab; border-radius: 3px;
+  padding: 1px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+}
+/* A filter bar whose controls size to their content.
+   `.inline-form` is a flex row, but the global `input, select { width: 100% }`
+   makes every child claim the whole row, so a search box, a picker and a button
+   come out stacked three deep instead of sitting side by side. The same rule
+   that stretched the position checkboxes on the Artists screen until their
+   labels fell outside the box.
+   SCOPED, not fixed globally: every other filter bar in the app is laid out
+   around the current behaviour, and quietly reflowing all of them to ship two
+   new screens is not a trade worth making. */
+.filter-bar input[type=text], .filter-bar input:not([type]), .filter-bar select { width: auto; }
+.filter-bar select { max-width: 22em; }
