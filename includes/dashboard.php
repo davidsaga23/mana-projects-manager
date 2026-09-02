@@ -24,6 +24,33 @@ require_once __DIR__ . '/quota.php';
  * two screens disagreed about the denominator, every percentage on this page
  * would be quietly wrong.
  */
+/**
+ * HOW MANY TASKS A STEP IS, given what the project contains.
+ *
+ * A whole-project step is one deliverable however big the show is; a step that
+ * applies to shots is one task per shot; a type-scoped asset step counts only
+ * its own type. Items somebody marked not-applicable leave the denominator, or
+ * the step could never reach 100%.
+ *
+ * ONE IMPLEMENTATION, two callers: dashboard_steps() below, which does it for a
+ * single project in full, and projects_overall_pct(), which does it for a whole
+ * list at once. This is the denominator under every percentage in the app, and
+ * two copies of it would drift the first time one was corrected.
+ */
+function step_applicable_count(array $step, int $shotCount, array $typeCounts, int $assetCount): int {
+    if (($step['applies_to'] ?? '') === 'project') {
+        $n = 1;
+    } else {
+        $n = 0;
+        if (in_array($step['applies_to'] ?? '', ['shot', 'both'], true))  $n += $shotCount;
+        if (in_array($step['applies_to'] ?? '', ['asset', 'both'], true)) {
+            $type = (string)($step['applies_to_asset_type'] ?? '');
+            $n += $type !== '' ? ($typeCounts[$type] ?? 0) : $assetCount;
+        }
+    }
+    return max(0, $n - (int)($step['excluded'] ?? 0));
+}
+
 function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null): array {
     $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 
@@ -74,19 +101,7 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
 
     $out = [];
     foreach ($steps as $s) {
-        $type = $s['applies_to_asset_type'] ?? '';
-        if ($s['applies_to'] === 'project') {
-            $applicable = 1;
-        } else {
-            $applicable = 0;
-            if (in_array($s['applies_to'], ['shot', 'both'], true))  $applicable += $shotCount;
-            if (in_array($s['applies_to'], ['asset', 'both'], true)) {
-                $applicable += $type !== '' ? ($typeCounts[$type] ?? 0) : $assetCount;
-            }
-        }
-        // Items marked not-applicable are not work, so they leave the
-        // denominator. Otherwise a step could never reach 100%.
-        $applicable = max(0, $applicable - (int)$s['excluded']);
+        $applicable = step_applicable_count($s, $shotCount, $typeCounts, $assetCount);
 
         $sched->execute([(int)$s['id']]);
         $sp = $sched->fetch();
@@ -446,6 +461,98 @@ function dashboard_overall(array $steps, ?string $delivery, ?array $pace, ?strin
         'delta_delivered' => $pace['delta_delivered'] ?? null,
         'last_reading'  => $pace['to'] ?? null,
     ];
+}
+
+/**
+ * THE SAME HEADLINE PERCENTAGE, for a whole list of projects at once.
+ *
+ * David, 2026-09-02: a progress capsule on every row of the front door.
+ *
+ * WHY THIS EXISTS RATHER THAN A LOOP OVER dashboard_steps(). That function is
+ * built for one project opened on purpose: per step it runs a schedule query, a
+ * pace query and a deltas query, so a seventeen-step show costs upwards of
+ * fifty round trips. Called once per row, the project list would run hundreds
+ * of queries to print a dozen numbers. This runs THREE, whatever the list.
+ *
+ * WHY IT CANNOT DISAGREE WITH THE OVERVIEW. It does not re-implement the
+ * arithmetic — it collects the same four columns set-wise, applies the shared
+ * step_applicable_count() rule, and then hands the rows to dashboard_overall(),
+ * which is the one place a project is turned into a percentage. The pieces this
+ * cheap path does not gather (pace, deltas, the saved schedule) are exactly the
+ * pieces dashboard_overall() does not read for `pct`; delivery is passed so the
+ * rest of its answer stays honest if anything ever reads it.
+ *
+ * Returns [project_id => ['pct' => int|null, 'approved' => int, 'applicable' => int]].
+ * A null pct means the project has nothing to count yet, which is a different
+ * fact from 0% and has to stay different on the screen.
+ */
+function projects_overall_pct(PDO $pdo, array $projects): array {
+    $ids = [];
+    foreach ($projects as $p) $ids[] = (int)$p['id'];
+    $ids = array_values(array_filter(array_unique($ids), fn($i) => $i > 0));
+    if (!$ids) return [];
+
+    // A list built from integers that were cast on the way in, so there is
+    // nothing here for a placeholder to protect.
+    $in = implode(',', $ids);
+
+    // ---- what each project contains ---------------------------------------
+    $shots = [];
+    foreach ($pdo->query("SELECT project_id, COUNT(*) n FROM shots
+                           WHERE project_id IN ($in) GROUP BY project_id") as $r) {
+        $shots[(int)$r['project_id']] = (int)$r['n'];
+    }
+
+    // Per TYPE as well as in total: a step scoped to Characters counts only the
+    // characters, and that distinction is the whole reason type-scoped steps
+    // exist.
+    $types = []; $assets = [];
+    foreach ($pdo->query("SELECT project_id, COALESCE(asset_type,'') t, COUNT(*) n FROM assets
+                           WHERE project_id IN ($in) GROUP BY project_id, asset_type") as $r) {
+        $pid = (int)$r['project_id'];
+        $types[$pid][(string)$r['t']] = (int)$r['n'];
+        $assets[$pid] = ($assets[$pid] ?? 0) + (int)$r['n'];
+    }
+
+    // ---- every step of every project, with its counts ----------------------
+    // The same joins dashboard_steps() makes, without the per-step follow-ups.
+    // progress carries no project_id; it is reached through the step, which is
+    // how the single-project version reaches it too.
+    $rows = $pdo->query(
+        "SELECT ps.project_id, ps.applies_to, ps.applies_to_asset_type,
+                COALESCE(SUM(pr.is_delivered), 0) AS delivered,
+                COALESCE(SUM(pr.is_approved), 0)  AS approved,
+                COALESCE(SUM(st.is_blocked = 1), 0) AS blocked,
+                COALESCE(SUM(st.is_excluded = 1), 0) AS excluded
+           FROM pipeline_steps ps
+           LEFT JOIN progress pr ON pr.step_id = ps.id
+           LEFT JOIN statuses st ON st.id = pr.status_id
+          WHERE ps.project_id IN ($in)
+          GROUP BY ps.id"
+    )->fetchAll();
+
+    $byProject = [];
+    foreach ($rows as $r) {
+        $pid = (int)$r['project_id'];
+        $byProject[$pid][] = [
+            'applicable' => step_applicable_count(
+                $r, $shots[$pid] ?? 0, $types[$pid] ?? [], $assets[$pid] ?? 0),
+            'approved'   => (int)$r['approved'],
+            'delivered'  => (int)$r['delivered'],
+            'blocked'    => (int)$r['blocked'],
+        ];
+    }
+
+    $out = [];
+    foreach ($projects as $p) {
+        $pid = (int)$p['id'];
+        $steps = $byProject[$pid] ?? [];
+        if (!$steps) { $out[$pid] = ['pct' => null, 'approved' => 0, 'applicable' => 0]; continue; }
+        $o = dashboard_overall($steps, $p['delivery_date'] ?: null, null);
+        $out[$pid] = ['pct' => $o['pct'], 'approved' => $o['approved'],
+                      'applicable' => $o['applicable']];
+    }
+    return $out;
 }
 
 /**

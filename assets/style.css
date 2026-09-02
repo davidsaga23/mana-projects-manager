@@ -1402,18 +1402,50 @@ body.lightbox-lock { overflow: hidden; }
 .row-btn::-webkit-details-marker { display: none; }
 .row-btn::marker { content: ''; }
 
+/* --- the progress capsule --------------------------------------------------
+   The project's headline percentage, sitting in the row of buttons.
+
+   FIXED WIDTH so the buttons after it line up down the list, and the digits
+   right-align into a column of their own. Sized and bordered to match .row-btn
+   exactly - it shares a line with three of them, and a pill half a pixel off
+   reads as a mistake.
+
+   The fill is a hard-stop gradient on the pill itself: two colours, no second
+   element, so there is nothing to fall out of alignment. --fill is set inline
+   per row and defaults to 0 so a missing value paints an empty track rather
+   than a full one. */
+.pct-cap {
+  --fill: 0%;
+  display: inline-block; box-sizing: border-box;
+  min-width: 54px; padding: 4px 8px; border-radius: 4px;
+  font-size: 13px; font-weight: 600; text-align: right; white-space: nowrap;
+  color: #1c2733; border: 1px solid #dbe2e8;
+  background: linear-gradient(to right, #cfe3f6 0 var(--fill), #f1f4f7 var(--fill) 100%);
+}
+/* "Nothing to count yet" is not 0% and must not look like it: no track, no
+   fill, no number - an em dash and the title attribute. */
+.pct-cap.pct-none {
+  background: none; border-color: transparent; color: #8a97a3;
+  font-weight: 400; text-align: center;
+}
+
 /* ONE of the three is the one you came for. Open — or Resume setup, on a show
    that never finished the wizard — is filled; the other two are not. */
 .row-btn-go { background: #2f6fb2; color: #fff; border-color: #2f6fb2; }
 .row-btn-go:hover { background: #275d95; border-color: #275d95; color: #fff; }
 
-/* Rename and delete live behind a disclosure.
-   flex-basis:100% puts Edit on its own line UNDER Open and Finance, and that is
-   load-bearing rather than cosmetic: the panel it opens carries the delete form
-   and its paragraph of small print, and beside two other buttons it would be
-   squeezed into what is left of an already narrow last column. white-space
-   returns to normal because .row-actions is nowrap for every other screen. */
-.project-edit { flex-basis: 100%; margin-top: 0; white-space: normal; }
+/* Rename and delete live behind a disclosure, and CLOSED it is just the third
+   button on the line (David, 2026-09-02).
+   white-space returns to normal because .row-actions is nowrap for every other
+   screen, and the panel below has to wrap. */
+.project-edit { margin-top: 0; white-space: normal; }
+/* ⚠ OPEN, it takes the whole line. The panel it drops carries the delete form
+   and its paragraph of small print; left beside two other buttons that panel
+   would be squeezed into whatever is left of an already narrow last column.
+   flex-basis:100% cannot share a line, so the <details> wraps below - and only
+   it moves. Open and Finance are earlier flex items and stay exactly where they
+   were, so nothing slides under the cursor that just clicked. */
+.project-edit[open] { flex-basis: 100%; }
 /* Held down while the panel is open, so it reads as the thing that opened it. */
 .project-edit[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
 .project-edit .inline-form { margin: 0 0 8px; gap: 8px; }

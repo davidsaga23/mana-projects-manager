@@ -156,6 +156,17 @@ $archivedCount = $canArchive
     ? (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'archived'")->fetchColumn()
     : 0;
 
+// The progress figure on every row. THREE queries for the whole list, not
+// dashboard_steps() once per project - see projects_overall_pct() for why that
+// distinction matters and why the two cannot disagree.
+//
+// Loaded here rather than at the top of the file for the same reason finance.php
+// is loaded inside the delete branch: dashboard.php pulls in pipeline.php and
+// quota.php, and that is worth paying for a number on every row but would not be
+// worth paying for a POST that redirects.
+require_once __DIR__ . '/includes/dashboard.php';
+$progressPct = projects_overall_pct($pdo, $projects);
+
 $pageTitle = 'Projects';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -170,13 +181,13 @@ require __DIR__ . '/includes/header.php';
       // Starting a show is the thing this screen is for; the other three are
       // ways of looking at what is already here. Four solid blue buttons would
       // say all four are equally the point, which is how a row of buttons stops
-      // meaning anything. ?>
+      // meaning anything.
+      //
+      // ORDER IS THE GROUPING (David, 2026-09-02). The first two are about THIS
+      // list - add to it, and see what has left it. The last two lead away from
+      // it. Nothing draws the divide; the order carries it. ?>
 <div class="page-actions button-row">
   <a class="button" href="wizard.php">+ New project</a>
-  <a class="button secondary" href="mytasks.php">My tasks</a>
-  <?php if (is_admin()): ?>
-    <a class="button secondary" href="finance.php">Finance across all projects</a>
-  <?php endif; ?>
   <?php // Always drawn once there is anything archived, so a project that has
         // left the list can always be found again. A hidden thing with no way
         // back is indistinguishable from a deleted one. ?>
@@ -185,6 +196,10 @@ require __DIR__ . '/includes/header.php';
       $showArchived
         ? 'Hide archived'
         : 'Show archived (' . (int)$archivedCount . ')' ?></a>
+  <?php endif; ?>
+  <a class="button secondary" href="mytasks.php">My tasks</a>
+  <?php if (is_admin()): ?>
+    <a class="button secondary" href="finance.php">Finance across all projects</a>
   <?php endif; ?>
 </div>
 
@@ -248,6 +263,35 @@ require __DIR__ . '/includes/header.php';
               // Buttons touching each other read as one segmented control, and
               // the gap is what says they are three separate decisions. ?>
         <div class="proj-actions">
+        <?php
+        // THE PROGRESS CAPSULE. Every shot and asset through every step, as one
+        // figure - the same headline the project's Overview leads with, out of
+        // the same dashboard_overall().
+        //
+        // FIRST in the row and a FIXED WIDTH, both on purpose: the buttons after
+        // it then start at the same x on every row, so a list can be clicked
+        // down without the target moving. Right-aligned inside that width so the
+        // digits line up as a column.
+        //
+        // ⚠ NOT COLOUR-CODED, and that is a decision rather than an omission. A
+        // percentage on its own says nothing about health: 30% is fine in week
+        // two and a catastrophe in the last week, and the app cannot tell which
+        // from this number alone. Painting it green or red here would be a claim
+        // the figure does not support. The fill shows the shape; the title says
+        // the arithmetic; the Overview says whether it is a problem.
+        $pr = $progressPct[$pid] ?? null;
+        $pct = $pr['pct'] ?? null;
+        ?>
+        <?php if ($pct === null): ?>
+          <span class="pct-cap pct-none" title="Nothing to count yet - this project has no steps, shots or assets.">&mdash;</span>
+        <?php else: ?>
+          <?php // The fill is a gradient on the pill itself rather than a second
+                // element: one box, so it cannot drift out of line with the row
+                // of buttons beside it at any font size. ?>
+          <span class="pct-cap" style="--fill: <?= (float)$pct ?>%"
+                title="<?= (int)$pr['approved'] ?> of <?= (int)$pr['applicable'] ?> tasks approved - every shot and asset through every step"><?= (int)$pct ?>%</span>
+        <?php endif; ?>
+
         <?php if ($p['status'] === 'setup'): ?>
           <a class="row-btn row-btn-go" href="wizard.php?project=<?= $pid ?>&step=<?= max(1, (int)($p['wizard_step'] ?: 1)) ?>">Resume setup</a>
         <?php else: ?>
