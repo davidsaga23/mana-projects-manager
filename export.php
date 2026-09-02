@@ -34,8 +34,12 @@ if (!$project) {
     exit;
 }
 
+// `items` is the original combined file and stays exactly as it was — the
+// Export tab links to it and somebody may have the URL. `shots` and `assets`
+// are the same data split, added 2026-09-02 so the Overview can offer them as
+// separate buttons rather than one link called "the shot and asset list".
 $what = $_GET['what'] ?? 'steps';
-if (!in_array($what, ['steps', 'items'], true)) $what = 'steps';
+if (!in_array($what, ['steps', 'items', 'shots', 'assets'], true)) $what = 'steps';
 
 $stamp = date('Y-m-d');
 $name  = preg_replace('/[^A-Za-z0-9_-]/', '', $project['code']) ?: 'project';
@@ -50,25 +54,43 @@ $out = fopen('php://output', 'w');
 // which mangles accented names like "Santiago Bernabéu" and "Ousmane Dembelé".
 fwrite($out, "\xEF\xBB\xBF");
 
-if ($what === 'items') {
+if (in_array($what, ['items', 'shots', 'assets'], true)) {
     // The breakdown itself — one row per shot or asset.
-    fputcsv($out, ['Project', 'Code', 'Kind', 'Episode / Type', 'Name', 'Seconds', 'Frames']);
+    //
+    // The COMBINED file keeps its original columns unchanged. The two split
+    // files get their own, because a shot-only sheet with an empty "Type" column
+    // and an asset-only sheet with empty "Seconds" and "Frames" would be a sheet
+    // half made of columns that can never be filled.
+    $wantShots  = ($what !== 'assets');
+    $wantAssets = ($what !== 'shots');
 
-    $stmt = $pdo->prepare('SELECT * FROM shots WHERE project_id = ? ORDER BY episode, shot_code');
-    $stmt->execute([$projectId]);
-    foreach ($stmt as $r) {
-        fputcsv($out, [
-            $project['name'], $project['code'], 'Shot', $r['episode'], $r['shot_code'],
-            $r['placeholder_seconds'] !== null ? fmt_num($r['placeholder_seconds'], 3) : '',
-            $r['frames'] !== null ? (int)$r['frames'] : '',
-        ]);
+    if ($what === 'items') {
+        fputcsv($out, ['Project', 'Code', 'Kind', 'Episode / Type', 'Name', 'Seconds', 'Frames']);
+    } elseif ($what === 'shots') {
+        fputcsv($out, ['Project', 'Code', 'Episode', 'Shot', 'Seconds', 'Frames']);
+    } else {
+        fputcsv($out, ['Project', 'Code', 'Type', 'Asset']);
     }
-    $stmt = $pdo->prepare("SELECT * FROM assets WHERE project_id = ? ORDER BY asset_type, name");
-    $stmt->execute([$projectId]);
-    foreach ($stmt as $r) {
-        fputcsv($out, [
-            $project['name'], $project['code'], 'Asset', $r['asset_type'] ?? '', $r['name'], '', '',
-        ]);
+
+    if ($wantShots) {
+        $stmt = $pdo->prepare('SELECT * FROM shots WHERE project_id = ? ORDER BY episode, shot_code');
+        $stmt->execute([$projectId]);
+        foreach ($stmt as $r) {
+            $secs   = $r['placeholder_seconds'] !== null ? fmt_num($r['placeholder_seconds'], 3) : '';
+            $frames = $r['frames'] !== null ? (int)$r['frames'] : '';
+            fputcsv($out, $what === 'items'
+                ? [$project['name'], $project['code'], 'Shot', $r['episode'], $r['shot_code'], $secs, $frames]
+                : [$project['name'], $project['code'], $r['episode'], $r['shot_code'], $secs, $frames]);
+        }
+    }
+    if ($wantAssets) {
+        $stmt = $pdo->prepare("SELECT * FROM assets WHERE project_id = ? ORDER BY asset_type, name");
+        $stmt->execute([$projectId]);
+        foreach ($stmt as $r) {
+            fputcsv($out, $what === 'items'
+                ? [$project['name'], $project['code'], 'Asset', $r['asset_type'] ?? '', $r['name'], '', '']
+                : [$project['name'], $project['code'], $r['asset_type'] ?? '', $r['name']]);
+        }
     }
     fclose($out);
     exit;

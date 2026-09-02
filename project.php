@@ -195,7 +195,12 @@ $startIn = $daysTo($project['start_date']);
               // thing you want to know, and only the colour should change. ?>
         <?php if ($scheduleEnd): ?>
           <span class="<?= $overrunDays > 0 ? 'warn-text' : '' ?>">schedule ends
-            <?= e($fmtDay($scheduleEnd)) ?></span>
+            <?= e($fmtDay($scheduleEnd)) ?><?php
+            // The GAP, not just the later date. It is the whole reason the two
+            // dates are worth putting side by side, and it used to need a
+            // sentence of its own underneath — which David had removed by
+            // 2026-09-02 as prose. Four words in the capsule say the same thing.
+            if ($overrunDays > 0): ?> · <?= $overrunDays ?>d late<?php endif; ?></span>
         <?php else: ?>
           <span class="muted">nothing scheduled</span>
         <?php endif; ?>
@@ -227,22 +232,27 @@ $startIn = $daysTo($project['start_date']);
         <span class="gc-l"><?= e($type !== '' ? $type : 'No type set') ?></span>
       </li>
     <?php endforeach; ?>
+    <?php // CREW, asked for 2026-09-02. Slots rather than the sum of the
+          // headcount column, because a slot is the real seat somebody is hired
+          // into — and how many are still nobody is the fact that matters when
+          // the show has already started. ?>
+    <?php if ($slotCount): ?>
+      <li>
+        <span class="gc-n"><?= $slotCount ?></span>
+        <span class="gc-l">Crew</span>
+        <?php if ($slotsUnfilled): ?>
+          <span class="gc-sub"><?= $slotCount - $slotsUnfilled ?> named ·
+            <span class="warn-text"><?= $slotsUnfilled ?> still open</span></span>
+        <?php else: ?>
+          <span class="gc-sub">all named</span>
+        <?php endif; ?>
+      </li>
+    <?php endif; ?>
     <li class="gc-meta">
       <span class="gc-l"><?= e($project['type']) ?> · <?= (int)$project['fps'] ?> fps</span>
     </li>
   </ul>
 
-  <?php // A DIRECT CHILD OF .glance, not of the dates block. It is full-width, and
-        // inside .glance-dates that width was inherited by the dates block itself
-        // — which then claimed the whole row and pushed the counts underneath it,
-        // leaving the right half of the card empty. ?>
-  <?php if ($overrunDays > 0): ?>
-    <div class="cap-overrun">
-      <strong><?= $overrunDays ?></strong> working day<?= $overrunDays === 1 ? '' : 's' ?> past delivery.
-      <span class="muted">The plan does not fit the date — more people, more time, or less work.</span>
-      <a href="schedule.php?project=<?= $projectId ?>">See the schedule →</a>
-    </div>
-  <?php endif; ?>
 </div>
 
 <?php // Compact: the shape of where the show is. The rates and deltas behind it
@@ -325,11 +335,15 @@ $startIn = $daysTo($project['start_date']);
     </tr>
     <?php endforeach; ?>
   </table>
-  <p class="muted small">"Tracked" is how many items have a progress record for that step —
-     lower than the total simply means nothing has been recorded for the rest yet.
-     <a href="export.php?project=<?= $projectId ?>">Export these figures as CSV</a>, or
-     <a href="export.php?project=<?= $projectId ?>&amp;what=items">export the shot and asset
-     list</a>.</p>
+  <?php // Three buttons where a paragraph used to bury two links in an
+        // explanation of the Tracked column. Each names the FILE it produces
+        // rather than the act of exporting, so the row reads as a choice of
+        // three sheets rather than three ways to press Export. ?>
+  <div class="export-row">
+    <a class="button secondary" href="export.php?project=<?= $projectId ?>">Export progress ↓</a>
+    <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=shots">Export shot list ↓</a>
+    <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=assets">Export asset list ↓</a>
+  </div>
 <?php endif; ?>
 
 </div>

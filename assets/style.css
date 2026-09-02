@@ -103,11 +103,21 @@ a.button, .page-actions .button {
 }
 a.button:hover { background: #275d95; text-decoration: none; }
 /* Bordered rather than flat grey — a low-contrast filled button reads as
-   disabled, which hid the plain "Save" option next to "Save and continue". */
-button.secondary {
+   disabled, which hid the plain "Save" option next to "Save and continue".
+   
+   ⚠ .button.secondary IS LISTED TOO, and it is not decoration. The rule used to
+   be `button.secondary` alone, so it reached a <button> and nothing else — while
+   `a.button` painted every anchor solid blue. Every `<a class="button
+   secondary">` in the app has therefore been rendering as a PRIMARY button since
+   it was written: the class was accepted, did nothing, and nobody could see that
+   it had not. (0,2,0) beats a.button's (0,1,1), so the intent finally lands.
+   Same reason a <summary> needs its own .slot-btn: these rules are
+   element-qualified, and a class that silently does nothing is worse than one
+   that does not exist. */
+button.secondary, .button.secondary {
   background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
 }
-button.secondary:hover { background: #eef4fa; border-color: #2f6fb2; }
+button.secondary:hover, .button.secondary:hover { background: #eef4fa; border-color: #2f6fb2; }
 button:disabled { background: #c3ccd4; cursor: not-allowed; }
 button.danger { background: #b02a37; }
 button.danger:hover { background: #8f222c; }
@@ -1712,15 +1722,9 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cap-span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5a6a7a; }
 .cap-arrow { font-size: 20px; color: #9aa7b3; }
 
-/* Spans the whole card, beneath both groups - it is a sentence about the show,
-   not a caption on the date. flex-basis 100% on a DIRECT child of .glance;
-   inside .glance-dates that width was inherited by the dates block, which then
-   claimed the row and pushed the counts below it. */
-.cap-overrun {
-  flex: 1 1 100%;
-  border-left: 3px solid #b02a37; padding-left: 12px; color: #b02a37; font-size: 13px;
-  margin-top: 4px;
-}
+/* The export row at the foot of the Overview. Three sheets, three buttons. */
+.export-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; }
+.export-row .button { margin-top: 0; }
 
 /* The counts. A list, because they are a list: a total with its breakdown
    indented under it, so the types can be checked against the total by eye. */
