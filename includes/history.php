@@ -46,19 +46,59 @@ function history_quotas_available(PDO $pdo): bool {
  * exact timestamp because a project with enough steps can cross a second
  * boundary mid-loop, which would split one capture into two on screen.
  *
- * @param string $q    free text over project name, code, step name and reason
- * @param int    $proj one project, or 0 for all of them
+ * @param string   $q     free text over project name, code, step name and reason
+ * @param int[]     $projs the shows to include; EMPTY MEANS ALL of them, which
+ *                         is what an untouched set of checkboxes should mean.
+ *                         Ticking none and seeing nothing would be a screen that
+ *                         looks broken on arrival.
+ * @param string[]  $types project types (2D, 3D) to include; empty means all.
+ * @param string[]  $steps step IDENTITIES to include, each "name|applies_to|asset_type";
+ *                         empty means all. The identity triple, not the name:
+ *                         "Concept, Character" and "Concept, Environment" are
+ *                         different jobs, which is the whole reason the baseline
+ *                         index is keyed on all three.
  * @return array<int, array> capture batches, each carrying its own 'rows'
  */
-function quota_history(PDO $pdo, string $q = '', int $proj = 0): array {
-    $sql = 'SELECT b.*, p.code AS project_code, p.name AS project_name, p.status AS project_status
+function quota_history(PDO $pdo, string $q = '', array $projs = [],
+                       array $types = [], array $steps = []): array {
+    // project_type comes from the JOIN rather than from the baseline row: the
+    // baseline copies the STEP's identity because steps get renamed and deleted,
+    // but a baseline cannot outlive its project (ON DELETE CASCADE), so the
+    // project's own columns are always there to be read.
+    $sql = 'SELECT b.*, p.code AS project_code, p.name AS project_name,
+                   p.status AS project_status, p.type AS project_type
               FROM step_estimate_baseline b
               JOIN projects p ON p.id = b.project_id
              WHERE 1=1';
     $args = [];
-    if ($proj > 0) {
-        $sql .= ' AND b.project_id = ?';
-        $args[] = $proj;
+
+    $projs = array_values(array_unique(array_filter(array_map('intval', $projs), fn($i) => $i > 0)));
+    if ($projs) {
+        $sql .= ' AND b.project_id IN (' . implode(',', array_fill(0, count($projs), '?')) . ')';
+        foreach ($projs as $i) $args[] = $i;
+    }
+
+    $types = array_values(array_unique(array_filter(array_map('strval', $types), fn($t) => $t !== '')));
+    if ($types) {
+        $sql .= ' AND p.type IN (' . implode(',', array_fill(0, count($types), '?')) . ')';
+        foreach ($types as $t) $args[] = $t;
+    }
+
+    // Three equality tests OR'd together per step rather than one CONCAT over
+    // the three columns: a concatenation cannot use idx_baseline_identity, and
+    // that index exists for precisely this lookup.
+    $steps = array_values(array_unique(array_filter(array_map('strval', $steps), fn($t) => $t !== '')));
+    if ($steps) {
+        $ors = [];
+        foreach ($steps as $key) {
+            $parts = explode('|', $key, 3);
+            if (count($parts) !== 3) continue;
+            $ors[] = '(b.step_name = ? AND b.applies_to = ? AND b.applies_to_asset_type = ?)';
+            array_push($args, $parts[0], $parts[1], $parts[2]);
+        }
+        // Every key malformed means the caller asked for nothing that exists,
+        // and that is an empty result, not an unfiltered one.
+        $sql .= $ors ? ' AND (' . implode(' OR ', $ors) . ')' : ' AND 1=0';
     }
     if ($q !== '') {
         $sql .= ' AND (b.step_name LIKE ? OR p.name LIKE ? OR p.code LIKE ? OR b.reason LIKE ?)';
@@ -82,6 +122,7 @@ function quota_history(PDO $pdo, string $q = '', int $proj = 0): array {
                 'project_code'   => (string)$r['project_code'],
                 'project_name'   => (string)$r['project_name'],
                 'project_status' => (string)$r['project_status'],
+                'project_type'   => (string)($r['project_type'] ?? ''),
                 'captured_at'    => (string)$r['captured_at'],
                 'reason'         => (string)$r['reason'],
                 'rows'           => [],
@@ -340,8 +381,34 @@ function fee_spread(array $rows): array {
  * Built from what is on the screen rather than from every project that exists,
  * so the picker can never offer a show that would come back empty.
  */
+/**
+ * Every step identity a baseline has ever been written for, with a count.
+ *
+ * Read from the BASELINE table, not from pipeline_steps: this filter offers what
+ * there are records of, so a step that was deleted from a live project is still
+ * offered as long as its history survives, and a step nobody has ever baselined
+ * is not offered at all. Offering a filter that can only ever return nothing is
+ * worse than not offering it.
+ */
+function history_steps(PDO $pdo): array {
+    if (!history_quotas_available($pdo)) return [];
+    return $pdo->query(
+        'SELECT step_name, applies_to, applies_to_asset_type, COUNT(*) AS n
+           FROM step_estimate_baseline
+          GROUP BY step_name, applies_to, applies_to_asset_type
+          ORDER BY step_name, applies_to, applies_to_asset_type'
+    )->fetchAll();
+}
+
+/** The identity key a step filter checkbox carries. One spelling, two readers. */
+function step_identity_key(array $row): string {
+    return ($row['step_name'] ?? '') . '|' . ($row['applies_to'] ?? '')
+         . '|' . ($row['applies_to_asset_type'] ?? '');
+}
+
 function history_projects(PDO $pdo): array {
     return $pdo->query(
-        'SELECT id, code, name, status FROM projects ORDER BY COALESCE(start_date, created_at) DESC, id DESC'
+        'SELECT id, code, name, status, type FROM projects
+          ORDER BY COALESCE(start_date, created_at) DESC, id DESC'
     )->fetchAll();
 }

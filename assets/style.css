@@ -1820,6 +1820,39 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .filter-bar input[type=text], .filter-bar input:not([type]), .filter-bar select { width: auto; }
 .filter-bar select { max-width: 22em; }
 
+/* --- tick-lists in a filter bar -------------------------------------------
+   Several shows at once, a project type, a pipeline step (David, 2026-09-02).
+   Each group is its own line and takes the full width of the bar, because a
+   list of shows wrapping around the end of the search box reads as one long
+   sentence of controls rather than as a group with a name. */
+.filter-checks {
+  flex: 1 1 100%;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px;
+  font-size: 13px;
+}
+.fc-label {
+  font-weight: 600; color: #43535f; min-width: 52px;
+}
+/* ⚠ The checkbox itself needs width:auto or the global `input, select { width:
+   100% }` gives every one of them its own line. label.inline already carries
+   that rule, which is why these are label.inline and not a bare span. */
+.filter-checks label.inline { gap: 5px; white-space: nowrap; }
+.filter-checks label.inline.muted { color: #8a97a3; }
+
+/* The step list is as long as the pipeline, several times over, so it folds.
+   The summary is a .row-btn and says what is on without being opened. */
+.filter-fold { flex: 1 1 100%; margin: 0; }
+.filter-fold > summary { display: inline-block; }
+.filter-fold .filter-checks { margin-top: 8px; padding-left: 2px; }
+
+/* The project type, beside a project code or a heading. Quiet: it is context
+   for the numbers, not one of them. */
+.type-tag {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  background: #eef1f4; color: #5a6a7a;
+  border-radius: 3px; padding: 1px 5px; vertical-align: 1px;
+}
+
 /* ---- previewing as another role --------------------------------------------
    Loud on purpose, and a colour used nowhere else. Somebody who forgets they
    are wearing a borrowed role will read every missing menu item as a fault in
