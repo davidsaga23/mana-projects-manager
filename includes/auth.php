@@ -109,9 +109,50 @@ function current_user(): ?array {
     return $user;
 }
 
-function user_role(): string {
+/**
+ * The role this account ACTUALLY has, ignoring any preview.
+ *
+ * Everything that decides whether you may ENTER or LEAVE a preview asks this,
+ * never user_role() — otherwise previewing as a viewer would take away the very
+ * permission needed to stop previewing, and the only way out would be clearing
+ * the session cookie.
+ */
+function real_role(): string {
     $u = current_user();
     return $u['role'] ?? 'viewer';
+}
+
+/** The role being previewed, or '' when not previewing. */
+function preview_role(): string {
+    // ⚠ CHECKED AGAINST THE REAL ROLE ON EVERY CALL, not just when the preview
+    // started. An admin demoted to editor mid-session stops previewing at once
+    // rather than keeping a session key that outlives the authority to hold it.
+    //
+    // ⚠ AND ONLY EVER DOWNWARD. The whitelist is editor and viewer — both
+    // strictly less than admin — so this can take permissions away and has no
+    // path to granting one. A tampered session value is either a lesser role or
+    // nothing at all.
+    if (real_role() !== 'admin') return '';
+    $p = (string)($_SESSION['preview_role'] ?? '');
+    return in_array($p, ['editor', 'viewer'], true) ? $p : '';
+}
+
+/** Is an admin currently looking at the app as somebody else? */
+function in_preview(): bool {
+    return preview_role() !== '';
+}
+
+/**
+ * The role the app should behave as, which is the preview when one is running.
+ *
+ * ONE OVERRIDE POINT FOR THE WHOLE APP. is_admin(), can_edit(), can_see_money(),
+ * require_admin(), the top bar and the read-only guard below all come through
+ * here, so nothing has to be taught about previewing separately — and a screen
+ * added next year is covered without anybody remembering.
+ */
+function user_role(): string {
+    $preview = preview_role();
+    return $preview !== '' ? $preview : real_role();
 }
 
 function is_admin(): bool {
@@ -159,9 +200,17 @@ function require_login(): void {
     // Read-only is enforced HERE rather than page by page, so a screen added
     // later is covered without anyone remembering to add a check. Every write in
     // this app is a POST, so refusing POSTs is the whole of it.
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !can_edit()) {
+    //
+    // A PREVIEW IS ALWAYS READ-ONLY, whichever role is being worn. Previewing as
+    // an editor would otherwise let real work be done by somebody who believes
+    // they are only looking — and "I was just seeing what they see" is a poor
+    // account of how a rate got changed. The controls all still DRAW, which is
+    // the point of the preview; only the saving stops.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!can_edit() || in_preview())) {
         if (function_exists('flash')) {
-            flash('err', 'Your account has view-only access, so that change was not saved.');
+            flash('err', in_preview()
+                ? 'Nothing saves while you are previewing as someone else — leave the preview first.'
+                : 'Your account has view-only access, so that change was not saved.');
         }
         // Back to the same screen as a GET, so the reader sees the page and the
         // message rather than a dead POST.

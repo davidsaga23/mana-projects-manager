@@ -1663,3 +1663,19 @@ button.secondary.danger:hover { background: #e9c2c7; }
    new screens is not a trade worth making. */
 .filter-bar input[type=text], .filter-bar input:not([type]), .filter-bar select { width: auto; }
 .filter-bar select { max-width: 22em; }
+
+/* ---- previewing as another role --------------------------------------------
+   Loud on purpose, and a colour used nowhere else. Somebody who forgets they
+   are wearing a borrowed role will read every missing menu item as a fault in
+   the app, so this has to be the most obvious thing on the page. */
+.flash-preview {
+  background: #efe7fb; border-left: 4px solid #6f42c1; color: #4a2d86;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.flash-preview strong { color: #3c2270; }
+.preview-msg { flex: 1 1 340px; }
+/* The way out sits IN the banner, never in the menu — the menu is wearing the
+   borrowed role and may not be able to show it. */
+.preview-exit { margin: 0 0 0 auto; }
+.preview-exit button { margin: 0; white-space: nowrap; }
+.role-badge-preview { background: #6f42c1; color: #fff; }

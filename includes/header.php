@@ -17,7 +17,13 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     <h1><a href="index.php" class="brand"><?= site_logo() ?><span class="brand-name">Anima <span class="muted">| Project manager</span></span></a></h1>
     <div class="topbar-right">
       <span><?= e(current_user_display()) ?></span>
-      <?php if (!can_edit()): ?><span class="role-badge">view only</span><?php endif; ?>
+      <?php // Names the role being WORN, so the top bar and the app agree about
+            // who you are while a preview is running. ?>
+      <?php if (in_preview()): ?>
+        <span class="role-badge role-badge-preview">as <?= e(preview_role() === 'viewer' ? 'view only' : 'editor') ?></span>
+      <?php elseif (!can_edit()): ?>
+        <span class="role-badge">view only</span>
+      <?php endif; ?>
       <?php
       // ONE HOME, settled with David 2026-08-17. This bar used to offer
       // "Project management" and "Finance management" side by side, and both led
@@ -80,6 +86,32 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       · <a href="logout.php">Log out</a>
     </div>
   </div>
+<?php if (in_preview()): ?>
+  <?php
+  // ⚠ DRAWN OUTSIDE EVERY is_admin() CHECK ON THIS PAGE. While a preview is
+  // running is_admin() answers for the BORROWED role, so anything gated on it
+  // is hidden — including, if this were gated too, the only way out.
+  //
+  // The form posts to preview.php, which does its own auth precisely so that
+  // this button still works while wearing a role that cannot POST anywhere.
+  ?>
+  <div class="flash flash-preview">
+    <?php // The whole message in ONE element. The banner is a flex row, and left
+          // loose the sentence became four flex items with a 14px gap opening up
+          // mid-clause after every <strong>. Two items: what is happening, and
+          // the way out. ?>
+    <div class="preview-msg">
+      <strong>Previewing as <?= preview_role() === 'viewer' ? 'a view-only account' : 'an editor' ?>.</strong>
+      This is what they see: the menu, the screens they can open, the buttons they get.
+      <strong>Nothing saves</strong> while you are in here, whichever role you are wearing.
+    </div>
+    <form method="post" action="preview.php" class="preview-exit">
+      <input type="hidden" name="stop" value="1">
+      <input type="hidden" name="back" value="<?= e((string)($_SERVER['REQUEST_URI'] ?? '/index.php')) ?>">
+      <button class="button" type="submit">Leave preview</button>
+    </form>
+  </div>
+<?php endif; ?>
 <?php if ($pendingMigrations > 0): ?>
   <div class="flash flash-warn">
     <strong><?= $pendingMigrations ?></strong> database update<?= $pendingMigrations === 1 ? '' : 's' ?>
@@ -88,7 +120,10 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     <a href="migrate.php">Review and apply →</a>
   </div>
 <?php endif; ?>
-<?php if (!can_edit()): ?>
+<?php // Suppressed during a preview: the banner above already says both that
+      // nothing saves and why, and two warnings stacked about the same thing
+      // read as two separate problems. ?>
+<?php if (!can_edit() && !in_preview()): ?>
   <div class="flash flash-warn">You have view-only access — everything is readable, nothing
     can be changed. Ask an administrator if you need to edit something.</div>
 <?php endif; ?>

@@ -319,9 +319,39 @@ require __DIR__ . '/includes/header.php';
 </table>
 <p class="muted small">
   View-only is enforced in one place rather than screen by screen, so it also covers
-  screens built later. Money, contracts and rates aren't in this application at all —
-  they live in a separate system with its own accounts, and no role here reaches them.
+  screens built later. <strong>Money is admin-only</strong>: rates, budgets, invoices and
+  contracts live in a separate database with its own login, and the connection to it is
+  never even opened for an editor or a view-only account.
 </p>
+
+<?php // ---- see it for yourself ------------------------------------------------
+      // David, 2026-09-02: "I'd like to see what the others have access to."
+      // A table saying what a role can do is a claim; wearing the role is the
+      // proof. It sits here because this is where the claim is made.
+      //
+      // Reached only from this screen, which is admin-only, so a preview can
+      // only ever be STARTED by an administrator. It is left from the banner
+      // that then follows you across every page — necessarily, since the
+      // borrowed role cannot open this screen to find its way back. ?>
+<h3>See the app as they see it</h3>
+<p class="muted small">
+  Borrow one of these roles for a moment. The menu, the screens you can open and the
+  buttons you get all become theirs. <strong>Nothing saves while you are in there</strong>,
+  whichever role you wear — so it is safe to click about — and a banner across the top
+  brings you back.
+</p>
+<form method="post" action="preview.php" class="inline-form filter-bar">
+  <input type="hidden" name="start" value="1">
+  <input type="hidden" name="back" value="/users.php">
+  <label class="inline">
+    See Anima as
+    <select name="role">
+      <option value="editor">an Editor</option>
+      <option value="viewer">a View-only account</option>
+    </select>
+  </label>
+  <button class="button secondary" type="submit">Start preview</button>
+</form>
 
 <h3>Add someone</h3>
 <form method="post" class="stack">
