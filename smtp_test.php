@@ -58,7 +58,7 @@ function smtp_probe(string $host, int $port, string $secure, string $user, strin
     if ((int)substr($banner, 0, 3) !== 220) {
         fclose($sock);
         return ['ok' => false, 'stage' => 'greeting',
-                'error' => $banner ?: 'no banner — wrong encryption for this port?',
+                'error' => $banner ?: 'no banner, wrong encryption for this port?',
                 'steps' => $steps, 'ms' => $ms()];
     }
     $steps[] = 'Greeting: ' . substr($banner, 0, 60);
@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send'])) {
         $sendMsg = 'That is not a valid email address, so nothing was sent.';
     } elseif (!SmtpMailer::isConfigured($config)) {
         $sendOk = false;
-        $sendMsg = 'SMTP is not configured in config.php — smtp_host, smtp_user and smtp_pass '
+        $sendMsg = 'SMTP is not configured in config.php, smtp_host, smtp_user and smtp_pass '
                  . 'all have to be filled in before anything can send.';
     } else {
         // Deliberately the SAME class the ticket notifications use. A test that
@@ -164,10 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send'])) {
                 [['email' => $to, 'name' => '']],
                 'Anima test message',
                 '<p>This is a test from <strong>Anima | Project manager</strong>.</p>'
-                . '<p>If you are reading it, ticket notifications will send too — they go '
+                . '<p>If you are reading it, ticket notifications will send too, they go '
                 . 'through exactly this route.</p>',
                 "This is a test from Anima | Project manager.\n\n"
-                . "If you are reading it, ticket notifications will send too — they go "
+                . "If you are reading it, ticket notifications will send too, they go "
                 . "through exactly this route.\n"
             );
             $sendOk = true;
@@ -244,7 +244,7 @@ require __DIR__ . '/includes/header.php';
     and PHP silently uses the LAST one.</strong>
     <ul style="margin:6px 0 0 18px;">
       <?php foreach ($dupKeys as $k => $n): ?>
-        <li><code><?= e($k) ?></code> — <?= (int)$n ?> times</li>
+        <li><code><?= e($k) ?></code>, <?= (int)$n ?> times</li>
       <?php endforeach; ?>
     </ul>
     This is what happens when a corrected block is pasted in above the original lines. Open
@@ -262,7 +262,7 @@ require __DIR__ . '/includes/header.php';
     below stays switched off and no ticket notification will go out.
     <?php if ($hostFallback): ?>
       <br><br>
-      Note that the probe below <em>will still work</em> with <code>smtp_host</code> empty — it
+      Note that the probe below <em>will still work</em> with <code>smtp_host</code> empty, it
       falls back to this site's own hostname to have something to try. So green ticks there do
       not mean the app can send. They mean the username and password are right.
     <?php endif; ?>
@@ -272,7 +272,7 @@ require __DIR__ . '/includes/header.php';
 <?php if ($disabledFns): ?>
   <div class="flash flash-err">
     Your host has disabled <strong><?= e(implode(', ', $disabledFns)) ?></strong>. Outbound email
-    from PHP is impossible until they switch these back on — everything below will fail at
+    from PHP is impossible until they switch these back on, everything below will fail at
     "connect" no matter what the settings say. Contact hosting support.
   </div>
 <?php endif; ?>
@@ -282,7 +282,7 @@ require __DIR__ . '/includes/header.php';
   <p class="muted small">
     There is more than one <code>config.php</code> on this server, and more than one folder called
     <code>mana</code>. Rather than anyone navigating to the right one and hoping, this is the file
-    <em>this running application</em> loaded — resolved to its real absolute path.
+    <em>this running application</em> loaded, resolved to its real absolute path.
   </p>
   <table>
     <tr><th>Config file</th>
@@ -291,12 +291,12 @@ require __DIR__ . '/includes/header.php';
         <td><?= is_file($configPath)
               ? e(date('j M Y, H:i', (int)filemtime($configPath)))
               : '<span class="err">file not found</span>' ?>
-          <span class="muted small">— if this isn't when you last saved, you edited a different file</span>
+          <span class="muted small">if this isn't when you last saved, you edited a different file</span>
         </td></tr>
     <tr><th>Database in use</th>
         <td><code><?= e((string)($config['db_name'] ?? '?')) ?></code>
         <?php if (stripos((string)($config['db_name'] ?? ''), 'stfc') !== false): ?>
-          <span class="err">— that looks like STFC's database, not this platform's.
+          <span class="err">that looks like STFC's database, not this platform's.
           These two applications must never share one: their schemas both define
           <code>shots</code>, <code>crew</code> and <code>users</code>.</span>
         <?php endif; ?>
@@ -319,7 +319,7 @@ require __DIR__ . '/includes/header.php';
         $sec  = strtolower((string)($config['smtp_secure'] ?? ''));
         $mismatch = ($port === 465 && $sec !== 'ssl') || ($port === 587 && $sec !== 'tls');
         if ($mismatch): ?>
-          <span class="warn-text">— port <?= $port ?> should be
+          <span class="warn-text">port <?= $port ?> should be
           '<?= $port === 465 ? 'ssl' : 'tls' ?>'. Mixed settings hang rather than fail.</span>
         <?php endif; ?>
         </td></tr>
@@ -327,11 +327,11 @@ require __DIR__ . '/includes/header.php';
     <tr><td><code>smtp_pass</code></td>
         <td><?= !empty($config['smtp_pass'])
               ? '<span class="ok">set (' . strlen((string)$config['smtp_pass']) . ' characters)</span>'
-              : '<span class="err">EMPTY — nothing will send</span>' ?></td></tr>
+              : '<span class="err">EMPTY, nothing will send</span>' ?></td></tr>
     <tr><td><code>mail_from</code></td><td><code><?= e($config['mail_from'] ?: '(empty)') ?></code></td></tr>
     <tr><td><code>mail_reply_to</code></td><td><code><?= e($config['mail_reply_to'] ?: '(none)') ?></code></td></tr>
   </table>
-  <p class="muted small">The password itself is never shown — only whether one is set, and how long it is.</p>
+  <p class="muted small">The password itself is never shown, only whether one is set, and how long it is.</p>
 </section>
 
 <section class="panel">
@@ -344,10 +344,10 @@ require __DIR__ . '/includes/header.php';
   <form method="post">
     <div class="actions">
       <button type="submit" name="probe" value="1" <?= empty($config['smtp_user']) ? 'disabled' : '' ?>>Run the probe</button>
-      <span class="hint">Takes up to a minute — each failing combination waits for its timeout.</span>
+      <span class="hint">Takes up to a minute, each failing combination waits for its timeout.</span>
     </div>
     <?php if (empty($config['smtp_user'])): ?>
-      <small>Fill in <code>smtp_user</code> and <code>smtp_pass</code> in <code>config.php</code> first —
+      <small>Fill in <code>smtp_user</code> and <code>smtp_pass</code> in <code>config.php</code> first,
              there is nothing to authenticate with yet.</small>
     <?php endif; ?>
   </form>
@@ -358,7 +358,7 @@ require __DIR__ . '/includes/header.php';
       <div class="flash flash-<?= $hostFallback ? 'warn' : 'ok' ?>" style="margin-top:14px;">
         <strong>Found a working combination.</strong> Put these into <code>config.php</code>:
         <?php if ($hostFallback): ?>
-          <br><strong>This is the line you are missing</strong> — <code>smtp_host</code> is
+          <br><strong>This is the line you are missing</strong>, <code>smtp_host</code> is
           currently empty, which is why the Send button below is switched off.
         <?php endif; ?>
       </div>
@@ -368,16 +368,16 @@ require __DIR__ . '/includes/header.php';
 'smtp_verify_peer' => false,</pre>
     <?php else: ?>
       <div class="flash flash-err" style="margin-top:14px;">
-        Nothing authenticated. The most informative row is the one that got <em>furthest</em> —
+        Nothing authenticated. The most informative row is the one that got <em>furthest</em>,
         read the "stage reached" column.
       </div>
       <ul class="dash-attention small">
-        <li><strong>Every row stopped at "connect"</strong> — the host blocks outbound SMTP from
+        <li><strong>Every row stopped at "connect"</strong>, the host blocks outbound SMTP from
             PHP. Ask hosting support to allow it.</li>
-        <li><strong>Something reached "AUTH credentials"</strong> — host and port are right, the
+        <li><strong>Something reached "AUTH credentials"</strong>, host and port are right, the
             mailbox password is wrong. Reset it in cPanel → Email Accounts and update
             <code>smtp_pass</code>.</li>
-        <li><strong>Stopped at "greeting"</strong> — wrong encryption for that port. 465 needs
+        <li><strong>Stopped at "greeting"</strong>, wrong encryption for that port. 465 needs
             <code>ssl</code>, 587 needs <code>tls</code>.</li>
       </ul>
     <?php endif; ?>
@@ -404,7 +404,7 @@ require __DIR__ . '/includes/header.php';
 <section class="panel">
   <h2>2 · Send a real test</h2>
   <p class="muted small">
-    Uses the settings exactly as they stand, through the same code the ticket notifications use —
+    Uses the settings exactly as they stand, through the same code the ticket notifications use,
     a test that sent by any other route would prove nothing about whether tickets work.
   </p>
 

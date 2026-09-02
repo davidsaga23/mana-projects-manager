@@ -289,7 +289,7 @@ $startIn = $daysTo($project['start_date']);
           // and this line just counts the work. ?>
     <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled.
   <?php else: ?>
-    Nothing scheduled yet — the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
+    Nothing scheduled yet, the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
     screen works the pipeline forwards into real dates.
   <?php endif; ?>
   <?php if ($slotCount): ?>
@@ -300,11 +300,11 @@ $startIn = $daysTo($project['start_date']);
 
 <h3>Progress by step</h3>
 <?php if (!$steps): ?>
-  <p class="muted">No pipeline steps yet — <a href="wizard.php?project=<?= $projectId ?>&step=2">add them</a>.</p>
+  <p class="muted">No pipeline steps yet, <a href="wizard.php?project=<?= $projectId ?>&step=2">add them</a>.</p>
 <?php else: ?>
   <?php if ($blocked): ?>
     <p class="flash flash-warn"><strong><?= $blocked ?></strong> tracked
-      <?= $blocked === 1 ? 'task is' : 'tasks are' ?> blocked — they still count as work
+      <?= $blocked === 1 ? 'task is' : 'tasks are' ?> blocked, they still count as work
       remaining, but they need unblocking rather than an artist.</p>
   <?php endif; ?>
   <table class="review-table">

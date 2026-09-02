@@ -129,7 +129,7 @@ require __DIR__ . '/includes/header.php';
   <h3>Names that didn't match anyone</h3>
   <p class="lead">These arrived on imported work but aren't linked to a person, so that work is
      missing from per-artist reporting. Linking one now repairs every record it already
-     appears on — nothing needs re-importing.</p>
+     appears on, nothing needs re-importing.</p>
   <form method="post">
     <input type="hidden" name="action" value="match_people">
     <table class="review-table">
@@ -141,7 +141,7 @@ require __DIR__ . '/includes/header.php';
         <td class="muted"><?= (int)$u['times_seen'] ?></td>
         <td>
           <select name="raw_val[<?= $i ?>]">
-            <option value="0">— leave for now —</option>
+            <option value="0">leave for now</option>
             <?php foreach ($crew as $c): ?>
               <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?><?= $c['active'] ? '' : ' (inactive)' ?></option>
             <?php endforeach; ?>
@@ -172,7 +172,7 @@ require __DIR__ . '/includes/header.php';
         <td class="muted"><?= (int)$u['times_seen'] ?></td>
         <td>
           <select name="status_val[<?= $i ?>]">
-            <option value="0">— leave for now —</option>
+            <option value="0">leave for now</option>
             <?php foreach ($statuses as $s): ?>
               <option value="<?= (int)$s['id'] ?>">
                 <?= e($s['name']) ?><?= $s['maps_to'] !== 'none' ? ' (' . e($s['maps_to']) . ')' : '' ?><?= $s['is_blocked'] ? ' (blocked)' : '' ?>
@@ -208,7 +208,7 @@ require __DIR__ . '/includes/header.php';
     </tr>
     <?php endforeach; ?>
   </table>
-  <p class="muted small">Aliases are shared across every project — a person's handle is the
+  <p class="muted small">Aliases are shared across every project, a person's handle is the
      same wherever they work.</p>
 <?php endif; ?>
 

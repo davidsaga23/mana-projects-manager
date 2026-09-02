@@ -269,7 +269,7 @@ require __DIR__ . '/includes/header.php';
     <div class="empty-state">
       <h2><?= $q !== '' ? 'Nobody matches that' : 'Nobody entered yet' ?></h2>
       <p><?= $q !== ''
-            ? 'Matching is on the words as typed, never fuzzy — try a shorter search.'
+            ? 'Matching is on the words as typed, never fuzzy, try a shorter search.'
             : 'Add some below, or enter them from a project\'s Hiring screen.' ?></p>
     </div>
   <?php else: ?>
@@ -363,7 +363,7 @@ require __DIR__ . '/includes/header.php';
               <td class="reel-cell" data-reel>
                 <a class="reel-link" href="<?= e($p['portfolio_url'] ?: '#') ?>"
                    target="_blank" rel="noopener"
-                   title="<?= e($p['portfolio_url'] ?: '') ?> — double-click to edit"><?=
+                   title="<?= e($p['portfolio_url'] ?: '') ?>, double-click to edit"><?=
                    e($p['portfolio_url'] ?: '—') ?></a>
                 <input name="<?= $n ?>[portfolio_url]" value="<?= e($p['portfolio_url'] ?? '') ?>"
                        size="22" maxlength="500" class="reel-input" hidden>
@@ -429,7 +429,7 @@ require __DIR__ . '/includes/header.php';
          href="export_artists.php<?= ($q !== '' || $pos)
               ? '?' . http_build_query(array_filter(['q' => $q, 'position' => $pos]))
               : '' ?>">Download as Excel ↓</a>
-      <span class="muted small">Same layout as the studio's freelancer sheet — the same columns,
+      <span class="muted small">Same layout as the studio's freelancer sheet, the same columns,
         the red title bar, Arial throughout.</span>
     </p>
   <?php endif; ?>
@@ -457,7 +457,7 @@ require __DIR__ . '/includes/header.php';
     <?php else: ?>
       <p class="muted small">
         Five at a time, the same shape as the hiring grid. Nobody added here belongs to a
-        project yet — they are simply known to the studio, and turn up in the candidate
+        project yet, they are simply known to the studio, and turn up in the candidate
         lookup on every show from now on. Leave a row blank to skip it.
       </p>
       <form method="post">

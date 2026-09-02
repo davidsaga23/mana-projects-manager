@@ -306,7 +306,7 @@
     // out of here, not just the one where everything is set.
     if (unitsRaw > 0 && units <= 0) {
       updateDuration(0);
-      return say('<span class="muted">covers 0% — nothing to do</span>');
+      return say('<span class="muted">covers 0%, nothing to do</span>');
     }
     if (units <= 0) {
       updateDuration(0);
@@ -529,7 +529,7 @@
     if (note) {
       note.textContent = want
         ? 'Showing ' + shown + ' of ' + items.length + ' ' + noun + '. Saving still keeps every one.'
-        : 'Filtering only changes what you see — saving still keeps everything.';
+        : 'Filtering only changes what you see, saving still keeps everything.';
     }
 
     // Reordering a filtered list would post an order missing the hidden rows, so

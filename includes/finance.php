@@ -54,7 +54,7 @@ function project_budgets(array $projectIds): array {
 function save_project_budget(int $projectId, array $project, array $in, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can change a budget.');
     $db = finance_db();
-    if (!$db) throw new RuntimeException('The finance database is not set up yet — see finance_install.sql.');
+    if (!$db) throw new RuntimeException('The finance database is not set up yet, see finance_install.sql.');
 
     $raw = trim((string)($in['budget_amount'] ?? ''));
     if ($raw === '') {
@@ -62,7 +62,7 @@ function save_project_budget(int $projectId, array $project, array $in, string $
     } else {
         $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $raw));
         if ($clean === '' || !is_numeric($clean)) {
-            throw new RuntimeException('"' . $raw . '" is not a number — nothing was saved.');
+            throw new RuntimeException('"' . $raw . '" is not a number, nothing was saved.');
         }
         $amount = round((float)$clean, 2);
         if ($amount < 0) throw new RuntimeException('A budget cannot be negative.');
@@ -545,7 +545,7 @@ function expense_categories(): array {
 function save_expenses_bulk(array $rows, array $project, string $who = ''): array {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can record an expense.');
     $db = finance_db();
-    if (!$db) throw new RuntimeException('The finance database is not set up yet — see finance_install.sql.');
+    if (!$db) throw new RuntimeException('The finance database is not set up yet, see finance_install.sql.');
     if (!expenses_available()) {
         throw new RuntimeException(
             'Other expenses need finance_install_05.sql, which has not been imported into the '
@@ -578,7 +578,7 @@ function save_expenses_bulk(array $rows, array $project, string $who = ''): arra
         if ($rawAmt === '' && $typed === '') continue;          // an unused row
 
         if ($desc === '') {
-            $out['errors'][] = sprintf('Row %d has no description, so it was not recorded — '
+            $out['errors'][] = sprintf('Row %d has no description, so it was not recorded, '
                                      . 'a cost nobody can identify later is not a record.', $i + 1);
             continue;
         }
@@ -747,7 +747,7 @@ function save_invoice(array $in, array $project, string $who = ''): string {
     $raw = trim((string)($in['amount'] ?? ''));
     $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $raw));
     if ($clean === '' || !is_numeric($clean)) {
-        throw new RuntimeException('"' . $raw . '" is not an amount — nothing was saved.');
+        throw new RuntimeException('"' . $raw . '" is not an amount, nothing was saved.');
     }
     $amount = round((float)$clean, 2);
     if ($amount <= 0) throw new RuntimeException('An invoice has to be for more than nothing.');

@@ -121,7 +121,7 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <p class="lead">
-  What the client asked for, in their terms — the thing every date, quota and breakdown on the
+  What the client asked for, in their terms, the thing every date, quota and breakdown on the
   other screens is ultimately derived from. Written as prose rather than a form, because every
   brief is shaped differently and a box that doesn't fit is a box people leave empty.
 </p>
@@ -166,7 +166,7 @@ require __DIR__ . '/includes/header.php';
     <textarea name="deliverables" rows="5"
               placeholder="e.g. 6 × 30s spots, 1920×1080 ProRes 422 HQ, 23.976, stereo mix, captions as SRT"
               <?= can_edit() ? '' : 'disabled' ?>><?= e($brief['deliverables'] ?? '') ?></textarea>
-    <small>Formats, durations, resolutions, quantities — the half people re-read, and the half a
+    <small>Formats, durations, resolutions, quantities, the half people re-read, and the half a
            disagreement is usually about.</small>
   </label>
 
@@ -230,7 +230,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="muted small">
   Files live in the same protected directory as ticket attachments, behind the same login and
-  the same checks — never on a guessable public URL. Contracts and rates are deliberately
+  the same checks, never on a guessable public URL. Contracts and rates are deliberately
   <em>not</em> here: those are in the finance database, reachable from a person's page and only
   by an administrator.
 </p>

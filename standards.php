@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($r['saved'])   flash('ok', sprintf('Saved %d standard%s for %s projects.',
                                  $r['saved'], $r['saved'] === 1 ? '' : 's', $type));
-        if ($r['removed']) flash('warn', sprintf('%d standard%s cleared — a blank removes it rather '
+        if ($r['removed']) flash('warn', sprintf('%d standard%s cleared, a blank removes it rather '
                                  . 'than storing zero days, which nothing could plan against.',
                                  $r['removed'], $r['removed'] === 1 ? ' was' : 's were'));
         foreach ($r['errors'] as $e) flash('err', $e);
@@ -133,14 +133,14 @@ require __DIR__ . '/includes/header.php';
 <h2 class="wizard-title">Ideal quotas <span class="muted">· base sheet for <?= e($type) ?> projects</span></h2>
 
 <p class="lead">
-  What the work <strong>should</strong> take when it is done properly — one sheet per kind of
+  What the work <strong>should</strong> take when it is done properly, one sheet per kind of
   project, written from experience and true across shows until experience changes it.
 </p>
 
 <div class="flash flash-warn">
   <strong>This is not the quota on the dashboard.</strong> That one is the <em>minimum</em>: it is
   derived from what is left to do and how many working days remain, so it rises every time a
-  deadline gets closer or work slips, and nobody types it. This is the opposite kind of number —
+  deadline gets closer or work slips, and nobody types it. This is the opposite kind of number,
   what a step actually takes, independent of any deadline. Their disagreement is the useful part:
   a required pace far above the ideal is not an ambitious plan, it is one that cannot be delivered
   by the people on it.
@@ -289,7 +289,7 @@ require __DIR__ . '/includes/header.php';
                 <option value="both">both</option>
                 <option value="project">whole project</option>
               </select>
-              <input name="<?= $n ?>[applies_to_asset_type]" placeholder="asset type — any">
+              <input name="<?= $n ?>[applies_to_asset_type]" placeholder="asset type, or any">
             </td>
             <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"></td>
             <td class="muted small">—</td>
@@ -305,7 +305,7 @@ require __DIR__ . '/includes/header.php';
       <strong>Days per item</strong> is the number; the column beside it shows the same fact the
       other way round, because "half a day each" and "two a day" are the same standard and people
       say whichever suits the step.
-      <strong>Clearing the days removes that standard</strong> rather than storing zero — zero days
+      <strong>Clearing the days removes that standard</strong> rather than storing zero, zero days
       per item is not a slow standard, it is a step that takes no time, and nothing could plan
       against it.
       <strong>Where the number came from</strong> earns its place: a figure somebody guessed and a
@@ -333,7 +333,7 @@ require __DIR__ . '/includes/header.php';
   <?php if ($missing && is_admin()): ?>
     <p class="muted small warn-text">
       <?= count($missing) ?> step identit<?= count($missing) === 1 ? 'y is' : 'ies are' ?>
-      already in use on <?= e($type) ?> projects with no standard recorded — highlighted above,
+      already in use on <?= e($type) ?> projects with no standard recorded, highlighted above,
       showing what they have actually been planned at so far. That average is a starting point to
       argue from, not a measurement: it is what somebody estimated, not what the work took.
     </p>
@@ -342,7 +342,7 @@ require __DIR__ . '/includes/header.php';
   <p class="muted small">
     <strong>Later, this becomes measured rather than believed.</strong> The cross-project benchmark
     designed in <code>docs/ROADMAP.md</code> compares estimate against actual on exactly the same
-    step identity used here, so when it exists it can propose an observed median for each row —
+    step identity used here, so when it exists it can propose an observed median for each row,
     written into <em>where the number came from</em>, never applied silently. Until then these are
     the studio's stated standards, which is already more than lived in anyone's head before.
   </p>

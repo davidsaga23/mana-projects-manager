@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) 
                                $note !== '' ? mb_substr($note, 0, 255) : null,
                                (int)$mm[1], $projectId]);
             }
-            flash('ok', sprintf('Updated "%s" — now on %s.', $name, $date));
+            flash('ok', sprintf('Updated "%s", now on %s.', $name, $date));
 
         } elseif (preg_match('/^remove:(\d+)$/', $act, $mm)) {
             $del = $pdo->prepare('DELETE FROM project_milestones WHERE id = ? AND project_id = ?');
@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regenerate'])) {
     try {
         $plan = build_schedule($pdo, $project);
         if (!$plan['tasks']) {
-            throw new RuntimeException('The plan came out empty — open the Schedule screen, ' .
+            throw new RuntimeException('The plan came out empty, open the Schedule screen, ' .
                                        'which lists the reasons.');
         }
         $res = commit_schedule($pdo, $projectId, $plan);
@@ -349,11 +349,11 @@ require __DIR__ . '/includes/header.php';
     as it stands now works out to <strong><?= $freshCount ?></strong>.
     <?php if ($freshCount > $storedCount): ?>
       <?= $freshCount - $storedCount ?> task<?= ($freshCount - $storedCount) === 1 ? ' is' : 's are' ?>
-      missing from the picture — usually because shots or assets were added, or an asset type
+      missing from the picture, usually because shots or assets were added, or an asset type
       was corrected, after this schedule was saved.
     <?php else: ?>
       <?= $storedCount - $freshCount ?> more <?= ($storedCount - $freshCount) === 1 ? 'is' : 'are' ?>
-      drawn than the setup now calls for — usually because work was approved, marked not
+      drawn than the setup now calls for, usually because work was approved, marked not
       applicable, or items were removed.
     <?php endif; ?>
     <?php if (can_edit()): ?>Press <em>Regenerate</em> to bring it in line.<?php endif; ?>
@@ -401,13 +401,13 @@ require __DIR__ . '/includes/header.php';
   <div id="generalGantt" class="tl-chart"></div>
   <?php if (can_edit()): ?>
     <p class="muted small tl-note">
-      Drag a bar to change that step's dates — it saves straight into
+      Drag a bar to change that step's dates, it saves straight into
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Dates &amp; headcount</a>,
       so the two always agree. Arrows show what the
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=3') ?>">workflow</a> says waits
       for what; a <strong class="dep-legend">red one</strong> means you have planned a step to
-      start before the thing it waits for has finished. That is allowed here — it is a warning,
-      not a wall — but the schedule will not be able to honour it.
+      start before the thing it waits for has finished. That is allowed here, it is a warning,
+      not a wall, but the schedule will not be able to honour it.
       <?php // A drag here writes to a screen you are not looking at, which is
             // exactly when a silent save feels like a lost one. Elsewhere in
             // this file saving is silent because the bar you moved is the thing
@@ -426,16 +426,16 @@ require __DIR__ . '/includes/header.php';
       <p class="muted small">
         A date the plan has to be ready for, drawn as a
         <span class="ms-flag">dashed line</span> down both charts. Typed by hand and never moved
-        by the scheduler — the point of a review date is that the work bends around it, not the
+        by the scheduler, the point of a review date is that the work bends around it, not the
         other way about.
         <?php if (can_edit()): ?>
           <br><strong>Drag a marker</strong> on the chart to move it, or
-          <strong>double-click</strong> it to change it — the same gestures the task bars use.
+          <strong>double-click</strong> it to change it, the same gestures the task bars use.
           Grab it anywhere down the line, not just the diamond.
           <?php if ($msSteps): ?>
             <br>Tie one to a step and its marker sits on <strong>that step's row</strong> instead
             of at the top, and turns <strong class="err">red</strong> if the date falls before
-            that step finishes — a review of work that will not exist yet.
+            that step finishes, a review of work that will not exist yet.
           <?php endif; ?>
         <?php endif; ?>
       </p>
@@ -458,7 +458,7 @@ require __DIR__ . '/includes/header.php';
                 <?php if (!empty($m['step_name'])): ?>
                   <span class="ms-onstep">reviews <?= e($m['step_name']) ?></span>
                   <?php if (!empty($m['early'])): ?>
-                    <span class="err small">— that step runs to <?= e($m['step_end']) ?></span>
+                    <span class="err small">that step runs to <?= e($m['step_end']) ?></span>
                   <?php endif; ?>
                   <?= $m['notes'] !== '' ? ' · ' : '' ?>
                 <?php endif; ?>
@@ -487,7 +487,7 @@ require __DIR__ . '/includes/header.php';
           <input name="ms_notes" placeholder="Notes (optional)" size="26" maxlength="255">
           <?php if ($msSteps): ?>
             <select name="ms_step">
-              <option value="">— not tied to a step —</option>
+              <option value="">not tied to a step</option>
               <?php // The scope, not just the name. A pipeline legitimately has
                     // Concept for characters, for environments and for props —
                     // three options reading "Concept" is a guess, and the same
@@ -580,7 +580,7 @@ require __DIR__ . '/includes/header.php';
 
   <p class="muted small">
     <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
-    the name to the <strong>left</strong> of each bar is who is on it — a placeholder slot
+    the name to the <strong>left</strong> of each bar is who is on it, a placeholder slot
     until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
     scheduler won't move it · click a bar to edit it, or drag it.
   </p>
@@ -607,7 +607,7 @@ require __DIR__ . '/includes/header.php';
       <?php if ($msSteps): ?>
         <label>Reviews which step
           <select name="ms_step" id="msStep">
-            <option value="">— not tied to a step —</option>
+            <option value="">not tied to a step</option>
             <?php foreach ($steps as $st): ?>
               <option value="<?= (int)$st['id'] ?>"><?= e($st['name'] . ' · '
                   . applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></option>
@@ -637,10 +637,10 @@ require __DIR__ . '/includes/header.php';
       <input type="hidden" id="editTaskId">
       <label>Starts <input type="date" id="editStart" required></label>
       <label>Finishes <input type="date" id="editEnd" required>
-        <small>Inclusive — the last day worked.</small></label>
+        <small>Inclusive, the last day worked.</small></label>
       <label>Assigned to
         <select id="editCrew">
-          <option value="">— nobody —</option>
+          <option value="">nobody</option>
           <?php foreach ($crewList as $c): ?>
             <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?><?php
               if ((int)$c['is_placeholder'] === 1) echo ' (slot)'; ?></option>
@@ -648,7 +648,7 @@ require __DIR__ . '/includes/header.php';
         </select>
       </label>
       <label class="inline"><input type="checkbox" id="editManual">
-        Lock this task — Regenerate won't move it</label>
+        Lock this task, Regenerate won't move it</label>
       <div class="actions">
         <button type="button" class="secondary" onclick="closeTaskEditor()">Cancel</button>
         <button type="submit">Save</button>

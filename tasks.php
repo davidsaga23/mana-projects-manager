@@ -50,7 +50,7 @@ $ready = column_exists($pdo, 'tickets', 'id');
 if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
     $title = trim($_POST['title'] ?? '');
     if ($title === '') {
-        flash('err', 'A card needs a title — nothing was created.');
+        flash('err', 'A card needs a title, nothing was created.');
         finish_post($selfUrl);
     }
 
@@ -61,7 +61,7 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) 
     // and nobody is told about it — checked here as well as in the form, so a
     // hand-made POST cannot slip past.
     if ($type === 'ticket' && !$crewId) {
-        flash('err', 'A ticket needs somebody to own it — nothing was created. Pick who should look at it.');
+        flash('err', 'A ticket needs somebody to own it, nothing was created. Pick who should look at it.');
         finish_post($selfUrl);
     }
 
@@ -157,7 +157,7 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) 
         $res = delete_ticket_with_files($pdo, $delId);
         flash($res['deleted'] ? 'ok' : 'warn', $res['deleted']
             ? 'Deleted' . ($res['files'] ? ", and removed {$res['files']} attached file(s)." : '.')
-            : 'Nothing was deleted — that card is already gone.');
+            : 'Nothing was deleted, that card is already gone.');
     } else {
         flash('err', 'Only an administrator, or whoever raised it, can delete this card.');
     }
@@ -214,7 +214,7 @@ require __DIR__ . '/includes/header.php';
   <div class="empty-state">
     <p><strong>The tasks board needs a database update that hasn't been applied yet.</strong></p>
     <p class="muted">Migration <code>017_tickets.sql</code> creates the tables this screen reads.
-       Nothing is broken — the feature simply isn't switched on until it runs.</p>
+       Nothing is broken, the feature simply isn't switched on until it runs.</p>
     <?php if (is_admin()): ?>
       <p><a class="button" href="migrate.php">Review and apply it →</a></p>
     <?php else: ?>
@@ -273,7 +273,7 @@ require __DIR__ . '/includes/header.php';
   <p class="muted small">
     <strong><?= $archivedCount ?></strong> archived card(s). Finished work lands here
     <?= $archiveDays ?> day<?= $archiveDays === 1 ? '' : 's' ?> after it reaches a status that counts
-    as approved. <strong>Nothing is deleted</strong> — use Restore to bring one back.
+    as approved. <strong>Nothing is deleted</strong>, use Restore to bring one back.
   </p>
 <?php elseif ($justArchived > 0): ?>
   <p class="muted small">
@@ -285,7 +285,7 @@ require __DIR__ . '/includes/header.php';
 <?php if (!$columns): ?>
   <div class="empty-state">
     <p><strong>This project has no statuses yet, so the board has no columns.</strong></p>
-    <p class="muted">Board columns are the project's own statuses — the same vocabulary the
+    <p class="muted">Board columns are the project's own statuses, the same vocabulary the
        shots and assets use, rather than a second set of words for the same ideas.</p>
     <p><a class="button" href="statuses_edit.php?project=<?= $projectId ?>">Set up statuses →</a></p>
   </div>
@@ -293,7 +293,7 @@ require __DIR__ . '/includes/header.php';
 
 <?php if ($usedFallback): ?>
   <p class="flash flash-warn">
-    No status is ticked as a board column, so these <?= count($columns) ?> were chosen automatically —
+    No status is ticked as a board column, so these <?= count($columns) ?> were chosen automatically,
     one per meaning. Pick the ones you actually want on the
     <a href="statuses_edit.php?project=<?= $projectId ?>">Statuses screen</a>.
   </p>
@@ -333,7 +333,7 @@ foreach ($cards as $sid => $list) {
         <span class="board-dot" style="background:<?= e($colColor) ?>"></span>
         <span class="board-col-name"><?= e($col['name']) ?></span>
         <?php if ((int)$col['is_blocked'] === 1): ?>
-          <span class="board-col-flag" title="Work that cannot proceed — this column is an escalation, not a queue">blocked</span>
+          <span class="board-col-flag" title="Work that cannot proceed, this column is an escalation, not a queue">blocked</span>
         <?php endif; ?>
         <span class="board-col-count"><?= count($list) ?></span>
       </div>
@@ -461,7 +461,7 @@ foreach ($cards as $sid => $list) {
         </div>
         <label>Pipeline step <span class="muted small">(which part of the pipeline this is about)</span>
           <select name="step_id">
-            <option value="">— not step-specific —</option>
+            <option value="">not step-specific</option>
             <?php foreach ($steps as $st): ?>
               <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
             <?php endforeach; ?>
@@ -489,7 +489,7 @@ foreach ($cards as $sid => $list) {
       <div class="modal-row">
         <label>Owner <span class="req-mark ticket-only" style="display:none;">*</span>
           <select name="assigned_crew_id" id="createCrew">
-            <option value="">— nobody —</option>
+            <option value="">nobody</option>
             <?php foreach ($assignees as $c): ?>
               <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
             <?php endforeach; ?>
@@ -550,7 +550,7 @@ foreach ($cards as $sid => $list) {
       <div class="modal-row">
         <label>Owner
           <select id="editCrew">
-            <option value="">— nobody —</option>
+            <option value="">nobody</option>
             <?php foreach ($assignees as $c): ?>
               <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
             <?php endforeach; ?>
@@ -582,13 +582,13 @@ foreach ($cards as $sid => $list) {
 //
 // NOTE FOR ANYONE EDITING THIS COMMENT: do not write that tag out literally,
 // even inside a // comment. The HTML parser looks for the character sequence and
-// does not care that JavaScript considers it commented out — it ends the script
+// does not care that JavaScript considers it commented out, it ends the script
 // element on the spot. This exact comment shipped with the tag spelled out and
 // dumped the rest of the page to the screen as text. Identical in kind to
 // lesson 9 about '?>' inside a PHP comment: the parser acts on the characters,
 // not on your intent.
 // EVERY ONE OF THESE IS `window.x =`, NOT `const x =`. A top-level `const` (or
-// `let`) does NOT become a property of window — only `var` and a plain
+// `let`) does NOT become a property of window, only `var` and a plain
 // assignment do. board.js reads them as window.CARDS / window.CAN_EDIT, so
 // declaring them with `const` left it seeing undefined: canEdit came out false,
 // dragCard bailed on its first line, and the board silently would not drag.
@@ -598,7 +598,7 @@ window.CARDS = <?= json_encode(array_values(array_merge(...array_values($cards ?
 window.PROJECT_URL = <?= json_encode($selfUrl, $jsonFlags) ?>;
 window.CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
 // Read by tickets.js as it initialises, so these MUST be set before that file
-// loads — not after it, which is a silent no-op that falls back to the defaults.
+// loads, not after it, which is a silent no-op that falls back to the defaults.
 window.TICKET_MAX_FILES = <?= (int)($config['upload_max_files'] ?? 5) ?>;
 window.TICKET_MAX_BYTES = <?= (int)($config['upload_max_bytes'] ?? 26214400) ?>;
 </script>

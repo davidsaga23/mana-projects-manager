@@ -128,7 +128,7 @@ $stmt = $pdo->prepare(
 );
 $stmt->execute([$id, $projectId]);
 $task = $stmt->fetch();
-if (!$task) api_fail('That task no longer exists — reload the page.', 404);
+if (!$task) api_fail('That task no longer exists, reload the page.', 404);
 
 $start = trim($_POST['start_date'] ?? '');
 $end   = trim($_POST['end_date'] ?? '');

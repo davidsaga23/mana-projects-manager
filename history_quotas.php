@@ -64,7 +64,7 @@ require __DIR__ . '/includes/header.php';
     <?php foreach ($projects as $p): $n = $counts[(int)$p['id']] ?? 0; ?>
       <option value="<?= (int)$p['id'] ?>" <?= $proj === (int)$p['id'] ? 'selected' : '' ?>
               <?= $n === 0 ? 'disabled' : '' ?>>
-        <?= e($p['code'] . ' · ' . $p['name']) ?><?= $n === 0 ? ' — no baseline yet' : ' (' . $n . ')' ?>
+        <?= e($p['code'] . ' · ' . $p['name']) ?><?= $n === 0 ? ', no baseline yet' : ' (' . $n . ')' ?>
       </option>
     <?php endforeach; ?>
   </select>
@@ -82,7 +82,7 @@ require __DIR__ . '/includes/header.php';
       // no reason to know the difference between this and the live plan, and a
       // record that gets read as the current plan is worse than no record. ?>
 <p class="muted small">
-  Each block is one <strong>capture</strong> — every step of a project as it stood the moment
+  Each block is one <strong>capture</strong>, every step of a project as it stood the moment
   somebody recorded a baseline on <em>Dates &amp; headcount</em>. Captures are never overwritten,
   so a project that was re-baselined appears more than once and the older rows are what it
   originally committed to. Days per item is what the plan actually ran on: the studio ideal

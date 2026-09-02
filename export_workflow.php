@@ -46,7 +46,7 @@ if (!$steps) {
 $depsMap = step_dependencies_map($pdo, $projectId);
 
 // Named so the file still says what it is a month later in a downloads folder.
-$caption = $project['code'] . ' · ' . $project['name'] . ' — pipeline workflow, '
+$caption = $project['code'] . ' · ' . $project['name'] . ', pipeline workflow, '
          . date('j M Y');
 
 $svg = workflow_diagram_svg($steps, $depsMap, true, $caption);

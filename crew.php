@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'generate') {
             $r = sync_project_lanes($pdo, $projectId);
             if ($r['created'] === 0 && $r['existing'] === 0) {
-                flash('warn', 'No slots were created — no pipeline step has a headcount yet. ' .
+                flash('warn', 'No slots were created, no pipeline step has a headcount yet. ' .
                               'Set one on the Dates & headcount screen and come back.');
             } else {
                 flash('ok', sprintf(
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (!empty($r['renamed'])) {
                 flash('ok', sprintf(
-                    'Renamed %d slot%s so two steps sharing a name can be told apart — ' .
+                    'Renamed %d slot%s so two steps sharing a name can be told apart, ' .
                     'they now carry what they apply to, e.g. "Concept Character 01". ' .
                     'Only unfilled slots were touched.',
                     $r['renamed'], $r['renamed'] === 1 ? '' : 's'
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($r['surplus']) {
                 $n = count($r['surplus']);
                 flash('warn', sprintf(
-                    '%d slot%s beyond what the current headcount asks for. %s kept, not deleted — ' .
+                    '%d slot%s beyond what the current headcount asks for. %s kept, not deleted, ' .
                     '%s may already have work planned against %s. They are marked below.',
                     $n, $n === 1 ? ' is' : 's are', $n === 1 ? 'It was' : 'They were',
                     $n === 1 ? 'it' : 'they', $n === 1 ? 'it' : 'them'
@@ -78,13 +78,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'clean_surplus') {
             $r = remove_surplus_lanes($pdo, $projectId);
             if ($r['removed'] === 0 && !$r['blocked']) {
-                flash('warn', 'Nothing to clean up — every slot matches its step\'s headcount.');
+                flash('warn', 'Nothing to clean up, every slot matches its step\'s headcount.');
             } else {
                 flash('ok', sprintf(
                     'Removed %d surplus slot%s.%s',
                     $r['removed'], $r['removed'] === 1 ? '' : 's',
                     $r['kept_people'] > 0
-                        ? ' ' . $r['kept_people'] . ' of them held a real person — they were taken off '
+                        ? ' ' . $r['kept_people'] . ' of them held a real person, they were taken off '
                           . 'this step but remain on the studio crew list.'
                         : ''
                 ));
@@ -109,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['real_name'][$m[1]] ?? '',
                 $_POST['real_email'][$m[1]] ?? null
             );
-            flash('ok', 'That slot is now a person. Everything already planned for it — ' .
-                        'scheduled tasks, logged progress — belongs to them, with nothing moved.');
+            flash('ok', 'That slot is now a person. Everything already planned for it, ' .
+                        'scheduled tasks, logged progress, belongs to them, with nothing moved.');
 
         } elseif (preg_match('/^assign:(\d+)$/', $action, $m)) {
             $crewId = (int)($_POST['assign_crew'][$m[1]] ?? 0);
@@ -308,7 +308,7 @@ require __DIR__ . '/includes/header.php';
 <h2 class="wizard-title">Crew <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <p class="lead">
-  A crew is never complete until a show nearly is — people arrive as their department starts.
+  A crew is never complete until a show nearly is, people arrive as their department starts.
   So the plan is built against <strong>slots</strong>, one per person the headcount asks for,
   and a slot becomes a real person the day someone is hired into it. Everything already
   planned for that slot becomes their work, with nothing moved.
@@ -337,7 +337,7 @@ require __DIR__ . '/includes/header.php';
   <?php if ($surplusCount): ?>
     <div class="flash flash-warn">
       <strong><?= $surplusCount ?></strong> slot<?= $surplusCount === 1 ? '' : 's' ?>
-      <?= $surplusCount === 1 ? 'is' : 'are' ?> above what the headcount now asks for —
+      <?= $surplusCount === 1 ? 'is' : 'are' ?> above what the headcount now asks for,
       lowering a step's headcount never deletes people, because work may already be planned
       against them. <?= $surplusCount === 1 ? 'It is' : 'They are' ?> highlighted below.
       Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a> first so that
@@ -391,7 +391,7 @@ require __DIR__ . '/includes/header.php';
            assigning work to them by name.</p>
       <?php else: ?>
         <p>Set a headcount per step on the <a href="wizard.php?project=<?= $projectId ?>&step=6">Dates
-           &amp; headcount</a> screen first — that is what says how many people each step needs.</p>
+           &amp; headcount</a> screen first, that is what says how many people each step needs.</p>
       <?php endif; ?>
     </div>
   <?php else: ?>
@@ -495,7 +495,7 @@ require __DIR__ . '/includes/header.php';
                   </form>
                   <form method="post" class="hire-row">
                     <select name="assign_crew[<?= (int)$l['id'] ?>]">
-                      <option value="">— or somebody already on the books —</option>
+                      <option value="">or somebody already on the books</option>
                       <?php foreach ($people as $p): ?>
                         <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?></option>
                       <?php endforeach; ?>
@@ -521,7 +521,7 @@ require __DIR__ . '/includes/header.php';
                 <summary class="slot-btn">Change assignee</summary>
                 <form method="post" class="inline-form slot-change-bar">
                   <select name="assign_crew[<?= (int)$l['id'] ?>]">
-                    <option value="">— pick somebody —</option>
+                    <option value="">pick somebody</option>
                     <?php foreach ($people as $p): ?>
                       <option value="<?= (int)$p['id'] ?>" <?= (int)$p['id'] === (int)$l['crew_id'] ? 'selected' : '' ?>>
                         <?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?>

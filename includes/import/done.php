@@ -9,7 +9,7 @@ if (!$report):
 <?php else: ?>
 
 <div class="flash flash-ok">
-  Import finished. Everything below was written in a single transaction — if any part had
+  Import finished. Everything below was written in a single transaction, if any part had
   failed, none of it would have been applied.
 </div>
 
@@ -61,7 +61,7 @@ if ($anySkips):
   <h3>Still needs attention</h3>
   <?php if ($report['unmatched_people']): ?>
     <p><strong>Names not linked to anyone.</strong> The work is imported and the raw name kept,
-       so matching them later fills in the history — it doesn't need re-importing.</p>
+       so matching them later fills in the history, it doesn't need re-importing.</p>
     <table class="review-table">
       <tr><th>Name in the file</th><th>Records</th></tr>
       <?php foreach ($report['unmatched_people'] as $name => $count): ?>
@@ -81,7 +81,7 @@ if ($anySkips):
   <?php endif; ?>
   <p><a class="button" href="aliases.php?project=<?= $projectId ?>">Sort these out →</a></p>
 <?php else: ?>
-  <p class="ok">Everything in the file matched something here — no loose ends.</p>
+  <p class="ok">Everything in the file matched something here, no loose ends.</p>
 <?php endif; ?>
 
 <div class="actions">

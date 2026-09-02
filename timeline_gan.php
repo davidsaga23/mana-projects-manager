@@ -161,7 +161,7 @@ header('Content-Disposition: attachment; filename="' . $filename . '"');
 
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 ?>
-<project name="<?= $esc($project['name']) ?> — Detailed schedule" company="Mana Animation Studio" webLink="" view-date="<?= $esc($viewDate) ?>" view-index="0" gantt-divider-location="380" resource-divider-location="300" version="3.2" locale="en">
+<project name="<?= $esc($project['name']) ?>, Detailed schedule" company="Mana Animation Studio" webLink="" view-date="<?= $esc($viewDate) ?>" view-index="0" gantt-divider-location="380" resource-divider-location="300" version="3.2" locale="en">
     <description>Exported from Anima on <?= date('Y-m-d H:i') ?>. <?= $esc($filterDesc) ?></description>
     <view zooming-state="default:3" id="gantt-chart">
         <field id="tpd3" name="Name" width="280" order="0"/>

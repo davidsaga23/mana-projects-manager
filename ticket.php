@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
     $hasFiles = !empty($_FILES['attachments']['name'][0] ?? '');
 
     if ($body === '' && !$hasFiles) {
-        flash('warn', 'Nothing to post — the comment was empty and no file was attached.');
+        flash('warn', 'Nothing to post, the comment was empty and no file was attached.');
         finish_post($selfUrl);
     }
 
@@ -84,14 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     // A ticket always needs an owner — refuse to strip the assignee off one
     // rather than accepting the save and quietly leaving it unowned.
     if ($isTicket && !$newCrew) {
-        flash('err', 'A ticket has to stay assigned to somebody — nothing was saved.');
+        flash('err', 'A ticket has to stay assigned to somebody, nothing was saved.');
         header('Location: ' . $selfUrl);
         exit;
     }
 
     $newTitle = trim($_POST['title'] ?? '');
     if ($newTitle === '') {
-        flash('err', 'The title cannot be empty — nothing was saved.');
+        flash('err', 'The title cannot be empty, nothing was saved.');
         header('Location: ' . $selfUrl);
         exit;
     }
@@ -304,7 +304,7 @@ require __DIR__ . '/includes/header.php';
   <?php if ((int)($t['is_placeholder'] ?? 0) === 1): ?>
     <p class="flash flash-warn" style="margin-top:10px;">
       This is owned by <strong><?= e($t['crew_name']) ?></strong>, a planning slot that nobody
-      fills yet — so no notification email was sent. Renaming the slot to a real person on the
+      fills yet, so no notification email was sent. Renaming the slot to a real person on the
       <a href="crew.php?project=<?= $projectId ?>">Crew screen</a> makes this theirs, with nothing to move.
     </p>
   <?php elseif ($t['crew_name'] && empty($t['crew_email']) && (int)($t['is_team'] ?? 0) === 0): ?>
@@ -413,7 +413,7 @@ require __DIR__ . '/includes/header.php';
       </label>
       <label>Pipeline step
         <select name="step_id" <?= can_edit() ? '' : 'disabled' ?>>
-          <option value="">— not step-specific —</option>
+          <option value="">not step-specific</option>
           <?php foreach ($steps as $st): ?>
             <option value="<?= (int)$st['id'] ?>" <?= (int)$t['step_id'] === (int)$st['id'] ? 'selected' : '' ?>>
               <?= e($st['name']) ?>
@@ -446,7 +446,7 @@ require __DIR__ . '/includes/header.php';
       </label>
       <label>Owner <?php if ($isTicket): ?><span class="req-mark">*</span><?php endif; ?>
         <select name="assigned_crew_id" <?= $isTicket ? 'required' : '' ?> <?= can_edit() ? '' : 'disabled' ?>>
-          <option value="">— nobody —</option>
+          <option value="">nobody</option>
           <?php
           // A person who has since left the project still has to appear, or
           // saving anything else on the card would silently unassign them.

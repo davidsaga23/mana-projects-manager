@@ -64,7 +64,7 @@ $selfUrl    = 'person.php?project=' . $projectId . '&crew=' . $crewId
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
     $name = trim($_POST['name'] ?? '');
     if ($name === '') {
-        flash('err', 'A name is required — nothing was saved.');
+        flash('err', 'A name is required, nothing was saved.');
     } else {
         $sql = 'UPDATE crew SET name = ?, role = ?, email = ?' . ($hasDept ? ', department = ?' : '') . ' WHERE id = ?';
         $args = [$name, trim($_POST['role'] ?? '') ?: null, trim($_POST['email'] ?? '') ?: null];
@@ -217,14 +217,14 @@ require __DIR__ . '/includes/header.php';
 <p class="summary-line">
   <?= e($person['department'] ?? '') ?: 'No department' ?> ·
   <?= e($person['role'] ?? '') ?: 'No role recorded' ?> ·
-  <?= $person['email'] ? e($person['email']) : '<span class="warn-text">no email — cannot be notified</span>' ?>
+  <?= $person['email'] ? e($person['email']) : '<span class="warn-text">no email, cannot be notified</span>' ?>
 </p>
 
 <?php if ($isSlot): ?>
   <div class="flash flash-warn">
     This is a planning slot, not a person. The figures below are what the plan asks of whoever
     fills it. Renaming the slot on the <a href="crew.php?project=<?= $projectId ?>">Crew screen</a>
-    makes all of this theirs — the id never changes, so nothing has to be moved.
+    makes all of this theirs, the id never changes, so nothing has to be moved.
   </div>
 <?php endif; ?>
 
@@ -262,16 +262,16 @@ require __DIR__ . '/includes/header.php';
     <?php if ((int)$dateClash['before'] > 0): ?>
       <?= (int)$dateClash['before'] ?> task<?= (int)$dateClash['before'] === 1 ? '' : 's' ?>
       start<?= (int)$dateClash['before'] === 1 ? 's' : '' ?> before
-      <?= e($dateClash['start']) ?> — the earliest is <?= e($dateClash['first_start']) ?>.
+      <?= e($dateClash['start']) ?>, the earliest is <?= e($dateClash['first_start']) ?>.
     <?php endif; ?>
     <?php if ((int)$dateClash['after'] > 0): ?>
       <?= (int)$dateClash['after'] ?> task<?= (int)$dateClash['after'] === 1 ? '' : 's' ?>
       finish<?= (int)$dateClash['after'] === 1 ? 'es' : '' ?> after
-      <?= e($dateClash['end']) ?> — the last is <?= e($dateClash['last_end']) ?>.
+      <?= e($dateClash['end']) ?>, the last is <?= e($dateClash['last_end']) ?>.
     <?php endif; ?>
     <div class="muted small" style="margin-top:6px;">
       The scheduler does not yet take engagement dates into account, so it has planned this work
-      as though they were available throughout. Nothing here is wrong by itself — it is a
+      as though they were available throughout. Nothing here is wrong by itself, it is a
       difference between the plan and the agreement that somebody has to resolve, by moving the
       work on the <a href="timeline.php?project=<?= $projectId ?>">timeline</a> or by changing the
       dates below.
@@ -291,7 +291,7 @@ require __DIR__ . '/includes/header.php';
 <h3>Pace, step by step</h3>
 <p class="muted small">
   <strong>Required</strong> is the minimum one person must finish each day for that step's
-  deadline to hold — the platform's central number, and the same one the dashboard shows.
+  deadline to hold, the platform's central number, and the same one the dashboard shows.
   <strong>Recent</strong> is approximate: history is recorded per step, not per person, so this
   counts their approved tasks touched in the last 7 working days. A re-import that touches old
   rows inflates it; a week nobody records inflates nothing at all. Read it as a direction, not a
@@ -382,10 +382,10 @@ require __DIR__ . '/includes/header.php';
         <input type="date" name="end_date" value="<?= e($engagement['end_date'] ?? '') ?>"></label>
     </div>
     <p class="muted small">
-      Recorded per show, not per person — the same artist can be on this one from September and on
+      Recorded per show, not per person, the same artist can be on this one from September and on
       the next from January. Leave either blank while it is genuinely not settled; a guessed date
       reads as a fact. <strong>The scheduler does not use these yet</strong>, so they do not move
-      any bar on the timeline — where the plan disagrees with them, this page says so above.
+      any bar on the timeline, where the plan disagrees with them, this page says so above.
     </p>
   <?php endif; ?>
   <div class="actions"><button type="submit">Save details</button></div>
@@ -408,7 +408,7 @@ require __DIR__ . '/includes/header.php';
     <div class="empty-state">
       <p><strong>The finance database isn't set up yet.</strong></p>
       <p class="muted">Rates and contracts live in their own database with their own MySQL
-         user, so that this application's ordinary connection has no rights to them at all —
+         user, so that this application's ordinary connection has no rights to them at all,
          a bug in any normal query cannot reach a rate, because the connection it runs on
          isn't permitted to see one.</p>
       <p class="muted">Import <code>finance_install.sql</code> into a new database, then add
@@ -418,7 +418,7 @@ require __DIR__ . '/includes/header.php';
 
   <?php else: ?>
     <p class="muted small">
-      Visible to administrators only — <?= e(current_user_display()) ?> is one. Editors and
+      Visible to administrators only, <?= e(current_user_display()) ?> is one. Editors and
       view-only accounts never see this section and the data never reaches their browser.
       It is stored in a <strong>separate database</strong>, and the contract itself stays in
       Google Drive under Drive's own permissions.
@@ -488,7 +488,7 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
         <p class="muted small">
           Marking it <em>sent</em> or <em>signed</em> fills in today's date if you leave the box
-          blank — a status with no date is a fact nobody can check later. <em>Declined</em> is
+          blank, a status with no date is a fact nobody can check later. <em>Declined</em> is
           deliberately not the same as <em>no contract yet</em>: it is a hole in the plan somebody
           has to fill.
         </p>
@@ -549,7 +549,7 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
       <p class="muted small">
         Months is days ÷ <?= (int)DAYS_PER_MONTH ?>, the divisor the expense sheet uses.
-        These are <strong>planned</strong> days from the pipeline, not hours logged — actual cost
+        These are <strong>planned</strong> days from the pipeline, not hours logged, actual cost
         comes from the invoices attached to each position.
       </p>
     <?php elseif (can_see_money() && $isSlot): ?>

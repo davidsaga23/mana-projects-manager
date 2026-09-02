@@ -105,9 +105,9 @@ $pendingCount = count(array_filter($results, function ($r) { return $r[1] === 'p
   <h2 class="wizard-title">Schema migrations</h2>
 
   <?php if (!$files): ?>
-    <p class="ok">No migration files exist yet — the baseline schema is all there is. ✓</p>
+    <p class="ok">No migration files exist yet, the baseline schema is all there is. ✓</p>
   <?php elseif ($dryRun && $pendingCount === 0): ?>
-    <p class="ok">✓ Database is up to date — <?= count($files) ?> migration file(s), all applied.</p>
+    <p class="ok">✓ Database is up to date, <?= count($files) ?> migration file(s), all applied.</p>
   <?php elseif ($dryRun): ?>
     <p><strong><?= $pendingCount ?></strong> migration(s) pending. Review the list, then apply:</p>
     <form method="post"><button type="submit" name="run" value="1">Apply pending migrations</button></form>

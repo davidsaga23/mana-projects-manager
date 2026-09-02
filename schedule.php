@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'commit') {
             $plan = build_schedule($pdo, $project);
             if (!$plan['tasks']) {
-                throw new RuntimeException('There is nothing to save — the plan came out empty. ' .
+                throw new RuntimeException('There is nothing to save, the plan came out empty. ' .
                                            'The reasons are listed on the screen.');
             }
             $res = commit_schedule($pdo, $projectId, $plan);
@@ -128,7 +128,7 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
     · <?= e($saved['first']) ?> → <?= e($saved['last']) ?>.
     The plan below is worked out fresh each time this page opens, so it may differ from what
-    is stored — saving again replaces it.
+    is stored, saving again replaces it.
   <?php else: ?>
     <strong>Nothing saved yet.</strong>
     Everything below is a preview, worked out fresh just now and thrown away when you leave.
@@ -288,7 +288,7 @@ require __DIR__ . '/includes/header.php';
     <?php if ($anySlotless): ?>
       These are derived from the step name because this project has no crew slots yet.
       <a href="crew.php?project=<?= $projectId ?>">Create them from the headcount</a> and the
-      plan starts naming who does what — a placeholder at first, a real person once someone
+      plan starts naming who does what, a placeholder at first, a real person once someone
       is hired into the slot.
     <?php elseif ($anyPlaceholder): ?>
       Slots, not yet all people. A placeholder holds the plan until someone is hired into it;
@@ -315,7 +315,7 @@ require __DIR__ . '/includes/header.php';
   <?php if (count($plan['tasks']) > SCHEDULE_ROW_LIMIT): ?>
     <p class="muted small">
       Showing the first <?= SCHEDULE_ROW_LIMIT ?> of <?= count($plan['tasks']) ?> tasks, in date
-      order. All of them are saved when you press the button — this listing is trimmed only to
+      order. All of them are saved when you press the button, this listing is trimmed only to
       keep the page readable.
     </p>
   <?php endif; ?>
@@ -342,7 +342,7 @@ require __DIR__ . '/includes/header.php';
   <?php if ($plan['kept']): ?>
     <h3>Left alone</h3>
     <p class="muted small">
-      Hand-planned tasks. The pass reads them — what comes after still waits for them — but
+      Hand-planned tasks. The pass reads them, what comes after still waits for them, but
       never rewrites them.
     </p>
     <table class="review-table">
@@ -374,7 +374,7 @@ require __DIR__ . '/includes/header.php';
 
 <?php else: ?>
   <p class="muted">
-    There is nothing to schedule yet. The reasons are listed above — usually a missing
+    There is nothing to schedule yet. The reasons are listed above, usually a missing
     breakdown, a missing deadline, or a pipeline with no steps in it.
   </p>
 <?php endif; ?>

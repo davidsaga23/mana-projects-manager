@@ -29,7 +29,7 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
   </tr>
   <tr>
     <td><strong>Progress records</strong>
-      <div class="muted small">one per pipeline step on each shot or asset — the status,
+      <div class="muted small">one per pipeline step on each shot or asset, the status,
         who's on it and any time logged</div></td>
     <td><strong><?= (int)$report['progress_created'] + (int)$report['progress_updated'] ?></strong></td>
     <td><?= (int)$report['progress_created'] ?></td>
@@ -37,7 +37,7 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
   </tr>
 </table>
 <p class="muted small">
-  "Already here" is not a problem — shots and assets are matched by name, so anything you
+  "Already here" is not a problem, shots and assets are matched by name, so anything you
   already created is updated in place rather than duplicated.
 </p>
 
@@ -59,7 +59,7 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
       <tr><td><strong><?= (int)$report[$key] ?></strong></td><td class="muted"><?= e($label) ?></td></tr>
     <?php endforeach; ?>
   </table>
-  <p class="muted small">These are the consequences of the choices on the previous screen —
+  <p class="muted small">These are the consequences of the choices on the previous screen,
      go back if any of them look wrong.</p>
 <?php endif; ?>
 
@@ -89,7 +89,7 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
   <div class="flash flash-warn">
     <strong><?= count($report['unmatched_people']) ?></strong>
     <?= count($report['unmatched_people']) === 1 ? 'name' : 'names' ?> won't be linked to anyone.
-    Their work still imports, and the raw name is kept so it can be matched later —
+    Their work still imports, and the raw name is kept so it can be matched later,
     but it won't appear in per-artist reporting until then.
     <br>
     <?php $bits = [];
@@ -113,7 +113,7 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
 
 <?php if ($willWrite === 0): ?>
   <div class="flash flash-err">This import would change nothing. Check the group mapping on
-    the previous screen — if every group is set to "ignore", there is nothing to bring in.</div>
+    the previous screen, if every group is set to "ignore", there is nothing to bring in.</div>
 <?php endif; ?>
 
 <form method="post" class="actions">

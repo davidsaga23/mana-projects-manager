@@ -107,7 +107,7 @@
         // so — a wrong total is worse than an out-of-date one.
         markStale();
       } catch (err) {
-        alert('Network error — nothing was saved. ' + err.message);
+        alert('Network error, nothing was saved. ' + err.message);
         cell.style.background = before.bg;
         cell.dataset.status = before.status;
         cell.classList.remove('is-saving');
@@ -158,7 +158,7 @@
       const label = key === 'none' ? 'Not recorded' : (statusNames[key] || 'Status');
 
       document.getElementById('sliceTitle').textContent =
-        label + ' — ' + group + ' (' + entries.length + ')';
+        label + ', ' + group + ' (' + entries.length + ')';
 
       const body = document.getElementById('sliceBody');
       body.innerHTML = '';

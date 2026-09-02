@@ -55,7 +55,7 @@
 
         const size = document.createElement('span');
         size.className = 'file-chip-size';
-        size.textContent = humanSize(f.size) + (tooBig ? ' — too large' : '');
+        size.textContent = humanSize(f.size) + (tooBig ? ', too large' : '');
 
         const rm = document.createElement('button');
         rm.type = 'button';
@@ -167,14 +167,14 @@
           window.location.href = target;
         } else {
           if (label) label.textContent = 'Upload failed (HTTP ' + xhr.status + ').';
-          alert('Upload failed (HTTP ' + xhr.status + '). Nothing was saved — try again.');
+          alert('Upload failed (HTTP ' + xhr.status + '). Nothing was saved, try again.');
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtn.dataset.label; }
         }
       });
 
       xhr.addEventListener('error', () => {
         if (label) label.textContent = 'Network error.';
-        alert('Network error — nothing was saved. Check your connection and try again.');
+        alert('Network error, nothing was saved. Check your connection and try again.');
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtn.dataset.label; }
       });
 

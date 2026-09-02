@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                   . 'and the answer is remembered for future projects.',
                       $r['changed'], $r['changed'] === 1 ? '' : 's', implode('; ', $r['moved'])));
             } else {
-                flash('warn', 'Nothing changed — every step is already in the phase shown.');
+                flash('warn', 'Nothing changed, every step is already in the phase shown.');
             }
 
         } elseif (isset($_POST['save_expenses'])) {
@@ -169,7 +169,7 @@ foreach (project_lanes($pdo, $projectId) as $l) {
         'step_id'   => (int)$l['step_id'],
         'crew_name' => (string)$l['name'],
         'step_name' => (string)$l['step_name'],
-        'label'     => $l['name'] . ' — ' . $l['step_name'],
+        'label'     => $l['name'] . ', ' . $l['step_name'],
     ];
 }
 $people  = project_people($pdo, $projectId);
@@ -285,8 +285,8 @@ try {
       <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
   </div>
   <p class="muted small">
-    A <strong>task</strong> is one item through one step — every shot and every asset multiplied by
-    the steps that apply to it — so <?= (int)$progress['applicable'] ?> is the whole show as a
+    A <strong>task</strong> is one item through one step, every shot and every asset multiplied by
+    the steps that apply to it, so <?= (int)$progress['applicable'] ?> is the whole show as a
     count of things to finish, not a count of shots. The same figures the
     <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> draws, from the same
     calculation, so the two screens cannot disagree about how far along the show is.
@@ -327,7 +327,7 @@ try {
 <?php if ($proj['mixed_currency']): ?>
   <div class="flash flash-warn">
     People on this show are paid in more than one currency, and these totals simply add the
-    numbers together. <strong>Treat the projected cost as indicative until that is resolved</strong> —
+    numbers together. <strong>Treat the projected cost as indicative until that is resolved</strong>,
     nothing here converts between currencies, and inventing an exchange rate would be worse than
     saying so.
   </div>
@@ -388,14 +388,14 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 
   <?php if (!$hasDeptCol): ?>
     <p class="muted small warn-text">
-      Phases need migration <strong>015</strong>, which hasn't been applied — so everything groups
+      Phases need migration <strong>015</strong>, which hasn't been applied, so everything groups
       as <em>Unassigned</em>.
     </p>
   <?php elseif (can_edit()): ?>
     <p class="muted small">
       Which phase each step belongs to is set at the top of the
       <a href="finance_project.php?project=<?= $projectId ?>&amp;tab=projection">Expense
-      projection</a> — beside the table it regroups.
+      projection</a>, beside the table it regroups.
     </p>
   <?php endif; ?>
 <?php endif; ?>
@@ -451,7 +451,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   <details class="inline-actions">
     <summary>Which phase each step belongs to</summary>
     <p class="muted small">
-      A step's phase is what groups it here, on the expense projection, and in the crew list —
+      A step's phase is what groups it here, on the expense projection, and in the crew list,
       so moving <em>Comp</em> to Post-production regroups every one of them at once. It is a
       <strong>production</strong> fact rather than a financial one, and it is stored with the
       step, not with the money.
@@ -592,7 +592,7 @@ if (standards_available($pdo)) {
 
 <p class="muted small">
   Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
-  one person per day — remaining work over the working days left, divided by the people on it. It
+  one person per day, remaining work over the working days left, divided by the people on it. It
   is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
   closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
   from the <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
@@ -618,7 +618,7 @@ if (standards_available($pdo)) {
     <div class="flash flash-err">
       <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
       <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above the studio standard. That is not
-      an ambitious plan — it is one the people on it are not expected to hit. The three fixes are
+      an ambitious plan, it is one the people on it are not expected to hit. The three fixes are
       more people, more time, or less work, and all three land on this page.
     </div>
   <?php endif; ?>
@@ -677,7 +677,7 @@ if (standards_available($pdo)) {
           <?php elseif ($over > 1.05): ?>
             <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the standard.</span>
           <?php elseif ($over < 0.95): ?>
-            <span class="ok">Comfortable — <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
+            <span class="ok">Comfortable, <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
           <?php else: ?>
             <span class="muted">Right at the standard.</span>
           <?php endif; ?>
@@ -688,7 +688,7 @@ if (standards_available($pdo)) {
   </table>
 
   <p class="muted small">
-    Steps with no ideal recorded are left out rather than shown blank — a comparison against
+    Steps with no ideal recorded are left out rather than shown blank, a comparison against
     nothing is not a row. The minimum here is the same figure the
     <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
     <em>required</em>, from the same calculation, so the two cannot disagree.
@@ -729,7 +729,7 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
   <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
   <span class="muted small">
     Built live from the numbers below, in the fifteen-column shape of
-    <code>RTC_ExpenseProjection_v01.xlsx</code> — department bands, subtotals, grand total and the
+    <code>RTC_ExpenseProjection_v01.xlsx</code>, department bands, subtotals, grand total and the
     summary block. Because it comes out of the same calculation this page draws, the file and the
     screen cannot disagree.
   </span>
@@ -764,7 +764,7 @@ if ($retakePct <= 0):
   and the CSV export use; the rate comes from each person's page.
   <strong>Computed every time this page loads</strong>, never stored, so it cannot disagree with the plan.
   <br><strong>A rate belongs to the PERSON, not to this row or this project.</strong> Type one in the
-  Rate column and it saves against them everywhere — the other rows they appear on here, and every
+  Rate column and it saves against them everywhere, the other rows they appear on here, and every
   future show they are booked on. A rate set on a <em>slot</em> is the exception: a slot exists only
   on this project, so its rate goes when the slot does.
 </p>
@@ -882,7 +882,7 @@ if ($retakePct <= 0):
     </tbody>
     <tfoot>
       <tr>
-        <th colspan="5">Total projected — people</th>
+        <th colspan="5">Total projected, people</th>
         <th class="num"><?= e(fmt_money_plain($proj['total'], $proj['currency'])) ?></th>
         <th></th><th></th>
         <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
@@ -896,7 +896,7 @@ if ($retakePct <= 0):
   <p class="muted small">
     <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
     <strong>Actual days</strong> comes from time logged against that person on that step.
-    <strong>Actual cost comes from the invoices</strong> attached to that position — not from days
+    <strong>Actual cost comes from the invoices</strong> attached to that position, not from days
     times a rate, which would be a second estimate rather than a fact. A dash in either means
     nothing was recorded, which is not the same as it having been free.
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
@@ -904,14 +904,14 @@ if ($retakePct <= 0):
       The actual total here counts only invoices attached to a position, so it is
       <?= e(fmt_money_plain($unattached, $cur)) ?> lower than the <em>Invoiced</em> figure at the
       top of the page. That gap is the unattached invoices, and it is a real difference rather
-      than a rounding error — the money is spent either way, it just belongs to no row.
+      than a rounding error, the money is spent either way, it just belongs to no row.
     <?php endif; ?>
     A day is <?= e(fmt_num($proj['hours_per_day'], 1)) ?> hours on this project.
   </p>
 
   <?php if ($proj['unpriced_days'] > 0): ?>
     <p class="flash flash-warn">
-      <strong><?= e(fmt_num($proj['unpriced_days'], 1)) ?> person-days have no rate behind them</strong> —
+      <strong><?= e(fmt_num($proj['unpriced_days'], 1)) ?> person-days have no rate behind them</strong>,
       mostly lanes still held by unfilled slots. Those days are <em>excluded</em> from the total
       rather than counted as free, so the real cost is higher than it says. Type one into the
       <strong>Rate</strong> column above and every figure on this page moves with it.
@@ -921,7 +921,7 @@ if ($retakePct <= 0):
 
 <?php if ($unattached > 0): ?>
   <p class="flash flash-warn">
-    <strong><?= e(fmt_money_plain($unattached, $cur)) ?> of invoices name no position</strong> —
+    <strong><?= e(fmt_money_plain($unattached, $cur)) ?> of invoices name no position</strong>,
     a kill fee, a one-off, or simply nobody picked one. That money counts against the budget but
     cannot appear on a row above, because spreading it across rows would put a figure into a
     subtotal that nobody agreed to. Edit those invoices to attach them, or leave them as they are.
@@ -931,7 +931,7 @@ if ($retakePct <= 0):
 <h3>Other expenses <span class="muted">· <?= count($proj['other'] ?? []) ?></span></h3>
 
 <p class="muted small">
-  Costs with no lane behind them — software seats, render or cloud time, a music licence, stock,
+  Costs with no lane behind them, software seats, render or cloud time, a music licence, stock,
   equipment, travel. The projection above is computed from pipeline steps and can only ever contain
   people; <strong>these are the rest of what a show spends</strong>, and they count toward the
   Projected cost and Margin at the top of this page.
@@ -944,7 +944,7 @@ if ($retakePct <= 0):
 <?php if (expenses_need_upgrade()): ?>
   <div class="flash flash-warn">
     Other expenses need <code>finance_install_05.sql</code>, which hasn't been imported into the
-    finance database yet. Until it is, this section cannot record anything — and
+    finance database yet. Until it is, this section cannot record anything, and
     <strong>Projected cost and Margin above are people only</strong>.
   </div>
 <?php else: ?>
@@ -1080,7 +1080,7 @@ if ($retakePct <= 0):
         <button type="button" class="secondary" onclick="expenseAddRows()">Add 5 more rows</button>
       </div>
       <p class="muted small">
-        <strong>All three statuses count toward the projection</strong>, which is the point — a
+        <strong>All three statuses count toward the projection</strong>, which is the point, a
         projection is what the show will cost, not what it has cost so far. <em>Planned</em> is
         budgeted, <em>committed</em> is ordered, <em>paid</em> is settled. Marking one paid without
         a date fills in today. The category list grows as you use it and is shared across every
@@ -1157,9 +1157,9 @@ if ($retakePct <= 0):
 <h3>Record invoices</h3>
 
 <p class="muted small">
-  One row per invoice, five at a time — a month's invoices arrive as a batch, and one form submit
+  One row per invoice, five at a time, a month's invoices arrive as a batch, and one form submit
   each was six page loads to do one afternoon's bookkeeping. Only the <strong>amount</strong> is
-  required; blank rows are ignored. A row with details but no amount is <em>not</em> ignored — it
+  required; blank rows are ignored. A row with details but no amount is <em>not</em> ignored, it
   is reported, because that is somebody who was interrupted mid-typing rather than a row nobody
   wanted.
 </p>
@@ -1190,7 +1190,7 @@ if ($retakePct <= 0):
           <tr>
             <td>
               <select name="<?= $n ?>[position]" onchange="invPosition(this)">
-                <option value="">— no particular position —</option>
+                <option value="">no particular position</option>
                 <?php foreach ($positions as $ps): ?>
                   <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
                           data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
@@ -1228,7 +1228,7 @@ if ($retakePct <= 0):
     <button type="button" class="secondary" onclick="invAddRows()">Add 5 more rows</button>
   </div>
   <p class="muted small">
-    Choosing a <strong>position</strong> puts that invoice on that row of the projection above —
+    Choosing a <strong>position</strong> puts that invoice on that row of the projection above,
     crew and step together are the lane, which is why "who" alone cannot say what a payment was
     for. Leaving it blank is a real answer: a kill fee or a one-off counts in the project total and
     is listed as unattached, rather than being forced onto a row nobody agreed to.
@@ -1240,7 +1240,7 @@ if ($retakePct <= 0):
 // Fill the visible name from the position picker, within THIS row only.
 //
 // The old single form did this with document.getElementById, which addresses
-// exactly one field on the page — with five rows it would have written every
+// exactly one field on the page, with five rows it would have written every
 // pick into the first row's name box. The id that actually matters is not sent
 // from here at all: the server re-resolves the position itself, so a name and
 // an id can never disagree about which lane an invoice belongs to.
@@ -1278,7 +1278,7 @@ function invAddRows() {
 
 <p class="muted small">
   The invoice document stays in Drive under Drive's own permissions; only the link is stored.
-  <strong>The reference is theirs, not ours</strong> — nothing is generated here, because a second
+  <strong>The reference is theirs, not ours</strong>, nothing is generated here, because a second
   number guarantees the two disagree the moment somebody quotes one over email.
   Marking an invoice paid without a date fills in today: a status that cannot be checked later
   is not a record.

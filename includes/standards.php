@@ -323,7 +323,7 @@ function standards_drift(PDO $pdo, array $project): array {
             } elseif ($ratio < 1) {
                 // Under the money, whatever else it is. Deliverability is a
                 // separate question and a separate warning.
-                $verdict = sprintf('Planned %s%% faster than the standard — %s a day against %s.',
+                $verdict = sprintf('Planned %s%% faster than the standard, %s a day against %s.',
                     fmt_num((1 - $ratio) * 100, 0),
                     fmt_num($planned > 0 ? 1 / $planned : 0, 2),
                     fmt_num(1 / $ideal, 2));
@@ -332,7 +332,7 @@ function standards_drift(PDO $pdo, array $project): array {
                 // The budget is built on the standard, so slower than it is
                 // spending days nobody costed — not "the safe direction", which
                 // is what this said before David corrected it (2026-08-17).
-                $verdict = sprintf('Planned %s%% SLOWER than the standard — beyond the days the '
+                $verdict = sprintf('Planned %s%% SLOWER than the standard, beyond the days the '
                                  . 'budget was built on.', fmt_num(($ratio - 1) * 100, 0));
                 $state   = 'slow';
             }

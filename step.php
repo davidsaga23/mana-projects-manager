@@ -218,12 +218,12 @@ $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
       <div class="flash flash-err">
         This step needs <strong><?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% more per person per
         day</strong> than the studio standard for <?= e($project['type']) ?> projects. That is not
-        an ambitious target — it is one nobody is expected to hit. More people, more time, or less
+        an ambitious target, it is one nobody is expected to hit. More people, more time, or less
         work.
       </div>
     <?php elseif ($ratio < 0.95): ?>
       <p class="muted small ok">
-        Comfortably inside the studio standard — <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% under.
+        Comfortably inside the studio standard, <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% under.
       </p>
     <?php else: ?>
       <p class="muted small">The deadline asks for almost exactly the studio standard.</p>
@@ -238,7 +238,7 @@ $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
     </p>
   <?php endif; ?>
   <p class="muted small">
-    The team figure does not fall when people are added — the work needed to hit a date is
+    The team figure does not fall when people are added, the work needed to hit a date is
     fixed. Only each person's share of it moves.
     <?php if ($s['actual_pace'] !== null && $s['actual_pace'] < $s['required_pace']): ?>
       <span class="warn-text">At the current rate this step does not reach its deadline.</span>
@@ -269,7 +269,7 @@ $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
 <h3>Trend</h3>
 <?php if (count($trendRows) < 2): ?>
   <p class="muted">
-    A trend needs at least two days of history, and snapshots only began on 13 August 2026 —
+    A trend needs at least two days of history, and snapshots only began on 13 August 2026,
     the day the writer was added. This fills in on its own from here, one reading per day, and
     <strong>cannot be backfilled</strong>: a day nobody opened the app is a day that was never
     recorded. That is why the snapshot work jumped the queue.
@@ -288,7 +288,7 @@ $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
 <?php // --- daily history ---------------------------------------------------- ?>
 <h3>Daily history</h3>
 <?php if (count($history) < 2): ?>
-  <p class="muted">Progress is recorded once a day. There isn't enough yet to show a history —
+  <p class="muted">Progress is recorded once a day. There isn't enough yet to show a history,
      it fills itself in from here.</p>
 <?php else: ?>
   <table class="review-table">

@@ -62,7 +62,7 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
             // Names only have to be unique within what they apply to, so this
             // means a clash with a step of the SAME scope.
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
-                          '" — another step for ' . applies_to_phrase($appliesTo, $assetType) .
+                          '", another step for ' . applies_to_phrase($appliesTo, $assetType) .
                           ' is already called that. The same name is fine on a different scope.');
         }
     }
@@ -79,7 +79,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     if ($action !== 'add' && trim($_POST['new_name'] ?? '') !== '') {
         flash('warn', 'You had typed "' . trim($_POST['new_name']) . '" in the "Add a step" box '
                     . 'but pressed a different button, so it was not added. Everything else was '
-                    . 'saved — type it again and press Add.');
+                    . 'saved, type it again and press Add.');
     }
 
     // Copy a template in. Only offered while the pipeline is empty.
@@ -93,7 +93,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             $n = apply_pipeline_template($pdo, $projectId, $templateId);
             flash('ok', "Added $n steps from the template. Edit, add or remove any of them.");
         } else {
-            flash('ok', 'Starting with an empty pipeline — add your steps below.');
+            flash('ok', 'Starting with an empty pipeline, add your steps below.');
         }
         return wizard_url($projectId, 2);
     }
@@ -176,7 +176,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         flash($filled ? 'ok' : 'warn', $filled
             ? "Filled in $filled department" . ($filled === 1 ? '' : 's') .
               ' from step names used on other projects. Only blanks were touched.'
-            : 'Nothing to fill — every step either has a department already, or is a name ' .
+            : 'Nothing to fill, every step either has a department already, or is a name ' .
               'no other project has assigned one to.');
         if ($unknown) {
             flash('warn', 'No department is known yet for: ' . implode(', ', array_slice($unknown, 0, 8)) .
@@ -221,7 +221,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 
         // Order is presentation only now that dependencies are set explicitly, so
         // rearranging this list can no longer disturb the workflow.
-        flash('ok', 'Saved the new step order. The workflow is unaffected — order here is ' .
+        flash('ok', 'Saved the new step order. The workflow is unaffected, order here is ' .
                     'just how the list reads.');
         return wizard_url($projectId, 2);
     }
@@ -294,7 +294,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         foreach ($templates as $t) if ($t['project_type'] === $project['type']) $matched = true;
         ?>
         <p class="lead">Start from a template, then change anything. Templates are just
-           starting points — editing these steps never affects other projects.</p>
+           starting points, editing these steps never affects other projects.</p>
         <form method="post" class="stack">
           <input type="hidden" name="action" value="template">
           <div class="template-grid">
@@ -322,7 +322,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
        reading; which steps wait for which is set on the next screen.</p>
     <p class="muted small">
       <strong>Applies to</strong> decides what a step is counted against. <em>Both</em> is for
-      work that passes over shots <em>and</em> assets — 2D colour, where characters and shots
+      work that passes over shots <em>and</em> assets, 2D colour, where characters and shots
       are both coloured. <em>The whole project</em> is for one-off deliverables like an
       animatic, a music track or the final mix, which belong to no particular shot.
     </p>
@@ -356,7 +356,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
             <?php endforeach; ?>
           </select>
         </label>
-        <span class="muted small" id="step-filter-note">Filtering only changes what you see —
+        <span class="muted small" id="step-filter-note">Filtering only changes what you see,
           saving still keeps every step.</span>
       </div>
       <?php endif; ?>
@@ -383,7 +383,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
             </button>
             <small>
               From the same step names on other projects. A step's phase barely changes between
-              shows, so it is worth answering once — set them here and every future project
+              shows, so it is worth answering once, set them here and every future project
               starts with them already filled in.
             </small>
           </div>
@@ -514,7 +514,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
 
     <?php if ($library): ?>
       <p class="muted small">Start typing to see <?= count($library) ?> step
-         <?= count($library) === 1 ? 'name' : 'names' ?> used on other projects — picking one
+         <?= count($library) === 1 ? 'name' : 'names' ?> used on other projects, picking one
          fills in its usual settings. Anything new you add gets remembered the same way.</p>
     <?php endif; ?>
 

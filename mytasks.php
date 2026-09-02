@@ -235,11 +235,11 @@ require __DIR__ . '/includes/header.php';
 
 <?php elseif (!$myCrewId): ?>
   <p class="lead">Work is assigned to <strong>crew members</strong>, and logins are separate from
-     people — so this screen needs to know which of the crew you are. It is asked once.</p>
+     people, so this screen needs to know which of the crew you are. It is asked once.</p>
 
   <?php if (!$candidates): ?>
     <div class="empty-state">
-      <p><strong>Nobody is in the crew list yet — but you can add yourself.</strong></p>
+      <p><strong>Nobody is in the crew list yet, but you can add yourself.</strong></p>
       <form method="post">
         <button type="submit" name="set_crew" value="new">
           Add <?= e($me['display_name'] ?: $me['username']) ?> to the crew
@@ -256,7 +256,7 @@ require __DIR__ . '/includes/header.php';
     <form method="post" class="inline-form">
       <label>Which of the crew are you?
         <select name="set_crew" required>
-          <option value="">— choose —</option>
+          <option value="">choose</option>
           <?php foreach ($candidates as $c): ?>
             <option value="<?= (int)$c['id'] ?>" <?= $guess === (int)$c['id'] ? 'selected' : '' ?>>
               <?= e($c['name']) ?><?= $c['role'] ? ' · ' . e($c['role']) : '' ?>
@@ -302,7 +302,7 @@ require __DIR__ . '/includes/header.php';
   <h3>Production tasks <span class="muted">· <?= count($tasks) ?></span></h3>
   <?php if (!$tasks): ?>
     <p class="muted">Nothing unfinished is assigned to you. Tasks appear here when somebody is
-       named on a step — from a Plaky import, the tracking grid or an item page.</p>
+       named on a step, from a Plaky import, the tracking grid or an item page.</p>
   <?php else: ?>
     <table class="mywork-table">
       <thead>
@@ -331,7 +331,7 @@ require __DIR__ . '/includes/header.php';
               <input type="hidden" name="set_status" value="1">
               <input type="hidden" name="progress_id" value="<?= (int)$row['progress_id'] ?>">
               <select name="status_id" onchange="this.form.submit()" <?= can_edit() ? '' : 'disabled' ?>>
-                <option value="">— not started —</option>
+                <option value="">not started</option>
                 <?php foreach (($statusesByProject[$pid] ?? []) as $sid => $s): ?>
                   <?php if ((int)($s['is_excluded'] ?? 0) === 1) continue; ?>
                   <option value="<?= (int)$sid ?>" <?= (int)$row['status_id'] === (int)$sid ? 'selected' : '' ?>>
@@ -435,7 +435,7 @@ require __DIR__ . '/includes/header.php';
     <p class="muted small">
       Hours are what you type; minutes are what is stored, so nothing drifts when a column of
       these is summed. <strong>The date is the day the work happened</strong>, not the day you
-      typed it — logging Friday on Monday is normal and the default is simply today.
+      typed it, logging Friday on Monday is normal and the default is simply today.
       <em>Imported</em> next to a figure means it came from Plaky as one running total rather
       than being logged here.
     </p>
@@ -444,7 +444,7 @@ require __DIR__ . '/includes/header.php';
   <form method="post" class="inline-form" style="margin-top:22px;">
     <input type="hidden" name="set_crew" value="0">
     <small>Showing work for <strong><?= e($myCrewName) ?></strong>.</small>
-    <button type="submit" class="secondary">That isn't me — unlink</button>
+    <button type="submit" class="secondary">That isn't me, unlink</button>
   </form>
 <?php endif; ?>
 

@@ -94,9 +94,9 @@ $band = function (string $label, int $style) {
 };
 
 // --- the title block --------------------------------------------------------
-$put($band($project['code'] . ': ' . $project['name'] . ' — Expense projection', XLSX_TITLE));
+$put($band($project['code'] . ': ' . $project['name'] . ', Expense projection', XLSX_TITLE));
 $put([['v' => 'Generated ' . date('Y-m-d H:i') . ' by ' . current_user_display()
-            . ' — computed live from the pipeline, not a stored copy. Blue cells are formulas: '
+            . ', computed live from the pipeline, not a stored copy. Blue cells are formulas: '
             . 'change a rate and the totals follow.', 's' => XLSX_NOTE]]);
 $put([['v' => $retakePct > 0
         ? 'Retake allowance: +' . fmt_num($retakePct, 0) . '% applied to days per item.'
@@ -237,21 +237,21 @@ foreach ($proj['by_department'] as $dept => $group) {
             : ['v' => '', 's' => xlsx_alt(XLSX_MONEY, $shade)];
         $note = '';
         if ($rate === null) {
-            $note = 'No rate on file — unpriced, not free';
+            $note = 'No rate on file, unpriced, not free';
         } elseif ($rateUnit === 'hour') {
             $note = 'Hourly, converted at ' . fmt_num($hoursDay, 1) . ' h/day';
         } elseif ($rateUnit === 'flat') {
-            $note = 'Flat fee — not rate x days';
+            $note = 'Flat fee, not rate x days';
         } elseif ($rateUnit === 'second') {
             // The split is SPELT OUT rather than left as a bare /3 in the
             // formula bar. A divisor nobody can account for is the kind of thing
             // that gets 'corrected' out of a sheet by the next person to open it.
             $note = $liveSecond
                 ? ($laneCount > 1
-                    ? 'Per second of footage — column I is the whole step, shared '
+                    ? 'Per second of footage, column I is the whole step, shared '
                       . $laneCount . ' ways, so this row is one share'
-                    : 'Per second of footage — retakes lengthen the days, not the seconds')
-                : 'Per-second rate on a step not measured in seconds — cannot be priced';
+                    : 'Per second of footage, retakes lengthen the days, not the seconds')
+                : 'Per-second rate on a step not measured in seconds, cannot be priced';
         }
         $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];
 
@@ -292,7 +292,7 @@ foreach ($proj['by_department'] as $dept => $group) {
 // Included so the file reconciles with the screen: leaving them out would make
 // the exported grand total quietly smaller than the Projected cost it came from.
 if (!empty($proj['other'])) {
-    $put($band('Other expenses — not somebody\'s time', XLSX_BAND));
+    $put($band('Other expenses, not somebody\'s time', XLSX_BAND));
     $blockFirst = null; $blockLast = null; $shade = false;
 
     foreach ($proj['by_category'] as $cat => $g) {
@@ -312,7 +312,7 @@ if (!empty($proj['other'])) {
                                     'v' => round((float)$ex['amount']
                                           - (!empty($ex['paid_date']) ? (float)$ex['amount'] : 0), 2),
                                     's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
-            $cells[COL_NOTES]    = ['v' => trim($ex['description'] . ($ex['notes'] ? ' — ' . $ex['notes'] : '')),
+            $cells[COL_NOTES]    = ['v' => trim($ex['description'] . ($ex['notes'] ? ', ' . $ex['notes'] : '')),
                                     's' => xlsx_alt(XLSX_NOTE, $shade)];
             for ($i = 0; $i < COL_COUNT; $i++) {
                 if (!isset($cells[$i])) $cells[$i] = ['v' => '', 's' => xlsx_alt(XLSX_TEXT, $shade)];
@@ -348,7 +348,7 @@ if (!empty($proj['other'])) {
 // subtotal were edited by hand, and it is not how the sheet reads.
 $put([]);
 $grand = [];
-$grand[COL_DEPT] = ['v' => 'GRAND TOTAL — ' . $project['name'], 's' => XLSX_GRAND_LABEL];
+$grand[COL_DEPT] = ['v' => 'GRAND TOTAL, ' . $project['name'], 's' => XLSX_GRAND_LABEL];
 for ($i = 1; $i < COL_COUNT; $i++) $grand[$i] = ['v' => '', 's' => XLSX_GRAND_LABEL];
 if ($subtotalRows) {
     $sumOf = function (string $col) use ($subtotalRows) {

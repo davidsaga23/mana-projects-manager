@@ -81,7 +81,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
 
     $quotas = $steps ? project_quotas($pdo, $projectId, $steps) : [];
     ?>
-    <p class="lead">A last look before this becomes a live project. Nothing here is locked in —
+    <p class="lead">A last look before this becomes a live project. Nothing here is locked in,
        every screen stays editable afterwards.</p>
 
     <div class="review-grid">
@@ -123,7 +123,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
     </table>
 
     <h3>What this plan asks for</h3>
-    <p class="muted small">The daily rate is what the whole team must finish to hit the date —
+    <p class="muted small">The daily rate is what the whole team must finish to hit the date,
        it does not change when people are added. Only each person's share does.</p>
 
     <table class="review-table quota-table">
@@ -141,7 +141,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
             <span class="muted small">(<?= (int)round(($q['coverage'] ?? 1) * 100) ?>% of <?= fmt_rate((float)$q['units_raw']) ?>)</span>
           <?php endif; ?>
           <?php if (!empty($q['estimated'])): ?>
-            <span class="est-tag" title="From the early estimate on the Basics screen — no breakdown exists yet">est.</span>
+            <span class="est-tag" title="From the early estimate on the Basics screen, no breakdown exists yet">est.</span>
           <?php endif; ?>
         </td>
         <td><?= $q['working_days'] === null ? '—' : (int)$q['working_days'] ?></td>

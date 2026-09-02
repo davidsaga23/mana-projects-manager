@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($parsed['rates']) {
                     flash('warn', 'A rate came across for ' . implode(', ', array_slice($parsed['rates'], 0, 6))
                                 . (count($parsed['rates']) > 6 ? ' and others' : '')
-                                . '. Rates are not stored here — they live in the finance database. '
+                                . '. Rates are not stored here, they live in the finance database. '
                                 . 'Open the candidate and use "Save quote" to record one.');
                 }
             } else {
@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($r['duplicates']) {
                 flash('warn', sprintf(
                     '%d row%s skipped because that person is already up for the same job: %s. '
-                    . 'Nothing was overwritten — open the existing record to update it.',
+                    . 'Nothing was overwritten, open the existing record to update it.',
                     count($r['duplicates']), count($r['duplicates']) === 1 ? ' was' : 's were',
                     implode('; ', array_slice($r['duplicates'], 0, 8))
                         . (count($r['duplicates']) > 8 ? ' …' : '')
@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException(
                         'A candidate may have a quoted rate recorded in the finance database, which '
                       . 'this account cannot see or remove. Ask an administrator to delete the '
-                      . 'candidate, or move them to Passed instead — that keeps the record and '
+                      . 'candidate, or move them to Passed instead, that keeps the record and '
                       . 'takes them out of play.'
                     );
                 }
@@ -262,7 +262,7 @@ if ($fromFinance) {
 
 <p class="lead">
   The plan knows a slot needs somebody, and the crew list knows when one is filled. This is the
-  months in between — who was approached, what they asked for, and whether they said yes.
+  months in between, who was approached, what they asked for, and whether they said yes.
 </p>
 
 <?php if (!$ready): ?>
@@ -285,7 +285,7 @@ if ($fromFinance) {
     <div class="flash flash-warn">
       <strong><?= (int)$summary['slots_untouched'] ?></strong>
       unfilled slot<?= (int)$summary['slots_untouched'] === 1 ? ' has' : 's have' ?>
-      nobody in play — no candidate at all, or everyone approached has since declined.
+      nobody in play, no candidate at all, or everyone approached has since declined.
       <?php if (can_see_money()): ?>
         These are also what the
         <a href="finance_project.php?project=<?= $projectId ?>">expense projection</a>
@@ -299,7 +299,7 @@ if ($fromFinance) {
   <?php elseif ($needsFinanceUpgrade): ?>
     <div class="flash flash-warn">
       Contract tracking needs <code>finance_install_04.sql</code>, which hasn't been imported
-      into the finance database yet. Quotes and contract states are unavailable until it is —
+      into the finance database yet. Quotes and contract states are unavailable until it is,
       everything else on this page works.
     </div>
   <?php endif; ?>
@@ -340,8 +340,8 @@ if ($fromFinance) {
   ?>
     <?php if (!$extras): ?>
       <div class="flash flash-warn">
-        The freelancer fields — location, position, seniority, project type, worked-with-us,
-        rating — need migration <strong>025</strong>, which hasn't been applied yet.
+        The freelancer fields, location, position, seniority, project type, worked-with-us,
+        rating, need migration <strong>025</strong>, which hasn't been applied yet.
         <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?>
         Names, emails, portfolios and notes work without it.
       </div>
@@ -352,7 +352,7 @@ if ($fromFinance) {
 
       <p class="muted small">
         One row per person, in the same column order as <code>Mana_Freelancer_DataBase.xlsx</code>.
-        Fill in as many rows as you like and save them together — only the <strong>name</strong> is
+        Fill in as many rows as you like and save them together, only the <strong>name</strong> is
         required, and empty rows are ignored rather than complained about.
       </p>
 
@@ -393,7 +393,7 @@ if ($fromFinance) {
                   <td><input name="<?= $n ?>[notes]" size="20"></td>
                   <td>
                     <select name="<?= $n ?>[lane_id]">
-                      <option value="">— none —</option>
+                      <option value="">none</option>
                       <?php foreach ($slotChoices as $l): ?>
                         <option value="<?= (int)$l['id'] ?>"><?= e(slot_option_label($l)) ?></option>
                       <?php endforeach; ?>
@@ -422,7 +422,7 @@ if ($fromFinance) {
           somebody was taken on before they were ever entered here.
           <br>
           Slots marked <strong>(filled)</strong> already have somebody in them, and are still
-          offered on purpose — recording the hire of the person <em>who is already in one</em>
+          offered on purpose, recording the hire of the person <em>who is already in one</em>
           changes nothing and simply gives them a hiring record. Naming a
           <em>different</em> person for a filled slot is refused and says who holds it, because
           moving their planned work is a decision for the
@@ -437,8 +437,8 @@ if ($fromFinance) {
           <input type="hidden" name="action" value="paste">
           <p class="muted small">
             Select rows in Excel, copy, and paste them here. The columns are read in the sheet's own
-            order — <em>Artist · Location · Position · Seniority · Project type · Email ·
-            Demo/portfolio · Password · Worked with us? · Notes · Rate · Rating</em> — so a whole-row
+            order, <em>Artist · Location · Position · Seniority · Project type · Email ·
+            Demo/portfolio · Password · Worked with us? · Notes · Rate · Rating</em>, so a whole-row
             paste lines up without deleting anything first. A header row is spotted and skipped.
           </p>
           <p class="muted small">
@@ -452,7 +452,7 @@ if ($fromFinance) {
           <div class="row">
             <label>Put them all forward for
               <select name="paste_lane_id">
-                <option value="">— no slot, just add them —</option>
+                <option value="">no slot, just add them</option>
                 <?php foreach ($slotChoices as $l): ?>
                   <option value="<?= (int)$l['id'] ?>"><?= e(slot_option_label($l)) ?></option>
                 <?php endforeach; ?>
@@ -473,7 +473,7 @@ if ($fromFinance) {
       <?php if ($known): ?>
         <p class="muted small">
           Start typing a name to see the <strong><?= count($known) ?></strong>
-          <?= count($known) === 1 ? 'person' : 'people' ?> already recorded on any project —
+          <?= count($known) === 1 ? 'person' : 'people' ?> already recorded on any project,
           picking one fills in the rest of the row from the last time their details were entered,
           without overwriting anything you have already typed. Somebody already up for the same
           slot is reported and skipped rather than added twice.
@@ -601,7 +601,7 @@ if ($fromFinance) {
                 $foldOpen  = false;
                 ?>
                 <?php if (!$liveCands): ?>
-                  <p class="muted small">Nobody in play — everyone here has declined or been passed on.</p>
+                  <p class="muted small">Nobody in play, everyone here has declined or been passed on.</p>
                 <?php endif; ?>
                 <?php foreach ($ordered as $ci => $h): $c = hire_stage_color($h['stage']); ?>
                   <?php if (!$foldOpen && $closedCands && $ci >= $liveCount): $foldOpen = true; ?>
@@ -698,7 +698,7 @@ if ($fromFinance) {
                               // above — that keeps the record and takes them out
                               // of play, which is what the stage list is for. ?>
                         <form method="post" class="inline-form"
-                              onsubmit="return confirm('Remove <?= e(addslashes($h['candidate_name'])) ?> from this slot entirely? Use Declined or Passed instead if you actually spoke to them — this deletes the record.');">
+                              onsubmit="return confirm('Remove <?= e(addslashes($h['candidate_name'])) ?> from this slot entirely? Use Declined or Passed instead if you actually spoke to them, this deletes the record.');">
                           <button type="submit" class="linkish link-danger"
                                   name="action" value="drop:<?= (int)$h['id'] ?>">Remove this candidate</button>
                           <small class="muted">Deletes the record. For someone you really approached, move them to Passed.</small>
@@ -744,7 +744,7 @@ if ($fromFinance) {
   <?php if ($roster): ?>
     <h3>Who is on the show</h3>
     <p class="muted small">
-      When each person starts and finishes on this project. Recorded per show, not per person —
+      When each person starts and finishes on this project. Recorded per show, not per person,
       the same compositor can be on this one from September and on the next from January.
       <strong>The scheduler does not read these dates yet</strong>: they are a record, and where
       the plan asks for work outside somebody's dates their person page says so.
@@ -802,7 +802,7 @@ if ($fromFinance) {
                   </form>
                   <p class="muted small">
                     Marking it sent or signed fills in today's date if you leave it blank. The rate
-                    is untouched — set that on their person page.
+                    is untouched, set that on their person page.
                   </p>
                 <?php endif; ?>
               </details>
@@ -833,7 +833,7 @@ if ($fromFinance) {
   <p class="muted small">
     Hiring somebody <strong>renames the slot</strong> rather than creating a person: the crew
     record keeps its id, so every scheduled task and every progress record already pointing at that
-    slot becomes theirs with nothing moved. Records of people who declined are kept — the one who
+    slot becomes theirs with nothing moved. Records of people who declined are kept, the one who
     said no is exactly the record worth having when the other falls through.
   </p>
 

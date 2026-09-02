@@ -71,7 +71,7 @@ function wizard_save_shots(PDO $pdo, ?array $project): string {
             )->fetchColumn();
             if ($withEp > 0) {
                 flash('warn', "$withEp existing shot" . ($withEp === 1 ? '' : 's') .
-                              ' already had an episode. Nothing was deleted — the episodes are ' .
+                              ' already had an episode. Nothing was deleted, the episodes are ' .
                               'simply hidden, and come back if you turn this on again.');
             }
         }
@@ -152,7 +152,7 @@ function wizard_save_shots(PDO $pdo, ?array $project): string {
         $per = round($total / $count, 3);
         $pdo->prepare('UPDATE shots SET placeholder_seconds = ? WHERE project_id = ?')
             ->execute([$per, $projectId]);
-        flash('ok', "Spread {$total}s evenly across $count shots — {$per}s each. " .
+        flash('ok', "Spread {$total}s evenly across $count shots, {$per}s each. " .
                     'Replace individual values later as real timings come in.');
         return wizard_url($projectId, 4);
     }
@@ -187,7 +187,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
       <button type="submit" class="secondary">Apply</button>
       <small><?= $episodic
         ? 'Shots are grouped into episodes such as EP001. Turn this off for a single film, commercial or short.'
-        : 'Shots are one flat list — right for a single film, commercial or short. Turn it on for a series.' ?></small>
+        : 'Shots are one flat list, right for a single film, commercial or short. Turn it on for a series.' ?></small>
     </form>
 
     <?php if ($shots): ?>
@@ -212,7 +212,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
             <?php endforeach; ?>
           </select>
         </label>
-        <span class="muted small" id="shot-filter-note">Filtering only changes what you see —
+        <span class="muted small" id="shot-filter-note">Filtering only changes what you see,
           saving still keeps everything.</span>
       </div>
       <?php endif; ?>
@@ -251,14 +251,14 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
         <strong>Paste a list</strong>
         <?php if ($episodic): ?>
           <textarea name="paste" rows="6" placeholder="EP001, SH010, 3.5&#10;EP001, SH020, 2.0&#10;EP002, SH010"></textarea>
-          <small>One shot per line. <code>EPISODE, SHOT, SECONDS</code> — episode and seconds
+          <small>One shot per line. <code>EPISODE, SHOT, SECONDS</code>, episode and seconds
                  optional. A line with just a shot code uses the episode below.</small>
           <label>Episode for lines without one
             <input name="paste_episode" placeholder="EP001">
           </label>
         <?php else: ?>
           <textarea name="paste" rows="6" placeholder="SH010, 3.5&#10;SH020, 2.0&#10;SH030"></textarea>
-          <small>One shot per line. <code>SHOT, SECONDS</code> — seconds optional.</small>
+          <small>One shot per line. <code>SHOT, SECONDS</code>, seconds optional.</small>
         <?php endif; ?>
         <button type="submit" class="secondary">Add these shots</button>
       </form>
@@ -289,7 +289,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
         <label>Total seconds across all <?= count($shots) ?> shots
           <input type="number" name="total_seconds" step="0.1" min="0" placeholder="574">
         </label>
-        <small>A placeholder until real timings exist — steps measured in seconds need it
+        <small>A placeholder until real timings exist, steps measured in seconds need it
                to work out a quota. Overwrites every shot's current value.</small>
         <button type="submit" class="secondary">Spread evenly</button>
       </form>
@@ -300,7 +300,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
              as it is used, so there is never anything pending to save. A button
              offering to save nothing would be worse than not having one. */ ?>
     <form method="post" class="actions">
-      <span class="hint">Shots are saved as soon as you add them — nothing is waiting here.</span>
+      <span class="hint">Shots are saved as soon as you add them, nothing is waiting here.</span>
       <span class="spacer"></span>
       <button type="submit" name="action" value="continue">Continue →</button>
     </form>

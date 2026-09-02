@@ -23,7 +23,7 @@ $userId = (int)($_SESSION['user_id'] ?? 0);
 /** Load a card and the project it belongs to, or fail loudly. */
 function api_load(PDO $pdo, int $id): array {
     $t = load_ticket($pdo, $id);
-    if (!$t) throw new RuntimeException('That card no longer exists — reload the board.');
+    if (!$t) throw new RuntimeException('That card no longer exists, reload the board.');
     return $t;
 }
 

@@ -570,7 +570,7 @@ function render_overall_progress(array $overall, bool $compact = false): void {
         <div>
           <h3>Overall progress</h3>
           <p class="muted small">
-            Every shot and asset, through every step —
+            Every shot and asset, through every step,
             <strong><?= (int)$overall['applicable'] ?></strong> tasks in total.
             <?php if ($overall['days_left'] !== null): ?>
               <span class="<?= $overall['days_left'] <= 5 ? 'warn-text' : '' ?>">
@@ -626,7 +626,7 @@ function render_overall_progress(array $overall, bool $compact = false): void {
           </div></div>
       </div>
       <p class="muted small">
-        Counted in <strong>tasks</strong> — one item through one step — because that is the only
+        Counted in <strong>tasks</strong>, one item through one step, because that is the only
         unit every step shares. A step measured in seconds and one measured in shots cannot be
         added together, so each card below keeps its own unit.
       </p>

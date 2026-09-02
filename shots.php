@@ -52,7 +52,7 @@ require __DIR__ . '/includes/header.php';
 <?php project_nav($project, 'shots'); ?>
 
 <h2 class="wizard-title">Shots
-  <span class="muted">— what appears in each one</span>
+  <span class="muted">what appears in each one</span>
 </h2>
 
 <?php if (!$hasAssets): ?>
@@ -92,14 +92,14 @@ require __DIR__ . '/includes/header.php';
     <strong><?= $progress['empty'] ?></strong> of <?= $progress['total'] ?>
     shot<?= $progress['total'] === 1 ? '' : 's' ?> have nothing linked yet.
     Until a shot lists what is in it, the scheduler makes it wait for
-    <em>every</em> asset on the show before its animation can start — so breaking
+    <em>every</em> asset on the show before its animation can start, so breaking
     shots down usually pulls the delivery date <strong>in</strong>, not out.
     <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> afterwards;
     a saved plan is a snapshot and will not improve by itself.
   </div>
 <?php else: ?>
   <p class="muted small">
-    All <?= $progress['total'] ?> shots are broken down — <?= $progress['links'] ?>
+    All <?= $progress['total'] ?> shots are broken down, <?= $progress['links'] ?>
     asset<?= $progress['links'] === 1 ? '' : 's' ?> placed.
     <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> to use it:
     a saved plan is a snapshot and does not update itself.

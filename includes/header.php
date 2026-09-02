@@ -124,7 +124,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       // nothing saves and why, and two warnings stacked about the same thing
       // read as two separate problems. ?>
 <?php if (!can_edit() && !in_preview()): ?>
-  <div class="flash flash-warn">You have view-only access — everything is readable, nothing
+  <div class="flash flash-warn">You have view-only access, everything is readable, nothing
     can be changed. Ask an administrator if you need to edit something.</div>
 <?php endif; ?>
 <?php foreach (take_flashes() as $f): ?>

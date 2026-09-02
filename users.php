@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             )->execute([$username, password_hash($password, PASSWORD_DEFAULT), $display ?: $username, $role]);
 
             flash('ok', "Created the account \"$username\" as $role. Send the password through " .
-                        'something private — a password manager or a direct message, not email.');
+                        'something private, a password manager or a direct message, not email.');
         }
 
         if ($action === 'set_role') {
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "SELECT COUNT(*) FROM users WHERE role = 'admin' AND active = 1 AND id <> $currentUserId"
                 )->fetchColumn();
                 if ($others === 0) {
-                    throw new RuntimeException('You are the only administrator — promote someone else first.');
+                    throw new RuntimeException('You are the only administrator, promote someone else first.');
                 }
             }
             $pdo->prepare('UPDATE users SET role = ? WHERE id = ?')->execute([$role, $id]);
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$crewId) throw new RuntimeException('Link the account to a person first.');
 
             if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                throw new RuntimeException('"' . $email . '" is not a valid email address — nothing was saved.');
+                throw new RuntimeException('"' . $email . '" is not a valid email address, nothing was saved.');
             }
             $pdo->prepare('UPDATE crew SET email = ? WHERE id = ?')
                 ->execute([$email !== '' ? $email : null, $crewId]);
@@ -199,7 +199,7 @@ require __DIR__ . '/includes/header.php';
   <div class="flash flash-warn">
     <strong><?= $unlinked ?></strong> active account<?= $unlinked === 1 ? '' : 's' ?>
     <?= $unlinked === 1 ? 'is' : 'are' ?> not linked to a crew member yet.
-    <strong>A ticket is assigned to a person, not to a login</strong> — so until an account is
+    <strong>A ticket is assigned to a person, not to a login</strong>, so until an account is
     linked, that individual cannot be picked as an owner and has no "My tasks" list.
     Use the <em>Is which person</em> column below.
   </div>
@@ -223,7 +223,7 @@ require __DIR__ . '/includes/header.php';
           <input type="hidden" name="action" value="set_crew">
           <input type="hidden" name="user_id" value="<?= $id ?>">
           <select name="crew_id" onchange="this.form.submit()">
-            <option value="0" <?= empty($u['crew_id']) ? 'selected' : '' ?>>— not linked —</option>
+            <option value="0" <?= empty($u['crew_id']) ? 'selected' : '' ?>>not linked</option>
             <option value="new">+ Add "<?= e($u['display_name'] ?: $u['username']) ?>" to the crew</option>
             <?php foreach ($crewPeople as $cp): ?>
               <option value="<?= (int)$cp['id'] ?>" <?= (int)($u['crew_id'] ?? 0) === (int)$cp['id'] ? 'selected' : '' ?>>
@@ -235,7 +235,7 @@ require __DIR__ . '/includes/header.php';
       </td>
       <td>
         <?php if (empty($u['crew_id'])): ?>
-          <span class="muted small">— link a person first —</span>
+          <span class="muted small">link a person first</span>
         <?php else: ?>
           <form method="post" class="inline-form email-form">
             <input type="hidden" name="action" value="set_crew_email">
@@ -342,7 +342,7 @@ require __DIR__ . '/includes/header.php';
 <p class="muted small">
   Borrow one of these roles for a moment. The menu, the screens you can open and the
   buttons you get all become theirs. <strong>Nothing saves while you are in there</strong>,
-  whichever role you wear — so it is safe to click about — and a banner across the top
+  whichever role you wear, so it is safe to click about, and a banner across the top
   brings you back.
 </p>
 <form method="post" action="preview.php" class="inline-form filter-bar">
@@ -369,16 +369,16 @@ require __DIR__ . '/includes/header.php';
     <label>Password <input type="password" name="password" required minlength="8" placeholder="At least 8 characters"></label>
     <label>Role
       <select name="role">
-        <option value="viewer" selected>View only — can look, can't change</option>
-        <option value="editor">Editor — full production access</option>
-        <option value="admin">Admin — full access, can manage users</option>
+        <option value="viewer" selected>View only, can look, can't change</option>
+        <option value="editor">Editor, full production access</option>
+        <option value="admin">Admin, full access, can manage users</option>
       </select>
     </label>
   </div>
   <div class="actions"><button type="submit">Create account</button></div>
 </form>
 <p class="muted small">
-  Send the password through something private — a password manager or a direct message.
+  Send the password through something private, a password manager or a direct message.
   Ask them to change it once they're in.
 </p>
 

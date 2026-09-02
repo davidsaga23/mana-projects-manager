@@ -86,7 +86,7 @@ require __DIR__ . '/includes/header.php';
     <tr class="<?= $isSlot ? 'row-slot' : '' ?>">
       <td>
         <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$p['id'] ?>"><?= e($p['name']) ?></a>
-        <?php if ($isSlot): ?><span class="slot-tag" title="A planning slot — nobody fills it yet">slot</span><?php endif; ?>
+        <?php if ($isSlot): ?><span class="slot-tag" title="A planning slot, nobody fills it yet">slot</span><?php endif; ?>
         <?php if ((int)($p['active'] ?? 1) !== 1): ?><span class="muted small">inactive</span><?php endif; ?>
       </td>
       <td class="muted"><?= e($p['department'] ?? '') ?: '<span class="muted">—</span>' ?></td>
@@ -104,7 +104,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="muted small">
   <strong>Assigned</strong> counts progress records naming this person, including tasks shared
-  with somebody else — a shared task counts for <em>both</em>, which is right for "what is this
+  with somebody else, a shared task counts for <em>both</em>, which is right for "what is this
   person involved in" and generous for "how much did they deliver". That distinction is still
   open in <code>docs/DECISIONS.md</code> and is surfaced rather than quietly picked.
   <strong>Time logged</strong> comes from the Plaky import and is nearly empty until time is

@@ -214,7 +214,7 @@ require __DIR__ . '/includes/header.php';
 <?php if (!$rows): ?>
   <div class="empty-state">
     <p><strong>No pipeline step applies to this <?= e($item['scope']) ?>.</strong></p>
-    <p class="muted">A step's scope is set on the Setup screen. Nothing is broken — there is
+    <p class="muted">A step's scope is set on the Setup screen. Nothing is broken, there is
        simply no work defined for it.</p>
   </div>
 <?php else: ?>
@@ -242,7 +242,7 @@ require __DIR__ . '/includes/header.php';
         </td>
         <td>
           <select name="step[<?= $sid ?>][status_id]" <?= can_edit() ? '' : 'disabled' ?>>
-            <option value="">— nothing recorded —</option>
+            <option value="">nothing recorded</option>
             <?php foreach ($statuses as $stid => $s): ?>
               <option value="<?= (int)$stid ?>" <?= (int)($r['status']['id'] ?? 0) === (int)$stid ? 'selected' : '' ?>>
                 <?= e($s['name']) ?>
@@ -255,7 +255,7 @@ require __DIR__ . '/includes/header.php';
         </td>
         <td>
           <select name="step[<?= $sid ?>][crew_id]" <?= can_edit() ? '' : 'disabled' ?>>
-            <option value="">— nobody —</option>
+            <option value="">nobody</option>
             <?php foreach ($people as $p): ?>
               <option value="<?= (int)$p['id'] ?>" <?= (int)($r['progress']['crew_id'] ?? 0) === (int)$p['id'] ? 'selected' : '' ?>>
                 <?= e($p['name']) ?><?= (int)($p['is_placeholder'] ?? 0) === 1 ? ' (slot)' : '' ?>
@@ -296,7 +296,7 @@ require __DIR__ . '/includes/header.php';
   <a href="timeline.php?project=<?= $projectId ?>">Timeline</a>, which marks what you drag so a
   re-run of the scheduler leaves it alone. Editing them here as well would give the scheduler a
   second set of dates it didn't know to preserve.
-  <strong>Version is free text</strong> — "v003", "A_02", whatever the show uses. Nothing sorts
+  <strong>Version is free text</strong>, "v003", "A_02", whatever the show uses. Nothing sorts
   or compares them, because nothing can know that v10 follows v9 rather than v1.
   <strong>Plaky still overwrites status</strong> on the next import; version and notes are never
   touched by it.

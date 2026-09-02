@@ -115,11 +115,11 @@ if ($planOver > 0) $attention[] = ['The saved plan finishes ' . $planOver . ' wo
 if ($lateSteps) {
     $n = array_map(function ($s) { return $s['step']['name']; }, array_slice($lateSteps, 0, 4));
     $attention[] = [count($lateSteps) . ' step' . (count($lateSteps) === 1 ? '' : 's') .
-        ' finish past their own deadline — ' . implode(', ', $n) . (count($lateSteps) > 4 ? '…' : '') . '.',
+        ' finish past their own deadline, ' . implode(', ', $n) . (count($lateSteps) > 4 ? '…' : '') . '.',
         'timeline.php?project=' . $projectId, 'See the timeline'];
 }
 if ($totBlocked) $attention[] = [$totBlocked . ' task' . ($totBlocked === 1 ? ' is' : 's are') .
-    ' blocked — they need unblocking, not an artist.', 'aliases.php?project=' . $projectId, 'Review'];
+    ' blocked, they need unblocking, not an artist.', 'aliases.php?project=' . $projectId, 'Review'];
 if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t match anything, so that ' .
     'work is missing from every number here.', 'aliases.php?project=' . $projectId, 'Match them'];
 ?>
@@ -152,7 +152,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
           · <span class="warn-text"><?= (int)$s['blocked'] ?> blocked</span><?php endif; ?>
       </div>
       <?php if (!empty($s['seconds_missing'])): ?>
-        <div class="muted small">Set to track seconds, but no shot has a duration — counted as
+        <div class="muted small">Set to track seconds, but no shot has a duration, counted as
           items until they do.</div>
       <?php endif; ?>
       <div class="mini-pace">
@@ -226,7 +226,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <p class="muted small legend-key">
   <span class="hdot green"></span> On target ·
   <span class="hdot amber"></span> At risk ·
-  <span class="hdot red"></span> Critical —
+  <span class="hdot red"></span> Critical,
   judged against how much of the step's time has elapsed, not a flat percentage.
 </p>
 
@@ -235,7 +235,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
   <h3>Approved over time</h3>
   <?= dashboard_burnup_svg($pace['points'], $delivery) ?>
   <?php if (!$pace['confident']): ?>
-    <p class="muted small">Two readings is arithmetic, not a trend — this firms up over a few days.</p>
+    <p class="muted small">Two readings is arithmetic, not a trend, this firms up over a few days.</p>
   <?php endif; ?>
 <?php endif; ?>
 
@@ -249,7 +249,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <h3>Time logged</h3>
 <p class="muted small">
   Imported from Plaky against each task. Estimates are in days, logged time in hours, so the
-  comparison assumes a <strong><?= e(fmt_num($hpd)) ?>-hour day</strong> — every "estimated"
+  comparison assumes a <strong><?= e(fmt_num($hpd)) ?>-hour day</strong>, every "estimated"
   figure below is derived from that.
   <strong>Reported</strong> is how much of a step has any time against it at all: a step with
   three of forty tasks filled in will look far under budget when it is simply barely reported.
@@ -303,7 +303,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
     <?php endforeach; ?>
   </table>
   <p class="muted small">
-    A task with two people on it counts its hours for <strong>both</strong> — right for "who
+    A task with two people on it counts its hours for <strong>both</strong>, right for "who
     worked on this", wrong for "how much did each deliver". Which of the two per-artist
     reporting should mean is still an open question in the decision log, so it is stated here
     rather than quietly picked.
@@ -316,8 +316,8 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <?php if (!activity_available($pdo)): ?>
   <p class="muted">
     Recording status changes needs migration <code>021</code>, which hasn't been applied yet.
-    <strong>Nothing before it runs can be recovered</strong> — the platform only ever stored the
-    current status, never the previous one — so this fills in from the day it is applied.
+    <strong>Nothing before it runs can be recovered</strong>, the platform only ever stored the
+    current status, never the previous one, so this fills in from the day it is applied.
     <?php if (is_admin()): ?><a href="migrate.php">Review and apply it →</a><?php endif; ?>
   </p>
 <?php else: ?>
@@ -331,7 +331,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
         <?php endif; ?>
         <?php foreach ($activityDays as $d): ?>
           <option value="<?= e($d['log_date']) ?>" <?= $d['log_date'] === $activityDay ? 'selected' : '' ?>>
-            <?= e(date('D j M Y', strtotime($d['log_date']))) ?> — <?= (int)$d['n'] ?> change<?= (int)$d['n'] === 1 ? '' : 's' ?>
+            <?= e(date('D j M Y', strtotime($d['log_date']))) ?>, <?= (int)$d['n'] ?> change<?= (int)$d['n'] === 1 ? '' : 's' ?>
           </option>
         <?php endforeach; ?>
       </select>
@@ -369,7 +369,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
     <p class="muted small">
       <strong>Type</strong> is worked out from your own status vocabulary, not from the words in
       a name: <em>approved</em> and <em>delivered</em> follow <code>maps_to</code>, and
-      <em>retake</em> means the work had reached delivered or approved and is now neither —
+      <em>retake</em> means the work had reached delivered or approved and is now neither,
       so it is caught whatever the show happens to call that state.
       <strong>Source</strong> separates an import moving 140 rows from a person moving one.
     </p>
@@ -378,7 +378,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 
 <h3>Who is carrying what</h3>
 <?php if (!$workload): ?>
-  <p class="muted">No scheduled task has anyone on it yet — slots come from the headcount on the
+  <p class="muted">No scheduled task has anyone on it yet, slots come from the headcount on the
     <a href="crew.php?project=<?= $projectId ?>">crew screen</a>.</p>
 <?php else: ?>
   <table class="review-table">
@@ -404,7 +404,7 @@ function downloadDashboard() {
   html2canvas(el, { backgroundColor: '#f4f6f8', scale: 2, useCORS: true,
                     windowWidth: el.scrollWidth, width: el.scrollWidth })
     .then(function (canvas) {
-      // Local date parts, never toISOString — it shifts a day at UTC−6.
+      // Local date parts, never toISOString, it shifts a day at UTC−6.
       var d = new Date();
       var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
                 + '-' + String(d.getDate()).padStart(2, '0');

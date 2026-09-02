@@ -80,7 +80,7 @@ class SmtpMailer
         );
         if (!$this->sock) {
             throw new RuntimeException(
-                "Could not connect to {$host}:{$port} — {$errstr} (error {$errno}). "
+                "Could not connect to {$host}:{$port}, {$errstr} (error {$errno}). "
                 . 'Check the host and port in config.php, and that outbound SMTP is not blocked. '
                 . 'Remember 465 needs ssl and 587 needs tls.'
             );
@@ -106,7 +106,7 @@ class SmtpMailer
                     throw new RuntimeException(
                         'TLS negotiation failed. ' . ($err ? "({$err}) " : '')
                         . 'If that mentions a certificate problem, the mail server is probably using a '
-                        . "self-signed cert — add 'smtp_verify_peer' => false to config.php."
+                        . "self-signed cert, add 'smtp_verify_peer' => false to config.php."
                     );
                 }
                 // The connection has changed; EHLO has to be repeated.
@@ -263,11 +263,11 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
         }
         if (!$recipients) {
             return [false, 'Assigned to the team "' . $t['crew_name']
-                . '", but nobody active has that word in their role and an email address — so no notification went out.'];
+                . '", but nobody active has that word in their role and an email address, so no notification went out.'];
         }
     } elseif ((int)($t['is_placeholder'] ?? 0) === 1) {
         return [false, 'Assigned to the slot "' . $t['crew_name']
-            . '", which nobody fills yet — so there was nobody to notify. Renaming the slot to a real person on the Crew screen fixes this.'];
+            . '", which nobody fills yet, so there was nobody to notify. Renaming the slot to a real person on the Crew screen fixes this.'];
     }
 
     if (!$recipients) {
@@ -279,7 +279,7 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
     $isTicket = $t['type'] === 'ticket';
     $verb = $reason === 'status' ? 'updated' : 'assigned to you';
 
-    $subject = sprintf('[%s] %s %s — %s',
+    $subject = sprintf('[%s] %s %s, %s',
         $t['project_code'], $label, $reason === 'status' ? 'updated' : 'assigned', $t['title']);
 
     $context = [];

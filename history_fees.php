@@ -95,12 +95,12 @@ require __DIR__ . '/includes/header.php';
 <div class="flash flash-warn">
   <p><strong>Two of these three columns are history. One is not.</strong></p>
   <p class="small">
-    A <strong>slot</strong> — <em>Rough Animation 01</em> and the like — belongs to one show and
+    A <strong>slot</strong>, <em>Rough Animation 01</em> and the like, belongs to one show and
     dies with it, so its rate is what that show budgeted for that seat and stays true.
     <strong>Invoiced</strong> is what was actually billed against the position, on a date: the
     ground truth. But a <strong>named artist</strong> has one rate for the whole studio, with no
     project and no date attached, so their row shows what they cost <em>today</em> on every show
-    they have ever worked on — not what they were paid at the time. Tick <em>Slots only</em> for
+    they have ever worked on, not what they were paid at the time. Tick <em>Slots only</em> for
     the part of this you can quote from.
   </p>
 </div>
@@ -157,7 +157,7 @@ require __DIR__ . '/includes/header.php';
                 <?php if ($r['is_slot']): ?>
                   <span class="slot-tag" title="A placeholder seat on this show only, so its rate is this show's">slot</span>
                 <?php else: ?>
-                  <span class="muted small" title="One studio-wide rate — this is what they cost today, not at the time">person</span>
+                  <span class="muted small" title="One studio-wide rate, this is what they cost today, not at the time">person</span>
                 <?php endif; ?>
               </td>
               <td class="num">

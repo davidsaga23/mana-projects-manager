@@ -214,7 +214,7 @@ function applies_to_options(string $selectedValue, array $assetTypes = []): stri
             foreach ($assetTypes as $t) {
                 $v = 'asset:' . $t;
                 $html .= '<option value="' . e($v) . '"' . ($v === $selectedValue ? ' selected' : '')
-                       . '>' . e('Assets — ' . $t . ' only') . '</option>';
+                       . '>' . e('Assets, ' . $t . ' only') . '</option>';
             }
         }
     }
@@ -602,7 +602,7 @@ function template_save_from_post(PDO $pdo, int $projectId, array $project): stri
     $n = create_template_from_project($pdo, $projectId, $name, $type, $overwrite);
 
     return ($overwrite ? "Replaced the template \"$name\"" : "Saved this pipeline as the template \"$name\"")
-         . " — $n step" . ($n === 1 ? '' : 's')
+         . ", $n step" . ($n === 1 ? '' : 's')
          . ', including which of them run in parallel'
          . (column_exists($pdo, 'pipeline_template_steps', 'department')
             ? ' and which department each belongs to' : '')
@@ -650,7 +650,7 @@ function template_save_form(PDO $pdo, array $project, string $note = '', bool $i
       <?php endif; ?>
       <strong>Save this pipeline as a template</strong>
       <input name="template_name" list="template-names"
-             placeholder="e.g. 3D — Mana house pipeline" <?= $inline ? '' : 'required' ?> size="30">
+             placeholder="e.g. 3D, Mana house pipeline" <?= $inline ? '' : 'required' ?> size="30">
       <?php /* Existing names offered so replacing one is a pick rather than a
                retype — a near-miss spelling would create a second template
                instead of updating the one meant. */ ?>
@@ -669,7 +669,7 @@ function template_save_form(PDO $pdo, array $project, string $note = '', bool $i
       </label>
       <button type="submit" <?= $inline ? 'name="action" value="save_template"' : '' ?>
               class="secondary">Save as template</button>
-      <small><?= $note !== '' ? e($note) : 'Saves the steps, their settings and which of them run in parallel — but not
+      <small><?= $note !== '' ? e($note) : 'Saves the steps, their settings and which of them run in parallel, but not
              dates or headcount, which belong to this project alone. New projects will be
              offered it alongside the built-in templates.' ?></small>
     </<?= $tag ?>>
@@ -691,7 +691,7 @@ function create_template_from_project(PDO $pdo, int $projectId, string $name, st
 
     if ($existingId !== false && !$overwrite) {
         throw new RuntimeException('A template called "' . $name . '" already exists. ' .
-                                   'Tick "replace it" to overwrite, or pick another name — ' .
+                                   'Tick "replace it" to overwrite, or pick another name, ' .
                                    'a template is never replaced by accident.');
     }
 

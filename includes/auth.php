@@ -209,7 +209,7 @@ function require_login(): void {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!can_edit() || in_preview())) {
         if (function_exists('flash')) {
             flash('err', in_preview()
-                ? 'Nothing saves while you are previewing as someone else — leave the preview first.'
+                ? 'Nothing saves while you are previewing as someone else, leave the preview first.'
                 : 'Your account has view-only access, so that change was not saved.');
         }
         // Back to the same screen as a GET, so the reader sees the page and the

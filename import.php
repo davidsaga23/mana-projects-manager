@@ -68,14 +68,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $codes = [
                     UPLOAD_ERR_INI_SIZE  => 'The file is larger than the server allows.',
                     UPLOAD_ERR_FORM_SIZE => 'The file is larger than the form allows.',
-                    UPLOAD_ERR_PARTIAL   => 'The upload was interrupted — try again.',
+                    UPLOAD_ERR_PARTIAL   => 'The upload was interrupted, try again.',
                     UPLOAD_ERR_NO_FILE   => 'Choose a file first.',
                 ];
                 throw new RuntimeException($codes[$_FILES['file']['error'] ?? -1] ?? 'The upload failed.');
             }
             $orig = $_FILES['file']['name'];
             if (!preg_match('/\.csv$/i', $orig)) {
-                throw new RuntimeException('Export the board as CSV — this importer reads .csv files. ' .
+                throw new RuntimeException('Export the board as CSV, this importer reads .csv files. ' .
                                            'In Plaky: board menu → Export → CSV.');
             }
             $dest = import_dir() . '/' . bin2hex(random_bytes(12)) . '.csv';
@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($createdSteps) {
                 flash('ok', "Created $createdSteps new pipeline step" . ($createdSteps === 1 ? '' : 's') .
-                            '. Each waits for the last step of its own chain — set what they ' .
+                            '. Each waits for the last step of its own chain, set what they ' .
                             'really wait for on the workflow screen.');
             }
 

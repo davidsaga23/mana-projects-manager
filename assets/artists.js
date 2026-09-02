@@ -99,7 +99,7 @@
         // Left visible and NOT cleared: an edit that failed silently is an edit
         // somebody believes they made.
         status(row, 'failed', 'not saved');
-        say('Could not save ' + (row.querySelector('.a-name') || {}).value + ' — ' + err.message);
+        say('Could not save ' + (row.querySelector('.a-name') || {}).value + ', ' + err.message);
       })
       .then(function () { inflight--; });
   }
@@ -171,7 +171,7 @@
     var url = box.value.trim();
     link.textContent = url || '—';
     link.setAttribute('href', url || '#');
-    link.setAttribute('title', url + ' — double-click to edit');
+    link.setAttribute('title', url + ', double-click to edit');
     box.hidden = true;
     link.hidden = false;
   });

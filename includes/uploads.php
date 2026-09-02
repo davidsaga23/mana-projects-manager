@@ -48,7 +48,7 @@ function ensure_upload_dir(): string {
     $ht = $dir . '/.htaccess';
     if (!file_exists($ht)) {
         @file_put_contents($ht, implode("\n", [
-            '# Never execute anything in here — these are user uploads.',
+            '# Never execute anything in here, these are user uploads.',
             'php_flag engine off',
             'RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps',
             'RemoveType .php .phtml .php3 .php4 .php5 .php7 .phps',
@@ -106,7 +106,7 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
 
     // Whitelisted, never interpolated from anything a request controls.
     if (!in_array($table, ['ticket_attachments', 'project_attachments'], true)) {
-        return ['saved' => 0, 'errors' => ['Unknown attachment type — nothing was saved.']];
+        return ['saved' => 0, 'errors' => ['Unknown attachment type, nothing was saved.']];
     }
     $hasComment = $table === 'ticket_attachments';
     $maxBytes = (int)($config['upload_max_bytes'] ?? 25 * 1024 * 1024);
@@ -140,7 +140,7 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
         if (($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
 
         if ($saved + $existing >= $maxFiles) {
-            $errors[] = "Only {$maxFiles} files allowed — the rest were skipped.";
+            $errors[] = "Only {$maxFiles} files allowed, the rest were skipped.";
             break;
         }
         if ($f['error'] !== UPLOAD_ERR_OK) {

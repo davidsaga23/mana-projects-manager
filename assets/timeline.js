@@ -494,7 +494,7 @@
         return d;
       })
       .catch(function (err) {
-        if (err instanceof SyntaxError) alert('Save failed — try reloading the page.');
+        if (err instanceof SyntaxError) alert('Save failed, try reloading the page.');
         throw err;
       });
   }
@@ -556,7 +556,7 @@
   function stepSaved(msg) {
     var el = $('stepSaveNote');
     if (!el) return;
-    el.textContent = 'Saved — ' + msg;
+    el.textContent = 'Saved, ' + msg;
     el.hidden = false;
     clearTimeout(stepSaveTimer);
     stepSaveTimer = setTimeout(function () { el.hidden = true; }, 4000);
@@ -575,7 +575,7 @@
         return d;
       })
       .catch(function (err) {
-        if (err instanceof SyntaxError) alert('Save failed — try reloading the page.');
+        if (err instanceof SyntaxError) alert('Save failed, try reloading the page.');
         throw err;
       });
   }
@@ -903,7 +903,7 @@
         return d;
       })
       .catch(function (err) {
-        if (err instanceof SyntaxError) alert('Save failed — try reloading the page.');
+        if (err instanceof SyntaxError) alert('Save failed, try reloading the page.');
         throw err;
       });
   }
@@ -944,7 +944,7 @@
     //
     // .tl-chart is `overflow: auto; max-height: 420px`, so what you see is a
     // porthole over a much taller and wider drawing. Passing width/height to
-    // html2canvas only sizes the CANVAS — the element itself is still cropped by
+    // html2canvas only sizes the CANVAS, the element itself is still cropped by
     // its own CSS, which is why exports arrived with the first and last steps
     // sliced off and a field of white where the rest should have been.
     //

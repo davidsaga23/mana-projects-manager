@@ -52,7 +52,7 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
     foreach ($wanted as $deps) $edges += count($deps);
     $starters = count(array_filter($wanted, function ($d) { return !$d; }));
 
-    flash('ok', "Saved the workflow — $edges link" . ($edges === 1 ? '' : 's') . ', ' .
+    flash('ok', "Saved the workflow, $edges link" . ($edges === 1 ? '' : 's') . ', ' .
                 "$starters step" . ($starters === 1 ? '' : 's') . ' able to start immediately.');
 
     return wizard_next_url($projectId, 3);
@@ -76,7 +76,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
     $levels = workflow_levels($steps, $depsMap);
     ?>
     <p class="lead">For each step, tick what has to finish before it can start. Steps waiting
-       on the same things run <strong>side by side</strong> — you never set that directly,
+       on the same things run <strong>side by side</strong>, you never set that directly,
        it's simply what the picture shows.</p>
 
     <div class="wf-diagram-head">
@@ -145,7 +145,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
       // wipe the graph. Here the action rides on the button and the ticks come
       // with it, which is also what makes the promise below true.
       template_save_form($pdo, $project,
-          'Saves the steps AND this dependency graph — what waits for what, and therefore what '
+          'Saves the steps AND this dependency graph, what waits for what, and therefore what '
         . 'runs in parallel. Not dates or headcount, which belong to this project alone. The '
         . 'ticks above are saved first, so the template captures the shape on screen rather than '
         . 'the last one saved. New projects will be offered it alongside the built-in templates.',
@@ -153,8 +153,8 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
       ?>
     </form>
 
-    <p class="muted small">Ticking nothing means a step can begin on day one. A loop — two steps
-       each waiting for the other — is refused with nothing saved, so the scheduler can never be
+    <p class="muted small">Ticking nothing means a step can begin on day one. A loop, two steps
+       each waiting for the other, is refused with nothing saved, so the scheduler can never be
        handed one.</p>
     <?php
 }

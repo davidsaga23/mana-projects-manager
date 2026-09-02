@@ -303,7 +303,7 @@ function grid_donut_svg(array $slices, int $ready, int $itemCount, int $size = 1
                 $svg .= '<circle cx="' . $r . '" cy="' . $r . '" r="' . (($ro + $ri) / 2)
                       . '" fill="none" stroke="' . e($s['color']) . '" stroke-width="' . ($ro - $ri)
                       . '" data-status="' . e((string)$s['key']) . '" class="donut-seg"><title>'
-                      . e($s['label'] . ' — ' . $s['count']) . '</title></circle>';
+                      . e($s['label'] . ', ' . $s['count']) . '</title></circle>';
                 break;
             }
 
@@ -318,7 +318,7 @@ function grid_donut_svg(array $slices, int $ready, int $itemCount, int $size = 1
 
             $svg .= '<path class="donut-seg" d="' . $d . '" fill="' . e($s['color']) . '"'
                   . ' data-status="' . e((string)$s['key']) . '"><title>'
-                  . e($s['label'] . ' — ' . $s['count'] . ' cell' . ($s['count'] === 1 ? '' : 's'))
+                  . e($s['label'] . ', ' . $s['count'] . ' cell' . ($s['count'] === 1 ? '' : 's'))
                   . '</title></path>';
             $angle = $end;
         }

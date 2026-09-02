@@ -20,7 +20,7 @@ function wizard_asset_types(PDO $pdo): array {
 }
 
 /** Render <option> tags for a type dropdown. */
-function wizard_asset_type_options(array $types, string $selected = '', string $blankLabel = '— no type —'): string {
+function wizard_asset_type_options(array $types, string $selected = '', string $blankLabel = 'no type'): string {
     $html = '<option value="">' . e($blankLabel) . '</option>';
     $found = false;
     foreach ($types as $t) {
@@ -85,7 +85,7 @@ function wizard_assets_apply_edits(PDO $pdo, int $projectId): int {
             $changed++;
         } catch (PDOException $e) {
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
-                          '" — this project already has an asset with that name.');
+                          '", this project already has an asset with that name.');
         }
     }
     return $changed;
@@ -149,7 +149,7 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         if ($invented) {
             flash('warn', 'This created ' . (count($invented) === 1 ? 'a new type' : 'new types') .
                           ': "' . implode('", "', array_keys($invented)) . '". If that was not ' .
-                          'intended — putting two names on one line does it — tick those assets ' .
+                          'intended, putting two names on one line does it, tick those assets ' .
                           'and use "Fix a type" below.');
         }
         if ($dupes) flash('warn', count($dupes) . ' already existed and were skipped: ' .
@@ -246,7 +246,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
     $anchors = array_merge(step_scoped_asset_types($pdo, $projectId),
                            ['Character', 'Environment', 'Prop', 'Vehicle', 'FX']);
     ?>
-    <p class="lead">Characters, environments, props — anything built once and reused across
+    <p class="lead">Characters, environments, props, anything built once and reused across
        shots. Skip this if the project doesn't track assets separately.</p>
 
     <?php foreach ($similar as $spellings):
@@ -259,7 +259,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
     ?>
       <div class="flash flash-warn">
         <strong>Two spellings of the same type:</strong> <?= e(implode(' and ', $parts)) ?>.
-        These count as completely different types — a pipeline step scoped to one of them
+        These count as completely different types, a pipeline step scoped to one of them
         counts none of the other, and every quota and date derived from it is wrong without
         anything looking broken.
         <?php if (can_edit()): ?>
@@ -301,7 +301,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
             <?php endforeach; ?>
           </select>
         </label>
-        <span class="muted small" id="asset-filter-note">Filtering only changes what you see —
+        <span class="muted small" id="asset-filter-note">Filtering only changes what you see,
           saving still keeps everything.</span>
       </div>
       <?php endif; ?>
@@ -366,7 +366,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
         <strong>Paste a list</strong>
         <textarea name="paste" rows="6" placeholder="Romulan Officer, Character&#10;Bridge, Environment, reuse from ep2&#10;Phaser, Prop, hero prop, needs a rig"></textarea>
         <small><strong>One asset per line.</strong> Commas split a line into
-               <em>name, type, note</em> — so <code>Phaser, Prop, hero prop</code> sets all three,
+               <em>name, type, note</em>, so <code>Phaser, Prop, hero prop</code> sets all three,
                and anything after the second comma stays in the note, commas and all.
                A comma is never a second asset: put each name on its own line.</small>
         <label>Type for these assets

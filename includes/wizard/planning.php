@@ -36,7 +36,7 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $start = $project['start_date'] ?: date('Y-m-d');
         $end   = $project['delivery_date'];
         if (!$end) {
-            throw new RuntimeException('Set a delivery date on the Basics screen first — ' .
+            throw new RuntimeException('Set a delivery date on the Basics screen first, ' .
                                        'there is nothing to spread the steps across.');
         }
         if ($end < $start) throw new RuntimeException('The delivery date is before the start date.');
@@ -86,15 +86,15 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         // what the project actually set out with.
         $isFirst = last_baseline($pdo, $projectId) === null;
         $reason  = trim($_POST['rebaseline_reason'] ?? '');
-        if ($reason === '') $reason = $isFirst ? 'first record — already running' : 're-planned';
+        if ($reason === '') $reason = $isFirst ? 'first record, already running' : 're-planned';
 
         $n = capture_baseline($pdo, $projectId, $reason);
         flash('ok', $isFirst
             ? "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') . '. This project ' .
               'was already running, so these are current numbers rather than what it started ' .
-              'with — the record says so, and future projects get a true starting estimate.'
+              'with, the record says so, and future projects get a true starting estimate.'
             : "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') .
-              '. The previous baseline is kept — the history now shows both, so a revision ' .
+              '. The previous baseline is kept, the history now shows both, so a revision ' .
               'reads as a revision rather than replacing what came before.');
         return wizard_url($projectId, 6);
     }
@@ -157,7 +157,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         return;
     }
     ?>
-    <p class="lead">Rough estimates are fine — this seeds the first timeline and the quota on
+    <p class="lead">Rough estimates are fine, this seeds the first timeline and the quota on
        the next screen. Everything stays editable once the project is running.</p>
 
     <p class="summary-line">
@@ -195,12 +195,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <form method="post"
             onsubmit="return confirm('Record today\'s estimates as a new baseline? The previous one is kept.');">
         <input type="hidden" name="action" value="rebaseline">
-        <input name="rebaseline_reason" placeholder="Why — e.g. scope change" size="22">
+        <input name="rebaseline_reason" placeholder="Why, e.g. scope change" size="22">
         <button type="submit" class="secondary"><?= $baseline ? 'Re-baseline' : 'Record the starting estimate' ?></button>
       </form>
 
       <small>
-        Editing the numbers below never changes what was recorded — that is the point.
+        Editing the numbers below never changes what was recorded, that is the point.
         Comparing the two is how next project's estimates get better
         <?php if ($drift): ?>
           · <strong><?= count($drift) ?></strong> step<?= count($drift) === 1 ? '' : 's' ?>
@@ -239,7 +239,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <?php endforeach; ?>
         </table>
         <p class="muted small">
-          Nothing here is wrong — plans move. Re-baseline when the change is a decision you want
+          Nothing here is wrong, plans move. Re-baseline when the change is a decision you want
           recorded, and leave it when you are still adjusting.
         </p>
       </details>
@@ -269,7 +269,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         A step is scoped to <strong>"<?= e($hit) ?>"</strong>, but
         <strong><?= $missed ?></strong> asset<?= $missed === 1 ? ' is' : 's are' ?> typed
         <?= e(implode(' or ', array_map(function ($n) { return '"' . $n . '"'; }, array_keys($others)))) ?>
-        instead — so <?= $missed === 1 ? 'it is' : 'they are' ?> not counted in the work below,
+        instead, so <?= $missed === 1 ? 'it is' : 'they are' ?> not counted in the work below,
         and every date and headcount here is short by that much.
         <a href="<?= e(wizard_url($projectId, 5)) ?>">Fix it on the Assets screen →</a>
       </div>
@@ -303,7 +303,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         <input type="number" id="retake-pct" name="retake_pct" min="0" max="200" step="any"
                value="<?= e(fmt_num($retakePct)) ?>"> %
         <span class="muted small">
-          added to the time each item takes, never to the number of items — 22 assets are still
+          added to the time each item takes, never to the number of items, 22 assets are still
           22 assets after a revision, they just take longer. Every figure below includes it, and
           the <strong>Retakes</strong> column shows what it comes to in days.
         </span>
@@ -353,8 +353,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // always read together. Stacked they cost one column and a little
                 // height — which is the trade this whole screen now makes. ?>
           <th>Dates<div class="muted small">start / deadline</div></th>
-          <th title="How long one shot or asset takes one person. Decimals are fine — 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
-          <th title="How many people are on this step. Decimals are fine — 2.5 means someone is half-time.">People</th>
+          <th title="How long one shot or asset takes one person. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
+          <th title="How many people are on this step. Decimals are fine, 2.5 means someone is half-time.">People</th>
           <?php // Studio ideal sits BEFORE Duration because that is the order the
                 // cells are written in below. They were the other way round in the
                 // header from 2026-08-17 until David spotted it: every figure under
@@ -379,13 +379,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           // is set elsewhere and cannot be edited here. Mixing the two is what
           // made a studio standard read as this project's duration.
           ?>
-          <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people — not editable.">Minimum<div class="muted small">per person / day</div></th>
+          <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people, not editable.">Minimum<div class="muted small">per person / day</div></th>
           <?php // Retakes sits BEFORE Duration because it is one of the things the
                 // duration is made of: work, plus the allowance, divided by people.
                 // Reading it after the total it feeds is reading the sum before its
                 // parts. ?>
           <th title="What the retake allowance adds to this step, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
-          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this step's own start and deadline — this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
+          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this step's own start and deadline, this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
           <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
@@ -520,8 +520,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
               if ($planned > 0 && (float)$std['days_per_unit'] > 0):
                   $ratio = $planned / (float)$std['days_per_unit'];
                   if ($ratio > 1.05): ?>
-                    <div class="err small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower
-                      — beyond the budgeted days</div>
+                    <div class="err small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower,
+                      beyond the budgeted days</div>
                   <?php elseif ($ratio < 0.95): ?>
                     <div class="muted small">planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster</div>
                   <?php endif;
@@ -543,7 +543,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
     </form>
 
     <p class="muted small">
-      The check updates as you type — nothing is saved until you press a button. The daily
+      The check updates as you type, nothing is saved until you press a button. The daily
       rate is what the <em>whole team</em> must finish to hit the date; it doesn't fall when
       you add people, only each person's share does.
     </p>

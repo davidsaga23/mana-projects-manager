@@ -57,7 +57,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="lead">
   Budgets, what the plan will cost, and what has been billed. Rates and invoices live in a
-  <strong>separate database</strong> whose credential ordinary screens do not hold — so a bug in
+  <strong>separate database</strong> whose credential ordinary screens do not hold, so a bug in
   any normal query cannot reach them. Editors and view-only accounts cannot open this page at all.
 </p>
 
@@ -144,7 +144,7 @@ require __DIR__ . '/includes/header.php';
   <strong>Projected cost is computed every time this page loads</strong>, from the current
   pipeline: person-days per step, the lanes staffed on it, and each person's rate. It is never
   stored, so it cannot go stale when somebody changes a headcount.
-  <strong>"Days unpriced"</strong> is the part of the plan held by people with no rate on file —
+  <strong>"Days unpriced"</strong> is the part of the plan held by people with no rate on file,
   usually unfilled slots. Those days are counted and reported rather than treated as free, since
   a total that looks low because half of it is missing is worse than no total at all.
   <strong>Margin</strong> is budget minus projected cost, and means nothing until both exist.

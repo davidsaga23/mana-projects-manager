@@ -77,7 +77,7 @@ function finance_db(): ?PDO {
         error_log('[Anima finance db] ' . $e->getMessage());
         throw new RuntimeException(
             'The finance database is configured but could not be opened. Pay terms are '
-            . 'unavailable until that is fixed — this is not the same as nobody having a rate. '
+            . 'unavailable until that is fixed, this is not the same as nobody having a rate. '
             . 'Check the finance_db block in config.php.'
         );
     }
@@ -172,7 +172,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         // Accept "1,200.00" and "$1200" — people paste from a spreadsheet.
         $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rate));
         if ($clean === '' || !is_numeric($clean)) {
-            throw new RuntimeException('"' . $rate . '" is not a number — nothing was saved.');
+            throw new RuntimeException('"' . $rate . '" is not a number, nothing was saved.');
         }
         $rateVal = round((float)$clean, 2);
         if ($rateVal < 0) throw new RuntimeException('A rate cannot be negative.');
@@ -189,7 +189,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         // clicks from a page that already trusts them.
         $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
         if (!in_array($scheme, ['http', 'https'], true)) {
-            throw new RuntimeException('A contract link must start with http:// or https:// — nothing was saved.');
+            throw new RuntimeException('A contract link must start with http:// or https://, nothing was saved.');
         }
         if (mb_strlen($url) > 500) throw new RuntimeException('That link is too long to store.');
     }
@@ -258,7 +258,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
     )->execute(array_merge($logArgs, [$who]));
 
     $said = $rateVal === null
-        ? 'Terms saved — no rate recorded.'
+        ? 'Terms saved, no rate recorded.'
         : 'Terms saved: ' . fmt_money($rateVal, $unit, $cur) . '.';
     if ($hasContract && $cStatus !== 'none') {
         $said .= ' Contract ' . contract_state_phrase($cStatus, $cSent, $cSigned) . '.';
@@ -334,7 +334,7 @@ function set_contract_state(int $crewId, string $crewName, string $status,
                             ?string $sent = null, ?string $signed = null, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can change a contract.');
     $db = finance_db();
-    if (!$db) throw new RuntimeException('The finance database is not set up yet — see finance_install.sql.');
+    if (!$db) throw new RuntimeException('The finance database is not set up yet, see finance_install.sql.');
     if (!finance_column_exists('crew_terms', 'contract_status')) {
         throw new RuntimeException(
             'Contract tracking needs finance_install_04.sql, which has not been imported into the '
@@ -514,7 +514,7 @@ function save_hire_quote(int $hireId, string $candidateName, ?int $projectId, ar
     if (!hire_quotes_available()) {
         throw new RuntimeException(
             'Quotes need finance_install_04.sql, which has not been imported into the finance '
-            . 'database yet. The hiring record itself saved fine — only the money did not.'
+            . 'database yet. The hiring record itself saved fine, only the money did not.'
         );
     }
 
@@ -524,7 +524,7 @@ function save_hire_quote(int $hireId, string $candidateName, ?int $projectId, ar
         // Accept "1,200.00" and "$1200" — people paste from an email.
         $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $raw));
         if ($clean === '' || !is_numeric($clean)) {
-            throw new RuntimeException('"' . $raw . '" is not a number — nothing was saved.');
+            throw new RuntimeException('"' . $raw . '" is not a number, nothing was saved.');
         }
         $v = round((float)$clean, 2);
         if ($v < 0) throw new RuntimeException('A ' . $label . ' cannot be negative.');
@@ -554,7 +554,7 @@ function save_hire_quote(int $hireId, string $candidateName, ?int $projectId, ar
     ]);
 
     return $quoted === null
-        ? 'Saved — no rate quoted yet.'
+        ? 'Saved, no rate quoted yet.'
         : 'Quote saved: ' . fmt_money($quoted, $unit, $cur) . '.';
 }
 

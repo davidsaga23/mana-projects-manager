@@ -401,7 +401,7 @@ function hiring_check_url(string $url, string $what): ?string {
     if ($url === '') return null;
     $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
     if (!in_array($scheme, ['http', 'https'], true)) {
-        throw new RuntimeException('The ' . $what . ' link must start with http:// or https:// — nothing was saved.');
+        throw new RuntimeException('The ' . $what . ' link must start with http:// or https://, nothing was saved.');
     }
     if (mb_strlen($url) > 500) throw new RuntimeException('That link is too long to store.');
     return $url;
@@ -424,12 +424,12 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
     }
 
     $name = trim((string)($in['candidate_name'] ?? ''));
-    if ($name === '') throw new RuntimeException('A candidate needs a name — nothing was saved.');
+    if ($name === '') throw new RuntimeException('A candidate needs a name, nothing was saved.');
     if (mb_strlen($name) > 120) throw new RuntimeException('That name is too long to store.');
 
     $email = trim((string)($in['email'] ?? ''));
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException('"' . $email . '" is not an email address — nothing was saved.');
+        throw new RuntimeException('"' . $email . '" is not an email address, nothing was saved.');
     }
 
     $portfolio = hiring_check_url((string)($in['portfolio_url'] ?? ''), 'portfolio');
@@ -565,7 +565,7 @@ function set_hire_stage(PDO $pdo, int $projectId, int $hireId, string $stage,
     if ($hire['stage'] === 'hired') {
         throw new RuntimeException(
             '"' . $hire['candidate_name'] . '" has already been hired. Change who is in the slot '
-            . 'on the Crew screen instead — moving the hiring record would not move the work.'
+            . 'on the Crew screen instead, moving the hiring record would not move the work.'
         );
     }
     if ($hire['stage'] === $stage) {
@@ -623,8 +623,8 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
             if ($slotRow && (int)$slotRow['is_placeholder'] === 1) {
                 promote_placeholder($pdo, $crewId, $name, $email !== '' ? $email : null);
                 $out[] = sprintf(
-                    'The slot "%s" is now %s. Everything already planned for it — every scheduled '
-                    . 'task and every progress record — is theirs, with nothing moved, because the '
+                    'The slot "%s" is now %s. Everything already planned for it, every scheduled '
+                    . 'task and every progress record, is theirs, with nothing moved, because the '
                     . 'crew record kept its id.',
                     $slotRow['name'], $name
                 );
@@ -635,7 +635,7 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                 // renamed and nothing moves, because nothing needs to: the
                 // record simply points at the person who is already there.
                 $out[] = sprintf(
-                    '%s already holds that slot, so nothing was renamed or moved — the hiring '
+                    '%s already holds that slot, so nothing was renamed or moved, the hiring '
                     . 'record now points at them and the slot is unchanged.',
                     $slotRow['name']
                 );
@@ -645,7 +645,7 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                 // somebody else without anyone asking for it.
                 throw new RuntimeException(sprintf(
                     'That slot already holds %s, so it was not overwritten. If %s is replacing '
-                    . 'them, change who is in the slot on the Crew screen first — that is the '
+                    . 'them, change who is in the slot on the Crew screen first, that is the '
                     . 'screen that moves the planned work with it.',
                     $slotRow['name'] ?? 'somebody', $name
                 ));
@@ -667,7 +667,7 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                      VALUES (?, ?, ?, 0, 0, 1)'
                 )->execute([$name, $hire['step_name'] ?: null, $email !== '' ? $email : null]);
                 $crewId = (int)$pdo->lastInsertId();
-                $out[] = 'Added "' . $name . '" to the studio crew list. They are not in a slot yet — '
+                $out[] = 'Added "' . $name . '" to the studio crew list. They are not in a slot yet, '
                        . 'put them in one on the Crew screen so the plan knows what they are doing.';
             }
             $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
@@ -750,7 +750,7 @@ function set_engagement_dates(PDO $pdo, int $crewId, int $projectId, ?string $st
     $s = $clean($start);
     $e = $clean($end);
     if ($s !== null && $e !== null && $e < $s) {
-        throw new RuntimeException('The end date is before the start date — nothing was saved.');
+        throw new RuntimeException('The end date is before the start date, nothing was saved.');
     }
 
     $pdo->prepare(

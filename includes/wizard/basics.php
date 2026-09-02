@@ -111,8 +111,8 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
       <fieldset class="unit-choice">
         <legend>Pre-production estimate</legend>
         <p class="muted small" style="margin-top:0">
-          At the start of a project the runtime is usually known long before the shot count is
-          — that only settles once the animatic is cut and labelled. Put what you know here and
+          At the start of a project the runtime is usually known long before the shot count is,
+          that only settles once the animatic is cut and labelled. Put what you know here and
           the review screen can still tell you how many people the deadline needs.
           <strong>These are used only until real shots or assets exist</strong>, then they're
           ignored in favour of the actual counts.
@@ -137,7 +137,7 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
         <legend>Expected retakes</legend>
         <p class="muted small" style="margin-top:0">
           Work that comes back and is done again. It doesn't change how much there is to
-          make — 22 assets are still 22 assets — it changes how long each one takes, so it
+          make, 22 assets are still 22 assets, it changes how long each one takes, so it
           scales the days per item and therefore the crew a deadline needs.
           Mana's projections have used <strong>10%</strong>.
         </p>

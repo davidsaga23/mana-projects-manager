@@ -53,11 +53,11 @@ $selfUrl = 'production.php?project=' . $projectId;
 // empty screens.
 $phases = [
     'asset'   => ['label' => 'Pre-production', 'noun' => 'asset',
-                  'blurb' => 'Characters, environments, props — everything built before a shot can be made.'],
+                  'blurb' => 'Characters, environments, props, everything built before a shot can be made.'],
     'shot'    => ['label' => 'Production',     'noun' => 'shot',
                   'blurb' => 'The shots themselves, through the pipeline.'],
     'project' => ['label' => 'Post-production','noun' => 'deliverable',
-                  'blurb' => 'Whole-show deliverables — SFX, music, the mix, the master. One row, because each of these is one piece of work for the whole film rather than one per shot.'],
+                  'blurb' => 'Whole-show deliverables, SFX, music, the mix, the master. One row, because each of these is one piece of work for the whole film rather than one per shot.'],
 ];
 $scope = $_GET['scope'] ?? 'asset';
 if (!isset($phases[$scope])) $scope = 'asset';
@@ -108,7 +108,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="lead">
   <?= e($phase['blurb']) ?>
-  <strong>Green means approved</strong> — finished, and ready for the next department to pick up.
+  <strong>Green means approved</strong>, finished, and ready for the next department to pick up.
   A dash means the step doesn't apply. Click any cell to set its status.
 </p>
 
@@ -123,10 +123,10 @@ require __DIR__ . '/includes/header.php';
       <p class="muted">
         <?php if ($scope === 'project'): ?>
           A whole-show deliverable is a step whose scope is <em>the project</em> rather than shots
-          or assets — an animatic, a music track, the mix, the final master. Set that on the
+          or assets, an animatic, a music track, the mix, the final master. Set that on the
           Setup screen and it will appear here.
         <?php else: ?>
-          A step's scope is set on the Setup screen — applies to shots, to assets, or to one kind
+          A step's scope is set on the Setup screen, applies to shots, to assets, or to one kind
           of asset. Nothing here is broken; there is simply nothing to draw.
         <?php endif; ?>
       </p>
@@ -271,7 +271,7 @@ require __DIR__ . '/includes/header.php';
               <?php if ($cell['kind'] === 'n/a'): ?>
                 <span class="cell-dash" title="<?= $cell['reason'] === 'excluded'
                       ? 'Marked not applicable for this item'
-                      : e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) . ' — this step does not cover it' ?>">—</span>
+                      : e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) . ', this step does not cover it' ?>">—</span>
               <?php else:
                 $s = $cell['status'];
                 $title = ($s['name'] ?? 'Nothing recorded')
@@ -299,7 +299,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="muted small">
   <strong>Plaky is still the source of truth for status.</strong> A status set here is overwritten
-  by the next import that covers the same cell — the same caveat STFC's screen carried. It is a
+  by the next import that covers the same cell, the same caveat STFC's screen carried. It is a
   way to correct or nudge something between uploads, not a second place to record work.
   <a href="import.php?project=<?= $projectId ?>">Import screen →</a>
 </p>
@@ -314,7 +314,7 @@ require __DIR__ . '/includes/header.php';
     </button>
   <?php endforeach; ?>
   <button type="button" class="status-opt" data-status="">
-    <span class="cell-chip cell-none"></span> Clear — nothing recorded
+    <span class="cell-chip cell-none"></span> Clear, nothing recorded
   </button>
 </div>
 

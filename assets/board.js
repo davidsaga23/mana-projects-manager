@@ -70,7 +70,7 @@
         updateCount(target);
       }
     } catch (err) {
-      alert('Network error — the card was NOT moved: ' + err.message);
+      alert('Network error, the card was NOT moved: ' + err.message);
     }
   };
 
@@ -171,7 +171,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         if (err) {
-          err.textContent = 'Choose who owns this ticket before creating it — an unowned ticket notifies nobody.';
+          err.textContent = 'Choose who owns this ticket before creating it, an unowned ticket notifies nobody.';
           err.style.display = '';
         }
         crewSel.focus();
@@ -228,7 +228,7 @@
         }
       } catch (netErr) {
         if (err) {
-          err.textContent = 'Network error — nothing was saved. ' + netErr.message;
+          err.textContent = 'Network error, nothing was saved. ' + netErr.message;
           err.style.display = '';
         }
       }

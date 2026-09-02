@@ -26,7 +26,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
       if ($unmatchedStatus) $bits[] = "$unmatchedStatus status value" . ($unmatchedStatus === 1 ? '' : 's');
       if ($unmatchedPeople) $bits[] = "$unmatchedPeople " . ($unmatchedPeople === 1 ? 'person' : 'people');
       echo e(implode(', ', $bits));
-    ?>. Set them below — what you choose is remembered for next time.
+    ?>. Set them below, what you choose is remembered for next time.
   </div>
 <?php endif; ?>
 
@@ -34,7 +34,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   <input type="hidden" name="action" value="map">
 
   <h3>Groups</h3>
-  <p class="muted small">Plaky uses one "Group" column for two different things — episodes of
+  <p class="muted small">Plaky uses one "Group" column for two different things, episodes of
      shots, and types of asset. Only you can say which is which.</p>
   <table class="review-table">
     <tr><th>Group</th><th>Items</th><th>Treat as</th></tr>
@@ -61,7 +61,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
     <?php $gi++; endforeach; ?>
   </table>
   <p class="muted small">
-    <strong>Shots (no episodes)</strong> is for a single film or commercial — the shots go in
+    <strong>Shots (no episodes)</strong> is for a single film or commercial, the shots go in
     as one flat list rather than an episode named after the group.
     <strong>Whole-project steps</strong> is for groups like Pre-production or Post-production,
     where each item (an animatic, a music track) <em>is</em> a step for the whole show rather
@@ -77,13 +77,13 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
     <p class="muted small">
       <?php $names = array_map(function ($c) { return $c['title'] . ' (' . $c['group'] . ')'; }, $analysis['childless']); ?>
       <?= e(implode(', ', array_slice($names, 0, 8))) ?><?= count($names) > 8 ? ' …' : '' ?>.
-      An item with no steps beneath it is usually not a shot or an asset — a time bucket or a
+      An item with no steps beneath it is usually not a shot or an asset, a time bucket or a
       one-off deliverable. Untick to import them anyway.
     </p>
   <?php endif; ?>
 
   <h3>Pipeline steps</h3>
-  <p class="muted small">Subitem names in the file, matched to this project's steps —
+  <p class="muted small">Subitem names in the file, matched to this project's steps,
      listed <strong>per group</strong>, because the same name can mean different steps.
      "Concept" under Characters and "Concept" under Environments are two different things,
      so each gets its own choice.</p>
@@ -101,7 +101,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
       <td class="muted"><?= (int)$s['count'] ?></td>
       <td>
         <select name="step_val[<?= $si ?>]" class="step-choice" data-scope-for="step-scope-<?= $si ?>">
-          <option value="0">— skip these rows —</option>
+          <option value="0">skip these rows</option>
           <?php foreach ($analysis['project_steps'] as $ps): ?>
             <?php // Whole-project steps have no shot or asset to attach to, so a
                   // subitem could never belong to one. Leaving them out prevents
@@ -142,7 +142,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
       <td class="muted"><?= (int)$s['count'] ?></td>
       <td>
         <select name="status_val[<?= $ci ?>]">
-          <option value="0">— leave unmapped —</option>
+          <option value="0">leave unmapped</option>
           <?php foreach ($analysis['project_statuses'] as $ps): ?>
             <option value="<?= (int)$ps['id'] ?>" <?= $s['status_id'] === (int)$ps['id'] ? 'selected' : '' ?>>
               <?= e($ps['name']) ?> <?= $ps['maps_to'] !== 'none' ? '(' . e($ps['maps_to']) . ')' : '' ?><?= $ps['is_blocked'] ? ' (blocked)' : '' ?>
@@ -167,7 +167,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
       <td class="muted"><?= (int)$p['count'] ?></td>
       <td>
         <select name="person_val[<?= $pi ?>]">
-          <option value="0">— leave unmatched —</option>
+          <option value="0">leave unmatched</option>
           <?php foreach ($crew as $c): ?>
             <option value="<?= (int)$c['id'] ?>" <?= $p['crew_id'] === (int)$c['id'] ? 'selected' : '' ?>>
               <?= e($c['name']) ?><?= $c['active'] ? '' : ' (inactive)' ?>

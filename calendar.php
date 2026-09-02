@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // way to tell the two apart — and the difference is worth reporting.
             flash('ok', $stmt->rowCount() >= 2
                 ? "Renamed $day to \"$name\"."
-                : "Added $day — \"$name\". Every quota and schedule now skips it.");
+                : "Added $day, \"$name\". Every quota and schedule now skips it.");
 
         } elseif ($action === 'add_suggested') {
             $wanted = (array)($_POST['suggest'] ?? []);
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             flash($n ? 'ok' : 'warn', $n
                 ? "Added $n day(s) to the calendar."
-                : 'Nothing was added — those days were already on the calendar.');
+                : 'Nothing was added, those days were already on the calendar.');
 
         } elseif ($action === 'delete') {
             $day = trim($_POST['day'] ?? '');
@@ -133,13 +133,13 @@ require __DIR__ . '/includes/header.php';
 
 <p class="lead">
   Days nobody works. Every deadline in this tool counts working days, and without this it
-  would mean Monday to Friday and nothing else — so a holiday would be quietly treated as a
+  would mean Monday to Friday and nothing else, so a holiday would be quietly treated as a
   day someone could finish a shot on. That error always makes a plan look more achievable
   than it is.
 </p>
 <p class="lead">
   Mana works to <strong>US client calendars</strong>, so this is seeded with the American
-  holidays almost every company closes for. It is a starting point, not a rule — remove any
+  holidays almost every company closes for. It is a starting point, not a rule, remove any
   the studio works, and add whatever else it takes.
 </p>
 
@@ -160,7 +160,7 @@ require __DIR__ . '/includes/header.php';
     <h3>Taken by some studios, not all</h3>
     <p class="muted small">
       The rest of the US federal calendar. These weren't added for you because studios genuinely
-      differ on them — plenty work Martin Luther King Jr. Day and Veterans Day — and a day off
+      differ on them, plenty work Martin Luther King Jr. Day and Veterans Day, and a day off
       the team actually works would quietly pad every schedule. Tick the ones Mana takes.
     </p>
     <form method="post">
@@ -199,7 +199,7 @@ require __DIR__ . '/includes/header.php';
           <td class="muted">
             <?= e(date('D', strtotime($d['day']))) ?>
             <?php if ($weekend): ?>
-              <span class="muted small">— a weekend anyway, so it costs nothing</span>
+              <span class="muted small">a weekend anyway, so it costs nothing</span>
             <?php endif; ?>
           </td>
           <td><?= e($d['name']) ?></td>
@@ -223,12 +223,12 @@ require __DIR__ . '/includes/header.php';
     <form method="post" class="inline-form">
       <input type="hidden" name="action" value="add">
       <input type="date" name="day" required>
-      <input type="text" name="name" placeholder="What it is — e.g. studio shutdown" size="34">
+      <input type="text" name="name" placeholder="What it is, e.g. studio shutdown" size="34">
       <button type="submit">Add</button>
     </form>
     <p class="muted small">
       Adding a date that is already listed renames it rather than duplicating it.
-      A shutdown of several days is entered one day at a time — a range would hide which
+      A shutdown of several days is entered one day at a time, a range would hide which
       individual days were actually taken.
     </p>
   <?php endif; ?>

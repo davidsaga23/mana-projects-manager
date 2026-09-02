@@ -186,25 +186,25 @@ function log_time(PDO $pdo, array $in): string {
     } else {
         $clean = str_replace(',', '.', preg_replace('/[^0-9.,]/', '', $raw));
         if ($clean === '' || !is_numeric($clean)) {
-            throw new RuntimeException('"' . $raw . '" is not a number of hours — nothing was logged.');
+            throw new RuntimeException('"' . $raw . '" is not a number of hours, nothing was logged.');
         }
         $minutes = (int)round((float)$clean * 60);
     }
 
-    if ($minutes <= 0) throw new RuntimeException('That works out as zero — nothing was logged.');
+    if ($minutes <= 0) throw new RuntimeException('That works out as zero, nothing was logged.');
     // A day has 24 hours in it, and somebody typing 800 meant 8.00. Refusing is
     // better than storing a figure that quietly poisons every average built on it.
     if ($minutes > 24 * 60) {
-        throw new RuntimeException('That is more than 24 hours in one entry — check the number.');
+        throw new RuntimeException('That is more than 24 hours in one entry, check the number.');
     }
 
     $day = trim((string)($in['log_date'] ?? ''));
     if ($day === '') $day = date('Y-m-d');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) {
-        throw new RuntimeException('That date is not a real date — nothing was logged.');
+        throw new RuntimeException('That date is not a real date, nothing was logged.');
     }
     if ($day > date('Y-m-d')) {
-        throw new RuntimeException('That day is in the future — time cannot be logged before it is worked.');
+        throw new RuntimeException('That day is in the future, time cannot be logged before it is worked.');
     }
 
     $pdo->prepare(

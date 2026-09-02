@@ -178,7 +178,7 @@ fputcsv($out, [
     fmt_num($totalDays / WORKING_DAYS_PER_MONTH, 3),
     '', '', '', $project['start_date'] ?? '', $project['delivery_date'] ?? '', '',
     '',
-    'Rates and costs are deliberately not in this file — they live in the finance system.',
+    'Rates and costs are deliberately not in this file, they live in the finance system.',
 ]);
 
 fclose($out);

@@ -68,7 +68,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     $depsMap = step_dependencies_map($pdo, $projectId);
     if (pipeline_has_cycle($depsMap)) {
         $out['problems'][] = 'The workflow has steps waiting for each other in a loop. ' .
-                             'Fix it on the Workflow screen — nothing can be scheduled until then.';
+                             'Fix it on the Workflow screen, nothing can be scheduled until then.';
         return $out;
     }
 
@@ -136,7 +136,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     if (!empty($axis['exhausted'])) {
         $out['problems'][] = 'The plan ran past the end of the calendar this tool will build ' .
                              '(about twelve years). That normally means a step has far more work ' .
-                             'than one lane can absorb — check the headcount and days-per-item on ' .
+                             'than one lane can absorb, check the headcount and days-per-item on ' .
                              'the Dates & headcount screen.';
     }
 
@@ -162,7 +162,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
                           'their own were sized from their own workload rather than from a date.';
     }
     if (!$holidays) {
-        $out['notes'][] = 'No non-working days are recorded, so every weekday counts as workable — ' .
+        $out['notes'][] = 'No non-working days are recorded, so every weekday counts as workable, ' .
                           'including public holidays.';
     }
 
@@ -455,7 +455,7 @@ function scheduler_schedule_step(
             $nearMiss = scheduler_near_miss_type($pdo, $projectId, $step);
             if ($nearMiss !== null) {
                 $s['notes'][] = sprintf(
-                    'Scoped to "%s", but nothing is typed that way — %d asset%s typed "%s". ' .
+                    'Scoped to "%s", but nothing is typed that way, %d asset%s typed "%s". ' .
                     'Nothing is planned for this step until the two spellings are merged on ' .
                     'the Assets screen.',
                     $step['applies_to_asset_type'], $nearMiss['count'],
@@ -482,7 +482,7 @@ function scheduler_schedule_step(
     if (!$fromEstimate && $s['mode'] !== 'project' && $coverage < 1.0) {
         if ($s['excluded'] > 0) {
             $s['notes'][] = sprintf(
-                'Covers %s%% by estimate, but %d item%s already marked as not applicable — ' .
+                'Covers %s%% by estimate, but %d item%s already marked as not applicable, ' .
                 'the real list is used and the percentage ignored.',
                 fmt_num($coverage * 100), $s['excluded'], $s['excluded'] === 1 ? ' is' : 's are'
             );
@@ -585,9 +585,9 @@ function scheduler_schedule_step(
         $scope = applies_to_phrase($step['applies_to'], $step['applies_to_asset_type'] ?? null);
 
         $label = $fromEstimate
-            ? sprintf('%s — %s estimated %s', $stepName,
+            ? sprintf('%s, %s estimated %s', $stepName,
                       fmt_rate((float)$s['estimate_units']), $s['estimate_label'])
-            : sprintf('%s — %s%% of %d %s', $stepName,
+            : sprintf('%s, %s%% of %d %s', $stepName,
                       fmt_num($coverage * 100), count($todo), $scope);
 
         $task = scheduler_make_task(
@@ -678,7 +678,7 @@ function scheduler_lane_count(
         $lanes = max(1, (int)ceil($planned));
         if (abs($lanes - $planned) > 0.001) {
             $notes[] = sprintf(
-                '%s people planned, drawn as %d lanes — a part-time person still occupies a lane, ' .
+                '%s people planned, drawn as %d lanes, a part-time person still occupies a lane, ' .
                 'they just fill it more slowly.',
                 fmt_num($planned), $lanes
             );
@@ -698,14 +698,14 @@ function scheduler_lane_count(
             if ($lanes > $cap) {
                 $notes[] = sprintf(
                     'Hitting %s would take more than %d people working in parallel, which is more ' .
-                    'than there are items to work on. Capped at %d — the finish date below is the ' .
+                    'than there are items to work on. Capped at %d, the finish date below is the ' .
                     'earliest this step can manage, not the deadline.',
                     $deadline, $cap, $cap
                 );
                 return [$cap, 'capped', $notes];
             }
             $notes[] = sprintf(
-                'No headcount set, so %d %s assumed — the number needed to finish %s days of work ' .
+                'No headcount set, so %d %s assumed, the number needed to finish %s days of work ' .
                 'in the %d working day%s before %s.',
                 $lanes, $lanes === 1 ? 'person is' : 'people are',
                 fmt_rate($totalWork), $available, $available === 1 ? '' : 's', $deadline
@@ -716,12 +716,12 @@ function scheduler_lane_count(
 
     if ($deadline && $deadline < $anchor) {
         $notes[] = 'The deadline (' . $deadline . ') has already passed, so it can\'t say how many ' .
-                   'people are needed. One person is assumed — set a headcount to get real dates.';
+                   'people are needed. One person is assumed, set a headcount to get real dates.';
         return [1, 'fallback', $notes];
     }
 
     $notes[] = 'No headcount and no deadline, so one person is assumed. That is almost ' .
-               'certainly wrong — set either on the Dates & headcount screen.';
+               'certainly wrong, set either on the Dates & headcount screen.';
     return [1, 'fallback', $notes];
 }
 

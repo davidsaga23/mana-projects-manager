@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Check if already installed (users exist)
         $count = $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if ($count > 0) {
-            throw new Exception('Users already exist. Delete install.php now — installer is closed.');
+            throw new Exception('Users already exist. Delete install.php now, installer is closed.');
         }
 
         $hash = password_hash($password, PASSWORD_DEFAULT);

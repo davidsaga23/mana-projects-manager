@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $typed = trim((string)($_POST['confirm_code'] ?? ''));
             if ($typed === '' || strcasecmp($typed, (string)$project['code']) !== 0) {
                 throw new RuntimeException(sprintf(
-                    'Nothing was deleted. To delete "%s", type its code — %s — in the box.',
+                    'Nothing was deleted. To delete "%s", type its code, %s, in the box.',
                     $project['name'], $project['code']));
             }
 
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException(
                     'The finance database is configured but would not open, so there is no way to '
                   . 'tell whether this project has a budget or invoices on that side. Nothing was '
-                  . 'deleted — that is the safe answer to a question that could not be asked.');
+                  . 'deleted, that is the safe answer to a question that could not be asked.');
             }
 
             if ($fin['total'] > 0) {
@@ -209,11 +209,11 @@ require __DIR__ . '/includes/header.php';
           // saying the first when the second is true reads as data loss. ?>
     <?php if ($archivedCount > 0 && !$showArchived): ?>
       <h2>Nothing active</h2>
-      <p>Every project is archived. Nothing has been deleted — they are just out of the way.</p>
+      <p>Every project is archived. Nothing has been deleted, they are just out of the way.</p>
       <p><a class="button" href="index.php?archived=1">Show the <?= (int)$archivedCount ?> archived</a></p>
     <?php else: ?>
       <h2>No projects yet</h2>
-      <p>Set up your first one — it takes about five minutes and drives the schedule,
+      <p>Set up your first one, it takes about five minutes and drives the schedule,
          the quotas and the reporting from there on.</p>
       <p><a class="button" href="wizard.php">Start a new project</a></p>
     <?php endif; ?>
@@ -333,7 +333,7 @@ require __DIR__ . '/includes/header.php';
                   Type <code><?= e($p['code']) ?></code> to confirm. Removes
                   <?= (int)$p['shot_count'] ?> shots, <?= (int)$p['asset_count'] ?> assets,
                   <?= (int)$p['step_count'] ?> steps and everything tracked against them.
-                  Refused while the project still has anything in the finance database —
+                  Refused while the project still has anything in the finance database,
                   <strong>set the status to archived instead</strong> to take it off this list
                   without destroying anything.
                 </small>

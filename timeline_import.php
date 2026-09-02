@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
         libxml_use_internal_errors(true);
         $xml = simplexml_load_file($_FILES['ganfile']['tmp_name']);
         if ($xml === false) {
-            throw new RuntimeException('That file could not be read as XML — is it a GanttProject .gan?');
+            throw new RuntimeException('That file could not be read as XML, is it a GanttProject .gan?');
         }
 
         // --- resources -> crew ------------------------------------------------
@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                 }
 
                 $split = gan_split_name($name);
-                if (!$split) { $unmatched[] = $name . ' — name is not "item - step"'; continue; }
+                if (!$split) { $unmatched[] = $name . ', name is not "item - step"'; continue; }
                 [$itemName, $stepName] = $split;
 
                 $shotId = $shots[mb_strtoupper($itemName)] ?? null;
@@ -167,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                 $asset = $assets[mb_strtolower($itemName)] ?? null;
 
                 $step = $resolveStep($stepName, $asset, $shotId !== null);
-                if (!$step) { $unmatched[] = $name . ' — no step called "' . $stepName . '" applies here'; continue; }
+                if (!$step) { $unmatched[] = $name . ', no step called "' . $stepName . '" applies here'; continue; }
                 $stepId = (int)$step['id'];
 
                 if ($shotId !== null)      { $itemKey = 's' . $shotId; $assetId = null; }
@@ -177,13 +177,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                     // step's own name, and the stored row says which key it uses.
                     $itemKey = $stepOnlyKey[$stepId]; $assetId = null; $shotId = null;
                 } else {
-                    $unmatched[] = $name . ' — no shot or asset called "' . $itemName . '"';
+                    $unmatched[] = $name . ', no shot or asset called "' . $itemName . '"';
                     continue;
                 }
 
                 $start = trim((string)$task['start']);
                 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start)) {
-                    $unmatched[] = $name . ' — start date is not a date'; continue;
+                    $unmatched[] = $name . ', start date is not a date'; continue;
                 }
                 $dur = max(1, (int)$task['duration']);
                 // GanttProject counts duration in working days INCLUSIVE of the
@@ -275,7 +275,7 @@ require __DIR__ . '/includes/header.php';
 <p class="lead">
   The round trip for the <strong>.gan</strong> export: refine the plan in GanttProject, bring
   it back here. Tasks are matched on the shot or asset name and the step name, so keep those
-  intact — renaming a task in GanttProject means it won't be found. Anything imported is
+  intact, renaming a task in GanttProject means it won't be found. Anything imported is
   marked <strong>locked</strong>, so a later Regenerate won't undo it.
 </p>
 
@@ -287,7 +287,7 @@ require __DIR__ . '/includes/header.php';
     <input type="file" name="ganfile" accept=".gan,.xml" required></label>
   <label class="inline">
     <input type="checkbox" name="dry_run" value="1" checked>
-    Preview only — show what would change without saving</label>
+    Preview only, show what would change without saving</label>
   <div class="actions"><button type="submit">Upload</button></div>
 </form>
 
@@ -303,13 +303,13 @@ require __DIR__ . '/includes/header.php';
 
   <?php if (!$report['dry_run']): ?>
     <div class="flash flash-ok">Applied <?= (int)$report['applied'] ?> change<?= $report['applied'] === 1 ? '' : 's' ?>.
-      Those tasks are now locked — Regenerate will schedule around them.</div>
+      Those tasks are now locked, Regenerate will schedule around them.</div>
   <?php elseif (!$report['changes']): ?>
-    <div class="flash flash-ok">Nothing to change — the file already matches the saved schedule.</div>
+    <div class="flash flash-ok">Nothing to change, the file already matches the saved schedule.</div>
   <?php else: ?>
     <div class="flash flash-warn">
       Nothing has been saved. <strong><?= count($report['changes']) ?></strong>
-      task<?= count($report['changes']) === 1 ? '' : 's' ?> would change — untick
+      task<?= count($report['changes']) === 1 ? '' : 's' ?> would change, untick
       <em>Preview only</em> and upload again to apply.
     </div>
   <?php endif; ?>
@@ -345,14 +345,14 @@ require __DIR__ . '/includes/header.php';
     </div>
     <?php if (count($report['changes']) > 300): ?>
       <p class="muted small">Showing the first 300 of <?= count($report['changes']) ?>. All of them
-         are applied when you save — this listing is trimmed to keep the page readable.</p>
+         are applied when you save, this listing is trimmed to keep the page readable.</p>
     <?php endif; ?>
   <?php endif; ?>
 
   <?php if ($report['unmatched']): ?>
     <h3>Not matched</h3>
     <p class="muted small">
-      Skipped, and named rather than dropped quietly — usually a task renamed in GanttProject,
+      Skipped, and named rather than dropped quietly, usually a task renamed in GanttProject,
       or a shot, asset or step that doesn't exist on this project.
     </p>
     <ul class="plain-list">

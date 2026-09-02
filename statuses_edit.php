@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $upd->execute($args);
                 if ($upd->rowCount() > 0) $changed++;
             } catch (PDOException $e) {
-                flash('warn', 'Could not rename "' . $existing[$id]['name'] . '" — that name is already used.');
+                flash('warn', 'Could not rename "' . $existing[$id]['name'] . '", that name is already used.');
             }
         }
 
@@ -183,7 +183,7 @@ require __DIR__ . '/includes/header.php';
         <th title="What this state means for delivered/approved reporting">Counts as</th>
         <th title="Work that cannot proceed, as opposed to work not yet started">Blocked</th>
         <?php if ($hasExcluded): ?>
-          <th title="This item does not pass through this step at all — the scheduler plans no time for it">Not applicable</th>
+          <th title="This item does not pass through this step at all, the scheduler plans no time for it">Not applicable</th>
         <?php endif; ?>
         <?php if ($hasBoard): ?>
           <th title="Show this status as a column on the tasks board">Board column</th>
@@ -263,8 +263,8 @@ require __DIR__ . '/includes/header.php';
 </form>
 
 <p class="muted small">
-  <strong>Blocked</strong> means work that can't proceed — waiting on a client, a dependency
-  or a decision — rather than work nobody has started. Both count as unfinished, but blocked
+  <strong>Blocked</strong> means work that can't proceed, waiting on a client, a dependency
+  or a decision, rather than work nobody has started. Both count as unfinished, but blocked
   work needs someone to unblock it, so it is reported separately.
 </p>
 
@@ -272,7 +272,7 @@ require __DIR__ . '/includes/header.php';
 <p class="muted small">
   <strong>Not applicable</strong> is different again: the work doesn't exist. A shot with no
   FX, a prop that needs no rig. It is what <code>N/A</code> has always meant, and the
-  scheduler reads it — an item marked this way gets no time planned for it, rather than
+  scheduler reads it, an item marked this way gets no time planned for it, rather than
   sitting in the plan forever as something nobody will ever finish. It is also how a step
   whose coverage is still a guess ("FX is about 30% of the show") turns into real per-shot
   dates: mark the shots it doesn't touch, and the estimate stops being needed.
@@ -283,7 +283,7 @@ require __DIR__ . '/includes/header.php';
 <p class="muted small">
   <strong>Board column</strong> decides which of these appear as columns on the
   <a href="tasks.php?project=<?= $projectId ?>">tasks board</a>. Tickets use this same
-  vocabulary rather than a second set of words for the same ideas — but eleven columns is not
+  vocabulary rather than a second set of words for the same ideas, but eleven columns is not
   a board anyone can read, so pick the five or six a card really moves between. A status that
   isn't a column still works: a card can sit in it, and the board shows those in its first
   column marked <em>off-board</em> rather than hiding them.
