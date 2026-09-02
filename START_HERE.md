@@ -426,7 +426,7 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    - **`item.php`** (migration 020) — one shot or asset opened up, version and notes per step.
    - **`includes/activity.php`** (migration 021) — the status-change log, written by the Plaky
      import, the tracking grid and the item page. **Cannot be backfilled.**
-   - **`time_logs`** (migration 022) — per-day effort, entered from **My work**, which now carries
+   - **`time_logs`** (migration 022) — per-day effort, entered from **My tasks**, which now carries
      production tasks as well as tickets.
 
    **The four things to know before touching any of it:**

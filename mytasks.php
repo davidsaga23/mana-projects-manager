@@ -1,5 +1,5 @@
 <?php
-// My work — one person's day, across every show.
+// My tasks — one person's day, across every show.
 //
 // It began as a list of tickets. It is now the screen an artist actually opens:
 // their PRODUCTION tasks (a step against a shot or an asset — the rows that
@@ -218,12 +218,12 @@ $overdue = 0;
 foreach ($tasks as $t2) if (!empty($t2['end_date']) && $t2['end_date'] < $today) $overdue++;
 foreach ($tickets as $t2) if (!empty($t2['due_date']) && $t2['due_date'] < $today) $overdue++;
 
-$pageTitle = 'My work';
+$pageTitle = 'My tasks';
 require __DIR__ . '/includes/header.php';
 ?>
 
 <p class="crumb"><a href="index.php">← All projects</a></p>
-<h2 class="wizard-title">My work</h2>
+<h2 class="wizard-title">My tasks</h2>
 
 <?php if (!$ready): ?>
   <div class="empty-state">

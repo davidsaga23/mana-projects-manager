@@ -36,7 +36,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       // finance_nav() both draw. So the top bar carries what is on MY desk, the
       // one way to ALL the shows, and the housekeeping behind a separator.
       ?>
-      · <a href="mytasks.php">My work</a>
+      · <a href="mytasks.php">My tasks</a>
       · <a href="index.php">Projects</a>
       <?php // ARTISTS is up here, not inside a project, because a freelancer is
             // not the property of the show that first spoke to them — the whole

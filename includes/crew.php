@@ -403,7 +403,7 @@ function unfilled_slot_count(PDO $pdo, int $projectId): int {
  * Tie a LOGIN to a PERSON, creating the crew row if there isn't one.
  *
  * `users` are logins and `crew` are people; a ticket is assigned to a person, so
- * an account with no crew row cannot own anything and has no "My work" list.
+ * an account with no crew row cannot own anything and has no "My tasks" list.
  * This is the one operation that fixes that, shared by users.php (an admin doing
  * it for someone) and mytasks.php (someone doing it for themselves) so the two
  * cannot drift into behaving differently.

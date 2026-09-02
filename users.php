@@ -20,7 +20,7 @@ const USER_ROLES = ['admin', 'editor', 'viewer'];
 // Why this matters here rather than being a curiosity: a ticket is assigned to a
 // `crew` row, because that is what this schema means by a person. `users` are
 // logins. So until a login is tied to a crew row, that individual cannot own a
-// ticket and cannot have a "My work" list — which is exactly the state David and
+// ticket and cannot have a "My tasks" list — which is exactly the state David and
 // Renata were in.
 $hasCrewLink = column_exists($pdo, 'users', 'crew_id');
 
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('ok', $msg);
             } elseif ($choice === '' || $choice === '0') {
                 $pdo->prepare('UPDATE users SET crew_id = NULL WHERE id = ?')->execute([$id]);
-                flash('ok', 'Unlinked. Their "My work" list will ask again who they are.');
+                flash('ok', 'Unlinked. Their "My tasks" list will ask again who they are.');
             } else {
                 $crewId = (int)$choice;
                 $chk = $pdo->prepare('SELECT name FROM crew WHERE id = ? AND is_team = 0');
@@ -200,7 +200,7 @@ require __DIR__ . '/includes/header.php';
     <strong><?= $unlinked ?></strong> active account<?= $unlinked === 1 ? '' : 's' ?>
     <?= $unlinked === 1 ? 'is' : 'are' ?> not linked to a crew member yet.
     <strong>A ticket is assigned to a person, not to a login</strong> — so until an account is
-    linked, that individual cannot be picked as an owner and has no "My work" list.
+    linked, that individual cannot be picked as an owner and has no "My tasks" list.
     Use the <em>Is which person</em> column below.
   </div>
 <?php endif; ?>

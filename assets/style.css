@@ -127,6 +127,15 @@ button.danger:hover { background: #8f222c; }
 }
 .link-danger:hover { background: none; color: #8f222c; }
 .page-actions { margin-bottom: 16px; }
+/* A ROW OF BUTTONS, opt-in. Scoped to a modifier rather than applied to
+   .page-actions itself: three other screens use that class for a button sitting
+   next to a sentence of small print (the two Excel downloads, the standards
+   tabs), and making the container flex would reflow all three to fix one.
+   align-items:center rather than baseline — a secondary button carries a 1px
+   border the primary does not, and on a shared baseline that 2px shows. */
+.page-actions.button-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
 .actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .actions button { margin-top: 0; }
 /* "Stay here and save" is a different intention from "move on" — give them a
@@ -1203,7 +1212,10 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .trend-swatch.delivered { background: #2f6fb2; }
 .trend-swatch.target { background: repeating-linear-gradient(90deg, #b02a37 0 5px, transparent 5px 9px); }
 
-/* My work — status and time entered in place, so a row stays one line. */
+/* The .mywork- class names below are deliberately left alone after the screen
+   was renamed to My tasks: they are internal, and renaming markup across a
+   screen to match a label is churn with no reader.
+   My tasks — status and time entered in place, so a row stays one line. */
 .mywork-table td { vertical-align: middle; }
 .mywork-table small { display: block; margin-top: 2px; }
 .mywork-table select { width: auto; min-width: 140px; padding: 4px 6px; font-size: 13px; }
@@ -1365,10 +1377,45 @@ body.lightbox-lock { overflow: hidden; }
 }
 .status-select:hover { border-color: rgba(0,0,0,.30); }
 
-/* Rename and delete live behind a disclosure. .row-actions is nowrap so the
-   Open/Finance links stay on one line; the panel inside it must wrap again or
-   the delete form runs off the table. */
-.project-edit { margin-top: 6px; white-space: normal; }
+/* --- the actions on a project row -----------------------------------------
+   David, 2026-09-02: Open, Finance and Edit as buttons rather than links.
+
+   SMALL buttons, not the page-level 9px/18px. A dozen shows at full size turns
+   the front door into a wall of blue, and these are row actions — they should
+   read as controls without competing with "+ New project" above them.
+
+   Spelled out rather than borrowing .button, because one of the three is a
+   <summary> (the Edit disclosure) and this stylesheet's button rules are
+   `a.button` and `button.secondary`, both element-qualified — neither reaches
+   it. Same reason .slot-btn exists a few hundred lines down. */
+.proj-actions { display: flex; flex-wrap: wrap; gap: 8px; white-space: normal; }
+.row-btn {
+  display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px;
+  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  user-select: none; list-style: none;
+}
+.row-btn:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
+/* Both spellings, because the disclosure triangle is a ::-webkit-details-marker
+   in one engine and a ::marker in the other, and a stray arrowhead inside a
+   button looks like a bug. */
+.row-btn::-webkit-details-marker { display: none; }
+.row-btn::marker { content: ''; }
+
+/* ONE of the three is the one you came for. Open — or Resume setup, on a show
+   that never finished the wizard — is filled; the other two are not. */
+.row-btn-go { background: #2f6fb2; color: #fff; border-color: #2f6fb2; }
+.row-btn-go:hover { background: #275d95; border-color: #275d95; color: #fff; }
+
+/* Rename and delete live behind a disclosure.
+   flex-basis:100% puts Edit on its own line UNDER Open and Finance, and that is
+   load-bearing rather than cosmetic: the panel it opens carries the delete form
+   and its paragraph of small print, and beside two other buttons it would be
+   squeezed into what is left of an already narrow last column. white-space
+   returns to normal because .row-actions is nowrap for every other screen. */
+.project-edit { flex-basis: 100%; margin-top: 0; white-space: normal; }
+/* Held down while the panel is open, so it reads as the thing that opened it. */
+.project-edit[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
 .project-edit .inline-form { margin: 0 0 8px; gap: 8px; }
 .project-edit .danger-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
 

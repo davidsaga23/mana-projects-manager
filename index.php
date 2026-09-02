@@ -166,21 +166,25 @@ require __DIR__ . '/includes/header.php';
       // managements now live INSIDE a project, on the switcher project_nav()
       // and finance_nav() share; what is left here is the portfolio-wide money
       // report, which is a report and not a second home. ?>
-<div class="page-actions">
+<?php // ONE PRIMARY, THREE SECONDARIES (David, 2026-09-02: buttons, not links).
+      // Starting a show is the thing this screen is for; the other three are
+      // ways of looking at what is already here. Four solid blue buttons would
+      // say all four are equally the point, which is how a row of buttons stops
+      // meaning anything. ?>
+<div class="page-actions button-row">
   <a class="button" href="wizard.php">+ New project</a>
-  <a href="mytasks.php" style="margin-left:12px;">My work across all projects →</a>
+  <a class="button secondary" href="mytasks.php">My tasks</a>
   <?php if (is_admin()): ?>
-    <a href="finance.php" style="margin-left:12px;">Finance across all projects →</a>
+    <a class="button secondary" href="finance.php">Finance across all projects</a>
   <?php endif; ?>
   <?php // Always drawn once there is anything archived, so a project that has
         // left the list can always be found again. A hidden thing with no way
         // back is indistinguishable from a deleted one. ?>
   <?php if ($archivedCount > 0 || $showArchived): ?>
-    <a href="index.php<?= $showArchived ? '' : '?archived=1' ?>" style="margin-left:12px;">
-      <?= $showArchived
-            ? 'Hide archived'
-            : 'Show archived (' . (int)$archivedCount . ')' ?>
-    </a>
+    <a class="button secondary" href="index.php<?= $showArchived ? '' : '?archived=1' ?>"><?=
+      $showArchived
+        ? 'Hide archived'
+        : 'Show archived (' . (int)$archivedCount . ')' ?></a>
   <?php endif; ?>
 </div>
 
@@ -240,16 +244,20 @@ require __DIR__ . '/includes/header.php';
       <td><?= (int)$p['crew_count'] ?></td>
       <td><?= e($p['delivery_date'] ?? '—') ?></td>
       <td class="row-actions">
+        <?php // A FLEX ROW, not three inline links with a space between them.
+              // Buttons touching each other read as one segmented control, and
+              // the gap is what says they are three separate decisions. ?>
+        <div class="proj-actions">
         <?php if ($p['status'] === 'setup'): ?>
-          <a href="wizard.php?project=<?= $pid ?>&step=<?= max(1, (int)($p['wizard_step'] ?: 1)) ?>">Resume setup →</a>
+          <a class="row-btn row-btn-go" href="wizard.php?project=<?= $pid ?>&step=<?= max(1, (int)($p['wizard_step'] ?: 1)) ?>">Resume setup</a>
         <?php else: ?>
-          <a href="project.php?id=<?= $pid ?>">Open →</a>
+          <a class="row-btn row-btn-go" href="project.php?id=<?= $pid ?>">Open</a>
           <?php // Straight to the money side of the same show, for the admin who
                 // came here to look at a budget. Opening the project first and
                 // then switching works too — this saves the hop, it does not
                 // replace the switcher. ?>
           <?php if (is_admin()): ?>
-            <a href="finance_project.php?project=<?= $pid ?>&tab=overview" class="muted">Finance →</a>
+            <a class="row-btn" href="finance_project.php?project=<?= $pid ?>&tab=overview">Finance</a>
           <?php endif; ?>
         <?php endif; ?>
 
@@ -259,7 +267,7 @@ require __DIR__ . '/includes/header.php';
               // removed by a misplaced click. ?>
         <?php if (can_edit()): ?>
           <details class="inline-actions project-edit">
-            <summary>Edit</summary>
+            <summary class="row-btn">Edit</summary>
 
             <form method="post" class="inline-form">
               <input type="hidden" name="action" value="rename">
@@ -289,6 +297,7 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
           </details>
         <?php endif; ?>
+        </div>
       </td>
     </tr>
     <?php endforeach; ?>
