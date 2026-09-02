@@ -1679,3 +1679,69 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .preview-exit { margin: 0 0 0 auto; }
 .preview-exit button { margin: 0; white-space: nowrap; }
 .role-badge-preview { background: #6f42c1; color: #fff; }
+
+/* ---- the project glance -----------------------------------------------------
+   Replaces the grey sentence that used to run above Overall progress. The dates
+   were the thing people came to this screen for and they read like punctuation
+   in the middle of it, so here they are the largest thing on the row. */
+.glance {
+  display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start;
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  padding: 18px 20px; margin: 16px 0;
+}
+.glance-dates { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.date-capsule {
+  border: 1px solid #d7dde3; border-radius: 10px; padding: 10px 18px;
+  background: #f7f9fb; min-width: 148px;
+}
+.cap-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6b7885;
+}
+/* tabular-nums so two capsules side by side have their dates the same width and
+   the eye can compare them rather than re-reading each one. */
+.cap-date { font-size: 22px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.cap-note { font-size: 12px; color: #5a6a7a; margin-top: 2px; }
+
+/* Delivery is the date that matters, so it carries the weight - and turns red
+   only when the schedule genuinely runs past it. */
+.cap-delivery { border-color: #b9c6d1; background: #eef3f7; }
+.cap-late { border-color: #e6a6ac; background: #fdeff0; }
+.cap-late .cap-date { color: #b02a37; }
+
+.cap-span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5a6a7a; }
+.cap-arrow { font-size: 20px; color: #9aa7b3; }
+
+/* Spans the whole card, beneath both groups - it is a sentence about the show,
+   not a caption on the date. flex-basis 100% on a DIRECT child of .glance;
+   inside .glance-dates that width was inherited by the dates block, which then
+   claimed the row and pushed the counts below it. */
+.cap-overrun {
+  flex: 1 1 100%;
+  border-left: 3px solid #b02a37; padding-left: 12px; color: #b02a37; font-size: 13px;
+  margin-top: 4px;
+}
+
+/* The counts. A list, because they are a list: a total with its breakdown
+   indented under it, so the types can be checked against the total by eye. */
+/* Divided from the dates by a rule rather than by distance: two groups of
+   facts about one show, not two panels. */
+.glance-counts {
+  list-style: none; margin: 0; padding: 0 0 0 28px; min-width: 230px;
+  border-left: 1px solid #e9edf1;
+}
+.glance-counts li {
+  display: flex; align-items: baseline; gap: 10px; padding: 2px 0; font-size: 14px;
+}
+.gc-n {
+  min-width: 42px; text-align: right; font-weight: 600; font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.gc-l { color: #2c3844; }
+.gc-sub { color: #6b7885; font-size: 12px; }
+/* Indented and quieter: a part of the total above, not another total. */
+.gc-child { padding-left: 18px; }
+.gc-child .gc-n { font-size: 14px; font-weight: 500; color: #5a6a7a; }
+.gc-child .gc-l { color: #5a6a7a; font-size: 13px; }
+.gc-meta { margin-top: 6px; color: #8b97a3; font-size: 12px; }
+.gc-meta .gc-l { color: #8b97a3; }

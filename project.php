@@ -6,6 +6,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/statuses.php';
+require_once __DIR__ . '/includes/quota.php';   // project_estimates(), for the footage fallback
 require __DIR__ . '/includes/names.php';
 require_once __DIR__ . '/includes/dashboard.php';
 require_login();
@@ -84,6 +85,46 @@ if ($row = $stmt->fetch(PDO::FETCH_NUM)) {
     $scheduleEnd = $row[1];
 }
 
+// ---- the glance panel -------------------------------------------------------
+//
+// David, 2026-09-02: "a summary of total assets (by type) and shots in a list...
+// bigger capsules with the start and end date. This view should give you a clean
+// and quick glance at the project."
+
+// FOOTAGE, read exactly the way step_quota() reads it when pricing a per-second
+// step — the shots' own seconds, falling back to the early estimate. Two readers
+// of one number, so the glance and the money can never disagree about how long
+// the show is.
+$stmt = $pdo->prepare('SELECT COALESCE(SUM(placeholder_seconds), 0) FROM shots WHERE project_id = ?');
+$stmt->execute([$projectId]);
+$footage = (float)$stmt->fetchColumn();
+$footageEstimated = false;
+if ($footage <= 0) {
+    $est = project_estimates($pdo, $projectId);
+    $footage = (float)($est['seconds'] ?? 0);
+    $footageEstimated = $footage > 0;
+}
+
+// The window the show has, in working days — the studio calendar, not raw days.
+$spanDays = ($project['start_date'] && $project['delivery_date'])
+    ? working_days_between($project['start_date'], $project['delivery_date']) : 0;
+
+// ⚠ THE ONE COMPARISON NOTHING ON THIS PAGE WAS MAKING. The delivery date sat in
+// one sentence and "finishing <date>" sat in another three lines below, and
+// nobody was subtracting them. FC Mobile delivered 16 Oct with a schedule
+// finishing 5 Nov, and the screen reported both without a word about the gap.
+//
+// working_days_between() counts both ends, so the delivery day itself is in the
+// count and comes back off: what is wanted is days PAST it, not days including.
+$overrunDays = 0;
+if ($scheduleEnd && $project['delivery_date'] && $scheduleEnd > $project['delivery_date']) {
+    $overrunDays = max(0, working_days_between($project['delivery_date'], $scheduleEnd) - 1);
+}
+
+// Biggest group first: on a show with eleven asset types, the order that helps is
+// the order of how much there is.
+arsort($assetTypeCounts);
+
 // The same headline the dashboard leads with. Computed here rather than passed
 // around, so the two screens can never show different numbers for the same day.
 $overall = dashboard_overall(
@@ -103,12 +144,106 @@ require __DIR__ . '/includes/header.php';
   <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
 </h2>
 
-<p class="summary-line">
-  <?= e($project['type']) ?> ·
-  <strong><?= $shotCount ?></strong> shots ·
-  <strong><?= $assetCount ?></strong> assets ·
-  <?= e($project['start_date'] ?: '—') ?> → <?= e($project['delivery_date'] ?: '—') ?>
-</p>
+<?php
+// The glance. This replaced a single grey sentence carrying the same four facts
+// at the same weight — "2D · 45 shots · 26 assets · 2026-08-31 → 2026-10-16" —
+// where the dates were the thing people came for and read like punctuation.
+//
+// Written as ONE readable date with the ISO in a title, because this is the only
+// place in the app that shouts a date rather than listing one. Everywhere else
+// stays ISO, where columns of dates have to line up and be compared.
+$fmtDay = function (?string $d): string {
+    return $d ? date('j M Y', strtotime($d)) : '—';
+};
+$today = date('Y-m-d');
+// Calendar days, not working days, for "3 days ago" — that phrase means what a
+// person means by it, and nobody counts a weekend out of it in their head.
+$daysTo = function (?string $d) use ($today): ?int {
+    if (!$d) return null;
+    return (int)round((strtotime($d) - strtotime($today)) / 86400);
+};
+$startIn = $daysTo($project['start_date']);
+?>
+<div class="glance">
+
+  <div class="glance-dates">
+    <div class="date-capsule">
+      <div class="cap-label">Starts</div>
+      <div class="cap-date" title="<?= e($project['start_date'] ?: '') ?>"><?= e($fmtDay($project['start_date'])) ?></div>
+      <div class="cap-note">
+        <?php if ($startIn === null): ?><span class="muted">no start date</span>
+        <?php elseif ($startIn > 0): ?>in <?= $startIn ?> day<?= $startIn === 1 ? '' : 's' ?>
+        <?php elseif ($startIn === 0): ?>today
+        <?php else: ?><?= abs($startIn) ?> day<?= abs($startIn) === 1 ? '' : 's' ?> ago<?php endif; ?>
+      </div>
+    </div>
+
+    <div class="cap-span">
+      <span class="cap-arrow" aria-hidden="true">→</span>
+      <?php if ($spanDays > 0): ?>
+        <span><strong><?= $spanDays ?></strong> working days</span>
+      <?php endif; ?>
+    </div>
+
+    <div class="date-capsule cap-delivery<?= $overrunDays > 0 ? ' cap-late' : '' ?>">
+      <div class="cap-label">Delivery</div>
+      <div class="cap-date" title="<?= e($project['delivery_date'] ?: '') ?>"><?= e($fmtDay($project['delivery_date'])) ?></div>
+      <div class="cap-note">
+        <?php // The comparison, made where the date is rather than left for a
+              // reader to do between two paragraphs three lines apart. Shown in
+              // BOTH states: when the schedule fits, when it lands is still the
+              // thing you want to know, and only the colour should change. ?>
+        <?php if ($scheduleEnd): ?>
+          <span class="<?= $overrunDays > 0 ? 'warn-text' : '' ?>">schedule ends
+            <?= e($fmtDay($scheduleEnd)) ?></span>
+        <?php else: ?>
+          <span class="muted">nothing scheduled</span>
+        <?php endif; ?>
+      </div>
+    </div>
+
+  </div>
+
+  <?php // The counts, as a list rather than a run-on sentence. Assets indent
+        // under their total because the types SUM to it — a reader should be
+        // able to check that by eye. ?>
+  <ul class="glance-counts">
+    <li>
+      <span class="gc-n"><?= $shotCount ?></span>
+      <span class="gc-l">Shot<?= $shotCount === 1 ? '' : 's' ?></span>
+      <?php if ($footage > 0): ?>
+        <span class="gc-sub"><?= e(fmt_num($footage, 1)) ?>s of footage<?php
+          if ($footage >= 60): ?> · <?= e(fmt_num($footage / 60, 1)) ?> min<?php endif;
+          if ($footageEstimated): ?> <span class="est-tag">est.</span><?php endif; ?></span>
+      <?php endif; ?>
+    </li>
+    <li>
+      <span class="gc-n"><?= $assetCount ?></span>
+      <span class="gc-l">Asset<?= $assetCount === 1 ? '' : 's' ?></span>
+    </li>
+    <?php foreach ($assetTypeCounts as $type => $n): ?>
+      <li class="gc-child">
+        <span class="gc-n"><?= (int)$n ?></span>
+        <span class="gc-l"><?= e($type !== '' ? $type : 'No type set') ?></span>
+      </li>
+    <?php endforeach; ?>
+    <li class="gc-meta">
+      <span class="gc-l"><?= e($project['type']) ?> · <?= (int)$project['fps'] ?> fps</span>
+    </li>
+  </ul>
+
+  <?php // A DIRECT CHILD OF .glance, not of the dates block. It is full-width, and
+        // inside .glance-dates that width was inherited by the dates block itself
+        // — which then claimed the whole row and pushed the counts underneath it,
+        // leaving the right half of the card empty. ?>
+  <?php if ($overrunDays > 0): ?>
+    <div class="cap-overrun">
+      <strong><?= $overrunDays ?></strong> working day<?= $overrunDays === 1 ? '' : 's' ?> past delivery.
+      <span class="muted">The plan does not fit the date — more people, more time, or less work.</span>
+      <a href="schedule.php?project=<?= $projectId ?>">See the schedule →</a>
+    </div>
+  <?php endif; ?>
+</div>
 
 <?php // Compact: the shape of where the show is. The rates and deltas behind it
        // live on the dashboard, which is one click away and lit in the tab bar. ?>
@@ -139,8 +274,10 @@ require __DIR__ . '/includes/header.php';
       // where a number belongs rather than inside a navigation control. ?>
 <p class="muted small">
   <?php if ($scheduled): ?>
-    <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled<?php
-      if ($scheduleEnd): ?>, finishing <?= e($scheduleEnd) ?><?php endif; ?>.
+    <?php // The finish date used to be here too. It belongs beside the delivery
+          // date it has to be compared against, so the capsule above owns it now
+          // and this line just counts the work. ?>
+    <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled.
   <?php else: ?>
     Nothing scheduled yet — the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
     screen works the pipeline forwards into real dates.
