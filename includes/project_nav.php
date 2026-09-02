@@ -33,6 +33,10 @@ function project_nav_items(int $projectId): array {
         ['key' => 'hiring',     'label' => 'Hiring',              'href' => 'hiring.php' . $p,             'group' => 'work'],
         ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],
         ['key' => 'timeline',   'label' => 'Timeline',            'href' => 'timeline.php' . $p,           'group' => 'work'],
+        // Directly before Production tracking, because it is the same list one
+        // step earlier: Shots says what is IN each shot, Production tracking says
+        // how far each one has got.
+        ['key' => 'shots',      'label' => 'Shots',               'href' => 'shots.php' . $p,              'group' => 'work'],
         ['key' => 'production', 'label' => 'Production tracking', 'href' => 'production.php' . $p,         'group' => 'work'],
         ['key' => 'tasks',      'label' => 'Tasks',               'href' => 'tasks.php' . $p,              'group' => 'work'],
         ['key' => 'team',       'label' => 'Team performance',    'href' => 'team.php' . $p,               'group' => 'work'],

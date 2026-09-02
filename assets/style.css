@@ -1749,3 +1749,49 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .gc-child .gc-l { color: #5a6a7a; font-size: 13px; }
 .gc-meta { margin-top: 6px; color: #8b97a3; font-size: 12px; }
 .gc-meta .gc-l { color: #8b97a3; }
+
+/* ---- the shot breakdown grid ------------------------------------------------
+   Rows of shots, a column per asset type, chips inside the cells. Dense on
+   purpose: the value is seeing forty shots at once, not one comfortably. */
+.breakdown-table td, .breakdown-table th { padding: 5px 8px; vertical-align: top; }
+.breakdown-table .bd-ep     { width: 70px; }
+.breakdown-table .bd-shot   { width: 96px; }
+.breakdown-table .bd-frames { width: 92px; }
+.breakdown-table .bd-notes  { width: 190px; }
+/* The frame box sizes to its content rather than being stretched to the column
+   by the global `input { width: 100% }`. */
+.breakdown-table .bd-frame-input {
+  width: 4.5em; padding: 3px 6px; font-size: 13px; text-align: right;
+}
+.bd-secs { line-height: 1.3; min-height: 14px; }
+
+/* A cell is a wrapping row of chips with the picker at the end of them. */
+.bd-cell { min-width: 180px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #eef3f7; border: 1px solid #d7dde3; border-radius: 12px;
+  padding: 1px 4px 1px 9px; margin: 0 4px 4px 0; font-size: 12px; white-space: nowrap;
+}
+.chip-x {
+  background: none; border: 0; color: #7c8896; cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 3px; margin: 0; width: auto;
+}
+.chip-x:hover { color: #b02a37; background: none; }
+/* The picker reads as the "+" it shows until it is opened — a full-width select
+   in every cell would swamp the chips it sits beside. */
+/* ⚠ A FIXED WIDTH, not `auto`. A <select> sizes itself to its WIDEST OPTION, so
+   `width: auto` made every picker as wide as the longest asset name — a 90px
+   control that pushed itself onto its own line under the chips it belongs
+   beside. Pinned narrow it reads as the "+" it shows; the list still opens at
+   full width, because a dropdown is not clipped by its control. */
+.bd-add {
+  width: 46px; padding: 2px 3px; font-size: 12px; margin-bottom: 4px;
+  border-radius: 12px; color: #5a6a7a; vertical-align: top;
+}
+/* Horizontal scroll on the table alone. A project with six asset types is wider
+   than a laptop, and the page itself must never scroll sideways.
+   ⚠ ITS OWN CLASS, not the tracking grid's .grid-scroll — that one carries
+   `max-height: 78vh` to keep a 200-row status grid in a box, and a breakdown
+   wants to scroll with the page so it can be read and printed straight through.
+   Reusing the name would have inherited the cap silently. */
+.bd-scroll { overflow-x: auto; }
