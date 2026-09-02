@@ -205,7 +205,7 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php endif; ?>
 
-<table class="review-table">
+<table class="review-table users-table">
   <thead>
     <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><th>Email for notifications</th><?php endif; ?><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
   </thead>
@@ -237,11 +237,11 @@ require __DIR__ . '/includes/header.php';
         <?php if (empty($u['crew_id'])): ?>
           <span class="muted small">— link a person first —</span>
         <?php else: ?>
-          <form method="post" class="inline-form" style="margin:0;">
+          <form method="post" class="inline-form email-form">
             <input type="hidden" name="action" value="set_crew_email">
             <input type="hidden" name="user_id" value="<?= $id ?>">
             <input type="email" name="crew_email" value="<?= e($u['crew_email'] ?? '') ?>"
-                   placeholder="none — no notifications" style="min-width:190px;">
+                   placeholder="none, so no notifications">
             <button type="submit" class="secondary">Save</button>
           </form>
           <?php if (empty($u['crew_email'])): ?>
@@ -275,23 +275,28 @@ require __DIR__ . '/includes/header.php';
       </td>
       <td class="muted small"><?= e($u['last_login'] ? substr($u['last_login'], 0, 16) : 'never') ?></td>
       <td class="row-actions">
-        <details class="inline-actions">
-          <summary>Set password</summary>
-          <form method="post" class="inline-form">
-            <input type="hidden" name="action" value="password">
-            <input type="hidden" name="user_id" value="<?= $id ?>">
-            <input type="password" name="new_password" placeholder="At least 8 characters" required minlength="8">
-            <button type="submit" class="secondary">Change</button>
-          </form>
-        </details>
-        <?php if (!$isSelf): ?>
-          <form method="post" class="inline-form"
-                onsubmit="return confirm('Delete <?= e(addslashes($u['username'])) ?> permanently? Switching the account off is usually better.');">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="user_id" value="<?= $id ?>">
-            <button type="submit" class="danger">Delete</button>
-          </form>
-        <?php endif; ?>
+        <?php // The same flex row the project list uses, and the same
+              // <summary>-as-a-button: two controls on one line, and the panel
+              // drops below only when it is opened. ?>
+        <div class="cell-btns">
+          <details class="inline-actions pw-edit">
+            <summary class="row-btn">Set password</summary>
+            <form method="post" class="inline-form">
+              <input type="hidden" name="action" value="password">
+              <input type="hidden" name="user_id" value="<?= $id ?>">
+              <input type="password" name="new_password" placeholder="At least 8 characters" required minlength="8">
+              <button type="submit" class="secondary">Change</button>
+            </form>
+          </details>
+          <?php if (!$isSelf): ?>
+            <form method="post" class="inline-form"
+                  onsubmit="return confirm('Delete <?= e(addslashes($u['username'])) ?> permanently? Switching the account off is usually better.');">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="user_id" value="<?= $id ?>">
+              <button type="submit" class="danger">Delete</button>
+            </form>
+          <?php endif; ?>
+        </div>
       </td>
     </tr>
   <?php endforeach; ?>

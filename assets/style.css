@@ -1388,7 +1388,20 @@ body.lightbox-lock { overflow: hidden; }
    <summary> (the Edit disclosure) and this stylesheet's button rules are
    `a.button` and `button.secondary`, both element-qualified — neither reaches
    it. Same reason .slot-btn exists a few hundred lines down. */
-.proj-actions { display: flex; flex-wrap: wrap; gap: 8px; white-space: normal; }
+/* A ROW OF SMALL BUTTONS INSIDE A TABLE CELL. Used by the project list and by
+   Users, and meant for the next screen that needs it: David, 2026-09-02,
+   "generally speaking let's try to always use buttons instead of hyperlinks and
+   keep in line and aligned all the elements".
+   align-items:flex-start so a <details> that opens grows downward instead of
+   dragging the buttons beside it to the middle of a taller row. */
+.cell-btns {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: flex-start; white-space: normal;
+}
+/* A real <button> here has no border where .row-btn has one, so the two come
+   out 2px different in height and sit half a pixel off each other. Given a
+   transparent one they match exactly. */
+.cell-btns button { border: 1px solid transparent; margin-top: 0; }
 .row-btn {
   display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px;
   background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
@@ -1445,11 +1458,46 @@ body.lightbox-lock { overflow: hidden; }
    flex-basis:100% cannot share a line, so the <details> wraps below - and only
    it moves. Open and Finance are earlier flex items and stay exactly where they
    were, so nothing slides under the cursor that just clicked. */
-.project-edit[open] { flex-basis: 100%; }
+.project-edit[open], .pw-edit[open] { flex-basis: 100%; }
+.pw-edit { margin-top: 0; white-space: normal; }
 /* Held down while the panel is open, so it reads as the thing that opened it. */
 .project-edit[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
 .project-edit .inline-form { margin: 0 0 8px; gap: 8px; }
 .project-edit .danger-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
+
+/* --- the Users table ------------------------------------------------------
+   Scoped to .users-table, NOT to .review-table: thirty other screens share that
+   class, including the crew slot rows whose buttons are deliberately full size.
+
+   ⚠ THE EMAIL FIELD IS THE POINT OF THE width:auto. .inline-form is a flex row,
+   but the global `input, select { width: 100% }` gave the field a 100% basis,
+   which filled the row and wrapped Save onto a second line under it. That is
+   what David photographed. flex lets it take the room that is going spare
+   instead of all of it. */
+.users-table td { vertical-align: middle; }
+/* ⚠ display:flex IS THE LOAD-BEARING DECLARATION and it is easy to think it is
+   already there. .inline-form sets it, but `.review-table form { display:
+   inline }` is (0,1,1) against its (0,1,0) and wins, so inside this table an
+   .inline-form is NOT a flex row: the field and its button were two inline
+   boxes that wrapped when the column ran out. Restating it here at (0,2,0) is
+   what puts Save back on the line. */
+.users-table .email-form,
+.users-table .pw-edit .inline-form { display: flex; align-items: center; }
+.users-table .email-form { margin: 0; gap: 8px; }
+/* A basis small enough that the field and the button fit the column together,
+   then grow into whatever room is left. Not nowrap: on a narrow window they
+   should fold rather than push out of the cell. */
+.users-table .email-form input[type=email] {
+  width: auto; flex: 1 1 120px; min-width: 90px;
+}
+/* One size of control across the whole table, so a row reads as one line rather
+   than as three heights stacked. Buttons only: the selects stay full width
+   because their job is to show a name that can be long. */
+.users-table td button {
+  margin-top: 0; padding: 4px 10px; font-size: 13px; white-space: nowrap;
+}
+.users-table .pw-edit .inline-form { margin: 6px 0 0; gap: 8px; }
+.users-table .pw-edit input[type=password] { width: auto; flex: 0 1 200px; }
 
 /* The notes column on the asset breakdown. Given the room it needs: a note is
    the widest thing on the row and the only free text, so it takes the slack

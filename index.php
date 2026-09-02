@@ -262,7 +262,7 @@ require __DIR__ . '/includes/header.php';
         <?php // A FLEX ROW, not three inline links with a space between them.
               // Buttons touching each other read as one segmented control, and
               // the gap is what says they are three separate decisions. ?>
-        <div class="proj-actions">
+        <div class="cell-btns">
         <?php
         // THE PROGRESS CAPSULE. Every shot and asset through every step, as one
         // figure - the same headline the project's Overview leads with, out of
