@@ -199,7 +199,7 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
   <a class="button secondary" href="mytasks.php">My tasks</a>
   <?php if (is_admin()): ?>
-    <a class="button secondary" href="finance.php">Finance across all projects</a>
+    <a class="button secondary" href="finance.php">Studio finances</a>
   <?php endif; ?>
 </div>
 

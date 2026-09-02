@@ -35,12 +35,12 @@ if ($configured) {
     }
 }
 
-$pageTitle = 'Finance';
+$pageTitle = 'Studio finances';
 require __DIR__ . '/includes/header.php';
 ?>
 
 <p class="crumb"><a href="index.php">← Projects</a></p>
-<h2 class="wizard-title">Finance across all projects <span class="admin-only-tag">administrators only</span></h2>
+<h2 class="wizard-title">Studio finances <span class="admin-only-tag">administrators only</span></h2>
 
 <?php // A REPORT, not a home (David, 2026-08-17). This screen used to be a
       // top-bar destination, which made it a second list of the same projects
@@ -56,9 +56,10 @@ require __DIR__ . '/includes/header.php';
       // it. ?>
 
 <p class="lead">
-  Budgets, what the plan will cost, and what has been billed. Rates and invoices live in a
-  <strong>separate database</strong> whose credential ordinary screens do not hold, so a bug in
-  any normal query cannot reach them. Editors and view-only accounts cannot open this page at all.
+  Every show the studio has taken on, with the dates it runs between, what it was sold for,
+  what the current plan will cost to deliver, and what has actually been billed against it.
+  <strong>The comparison across shows is what this page is for.</strong> One project on its own
+  reads better from inside it, by opening the project and switching to Finance management.
 </p>
 
 <?php if (function_exists('invoices_need_upgrade') && invoices_need_upgrade()): ?>
@@ -85,8 +86,11 @@ require __DIR__ . '/includes/header.php';
 
 <table>
   <thead>
-    <tr><th>Project</th><th>Status</th><th class="num">Budget</th><th class="num">Projected cost</th>
-        <th class="num">Margin</th><th class="num">Invoiced</th><th class="num">Paid</th><th></th></tr>
+    <tr><th>Project</th><th>Status</th><th>Starts</th><th>Delivery</th>
+        <th class="num">Budget</th>
+        <th class="num" title="Worked out afresh every time this page loads, from the current pipeline: person-days per step, the lanes staffed on it, and each person's rate. Never stored, so it cannot go stale when somebody changes a headcount.">Projected cost</th>
+        <th class="num" title="Budget minus projected cost. Means nothing until both exist.">Margin</th>
+        <th class="num">Invoiced</th><th class="num">Paid</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($projects as $p): $pid = (int)$p['id'];
@@ -118,6 +122,11 @@ require __DIR__ . '/includes/header.php';
       <td><a href="finance_project.php?project=<?= $pid ?>"><?= e($p['name']) ?></a>
           <small class="muted"><?= e($p['code']) ?></small></td>
       <td><span class="status status-<?= e($p['status']) ?>"><?= e(str_replace('_', ' ', $p['status'])) ?></span></td>
+      <?php // The span the money is being spent across. A cost with no dates
+            // beside it cannot be judged: the same figure is comfortable over a
+            // year and impossible over a month. ?>
+      <td class="muted small"><?= $p['start_date'] ? e($p['start_date']) : '<span class="muted">&mdash;</span>' ?></td>
+      <td class="muted small"><?= $p['delivery_date'] ? e($p['delivery_date']) : '<span class="muted">&mdash;</span>' ?></td>
       <td class="num"><?= $budget === null ? '<span class="muted">—</span>' : e(fmt_money_plain($budget, $cur)) ?></td>
       <td class="num">
         <?php if ($projError !== null): ?>
@@ -125,7 +134,7 @@ require __DIR__ . '/includes/header.php';
         <?php else: ?>
           <?= $cost > 0 ? e(fmt_money_plain($cost, $proj['currency'])) : '<span class="muted">—</span>' ?>
           <?php if ($proj['unpriced_days'] > 0): ?>
-            <small class="warn-text"><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</small>
+            <small class="warn-text" title="The part of the plan held by people with no rate on file, usually unfilled slots. Counted and reported rather than treated as free: a total that looks low because half of it is missing is worse than no total at all."><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</small>
           <?php endif; ?>
         <?php endif; ?>
       </td>
@@ -134,21 +143,13 @@ require __DIR__ . '/includes/header.php';
       </td>
       <td class="num"><?= $inv ? e(fmt_money_plain((float)$inv['billed'], $cur)) : '<span class="muted">—</span>' ?></td>
       <td class="num muted"><?= $inv ? e(fmt_money_plain((float)$inv['paid'], $cur)) : '—' ?></td>
-      <td class="row-actions"><a href="finance_project.php?project=<?= $pid ?>">Open →</a></td>
+      <td class="row-actions">
+        <div class="cell-btns"><a class="row-btn row-btn-go" href="finance_project.php?project=<?= $pid ?>">Open</a></div>
+      </td>
     </tr>
   <?php endforeach; ?>
   </tbody>
 </table>
-
-<p class="muted small">
-  <strong>Projected cost is computed every time this page loads</strong>, from the current
-  pipeline: person-days per step, the lanes staffed on it, and each person's rate. It is never
-  stored, so it cannot go stale when somebody changes a headcount.
-  <strong>"Days unpriced"</strong> is the part of the plan held by people with no rate on file,
-  usually unfilled slots. Those days are counted and reported rather than treated as free, since
-  a total that looks low because half of it is missing is worse than no total at all.
-  <strong>Margin</strong> is budget minus projected cost, and means nothing until both exist.
-</p>
 
 <?php endif; ?>
 
