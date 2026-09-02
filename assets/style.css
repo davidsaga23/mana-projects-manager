@@ -1786,14 +1786,19 @@ button.secondary.danger:hover { background: #e9c2c7; }
    Three shapes, three column sets; the percentages are what the content wants
    at a normal window, and fixed layout wraps rather than truncates when it is
    narrower. */
-.h-cap th:nth-child(1) { width: 19%; } .h-cap th:nth-child(2) { width: 16%; }
-.h-cap th:nth-child(3) { width: 11%; } .h-cap th:nth-child(4) { width: 10%; }
-.h-cap th:nth-child(5) { width:  9%; } .h-cap th:nth-child(6) { width:  8%; }
-.h-cap th:nth-child(7) { width:  9%; } .h-cap th:nth-child(8) { width: 18%; }
-
-.h-step th:nth-child(1) { width: 16%; } .h-step th:nth-child(2) { width: 13%; }
-.h-step th:nth-child(3) { width: 15%; } .h-step th:nth-child(4) { width: 26%; }
-.h-step th:nth-child(5) { width: 12%; } .h-step th:nth-child(6) { width: 18%; }
+/* ONE column set now, not two. The two views draw the same nine columns from
+   one renderer (David, 2026-09-02), so .h-cap and .h-step are gone: two width
+   lists for tables that are meant to match is the same trap the two <thead>s
+   were, one level down. */
+.history-table th:nth-child(1) { width: 17%; }
+.history-table th:nth-child(2) { width: 15%; }
+.history-table th:nth-child(3) { width: 10%; }
+.history-table th:nth-child(4) { width: 10%; }
+.history-table th:nth-child(5) { width: 11%; }
+.history-table th:nth-child(6) { width:  8%; }
+.history-table th:nth-child(7) { width:  7%; }
+.history-table th:nth-child(8) { width:  7%; }
+.history-table th:nth-child(9) { width: 15%; }
 
 .h-fee th:nth-child(1) { width: 17%; } .h-fee th:nth-child(2) { width: 30%; }
 .h-fee th:nth-child(3) { width: 16%; } .h-fee th:nth-child(4) { width: 21%; }

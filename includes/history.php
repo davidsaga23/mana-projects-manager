@@ -93,6 +93,58 @@ function quota_history(PDO $pdo, string $q = '', int $proj = 0): array {
 }
 
 /**
+ * THE TWO QUOTAS, recovered from a frozen baseline row.
+ *
+ * David, 2026-09-02, asked for both on this screen. They come from opposite
+ * directions and the gap between them is the whole finding:
+ *
+ *   IDEAL    deliveries per person per day at the days-per-item this plan was
+ *            priced at. days_per_unit in a baseline is what capture_baseline()
+ *            calls effective_days_per_unit(), which is the studio ideal where
+ *            one exists and the project's own estimate where it does not, so
+ *            this IS the rate the expense projection costs the work with.
+ *   MINIMUM  what the dates demanded of one person per day: the work in the
+ *            step spread over its working days, divided by the people planned.
+ *
+ * A minimum above the ideal means the plan asked for a pace the studio does not
+ * believe in. The same pair is drawn live on Finance management, out of
+ * step_quota(); this is the frozen version of it.
+ *
+ * ⚠ COUNTED FROM THE STEP'S START, NOT FROM THE CAPTURE DATE. step_quota()
+ * counts from today because it is asking "can we still make it"; a record is
+ * asking "what did this plan demand of the span it drew", and an answer that
+ * moved with the day somebody pressed the button is exactly the volatility a
+ * baseline exists to remove. Same reasoning as the planning window on Dates &
+ * headcount, which stopped counting from today for this reason on 2026-09-01.
+ *
+ * Retakes are deliberately NOT applied, matching step_quota(): they scale
+ * days-per-item, not the amount of work.
+ *
+ * Any of these can be null, and null means "cannot be known from what was
+ * recorded", never zero.
+ */
+function baseline_quota(array $row): array {
+    $out = ['ideal' => null, 'minimum' => null, 'team_per_day' => null, 'working_days' => null];
+
+    $days = (float)($row['days_per_unit'] ?? 0);
+    if ($days > 0) $out['ideal'] = 1 / $days;
+
+    $units = (float)($row['work_units'] ?? 0);
+    $start = $row['start_date'] ?? null;
+    $end   = $row['deadline'] ?? null;
+    if ($units <= 0 || !$start || !$end || $end < $start) return $out;
+
+    $wd = working_days_between((string)$start, (string)$end);
+    if ($wd <= 0) return $out;
+    $out['working_days'] = $wd;
+    $out['team_per_day'] = $units / $wd;
+
+    $head = $row['planned_headcount'] !== null ? (float)$row['planned_headcount'] : null;
+    if ($head !== null && $head > 0) $out['minimum'] = $out['team_per_day'] / $head;
+    return $out;
+}
+
+/**
  * How many days per item a step has been baselined at across every project.
  *
  * The answer to "what do we normally allow for this?", which is the question a
@@ -105,16 +157,11 @@ function quota_history_by_step(array $batches): array {
     foreach ($batches as $b) {
         foreach ($b['rows'] as $r) {
             $label = $r['step_name'] . ' (' . step_scope_tag($r) . ')';
-            $out[$label][] = [
+            $out[$label][] = $r + [
                 'project_code' => $b['project_code'],
                 'project_id'   => $b['project_id'],
+                'project_name' => $b['project_name'],
                 'captured_at'  => $b['captured_at'],
-                'days'         => (float)$r['days_per_unit'],
-                'units'        => (float)$r['work_units'],
-                'label'        => (string)$r['work_label'],
-                'headcount'    => $r['planned_headcount'] !== null ? (float)$r['planned_headcount'] : null,
-                'retake_pct'   => (float)$r['retake_pct'],
-                'estimated'    => (int)$r['units_estimated'] === 1,
             ];
         }
     }

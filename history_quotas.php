@@ -78,16 +78,77 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
 </form>
 
-<?php // What a baseline IS, said once. Somebody arriving here from the menu has
-      // no reason to know the difference between this and the live plan, and a
-      // record that gets read as the current plan is worse than no record. ?>
-<p class="muted small">
-  Each block is one <strong>capture</strong>, every step of a project as it stood the moment
-  somebody recorded a baseline on <em>Dates &amp; headcount</em>. Captures are never overwritten,
-  so a project that was re-baselined appears more than once and the older rows are what it
-  originally committed to. Days per item is what the plan actually ran on: the studio ideal
-  where one existed, the project's own estimate where it did not.
-</p>
+<?php
+// ⚠ ONE HEADER AND ONE ROW, DRAWN BY BOTH VIEWS (David, 2026-09-02:
+// "let's homogenize the columns when checking by project and by step, across
+// shows"). The two views differ in ONE cell, which thing is being named, and
+// are identical after it.
+//
+// Written as functions rather than as two tables that happen to match, because
+// two tables that happen to match stop matching the first time a column is
+// added to one of them. That is exactly how they came to be different in the
+// first place: one grew "Coverage" and "Dates" and the other did not.
+//
+// Both read the RAW baseline row, which is why quota_history_by_step() now
+// carries the whole row instead of a renamed subset of it.
+
+/** The column headings. $first names whatever the identity column holds. */
+function quota_head(string $first): void { ?>
+  <thead><tr>
+    <th><?= e($first) ?></th>
+    <th class="num">Asset/shot count</th>
+    <th class="num">Days per item</th>
+    <?php // THE TWO QUOTAS, from opposite directions. Explained on the heading
+          // rather than in a paragraph above the table, because the paragraph
+          // is the thing David asked to take away. ?>
+    <th class="num" title="Deliveries per person per day at the days per item this plan was priced at. This is the rate the expense projection costs the work with.">Ideal / day</th>
+    <th class="num" title="What the dates demanded of one person per day: the work in this step spread over the working days between its start and its deadline, divided by the people planned on it. A minimum above the ideal means the plan asked for a pace the studio does not believe in.">Minimum / day</th>
+    <th class="num">Coverage</th>
+    <th class="num">People</th>
+    <th class="num">Retakes</th>
+    <th>Dates</th>
+  </tr></thead>
+<?php }
+
+/**
+ * One baseline row. $identity is the finished HTML of the first cell, the only
+ * thing the two views disagree about.
+ */
+function quota_row(array $r, string $identity): void {
+    $q = baseline_quota($r);
+    $d = (float)$r['days_per_unit'];
+    // Over the ideal is the finding, so it is the one thing on the row that
+    // carries a colour. Under it is not praise, and is left plain.
+    $over = ($q['minimum'] !== null && $q['ideal'] !== null && $q['ideal'] > 0)
+          ? $q['minimum'] / $q['ideal'] : null;
+    ?>
+    <tr>
+      <td><?= $identity ?></td>
+      <td class="num"><?= e(fmt_num((float)$r['work_units'], 1)) ?>
+          <span class="muted small"><?= e($r['work_label']) ?></span>
+          <?php if ((int)$r['units_estimated'] === 1): ?><span class="est-tag">est.</span><?php endif; ?></td>
+      <td class="num"><strong><?= e(fmt_num($d, 3)) ?></strong></td>
+      <td class="num"><?= $q['ideal'] === null ? '<span class="muted">&mdash;</span>'
+            : e(fmt_num($q['ideal'], 2)) ?></td>
+      <td class="num<?= $over !== null && $over > 1.05 ? ' err' : '' ?>"
+          <?php if ($over !== null): ?>title="<?= e(fmt_num($over * 100, 0)) ?>% of the ideal pace"<?php endif; ?>>
+        <?php // Null is not zero. A step with no dates, no work or no headcount
+              // recorded cannot have a minimum, and a printed 0 would read as
+              // "nothing was asked of anybody". ?>
+        <?= $q['minimum'] === null ? '<span class="muted">&mdash;</span>'
+            : e(fmt_num($q['minimum'], 2)) ?>
+      </td>
+      <td class="num"><?= e(fmt_num((float)$r['coverage_pct'], 0)) ?>%</td>
+      <td class="num"><?= $r['planned_headcount'] === null
+            ? '<span class="muted">&mdash;</span>' : e(fmt_num((float)$r['planned_headcount'], 2)) ?></td>
+      <td class="num muted"><?= e(fmt_num((float)$r['retake_pct'], 1)) ?>%</td>
+      <td class="small muted">
+        <?= $r['start_date'] ? e($r['start_date']) : '&mdash;' ?> &rarr;
+        <?= $r['deadline'] ? e($r['deadline']) : '&mdash;' ?>
+      </td>
+    </tr>
+<?php }
+?>
 
 <?php if (!$batches): ?>
   <p class="muted">
@@ -105,7 +166,7 @@ require __DIR__ . '/includes/header.php';
         // Environment" — different jobs that happen to share a name. ?>
   <?php foreach ($byStep as $label => $rows): ?>
     <?php
-      $days = array_column($rows, 'days');
+      $days = array_map('floatval', array_column($rows, 'days_per_unit'));
       sort($days);
       $n = count($days);
       $mid = $n % 2 ? $days[intdiv($n, 2)] : ($days[$n / 2 - 1] + $days[$n / 2]) / 2;
@@ -119,25 +180,17 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
       </span>
     </h3>
-    <table class="grid-table history-table h-step">
-      <thead><tr>
-        <th>Project</th><th>Captured</th>
-        <th class="num">Days per item</th><th class="num">Work</th>
-        <th class="num">People</th><th class="num">Retakes</th>
-      </tr></thead>
+    <table class="grid-table history-table">
+      <?php quota_head('Project'); ?>
       <tbody>
         <?php foreach ($rows as $r): ?>
-          <tr>
-            <td><a href="wizard.php?project=<?= (int)$r['project_id'] ?>&amp;step=4"><?=
-                  e($r['project_code']) ?></a></td>
-            <td class="muted small"><?= e(substr((string)$r['captured_at'], 0, 10)) ?></td>
-            <td class="num"><strong><?= e(fmt_num($r['days'], 3)) ?></strong></td>
-            <td class="num"><?= e(fmt_num($r['units'], 1)) ?>
-                <span class="muted small"><?= e($r['label']) ?></span>
-                <?php if ($r['estimated']): ?><span class="est-tag">est.</span><?php endif; ?></td>
-            <td class="num"><?= $r['headcount'] === null ? '—' : e(fmt_num($r['headcount'], 2)) ?></td>
-            <td class="num muted"><?= e(fmt_num($r['retake_pct'], 1)) ?>%</td>
-          </tr>
+          <?php // The capture date sits UNDER the project code, where the other
+                // view puts the step's scope tag, so every column after the
+                // first lines up between the two. ?>
+          <?php quota_row($r, sprintf(
+                '<a href="wizard.php?project=%d&amp;step=4">%s</a><div class="muted small">%s</div>',
+                (int)$r['project_id'], e($r['project_code']),
+                e(substr((string)$r['captured_at'], 0, 10)))); ?>
         <?php endforeach; ?>
       </tbody>
     </table>
@@ -158,36 +211,12 @@ require __DIR__ . '/includes/header.php';
         · <?= count($b['rows']) ?> step<?= count($b['rows']) === 1 ? '' : 's' ?>
       </span>
     </h3>
-    <table class="grid-table history-table h-cap">
-      <thead><tr>
-        <th>Step</th><th class="num">Work</th>
-        <th class="num">Days per item</th><th class="num">= per day</th>
-        <th class="num">Coverage</th><th class="num">People</th>
-        <th class="num">Retakes</th><th>Dates</th>
-      </tr></thead>
+    <table class="grid-table history-table">
+      <?php quota_head('Step'); ?>
       <tbody>
         <?php foreach ($b['rows'] as $r): ?>
-          <?php $d = (float)$r['days_per_unit']; ?>
-          <tr>
-            <td><strong><?= e($r['step_name']) ?></strong>
-                <div class="muted small"><?= e(step_scope_tag($r)) ?></div></td>
-            <td class="num"><?= e(fmt_num((float)$r['work_units'], 1)) ?>
-                <span class="muted small"><?= e($r['work_label']) ?></span>
-                <?php if ((int)$r['units_estimated'] === 1): ?><span class="est-tag">est.</span><?php endif; ?></td>
-            <td class="num"><strong><?= e(fmt_num($d, 3)) ?></strong></td>
-            <?php // The same number the other way up. The field is days per item,
-                  // so 0.25 reads as "four days" to most people until something
-                  // says otherwise — the same reason the planning screen prints it. ?>
-            <td class="num muted"><?= $d > 0 ? e(fmt_num(1 / $d, 2)) . ' /day' : '—' ?></td>
-            <td class="num"><?= e(fmt_num((float)$r['coverage_pct'], 0)) ?>%</td>
-            <td class="num"><?= $r['planned_headcount'] === null
-                  ? '<span class="muted">—</span>' : e(fmt_num((float)$r['planned_headcount'], 2)) ?></td>
-            <td class="num muted"><?= e(fmt_num((float)$r['retake_pct'], 1)) ?>%</td>
-            <td class="small muted">
-              <?= $r['start_date'] ? e($r['start_date']) : '—' ?> →
-              <?= $r['deadline'] ? e($r['deadline']) : '—' ?>
-            </td>
-          </tr>
+          <?php quota_row($r, sprintf('<strong>%s</strong><div class="muted small">%s</div>',
+                e($r['step_name']), e(step_scope_tag($r)))); ?>
         <?php endforeach; ?>
       </tbody>
     </table>
