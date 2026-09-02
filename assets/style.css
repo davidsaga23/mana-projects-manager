@@ -254,9 +254,23 @@ label.inline input { width: auto; }
 .flash-err  { background: #fdf0f1; border-color: #b02a37; color: #8f222c; }
 
 /* ---------------------------------------------------------------- wizard */
-.crumb { margin: 0 0 6px; font-size: 13px; }
-.crumb a { color: #5a6a7a; }
-.crumb a:hover { color: #2f6fb2; }
+.crumb {
+  margin: 0 0 10px; font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+/* The look is borrowed from .row-btn rather than restated, a few hundred lines
+   down: one small secondary button in this app, not three that drift apart.
+   white-space goes back to normal because a crumb can name where it is going,
+   "Finance management, Test Project", and that should fold on a narrow window
+   rather than push the page sideways. */
+/* ⚠ p.crumb, not .crumb: the .row-btn block this borrows from sits a thousand
+   lines BELOW and carries white-space:nowrap at the same (0,1,1) weight, so an
+   equal rule up here loses on order. The element selector makes it (0,1,2) and
+   the position in the file stops mattering. */
+p.crumb a { white-space: normal; }
+/* One of two crumbs is the lesser one. It stays a button, but a quieter one. */
+.crumb a.muted { color: #5a6a7a; border-color: #d3dae1; }
+.crumb a.muted:hover { color: #2f6fb2; }
 .wizard-title { font-size: 20px; margin: 4px 0 14px; }
 .wizard-nav {
   list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
@@ -1402,13 +1416,13 @@ body.lightbox-lock { overflow: hidden; }
    out 2px different in height and sit half a pixel off each other. Given a
    transparent one they match exactly. */
 .cell-btns button { border: 1px solid transparent; margin-top: 0; }
-.row-btn {
+.row-btn, .crumb a {
   display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px;
   background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
   text-decoration: none; white-space: nowrap; cursor: pointer;
   user-select: none; list-style: none;
 }
-.row-btn:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
+.row-btn:hover, .crumb a:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
 /* Both spellings, because the disclosure triangle is a ::-webkit-details-marker
    in one engine and a ::marker in the other, and a stray arrowhead inside a
    button looks like a bug. */

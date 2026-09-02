@@ -201,7 +201,6 @@ require __DIR__ . '/includes/header.php';
 <p class="crumb">
   <?php if ($from === 'finance'): ?>
     <a href="<?= e($backUrl) ?>">← Back to the expense projection</a>
-    <span class="muted">·</span>
     <a href="team.php?project=<?= $projectId ?>" class="muted">the team</a>
   <?php else: ?>
     <a href="team.php?project=<?= $projectId ?>">← Back to the team</a>
