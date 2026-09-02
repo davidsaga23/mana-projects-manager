@@ -429,8 +429,6 @@ require __DIR__ . '/includes/header.php';
          href="export_artists.php<?= ($q !== '' || $pos)
               ? '?' . http_build_query(array_filter(['q' => $q, 'position' => $pos]))
               : '' ?>">Download as Excel ↓</a>
-      <span class="muted small">Same layout as the studio's freelancer sheet, the same columns,
-        the red title bar, Arial throughout.</span>
     </p>
   <?php endif; ?>
 
@@ -455,11 +453,6 @@ require __DIR__ . '/includes/header.php';
         Until then, add people from a project's Hiring screen.
       </div>
     <?php else: ?>
-      <p class="muted small">
-        Five at a time, the same shape as the hiring grid. Nobody added here belongs to a
-        project yet, they are simply known to the studio, and turn up in the candidate
-        lookup on every show from now on. Leave a row blank to skip it.
-      </p>
       <form method="post">
         <div class="grid-scroll">
           <table class="artist-table">
