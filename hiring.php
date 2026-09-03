@@ -254,15 +254,22 @@ if ($fromFinance) {
     require_once __DIR__ . '/includes/finance_nav.php';
     finance_nav($project, 'hiring');
 } else {
-    project_nav($project, 'hiring');
+    project_nav($project, 'crew');
 }
 ?>
 
-<h2 class="wizard-title">Hiring <span class="muted">· <?= e($project['name']) ?></span></h2>
+<h2 class="wizard-title"><?= $fromFinance ? 'Hiring' : 'Crew &amp; hiring' ?>
+  <span class="muted">· <?= e($project['name']) ?></span></h2>
+
+<?php // The switch belongs to the PRODUCTION side only. Arriving through
+      // Finance management, this screen is one of that bar's tabs and offering
+      // a jump to the Crew screen would land the reader on the other side of
+      // the app with no warning. Same reasoning as the nav choice above. ?>
+<?php if (!$fromFinance) crew_view_switch($projectId, 'stage'); ?>
 
 <p class="lead">
-  The plan knows a slot needs somebody, and the crew list knows when one is filled. This is the
-  months in between, who was approached, what they asked for, and whether they said yes.
+  The months between the plan knowing a slot needs somebody and the crew list knowing it is
+  filled: who was approached, what they asked for, and whether they said yes.
 </p>
 
 <?php if (!$ready): ?>

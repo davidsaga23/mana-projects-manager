@@ -27,10 +27,13 @@ function project_nav_items(int $projectId): array {
         ['key' => 'overview',   'label' => 'Overview',            'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
         ['key' => 'brief',      'label' => 'Brief',               'href' => 'brief.php' . $p,              'group' => 'work'],
         ['key' => 'dashboard',  'label' => 'Dashboard',           'href' => 'dashboard.php' . $p,          'group' => 'work'],
-        ['key' => 'crew',       'label' => 'Crew',                'href' => 'crew.php' . $p,               'group' => 'work'],
-        // Directly after Crew, because it is the same question one step earlier:
-        // Crew says which slots are empty, Hiring says what is being done about it.
-        ['key' => 'hiring',     'label' => 'Hiring',              'href' => 'hiring.php' . $p,             'group' => 'work'],
+        // ONE TAB, TWO VIEWS (David, 2026-09-02: "I feel like they're used for
+        // the same thing"). Crew and Hiring were separate tabs and he was
+        // right - they are one activity, staffing this show, split along a line
+        // that exists in the database rather than in anybody's day. The screens
+        // stay separate files; what was a choice of tab is now a choice of view
+        // inside one, drawn by crew_view_switch(). Both mark this tab.
+        ['key' => 'crew',       'label' => 'Crew & hiring',       'href' => 'crew.php' . $p,               'group' => 'work'],
         ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],
         ['key' => 'timeline',   'label' => 'Timeline',            'href' => 'timeline.php' . $p,           'group' => 'work'],
         // Directly before Production tracking, because it is the same list one

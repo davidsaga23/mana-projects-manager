@@ -291,13 +291,46 @@ foreach ($lanes as $l) {
 $byStep = [];
 foreach ($lanes as $l) $byStep[(int)$l['step_id']][] = $l;
 
+// DEPARTMENT FIRST, then the steps inside it (David, 2026-09-02: "the crew
+// should only be a list per department"). pipeline_steps.department has carried
+// this since migration 015 and nothing on this screen was reading it.
+//
+// The steps keep PIPELINE ORDER inside each department, and the departments
+// themselves are ordered by their earliest step, so the page still reads top to
+// bottom in the order the work happens. Sorting departments alphabetically
+// would put Compositing above Layout, which is not how anybody reads a plan.
+//
+// A step with no department set groups under "Unassigned", last, and is not
+// hidden - the same choice breakdown_asset_types() makes for an asset with no
+// type. A blank field is a filing job, not a reason to disappear.
+$byDept = [];
+foreach ($byStep as $stepId => $rows) {
+    $dept = trim((string)($rows[0]['department'] ?? '')) ?: 'Unassigned';
+    $byDept[$dept][$stepId] = $rows;
+}
+uasort($byDept, function ($a, $b) {
+    $first = function (array $steps) {
+        $min = PHP_INT_MAX;
+        foreach ($steps as $rows) $min = min($min, (int)$rows[0]['step_order']);
+        return $min;
+    };
+    return $first($a) <=> $first($b);
+});
+if (isset($byDept['Unassigned'])) {
+    $tail = $byDept['Unassigned'];
+    unset($byDept['Unassigned']);
+    $byDept['Unassigned'] = $tail;
+}
+
 $pageTitle = 'Crew · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
 <?php project_nav($project, 'crew'); ?>
 
-<h2 class="wizard-title">Crew <span class="muted">· <?= e($project['name']) ?></span></h2>
+<h2 class="wizard-title">Crew &amp; hiring <span class="muted">· <?= e($project['name']) ?></span></h2>
+
+<?php crew_view_switch($projectId, 'position'); ?>
 
 <p class="lead">
   A crew is never complete until a show nearly is, people arrive as their department starts.
@@ -404,7 +437,32 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php else: ?>
 
-    <?php foreach ($byStep as $rows): $first = $rows[0]; ?>
+    <?php foreach ($byDept as $deptName => $deptSteps): ?>
+      <?php
+        // What this department still needs, said on its own heading. How many
+        // positions are still empty is the one number somebody opens this
+        // screen for, and it was only available by counting rows by eye.
+        $deptSlots = 0; $deptEmpty = 0;
+        foreach ($deptSteps as $deptRows) {
+            foreach ($deptRows as $dl) {
+                $deptSlots++;
+                if ((int)$dl['is_placeholder'] === 1) $deptEmpty++;
+            }
+        }
+      ?>
+      <h3 class="crew-dept-head">
+        <?= e($deptName) ?>
+        <span class="muted small">
+          <?= $deptSlots ?> position<?= $deptSlots === 1 ? '' : 's' ?>
+          <?php if ($deptEmpty > 0): ?>
+            · <span class="warn-text"><?= $deptEmpty ?> still to fill</span>
+          <?php else: ?>
+            · all filled
+          <?php endif; ?>
+        </span>
+      </h3>
+
+    <?php foreach ($deptSteps as $rows): $first = $rows[0]; ?>
       <h3 class="crew-step-head">
         <span class="dot" style="background:<?= e($first['color'] ?: '#ccc') ?>"></span>
         <?= e($first['step_name']) ?>
@@ -608,7 +666,7 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
       </table>
     <?php endforeach; ?>
-
+    <?php endforeach; ?>
 
   <?php endif; ?>
 <?php endif; ?>

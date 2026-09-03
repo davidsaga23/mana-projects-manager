@@ -1845,6 +1845,25 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .filter-fold > summary { display: inline-block; }
 .filter-fold .filter-checks { margin-top: 8px; padding-left: 2px; }
 
+/* --- Crew & hiring ---------------------------------------------------------
+   The department heading sits ABOVE the step headings and has to read as their
+   parent, not as another one of them: bigger, with a rule under it, and the
+   step heads indented beneath. Without the indent the two levels read as a flat
+   list of alternating sizes. */
+.crew-dept-head {
+  margin: 26px 0 4px; font-size: 16px; font-weight: 700;
+  padding-bottom: 5px; border-bottom: 2px solid #e4e8ec;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.crew-dept-head .muted { font-weight: 400; }
+.crew-dept-head + .crew-step-head { margin-top: 12px; }
+.crew-dept-head ~ .crew-step-head,
+.crew-dept-head ~ .review-table { margin-left: 14px; width: calc(100% - 14px); }
+
+/* The two views of staffing a show. Sits under the title rather than in the tab
+   bar: the tab bar says which SCREEN, this says which arrangement of it. */
+.view-switch { margin-top: 2px; }
+
 /* --- the duplicate-people screen ------------------------------------------
    A comparison table: the columns are what each record is CARRYING, because
    that is the only thing that decides which one to keep. Middle-aligned so a

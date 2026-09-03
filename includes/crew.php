@@ -72,7 +72,7 @@ function step_slot_count(array $step): int {
 function project_lanes(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
         'SELECT cl.*, c.name, c.role, c.is_placeholder, c.active, c.email,
-                ps.name AS step_name, ps.color, ps.step_order,
+                ps.name AS step_name, ps.color, ps.step_order, ps.department,
                 ps.applies_to, ps.applies_to_asset_type, ps.planned_headcount
            FROM crew_lanes cl
            JOIN crew c            ON c.id  = cl.crew_id
@@ -250,6 +250,34 @@ function remove_surplus_lanes(PDO $pdo, int $projectId): array {
         throw $e;
     }
     return $out;
+}
+
+/**
+ * THE TWO VIEWS OF STAFFING A SHOW, drawn by both screens that offer them.
+ *
+ * By position: every slot the plan needs, and who is in it. By stage: the same
+ * people arranged by how far along the conversation is. One asks "is this show
+ * staffed", the other asks "who am I waiting on", and they are the same rows
+ * seen from two ends - which is why they used to be two tabs and should not
+ * have been.
+ *
+ * Written here rather than in either screen so the pair cannot drift into
+ * offering different destinations, the same reason project_nav_items() is one
+ * list rather than ten copies.
+ */
+function crew_view_switch(int $projectId, string $current): void {
+    $views = [
+        ['key' => 'position', 'label' => 'By position', 'href' => 'crew.php?project=' . $projectId],
+        ['key' => 'stage',    'label' => 'By stage',    'href' => 'hiring.php?project=' . $projectId],
+    ];
+    echo '<div class="page-actions button-row view-switch">';
+    foreach ($views as $v) {
+        // The one you are on is the solid button. Two identical buttons would
+        // make the switch say nothing about where you already are.
+        $cls = $v['key'] === $current ? 'button' : 'button secondary';
+        printf('<a class="%s" href="%s">%s</a>', $cls, e($v['href']), e($v['label']));
+    }
+    echo '</div>';
 }
 
 /**
