@@ -1899,18 +1899,35 @@ button.secondary.danger:hover { background: #e9c2c7; }
    The stripe is on the first cell rather than the row, because with
    border-collapse a <tr> border is not painted at all. 3px so it reads down a
    long list without becoming a bar chart. */
-.slot-inplay > td:first-child { box-shadow: inset 3px 0 0 #e0a83c; }
-.slot-nobody > td:first-child { box-shadow: inset 3px 0 0 #b02a37; }
-/* inset shadow, not border-left: a border changes the cell's width and shunts
-   the lane number half a character right on exactly the rows that are already
-   the odd ones out. */
+/* ⚠ THE WHOLE ROW IS WASHED, not just its edge. A 3px stripe was the first
+   attempt and David's answer was "too subtle, we need something more in the
+   face" - he is reading a screen of thirty positions and needs the gaps to
+   arrive without being looked for. Filled rows stay white, so the open ones are
+   bands of colour in a white list rather than a slightly different white.
 
+   ⚠ AFTER .has-problem ON PURPOSE. A surplus slot tints its row #fffbee at the
+   same weight; a row that is both surplus and unfilled should say unfilled,
+   which is the more urgent of the two, so this wins on source order. */
+.slot-inplay > td { background: #fff6e0; }
+.slot-nobody > td { background: #fdecee; }
+
+/* The stripe stays and thickens. Inset shadow, not border-left: a border
+   changes the cell's width and would shunt the lane number half a character
+   right on exactly the rows that are already the odd ones out. */
+.slot-inplay > td:first-child { box-shadow: inset 5px 0 0 #c8901f; }
+.slot-nobody > td:first-child { box-shadow: inset 5px 0 0 #b02a37; }
+
+/* Solid badges, not pale ones. Uppercase because it is a state, not a
+   sentence, and it has to be readable at the speed somebody scans a column. */
 .slot-state {
-  display: inline-block; font-size: 11px; font-weight: 600;
-  border-radius: 3px; padding: 1px 6px; vertical-align: 1px; white-space: nowrap;
+  display: inline-block; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  border-radius: 3px; padding: 2px 8px; vertical-align: 1px; white-space: nowrap;
 }
-.slot-state-inplay { background: #fff3cd; color: #8a6d1a; }
-.slot-state-nobody { background: #f8e3e5; color: #b02a37; }
+/* RED IS RESERVED for the one that needs doing something about. Amber is
+   "in hand, keep going"; if both shouted equally the split would be pointless. */
+.slot-state-inplay { background: #a8791c; color: #fff; }
+.slot-state-nobody { background: #b02a37; color: #fff; }
 
 /* What a record is still missing, on the candidate row and in the artists
    filter. Quiet on purpose: a reminder, not a fault. Nothing here is required,
