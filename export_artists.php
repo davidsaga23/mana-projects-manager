@@ -52,6 +52,15 @@ foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us',
 $q   = trim((string)($_GET['q'] ?? ''));
 $pos = array_values(array_filter(array_map('strval', (array)($_GET['position'] ?? []))));
 [$people] = artists_list($pdo, $q, $extra, $pos);
+
+// The "needs finishing" filter is applied in PHP on the screen, for the reason
+// given there, so it has to be applied again here rather than being part of the
+// query. Without this the button would download everyone while the screen
+// showed the thin ones, and the file's own claim to be what you were looking at
+// would be false.
+if (isset($_GET['thin'])) {
+    $people = array_values(array_filter($people, fn($r) => (bool)artist_missing($r)));
+}
 if (!$people) {
     flash('err', $q !== '' ? 'Nothing matches that search, so there was nothing to export.'
                            : 'There are no artists to export yet.');

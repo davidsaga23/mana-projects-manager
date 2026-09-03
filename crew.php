@@ -13,6 +13,7 @@ require __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/people_merge.php';
+require_once __DIR__ . '/includes/artists.php';   // artist_missing(), for the gaps marker
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -599,6 +600,18 @@ require __DIR__ . '/includes/header.php';
                         <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
                       <?php endif; ?>
                       <a class="muted small" href="hiring.php?project=<?= $projectId ?>#h<?= (int)$h['id'] ?>">record →</a>
+                      <?php // WHAT IS STILL BLANK, said where the conversation is
+                            // actually happening. Nothing is mandatory, so this is
+                            // the only thing standing between a thin entry and a
+                            // book nobody trusts: it has to be visible at the
+                            // moment somebody is looking at the person, not
+                            // discovered later on a screen nobody opens.
+                            //
+                            // Quiet on purpose. It is a reminder, not a fault. ?>
+                      <?php $gaps = artist_missing($h); if ($gaps): ?>
+                        <span class="cand-gaps"
+                              title="Their artist database entry has no <?= e(implode(', no ', $gaps)) ?>. Nothing here is required, but a record with these filled in is one the next show can use.">needs <?= e(implode(', ', $gaps)) ?></span>
+                      <?php endif; ?>
                     </div>
                   <?php endforeach; ?>
                 <?php else: ?>

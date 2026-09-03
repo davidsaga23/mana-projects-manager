@@ -29,6 +29,59 @@ const ARTIST_FIELDS = [
 // Writing those across a person's rows would move them onto slots nobody put
 // them up for, and mark them hired on shows that never hired them.
 
+/**
+ * THE FIELDS WORTH CHASING, and only those.
+ *
+ * David, 2026-09-02, on a candidate added from Crew & hiring with a name and an
+ * email and nothing else: an entry can be thin, and thin entries are how a book
+ * quietly stops being worth reading. The answer is NOT to make anything
+ * mandatory - his own call, and the right one. At "approached" you genuinely do
+ * not know most of this, and a guess is worse than a blank: a blank you can see
+ * and chase, an invented rate quietly prices a projection.
+ *
+ * So the record stays optional and the gaps are made VISIBLE instead.
+ *
+ * ⚠ FOUR FIELDS, NOT THIRTEEN, and the omissions are deliberate:
+ *   position   what they do. Without it they cannot be found by the one filter
+ *              anybody searches this book with.
+ *   email      how you reach them. A person you cannot contact is a note.
+ *   reel       why you would hire them at all.
+ *   source     which of our sources actually produces people we hire, which is
+ *              the question migration 024 added the column to answer and which
+ *              no spreadsheet the studio had could.
+ *
+ * Not chased: phone and notes, optional by nature; seniority, rating and
+ * project type, which are JUDGEMENTS made after seeing work, not facts missing
+ * at first contact; location, useful but never the reason a hire fails. Nagging
+ * about those would teach people to ignore the marker, and a marker that is
+ * ignored is worse than none.
+ *
+ * The RATE is not here and cannot be: it lives in the finance database, on the
+ * approach rather than the person, and an editor is not allowed to see it.
+ */
+const ARTIST_CHASED = [
+    'position'      => 'what they do',
+    'email'         => 'email',
+    'portfolio_url' => 'reel',
+    'source'        => 'where they came from',
+];
+
+/**
+ * What is still blank on somebody's record, in words rather than column names.
+ *
+ * A column the database does not have yet is not a blank to chase, so a install
+ * without migration 025 is told about email, reel and source and not nagged
+ * about a position field it cannot store.
+ */
+function artist_missing(array $row): array {
+    $out = [];
+    foreach (ARTIST_CHASED as $col => $label) {
+        if (!array_key_exists($col, $row)) continue;
+        if (trim((string)($row[$col] ?? '')) === '') $out[] = $label;
+    }
+    return $out;
+}
+
 /** Seniority, as a fixed vocabulary rather than free text. */
 function artists_seniority_options(): array {
     return ['Junior', 'Mid', 'Senior', 'Lead'];

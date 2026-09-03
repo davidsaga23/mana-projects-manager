@@ -1887,6 +1887,16 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
+/* What a record is still missing, on the candidate row and in the artists
+   filter. Quiet on purpose: a reminder, not a fault. Nothing here is required,
+   and a marker that shouted would train people to stop reading it. */
+.cand-gaps {
+  font-size: 11.5px; color: #8a6d1a; background: #fff8e6;
+  border-radius: 3px; padding: 1px 6px; white-space: nowrap;
+}
+.thin-toggle { font-size: 13px; color: #8a6d1a; white-space: nowrap; }
+.thin-toggle input { width: auto; }
+
 /* --- the duplicate-people screen ------------------------------------------
    A comparison table: the columns are what each record is CARRYING, because
    that is the only thing that decides which one to keep. Middle-aligned so a

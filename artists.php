@@ -205,6 +205,23 @@ $pos = array_values(array_intersect(array_map('strval', $pos), $positions));
 
 [$people, $approaches] = $ready ? artists_list($pdo, $q, $extra, $pos) : [[], []];
 
+// THIN ENTRIES, on request. Filtered in PHP rather than in SQL on purpose: which
+// columns count as a gap depends on which of them migration 025 actually
+// created, and building that condition into the query would mean four optional
+// clauses to say what one readable loop says. The whole list is already loaded
+// for the grid, so this costs nothing extra.
+//
+// Counted BEFORE the filter is applied, so the toggle can say how many there
+// are while showing everybody. A filter that has to be turned on to find out
+// whether it is worth turning on is a filter nobody turns on.
+$thin = 0;
+foreach ($people as $pRow) if (artist_missing($pRow)) $thin++;
+
+$onlyThin = isset($_GET['thin']);
+if ($onlyThin) {
+    $people = array_values(array_filter($people, fn($pRow) => (bool)artist_missing($pRow)));
+}
+
 // Their quotes, for the rate column. One query for the page, admin only —
 // finance_db() hands a non-admin nothing, so this is empty for everyone else.
 $quotes = [];
@@ -257,11 +274,21 @@ require __DIR__ . '/includes/header.php';
       </fieldset>
     <?php endif; ?>
     <button type="submit" class="secondary">Search</button>
-    <?php if ($q !== '' || $pos): ?><a href="artists.php">Clear</a><?php endif; ?>
+    <?php // Only offered when there is something to find. A toggle that always
+          // reads "0 need finishing" is furniture. ?>
+    <?php if ($thin > 0 || $onlyThin): ?>
+      <label class="inline thin-toggle" title="Entries with no position, email, reel or source recorded. Nothing here is required; this is where to catch the ones worth finishing.">
+        <input type="checkbox" name="thin" value="1" <?= $onlyThin ? 'checked' : '' ?>
+               onchange="this.form.submit()">
+        <?= (int)$thin ?> need finishing
+      </label>
+    <?php endif; ?>
+    <?php if ($q !== '' || $pos || $onlyThin): ?><a href="artists.php">Clear</a><?php endif; ?>
     <span class="muted small">
       <?= count($people) ?> <?= count($people) === 1 ? 'person' : 'people' ?><?php
         if ($pos): ?> in <?= e(implode(', ', $pos)) ?><?php endif; ?><?php
-        if ($q !== ''): ?> matching &ldquo;<?= e($q) ?>&rdquo;<?php endif; ?>
+        if ($q !== ''): ?> matching &ldquo;<?= e($q) ?>&rdquo;<?php endif; ?><?php
+        if ($onlyThin): ?> with something still to fill in<?php endif; ?>
     </span>
   </form>
 
@@ -426,8 +453,9 @@ require __DIR__ . '/includes/header.php';
       <?php // Carries the search, so what downloads is what you were looking
             // at rather than everything regardless. ?>
       <a class="button secondary"
-         href="export_artists.php<?= ($q !== '' || $pos)
-              ? '?' . http_build_query(array_filter(['q' => $q, 'position' => $pos]))
+         href="export_artists.php<?= ($q !== '' || $pos || $onlyThin)
+              ? '?' . http_build_query(array_filter(
+                    ['q' => $q, 'position' => $pos, 'thin' => $onlyThin ? '1' : '']))
               : '' ?>">Download as Excel ↓</a>
     </p>
   <?php endif; ?>
