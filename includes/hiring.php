@@ -15,12 +15,22 @@
  *    the app and leave the ones who said no in the studio's permanent people
  *    list for ever. They become crew at exactly one moment — being hired.
  *
- * 2. HIRING DOES NOT CREATE ANYTHING; IT RENAMES THE SLOT. promote_placeholder()
- *    has done this since 2026-08-13 and the reason is the whole design: the
- *    crew row's id never changes, so every scheduled task, every progress
- *    record and all the history already pointing at that slot becomes the new
- *    person's with nothing moved. This file hands off to it rather than
- *    reimplementing it.
+ * 2. HIRING LINKS A PERSON TO A POSITION. It does not turn the position into
+ *    the person, which is what it did until 2026-09-02.
+ *
+ *    The old way renamed the slot's own crew row into the candidate, through
+ *    promote_placeholder(). The id never changed, so everything already planned
+ *    for that slot became theirs with nothing moved, and that was genuinely
+ *    elegant for ONE slot. Across slots it was a data bug: every slot has its
+ *    own crew row, nothing checked whether the name already existed, and an
+ *    artist hired into three slots became three people. Every duplicate in the
+ *    studio list came from it.
+ *
+ *    Now the person is found or created once, by exact name, and the slot is
+ *    re-pointed at them by assign_crew_to_lane(), which carries the scheduled
+ *    work across. Three slots point at one record, which is what hiring the
+ *    same artist three times always meant. See people_merge.php for the mess
+ *    the old way left and the tool that cleans it up.
  *
  * WHERE THE MONEY IS. Not here. What a candidate quoted lives in the finance
  * database behind includes/money.php, which is the only place that connection
@@ -31,6 +41,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/crew.php';
+require_once __DIR__ . '/people_merge.php';
 // The one door to pay data. Required rather than probed for with function_exists:
 // hiring hands a quoted rate across at the moment somebody is taken on, and a
 // dependency that is silently absent would make that step quietly not happen —
@@ -586,14 +597,33 @@ function set_hire_stage(PDO $pdo, int $projectId, int $hireId, string $stage,
  *
  * THIS IS THE POINT OF THE WHOLE PHASE, so what it does and does not do matters.
  *
- * With a slot: it RENAMES the slot, through promote_placeholder(). It does not
- * create a crew row and it does not reassign anything, because it does not have
- * to — the slot's crew id is already on every task the scheduler planned for
- * that lane, so renaming it makes all of that work theirs at a stroke. That is
- * the property the slot model was built for and this is the moment it pays off.
+ * ⚠ IT LINKS A PERSON TO A POSITION. It does not turn the position INTO the
+ * person, which is what it used to do (David, 2026-09-02).
  *
- * Without a slot: a plain crew row, for somebody taken on before it is settled
- * which job they will do. They can be put into a slot later on the Crew screen.
+ * The old way called promote_placeholder(), renaming the slot's own crew row
+ * into the candidate. That was cheap - the slot's id was already on every task
+ * the scheduler had planned, so the work became theirs at a stroke - and it was
+ * wrong in the way that matters: a person hired into three slots became three
+ * people, because nothing checked whether the name already existed. Every
+ * duplicate in the studio list came from it.
+ *
+ * Now the person is found or created ONCE, by name, and the slot is RE-POINTED
+ * at them through assign_crew_to_lane(), which moves the scheduled work across.
+ * A slot is a position and a person is a person; filling one is a link between
+ * them. Hiring the same artist into three slots now points three slots at one
+ * record, which is what it always meant.
+ *
+ * Without a slot: the same find-or-create, for somebody taken on before it is
+ * settled which job they will do. They go into a slot later on the Crew screen.
+ *
+ * ⚠ ONE CONSEQUENCE WORTH KNOWING. An unfilled slot carries its own day rate,
+ * keyed in the finance database on the placeholder's crew id - that is what
+ * prices a position nobody holds yet, and what the Historic fees screen calls a
+ * slot rate. Renaming used to carry that rate onto the person by accident,
+ * because the id never changed. Re-pointing does not: the person is priced at
+ * THEIR rate, and if they have none the step shows unpriced days until one is
+ * set. That is the honest answer - you do not know what they cost yet - and the
+ * caller says so rather than leaving it to be discovered on the projection.
  *
  * @return string[] sentences for the flash messages — one per thing that happened
  */
@@ -613,65 +643,80 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
 
     $pdo->beginTransaction();
     try {
-        if (!empty($hire['lane_id']) && !empty($hire['lane_crew_id'])) {
-            $crewId = (int)$hire['lane_crew_id'];
+        // ---- THE PERSON, once ------------------------------------------
+        // An exact name match reuses the existing record rather than making a
+        // second copy — the same rule the alias layer, link_login_to_crew() and
+        // the artist book all follow. Deliberately not fuzzy.
+        $find = $pdo->prepare('SELECT id, name FROM crew WHERE name = ? AND is_placeholder = 0 LIMIT 1');
+        $find->execute([$name]);
+        $found = $find->fetch();
+        if ($found) {
+            $crewId = (int)$found['id'];
+            $out[] = '"' . $name . '" was already on the studio crew list, so they were linked to '
+                   . 'that person rather than a second copy being made.';
+        } else {
+            $pdo->prepare(
+                'INSERT INTO crew (name, role, email, is_team, is_placeholder, active)
+                 VALUES (?, ?, ?, 0, 0, 1)'
+            )->execute([$name, $hire['step_name'] ?: null, $email !== '' ? $email : null]);
+            $crewId = (int)$pdo->lastInsertId();
+            $out[] = 'Added "' . $name . '" to the studio crew list.';
+        }
+        $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
+            ->execute([$crewId, $projectId]);
 
-            $slot = $pdo->prepare('SELECT name, is_placeholder FROM crew WHERE id = ?');
-            $slot->execute([$crewId]);
-            $slotRow = $slot->fetch();
+        // ---- THE POSITION, linked to them ------------------------------
+        if (!empty($hire['lane_id'])) {
+            $occupantId = (int)($hire['lane_crew_id'] ?? 0);
+            $occupant = null;
+            if ($occupantId > 0) {
+                $slot = $pdo->prepare('SELECT id, name, is_placeholder FROM crew WHERE id = ?');
+                $slot->execute([$occupantId]);
+                $occupant = $slot->fetch() ?: null;
+            }
 
-            if ($slotRow && (int)$slotRow['is_placeholder'] === 1) {
-                promote_placeholder($pdo, $crewId, $name, $email !== '' ? $email : null);
-                $out[] = sprintf(
-                    'The slot "%s" is now %s. Everything already planned for it, every scheduled '
-                    . 'task and every progress record, is theirs, with nothing moved, because the '
-                    . 'crew record kept its id.',
-                    $slotRow['name'], $name
-                );
-            } elseif ($slotRow && mb_strtolower(trim((string)$slotRow['name'])) === mb_strtolower($name)) {
-                // The slot already holds THIS person. That is not a clash — it
-                // is a hiring record being written after the fact, for somebody
-                // put into the slot on the Crew screen weeks ago. Nothing is
-                // renamed and nothing moves, because nothing needs to: the
-                // record simply points at the person who is already there.
-                $out[] = sprintf(
-                    '%s already holds that slot, so nothing was renamed or moved, the hiring '
-                    . 'record now points at them and the slot is unchanged.',
-                    $slotRow['name']
-                );
-            } else {
-                // A DIFFERENT person is in this slot. Refusing is right:
+            if ($occupant && $occupantId === $crewId) {
+                // Already theirs. A hiring record written after the fact, for
+                // somebody put into the slot on the Crew screen weeks ago.
+                $out[] = sprintf('%s already holds that slot, so nothing moved, the hiring record '
+                               . 'now points at them and the slot is unchanged.', $name);
+
+            } elseif ($occupant && (int)$occupant['is_placeholder'] === 0) {
+                // A DIFFERENT real person is in this slot. Refusing is right:
                 // silently replacing them would move their planned work onto
                 // somebody else without anyone asking for it.
                 throw new RuntimeException(sprintf(
                     'That slot already holds %s, so it was not overwritten. If %s is replacing '
                     . 'them, change who is in the slot on the Crew screen first, that is the '
                     . 'screen that moves the planned work with it.',
-                    $slotRow['name'] ?? 'somebody', $name
-                ));
-            }
-        } else {
-            // No slot: an exact name match reuses the existing person rather
-            // than making a second copy of them — the same rule the alias layer
-            // and link_login_to_crew() follow.
-            $find = $pdo->prepare('SELECT id, name FROM crew WHERE name = ? AND is_placeholder = 0 LIMIT 1');
-            $find->execute([$name]);
-            $found = $find->fetch();
-            if ($found) {
-                $crewId = (int)$found['id'];
-                $out[] = '"' . $name . '" was already on the studio crew list, so they were linked '
-                       . 'to that person rather than a second copy being made.';
+                    $occupant['name'], $name));
+
             } else {
-                $pdo->prepare(
-                    'INSERT INTO crew (name, role, email, is_team, is_placeholder, active)
-                     VALUES (?, ?, ?, 0, 0, 1)'
-                )->execute([$name, $hire['step_name'] ?: null, $email !== '' ? $email : null]);
-                $crewId = (int)$pdo->lastInsertId();
-                $out[] = 'Added "' . $name . '" to the studio crew list. They are not in a slot yet, '
-                       . 'put them in one on the Crew screen so the plan knows what they are doing.';
+                // The slot is empty, so point it at them. This moves every
+                // scheduled task on that track across; see assign_crew_to_lane().
+                assign_crew_to_lane($pdo, $projectId, (int)$hire['lane_id'], $crewId);
+                $out[] = sprintf('The slot "%s" is now %s, and every task already scheduled on '
+                               . 'that track is theirs.',
+                                 $occupant['name'] ?? 'that position', $name);
+
+                // ⚠ THE SLOT'S OWN RATE DOES NOT COME WITH THEM. It is keyed on
+                // the placeholder's crew id in the finance database, and it was
+                // a budgeting assumption about the position, not a fact about
+                // this person. Said here rather than left to be noticed as a
+                // number changing on the projection.
+                if ($occupant) {
+                    $slotMoney = crew_money_footprint($occupantId);
+                    $theirs    = crew_money_footprint($crewId);
+                    if ($slotMoney['reachable'] && $theirs['reachable']
+                        && $slotMoney['terms'] > 0 && $theirs['terms'] === 0) {
+                        $out[] = sprintf('That slot had a day rate of its own, which was an '
+                                       . 'estimate for the position rather than a fact about %s. '
+                                       . 'It has not been carried over, so this step will show '
+                                       . 'unpriced days until their rate is set under Finance '
+                                       . 'management.', $name);
+                    }
+                }
             }
-            $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
-                ->execute([$crewId, $projectId]);
         }
 
         $pdo->prepare('UPDATE hires SET stage = ?, stage_changed_at = NOW(), crew_id = ?, candidate_name = ? WHERE id = ?')

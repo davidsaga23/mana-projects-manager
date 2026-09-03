@@ -253,35 +253,24 @@ function remove_surplus_lanes(PDO $pdo, int $projectId): array {
 }
 
 /**
- * Turn a slot into a person: rename it and clear the placeholder flag.
+ * ⚠ promote_placeholder() WAS HERE AND IS GONE (2026-09-02). Do not bring it
+ * back without reading this.
  *
- * The crew row's id is untouched, which is the whole point — everything already
- * pointing at that slot (scheduled tasks, progress records, the alias layer)
- * keeps pointing at it, and what was PLANNED for a slot becomes what was DONE by
- * a person with no re-linking at all.
+ * It renamed a slot's own crew row into the person hired for it and cleared the
+ * placeholder flag. The id never changed, so everything already planned for the
+ * slot became theirs with nothing moved, and for a single slot that was exactly
+ * right. Across slots it was a data bug: every slot has its OWN crew row, and
+ * nothing checked whether a person of that name already existed, so an artist
+ * hired into three slots became three people, each holding its own scheduled
+ * work, with no way to tell them apart in a picker and no way to join them up.
+ *
+ * Filling a slot now goes through assign_crew_to_lane() in every path: the
+ * person is found or created once, and the slot is re-pointed at them. A slot
+ * is a position, a person is a person, and filling one is a link between them.
+ *
+ * The clean-up for what the old way left is people_merge.php.
  */
-function promote_placeholder(PDO $pdo, int $crewId, string $realName, ?string $email = null): void {
-    $realName = trim($realName);
-    if ($realName === '') throw new RuntimeException('Give the person a name.');
 
-    $stmt = $pdo->prepare('SELECT * FROM crew WHERE id = ?');
-    $stmt->execute([$crewId]);
-    $row = $stmt->fetch();
-    if (!$row) throw new RuntimeException('That crew slot no longer exists.');
-    if ((int)$row['is_placeholder'] !== 1) {
-        throw new RuntimeException('"' . $row['name'] . '" is already a real person.');
-    }
-
-    $pdo->prepare(
-        'UPDATE crew SET name = ?, email = ?, is_placeholder = 0 WHERE id = ?'
-    )->execute([$realName, $email !== null && $email !== '' ? $email : null, $crewId]);
-
-    // The slot's old name is what an import or an old export may still call this
-    // person, so it is kept as an alias rather than thrown away.
-    $pdo->prepare(
-        'INSERT IGNORE INTO crew_aliases (alias_name, crew_id) VALUES (?, ?)'
-    )->execute([$row['name'], $crewId]);
-}
 
 /** Put a real person who already exists into a slot, replacing whoever is in it. */
 function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId): void {

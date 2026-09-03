@@ -269,8 +269,7 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
 
         // The old records' names become aliases of the keeper, so an import or
         // an old export that still calls them that resolves to the right person
-        // instead of creating a fourth copy. Same reasoning as
-        // promote_placeholder() keeping the slot's old name.
+        // instead of creating a fourth copy.
         $alias = $pdo->prepare('INSERT IGNORE INTO crew_aliases (alias_name, crew_id) VALUES (?, ?)');
         foreach ($loseIds as $id) {
             try { $alias->execute([$byId[$id]['name'], $keepId]); } catch (PDOException $e) {}
