@@ -12,6 +12,7 @@ require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/hiring.php';
+require_once __DIR__ . '/includes/people_merge.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -373,6 +374,22 @@ require __DIR__ . '/includes/header.php';
       </small>
     </div>
   <?php endif; ?>
+
+<?php // ⚠ SAID WHERE IT IS NOTICED. A person recorded twice appears as two
+      // identical options in the picker below, and there is no way to tell them
+      // apart by looking. Admin only, because merging them is.
+      //
+      // One query over `crew`, only for an administrator. The expensive part,
+      // counting what each record carries, happens on the merge screen itself. ?>
+<?php if (is_admin() && ($dupes = duplicate_crew_groups($pdo))): ?>
+  <div class="flash flash-warn">
+    <strong><?= count($dupes) ?></strong>
+    <?= count($dupes) === 1 ? 'person is' : 'people are' ?> recorded more than once in the studio
+    crew list, so <?= count($dupes) === 1 ? 'their name appears' : 'their names appear' ?>
+    twice in the picker below with no way to tell them apart.
+    <a href="people_merge.php">Put them back together &rarr;</a>
+  </div>
+<?php endif; ?>
 
   <?php if (!$lanes): ?>
     <div class="empty-state">

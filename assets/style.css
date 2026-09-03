@@ -1845,6 +1845,15 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .filter-fold > summary { display: inline-block; }
 .filter-fold .filter-checks { margin-top: 8px; padding-left: 2px; }
 
+/* --- the duplicate-people screen ------------------------------------------
+   A comparison table: the columns are what each record is CARRYING, because
+   that is the only thing that decides which one to keep. Middle-aligned so a
+   radio button sits level with the name beside it. */
+.merge-table td, .merge-table th { vertical-align: middle; }
+.merge-table input[type=radio] { width: auto; margin: 0; }
+.merge-confirm { margin: 10px 0 4px; gap: 10px; }
+.merge-confirm input { width: auto; }
+
 /* The project type, beside a project code or a heading. Quiet: it is context
    for the numbers, not one of them. */
 .type-tag {
