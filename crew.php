@@ -374,6 +374,17 @@ require __DIR__ . '/includes/header.php';
 
 <h2 class="wizard-title">Staffing <span class="muted">· <?= e($project['name']) ?></span></h2>
 
+<?php // A SHEET TO SEND, not another view. David, 2026-09-02: something to let
+      // the other supervisors know about these staffing decisions. It carries
+      // the step's own dates, which this screen does not need and a message
+      // leaving the building does: "empty" is a fact, "empty and starts on the
+      // 14th" is a deadline with a name missing from it. ?>
+<?php if ($lanes): ?>
+  <p class="page-actions button-row">
+    <a class="button secondary" href="export_staffing.php?project=<?= $projectId ?>">Export staffing ↓</a>
+  </p>
+<?php endif; ?>
+
 
 <p class="lead">
   A crew is never complete until a show nearly is, people arrive as their department starts.
