@@ -125,14 +125,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        (string)($_POST['stage'] ?? ''), '', current_user_display()));
 
         } elseif (preg_match('/^addcand:(\d+)$/', $action, $m)) {
-            // save_hire() checks the lane belongs to THIS project, so a posted
-            // id cannot attach somebody to another show's position.
-            $r = save_hire($pdo, $projectId, [
-                'candidate_name' => $_POST['candidate_name'] ?? '',
-                'email'          => $_POST['candidate_email'] ?? '',
-                'lane_id'        => (int)$m[1],
-                'stage'          => 'approached',
-            ], current_user_display());
+            // TWO WAYS IN, one handler. Picking somebody the studio already
+            // knows carries their record across; typing a name starts a new
+            // one. save_hire() checks the lane belongs to THIS project in both
+            // cases, so a posted id cannot attach anybody to another show.
+            $laneId  = (int)$m[1];
+            $knownId = (int)($_POST['known_id'] ?? 0);
+            $r = $knownId > 0
+                ? add_known_candidate($pdo, $projectId, $laneId, $knownId, current_user_display())
+                : save_hire($pdo, $projectId, [
+                      'candidate_name' => $_POST['candidate_name'] ?? '',
+                      'email'          => $_POST['candidate_email'] ?? '',
+                      'lane_id'        => $laneId,
+                      'stage'          => 'approached',
+                  ], current_user_display());
             foreach ((array)$r as $said) if (is_string($said)) flash('ok', $said);
 
         } elseif (preg_match('/^assign:(\d+)$/', $action, $m)) {
@@ -291,6 +297,11 @@ $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 // play and one with nobody at all look identical on this screen otherwise, and
 // they are completely different problems.
 $hiringReady = hiring_available($pdo);
+// THE ARTIST DATABASE, one row per person, read once for the whole page rather
+// than once per position. known_candidates() is the same list the Hiring
+// screen's type-ahead uses, which is the point: one book, read the same way
+// wherever somebody is looked up.
+$book = $hiringReady ? known_candidates($pdo) : [];
 $candidatesByLane = $hiringReady ? hires_by_lane($pdo, $projectId) : [];
 
 // Steps with a headcount but no slots yet — the reason to press Generate.
@@ -601,11 +612,35 @@ require __DIR__ . '/includes/header.php';
                         // them is filled in later on their record. ?>
                   <details class="cand-add">
                     <summary class="row-btn">+ Add a candidate</summary>
+
+                    <?php // THE BOOK FIRST, typing second, because most people
+                          // put up for a position are already in it and picking
+                          // carries their email, reel, position and rating
+                          // across. Typing a name that is already in the book
+                          // is how a second, emptier copy of somebody gets
+                          // made. Same order, and the same reasoning, as the
+                          // two ways into a slot on the row above. ?>
+                    <?php if ($book): ?>
+                      <form method="post" class="inline-form cand-add-form">
+                        <select name="known_id" aria-label="Somebody already in the artist database">
+                          <option value="">from the artist database…</option>
+                          <?php foreach ($book as $k): ?>
+                            <option value="<?= (int)$k['id'] ?>"><?= e($k['candidate_name']) ?><?php
+                              if (!empty($k['position'])) echo ' · ' . e($k['position']);
+                              if (!empty($k['project_code'])) echo ' · last on ' . e($k['project_code']);
+                            ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <button type="submit" class="secondary" name="action"
+                                value="addcand:<?= (int)$l['id'] ?>">Put them up</button>
+                      </form>
+                    <?php endif; ?>
+
                     <form method="post" class="inline-form cand-add-form">
-                      <input name="candidate_name" placeholder="Their name" required
-                             aria-label="Candidate name">
+                      <input name="candidate_name" placeholder="or a name new to the studio" required
+                             aria-label="New candidate name">
                       <input name="candidate_email" type="email" placeholder="Email (optional)"
-                             aria-label="Candidate email">
+                             aria-label="New candidate email">
                       <button type="submit" class="secondary" name="action"
                               value="addcand:<?= (int)$l['id'] ?>">Add</button>
                     </form>

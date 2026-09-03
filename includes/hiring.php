@@ -188,6 +188,54 @@ function hire_extra_values(array $in): array {
 }
 
 /**
+ * Put somebody the studio already knows up for a position.
+ *
+ * David, 2026-09-02: "I still don't see the whole list of candidates from the
+ * artist database here." He was right, and the gap was real. Filling a position
+ * has THREE cases, and the screen only offered two:
+ *
+ *   somebody brand new          typed  ->  save_hire()
+ *   somebody already on crew    picked ->  assign_crew_to_lane()
+ *   somebody in the BOOK but    ...nothing, until now
+ *   not yet crew
+ *
+ * The third is the commonest one for a studio that has been filling the book,
+ * and it is exactly what Luka Bromley was before she was hired.
+ *
+ * ⚠ IT CARRIES THE PERSON ACROSS, not just their name. A new row typed from
+ * scratch would lose the email, the reel, the position and the rating somebody
+ * already recorded, and a second row under the same name with less in it is
+ * how a book decays. Only the PERSON-level fields come: the stage, the slot and
+ * the project belong to this approach and start fresh, which is the same split
+ * includes/artists.php makes when it writes an edit back across somebody's rows.
+ */
+function add_known_candidate(PDO $pdo, int $projectId, int $laneId, int $fromHireId,
+                             string $who = ''): array {
+    $src = get_hire($pdo, $fromHireId);
+    if (!$src) throw new RuntimeException('That person is no longer in the artist database.');
+
+    // No project check on the SOURCE, deliberately: the book is studio-wide and
+    // the whole point is putting somebody from another show, or from no show at
+    // all, up for this one.
+    $in = [
+        'candidate_name' => $src['candidate_name'],
+        'email'          => $src['email'] ?? '',
+        'phone'          => $src['phone'] ?? '',
+        'portfolio_url'  => $src['portfolio_url'] ?? '',
+        'source'         => $src['source'] ?? '',
+        'lane_id'        => $laneId,
+        'stage'          => 'approached',
+    ];
+    if (hire_extras_available($pdo)) {
+        foreach (['location', 'position', 'seniority', 'project_type', 'rating'] as $f) {
+            if (isset($src[$f]) && $src[$f] !== null && $src[$f] !== '') $in[$f] = $src[$f];
+        }
+        if (!empty($src['worked_with_us'])) $in['worked_with_us'] = 1;
+    }
+    return save_hire($pdo, $projectId, $in, $who);
+}
+
+/**
  * What has already been typed on this project, for the datalists.
  *
  * Built from the data exactly as asset types and departments are — a studio's
