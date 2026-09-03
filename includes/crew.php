@@ -287,14 +287,28 @@ function remove_surplus_lanes(PDO $pdo, int $projectId): array {
  */
 
 
-/** Put a real person who already exists into a slot, replacing whoever is in it. */
+/**
+ * Put a real person who already exists into a slot, replacing whoever is in it.
+ *
+ * ⚠ SAFE TO CALL FROM INSIDE ANOTHER TRANSACTION, and that is not decoration.
+ * hire_candidate() wraps the whole hire in one, and this is called from the
+ * middle of it. MySQL has no nested transactions: a second beginTransaction()
+ * throws "There is already an active transaction" and the hire fails outright,
+ * which is exactly what David hit trying to hire Luka Bromley (2026-09-02).
+ *
+ * So it opens one only when it is the outermost caller, and commits only what
+ * it opened. Nested, an exception simply propagates and the CALLER's rollback
+ * undoes the lot - which is the behaviour you want anyway: a hire that half
+ * happened is worse than one that did not.
+ */
 function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId): void {
     $stmt = $pdo->prepare('SELECT * FROM crew_lanes WHERE id = ? AND project_id = ?');
     $stmt->execute([$laneId, $projectId]);
     $lane = $stmt->fetch();
     if (!$lane) throw new RuntimeException('That slot no longer exists.');
 
-    $pdo->beginTransaction();
+    $own = !$pdo->inTransaction();
+    if ($own) $pdo->beginTransaction();
     try {
         $pdo->prepare('UPDATE crew_lanes SET crew_id = ? WHERE id = ?')->execute([$crewId, $laneId]);
         $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
@@ -307,9 +321,12 @@ function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId)
             'UPDATE schedule SET crew_id = ? WHERE step_id = ? AND lane = ? AND project_id = ?'
         )->execute([$crewId, (int)$lane['step_id'], (int)$lane['lane_no'], $projectId]);
 
-        $pdo->commit();
+        if ($own) $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        // Only roll back what this call started. Rolling back somebody else's
+        // transaction from in here would silently undo work the caller has not
+        // finished describing, and leave them committing nothing.
+        if ($own && $pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 }

@@ -405,3 +405,68 @@ for f in files:
 print('')
 print('%d files checked for prose leaking out of strings, %d suspect'
       % (len(files), bad_prose))
+
+# ---------------------------------------------------------------------------
+# PASS 7 - NESTED TRANSACTIONS.
+#
+# MySQL has no nested transactions. A second beginTransaction() on a connection
+# that already has one open throws "There is already an active transaction" and
+# the whole action fails - which is what hiring somebody did on 2026-09-02, when
+# hire_candidate() (which wraps the hire in a transaction) was changed to call
+# assign_crew_to_lane() (which opened its own).
+#
+# Nothing else in this project can catch that: there is no PHP binary here, and
+# the failure only appears when the outer path actually runs. So it is checked
+# statically instead - one function that opens a transaction calling another
+# that opens one, unguarded.
+#
+# GUARDED means the callee asks inTransaction() before beginning, and so only
+# opens and commits what it owns. That is the fix, not an exemption: a guarded
+# opener is safe to call from anywhere.
+# ---------------------------------------------------------------------------
+FUNC_DEF = re.compile(r'\bfunction\s+([A-Za-z_]\w*)\s*\(')
+
+bodies = {}
+for f in files:
+    code = php_code_only(io.open(f, encoding='utf-8', errors='replace').read())
+    hits = list(FUNC_DEF.finditer(code))
+    for i, m in enumerate(hits):
+        end = hits[i + 1].start() if i + 1 < len(hits) else len(code)
+        bodies[m.group(1)] = (f, code[m.start():end])
+
+openers = {}
+for name, (path, body) in bodies.items():
+    if 'beginTransaction' not in body:
+        continue
+    guarded = 'inTransaction' in body.split('beginTransaction')[0]
+    openers[name] = (path, guarded)
+
+# Only the span that is actually INSIDE a transaction counts. unassign_lane()
+# opens one, commits it, and THEN calls assign_crew_to_lane() - which is safe and
+# says so in a comment. A check that flagged it would be teaching people to
+# ignore this pass, which is worse than not having it.
+def open_span(body):
+    a = body.find('beginTransaction')
+    if a < 0:
+        return ''
+    b = body.find('commit', a)
+    return body[a:] if b < 0 else body[a:b]
+
+
+bad_tx = 0
+for name, (path, _) in openers.items():
+    body = open_span(bodies[name][1])
+    for callee, (cpath, guarded) in openers.items():
+        if callee == name or guarded:
+            continue
+        if re.search(r'(?<![\w$>:])' + re.escape(callee) + r'\s*\(', body):
+            if bad_tx == 0:
+                print('')
+                print('NESTED TRANSACTION - MySQL cannot nest these; the inner call throws:')
+            bad_tx += 1
+            print('  %s: %s() opens a transaction and calls %s(), which opens another'
+                  % (path, name, callee))
+            print('      fix: guard %s() with if (!$pdo->inTransaction()), commit only what it opened'
+                  % callee)
+print('')
+print('%d functions open transactions, %d nested unsafely' % (len(openers), bad_tx))
