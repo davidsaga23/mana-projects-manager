@@ -485,11 +485,19 @@ require __DIR__ . '/includes/header.php';
         // What this department still needs, said on its own heading. How many
         // positions are still empty is the one number somebody opens this
         // screen for, and it was only available by counting rows by eye.
-        $deptSlots = 0; $deptEmpty = 0;
+        // The same three states the rows carry, counted. "2 still to fill" is
+        // worth knowing; "and nobody is being spoken to about one of them" is
+        // the half that decides whether it is a problem this week.
+        $deptSlots = 0; $deptEmpty = 0; $deptNobody = 0;
         foreach ($deptSteps as $deptRows) {
             foreach ($deptRows as $dl) {
                 $deptSlots++;
-                if ((int)$dl['is_placeholder'] === 1) $deptEmpty++;
+                if ((int)$dl['is_placeholder'] !== 1) continue;
+                $deptEmpty++;
+                $anyLive = $hiringReady && array_filter(
+                    $candidatesByLane[(int)$dl['id']] ?? [],
+                    fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true));
+                if (!$anyLive) $deptNobody++;
             }
         }
       ?>
@@ -499,8 +507,11 @@ require __DIR__ . '/includes/header.php';
           <?= $deptSlots ?> position<?= $deptSlots === 1 ? '' : 's' ?>
           <?php if ($deptEmpty > 0): ?>
             · <span class="warn-text"><?= $deptEmpty ?> still to fill</span>
+            <?php if ($deptNobody > 0): ?>
+              · <span class="err"><?= $deptNobody ?> with nobody in the frame</span>
+            <?php endif; ?>
           <?php else: ?>
-            · all filled
+            · <span class="ok">all filled</span>
           <?php endif; ?>
         </span>
       </h3>
@@ -526,8 +537,28 @@ require __DIR__ . '/includes/header.php';
           // rather than only in a flash message, so it is still visible on the
           // next page view and sits next to the button that removes it.
           $isSurplus = (int)$l['lane_no'] > step_slot_count($l);
+
+          // ⚠ THREE STATES, NOT TWO (David, 2026-09-02: a visual cue for filled
+          // against unfilled). Filled or not is the question asked, but an open
+          // position with two people in the frame and an open position with
+          // nobody are completely different problems, and a cue that painted
+          // them the same colour would hide the only one that needs doing
+          // something about today.
+          //
+          // Computed here rather than inside the cell below, because the whole
+          // ROW carries the cue and the row opens first.
+          $liveHere = $isPh && $hiringReady
+              ? array_filter($candidatesByLane[(int)$l['id']] ?? [],
+                             fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true))
+              : [];
+          $slotState = !$isPh ? 'filled' : ($liveHere ? 'inplay' : 'nobody');
         ?>
-        <tr class="<?= $isSurplus ? 'has-problem' : '' ?>">
+        <?php // ⚠ FILLED ROWS CARRY NO COLOUR AT ALL, and that is the design
+              // rather than an omission. On a show that is mostly staffed, a
+              // green stripe down thirty rows is a wall telling you nothing;
+              // the eye should be pulled to what still needs work, not to what
+              // is already done. So done is quiet and open is not. ?>
+        <tr class="slot-<?= $slotState ?><?= $isSurplus ? ' has-problem' : '' ?>">
           <td class="col-num muted"><?= str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT) ?></td>
           <td>
             <?php // Straight to that person's page — their workload, their pace
@@ -539,8 +570,16 @@ require __DIR__ . '/includes/header.php';
                   // "what is Rough 02 carrying?" is a fair question before
                   // anyone is hired into it. ?>
             <strong><a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$l['crew_id'] ?>"><?= e($l['name']) ?></a></strong>
-            <?php if ($isPh): ?>
-              <span class="est-tag">placeholder</span>
+            <?php // "placeholder" was internal vocabulary printed at a reader:
+                  // it is the database's word for an empty position, not
+                  // anybody's word for one. What the row needs to say is what
+                  // state it is in, and a filled one needs to say nothing at
+                  // all - the person's name has already said it. ?>
+            <?php if ($isPh && $liveHere): ?>
+              <span class="slot-state slot-state-inplay"><?= count($liveHere) ?>
+                in the running</span>
+            <?php elseif ($isPh): ?>
+              <span class="slot-state slot-state-nobody">Nobody yet</span>
             <?php elseif (!$l['active']): ?>
               <span class="muted small">(inactive)</span>
             <?php endif; ?>
@@ -549,11 +588,7 @@ require __DIR__ . '/includes/header.php';
                 Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this step.
               </div>
             <?php endif; ?>
-            <?php if ($isPh && $hiringReady):
-              $live = array_filter($candidatesByLane[(int)$l['id']] ?? [], function ($h) {
-                  return in_array($h['stage'], HIRE_STAGES_OPEN, true);
-              });
-            ?>
+            <?php if ($isPh && $hiringReady): $live = $liveHere; ?>
               <?php // ⚠ THE WHOLE STAFFING LOOP, ON THE POSITION IT BELONGS TO
                     // (David, 2026-09-02: "I was asking to merge both of them and
                     // do all the staffing and hiring in the same page").

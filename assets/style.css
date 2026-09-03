@@ -1887,6 +1887,31 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
+/* --- filled against unfilled, at a glance ---------------------------------
+   David, 2026-09-02. THREE states, because "not filled" hides the distinction
+   that matters: a position with people in the frame is in hand, one with nobody
+   is not.
+
+   ⚠ A FILLED ROW IS GIVEN NO COLOUR. On a show that is mostly staffed, a green
+   stripe down thirty rows is a wall that says nothing; colour has to mean "look
+   here", and if everything is coloured nothing is. Done is quiet.
+
+   The stripe is on the first cell rather than the row, because with
+   border-collapse a <tr> border is not painted at all. 3px so it reads down a
+   long list without becoming a bar chart. */
+.slot-inplay > td:first-child { box-shadow: inset 3px 0 0 #e0a83c; }
+.slot-nobody > td:first-child { box-shadow: inset 3px 0 0 #b02a37; }
+/* inset shadow, not border-left: a border changes the cell's width and shunts
+   the lane number half a character right on exactly the rows that are already
+   the odd ones out. */
+
+.slot-state {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  border-radius: 3px; padding: 1px 6px; vertical-align: 1px; white-space: nowrap;
+}
+.slot-state-inplay { background: #fff3cd; color: #8a6d1a; }
+.slot-state-nobody { background: #f8e3e5; color: #b02a37; }
+
 /* What a record is still missing, on the candidate row and in the artists
    filter. Quiet on purpose: a reminder, not a fault. Nothing here is required,
    and a marker that shouted would train people to stop reading it. */
