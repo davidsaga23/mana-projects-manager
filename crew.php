@@ -103,15 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ));
             }
 
-        } elseif (preg_match('/^promote:(\d+)$/', $action, $m)) {
-            promote_placeholder(
-                $pdo, (int)$m[1],
-                $_POST['real_name'][$m[1]] ?? '',
-                $_POST['real_email'][$m[1]] ?? null
-            );
-            flash('ok', 'That slot is now a person. Everything already planned for it, ' .
-                        'scheduled tasks, logged progress, belongs to them, with nothing moved.');
-
         } elseif (preg_match('/^assign:(\d+)$/', $action, $m)) {
             $crewId = (int)($_POST['assign_crew'][$m[1]] ?? 0);
             if ($crewId <= 0) throw new RuntimeException('Pick somebody to put in that slot.');
@@ -480,28 +471,44 @@ require __DIR__ . '/includes/header.php';
                   // 2026-08-31), and it is the only action an empty slot has
                   // besides removing it. ?>
             <?php if (can_edit() && $isPh): ?>
+              <?php // ⚠ NO "REGISTER HIRE" HERE ANY MORE (David, 2026-09-02).
+                    //
+                    // It used to type a name straight into this slot, and that
+                    // is where every duplicate person in the studio list came
+                    // from. Each slot owns its own crew row; registering
+                    // RENAMED that row into the person, and nothing checked
+                    // whether the name already existed. Put the same artist in
+                    // three slots and the studio had three of them, each
+                    // holding its own scheduled work, with no way to join them
+                    // up. It also wrote nobody into the artist database, so
+                    // somebody hired this way stayed "approached" in the book
+                    // for ever.
+                    //
+                    // Hiring happens on the Hiring screen now, which is the one
+                    // place that records WHO, from WHERE, at WHAT STAGE, and
+                    // links the person it creates back to their entry in the
+                    // book. What is left here is the staffing decision, which
+                    // is a different act: put somebody the studio already knows
+                    // into this position. That path re-points the slot rather
+                    // than renaming it, so it cannot make a second copy of
+                    // anybody. ?>
               <details class="slot-change">
-                <summary class="slot-btn">Register hire</summary>
+                <summary class="slot-btn">Put somebody in</summary>
                 <div class="slot-change-bar slot-hire">
-                  <?php // TWO WAYS IN, because there are two situations. Somebody
-                        // new to the studio is typed; somebody already on the
-                        // books is picked, and picking carries their existing
-                        // record rather than making a second one under the same
-                        // name. ?>
-                  <form method="post" class="hire-row">
-                    <input name="real_name[<?= (int)$l['crew_id'] ?>]" placeholder="Their name" required>
-                    <input name="real_email[<?= (int)$l['crew_id'] ?>]" type="email" placeholder="Email (optional)">
-                    <button type="submit" name="action" value="promote:<?= (int)$l['crew_id'] ?>">Register</button>
-                  </form>
                   <form method="post" class="hire-row">
                     <select name="assign_crew[<?= (int)$l['id'] ?>]">
-                      <option value="">or somebody already on the books</option>
+                      <option value="">somebody already on the books</option>
                       <?php foreach ($people as $p): ?>
                         <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?></option>
                       <?php endforeach; ?>
                     </select>
                       <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Put them in</button>
                   </form>
+                  <?php // Said IN the popover, where the decision is being made,
+                        // rather than trusting somebody to remember it. ?>
+                  <small class="muted">Nobody new here. Somebody the studio has not
+                    worked with goes through <a href="hiring.php?project=<?= $projectId ?>">Hiring</a>,
+                    which writes them into the artist database and links them back to it.</small>
                   <button type="button" class="popover-close" aria-label="Close">&times;</button>
                 </div>
               </details>
