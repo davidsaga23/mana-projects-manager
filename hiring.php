@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException(
                     '"' . $h['candidate_name'] . '" has been hired, so this record is how the '
                   . 'crew member on that slot got there. Removing it would leave the person with '
-                  . 'no explanation. Take them out on the Crew screen instead.'
+                  . 'no explanation. Take them out on the Staffing screen instead.'
                 );
             }
 
@@ -258,16 +258,16 @@ if ($fromFinance) {
 }
 ?>
 
-<h2 class="wizard-title"><?= $fromFinance ? 'Hiring' : 'Crew &amp; hiring' ?>
+<h2 class="wizard-title"><?= $fromFinance ? 'Hiring' : 'Staffing' ?>
   <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <?php // NOT A TAB ANY MORE, and not a second view of one either. Staffing a
-      // show happens on Crew & hiring, one position at a time, with the
+      // show happens on Staffing, one position at a time, with the
       // candidates for it on the row. What is left here is what does not nest
       // into a row: the full record per candidate, quoted rates, contract
       // states, and adding people in bulk. ?>
 <?php if (!$fromFinance): ?>
-  <p class="crumb"><a href="crew.php?project=<?= $projectId ?>">&larr; Crew &amp; hiring</a></p>
+  <p class="crumb"><a href="crew.php?project=<?= $projectId ?>">&larr; Staffing</a></p>
 <?php endif; ?>
 
 <p class="lead">
@@ -436,7 +436,7 @@ if ($fromFinance) {
           changes nothing and simply gives them a hiring record. Naming a
           <em>different</em> person for a filled slot is refused and says who holds it, because
           moving their planned work is a decision for the
-          <a href="crew.php?project=<?= $projectId ?>">Crew screen</a>.
+          <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a>.
         </p>
       </form>
 
@@ -546,7 +546,7 @@ if ($fromFinance) {
     <div class="empty-state">
       <h2>No crew slots on this project yet</h2>
       <p>Hiring is organised around the slots the headcount asks for. Create them on the
-         <a href="crew.php?project=<?= $projectId ?>">Crew screen</a> and they will appear here,
+         <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a> and they will appear here,
          each one a job to find somebody for.</p>
     </div>
   <?php else: ?>

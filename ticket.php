@@ -305,12 +305,12 @@ require __DIR__ . '/includes/header.php';
     <p class="flash flash-warn" style="margin-top:10px;">
       This is owned by <strong><?= e($t['crew_name']) ?></strong>, a planning slot that nobody
       fills yet, so no notification email was sent. Renaming the slot to a real person on the
-      <a href="crew.php?project=<?= $projectId ?>">Crew screen</a> makes this theirs, with nothing to move.
+      <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a> makes this theirs, with nothing to move.
     </p>
   <?php elseif ($t['crew_name'] && empty($t['crew_email']) && (int)($t['is_team'] ?? 0) === 0): ?>
     <p class="flash flash-warn" style="margin-top:10px;">
       <strong><?= e($t['crew_name']) ?></strong> has no email address on file, so notifications about
-      this card go nowhere. Add one on the <a href="crew.php?project=<?= $projectId ?>">Crew screen</a>.
+      this card go nowhere. Add one on the <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a>.
     </p>
   <?php endif; ?>
 

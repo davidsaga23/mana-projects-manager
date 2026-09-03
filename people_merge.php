@@ -66,7 +66,7 @@ require __DIR__ . '/includes/header.php';
       // Somebody arriving here needs to know it is not their filing that went
       // wrong, and that the cause is already closed. ?>
 <div class="flash flash-warn">
-  <strong>These came from the old <em>Register hire</em> button on the Crew screen.</strong>
+  <strong>These came from the old <em>Register hire</em> button, on what is now Staffing.</strong>
   Every slot owns its own record, and registering a hire renamed that record into the person
   without checking whether the name already existed, so the same artist put into three slots
   became three people. That button is gone as of 2 September 2026, so no new ones are being

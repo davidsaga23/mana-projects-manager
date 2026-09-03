@@ -267,12 +267,12 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
         }
     } elseif ((int)($t['is_placeholder'] ?? 0) === 1) {
         return [false, 'Assigned to the slot "' . $t['crew_name']
-            . '", which nobody fills yet, so there was nobody to notify. Renaming the slot to a real person on the Crew screen fixes this.'];
+            . '", which nobody fills yet, so there was nobody to notify. Putting somebody into that position on the Staffing screen fixes this.'];
     }
 
     if (!$recipients) {
         return [false, ($t['crew_name'] ?? 'The assignee')
-            . ' has no email address on file, so no notification was sent. Add one on the Crew screen.'];
+            . ' has no email address on file, so no notification was sent. Add one on the Staffing screen.'];
     }
 
     $label = ($t['project_code'] ?? '') . '-' . (int)$t['seq'];

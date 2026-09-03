@@ -173,7 +173,7 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
             // of somebody's plan, which is not what this screen is for.
             throw new RuntimeException(
                 'One of those is an empty slot, not a person, so nothing was merged. '
-              . 'Remove the slot on the Crew screen if it is not needed.');
+              . 'Remove the position on the Staffing screen if it is not needed.');
         }
     }
 

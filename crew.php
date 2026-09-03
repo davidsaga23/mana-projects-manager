@@ -366,13 +366,13 @@ if (isset($byDept['Unassigned'])) {
     $byDept['Unassigned'] = $tail;
 }
 
-$pageTitle = 'Crew · ' . $project['name'];
+$pageTitle = 'Staffing · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
 <?php project_nav($project, 'crew'); ?>
 
-<h2 class="wizard-title">Crew &amp; hiring <span class="muted">· <?= e($project['name']) ?></span></h2>
+<h2 class="wizard-title">Staffing <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 
 <p class="lead">
@@ -680,7 +680,7 @@ require __DIR__ . '/includes/header.php';
                           <?php endforeach; ?>
                         </select>
                         <button type="submit" class="secondary" name="action"
-                                value="addcand:<?= (int)$l['id'] ?>">Put them up</button>
+                                value="addcand:<?= (int)$l['id'] ?>">Line up candidate</button>
                       </form>
                     <?php endif; ?>
 
@@ -690,7 +690,7 @@ require __DIR__ . '/includes/header.php';
                       <input name="candidate_email" type="email" placeholder="Email (optional)"
                              aria-label="New candidate email">
                       <button type="submit" class="secondary" name="action"
-                              value="addcand:<?= (int)$l['id'] ?>">Add</button>
+                              value="addcand:<?= (int)$l['id'] ?>">Add and line up candidate</button>
                     </form>
                   </details>
                 <?php endif; ?>

@@ -33,7 +33,7 @@ function project_nav_items(int $projectId): array {
         // that exists in the database rather than in anybody's day. The screens
         // stay separate files; what was a choice of tab is now a choice of view
         // inside one, drawn by crew_view_switch(). Both mark this tab.
-        ['key' => 'crew',       'label' => 'Crew & hiring',       'href' => 'crew.php' . $p,               'group' => 'work'],
+        ['key' => 'crew',       'label' => 'Staffing',            'href' => 'crew.php' . $p,               'group' => 'work'],
         ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],
         ['key' => 'timeline',   'label' => 'Timeline',            'href' => 'timeline.php' . $p,           'group' => 'work'],
         // Directly before Production tracking, because it is the same list one

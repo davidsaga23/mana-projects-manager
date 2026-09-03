@@ -624,7 +624,7 @@ function set_hire_stage(PDO $pdo, int $projectId, int $hireId, string $stage,
     if ($hire['stage'] === 'hired') {
         throw new RuntimeException(
             '"' . $hire['candidate_name'] . '" has already been hired. Change who is in the slot '
-            . 'on the Crew screen instead, moving the hiring record would not move the work.'
+            . 'on the Staffing screen instead, moving the hiring record would not move the work.'
         );
     }
     if ($hire['stage'] === $stage) {
@@ -735,7 +735,7 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                 // somebody else without anyone asking for it.
                 throw new RuntimeException(sprintf(
                     'That slot already holds %s, so it was not overwritten. If %s is replacing '
-                    . 'them, change who is in the slot on the Crew screen first, that is the '
+                    . 'them, change who is in the slot on the Staffing screen first, that is the '
                     . 'screen that moves the planned work with it.',
                     $occupant['name'], $name));
 

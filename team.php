@@ -58,7 +58,7 @@ require __DIR__ . '/includes/header.php';
     <p><strong>Nobody has work on this project yet.</strong></p>
     <p class="muted">People appear here once they are on the crew, hold a planning slot, or
        have progress recorded against them by an import.</p>
-    <p><a class="button" href="crew.php?project=<?= $projectId ?>">Open the Crew screen →</a></p>
+    <p><a class="button" href="crew.php?project=<?= $projectId ?>">Open the Staffing screen →</a></p>
   </div>
 <?php else: ?>
 

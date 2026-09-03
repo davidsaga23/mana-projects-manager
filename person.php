@@ -222,8 +222,8 @@ require __DIR__ . '/includes/header.php';
 <?php if ($isSlot): ?>
   <div class="flash flash-warn">
     This is a planning slot, not a person. The figures below are what the plan asks of whoever
-    fills it. Renaming the slot on the <a href="crew.php?project=<?= $projectId ?>">Crew screen</a>
-    makes all of this theirs, the id never changes, so nothing has to be moved.
+    fills it. Putting somebody into it on the <a href="crew.php?project=<?= $projectId ?>">Staffing
+    screen</a> makes all of this theirs, and carries the scheduled work across with it.
   </div>
 <?php endif; ?>
 
