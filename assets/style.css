@@ -1860,9 +1860,32 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .crew-dept-head ~ .crew-step-head,
 .crew-dept-head ~ .review-table { margin-left: 14px; width: calc(100% - 14px); }
 
-/* The two views of staffing a show. Sits under the title rather than in the tab
-   bar: the tab bar says which SCREEN, this says which arrangement of it. */
-.view-switch { margin-top: 2px; }
+/* --- the candidates on an empty position ----------------------------------
+   The hiring conversation, nested in the position it is about, which is what
+   made the two screens one.
+
+   ⚠ display:flex IS RESTATED, and it is load-bearing. These sit inside
+   .review-table, where `form { display: inline }` is (0,1,1) and beats
+   `.inline-form { display: flex }` at (0,1,0) - the same trap that put Save
+   under the email field on Users. Two classes here wins it back. */
+.lined-up { margin-top: 5px; }
+.cand {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 3px 0; font-size: 13px;
+}
+.lined-up .inline-form { display: flex; align-items: center; gap: 6px; margin: 0; }
+/* width:auto on both, or the global `input, select { width: 100% }` gives each
+   control its own line and the row stops being a row. */
+.lined-up select, .lined-up input {
+  width: auto; padding: 3px 6px; font-size: 12.5px;
+}
+.cand-stage select { min-width: 116px; }
+.cand-hire { display: inline-block; margin: 0; }
+.cand-add { margin-top: 6px; }
+.cand-add > summary { font-size: 12.5px; padding: 3px 9px; }
+.cand-add-form { margin-top: 6px !important; flex-wrap: wrap; }
+.cand-add-form input { min-width: 130px; }
+.cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
 /* --- the duplicate-people screen ------------------------------------------
    A comparison table: the columns are what each record is CARRYING, because

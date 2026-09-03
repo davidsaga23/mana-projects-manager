@@ -261,11 +261,14 @@ if ($fromFinance) {
 <h2 class="wizard-title"><?= $fromFinance ? 'Hiring' : 'Crew &amp; hiring' ?>
   <span class="muted">· <?= e($project['name']) ?></span></h2>
 
-<?php // The switch belongs to the PRODUCTION side only. Arriving through
-      // Finance management, this screen is one of that bar's tabs and offering
-      // a jump to the Crew screen would land the reader on the other side of
-      // the app with no warning. Same reasoning as the nav choice above. ?>
-<?php if (!$fromFinance) crew_view_switch($projectId, 'stage'); ?>
+<?php // NOT A TAB ANY MORE, and not a second view of one either. Staffing a
+      // show happens on Crew & hiring, one position at a time, with the
+      // candidates for it on the row. What is left here is what does not nest
+      // into a row: the full record per candidate, quoted rates, contract
+      // states, and adding people in bulk. ?>
+<?php if (!$fromFinance): ?>
+  <p class="crumb"><a href="crew.php?project=<?= $projectId ?>">&larr; Crew &amp; hiring</a></p>
+<?php endif; ?>
 
 <p class="lead">
   The months between the plan knowing a slot needs somebody and the crew list knowing it is

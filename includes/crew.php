@@ -253,32 +253,19 @@ function remove_surplus_lanes(PDO $pdo, int $projectId): array {
 }
 
 /**
- * THE TWO VIEWS OF STAFFING A SHOW, drawn by both screens that offer them.
+ * ⚠ crew_view_switch() WAS HERE AND LASTED ONE COMMIT (2026-09-02).
  *
- * By position: every slot the plan needs, and who is in it. By stage: the same
- * people arranged by how far along the conversation is. One asks "is this show
- * staffed", the other asks "who am I waiting on", and they are the same rows
- * seen from two ends - which is why they used to be two tabs and should not
- * have been.
+ * It offered "By position" and "By stage" as two views of one tab, which was a
+ * misreading of what David asked for: "I was asking to merge both of them and
+ * do all the staffing and hiring in the same page." Two views behind one tab is
+ * still two pages, and it still made somebody choose an arrangement before they
+ * could do anything.
  *
- * Written here rather than in either screen so the pair cannot drift into
- * offering different destinations, the same reason project_nav_items() is one
- * list rather than ten copies.
+ * A position and the conversations to fill it are one-to-many, and one-to-many
+ * belongs NESTED. The candidates, their stage and the hire itself now sit on the
+ * position row in crew.php, so there is one list rather than two views of two.
  */
-function crew_view_switch(int $projectId, string $current): void {
-    $views = [
-        ['key' => 'position', 'label' => 'By position', 'href' => 'crew.php?project=' . $projectId],
-        ['key' => 'stage',    'label' => 'By stage',    'href' => 'hiring.php?project=' . $projectId],
-    ];
-    echo '<div class="page-actions button-row view-switch">';
-    foreach ($views as $v) {
-        // The one you are on is the solid button. Two identical buttons would
-        // make the switch say nothing about where you already are.
-        $cls = $v['key'] === $current ? 'button' : 'button secondary';
-        printf('<a class="%s" href="%s">%s</a>', $cls, e($v['href']), e($v['label']));
-    }
-    echo '</div>';
-}
+
 
 /**
  * ⚠ promote_placeholder() WAS HERE AND IS GONE (2026-09-02). Do not bring it

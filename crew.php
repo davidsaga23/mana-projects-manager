@@ -104,6 +104,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ));
             }
 
+        } elseif (preg_match('/^hire:(\d+)$/', $action, $m)) {
+            // ⚠ THE SAME hire_candidate() THE HIRING SCREEN CALLS, not a second
+            // way of doing it. The candidate is found or created once by name,
+            // the position is pointed at them, their artist record is marked
+            // hired and linked to the person it created, and the stage change
+            // is logged.
+            //
+            // No name field on the button: the name is already on the hiring
+            // record and hire_candidate() falls back to it. Retyping it is
+            // exactly how "Luka Bromely" becomes a second person.
+            foreach (hire_candidate($pdo, $projectId, (int)$m[1], [], current_user_display()) as $said) {
+                flash('ok', $said);
+            }
+
+        } elseif (preg_match('/^stage:(\d+)$/', $action, $m)) {
+            // set_hire_stage() routes "hired" through hire_candidate() itself,
+            // so this cannot become a second, weaker way of hiring somebody.
+            flash('ok', set_hire_stage($pdo, $projectId, (int)$m[1],
+                                       (string)($_POST['stage'] ?? ''), '', current_user_display()));
+
+        } elseif (preg_match('/^addcand:(\d+)$/', $action, $m)) {
+            // save_hire() checks the lane belongs to THIS project, so a posted
+            // id cannot attach somebody to another show's position.
+            $r = save_hire($pdo, $projectId, [
+                'candidate_name' => $_POST['candidate_name'] ?? '',
+                'email'          => $_POST['candidate_email'] ?? '',
+                'lane_id'        => (int)$m[1],
+                'stage'          => 'approached',
+            ], current_user_display());
+            foreach ((array)$r as $said) if (is_string($said)) flash('ok', $said);
+
         } elseif (preg_match('/^assign:(\d+)$/', $action, $m)) {
             $crewId = (int)($_POST['assign_crew'][$m[1]] ?? 0);
             if ($crewId <= 0) throw new RuntimeException('Pick somebody to put in that slot.');
@@ -259,7 +290,8 @@ $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 // Who is lined up for the empty slots. An unfilled slot with three candidates in
 // play and one with nobody at all look identical on this screen otherwise, and
 // they are completely different problems.
-$candidatesByLane = hiring_available($pdo) ? hires_by_lane($pdo, $projectId) : [];
+$hiringReady = hiring_available($pdo);
+$candidatesByLane = $hiringReady ? hires_by_lane($pdo, $projectId) : [];
 
 // Steps with a headcount but no slots yet — the reason to press Generate.
 $stmt = $pdo->prepare(
@@ -330,7 +362,6 @@ require __DIR__ . '/includes/header.php';
 
 <h2 class="wizard-title">Crew &amp; hiring <span class="muted">· <?= e($project['name']) ?></span></h2>
 
-<?php crew_view_switch($projectId, 'position'); ?>
 
 <p class="lead">
   A crew is never complete until a show nearly is, people arrive as their department starts.
@@ -506,23 +537,79 @@ require __DIR__ . '/includes/header.php';
                 Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this step.
               </div>
             <?php endif; ?>
-            <?php if ($isPh && $candidatesByLane):
+            <?php if ($isPh && $hiringReady):
               $live = array_filter($candidatesByLane[(int)$l['id']] ?? [], function ($h) {
                   return in_array($h['stage'], HIRE_STAGES_OPEN, true);
               });
-              // Names, not just a count. "2 candidates" sends somebody to another
-              // screen to find out who; the names answer it here.
-              $names = array_map(function ($h) {
-                  return $h['candidate_name'] . ' (' . strtolower(hire_stage_label($h['stage'])) . ')';
-              }, $live);
             ?>
-              <div class="muted small">
-                <?php if ($names): ?>
-                  Lined up: <?= e(implode(', ', $names)) ?> ·
-                  <a href="hiring.php?project=<?= $projectId ?>">Hiring →</a>
+              <?php // ⚠ THE WHOLE STAFFING LOOP, ON THE POSITION IT BELONGS TO
+                    // (David, 2026-09-02: "I was asking to merge both of them and
+                    // do all the staffing and hiring in the same page").
+                    //
+                    // A position and the conversations to fill it are one thing
+                    // to N things, and one-to-many belongs nested, not on a
+                    // second screen: you never look at an empty position without
+                    // wanting to know who is in the frame for it, and you never
+                    // move somebody's stage without knowing what they are being
+                    // considered for. Put candidates, their stage and the hire
+                    // itself on the row and the two lists are one list.
+                    //
+                    // The Hiring screen keeps what does NOT nest into a row: the
+                    // full record per candidate, notes, quoted rates, contract
+                    // states, and adding people in bulk. Reached from the row
+                    // below rather than as a tab of its own. ?>
+              <div class="lined-up">
+                <?php if ($live): ?>
+                  <?php foreach ($live as $h): ?>
+                    <div class="cand">
+                      <strong><?= e($h['candidate_name']) ?></strong>
+                      <?php if (can_edit()): ?>
+                        <?php // The stage moves in place. "Hired" is NOT in this
+                              // list: set_hire_stage() would run the real hire
+                              // from a dropdown with no confirmation, and hiring
+                              // somebody by mis-clicking a select is not a
+                              // mistake this screen should make possible. It has
+                              // its own button. ?>
+                        <form method="post" class="inline-form cand-stage">
+                          <select name="stage" onchange="this.form.submit()"
+                                  aria-label="Stage for <?= e($h['candidate_name']) ?>">
+                            <?php foreach (HIRE_STAGES as $k => $lbl): if ($k === 'hired') continue; ?>
+                              <option value="<?= e($k) ?>" <?= $h['stage'] === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                          <input type="hidden" name="action" value="stage:<?= (int)$h['id'] ?>">
+                        </form>
+                        <form method="post" class="cand-hire"
+                              onsubmit="return confirm('Hire <?= e(addslashes($h['candidate_name'])) ?> into this position? Everything already planned for it becomes theirs.');">
+                          <button type="submit" class="row-btn row-btn-go" name="action"
+                                  value="hire:<?= (int)$h['id'] ?>">Hire</button>
+                        </form>
+                      <?php else: ?>
+                        <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
+                      <?php endif; ?>
+                      <a class="muted small" href="hiring.php?project=<?= $projectId ?>#h<?= (int)$h['id'] ?>">record →</a>
+                    </div>
+                  <?php endforeach; ?>
                 <?php else: ?>
-                  <span class="warn-text">Nobody lined up.</span>
-                  <a href="hiring.php?project=<?= $projectId ?>">Start looking →</a>
+                  <div class="muted small warn-text">Nobody lined up for this position yet.</div>
+                <?php endif; ?>
+
+                <?php if (can_edit()): ?>
+                  <?php // ADDING SOMEBODY HAPPENS HERE, against the position they
+                        // are being considered for. Two fields, because that is
+                        // all a first conversation has; everything else about
+                        // them is filled in later on their record. ?>
+                  <details class="cand-add">
+                    <summary class="row-btn">+ Add a candidate</summary>
+                    <form method="post" class="inline-form cand-add-form">
+                      <input name="candidate_name" placeholder="Their name" required
+                             aria-label="Candidate name">
+                      <input name="candidate_email" type="email" placeholder="Email (optional)"
+                             aria-label="Candidate email">
+                      <button type="submit" class="secondary" name="action"
+                              value="addcand:<?= (int)$l['id'] ?>">Add</button>
+                    </form>
+                  </details>
                 <?php endif; ?>
               </div>
             <?php endif; ?>
