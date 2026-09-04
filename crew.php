@@ -645,11 +645,23 @@ require __DIR__ . '/includes/header.php';
                       <?php else: ?>
                         <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
                       <?php endif; ?>
-                      <?php // "record →" was a link pretending to be a footnote. It
-                            // leads to everything about this person that does not
-                            // fit on the row - notes, quoted rate, contract, stage
-                            // history - which is a destination, not an aside. ?>
-                      <a class="row-btn" href="hiring.php?project=<?= $projectId ?>#h<?= (int)$h['id'] ?>">View details</a>
+                      <?php // ⚠ IT GOES TO THE PERSON, not to the Hiring screen
+                            // (David, 2026-09-02: "the view details should take
+                            // you to the detailed page of that person").
+                            //
+                            // It pointed at hiring.php, and that was wrong twice
+                            // over: that screen is a second list of these same
+                            // positions rather than a page about anybody, so the
+                            // button promised a person and delivered a rival copy
+                            // of the screen you were already on.
+                            //
+                            // A CANDIDATE HAS NO person.php PAGE, and cannot: that
+                            // page is built on a crew record, and somebody being
+                            // talked to deliberately does not have one until they
+                            // are hired. Their record is their entry in the artist
+                            // database, which is where every fact about them lives
+                            // and is editable in place. ?>
+                      <a class="row-btn" href="artists.php?q=<?= urlencode((string)$h['candidate_name']) ?>">View details</a>
                       <?php // WHAT IS STILL BLANK, said where the conversation is
                             // actually happening. Nothing is mandatory, so this is
                             // the only thing standing between a thin entry and a
