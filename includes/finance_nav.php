@@ -30,7 +30,13 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // admin-only inside includes/money.php, so nothing needs hiding here.
         // &section=finance tells that screen which bar to draw, so the tab that
         // was clicked is the tab that lights up when it lands.
-        ['key' => 'hiring',     'label' => 'Hiring', 'href' => 'hiring.php' . $p . '&section=finance'],
+        // ⚠ NO HIRING TAB (David, 2026-09-02: "just leave it there but nothing
+        // should point to that"). hiring.php still works if its address is
+        // typed, and still draws this bar when it is reached with
+        // &section=finance, but it is a second list of the positions Staffing
+        // already shows and nothing in the app sends anybody to it. What it
+        // uniquely holds - quoted rates, contract states, bulk add, stage
+        // history - is on the roadmap to be moved or retired.
         // The IDEAL QUOTA sheet — the number this project's budget is built on.
         //
         // It lives inside Finance management because that is where it is decided

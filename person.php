@@ -283,7 +283,10 @@ require __DIR__ . '/includes/header.php';
     Hired through the platform<?php
       if (!empty($hiredAs['stage_changed_at'])): ?> on <?= e(substr((string)$hiredAs['stage_changed_at'], 0, 10)) ?><?php endif;
       if (!empty($hiredAs['source'])): ?>, sourced via <?= e($hiredAs['source']) ?><?php endif; ?>.
-    <a href="hiring.php?project=<?= $projectId ?>">Hiring →</a>
+    <?php // The link here used to go to the Hiring screen. Nothing points
+          // there now; a person's own record is in the artist database, which
+          // is also where every fact about them is editable. ?>
+    <a href="artists.php?q=<?= urlencode((string)$person['name']) ?>">Their artist record →</a>
   </p>
 <?php endif; ?>
 

@@ -1725,10 +1725,10 @@ body.lightbox-lock { overflow: hidden; }
 
 /* The hire popover holds TWO forms — type a new person, or pick one already on
    the books — so it stacks where the assignee picker is a single line. */
-.slot-hire { flex-direction: column; align-items: stretch; gap: 8px; }
-.slot-hire .hire-row { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; margin: 0; }
-.slot-hire input, .slot-hire select { width: auto; flex: 1 1 auto; min-width: 150px; }
-.slot-hire button { flex: 0 0 auto; }
+/* .slot-hire was the two-way popover on an EMPTY position, typed name on one
+   line and a picker on the other. Both routes are gone: hiring makes duplicates
+   and was removed, and "put somebody already on the crew in" had no use in a
+   studio with three full-time people. Nothing carries the class now. */
 
 
 /* Removing the SLOT is a rarer, larger act than removing its assignee, and the
@@ -1748,8 +1748,10 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .popover-close:hover { background: #eef1f4; color: #1c2733; border-radius: 3px; }
 /* In the hire popover it sits in the corner rather than in either row, since
    neither of those two lines is the one it belongs to. */
-.slot-hire { position: relative; padding-right: 26px; }
-.slot-hire .popover-close { position: absolute; top: 4px; right: 4px; }
+/* .popover-close still earns its keep: the "Change assignee" popover on a
+   FILLED position uses it, and assets/crew.js listens for it. */
+.slot-change-bar { position: relative; padding-right: 26px; }
+.slot-change-bar .popover-close { position: absolute; top: 4px; right: 4px; }
 /* The editable rate in the expense projection. Narrow, because the column is,
    and the currency sits beside it as text rather than in a second control. */
 .rate-edit { display: flex; align-items: center; gap: 6px; margin: 0; }

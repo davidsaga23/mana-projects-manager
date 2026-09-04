@@ -743,7 +743,28 @@ require __DIR__ . '/includes/header.php';
                   // 2026-08-31), and it is the only action an empty slot has
                   // besides removing it. ?>
             <?php if (can_edit() && $isPh): ?>
-              <?php // ⚠ NO "REGISTER HIRE" HERE ANY MORE (David, 2026-09-02).
+              <?php // ⚠ NOTHING FILLS A POSITION FROM THIS COLUMN ANY MORE.
+                    //
+                    // "Register hire" went on 2026-09-02 because it made
+                    // duplicate people. "Put somebody in" went the same day, for
+                    // a different reason: it moved somebody already on the
+                    // studio crew into a position, and David's studio has three
+                    // full-time people. "We don't have employees... in that
+                    // sense, that button doesn't work for anything." A control
+                    // whose whole premise is a staff list this studio does not
+                    // have is one more thing to explain on every screen.
+                    //
+                    // Filling a position now has ONE route, on the row itself:
+                    // line somebody up and hire them. That is true for a
+                    // freelancer and equally true for Junior, and one route is
+                    // the answer to the question David asked three times about
+                    // which of these buttons does what.
+                    //
+                    // The assign: handler stays. "Change assignee" on a FILLED
+                    // position still uses it, and swapping one person for
+                    // another mid-show is a real thing that needs the scheduled
+                    // work carried across. ?>
+              <?php // (kept for the record) NO "REGISTER HIRE" HERE EITHER.
                     //
                     // It used to type a name straight into this slot, and that
                     // is where every duplicate person in the studio list came
@@ -764,26 +785,6 @@ require __DIR__ . '/includes/header.php';
                     // into this position. That path re-points the slot rather
                     // than renaming it, so it cannot make a second copy of
                     // anybody. ?>
-              <details class="slot-change">
-                <summary class="slot-btn">Put somebody in</summary>
-                <div class="slot-change-bar slot-hire">
-                  <form method="post" class="hire-row">
-                    <select name="assign_crew[<?= (int)$l['id'] ?>]">
-                      <option value="">somebody already on the books</option>
-                      <?php foreach ($people as $p): ?>
-                        <option value="<?= (int)$p['id'] ?>"><?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?></option>
-                      <?php endforeach; ?>
-                    </select>
-                      <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Put them in</button>
-                  </form>
-                  <?php // Said IN the popover, where the decision is being made,
-                        // rather than trusting somebody to remember it. ?>
-                  <small class="muted">Nobody new here. Somebody the studio has not
-                    worked with goes through <a href="hiring.php?project=<?= $projectId ?>">Hiring</a>,
-                    which writes them into the artist database and links them back to it.</small>
-                  <button type="button" class="popover-close" aria-label="Close">&times;</button>
-                </div>
-              </details>
             <?php elseif (can_edit()): ?>
               <?php // BUTTONS, not a line of small print (David, 2026-08-31).
                     // These are the two things done to a filled slot, and they

@@ -465,3 +465,54 @@ WhatsApp, without the platform becoming a video host.
 
 Decide this deliberately when it comes up. It is the one item on the list that
 could quietly become bigger than everything above it combined.
+
+---
+
+## The Hiring screen: move what is left, or retire it
+
+**Status as of 2026-09-02: orphaned on purpose. Nothing in the app links to it.**
+
+Crew and Hiring were merged into one screen, **Staffing**, on David's call: "I
+was asking to merge both of them and do all the staffing and hiring in the same
+page." A position now carries its own candidates, their stage, and the Hire
+button, so the whole loop happens on the row.
+
+`hiring.php` still exists and still works if its address is typed. It is not
+deleted, and it is not linked from anywhere: not the project tabs, not the
+finance bar, not a person's page, not the "View details" button. David,
+2026-09-02: "just leave it there but nothing should point to that, add it to the
+roadmap to see later on what to do with it."
+
+**Why it could not simply be deleted.** It is a second list of the same
+positions, which is why it had to stop being reachable, but it is also the only
+home of five things Staffing does not carry:
+
+- **quoted rates** per candidate, admin only, in the finance database on
+  `hire_quotes`;
+- **contract states** — sent, signed — per person;
+- **engagement dates**, when somebody starts and finishes on a show;
+- **stage history**, the append-only `hire_stage_log`, which answers "how long
+  has that offer been out";
+- **adding candidates in bulk**, and **candidates tied to no position at all**
+  (`hires.lane_id IS NULL`), which is somebody met at a festival.
+
+**The decision to make.** Each of those five either moves somewhere it belongs or
+justifies keeping a screen for itself:
+
+- rates and contracts are money and arguably belong on **Finance management**,
+  beside the expense projection they price;
+- engagement dates belong with the **crew_absences** work already on this list,
+  since both answer "is this person available";
+- stage history belongs on the **artist record**, which is already where a
+  person's facts live;
+- bulk add belongs on **Artists**, which already has a five-row grid for it;
+- candidates tied to no position belong on **Artists** too, since that is
+  exactly what an artist with no approach is.
+
+If all five move, the screen deletes itself. That is the likely answer, but it is
+five separate pieces of work and none of them is urgent while the screen still
+works for anybody who knows the address.
+
+**Do not link to it again without deciding this.** A screen that is reachable
+from two places and shows the same positions as another one is what this whole
+run of work removed.
