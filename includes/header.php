@@ -127,6 +127,17 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
   <div class="flash flash-warn">You have view-only access, everything is readable, nothing
     can be changed. Ask an administrator if you need to edit something.</div>
 <?php endif; ?>
+<?php // .flash-msg marks NEWS - what just happened - as against the standing
+      // banners above, which are drawn on every load. assets/keepplace.js
+      // floats only these down to wherever the reader is after a save, and a
+      // permanent "migrations are waiting" notice following somebody down the
+      // page would be a nag rather than a message. ?>
 <?php foreach (take_flashes() as $f): ?>
-  <div class="flash flash-<?= e($f['type']) ?>"><?= e($f['msg']) ?></div>
+  <div class="flash flash-msg flash-<?= e($f['type']) ?>"><?= e($f['msg']) ?></div>
 <?php endforeach; ?>
+
+<?php // KEEPS YOUR PLACE when a save reloads the page (David, 2026-09-02).
+      // Loaded here rather than per screen because every screen saves this way.
+      // defer, so it never blocks the page it is trying to make less annoying;
+      // it needs nothing from the DOM until DOMContentLoaded anyway. ?>
+<script defer src="assets/keepplace.js<?= asset_ver('keepplace.js') ?>"></script>

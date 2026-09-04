@@ -1894,6 +1894,35 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
+/* --- the message that follows you down the page ---------------------------
+   assets/keepplace.js copies a flash into this when it restores your scroll
+   position after a save. Without it, an error would be rendered at the top of
+   a page you are no longer looking at.
+
+   Fixed to the viewport, top right: it must be visible wherever the reader
+   ended up, and the top LEFT is where this app puts the page title. */
+.keepplace-toasts {
+  position: fixed; top: 14px; right: 16px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: min(440px, calc(100vw - 32px));
+}
+.keepplace-toast {
+  position: relative; padding: 10px 34px 10px 14px; border-radius: 5px;
+  font-size: 13.5px; line-height: 1.45; cursor: pointer;
+  box-shadow: 0 3px 14px rgba(15, 22, 30, .18);
+  border-left: 4px solid;
+}
+.keepplace-toast.is-ok  { background: #e8f6ec; border-color: #1e7e34; color: #17542a; }
+/* An error does not time out and does not fade: it is the only thing telling
+   somebody their change did not happen. */
+.keepplace-toast.is-err { background: #fdecee; border-color: #b02a37; color: #8f222c; }
+.keepplace-x {
+  position: absolute; top: 4px; right: 6px;
+  background: none; border: 0; margin: 0; padding: 0 4px;
+  font-size: 17px; line-height: 1; color: inherit; opacity: .55; cursor: pointer;
+}
+.keepplace-x:hover { opacity: 1; background: none; }
+
 /* --- filled against unfilled, at a glance ---------------------------------
    David, 2026-09-02. THREE states, because "not filled" hides the distinction
    that matters: a position with people in the frame is in hand, one with nobody
