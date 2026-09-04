@@ -645,7 +645,11 @@ require __DIR__ . '/includes/header.php';
                       <?php else: ?>
                         <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
                       <?php endif; ?>
-                      <a class="muted small" href="hiring.php?project=<?= $projectId ?>#h<?= (int)$h['id'] ?>">record →</a>
+                      <?php // "record →" was a link pretending to be a footnote. It
+                            // leads to everything about this person that does not
+                            // fit on the row - notes, quoted rate, contract, stage
+                            // history - which is a destination, not an aside. ?>
+                      <a class="row-btn" href="hiring.php?project=<?= $projectId ?>#h<?= (int)$h['id'] ?>">View details</a>
                       <?php // WHAT IS STILL BLANK, said where the conversation is
                             // actually happening. Nothing is mandatory, so this is
                             // the only thing standing between a thin entry and a

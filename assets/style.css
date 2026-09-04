@@ -1880,6 +1880,11 @@ button.secondary.danger:hover { background: #e9c2c7; }
   width: auto; padding: 3px 6px; font-size: 12.5px;
 }
 .cand-stage select { min-width: 116px; }
+/* The buttons on a candidate line match the controls beside them rather than
+   the page-level .row-btn: Hire stood a couple of pixels taller than the stage
+   picker it sits next to, which on a row of five small things reads as one of
+   them being slightly wrong. */
+.cand .row-btn { padding: 3px 9px; font-size: 12.5px; }
 .cand-hire { display: inline-block; margin: 0; }
 .cand-add { margin-top: 6px; }
 .cand-add > summary { font-size: 12.5px; padding: 3px 9px; }
