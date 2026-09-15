@@ -434,9 +434,56 @@ p.crumb a { white-space: normal; }
 .wf-label { font: 600 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
 .wf-sub   { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #7b8894; }
 
+/* --- drawing on the diagram (assets/workflow-edit.js) ----------------------
+   The handle is the dot on a box's right edge, the side every line leaves
+   from, so it reads as "a line starts here" without a word of explanation. */
+.wf-handle { fill: #fff; stroke: #2f6fb2; stroke-width: 1.6; pointer-events: none;
+             transition: r .12s; }
+/* The real target is the invisible ring around it. touch-action:none, or a
+   finger dragging from it scrolls the page instead of drawing. */
+.wf-handle-hit { fill: transparent; cursor: crosshair; touch-action: none; }
+.wf-node:hover .wf-handle { r: 6.5; fill: #2f6fb2; }
+.wf-drag-line { fill: none; stroke: #2f6fb2; stroke-width: 2; stroke-dasharray: 5 4;
+                pointer-events: none; }
+.wf-dragging { cursor: crosshair; }
+.wf-dragging .wf-edge-hit { pointer-events: none; }
+/* Where the line would land, and whether it can. */
+.wf-target-ok  .wf-box { stroke: #1e7e34; stroke-width: 2.5; fill: #eef8f1; }
+.wf-target-bad .wf-box { stroke: #b02a37; stroke-width: 2.5; fill: #fdeff0; }
+
+/* A line is selected before it is removed - see workflow-edit.js for why. The
+   hit path is wide and invisible; the visible one only changes colour. */
+.wf-edge-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
+/* The visible line sits ON TOP of its hit path and must not catch the click
+   itself, or a click landing exactly on its 1.6px stroke would miss the handler
+   looking for the hit path. Scoped to the page's diagram; the downloaded file
+   is a picture and never sees this rule. */
+.wf-diagram .wf-edge { pointer-events: none; }
+.wf-edge-hit:hover + .wf-edge,
+.wf-edge.is-selected { stroke: #b02a37; stroke-width: 2.4; }
+.wf-edge-x { cursor: pointer; }
+.wf-edge-x circle { fill: #b02a37; stroke: #fff; stroke-width: 2; }
+.wf-edge-x text { fill: #fff; font: 700 14px -apple-system, "Segoe UI", Roboto, sans-serif;
+                  pointer-events: none; }
+
+/* The sentence beside the pointer. Fixed, not inside the SVG, so the diagram's
+   own scrolling box cannot clip it at the edge. */
+.wf-hint {
+  position: fixed; z-index: 250; pointer-events: none; max-width: 320px;
+  padding: 5px 9px; border-radius: 4px; font-size: 12.5px; line-height: 1.35;
+  background: #1c2733; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.wf-hint.is-ok  { background: #1e7e34; }
+.wf-hint.is-bad { background: #b02a37; }
+/* While the save reloads the page, the picture cannot take a second gesture. */
+.wf-saving { opacity: .55; pointer-events: none; }
+.wf-howto { margin-bottom: 2px; }
+
 /* Dependency picker */
 .deps-table td { vertical-align: top; }
 .deps-table .wf-name { white-space: normal; min-width: 170px; }
+/* On an inner div, never on the <td>: display:flex on a table cell makes it
+   stop being one, and its borders stop lining up with the rest of the row. */
 .dep-picks { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .dep-pick { font-size: 13px; }
 .dep-pick .dot { width: 7px; height: 7px; margin-right: 3px; }

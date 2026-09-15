@@ -52,7 +52,38 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
     foreach ($wanted as $deps) $edges += count($deps);
     $starters = count(array_filter($wanted, function ($d) { return !$d; }));
 
-    flash('ok', "Saved the workflow, $edges link" . ($edges === 1 ? '' : 's') . ', ' .
+    // A CHANGE MADE ON THE DIAGRAM says what it did, in step names. The generic
+    // count below is fine after ticking a dozen boxes; after drawing ONE line it
+    // tells somebody nothing about whether the line went the way they meant,
+    // and direction is the thing most likely to be wrong with a drag.
+    //
+    // Ids, not text, arrive from the page, and are looked up here: the sentence
+    // is built from the step table, never from anything posted.
+    $said = '';
+    // Same rule as the hint beside the pointer, so the sentence before letting
+    // go and the sentence after saving are the same sentence. A name used by
+    // more than one step gets its scope in the words the diagram prints.
+    $count = [];
+    foreach ($steps as $s) {
+        $k = mb_strtolower(trim((string)$s['name']));
+        $count[$k] = ($count[$k] ?? 0) + 1;
+    }
+    $names = [];
+    foreach ($steps as $s) {
+        $n = (string)$s['name'];
+        $names[(int)$s['id']] = $count[mb_strtolower(trim($n))] > 1
+            ? $n . ' (' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null) . ')'
+            : $n;
+    }
+    foreach (['wf_add' => 'now waits for', 'wf_remove' => 'no longer waits for'] as $key => $verb) {
+        if (!preg_match('/^(\d+)-(\d+)$/', (string)($_POST[$key] ?? ''), $m)) continue;
+        $source = (int)$m[1]; $target = (int)$m[2];
+        if (isset($names[$source], $names[$target])) {
+            $said = $names[$target] . ' ' . $verb . ' ' . $names[$source] . '. ';
+        }
+    }
+
+    flash('ok', $said . "Saved the workflow, $edges link" . ($edges === 1 ? '' : 's') . ', ' .
                 "$starters step" . ($starters === 1 ? '' : 's') . ' able to start immediately.');
 
     return wizard_next_url($projectId, 3);
@@ -93,6 +124,16 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
     <div class="wf-diagram-wrap">
       <?= workflow_diagram_svg($steps, $depsMap) ?>
     </div>
+    <?php if (can_edit()): ?>
+      <?php // SAID ON THE PICTURE, where the gesture is, rather than in the lead
+            // paragraph above it: somebody looking at a diagram does not scroll up
+            // to find out whether it can be touched. ?>
+      <p class="muted small wf-howto">
+        <strong>Drag from the dot on the right of a box</strong> onto another box to make that
+        second step wait for the first. <strong>Click a line</strong> to remove it. Every change
+        saves at once and redraws the picture; the ticks below change with it.
+      </p>
+    <?php endif; ?>
     <p class="muted small">Left to right: everything in the first column can start on day one,
        and each column waits for the one before it. Steps stacked in the same column run at the
        same time. This redraws when you save.</p>
@@ -114,7 +155,14 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
                 · <?= empty($mine) ? 'starts immediately' : 'column ' . (($levels[$id] ?? 0) + 1) ?>
               </div>
             </td>
-            <td class="dep-picks">
+            <?php // ⚠ THE FLEX BOX IS INSIDE THE CELL, NOT THE CELL ITSELF. This <td>
+                  // used to carry display:flex, and a table cell given display:flex
+                  // stops being a table cell: the browser wraps it in an anonymous
+                  // one and draws its borders at its own height rather than the
+                  // row's. That is why every line in this column sat higher than
+                  // the matching line in the Step column (David, 2026-09-14). ?>
+            <td class="dep-picks-cell">
+              <div class="dep-picks">
               <?php foreach ($steps as $other): $oid = (int)$other['id']; if ($oid === $id) continue; ?>
                 <label class="inline dep-pick">
                   <input type="checkbox" name="deps[<?= $id ?>][]" value="<?= $oid ?>"
@@ -125,6 +173,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
               <?php if (count($steps) === 1): ?>
                 <span class="muted">Nothing else to wait for yet.</span>
               <?php endif; ?>
+              </div>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -156,5 +205,15 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
     <p class="muted small">Ticking nothing means a step can begin on day one. A loop, two steps
        each waiting for the other, is refused with nothing saved, so the scheduler can never be
        handed one.</p>
+
+    <?php // The diagram editor. A view-only account gets the picture without the
+          // handles: offering a gesture that cannot save would be a control that
+          // silently does nothing. window.WF_EDITABLE rather than a top-level
+          // const, because a const does not become a window property - the trap
+          // that cost the tasks board a day. ?>
+    <?php if (can_edit()): ?>
+      <script>window.WF_EDITABLE = true;</script>
+      <script src="assets/workflow-edit.js<?= asset_ver('workflow-edit.js') ?>"></script>
+    <?php endif; ?>
     <?php
 }

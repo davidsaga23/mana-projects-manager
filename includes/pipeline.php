@@ -846,9 +846,14 @@ function workflow_diagram_svg(array $steps, array $depsMap,
             $x1 = $from['x'] + $boxW; $y1 = $from['y'] + $boxH / 2;
             $x2 = $to['x'];           $y2 = $to['y'] + $boxH / 2;
             $mid = max(18, ($x2 - $x1) / 2);
+            // Which link this is, on the page only. The diagram can be edited by
+            // dragging (assets/workflow-edit.js), and a line has to know what it
+            // joins to be removed. Left off the downloaded file, which is a
+            // picture and has no use for either.
+            $ids = $standalone ? '' : ' data-from="' . (int)$d . '" data-to="' . (int)$stepId . '"';
             $svg .= '<path d="M' . $x1 . ',' . $y1
                   . ' C' . ($x1 + $mid) . ',' . $y1 . ' ' . ($x2 - $mid) . ',' . $y2
-                  . ' ' . $x2 . ',' . $y2 . '" class="wf-edge" />';
+                  . ' ' . $x2 . ',' . $y2 . '" class="wf-edge"' . $ids . ' />';
         }
     }
 
@@ -860,7 +865,10 @@ function workflow_diagram_svg(array $steps, array $depsMap,
         $label = mb_strlen($name) > 20 ? mb_substr($name, 0, 19) . '…' : $name;
         $scope = applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null);
 
-        $svg .= '<g class="wf-node">'
+        $svg .= '<g class="wf-node"'
+              . ($standalone ? '' : ' data-step="' . (int)$id . '" data-name="' . e($name)
+                                  . '" data-scope="' . e($scope) . '"')
+              . '>'
               . '<title>' . e($name . ' · ' . $scope) . '</title>'
               . '<rect x="' . $p['x'] . '" y="' . $p['y'] . '" width="' . $boxW . '" height="' . $boxH
               . '" rx="5" class="wf-box" />'
