@@ -766,6 +766,82 @@ function renumber_steps(PDO $pdo, int $projectId): void {
 
 
 /**
+ * Whether a step's deadline may be saved, and what to say about it.
+ *
+ * ⚠ ONE IMPLEMENTATION OF THE RULES, for the two places a deadline is edited:
+ * the Dates & headcount screen, which sets every step at once, and the step
+ * page, which sets one (David, 2026-09-14: "we need to have a deadline menu like
+ * the one in STFC"). Two screens editing one column with their own copies of
+ * the rules would quietly accept a date on one that the other refuses.
+ *
+ *   before the step's own start  REFUSED. The window would be negative, and
+ *                                 there is no quota that describes that.
+ *   after the project delivery    ALLOWED, with a warning. It can be a real
+ *                                 decision - a step allowed to run past the
+ *                                 cut - but it should never happen unnoticed.
+ *
+ * @return array{refuse: ?string, warn: ?string}
+ */
+function step_deadline_check(string $stepName, ?string $start, ?string $deadline,
+                             ?string $delivery): array {
+    if ($start && $deadline && $deadline < $start) {
+        return ['refuse' => $stepName . ': the deadline is before the start date, so it was left unchanged.',
+                'warn'   => null];
+    }
+    if ($deadline && $delivery && $deadline > $delivery) {
+        return ['refuse' => null,
+                'warn'   => $stepName . ': the deadline is after the project delivery date.'];
+    }
+    return ['refuse' => null, 'warn' => null];
+}
+
+/**
+ * Set, or clear, one step's deadline.
+ *
+ * An EMPTY value clears it, which is not the same as "no deadline": a step with
+ * none of its own is measured against the project's delivery date, the fallback
+ * dashboard_steps() applies. That is what "use the project's delivery date"
+ * means on the step page, and saying so is the difference between a clear
+ * button and a delete button.
+ *
+ * Returns [message, warning-or-null]. Throws, having written nothing, when the
+ * date is refused or is not a date.
+ */
+function set_step_deadline(PDO $pdo, array $project, int $stepId, string $raw): array {
+    $stmt = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $stmt->execute([$stepId, (int)$project['id']]);
+    $step = $stmt->fetch();
+    if (!$step) throw new RuntimeException('That step is not part of this project.');
+
+    $raw = trim($raw);
+    $deadline = null;
+    if ($raw !== '') {
+        // Strict: a date input posts Y-m-d, and anything else is refused rather
+        // than handed to strtotime(), which would read "next friday" as a date.
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $raw, $m)
+            || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+            throw new RuntimeException('"' . $raw . '" is not a date, so the deadline was left unchanged.');
+        }
+        $deadline = $raw;
+    }
+
+    $check = step_deadline_check((string)$step['name'], $step['start_date'] ?: null, $deadline,
+                                 $project['delivery_date'] ?: null);
+    if ($check['refuse']) throw new RuntimeException($check['refuse']);
+
+    $pdo->prepare('UPDATE pipeline_steps SET deadline = ? WHERE id = ? AND project_id = ?')
+        ->execute([$deadline, $stepId, (int)$project['id']]);
+
+    $said = $deadline === null
+        ? ($project['delivery_date']
+            ? $step['name'] . ' now works to the project delivery date, ' . $project['delivery_date'] . '.'
+            : $step['name'] . ' has no deadline now, and the project has no delivery date either.')
+        : $step['name'] . ' is due ' . $deadline
+          . ($step['deadline'] ? ', moved from ' . $step['deadline'] : '') . '.';
+    return [$said, $check['warn']];
+}
+
+/**
  * How far into the pipeline each step sits: 0 for anything that can start
  * immediately, otherwise one past the latest thing it waits for.
  *

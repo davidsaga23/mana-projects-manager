@@ -1262,6 +1262,24 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 /* Trend chart on the step page. Hand-rolled SVG — no chart library. */
 .trend-wrap { background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 12px; }
 .trend { display: block; }
+/* ⚠ CLASS COLLISION, fixed for the chart only. `.trend` is ALSO the "on track /
+   behind" indicator beside a pace figure, and that rule, much further up, gives
+   it margin-left:5px. The chart has worn that margin since it was built: shoved
+   5px right and 5px wider than its box. Invisible while its text lived inside
+   the same drawing and moved with it; with the text on its own layer, every
+   label landed 5px left of the point it named, which is how it was found.
+   svg.trend is (0,1,1) and beats the indicator's (0,1,0), so the indicator
+   keeps its spacing and the chart loses the margin. */
+svg.trend { margin: 0; }
+/* The plot stretches to the width; the text layer sits exactly over it and does
+   not. See step_trend_svg() for why the chart is two SVGs rather than one. */
+.trend-stack { position: relative; }
+.trend-text { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+/* ⚠ non-scaling-stroke. The plot is stretched horizontally, and without this the
+   stroke is stretched with it: lines thicker along their length than across, and
+   the target's dashes drawn two and a half times longer on a wide screen than on
+   a narrow one. This keeps every line its real width and every dash 6px. */
+.trend-grid, .trend-target, .trend-approved, .trend-delivered { vector-effect: non-scaling-stroke; }
 .trend-grid { stroke: #eef1f4; stroke-width: 1; }
 .trend-target { stroke: #b02a37; stroke-width: 1.6; stroke-dasharray: 6 4; }
 .trend-approved { fill: none; stroke: #1e7e34; stroke-width: 2.2; }
@@ -1940,6 +1958,22 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form { margin-top: 6px !important; flex-wrap: wrap; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
+
+/* --- the Deadline card on a step's page -----------------------------------
+   Sits directly above the daily quota, which is worked back from it. */
+.deadline-card {
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 12px 16px 6px; margin: 16px 0 8px;
+}
+.deadline-card h3 { margin: 0 0 8px; }
+.deadline-form { margin: 0; gap: 10px; }
+/* The global `input { width: 100% }` would give the date field its own line. */
+.deadline-form input[type=date] { width: auto; }
+.deadline-form button { margin-top: 0; }
+.deadline-now { margin: 0; }
+.deadline-clear { margin: 6px 0 0; }
+.deadline-clear button { margin: 0; font-size: 13px; }
+.deadline-card > p { margin: 8px 0 6px; }
 
 /* --- the message that follows you down the page ---------------------------
    assets/keepplace.js copies a flash into this when it restores your scroll

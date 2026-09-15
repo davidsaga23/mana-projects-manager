@@ -829,43 +829,74 @@ function step_trend_svg(array $rows, float $target, ?string $deadline = null,
         return $d;
     };
 
-    $svg = '<svg class="trend" viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" height="' . $h
-         . '" preserveAspectRatio="none" role="img">';
+    // ⚠ TWO LAYERS, because one could not be both things it needed to be
+    // (David, 2026-09-14: "the text in the graph seems to be stretched
+    // horizontally").
+    //
+    // The PLOT has to fill whatever width the page gives it, and the only way an
+    // SVG drawn server-side can do that without knowing the width is
+    // preserveAspectRatio="none" - stretch the drawing horizontally to fit. That
+    // is right for lines. It is wrong for letters: "Sep 15" was being stretched
+    // to the same factor as the axis it labels, on a wide monitor more than
+    // double, which is what the screenshot showed.
+    //
+    // So the plot keeps stretching, and every piece of TEXT moves into a second
+    // SVG laid over it with no viewBox at all, where one unit is one pixel and
+    // horizontal positions are written as percentages of the width. A label at
+    // 50% lands exactly on the point at 50% of the stretched plot below it, and
+    // its letters are drawn at their real size.
+    //
+    // Height is not a problem in either layer: the viewBox height and the
+    // element height are the same number, so vertically the plot is never
+    // scaled, and y is in pixels in both.
+    $pct = fn(float $xu) => sprintf('%.3f%%', $xu / $w * 100);
+
+    $plot = '<svg class="trend" viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" height="' . $h
+          . '" preserveAspectRatio="none" role="img" aria-hidden="true">';
+    $text = '<svg class="trend-text" width="100%" height="' . $h . '" role="img" '
+          . 'aria-label="' . e('Cumulative ' . ($unitLabel !== '' ? $unitLabel : 'work')
+                              . ', approved against delivered against the target') . '">';
 
     // Horizontal guides, labelled. Four is enough to read a value off without
     // turning the chart into graph paper.
     for ($g = 0; $g <= 4; $g++) {
         $val = $max * $g / 4;
         $gy  = $y($val);
-        $svg .= '<line class="trend-grid" x1="' . $padL . '" y1="' . sprintf('%.1f', $gy)
-              . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $gy) . '"></line>';
-        $svg .= '<text class="trend-axis" x="' . ($padL - 8) . '" y="' . sprintf('%.1f', $gy + 4)
-              . '" text-anchor="end">' . e(fmt_num($val, $val >= 100 ? 0 : 1)) . '</text>';
+        $plot .= '<line class="trend-grid" x1="' . $padL . '" y1="' . sprintf('%.1f', $gy)
+               . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $gy) . '"></line>';
+        $text .= '<text class="trend-axis" x="' . $pct($padL - 8) . '" y="' . sprintf('%.1f', $gy + 4)
+               . '" text-anchor="end">' . e(fmt_num($val, $val >= 100 ? 0 : 1)) . '</text>';
     }
 
     // Target ceiling.
-    $svg .= '<line class="trend-target" x1="' . $padL . '" y1="' . sprintf('%.1f', $y($target))
-          . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $y($target)) . '"></line>';
+    $plot .= '<line class="trend-target" x1="' . $padL . '" y1="' . sprintf('%.1f', $y($target))
+           . '" x2="' . ($w - $padR) . '" y2="' . sprintf('%.1f', $y($target)) . '"></line>';
 
     // Delivered under, approved over — approved is the number that matters, so it
     // is never the one hidden behind the other line.
-    $svg .= '<path class="trend-delivered" d="' . $path('delivered') . '"></path>';
-    $svg .= '<path class="trend-approved" d="' . $path('approved') . '"></path>';
+    $plot .= '<path class="trend-delivered" d="' . $path('delivered') . '"></path>';
+    $plot .= '<path class="trend-approved" d="' . $path('approved') . '"></path>';
 
     // Date labels: first, last, and a few between, so they never collide.
+    //
+    // The FIRST is anchored at its start and the LAST at its end. Centred on
+    // the plot's edges, as they were, half of each label hung outside the chart
+    // - which the stretching used to hide by happening to push them inward.
     $every = max(1, (int)ceil($n / 8));
     foreach ($rows as $i => $r) {
         if ($i !== 0 && $i !== $n - 1 && $i % $every !== 0) continue;
-        $svg .= '<text class="trend-axis" x="' . sprintf('%.1f', $x($i)) . '" y="' . ($h - 26)
-              . '" text-anchor="middle">' . e(date('M j', strtotime($r['date']))) . '</text>';
+        $anchor = $i === 0 ? 'start' : ($i === $n - 1 ? 'end' : 'middle');
+        $text .= '<text class="trend-axis" x="' . $pct($x($i)) . '" y="' . ($h - 26)
+               . '" text-anchor="' . $anchor . '">' . e(date('M j', strtotime($r['date']))) . '</text>';
     }
 
-    $svg .= '<text class="trend-cap" x="' . $padL . '" y="' . ($h - 8) . '">'
-          . e('Cumulative ' . ($unitLabel !== '' ? $unitLabel : 'work')
-              . ' · approved vs delivered vs target'
-              . ($deadline ? ' · deadline ' . $deadline : ''))
-          . '</text>';
+    $text .= '<text class="trend-cap" x="' . $pct($padL) . '" y="' . ($h - 8) . '">'
+           . e('Cumulative ' . ($unitLabel !== '' ? $unitLabel : 'work')
+               . ' · approved vs delivered vs target'
+               . ($deadline ? ' · deadline ' . $deadline : ''))
+           . '</text>';
 
-    $svg .= '</svg>';
-    return $svg;
+    $plot .= '</svg>';
+    $text .= '</svg>';
+    return '<div class="trend-stack" style="height:' . $h . 'px">' . $plot . $text . '</div>';
 }

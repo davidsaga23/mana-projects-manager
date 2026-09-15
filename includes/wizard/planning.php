@@ -120,13 +120,16 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $head     = $headRaw === '' ? null : max(0, (float)$headRaw);
 
         if ($dpu <= 0) $dpu = 1.0;
-        if ($start && $deadline && $deadline < $start) {
-            $warnings[] = $s['name'] . ': the deadline is before the start date, so it was left unchanged.';
+        // The same rules the step page applies, from the same function, so the
+        // two places a deadline can be edited cannot disagree about which dates
+        // are allowed. See step_deadline_check().
+        $check = step_deadline_check((string)$s['name'], $start, $deadline,
+                                     $project['delivery_date'] ?: null);
+        if ($check['refuse']) {
+            $warnings[] = $check['refuse'];
             continue;
         }
-        if ($deadline && $project['delivery_date'] && $deadline > $project['delivery_date']) {
-            $warnings[] = $s['name'] . ': the deadline is after the project delivery date.';
-        }
+        if ($check['warn']) $warnings[] = $check['warn'];
         $upd->execute([$start, $deadline, $dpu, $coverage, $head, $id, $projectId]);
         $saved++;
     }

@@ -32,6 +32,26 @@ if (!$project) {
     exit;
 }
 
+$stepIdOk = $pdo->prepare('SELECT 1 FROM pipeline_steps WHERE id = ? AND project_id = ?');
+$stepIdOk->execute([$stepId, $projectId]);
+
+// ---- changing the deadline ---------------------------------------------------
+// David, 2026-09-14, with a screenshot of STFC's Deadline card. Before the
+// figures are worked out, so the page it redirects to is computed from the new
+// date. require_login() has already refused a POST from a view-only account.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $stepIdOk->fetchColumn()) {
+    try {
+        $raw = ($_POST['action'] ?? '') === 'clear_deadline' ? '' : (string)($_POST['deadline'] ?? '');
+        [$said, $warn] = set_step_deadline($pdo, $project, $stepId, $raw);
+        flash('ok', $said . ' The pace and every figure on this page are worked out from it.');
+        if ($warn) flash('warn', $warn);
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: step.php?project=' . $projectId . '&step=' . $stepId);
+    exit;
+}
+
 $today    = date('Y-m-d');
 $delivery = $project['delivery_date'] ?: null;
 
@@ -175,6 +195,62 @@ $stdRow = standards_available($pdo)
 $idealPerDay = ($stdRow && (float)$stdRow['days_per_unit'] > 0)
     ? 1 / (float)$stdRow['days_per_unit'] : null;
 ?>
+
+<?php // --- the deadline --------------------------------------------------------
+      // Directly ABOVE the quota, because the quota is worked back from it:
+      // change the date, and the numbers under it are the ones that move.
+      //
+      // ⚠ STFC's card also said it "re-snapshots today's numbers". That is not
+      // copied, because here it would be a false claim. The daily history in this
+      // app records PROGRESS, not pace, so there is nothing in it a new date
+      // changes; the pace is recalculated from the deadline on every page load.
+      // And a history that rewrote itself whenever a date moved would stop being
+      // a history. ?>
+<?php if (can_edit()):
+    $ownDeadline = $step['deadline'] ?? null;
+    $inherited   = !$ownDeadline && $delivery;
+?>
+  <div class="deadline-card">
+    <h3>Deadline</h3>
+    <form method="post" class="inline-form deadline-form">
+      <label class="inline" for="deadlineInput">Change to</label>
+      <input type="date" id="deadlineInput" name="deadline"
+             value="<?= e((string)($ownDeadline ?: $delivery ?: '')) ?>" required>
+      <button type="submit" name="action" value="set_deadline">Save</button>
+      <span class="muted small deadline-now">
+        Current:
+        <?php if ($s['deadline']): ?>
+          <strong><?= e($s['deadline']) ?></strong>
+          <?php if ($s['overdue']): ?>
+            <span class="err">(passed)</span>
+          <?php elseif ($s['days_left'] !== null): ?>
+            (<?= (int)$s['days_left'] ?> working day<?= (int)$s['days_left'] === 1 ? '' : 's' ?> left, today included)
+          <?php endif; ?>
+          <?php // Which date it is matters as much as what it is. Clearing a
+                // step's own deadline does not remove the deadline; it falls
+                // back to the project's delivery date, and a screen that did not
+                // say so would make that look like a bug. ?>
+          <?php if ($inherited): ?>
+            · <em>the project's delivery date, this step has none of its own</em>
+          <?php endif; ?>
+        <?php else: ?>
+          <strong>none</strong> <span class="muted">(and the project has no delivery date)</span>
+        <?php endif; ?>
+      </span>
+    </form>
+    <?php if ($ownDeadline && $delivery): ?>
+      <form method="post" class="deadline-clear">
+        <button type="submit" name="action" value="clear_deadline" class="linkish">
+          Use the project's delivery date instead (<?= e($delivery) ?>)</button>
+      </form>
+    <?php endif; ?>
+    <p class="muted small">
+      Changing it recalculates the required pace and every figure on this page straight away.
+      A schedule already saved is not replanned; <a href="schedule.php?project=<?= $projectId ?>">re-run
+      it</a> to fit the new date.
+    </p>
+  </div>
+<?php endif; ?>
 
 <?php // --- the quota, per team and per artist ------------------------------ ?>
 <h3>The daily quota</h3>
