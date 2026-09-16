@@ -12,6 +12,13 @@
 //
 // Every browser opens it, and Illustrator, Figma, Word and PowerPoint all place
 // it directly.
+//
+// ⚠ THE BUTTON ON THE WORKFLOW SCREEN DOWNLOADS A PNG, and this file still serves
+// SVG (David, 2026-09-16: "download png instead of svg files"). Both are true at
+// once: assets/diagram-png.js fetches this SVG and draws it onto a canvas in the
+// browser, so the PNG is made from exactly these bytes. Every reason above for
+// not rasterising on the server still stands. Change the filename or the look
+// HERE and the PNG follows, because the script takes both from this response.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';

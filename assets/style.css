@@ -426,9 +426,13 @@ p.crumb a { white-space: normal; }
 .wf-diagram { display: block; }
 /* The heading and its download sit on one line, the link pushed to the right so
    it reads as an action on the picture below rather than part of the title. */
-.wf-diagram-head { display: flex; align-items: baseline; gap: 12px; }
+.wf-diagram-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wf-diagram-head h3 { margin-bottom: 0; }
-.wf-export { margin-left: auto; font-size: 13px; }
+.wf-export { margin-left: auto; align-self: center; }
+/* While the PNG is being drawn - a second or two on a large pipeline - the
+   button says so and cannot be pressed twice into two downloads. */
+.wf-export.is-busy { opacity: .7; pointer-events: none; cursor: progress; }
+.png-note { display: block; flex-basis: 100%; text-align: right; margin-top: 4px; }
 .wf-edge { fill: none; stroke: #b6c2cd; stroke-width: 1.6; }
 .wf-box { fill: #f7f9fb; stroke: #dbe2e8; stroke-width: 1; }
 .wf-label { font: 600 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }

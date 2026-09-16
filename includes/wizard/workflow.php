@@ -117,9 +117,13 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
             // in a deck, or to send to somebody who does not have a login.
             // SVG because it stays sharp at any size and needs no image
             // library on the server. ?>
-      <a href="export_workflow.php?project=<?= $projectId ?>" class="wf-export">
-        Download the diagram ↓
-      </a>
+      <?php // A BUTTON, and a PNG (David, 2026-09-16). The href is still the SVG
+            // export: assets/diagram-png.js turns that into a PNG in the browser,
+            // because the server has no reliable way to rasterise an SVG. Without
+            // JavaScript, or if a browser refuses, the link does what it always
+            // did and gives the SVG, and the page says so. ?>
+      <a href="export_workflow.php?project=<?= $projectId ?>" class="button secondary wf-export"
+         data-png>Download as PNG ↓</a>
     </div>
     <div class="wf-diagram-wrap">
       <?= workflow_diagram_svg($steps, $depsMap) ?>
@@ -134,6 +138,9 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
         saves at once and redraws the picture; the ticks below change with it.
       </p>
     <?php endif; ?>
+    <?php // For every account, not only editors: a view-only reader can download
+          // the picture as well as anybody. ?>
+    <script src="assets/diagram-png.js<?= asset_ver('diagram-png.js') ?>"></script>
     <p class="muted small">Left to right: everything in the first column can start on day one,
        and each column waits for the one before it. Steps stacked in the same column run at the
        same time. This redraws when you save.</p>
