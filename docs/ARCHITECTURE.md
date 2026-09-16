@@ -24,7 +24,7 @@ Read `../START_HERE.md` first for context and decisions.
 ```sql
 projects
   id, code (unique), name,
-  type ENUM('2D','3D','Mixed','Other'),
+  type VARCHAR(20),          -- a name from project_types (migration 032); was ENUM('2D','3D','Mixed','Other')
   status ENUM('setup','active','on_hold','wrapped'),
   fps INT DEFAULT 24,
   start_date DATE, delivery_date DATE,

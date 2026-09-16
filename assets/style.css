@@ -192,6 +192,50 @@ label.inline input { width: auto; }
    between them. */
 .standards-table .new-standard-scope { margin: 3px 0; }
 
+/* --- project types: the tabs, "+ New project type", what uses a type --------
+   David, 2026-09-16. The tabs and the button share one line. The panel is a
+   POPOVER under its button, not a block in the row: in the row it would push the
+   button it hangs from onto the next line the moment it was clicked, and the
+   same panel sits inside the Basics form, where it would shove the dates down.
+   Same construction as .slot-change-bar. */
+.type-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.type-bar .page-actions { margin: 0; }
+.type-new { position: relative; margin: 0; }
+/* Held down while the panel is open, so it reads as the thing that opened it. */
+.type-new[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
+.type-new-form {
+  /* max-content, or the popover shrink-fits to the button it hangs from and
+     stacks every control. Capped, so the small print wraps instead of running
+     off a narrow screen. 40 is the level of the other panels, above the sticky
+     table headings (5) of the sheet right below it. */
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  width: max-content; max-width: min(560px, calc(100vw - 40px));
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  background: #fff; border: 1px solid #dbe2e8; border-radius: 4px;
+  padding: 12px 14px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
+  font-weight: 400;
+}
+/* width:auto on both, or the global `input, select { width: 100% }` gives each
+   its own line. label.inline already frees the input; the select needs saying. */
+.type-new-form input, .type-new-form select {
+  width: auto; max-width: 100%; padding: 5px 8px; font-size: 14px;
+}
+/* On a phone the picker is wider than the room beside its words, and an inline
+   label does not wrap, so it stuck out past the panel's edge. Allowed to wrap,
+   the picker drops under "Start its ideal quotas from" instead. */
+.type-new-form label.inline { flex-wrap: wrap; max-width: 100%; }
+.type-new-form button { margin-top: 0; }
+.type-new-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
+/* The sentence under the tabs, with Remove at the end of it when that is allowed. */
+.type-usage { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.type-remove { margin: 0; }
+.type-remove button { margin-top: 0; }
+/* A small button that removes something: .row-btn's shape, in the red the admin
+   tag already uses, and quieter than button.danger. It only appears on a type
+   nothing uses, so it should not shout over the sheet. */
+.row-btn-danger { color: #8f222c; border-color: #e0b4ba; }
+.row-btn-danger:hover { background: #fdf0f1; border-color: #8f222c; color: #8f222c; }
+
 /* The Minimum-against-ideal table on the Expense projection tab. Read-only, so
    this is simpler than .standards-table — fixed layout for the colgroup to
    bind, and the two prose columns (Covers, Verdict) allowed to wrap. */

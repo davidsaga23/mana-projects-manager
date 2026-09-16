@@ -659,9 +659,11 @@ function template_save_form(PDO $pdo, array $project, string $note = '', bool $i
           <option value="<?= e($t['name']) ?>"></option>
         <?php endforeach; ?>
       </datalist>
+      <?php // Escaped now: since 2026-09-16 a type is a name somebody typed, not
+            // one of four literals. ?>
       <select name="template_type">
-        <?php foreach (['2D','3D','Mixed','Other'] as $t): ?>
-          <option value="<?= $t ?>" <?= $project['type'] === $t ? 'selected' : '' ?>>for <?= $t ?> projects</option>
+        <?php foreach (project_type_options($pdo, (string)$project['type']) as $t): ?>
+          <option value="<?= e($t) ?>" <?= $project['type'] === $t ? 'selected' : '' ?>>for <?= e($t) ?> projects</option>
         <?php endforeach; ?>
       </select>
       <label class="inline" title="Only needed when the name already exists">
@@ -680,7 +682,15 @@ function create_template_from_project(PDO $pdo, int $projectId, string $name, st
                                       bool $overwrite = false): int {
     $name = trim($name);
     if ($name === '') throw new RuntimeException('Give the template a name.');
-    if (!in_array($projectType, ['2D', '3D', 'Mixed', 'Other'], true)) $projectType = 'Other';
+    // One of the studio's types, or this project's own, which the picker always
+    // offers. Refused rather than rewritten to Other: a template filed under a
+    // type nobody picked is offered first to the wrong projects.
+    $own = $pdo->prepare('SELECT type FROM projects WHERE id = ?');
+    $own->execute([$projectId]);
+    if (!in_array($projectType, project_type_options($pdo, (string)$own->fetchColumn()), true)) {
+        throw new RuntimeException(sprintf('There is no project type called "%s" any more, so the '
+                                         . 'template was not saved. Pick one from the list.', $projectType));
+    }
 
     $steps = pipeline_steps($pdo, $projectId);
     if (!$steps) throw new RuntimeException('There are no pipeline steps to save yet.');

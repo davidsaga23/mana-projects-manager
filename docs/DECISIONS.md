@@ -1636,6 +1636,44 @@ admin-only in both places.
 - **The project's own column is kept, not overwritten**, on steps with an ideal. It is still the
   fallback should the ideal ever be removed, and it is what a pipeline template copies.
 
+## 2026-09-16 — Project types are a list an administrator adds to
+**Decision, David's:** *"we should have a way to manually create new project types then because
+right now it doesn't offer that possibility."* Prompted by a 2D motion comic: technically 2D, but its
+steps and quotas differ, so its budget does too, and ideal quotas are one sheet per type. The only
+choices with four fixed types were changing the 2D sheet for every 2D show, or filing the comic under
+Other.
+
+**What changed.**
+- **Migration 032** adds `project_types` (seeded with the four, plus any type an ideal quotas sheet
+  already used) and turns `projects.type` and `pipeline_templates.project_type` from ENUMs into
+  VARCHAR(20), the size `quota_standards.project_type` already was.
+- **One list.** `project_types()` in `functions.php` replaces the five copies of the four: the Basics
+  picker and its check, the template picker and its check, and the Ideal quotas tabs. Before 032 it
+  answers with the four, which is exactly what the ENUMs still accept.
+- **Added on Ideal quotas**, with "+ New project type" beside the tabs, and from the same panel beside
+  Type on Basics, which returns with the new type picked but not saved. Administrators only, like the
+  sheets. Names are 1 to 20 characters and unique ignoring case, the way MySQL compares them.
+- **The new sheet starts as a copy of another type's by default**, preselected to the type being
+  looked at. Copied rows keep their source behind "Copied from 2D:". Moving a project onto a copy
+  changes nothing until a number on the new sheet changes, so the comic starts as 2D and parts from it
+  one step at a time. An empty sheet is still offered, and its save message warns what it means.
+- **Changing a project's type now says what moved.** Saving Basics compares every step's days per item
+  under the old sheet and the new one, and names the steps that changed and the steps that lost a
+  studio ideal. The type decides the plan and the budget from a screen that looks like it edits a label.
+- **Removing a type** is offered only when no project (archived ones included) and no template uses it,
+  and never the last one. Its sheet goes with it, cleared through `save_standards()`, so the history log
+  keeps what it said. Otherwise `standard_project_types()` would bring the type back as a tab.
+
+**Two silent rewrites removed on the way.** Basics and "save as template" both turned an unrecognised
+type into Other. With types that can be removed, that would move a project onto another sheet without
+anybody choosing it. Both now refuse, with a message. Every type picker also always offers the value it
+already holds, because a `<select>` with no matching option shows its first one, and the next unrelated
+save would store it.
+
+**Not built: renaming a type.** It would have to rewrite projects, templates, the sheet and its log in
+step. The workaround: create the right name as a copy of the wrong one, move the projects, then remove
+the wrong one.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

@@ -34,36 +34,83 @@ $fromQs = $fromId > 0 ? '&from=' . $fromId : '';
 
 $selfUrl = 'standards.php?type=' . urlencode($type) . $fromQs;
 
+// Project types can be added since migration 032 (David, 2026-09-16).
+$typesReady = project_types_available($pdo);
+
+// Where a New project type panel was opened from, when it was not this screen.
+// Only Basics sends one: it draws the same panel beside the type picker, and
+// there the new type comes back PICKED, ready to save onto the project, rather
+// than shown as a sheet the reader did not ask to look at.
+$returnProject = 0;
+if (preg_match('/^basics:(\d+)$/', (string)($_POST['return'] ?? ''), $m)) $returnProject = (int)$m[1];
+$basicsUrl = $returnProject > 0 ? 'wizard.php?project=' . $returnProject . '&step=1' : '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string)($_POST['action'] ?? '');
+    // A refusal goes back to where the form was, so the reason is read beside
+    // the thing it refused.
+    $to = ($action === 'new_type' && $basicsUrl !== '') ? $basicsUrl : $selfUrl;
     try {
         if (!is_admin()) {
             throw new RuntimeException(
-                'Ideal quotas are set on the business side, so only an administrator can change '
-                . 'them. Everyone can read them.'
+                'Ideal quotas and project types are set on the business side, so only an '
+                . 'administrator can change them. Everyone can read them.'
             );
         }
-        if (!$ready) {
-            throw new RuntimeException(
-                'The database updates this screen needs have not been applied yet (migration 026), '
-                . 'so nothing was saved.'
-            );
-        }
-        $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
-        $r = save_standards($pdo, $type, $rows, current_user_display());
 
-        if ($r['saved'])   flash('ok', sprintf('Saved %d standard%s for %s projects.',
-                                 $r['saved'], $r['saved'] === 1 ? '' : 's', $type));
-        if ($r['removed']) flash('warn', sprintf('%d standard%s cleared, a blank removes it rather '
-                                 . 'than storing zero days, which nothing could plan against.',
-                                 $r['removed'], $r['removed'] === 1 ? ' was' : 's were'));
-        foreach ($r['errors'] as $e) flash('err', $e);
-        if (!$r['saved'] && !$r['removed'] && !$r['errors']) {
-            flash('warn', 'Nothing had a step name in it, so nothing was saved.');
+        if ($action === 'new_type') {
+            $copyFrom = trim((string)($_POST['copy_from'] ?? ''));
+            $made = create_project_type($pdo, (string)($_POST['type_name'] ?? ''), $copyFrom,
+                                        current_user_display());
+            if ($made['copied'] > 0) {
+                flash('ok', sprintf('Created the %s project type. Its ideal quotas start as a copy of '
+                                  . 'the %d on the %s sheet, so a project moved onto it plans exactly as '
+                                  . 'it did until one of them is changed.',
+                                    $made['name'], $made['copied'], $copyFrom));
+            } else {
+                flash('ok', sprintf('Created the %s project type, with an empty ideal quotas sheet%s.',
+                                    $made['name'], $copyFrom !== ''
+                                        ? ' (the ' . $copyFrom . ' sheet had nothing on it to copy)' : ''));
+                flash('warn', sprintf('Until ideals are written on the %s sheet, a project moved onto it '
+                                    . 'plans every step on its own days per item.', $made['name']));
+            }
+            $to = $basicsUrl !== ''
+                ? $basicsUrl . '&pick_type=' . urlencode($made['name'])
+                : 'standards.php?type=' . urlencode($made['name']) . $fromQs;
+
+        } elseif ($action === 'remove_type') {
+            $gone = (string)($_POST['remove_type'] ?? '');
+            $n = remove_project_type($pdo, $gone, current_user_display());
+            flash('ok', sprintf('Removed the %s project type%s.', $gone, $n > 0
+                ? sprintf(', and the %d ideal quota%s on its sheet, which stay in the history of changes',
+                          $n, $n === 1 ? '' : 's')
+                : ''));
+            $to = 'standards.php' . ($fromId > 0 ? '?from=' . $fromId : '');
+
+        } else {
+            if (!$ready) {
+                throw new RuntimeException(
+                    'The database updates this screen needs have not been applied yet (migration 026), '
+                    . 'so nothing was saved.'
+                );
+            }
+            $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            $r = save_standards($pdo, $type, $rows, current_user_display());
+
+            if ($r['saved'])   flash('ok', sprintf('Saved %d standard%s for %s projects.',
+                                     $r['saved'], $r['saved'] === 1 ? '' : 's', $type));
+            if ($r['removed']) flash('warn', sprintf('%d standard%s cleared, a blank removes it rather '
+                                     . 'than storing zero days, which nothing could plan against.',
+                                     $r['removed'], $r['removed'] === 1 ? ' was' : 's were'));
+            foreach ($r['errors'] as $e) flash('err', $e);
+            if (!$r['saved'] && !$r['removed'] && !$r['errors']) {
+                flash('warn', 'Nothing had a step name in it, so nothing was saved.');
+            }
         }
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
-    header('Location: ' . $selfUrl);
+    header('Location: ' . $to);
     exit;
 }
 
@@ -153,12 +200,58 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php else: ?>
 
-  <p class="page-actions">
-    <?php foreach ($types as $t): ?>
-      <a class="proj-tab <?= $t === $type ? 'current' : '' ?>"
-         href="standards.php?type=<?= urlencode($t) ?><?= e($fromQs) ?>"><?= e($t) ?></a>
-    <?php endforeach; ?>
-  </p>
+  <?php // THE TABS AND "+ New project type" ON ONE LINE. A type exists to own one
+        // of these sheets, so this is where they are added. The panel opens as a
+        // popover under its button rather than in the row, so opening it moves
+        // nothing on the line that was just clicked. ?>
+  <div class="type-bar">
+    <p class="page-actions">
+      <?php foreach ($types as $t): ?>
+        <a class="proj-tab <?= $t === $type ? 'current' : '' ?>"
+           href="standards.php?type=<?= urlencode($t) ?><?= e($fromQs) ?>"><?= e($t) ?></a>
+      <?php endforeach; ?>
+    </p>
+    <?php if (is_admin()): ?>
+      <?php if ($typesReady): ?>
+        <?php project_type_new_form($pdo, $type); ?>
+      <?php else: ?>
+        <span class="muted small">New project types arrive with database update 032.</span>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+
+  <?php
+  // WHAT IS FILED UNDER THIS TYPE, said for everyone: it is also what a number
+  // changed on this sheet reaches. And for an administrator, the way to remove a
+  // type nothing uses, which only appears when that is true. A type in use cannot
+  // be removed at all, see remove_project_type().
+  $usage = project_type_usage($pdo, $type);
+  $inUse = $usage['projects'] || $usage['templates'];
+  $removable = !$inUse && $typesReady && is_admin()
+            && count(project_types($pdo)) > 1 && in_array($type, project_types($pdo), true);
+  ?>
+  <div class="type-usage muted small">
+    <?php if ($inUse): ?>
+      Used by <?= e(project_type_usage_phrase($usage)) ?>.
+    <?php else: ?>
+      No project or pipeline template is <?= e($type) ?> yet.
+    <?php endif; ?>
+    <?php if ($removable): ?>
+      <?php $confirm = sprintf('Remove the %s project type?', $type)
+                     . ($usage['ideals'] > 0
+                        ? sprintf(' The %d ideal quota%s on its sheet %s with it, and %s in the history of changes.',
+                                  $usage['ideals'], $usage['ideals'] === 1 ? '' : 's',
+                                  $usage['ideals'] === 1 ? 'goes' : 'go',
+                                  $usage['ideals'] === 1 ? 'stays' : 'stay')
+                        : ' Its sheet is empty.')
+                     . ' Nothing uses it, so no project changes.'; ?>
+      <form method="post" class="type-remove" onsubmit="return confirm(<?= e(json_encode($confirm)) ?>);">
+        <input type="hidden" name="action" value="remove_type">
+        <input type="hidden" name="remove_type" value="<?= e($type) ?>">
+        <button type="submit" class="row-btn row-btn-danger">Remove the <?= e($type) ?> type</button>
+      </form>
+    <?php endif; ?>
+  </div>
 
   <?php
   // ADMINS SET IT, EVERYONE READS IT. The standard is a business decision — what

@@ -166,6 +166,62 @@ function enum_has_value(PDO $pdo, string $table, string $column, string $value):
     return in_array($value, $cache[$key], true);
 }
 
+/* ---------------------------------------------------------------------------
+ * PROJECT TYPES
+ *
+ * David, 2026-09-16: a 2D motion comic needed ideal quotas of its own without
+ * changing the 2D sheet, and the four types were fixed in the schema. Since
+ * migration 032 they are rows an administrator adds on the Ideal quotas screen.
+ *
+ * ⚠ THE ONE LIST. Five places carried their own copy of the four: the Basics
+ * picker and its check, the template picker and its check, and the Ideal quotas
+ * tabs. A copy left behind is how a type added in one place gets refused, or
+ * quietly rewritten to Other, in another.
+ * ------------------------------------------------------------------------- */
+
+/** The four types the schema shipped with, and all an install before 032 accepts. */
+const PROJECT_TYPES_BUILTIN = ['2D', '3D', 'Mixed', 'Other'];
+
+/** Has migration 032 been applied? */
+function project_types_available(PDO $pdo): bool {
+    return column_exists($pdo, 'project_types', 'name');
+}
+
+/**
+ * Every project type, in the order screens list them.
+ *
+ * Before 032 the answer is the four, which is also exactly what the ENUM columns
+ * still accept, so nothing can offer a type the database would refuse.
+ *
+ * $fresh skips the per-request cache, for code about to add or remove one.
+ */
+function project_types(PDO $pdo, bool $fresh = false): array {
+    static $cache = null;
+    if ($cache !== null && !$fresh) return $cache;
+    if (!project_types_available($pdo)) return $cache = PROJECT_TYPES_BUILTIN;
+
+    $names = $pdo->query('SELECT name FROM project_types ORDER BY sort_order, id')
+                 ->fetchAll(PDO::FETCH_COLUMN);
+    // Never an empty list: a picker with no options posts nothing, and every
+    // project needs a type. Removing the last one is refused, so an empty table
+    // was emptied by hand, and the four are the honest fallback.
+    return $cache = $names ? array_map('strval', $names) : PROJECT_TYPES_BUILTIN;
+}
+
+/**
+ * The types to offer in a picker that already holds $current.
+ *
+ * ⚠ $current IS ADDED WHEN IT IS MISSING. A <select> whose value has no option
+ * shows its FIRST option instead, so the next save of an unrelated field would
+ * move the project to 2D, onto another ideal quotas sheet and another budget,
+ * without anybody choosing it.
+ */
+function project_type_options(PDO $pdo, string $current = ''): array {
+    $types = project_types($pdo);
+    if ($current !== '' && !in_array($current, $types, true)) $types[] = $current;
+    return $types;
+}
+
 // Show a number without trailing-zero noise: 2.50 -> "2.5", 3.00 -> "3".
 // Empty string for null so it can fill a form field that means "not set".
 /**

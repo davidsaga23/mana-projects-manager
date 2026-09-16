@@ -1,10 +1,14 @@
 <?php
 // Wizard step 1 — project basics. Creates the project row on first save.
 
+// The type picks the ideal quotas sheet the plan runs on, so saving a changed
+// one reports what moved, and the New project type panel is drawn from there.
+require_once __DIR__ . '/../standards.php';
+
 function wizard_save_basics(PDO $pdo, ?array $project): string {
     $name     = trim($_POST['name'] ?? '');
     $codeRaw  = trim($_POST['code'] ?? '');
-    $type     = $_POST['type'] ?? '3D';
+    $type     = trim((string)($_POST['type'] ?? '3D'));
     $fps      = (int)($_POST['fps'] ?? 24);
     $start    = trim($_POST['start_date'] ?? '');
     $delivery = trim($_POST['delivery_date'] ?? '');
@@ -15,7 +19,15 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
     if ($name === '')                       throw new RuntimeException('The project needs a name.');
     if (strlen($code) < 2)                  throw new RuntimeException('The project code needs at least 2 letters or numbers.');
     if (strlen($code) > 20)                 throw new RuntimeException('The project code is too long (20 characters maximum).');
-    if (!in_array($type, ['2D','3D','Mixed','Other'], true)) $type = 'Other';
+    // ⚠ REFUSED, NOT REWRITTEN TO OTHER, which is what this line used to do. The
+    // type picks the ideal quotas sheet, so a quiet rewrite moves the plan and
+    // the budget onto numbers nobody chose. It only happens when a type is
+    // removed while this page is open. The project's own type always passes,
+    // listed or not, because the picker always offers it.
+    if (!in_array($type, project_type_options($pdo, (string)($project['type'] ?? '')), true)) {
+        throw new RuntimeException(sprintf('There is no project type called "%s" any more, so nothing '
+                                         . 'was saved. Pick one from the list.', $type));
+    }
     if ($fps < 1 || $fps > 120)             throw new RuntimeException('Frames per second should be between 1 and 120.');
     if ($start !== '' && $delivery !== '' && $delivery < $start) {
         throw new RuntimeException('The delivery date is before the start date.');
@@ -33,8 +45,18 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
               WHERE id = ?'
         );
         $stmt->execute([$name, $code, $type, $fps, $start ?: null, $delivery ?: null, $project['id']]);
-        flash('ok', 'Saved the project details.');
         $id = (int)$project['id'];
+        $wasType = (string)$project['type'];
+        if ($wasType !== $type) {
+            flash('ok', sprintf('Saved the project details, and moved it from %s to %s.', $wasType, $type));
+            // What the move did to the plan, step by step. Said on the save that
+            // did it, because nothing else on this screen shows the plan.
+            foreach (project_type_change_report($pdo, $id, $wasType, $type) as [$kind, $msg]) {
+                flash($kind, $msg);
+            }
+        } else {
+            flash('ok', 'Saved the project details.');
+        }
     } else {
         $stmt = $pdo->prepare(
             'INSERT INTO projects (code, name, type, status, fps, start_date, delivery_date)
@@ -87,14 +109,36 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
         <small>A short tag used in exports and file names. Letters and numbers only.</small>
       </label>
 
+      <?php
+      // A type created from the panel below comes back PICKED and not saved, and
+      // says so: a picker showing a type the project does not have yet looks
+      // exactly like one showing the type it has.
+      $typeOptions = project_type_options($pdo, (string)($project['type'] ?? ''));
+      $picked = (string)($_GET['pick_type'] ?? '');
+      if (!$project || !in_array($picked, $typeOptions, true)) $picked = '';
+      $shownType = $picked !== '' ? $picked : (string)$p['type'];
+      // A new project defaults to 3D; if 3D has been removed, the first type.
+      if (!in_array($shownType, $typeOptions, true)) $shownType = (string)($typeOptions[0] ?? '');
+      $canAddType = $project && is_admin() && project_types_available($pdo);
+      ?>
       <label>Type
         <select name="type">
-          <?php foreach (['2D','3D','Mixed','Other'] as $t): ?>
-            <option value="<?= $t ?>" <?= $p['type'] === $t ? 'selected' : '' ?>><?= $t ?></option>
+          <?php foreach ($typeOptions as $t): ?>
+            <option value="<?= e($t) ?>" <?= $shownType === $t ? 'selected' : '' ?>><?= e($t) ?></option>
           <?php endforeach; ?>
         </select>
-        <small>Decides which pipeline template is offered next. It doesn't lock anything in.</small>
+        <?php if ($picked !== '' && $picked !== (string)$project['type']): ?>
+          <small class="warn-text"><strong><?= e($picked) ?> is picked, not saved.</strong> This project
+            stays <?= e((string)$project['type']) ?> until you save.</small>
+        <?php endif; ?>
+        <small>Decides which ideal quotas sheet every step plans on, and which pipeline template is
+          offered next. Changing it later can move the dates and the budget, and saving says which
+          steps moved.</small>
       </label>
+      <?php if ($canAddType): ?>
+        <?php project_type_new_form($pdo, (string)$project['type'],
+                                    ['return' => 'basics:' . (int)$project['id']], 'new-type-form'); ?>
+      <?php endif; ?>
 
       <div class="row">
         <label>Start date
@@ -160,5 +204,11 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
         <button type="submit">Save and continue →</button>
       </div>
     </form>
+    <?php if ($canAddType): ?>
+      <?php // What the New project type panel beside Type posts through. Empty on
+            // purpose: forms cannot nest, so its controls sit inside the form above
+            // and name this one with the form attribute. See project_type_new_form(). ?>
+      <form id="new-type-form" method="post" action="standards.php"></form>
+    <?php endif; ?>
     <?php
 }

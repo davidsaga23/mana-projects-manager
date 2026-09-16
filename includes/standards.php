@@ -28,16 +28,382 @@ function standards_available(PDO $pdo): bool {
     return column_exists($pdo, 'quota_standards', 'days_per_unit');
 }
 
-/** The project types a base sheet can exist for — projects.type, plus any already used. */
+/**
+ * The types a base sheet can exist for: every project type, plus any type a
+ * sheet was written for that is missing from that list.
+ *
+ * The second half should find nothing since migration 032 copied such types into
+ * the list. It stays because a sheet no tab reaches is a set of studio numbers
+ * nobody can see, correct or remove.
+ *
+ * Compared case-insensitively, the way MySQL compares them: a sheet stored under
+ * "motion comic" already IS the "Motion comic" type's sheet, and a second tab for
+ * it would show the same rows twice.
+ */
 function standard_project_types(PDO $pdo): array {
-    $types = ['2D', '3D', 'Mixed', 'Other'];
+    $types = project_types($pdo);
     try {
         $used = $pdo->query('SELECT DISTINCT project_type FROM quota_standards')
                     ->fetchAll(PDO::FETCH_COLUMN);
     } catch (PDOException $e) {
         $used = [];                       // migration 026 pending
     }
-    return array_values(array_unique(array_merge($types, array_filter($used))));
+    $seen = array_map('mb_strtolower', $types);
+    foreach (array_filter(array_map('strval', $used)) as $u) {
+        if (in_array(mb_strtolower($u), $seen, true)) continue;
+        $types[] = $u;
+        $seen[] = mb_strtolower($u);
+    }
+    return $types;
+}
+
+/* ---------------------------------------------------------------------------
+ * ADDING AND REMOVING A PROJECT TYPE
+ *
+ * David, 2026-09-16, about a 2D motion comic: technically a 2D project, "but the
+ * pipeline steps and quotas are different, hence the budget also changes", and
+ * then: "we should have a way to manually create new project types."
+ *
+ * A type exists to own a sheet. That is the one thing the platform does
+ * differently per type (templates are offered by it, but any template can be
+ * picked for any project), so these live beside the sheets, and the screen that
+ * adds one is Ideal quotas.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * What is filed under a project type: its projects, archived ones included, the
+ * pipeline templates offered for it, and how many ideals its sheet holds.
+ *
+ * ⚠ ARCHIVED PROJECTS COUNT. An archived show still has a plan and a budget read
+ * through its type's sheet, and removing the type would change what those old
+ * numbers say.
+ */
+function project_type_usage(PDO $pdo, string $type): array {
+    $p = $pdo->prepare('SELECT id, name, code, status FROM projects WHERE type = ? ORDER BY name');
+    $p->execute([$type]);
+    $t = $pdo->prepare('SELECT name FROM pipeline_templates WHERE project_type = ? ORDER BY name');
+    $t->execute([$type]);
+    return [
+        'projects'  => $p->fetchAll(),
+        'templates' => $t->fetchAll(PDO::FETCH_COLUMN),
+        'ideals'    => count(standards_for_type($pdo, $type)),
+    ];
+}
+
+/** "3 projects (FC Mobile, Doomsday, 1 archived) and 1 pipeline template", for a sentence. */
+function project_type_usage_phrase(array $use): string {
+    $parts = [];
+    $n = count($use['projects']);
+    if ($n > 0) {
+        $live = [];
+        $archived = 0;
+        foreach ($use['projects'] as $p) {
+            if (($p['status'] ?? '') === 'archived') $archived++;
+            else $live[] = (string)$p['name'];
+        }
+        // Four names, then a count. The names are there to recognise which shows
+        // these are; past four they are a paragraph nobody reads to the end.
+        $names = array_slice($live, 0, 4);
+        if (count($live) > 4) $names[] = (count($live) - 4) . ' more';
+        if ($archived > 0) $names[] = $archived . ' archived';
+        $parts[] = $n . ' project' . ($n === 1 ? '' : 's') . ' (' . implode(', ', $names) . ')';
+    }
+    $k = count($use['templates']);
+    if ($k > 0) $parts[] = $k . ' pipeline template' . ($k === 1 ? '' : 's');
+    return implode(' and ', $parts);
+}
+
+/**
+ * Add a project type, its sheet started as a copy of another type's, or empty.
+ *
+ * ⚠ THE COPY IS THE POINT, and the default. A type with an empty sheet puts every
+ * project moved onto it back on its own days per item, most of them the 1 day
+ * nobody changed, so the plan and the budget jump on the save that moves it.
+ * Started as a copy, moving a project changes nothing until somebody changes a
+ * number on the new sheet: the motion comic starts as 2D and parts from it one
+ * step at a time, which is the order it should happen in.
+ *
+ * Each copied ideal keeps where its number came from, behind the name of the
+ * sheet it was copied from, so a figure measured on four shows is not mistaken
+ * for a guess after the move. Written through save_standards(), the one writer,
+ * so each lands in quota_standards_log like any other change.
+ *
+ * @return array ['name' => string, 'copied' => int]
+ */
+function create_project_type(PDO $pdo, string $rawName, string $copyFrom, string $who = ''): array {
+    if (!project_types_available($pdo)) {
+        throw new RuntimeException('Adding a project type needs database update 032, which has not '
+                                 . 'been applied yet, so nothing was created.');
+    }
+
+    // Tidied the way somebody means it: no spaces at either end, and a run of
+    // them made one. MySQL ignores trailing spaces when it compares, so "3D " and
+    // "3D" would be two types here and one type there.
+    $name = trim((string)preg_replace('/\s+/u', ' ', $rawName));
+    if ($name === '') {
+        throw new RuntimeException('The new project type needs a name, so nothing was created.');
+    }
+    if (mb_strlen($name) > 20) {
+        throw new RuntimeException(sprintf(
+            '"%s" is %d characters long, and a project type name can be 20 at most, so nothing was '
+          . 'created.', $name, mb_strlen($name)));
+    }
+    if (!preg_match('/[\p{L}\p{N}]/u', $name)) {
+        throw new RuntimeException('A project type name needs at least one letter or number, so '
+                                 . 'nothing was created.');
+    }
+
+    project_types($pdo, true);                     // the list as it is NOW, not at page load
+    $existing = standard_project_types($pdo);
+    foreach ($existing as $t) {
+        // Case-insensitively, as the unique key and every WHERE type = ? compare.
+        if (mb_strtolower($t) === mb_strtolower($name)) {
+            throw new RuntimeException(sprintf(
+                'There is already a project type called "%s", so nothing was created.', $t));
+        }
+    }
+
+    $copyFrom = trim($copyFrom);
+    $rows = [];
+    if ($copyFrom !== '') {
+        if (!in_array($copyFrom, $existing, true)) {
+            throw new RuntimeException(sprintf(
+                'There is no %s sheet to start from, so nothing was created.', $copyFrom));
+        }
+        foreach (standards_for_type($pdo, $copyFrom) as $s) {
+            $was = trim((string)($s['source'] ?? ''));
+            $rows[] = [
+                'step_name'             => $s['step_name'],
+                'applies_to'            => $s['applies_to'],
+                'applies_to_asset_type' => $s['applies_to_asset_type'],
+                'days_per_unit'         => (string)$s['days_per_unit'],
+                'typical_headcount'     => $s['typical_headcount'] ?? '',
+                // Cut to the column's 120 rather than refused. The sheet it came
+                // from is the part that must survive, and it comes first.
+                'source'                => mb_substr('Copied from ' . $copyFrom
+                                                     . ($was !== '' ? ': ' . $was : ''), 0, 120),
+                'notes'                 => $s['notes'] ?? '',
+            ];
+        }
+    }
+
+    $copied = 0;
+    $pdo->beginTransaction();
+    try {
+        $next = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM project_types')
+                         ->fetchColumn();
+        $pdo->prepare('INSERT INTO project_types (name, sort_order, created_by) VALUES (?, ?, ?)')
+            ->execute([$name, $next, $who !== '' ? $who : null]);
+
+        if ($rows) {
+            $r = save_standards($pdo, $name, $rows, $who);
+            if (!empty($r['errors'])) {
+                throw new RuntimeException('The ' . $copyFrom . ' sheet could not be copied, so nothing '
+                                         . 'was created: ' . implode(' ', $r['errors']));
+            }
+            $copied = $r['saved'];
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        // Two people adding the same name at the same moment: the unique key
+        // refuses the second, and that is the same answer as above.
+        if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062) {
+            throw new RuntimeException(sprintf(
+                'There is already a project type called "%s", so nothing was created.', $name));
+        }
+        throw $e;
+    }
+
+    project_types($pdo, true);
+    return ['name' => $name, 'copied' => $copied];
+}
+
+/**
+ * Remove a project type nothing is filed under, and its sheet with it.
+ *
+ * ⚠ REFUSED WHILE ANY PROJECT OR TEMPLATE USES IT, archived projects included,
+ * rather than moving them somewhere. Which type a show is changes its plan and
+ * its budget; that is decided on its Basics screen, one project at a time, and
+ * never as a side effect of tidying a list.
+ *
+ * The sheet goes too, because a sheet without a type is exactly what
+ * standard_project_types() turns back into a tab: the type would reappear the
+ * moment it was removed. Each ideal is cleared through save_standards(), so what
+ * it said stays in quota_standards_log.
+ *
+ * @return int how many ideals were removed with it
+ */
+function remove_project_type(PDO $pdo, string $type, string $who = ''): int {
+    if (!project_types_available($pdo)) {
+        throw new RuntimeException('Removing a project type needs database update 032, which has not '
+                                 . 'been applied yet, so nothing was removed.');
+    }
+    $types = project_types($pdo, true);
+    if (!in_array($type, $types, true)) {
+        throw new RuntimeException(sprintf('There is no project type called "%s" to remove.', $type));
+    }
+    if (count($types) <= 1) {
+        throw new RuntimeException(sprintf(
+            '%s is the only project type left, and every project needs one, so it was kept.', $type));
+    }
+    $use = project_type_usage($pdo, $type);
+    $users = count($use['projects']) + count($use['templates']);
+    if ($users > 0) {
+        throw new RuntimeException(sprintf(
+            'Nothing was removed: %s %s still filed under %s. Give %s another type first.',
+            project_type_usage_phrase($use), $users === 1 ? 'is' : 'are', $type,
+            $users === 1 ? 'it' : 'them'));
+    }
+
+    $clear = [];
+    foreach (standards_for_type($pdo, $type) as $s) {
+        $clear[] = [
+            'step_name'             => $s['step_name'],
+            'applies_to'            => $s['applies_to'],
+            'applies_to_asset_type' => $s['applies_to_asset_type'],
+            'days_per_unit'         => '',          // a blank removes, see save_standards()
+        ];
+    }
+
+    $removed = 0;
+    $pdo->beginTransaction();
+    try {
+        if ($clear) $removed = save_standards($pdo, $type, $clear, $who)['removed'];
+        $pdo->prepare('DELETE FROM project_types WHERE name = ?')->execute([$type]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+
+    project_types($pdo, true);
+    return $removed;
+}
+
+/**
+ * What moving a project to another type does to its plan, as flash messages.
+ *
+ * ⚠ THE TYPE PICKS THE SHEET EVERY STEP PLANS ON, so changing it can move a
+ * show's dates, crew and budget from a screen that looks like it edits a label.
+ * Said step by step on the save that does it, rather than found on the budget a
+ * week later.
+ *
+ * Compared on the number each step actually plans on under each type: the ideal
+ * where that sheet has one, the project's own days per item where it does not.
+ * That is effective_days_per_unit()'s rule, applied to both sheets.
+ *
+ * @return array of [flash type, message]
+ */
+function project_type_change_report(PDO $pdo, int $projectId, string $from, string $to): array {
+    if (!standards_available($pdo)) return [];
+    $steps = pipeline_steps($pdo, $projectId);
+    if (!$steps) return [];
+
+    $old = standards_for_type($pdo, $from);
+    $new = standards_for_type($pdo, $to);
+    $moved = [];
+    $lost  = [];
+    foreach ($steps as $s) {
+        $key = standard_key($s['name'], $s['applies_to'] ?? 'shot', $s['applies_to_asset_type'] ?? '');
+        $own = (float)($s['days_per_unit'] ?: 1.0);
+        $hadIdeal = isset($old[$key]) && (float)$old[$key]['days_per_unit'] > 0;
+        $hasIdeal = isset($new[$key]) && (float)$new[$key]['days_per_unit'] > 0;
+        $before = $hadIdeal ? (float)$old[$key]['days_per_unit'] : $own;
+        $after  = $hasIdeal ? (float)$new[$key]['days_per_unit'] : $own;
+
+        $label = step_display_name($s, $steps);
+        // The tolerance update_standard_days() uses: the column holds three
+        // decimals, and anything finer is not a change anybody made.
+        if (abs($before - $after) >= 0.0005) {
+            $moved[] = sprintf('%s %s → %s', $label, fmt_num($before, 3), fmt_num($after, 3));
+        }
+        if ($hadIdeal && !$hasIdeal) $lost[] = $label;
+    }
+
+    // Eight named, then a count, for the reason project_type_usage_phrase() stops
+    // at four: past that it is a paragraph, not a message.
+    $list = function (array $items): string {
+        $shown = array_slice($items, 0, 8);
+        return implode(', ', $shown) . (count($items) > 8 ? ', and ' . (count($items) - 8) . ' more' : '');
+    };
+
+    $out = [];
+    if (!$moved) {
+        $out[] = ['ok', sprintf('Every step plans on the same days per item on the %s sheet as it did '
+                              . 'on %s, so no date, headcount or budget moved.', $to, $from)];
+    } else {
+        $one = count($moved) === 1;
+        $out[] = ['warn', sprintf('%d step%s now plan%s on different days per item, and the dates, crew '
+                                . 'and budget moved with %s: %s.',
+                                  count($moved), $one ? '' : 's', $one ? 's' : '',
+                                  $one ? 'it' : 'them', $list($moved))];
+    }
+    if ($lost) {
+        $one = count($lost) === 1;
+        $out[] = ['warn', sprintf('%d step%s had a studio ideal on %s and %s none on %s, so %s on this '
+                                . "project's own days per item until one is written there: %s.",
+                                  count($lost), $one ? '' : 's', $from, $one ? 'has' : 'have', $to,
+                                  $one ? 'it plans' : 'they plan', $list($lost))];
+    }
+    return $out;
+}
+
+/**
+ * The "+ New project type" button, and the panel it opens.
+ *
+ * Drawn on Ideal quotas beside the type tabs, and on Basics beside the type
+ * picker, which is where somebody finds out they need one. One renderer so the
+ * two cannot drift, and one handler, in standards.php.
+ *
+ * ⚠ ON BASICS THESE CONTROLS BELONG TO ANOTHER FORM. The panel sits inside the
+ * Basics form, and forms cannot nest: the parser drops an inner <form> tag, and
+ * Create would have posted the project's details to the wrong page. So there
+ * every control names its form with the form attribute, and the caller draws
+ * that empty form after its own has closed. $formId says which; null draws an
+ * ordinary form.
+ *
+ * @param string $copyDefault the sheet preselected to start from
+ * @param array  $hidden      extra fields to post, such as where to come back to
+ */
+function project_type_new_form(PDO $pdo, string $copyDefault, array $hidden = [],
+                               ?string $formId = null): void {
+    $types = standard_project_types($pdo);
+    $counts = [];
+    if (standards_available($pdo)) {
+        $q = $pdo->query('SELECT project_type, COUNT(*) AS n FROM quota_standards GROUP BY project_type');
+        foreach ($q as $r) $counts[mb_strtolower((string)$r['project_type'])] = (int)$r['n'];
+    }
+    $f = $formId !== null ? ' form="' . e($formId) . '"' : '';
+    ?>
+    <details class="type-new">
+      <summary class="row-btn">+ New project type</summary>
+      <?php if ($formId === null): ?><form method="post" class="type-new-form"><?php else: ?><div class="type-new-form"><?php endif; ?>
+        <input type="hidden" name="action" value="new_type"<?= $f ?>>
+        <?php foreach ($hidden as $k => $v): ?>
+          <input type="hidden" name="<?= e((string)$k) ?>" value="<?= e((string)$v) ?>"<?= $f ?>>
+        <?php endforeach; ?>
+        <label class="inline">Name
+          <input name="type_name" maxlength="20" size="18" required autocomplete="off"
+                 placeholder="e.g. Motion comic"<?= $f ?>>
+        </label>
+        <label class="inline">Start its ideal quotas from
+          <select name="copy_from"<?= $f ?>>
+            <?php foreach ($types as $t): $n = $counts[mb_strtolower($t)] ?? 0; ?>
+              <option value="<?= e($t) ?>" <?= $t === $copyDefault ? 'selected' : '' ?>>a copy of the <?= e($t) ?> sheet, <?= $n ?> ideal<?= $n === 1 ? '' : 's' ?></option>
+            <?php endforeach; ?>
+            <option value="" <?= in_array($copyDefault, $types, true) ? '' : 'selected' ?>>nothing, an empty sheet</option>
+          </select>
+        </label>
+        <button type="submit"<?= $f ?>>Create project type</button>
+        <small>
+          A copy is the safe start: a project moved onto the new type plans exactly as it did until
+          a number on the new sheet is changed, and changing the new sheet never touches the one it
+          was copied from.
+        </small>
+      <?php if ($formId === null): ?></form><?php else: ?></div><?php endif; ?>
+    </details>
+    <?php
 }
 
 /**
