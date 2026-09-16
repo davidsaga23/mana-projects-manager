@@ -766,6 +766,30 @@ function renumber_steps(PDO $pdo, int $projectId): void {
 
 
 /**
+ * A step's name, with its scope when the name alone does not say which step.
+ *
+ * Step names only have to be unique within their scope, so a real pipeline
+ * carries two Concepts and two Colors, and "Concept" in a message does not say
+ * which. A repeated name gets its scope in the words the workflow diagram prints
+ * under it: "Concept (Environment assets)". A unique name is left alone.
+ *
+ * ONE implementation for every message that names a step. It was written inline
+ * in the workflow save first, then needed again for the studio-ideal message on
+ * Dates & headcount; the JS in assets/workflow-edit.js applies the same rule.
+ */
+function step_display_name(array $step, array $allSteps): string {
+    $name = (string)($step['name'] ?? '');
+    $key = mb_strtolower(trim($name));
+    $same = 0;
+    foreach ($allSteps as $o) {
+        if (mb_strtolower(trim((string)($o['name'] ?? ''))) === $key) $same++;
+    }
+    return $same > 1
+        ? $name . ' (' . applies_to_phrase($step['applies_to'] ?? 'shot', $step['applies_to_asset_type'] ?? null) . ')'
+        : $name;
+}
+
+/**
  * Whether a step's deadline may be saved, and what to say about it.
  *
  * ⚠ ONE IMPLEMENTATION OF THE RULES, for the two places a deadline is edited:

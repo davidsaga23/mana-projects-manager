@@ -288,6 +288,73 @@ function save_standards(PDO $pdo, string $projectType, array $rows, string $who 
 }
 
 /**
+ * Change the days-per-item of ONE existing studio ideal, and nothing else.
+ *
+ * David, 2026-09-16: Dates & headcount showed an editable "days per item" that
+ * the plan ignored whenever a studio ideal existed. "It makes no sense to have
+ * an editable field that's not used." The field now IS the ideal, and this is
+ * what saving it calls.
+ *
+ * ⚠ A MERGE, NOT A PLAIN save_standards() CALL. save_standards() writes every
+ * column of a standard - typical headcount, source and notes as well as the
+ * days - so handing it a row with only the days would wipe those three on the
+ * studio sheet for every project of the type. The existing row is read first
+ * and only the days are replaced. It still goes THROUGH save_standards(), so
+ * there is one writer and the change lands in quota_standards_log like any
+ * other.
+ *
+ * ⚠ NEVER REMOVES A STANDARD. A blank on the Ideal quotas sheet deletes the
+ * standard, which is right on the screen whose job that is. From a single
+ * project's planning table it would delete a studio-wide number as a side effect
+ * of clearing a box, so a blank is refused here.
+ *
+ * Returns the old value, or null when nothing changed. Throws, writing nothing,
+ * when the value is not a number of days above zero.
+ */
+function update_standard_days(PDO $pdo, string $projectType, array $step, string $raw,
+                              string $who = ''): ?float {
+    $key = standard_key($step['name'] ?? '', $step['applies_to'] ?? 'shot',
+                        $step['applies_to_asset_type'] ?? '');
+    $sheet = standards_for_type($pdo, $projectType);
+    $row = $sheet[$key] ?? null;
+    if ($row === null) {
+        throw new RuntimeException(sprintf('"%s" has no studio ideal to change.', $step['name'] ?? ''));
+    }
+
+    $raw = trim($raw);
+    if ($raw === '') {
+        throw new RuntimeException(sprintf(
+            '%s: a studio ideal cannot be removed from a project screen, because it applies to every '
+          . '%s project. It was left as it was. Remove it on the Ideal quotas sheet if that is meant.',
+            $step['name'] ?? '', $projectType));
+    }
+    if (!is_numeric($raw) || (float)$raw <= 0) {
+        throw new RuntimeException(sprintf('%s: "%s" is not a number of days above zero, so the '
+                                         . 'studio ideal was left as it was.', $step['name'] ?? '', $raw));
+    }
+
+    $old = (float)$row['days_per_unit'];
+    $new = round((float)$raw, 3);
+    // ⚠ Within a thousandth is NOT a change. The column holds three decimals,
+    // and a page that re-posts a displayed value must never rewrite a studio
+    // number just by being saved.
+    if (abs($new - $old) < 0.0005) return null;
+
+    $r = save_standards($pdo, $projectType, [[
+        'step_name'             => $row['step_name'] ?? ($step['name'] ?? ''),
+        'applies_to'            => $row['applies_to'] ?? ($step['applies_to'] ?? 'shot'),
+        'applies_to_asset_type' => $row['applies_to_asset_type'] ?? ($step['applies_to_asset_type'] ?? ''),
+        'days_per_unit'         => (string)$new,
+        // Carried through unchanged - see the docblock.
+        'typical_headcount'     => $row['typical_headcount'] ?? '',
+        'source'                => $row['source'] ?? '',
+        'notes'                 => $row['notes'] ?? '',
+    ]], $who);
+    if (!empty($r['errors'])) throw new RuntimeException(implode(' ', $r['errors']));
+    return $old;
+}
+
+/**
  * Compare a project's steps against the base sheet for its type.
  *
  * Returns one row per step with the ideal, this project's estimate, and the

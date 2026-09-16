@@ -1597,6 +1597,45 @@ server would not build.
 - **Template copying still reads the raw column** (`includes/pipeline.php`), correctly: that is
   moving data between a template and a project, not planning with it.
 
+## 2026-09-16 — Dates & headcount edits the number the plan uses, the studio ideal included
+**Decision, David's:** *"It makes no sense to have an editable field that's not used in this
+context. Please switch them for the studio ideal, so it just brings the same variable here to be
+edited if needed."*
+
+**What prompted it.** Concept (Environment assets) had 2 typed in Days per item and showed a
+3-day duration. The plan was running on the studio ideal of 0.5 — 4 × 0.5 × 1.1 retakes = 2.2,
+rounded up to 3 — exactly as the 2026-08-17 decision below says it should. The box said "not in use"
+in small type, and the last column simultaneously flagged the ignored 2 as "planned 300% slower".
+An editable number the plan ignored, beside a warning about that same number.
+
+**What changed.** The Days per item box now holds whatever the plan runs on:
+- **a studio ideal exists** → the box IS the ideal. An administrator edits it in place; an editor
+  sees it read-only, because editing the base sheet is admin-only everywhere.
+- **no ideal** → the box is the project's own estimate, as before.
+A line under each box says whose number it is. The **Ideal days** column is gone — it repeated the
+box and carried the contradiction.
+
+**This reverses one line of 2026-08-17.** The planning screen said the ideal was "read-only here on
+purpose: a number that could be changed from two places would stop being a standard." That worry is
+answered rather than ignored: it is the SAME record edited from two screens, not a copy, through ONE
+writer (`update_standard_days()` → `save_standards()`), logged in `quota_standards_log` the same way,
+admin-only in both places.
+
+**Consequences, and the traps closed on the way:**
+- **It is studio-wide.** Ideals are one sheet per project TYPE, so a change made on FC Mobile changes
+  every 2D project's plan and budget. The page asks before saving when an ideal moved, and the saved
+  message says how many projects of the type it reaches.
+- **A merge, not a plain save.** `save_standards()` writes every column of a standard; called with
+  only the days it would have wiped typical headcount, source and notes on the studio sheet.
+- **A blank never removes a studio ideal from this screen.** On the Ideal quotas sheet a blank
+  deletes the standard, which is right there. From one project's table it would delete a studio-wide
+  number as a side effect of clearing a box.
+- **Full precision, and a tolerance.** The box shows the ideal's three decimals and the server writes
+  only a change of a thousandth or more, so re-saving an untouched page never rewrites a studio number
+  through rounding.
+- **The project's own column is kept, not overwritten**, on steps with an ideal. It is still the
+  fallback should the ideal ever be removed, and it is what a pipeline template copies.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

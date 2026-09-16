@@ -169,7 +169,12 @@
       return row.querySelector('input[name^="' + prefix + '["]');
     }
     var startEl = field('start_date'), deadlineEl = field('deadline');
-    var perUnitEl = field('days_per_unit'), headEl = field('planned_headcount');
+    // A step with a studio ideal posts its box as ideal_days[], one without as
+    // days_per_unit[] - see wizard_save_planning(). Either is the number the plan
+    // runs on, so the live check reads whichever the row has. A read-only ideal
+    // (an editor's view) has no box at all and is read from data-ideal below.
+    var perUnitEl = field('days_per_unit') || field('ideal_days');
+    var headEl = field('planned_headcount');
     var coverageEl = field('coverage_pct');
 
     var start = startEl ? startEl.value : '';
@@ -190,17 +195,15 @@
     var datesBackwards = !!(start && deadline && deadline < start);
     var dateCell = row.querySelector('.date-pair');
     if (dateCell) dateCell.classList.toggle('dates-backwards', datesBackwards);
-    // ⚠ THE IDEAL WINS, matching effective_days_per_unit() on the server.
-    //
-    // Since 2026-08-17 the plan runs on the studio standard where one exists and
-    // on the typed estimate only where it does not. If this line kept reading the
-    // input, the live check would describe a plan the server would never build —
-    // the same disagreement that had Dates & headcount and the expense projection
-    // showing different quotas for one step.
-    var typedPerUnit = parseFloat(perUnitEl ? perUnitEl.value : '') || 0;
+    // ⚠ THE BOX IS THE NUMBER IN FORCE (2026-09-16). It used to show the
+    // project's own estimate even where a studio ideal existed, and this line
+    // then ignored the box and used the ideal, so the screen worked from a
+    // number nobody could see. Now the box itself is the ideal when there is
+    // one, and reading it is reading the plan - which also means an
+    // administrator changing an ideal sees the duration move as they type.
     var idealPerUnit = parseFloat(row.getAttribute('data-ideal'));
-    var usingIdeal   = (idealPerUnit > 0);
-    var perUnit      = usingIdeal ? idealPerUnit : typedPerUnit;
+    var perUnit = perUnitEl ? (parseFloat(perUnitEl.value) || 0)
+                            : (idealPerUnit > 0 ? idealPerUnit : 0);
 
     // Written HERE rather than further down, because everything below returns
     // early when a step has no deadline or no work yet — and those are exactly
@@ -208,12 +211,10 @@
     // number they are typing is not the one in force.
     var dpuHint = row.querySelector('.dpu-hint');
     if (dpuHint) {
-      if (usingIdeal) {
-        // The typed number is not what the plan uses, and a field that quietly
-        // does nothing is worse than one that says so.
-        dpuHint.innerHTML = '<span class="warn-text">not in use</span>'
-          + '<div>planning on the studio ideal of ' + trimNum(idealPerUnit) + ' d</div>';
-      } else if (perUnit > 0) {
+      // No "not in use" any more: the box always holds what the plan uses, so
+      // there is nothing left for this line to warn about. It only translates
+      // days-per-item into the pace people actually say out loud.
+      if (perUnit > 0) {
         dpuHint.textContent = '= ' + fmtRate(1 / perUnit) + ' ' + label + '/day';
       } else {
         dpuHint.textContent = '';
@@ -403,7 +404,10 @@
     // is then asking for more per person per day than the studio says the work
     // allows, and no amount of goodwill closes that. More people, more time, or
     // less work.
-    var idealDays = parseFloat(row.getAttribute('data-ideal'));
+    // Live from the box where the box IS the ideal, so the pace column moves
+    // with the number being typed rather than showing the one on the sheet.
+    var idealBox = field('ideal_days');
+    var idealDays = idealBox ? parseFloat(idealBox.value) : parseFloat(row.getAttribute('data-ideal'));
     var idealCell = row.querySelector('.ideal-cell');
     if (idealCell) {
       idealCell.classList.remove('quota-short');
@@ -457,6 +461,34 @@
     var row = e.target.closest('tr');
     if (row) recalc(row);
   });
+
+  // ⚠ A STUDIO IDEAL CHANGED FROM HERE CHANGES EVERY PROJECT OF THIS TYPE.
+  //
+  // Asked BEFORE saving, and only when one actually moved: this screen is about
+  // one show, and a number edited on it reaching every other 2D project's
+  // schedule and budget is exactly the kind of consequence nobody expects from
+  // pressing Save. Compared against data-was with a thousandth of tolerance, the
+  // precision the column stores, so re-saving an untouched page never asks.
+  var planForm = table.closest('form');
+  if (planForm) {
+    planForm.addEventListener('submit', function (e) {
+      var boxes = planForm.querySelectorAll('input.ideal-input');
+      var moved = [];
+      for (var i = 0; i < boxes.length; i++) {
+        var was = parseFloat(boxes[i].getAttribute('data-was'));
+        var now = parseFloat(boxes[i].value);
+        if (isFinite(was) && isFinite(now) && Math.abs(now - was) >= 0.0005) {
+          moved.push(boxes[i].getAttribute('data-step-label') + ': ' + trimNum(was) + ' to ' + trimNum(now));
+        }
+      }
+      if (!moved.length) return;
+      var type = (boxes[0].title.match(/every (\S+) project/) || [])[1] || 'this type of';
+      var ok = window.confirm('You changed the studio ideal for:\n\n  ' + moved.join('\n  ')
+        + '\n\nThat is the ' + type + ' base sheet, so it changes the plan and the budget of '
+        + 'every ' + type + ' project, not only this one.\n\nSave it?');
+      if (!ok) e.preventDefault();
+    });
+  }
   table.addEventListener('change', function (e) {
     var row = e.target.closest('tr');
     if (row) recalc(row);

@@ -61,20 +61,10 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
     // is built from the step table, never from anything posted.
     $said = '';
     // Same rule as the hint beside the pointer, so the sentence before letting
-    // go and the sentence after saving are the same sentence. A name used by
-    // more than one step gets its scope in the words the diagram prints.
-    $count = [];
-    foreach ($steps as $s) {
-        $k = mb_strtolower(trim((string)$s['name']));
-        $count[$k] = ($count[$k] ?? 0) + 1;
-    }
+    // go and the sentence after saving are the same sentence. See
+    // step_display_name() for the rule.
     $names = [];
-    foreach ($steps as $s) {
-        $n = (string)$s['name'];
-        $names[(int)$s['id']] = $count[mb_strtolower(trim($n))] > 1
-            ? $n . ' (' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null) . ')'
-            : $n;
-    }
+    foreach ($steps as $s) $names[(int)$s['id']] = step_display_name($s, $steps);
     foreach (['wf_add' => 'now waits for', 'wf_remove' => 'no longer waits for'] as $key => $verb) {
         if (!preg_match('/^(\d+)-(\d+)$/', (string)($_POST[$key] ?? ''), $m)) continue;
         $source = (int)$m[1]; $target = (int)$m[2];

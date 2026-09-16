@@ -1963,6 +1963,19 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
+/* --- Days per item on Dates & headcount: the number, and whose it is -------
+   The box holds what the plan runs on. The line under it says where that number
+   lives, because a studio ideal reaches every project of the type and must never
+   look like it belongs to this one. The studio case is coloured; this project's
+   own estimate is plain, since it only affects this show. */
+.dpu-cell input { width: 100%; }
+.dpu-source { font-size: 11px; line-height: 1.3; margin-top: 3px; color: #7b8894; }
+.dpu-source.is-studio { color: #6f42c1; font-weight: 600; }
+/* An administrator's box for a studio ideal carries the same colour at its edge,
+   so the two kinds of box cannot be mistaken for each other down a long table. */
+.dpu-cell input.ideal-input { border-color: #b9a3e0; box-shadow: inset 3px 0 0 #6f42c1; }
+.ideal-readonly { display: block; font-size: 15px; padding: 4px 0; }
+
 /* --- the Deadline card on a step's page -----------------------------------
    Sits directly above the daily quota, which is worked back from it. */
 .deadline-card {

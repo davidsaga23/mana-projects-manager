@@ -105,12 +105,51 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
             SET start_date = ?, deadline = ?, days_per_unit = ?, coverage_pct = ?, planned_headcount = ?
           WHERE id = ? AND project_id = ?'
     );
+    require_once __DIR__ . '/../standards.php';
+    $type  = (string)($project['type'] ?? '');
+    $sheet = standards_available($pdo) ? standards_for_type($pdo, $type) : [];
+    $idealChanges = [];
     $saved = 0; $warnings = [];
     foreach ($steps as $s) {
         $id = (int)$s['id'];
         $start    = trim($_POST['start_date'][$id] ?? '') ?: null;
         $deadline = trim($_POST['deadline'][$id] ?? '') ?: null;
-        $dpu      = (float)($_POST['days_per_unit'][$id] ?? 1);
+
+        // ⚠ DAYS PER ITEM COMES FROM ONE OF TWO PLACES, AND IS SAVED BACK TO IT.
+        //
+        // Where the studio sheet has an ideal for this step, that ideal is what
+        // the plan runs on, so it is what the screen shows and edits
+        // (David, 2026-09-16). It is posted as ideal_days[] and written to the
+        // STUDIO SHEET - never into this project's own column, which stays as
+        // the fallback it has always been should the ideal ever be removed.
+        //
+        // Where there is no ideal, the project's own estimate drives the plan,
+        // and it is posted as days_per_unit[] exactly as before.
+        //
+        // Only an administrator edits a studio ideal, here as on the Ideal quotas
+        // sheet. The field is not even drawn for anybody else, and a crafted
+        // post from an editor is ignored rather than trusted.
+        $stdRow = $sheet[standard_key($s['name'], $s['applies_to'] ?? 'shot',
+                                      $s['applies_to_asset_type'] ?? '')] ?? null;
+        if ($stdRow !== null) {
+            if (is_admin() && isset($_POST['ideal_days'][$id])) {
+                try {
+                    $was = update_standard_days($pdo, $type, $s, (string)$_POST['ideal_days'][$id],
+                                                current_user_display());
+                    if ($was !== null) {
+                        $idealChanges[] = sprintf('%s from %s to %s',
+                            step_display_name($s, $steps), fmt_num($was, 3),
+                            fmt_num(round((float)$_POST['ideal_days'][$id], 3), 3));
+                    }
+                } catch (RuntimeException $e) {
+                    $warnings[] = $e->getMessage();
+                }
+            }
+            // The project's own number is left exactly as it was.
+            $dpu = (float)($s['days_per_unit'] ?: 1);
+        } else {
+            $dpu = (float)($_POST['days_per_unit'][$id] ?? ($s['days_per_unit'] ?: 1));
+        }
         // A whole-project step has no coverage input, so it keeps whatever it has.
         $coverage = isset($_POST['coverage_pct'][$id])
             ? min(100, max(0, (float)$_POST['coverage_pct'][$id]))
@@ -135,6 +174,20 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
     }
 
     flash('ok', "Saved dates and headcount for $saved step" . ($saved === 1 ? '' : 's') . '.');
+
+    // ⚠ SAID IN FULL, because the reach of this is not visible from the screen it
+    // was made on. A studio ideal changed from FC Mobile changes the plan and the
+    // budget of every other project of the same type, and the person who made
+    // the change is looking at one of them.
+    if ($idealChanges) {
+        $cnt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE type = ? AND status <> 'archived'");
+        try { $cnt->execute([$type]); $n = (int)$cnt->fetchColumn(); }
+        catch (PDOException $e) { $n = 0; }   // 'archived' arrives with migration 027
+        flash('warn', 'Changed the studio ideal for ' . implode('; ', $idealChanges) . ' days per item. '
+            . 'This is the ' . $type . ' base sheet, so it applies to every ' . $type . ' project'
+            . ($n > 1 ? ', ' . $n . ' of them,' : '')
+            . ' including their schedules and expense projections.');
+    }
     foreach ($warnings as $w) flash('warn', $w);
 
     if ($action === 'continue') return wizard_next_url($projectId, 6);
@@ -142,9 +195,19 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
 }
 
 function wizard_render_planning(PDO $pdo, ?array $project): void {
-    // The studio's ideal for THIS kind of project, shown beside each estimate.
-    // Read-only here on purpose: the base sheet is edited on its own screen, and
-    // a number that could be changed from two places would stop being a standard.
+    // The studio's ideal for THIS kind of project.
+    //
+    // ⚠ THIS USED TO SAY "read-only here on purpose", and David reversed it on
+    // 2026-09-16. The worry was that a number changeable from two places would
+    // stop being a standard. What happened instead was worse: the Days per item
+    // box stayed editable while the plan ignored it, so a typed 2 produced a
+    // 3-day duration computed from the ideal's 0.5, with no visible reason.
+    //
+    // The ideal is now edited from here as well, and the worry is answered
+    // rather than ignored: it is the SAME record, not a copy, through the SAME
+    // writer (update_standard_days() -> save_standards()), logged the same way,
+    // admin-only in both places, and the screen and the saved message both say it
+    // reaches every project of the type.
     require_once __DIR__ . '/../standards.php';
     $idealSheet = standards_available($pdo)
         ? standards_for_type($pdo, (string)($project['type'] ?? ''))
@@ -336,14 +399,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <col style="width:6%">   <?php // Covers ?>
           <col style="width:6%">   <?php // Work ?>
           <col style="width:11%">  <?php // Dates ?>
-          <col style="width:7%">   <?php // Days per item ?>
+          <col style="width:10%">  <?php // Days per item: the number, and whose it is ?>
           <col style="width:5%">   <?php // People ?>
           <col style="width:8%">   <?php // Minimum ?>
           <col style="width:9%">   <?php // Retakes ?>
           <col style="width:9%">   <?php // Duration ?>
           <col style="width:18%">  <?php // Is that enough? ?>
-          <col style="width:6%">   <?php // Studio ideal ?>
-          <col style="width:6%">   <?php // Ideal days ?>
+          <col style="width:9%">   <?php // Studio ideal ?>
         </colgroup>
         <thead>
         <tr>
@@ -356,7 +418,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // always read together. Stacked they cost one column and a little
                 // height — which is the trade this whole screen now makes. ?>
           <th>Dates<div class="muted small">start / deadline</div></th>
-          <th title="How long one shot or asset takes one person. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage, so a ten-second shot takes ten times it.">Days per item</th>
+          <th title="How long one shot or asset takes one person: the number the plan actually runs on. Where the studio has an ideal for this step it is that ideal, shared by every project of this type; otherwise it is this project's own estimate. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage.">Days per item<div class="muted small">what the plan uses</div></th>
           <th title="How many people are on this step. Decimals are fine, 2.5 means someone is half-time.">People</th>
           <?php // Studio ideal sits BEFORE Duration because that is the order the
                 // cells are written in below. They were the other way round in the
@@ -391,7 +453,6 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this step's own start and deadline, this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace the studio's ideal implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Studio ideal<div class="muted small">per person / day</div></th>
-          <th title="What the studio says one item should take, from the Ideal quotas base sheet. Set under Finance management, read-only here.">Ideal days<div class="muted small">per item</div></th>
         </tr>
         </thead>
         <tbody>
@@ -460,8 +521,32 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                     read it that way; the scheduler now turns it into dates, where
                     getting it backwards is the difference between a two-day task and
                     a twenty-day one. */ ?>
-          <td><input type="number" name="days_per_unit[<?= $id ?>]" step="any" min="0.01"
-                     value="<?= e(fmt_num($s['days_per_unit'] ?? 1)) ?>">
+          <td class="dpu-cell">
+            <?php
+            // ⚠ THE BOX SHOWS WHAT THE PLAN RUNS ON (David, 2026-09-16). Where the
+            // studio has an ideal it IS the ideal, and the line under it says so,
+            // because a number that reaches every project of the type must never
+            // look like it belongs to this one.
+            //
+            // Rendered at the column's full three decimals: shown rounded, an ideal
+            // of 0.125 would post back as 0.13, and simply saving the page would
+            // rewrite a studio number nobody touched.
+            if ($rowStd !== null): $idealVal = fmt_num((float)$rowStd['days_per_unit'], 3); ?>
+              <?php if (is_admin()): ?>
+                <input type="number" name="ideal_days[<?= $id ?>]" step="any" min="0.001"
+                       class="ideal-input" value="<?= e($idealVal) ?>" data-was="<?= e($idealVal) ?>"
+                       data-step-label="<?= e(step_display_name($s, $steps)) ?>"
+                       title="Studio ideal: changing it changes every <?= e((string)$project['type']) ?> project">
+                <div class="dpu-source is-studio">studio ideal · every <?= e((string)$project['type']) ?> project</div>
+              <?php else: ?>
+                <strong class="ideal-readonly"><?= e($idealVal) ?></strong>
+                <div class="dpu-source is-studio">studio ideal · set by an administrator</div>
+              <?php endif; ?>
+            <?php else: ?>
+              <input type="number" name="days_per_unit[<?= $id ?>]" step="any" min="0.01"
+                     value="<?= e(fmt_num($s['days_per_unit'] ?? 1, 3)) ?>">
+              <div class="dpu-source">this project only · no studio ideal yet</div>
+            <?php endif; ?>
             <?php if ($s['tracks_seconds']): ?>
               <div class="muted small">per second</div>
             <?php endif; ?>
@@ -477,16 +562,6 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <td><input type="number" name="planned_headcount[<?= $id ?>]" min="0" step="any"
                      value="<?= e(fmt_num($s['planned_headcount'])) ?>"
                      placeholder="—"></td>
-          <?php
-          // The ideal for this step identity, if the studio has written one down.
-          // It is NOT applied and NOT defaulted in — a standard that quietly
-          // overwrote somebody's estimate would stop being a reference and start
-          // being a decision nobody made. Reported, and a person decides; the same
-          // rule the duplicate asset types follow.
-          $std = $idealSheet[standard_key($s['name'], $s['applies_to'] ?? 'shot',
-                                          $s['applies_to_asset_type'] ?? '')] ?? null;
-          $planned = (float)($s['days_per_unit'] ?: 0);
-          ?>
           <?php // Filled by wizard.js, like the duration and the verdict beside
                 // it — all three are recalculated as you type. ?>
           <td class="minimum"><span class="muted">—</span></td>
@@ -499,38 +574,6 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // right until the first keystroke — the unit label follows the
                 // Work column, which the coverage box can change. ?>
           <td class="ideal-cell col-sep"><span class="muted">&mdash;</span></td>
-          <?php // Static: the base sheet does not move as you type on this screen,
-                // and it is read-only here because it is set on the business side. ?>
-          <td class="small ideal-days">
-            <?php if ($std === null): ?>
-              <span class="muted">no standard</span>
-            <?php else: ?>
-              <strong><?= e(fmt_num((float)$std['days_per_unit'], 2)) ?></strong>
-              <?php
-              // ⚠ SLOWER IS THE RED ONE, AND THE REASON IS THE BUDGET.
-              //
-              // This read the other way round until David corrected it
-              // (2026-08-17), and the correction follows from a change made the
-              // same day: the expense projection is now computed from the IDEAL,
-              // not from the days typed here. So a step planned SLOWER than the
-              // standard spends days the budget never bought — the schedule and
-              // the money disagree, and the money is the one that was signed.
-              //
-              // Planning FASTER is not a warning on this axis: it comes in under
-              // the money. Whether it can actually be delivered is a different
-              // question, and the Studio ideal cell beside this one answers it by
-              // reddening when that pace cannot meet the deadline.
-              if ($planned > 0 && (float)$std['days_per_unit'] > 0):
-                  $ratio = $planned / (float)$std['days_per_unit'];
-                  if ($ratio > 1.05): ?>
-                    <div class="err small">planned <?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% slower,
-                      beyond the budgeted days</div>
-                  <?php elseif ($ratio < 0.95): ?>
-                    <div class="muted small">planned <?= e(fmt_num((1 - $ratio) * 100, 0)) ?>% faster</div>
-                  <?php endif;
-              endif; ?>
-            <?php endif; ?>
-          </td>
 
         </tr>
         <?php endforeach; ?>
