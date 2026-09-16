@@ -73,7 +73,7 @@
 // Mirrors includes/quota.php, with ONE deliberate exception: the window is the
 // step's own start-to-deadline here, where quota.php counts from today. See the
 // long note at `var from` below before touching it. Everything else — coverage,
-// the retake factor, the ideal-wins rule, the holiday calendar — must stay in
+// the retake factor, which days per item the plan uses, the holiday calendar — must stay in
 // step; a check that disagrees with the review screen by accident is worse than
 // no check.
 (function () {
@@ -169,11 +169,10 @@
       return row.querySelector('input[name^="' + prefix + '["]');
     }
     var startEl = field('start_date'), deadlineEl = field('deadline');
-    // A step with a studio ideal posts its box as ideal_days[], one without as
-    // days_per_unit[] - see wizard_save_planning(). Either is the number the plan
-    // runs on, so the live check reads whichever the row has. A read-only ideal
-    // (an editor's view) has no box at all and is read from data-ideal below.
-    var perUnitEl = field('days_per_unit') || field('ideal_days');
+    // The box is this project's ideal days per item, the number the plan runs on.
+    // A row without one (not an administrator, or before database update 034)
+    // shows the number read-only, and it is read from data-ideal below.
+    var perUnitEl = field('days_per_unit');
     var headEl = field('planned_headcount');
     var coverageEl = field('coverage_pct');
 
@@ -195,12 +194,10 @@
     var datesBackwards = !!(start && deadline && deadline < start);
     var dateCell = row.querySelector('.date-pair');
     if (dateCell) dateCell.classList.toggle('dates-backwards', datesBackwards);
-    // ⚠ THE BOX IS THE NUMBER IN FORCE (2026-09-16). It used to show the
-    // project's own estimate even where a studio ideal existed, and this line
-    // then ignored the box and used the ideal, so the screen worked from a
-    // number nobody could see. Now the box itself is the ideal when there is
-    // one, and reading it is reading the plan - which also means an
-    // administrator changing an ideal sees the duration move as they type.
+    // ⚠ THE BOX IS THE NUMBER IN FORCE. Until 2026-09-16 it showed the project's
+    // own estimate while this line used the studio ideal, so the screen worked
+    // from a number nobody could see. Now reading the box is reading the plan,
+    // and a changed number moves the duration as it is typed.
     var idealPerUnit = parseFloat(row.getAttribute('data-ideal'));
     var perUnit = perUnitEl ? (parseFloat(perUnitEl.value) || 0)
                             : (idealPerUnit > 0 ? idealPerUnit : 0);
@@ -375,7 +372,7 @@
     var required = teamPerDay * (perUnit > 0 ? perUnit : 1) * retakeFactor();
     var needed = Math.ceil(required);
 
-    // ---- the minimum, and how it compares with the studio ideal ------------
+    // ---- the minimum, and how it compares with the ideal -------------------
     //
     // Both are ITEMS PER PERSON PER DAY, which is the only comparison that
     // means anything: the ideal describes one artist working on one item, so
@@ -400,19 +397,16 @@
     }
 
     // The ideal is stored as DAYS PER ITEM; its pace is the reciprocal. Red when
-    // the studio's pace cannot keep up with what the deadline demands — the plan
-    // is then asking for more per person per day than the studio says the work
-    // allows, and no amount of goodwill closes that. More people, more time, or
-    // less work.
-    // Live from the box where the box IS the ideal, so the pace column moves
-    // with the number being typed rather than showing the one on the sheet.
-    var idealBox = field('ideal_days');
-    var idealDays = idealBox ? parseFloat(idealBox.value) : parseFloat(row.getAttribute('data-ideal'));
+    // that pace cannot keep up with what the deadline demands — the plan is then
+    // asking for more per person per day than this project says the work allows,
+    // and no amount of goodwill closes that. More people, more time, or less
+    // work. Live from the box, so the pace moves with the number being typed.
+    var idealDays = perUnitEl ? parseFloat(perUnitEl.value) : parseFloat(row.getAttribute('data-ideal'));
     var idealCell = row.querySelector('.ideal-cell');
     if (idealCell) {
       idealCell.classList.remove('quota-short');
       if (!(idealDays > 0)) {
-        idealCell.innerHTML = '<span class="muted">no standard</span>';
+        idealCell.innerHTML = '<span class="muted">&mdash;</span>';
       } else {
         var idealPerDay = 1 / idealDays;
         // Written in EXACTLY the shape the Minimum cell uses — same formatter,
@@ -462,33 +456,9 @@
     if (row) recalc(row);
   });
 
-  // ⚠ A STUDIO IDEAL CHANGED FROM HERE CHANGES EVERY PROJECT OF THIS TYPE.
-  //
-  // Asked BEFORE saving, and only when one actually moved: this screen is about
-  // one show, and a number edited on it reaching every other 2D project's
-  // schedule and budget is exactly the kind of consequence nobody expects from
-  // pressing Save. Compared against data-was with a thousandth of tolerance, the
-  // precision the column stores, so re-saving an untouched page never asks.
-  var planForm = table.closest('form');
-  if (planForm) {
-    planForm.addEventListener('submit', function (e) {
-      var boxes = planForm.querySelectorAll('input.ideal-input');
-      var moved = [];
-      for (var i = 0; i < boxes.length; i++) {
-        var was = parseFloat(boxes[i].getAttribute('data-was'));
-        var now = parseFloat(boxes[i].value);
-        if (isFinite(was) && isFinite(now) && Math.abs(now - was) >= 0.0005) {
-          moved.push(boxes[i].getAttribute('data-step-label') + ': ' + trimNum(was) + ' to ' + trimNum(now));
-        }
-      }
-      if (!moved.length) return;
-      var type = (boxes[0].title.match(/every (\S+) project/) || [])[1] || 'this type of';
-      var ok = window.confirm('You changed the studio ideal for:\n\n  ' + moved.join('\n  ')
-        + '\n\nThat is the ' + type + ' base sheet, so it changes the plan and the budget of '
-        + 'every ' + type + ' project, not only this one.\n\nSave it?');
-      if (!ok) e.preventDefault();
-    });
-  }
+  // No question before saving any more. It asked because a changed days per item
+  // was a studio ideal reaching every project of the type; since 2026-09-17 it
+  // belongs to this project alone, and saving it is an ordinary save.
   table.addEventListener('change', function (e) {
     var row = e.target.closest('tr');
     if (row) recalc(row);

@@ -141,9 +141,9 @@ function quota_history(PDO $pdo, string $q = '', array $projs = [],
  *
  *   IDEAL    deliveries per person per day at the days-per-item this plan was
  *            priced at. days_per_unit in a baseline is what capture_baseline()
- *            calls effective_days_per_unit(), which is the studio ideal where
- *            one exists and the project's own estimate where it does not, so
- *            this IS the rate the expense projection costs the work with.
+ *            got from effective_days_per_unit(): the project's own ideal since
+ *            2026-09-17, the type sheet's ideal where one existed before that,
+ *            so this IS the rate the expense projection costed the work with.
  *   MINIMUM  what the dates demanded of one person per day: the work in the
  *            step spread over its working days, divided by the people planned.
  *

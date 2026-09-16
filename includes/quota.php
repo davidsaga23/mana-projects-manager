@@ -194,8 +194,8 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
 
     // Retakes make each item take longer, so they scale days-per-item — not the
     // amount of work, which is fixed by the breakdown.
-    // The studio ideal where there is one; the typed estimate otherwise. One
-    // reader for the whole codebase — see effective_days_per_unit().
+    // This project's ideal (per project since 2026-09-17). One reader for the
+    // whole codebase — see effective_days_per_unit().
     $daysPerUnit = effective_days_per_unit($pdo, $projectId, $step) * retake_factor($retakePct);
     $out['required_exact']     = $out['team_per_day'] * $daysPerUnit;
     $out['required_headcount'] = (int)ceil($out['required_exact']);

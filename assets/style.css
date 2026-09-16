@@ -154,13 +154,12 @@ label.inline input { width: auto; }
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .row label { flex: 1 1 150px; }
 .stack { max-width: 620px; }
-/* The studio ideal cannot keep up with what the deadline demands. Red because it
-   is not a preference — the plan is asking for more per person per day than the
-   studio says the work allows. */
-/* Divides THIS PROJECT's numbers from THE STUDIO'S. Everything left of the rule
-   is about the show in front of you and most of it is editable; everything right
-   of it is the base sheet's opinion, set under Finance management and read-only
-   here. Mixing the two is what let a studio standard be read as a duration. */
+/* The ideal cannot keep up with what the deadline demands. Red because it is not
+   a preference — the plan is asking for more per person per day than this
+   project says the work allows. */
+/* Divides what the dates demand from what the work takes. Left of the rule is the
+   plan as drawn; right of it is the ideal's pace, the Days per item box turned
+   into items per person per day. */
 /* Every cell starts at the TOP, so the first line of each column sits on one
    line across the row. Without it a tall cell centres its neighbours and the
    figures wander up and down the row.
@@ -192,22 +191,18 @@ label.inline input { width: auto; }
    between them. */
 .standards-table .new-standard-scope { margin: 3px 0; }
 
-/* --- project types: the tabs, "+ New project type", what uses a type --------
-   David, 2026-09-16. The tabs and the button share one line. The panel is a
-   POPOVER under its button, not a block in the row: in the row it would push the
-   button it hangs from onto the next line the moment it was clicked, and the
-   same panel sits inside the Basics form, where it would shove the dates down.
-   Same construction as .slot-change-bar. */
-.type-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
-.type-bar .page-actions { margin: 0; }
+/* --- "+ New project type" beside Type on Basics ------------------------------
+   David, 2026-09-16. The panel is a POPOVER under its button, not a block in the
+   flow: it sits inside the Basics form, where a block would shove the dates down
+   the moment it opened. Same construction as .slot-change-bar. */
 .type-new { position: relative; margin: 0; }
 /* Held down while the panel is open, so it reads as the thing that opened it. */
 .type-new[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
 .type-new-form {
   /* max-content, or the popover shrink-fits to the button it hangs from and
      stacks every control. Capped, so the small print wraps instead of running
-     off a narrow screen. 40 is the level of the other panels, above the sticky
-     table headings (5) of the sheet right below it. */
+     off a narrow screen. 40 is the level of the other panels, above any sticky
+     table heading (5). */
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
   width: max-content; max-width: min(560px, calc(100vw - 40px));
   display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
@@ -215,21 +210,23 @@ label.inline input { width: auto; }
   padding: 12px 14px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
   font-weight: 400;
 }
-/* width:auto on both, or the global `input, select { width: 100% }` gives each
-   its own line. label.inline already frees the input; the select needs saying. */
+/* width:auto, or the global `input, select { width: 100% }` gives each control
+   its own line. */
 .type-new-form input, .type-new-form select {
   width: auto; max-width: 100%; padding: 5px 8px; font-size: 14px;
 }
-/* On a phone the picker is wider than the room beside its words, and an inline
-   label does not wrap, so it stuck out past the panel's edge. Allowed to wrap,
-   the picker drops under "Start its ideal quotas from" instead. */
+/* On a phone a control can be wider than the room beside its words, and an
+   inline label does not wrap, so it stuck out past the panel's edge. Allowed to
+   wrap, the control drops under its words instead. */
 .type-new-form label.inline { flex-wrap: wrap; max-width: 100%; }
 .type-new-form button { margin-top: 0; }
 .type-new-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
-/* The sentence under the tabs, with Remove at the end of it when that is allowed. */
-.type-usage { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
-.type-remove { margin: 0; }
-.type-remove button { margin-top: 0; }
+/* The types nothing uses, each with its own Remove, under the name box. */
+.type-unused { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.type-unused button { margin-top: 0; }
+/* The project picker for copying another project's ideal quotas. width:auto, or
+   the global `input, select { width: 100% }` pushes the button under it. */
+.ideals-copy select { width: auto; max-width: 100%; }
 /* A small button that removes something: .row-btn's shape, in the red the admin
    tag already uses, and quieter than button.danger. It only appears on a type
    nothing uses, so it should not shout over the sheet. */
@@ -2007,17 +2004,14 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand-add-form input { min-width: 130px; }
 .cand-add-form button { margin-top: 0; padding: 3px 10px; font-size: 12.5px; }
 
-/* --- Days per item on Dates & headcount: the number, and whose it is -------
-   The box holds what the plan runs on. The line under it says where that number
-   lives, because a studio ideal reaches every project of the type and must never
-   look like it belongs to this one. The studio case is coloured; this project's
-   own estimate is plain, since it only affects this show. */
+/* --- Days per item on Dates & headcount: the number, and where it came from --
+   The box holds this project's ideal, what the plan runs on. The line under it
+   says where the number came from. Coloured only in the one case where it is not
+   this project's own yet: before database update 034, when it is still the type
+   sheet's, shared by every project of the type. */
 .dpu-cell input { width: 100%; }
 .dpu-source { font-size: 11px; line-height: 1.3; margin-top: 3px; color: #7b8894; }
 .dpu-source.is-studio { color: #6f42c1; font-weight: 600; }
-/* An administrator's box for a studio ideal carries the same colour at its edge,
-   so the two kinds of box cannot be mistaken for each other down a long table. */
-.dpu-cell input.ideal-input { border-color: #b9a3e0; box-shadow: inset 3px 0 0 #6f42c1; }
 .ideal-readonly { display: block; font-size: 15px; padding: 4px 0; }
 
 /* --- the Deadline card on a step's page -----------------------------------

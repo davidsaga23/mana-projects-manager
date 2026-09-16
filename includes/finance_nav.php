@@ -37,23 +37,14 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // already shows and nothing in the app sends anybody to it. What it
         // uniquely holds - quoted rates, contract states, bulk add, stage
         // history - is on the roadmap to be moved or retired.
-        // The IDEAL QUOTA sheet — the number this project's budget is built on.
+        // THIS PROJECT'S IDEAL QUOTAS, the numbers its budget is built on.
         //
-        // It lives inside Finance management because that is where it is decided
+        // Inside Finance management because that is where they are decided
         // (David, 2026-08-17): the production head sets what the work should
-        // take, and every cost on the projection is computed from it. Reached
-        // from here pre-filtered to THIS project's type, because that is the
-        // sheet that priced the budget you are looking at.
-        //
-        // Studio-wide underneath, so it is not per-project data — but arriving
-        // at it from the project whose budget it produced is how somebody
-        // actually gets there.
-        // &from= is how the sheet gets a way back. It is studio-wide, so it
-        // cannot carry a project's nav — the crumb it draws instead is the
-        // difference between a tab and a trapdoor.
+        // take, and every cost on the projection is computed from it. Per project
+        // since 2026-09-17, so it is a tab like the others, drawing this bar.
         ['key' => 'standards',  'label' => 'Ideal quotas',
-         'href' => 'standards.php?from=' . $projectId
-                   . ($projectType !== '' ? '&type=' . urlencode($projectType) : '')],
+         'href' => 'standards.php' . $p],
     ];
 }
 

@@ -1,9 +1,10 @@
 <?php
 // Wizard step 1 — project basics. Creates the project row on first save.
 
-// The type picks the ideal quotas sheet the plan runs on, so saving a changed
-// one reports what moved, and the New project type panel is drawn from there.
+// The New project type panel is drawn beside Type, and whether a type still
+// decides any number depends on migration 034 (ideal quotas per project).
 require_once __DIR__ . '/../standards.php';
+require_once __DIR__ . '/../project_types.php';
 
 function wizard_save_basics(PDO $pdo, ?array $project): string {
     $name     = trim($_POST['name'] ?? '');
@@ -19,9 +20,8 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
     if ($name === '')                       throw new RuntimeException('The project needs a name.');
     if (strlen($code) < 2)                  throw new RuntimeException('The project code needs at least 2 letters or numbers.');
     if (strlen($code) > 20)                 throw new RuntimeException('The project code is too long (20 characters maximum).');
-    // ⚠ REFUSED, NOT REWRITTEN TO OTHER, which is what this line used to do. The
-    // type picks the ideal quotas sheet, so a quiet rewrite moves the plan and
-    // the budget onto numbers nobody chose. It only happens when a type is
+    // ⚠ REFUSED, NOT REWRITTEN TO OTHER, which is what this line used to do: a
+    // show filed under a type nobody chose. It only happens when a type is
     // removed while this page is open. The project's own type always passes,
     // listed or not, because the picker always offers it.
     if (!in_array($type, project_type_options($pdo, (string)($project['type'] ?? '')), true)) {
@@ -48,11 +48,17 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         $id = (int)$project['id'];
         $wasType = (string)$project['type'];
         if ($wasType !== $type) {
-            flash('ok', sprintf('Saved the project details, and moved it from %s to %s.', $wasType, $type));
-            // What the move did to the plan, step by step. Said on the save that
-            // did it, because nothing else on this screen shows the plan.
-            foreach (project_type_change_report($pdo, $id, $wasType, $type) as [$kind, $msg]) {
-                flash($kind, $msg);
+            // Said, because until 2026-09-17 this move DID change the plan: the
+            // type picked the ideal quotas sheet. Somebody who remembers that
+            // should not have to go and check the budget to find out it no longer
+            // does.
+            flash('ok', sprintf('Saved the project details, and moved it from %s to %s.', $wasType, $type)
+                . (ideals_per_project($pdo)
+                    ? ' No quota changed: ideal quotas belong to the project, not its type.' : ''));
+            if (!ideals_per_project($pdo)) {
+                flash('warn', 'Database update 034 has not been applied yet, so days per item still come '
+                            . 'from the ' . $type . ' ideal quotas sheet, and this move may have changed '
+                            . 'the plan and the budget.');
             }
         } else {
             flash('ok', 'Saved the project details.');
@@ -131,13 +137,16 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
           <small class="warn-text"><strong><?= e($picked) ?> is picked, not saved.</strong> This project
             stays <?= e((string)$project['type']) ?> until you save.</small>
         <?php endif; ?>
-        <small>Decides which ideal quotas sheet every step plans on, and which pipeline template is
-          offered next. Changing it later can move the dates and the budget, and saving says which
-          steps moved.</small>
+        <?php if (ideals_per_project($pdo)): ?>
+          <small>Files the project, and decides which pipeline templates are offered first. It changes
+            no quota: ideal quotas belong to each project.</small>
+        <?php else: ?>
+          <small>Decides which pipeline template is offered next, and, until database update 034 is
+            applied, which ideal quotas sheet the plan runs on.</small>
+        <?php endif; ?>
       </label>
       <?php if ($canAddType): ?>
-        <?php project_type_new_form($pdo, (string)$project['type'],
-                                    ['return' => 'basics:' . (int)$project['id']], 'new-type-form'); ?>
+        <?php project_type_panel($pdo, $project, 'new-type-form'); ?>
       <?php endif; ?>
 
       <div class="row">
@@ -207,8 +216,8 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
     <?php if ($canAddType): ?>
       <?php // What the New project type panel beside Type posts through. Empty on
             // purpose: forms cannot nest, so its controls sit inside the form above
-            // and name this one with the form attribute. See project_type_new_form(). ?>
-      <form id="new-type-form" method="post" action="standards.php"></form>
+            // and name this one with the form attribute. See project_type_panel(). ?>
+      <form id="new-type-form" method="post" action="project_types.php"></form>
     <?php endif; ?>
     <?php
 }

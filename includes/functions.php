@@ -67,6 +67,30 @@ function pending_migration_count(PDO $pdo): int {
 }
 
 /**
+ * Has this migration file been applied, all of it?
+ *
+ * For a change where the CODE must wait for the DATA, which column_exists()
+ * cannot tell: a column exists after a migration's first statement, while
+ * migrate.php records the file only once every statement has succeeded. Ideal
+ * quotas becoming per project (034) is the case. The code must not read a step's
+ * own days per item as the plan until 034 has copied the sheets' numbers into it,
+ * or every budget would move to the old, ignored values for as long as the
+ * update sat waiting.
+ */
+function migration_applied(PDO $pdo, string $filename): bool {
+    static $applied = null;
+    if ($applied === null) {
+        try {
+            $applied = array_flip($pdo->query('SELECT filename FROM schema_migrations')
+                                      ->fetchAll(PDO::FETCH_COLUMN));
+        } catch (PDOException $e) {
+            $applied = [];                 // a fresh install mid-setup
+        }
+    }
+    return isset($applied[$filename]);
+}
+
+/**
  * Does a column exist yet?
  *
  * For screens that gained a field in a migration which may not have been applied

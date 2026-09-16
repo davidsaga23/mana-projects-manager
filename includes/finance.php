@@ -123,25 +123,17 @@ function expense_projection(PDO $pdo, int $projectId): array {
     // ---- THE NUMBER THE BUDGET IS BUILT ON --------------------------------
     //
     // David, 2026-08-17: *"Ideal is what the studio or production head
-    // determines will budget the project based on."* So the projection reaches
-    // for the studio standard FIRST, and only falls back to what this project
-    // happened to be planned at.
+    // determines will budget the project based on."* So the projection is costed
+    // from the ideal quota, through effective_days_per_unit(), the same reader
+    // the schedule and the quotas use.
     //
-    // Why a fallback rather than zero: a step with no standard recorded is a
-    // step nobody has written a rule for yet, not a step that takes no time.
-    // Costing it at nothing would quietly shrink the budget, which is the
-    // failure this file exists to avoid — and the fallback is reported per row
-    // rather than assumed, so a projection can always say which of its rows are
-    // resting on a studio decision and which on one project's guess.
-    //
-    // ⚠ THE SCHEDULE DOES NOT FOLLOW. Dates still come from
-    // pipeline_steps.days_per_unit through the scheduler, because changing that
-    // moves every bar on every timeline. Where the two differ the money and the
-    // calendar are answering with different day counts, and the screen says so.
+    // Since 2026-09-17 that ideal is this project's own, per step (migration
+    // 034), so every row rests on it. Before 034 the old rule stands: the type
+    // sheet's standard, falling back to what this project was planned at, and
+    // each row says which, so the screen can report the mix in one line.
     $ptype = (string)$pdo->query(
         'SELECT type FROM projects WHERE id = ' . (int)$projectId
     )->fetchColumn();
-    $standards = standards_available($pdo) ? standards_for_type($pdo, $ptype) : [];
 
     // project_lanes() returns a FLAT list ordered by step; group it, because the
     // projection walks step by step and a linear scan per step would be n-squared.
@@ -180,12 +172,10 @@ function expense_projection(PDO $pdo, int $projectId): array {
         // The same helper the quota and the scheduler use, rather than a second
         // copy of the rule here — a duplicated lookup is how this file and the
         // planning screen came to disagree in the first place.
-        $std = $standards[standard_key($step['name'], $step['applies_to'] ?? 'shot',
-                                       $step['applies_to_asset_type'] ?? '')] ?? null;
-        $idealDays    = ($std && (float)$std['days_per_unit'] > 0) ? (float)$std['days_per_unit'] : null;
         $estimateDays = (float)($step['days_per_unit'] ?: 0);
         $baseDays     = effective_days_per_unit($pdo, $projectId, $step);
         $daysSource   = effective_days_source($pdo, $projectId, $step);
+        $idealDays    = $daysSource === 'ideal' ? $baseDays : null;
 
         // Retakes scale days-per-item whichever source it came from — a revision
         // takes as long on a standard as on a guess (DECISIONS, 2026-08-12).

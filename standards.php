@@ -1,187 +1,109 @@
 <?php
-// The base sheet — ideal quotas, one sheet per kind of project.
+// Ideal quotas: one project's.
 //
-// STUDIO-WIDE, not per project. That is the point of it: a 3D series and a 2D
-// short are different work, but every 3D series is the same work, and what
-// Character Concept actually takes is a fact about the studio rather than about
-// one show. Same reasoning as step_library and the department vocabulary being
-// global.
+// David, 2026-09-17: "between projects (even if they're the same type) might have
+// different ideal quotas and that will change my budget so this needs to be per
+// project. We can start copying another one but if I change something it
+// shouldn't affect other projects at all."
 //
-// ⚠ THIS IS NOT THE REQUIRED QUOTA. The dashboard's "required per day" is
-// derived from the deadline and moves whenever the date or the progress moves;
-// nobody types it. This is what the work SHOULD take, typed from experience, and
-// the difference between the two is the thing worth looking at — see
-// includes/standards.php for all three numbers side by side.
+// Each step's days per item on THIS project: what its schedule, its quotas and its
+// budget run on. The same number the Dates & headcount screen shows, stored once
+// on the step and editable from either screen. Nothing here reaches another
+// project, and nothing on another project reaches here, except a copy somebody
+// asks for.
+//
+// A Finance management tab, because that is where these numbers were put on
+// 2026-08-17: the budget is built on them. Until 2026-09-17 this screen was one
+// studio-wide sheet per project TYPE, reached from a project but belonging to none.
+// See includes/standards.php for what became of those sheets.
+//
+// ⚠ THIS IS NOT THE REQUIRED QUOTA. The dashboard's "required per day" is derived
+// from the deadline and moves whenever the date or the progress moves; nobody
+// types it. This is what the work SHOULD take, and the gap between the two is the
+// thing worth looking at.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/pipeline.php';
+require_once __DIR__ . '/includes/finance_nav.php';
 require_once __DIR__ . '/includes/standards.php';
 require_login();
 
-$ready = standards_available($pdo);
-$types = standard_project_types($pdo);
+// ?project= like every other project screen. ?from= is what links carried while
+// this was a studio-wide sheet that had to be told which project to lead back to,
+// and a bookmark may still carry it.
+$projectId = (int)($_GET['project'] ?? $_GET['from'] ?? 0);
+$stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+$stmt->execute([$projectId]);
+$project = $stmt->fetch();
+if (!$project) {
+    flash('err', 'Ideal quotas belong to each project now. Open them from a project, under Finance '
+               . 'management.');
+    header('Location: index.php');
+    exit;
+}
 
-$type = (string)($_GET['type'] ?? $_POST['project_type'] ?? '');
-if (!in_array($type, $types, true)) $type = $types[0] ?? '3D';
-
-// Where the project's finance tabs sent us, carried through every save and type
-// switch — a redirect that dropped it would strand the reader on the first save,
-// which is the moment they are most likely to want to go back.
-$fromId = (int)($_GET['from'] ?? $_POST['from'] ?? 0);
-$fromQs = $fromId > 0 ? '&from=' . $fromId : '';
-
-$selfUrl = 'standards.php?type=' . urlencode($type) . $fromQs;
-
-// Project types can be added since migration 032 (David, 2026-09-16).
-$typesReady = project_types_available($pdo);
-
-// Where a New project type panel was opened from, when it was not this screen.
-// Only Basics sends one: it draws the same panel beside the type picker, and
-// there the new type comes back PICKED, ready to save onto the project, rather
-// than shown as a sheet the reader did not ask to look at.
-$returnProject = 0;
-if (preg_match('/^basics:(\d+)$/', (string)($_POST['return'] ?? ''), $m)) $returnProject = (int)$m[1];
-$basicsUrl = $returnProject > 0 ? 'wizard.php?project=' . $returnProject . '&step=1' : '';
+$perProject = ideals_per_project($pdo);
+$canEdit = $perProject && is_admin();
+$self = 'standards.php?project=' . $projectId;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = (string)($_POST['action'] ?? '');
-    // A refusal goes back to where the form was, so the reason is read beside
-    // the thing it refused.
-    $to = ($action === 'new_type' && $basicsUrl !== '') ? $basicsUrl : $selfUrl;
     try {
         if (!is_admin()) {
-            throw new RuntimeException(
-                'Ideal quotas and project types are set on the business side, so only an '
-                . 'administrator can change them. Everyone can read them.'
-            );
+            throw new RuntimeException('Ideal quotas are set on the business side, so only an '
+                                     . 'administrator can change them. Everyone can read them.');
         }
-
-        if ($action === 'new_type') {
-            $copyFrom = trim((string)($_POST['copy_from'] ?? ''));
-            $made = create_project_type($pdo, (string)($_POST['type_name'] ?? ''), $copyFrom,
-                                        current_user_display());
-            if ($made['copied'] > 0) {
-                flash('ok', sprintf('Created the %s project type. Its ideal quotas start as a copy of '
-                                  . 'the %d on the %s sheet, so a project moved onto it plans exactly as '
-                                  . 'it did until one of them is changed.',
-                                    $made['name'], $made['copied'], $copyFrom));
-            } else {
-                flash('ok', sprintf('Created the %s project type, with an empty ideal quotas sheet%s.',
-                                    $made['name'], $copyFrom !== ''
-                                        ? ' (the ' . $copyFrom . ' sheet had nothing on it to copy)' : ''));
-                flash('warn', sprintf('Until ideals are written on the %s sheet, a project moved onto it '
-                                    . 'plans every step on its own days per item.', $made['name']));
-            }
-            $to = $basicsUrl !== ''
-                ? $basicsUrl . '&pick_type=' . urlencode($made['name'])
-                : 'standards.php?type=' . urlencode($made['name']) . $fromQs;
-
-        } elseif ($action === 'remove_type') {
-            $gone = (string)($_POST['remove_type'] ?? '');
-            $n = remove_project_type($pdo, $gone, current_user_display());
-            flash('ok', sprintf('Removed the %s project type%s.', $gone, $n > 0
-                ? sprintf(', and the %d ideal quota%s on its sheet, which stay in the history of changes',
-                          $n, $n === 1 ? '' : 's')
-                : ''));
-            $to = 'standards.php' . ($fromId > 0 ? '?from=' . $fromId : '');
-
+        if (($_POST['action'] ?? '') === 'copy_ideals') {
+            copy_ideals_flash(copy_project_ideals($pdo, $projectId, (int)($_POST['copy_from_project'] ?? 0),
+                                                  current_user_display()));
         } else {
-            if (!$ready) {
-                throw new RuntimeException(
-                    'The database updates this screen needs have not been applied yet (migration 026), '
-                    . 'so nothing was saved.'
-                );
+            $r = save_project_ideals($pdo, $projectId,
+                                     is_array($_POST['days'] ?? null) ? $_POST['days'] : [],
+                                     is_array($_POST['source'] ?? null) ? $_POST['source'] : [],
+                                     current_user_display());
+            $n = count($r['changed']);
+            if ($n > 0) {
+                flash('ok', sprintf('Saved %d ideal quota%s for this project: %s. No other project changed.',
+                                    $n, $n === 1 ? '' : 's', ideal_list($r['changed'])));
             }
-            $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
-            $r = save_standards($pdo, $type, $rows, current_user_display());
-
-            if ($r['saved'])   flash('ok', sprintf('Saved %d standard%s for %s projects.',
-                                     $r['saved'], $r['saved'] === 1 ? '' : 's', $type));
-            if ($r['removed']) flash('warn', sprintf('%d standard%s cleared, a blank removes it rather '
-                                     . 'than storing zero days, which nothing could plan against.',
-                                     $r['removed'], $r['removed'] === 1 ? ' was' : 's were'));
-            foreach ($r['errors'] as $e) flash('err', $e);
-            if (!$r['saved'] && !$r['removed'] && !$r['errors']) {
-                flash('warn', 'Nothing had a step name in it, so nothing was saved.');
+            if ($r['notes'] > 0) {
+                flash('ok', sprintf('Updated where the number came from on %d step%s.',
+                                    $r['notes'], $r['notes'] === 1 ? '' : 's'));
+            }
+            foreach ($r['errors'] as $msg) flash('err', $msg);
+            if ($n === 0 && $r['notes'] === 0 && !$r['errors']) {
+                flash('ok', 'Nothing had changed, so nothing was saved.');
             }
         }
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
-    header('Location: ' . $to);
+    header('Location: ' . $self);
     exit;
 }
 
-$standards = $ready ? standards_list($pdo, $type) : [];
+$steps = pipeline_steps($pdo, $projectId);
 
-// Step identities already in use on projects of THIS type that have no standard
-// yet — the list of rows worth filling in next. Built from real pipelines rather
-// than from a fixed list, exactly as every other vocabulary here is.
-$missing = [];
-if ($ready) {
-    $have = [];
-    foreach ($standards as $s) {
-        $have[standard_key($s['step_name'], $s['applies_to'], $s['applies_to_asset_type'])] = true;
-    }
-    $stmt = $pdo->prepare(
-        'SELECT ps.name, ps.applies_to, COALESCE(ps.applies_to_asset_type, \'\') AS asset_type,
-                COUNT(DISTINCT ps.project_id) AS projects,
-                MIN(ps.color) AS color,
-                ROUND(AVG(NULLIF(ps.days_per_unit, 0)), 2) AS avg_days
-           FROM pipeline_steps ps
-           JOIN projects p ON p.id = ps.project_id
-          WHERE p.type = ?
-          GROUP BY ps.name, ps.applies_to, COALESCE(ps.applies_to_asset_type, \'\')
-          ORDER BY MIN(ps.step_order), ps.name'
-    );
-    $stmt->execute([$type]);
-    foreach ($stmt as $r) {
-        if (!isset($have[standard_key($r['name'], $r['applies_to'], $r['asset_type'])])) {
-            $missing[] = $r;
-        }
-    }
-}
-
-// The project whose finance tabs sent us here, if any. This sheet is studio-wide
-// — it belongs to a KIND of project, not to one show — so it cannot sit inside a
-// project's nav. But it is reached from a project's Finance management tabs, and
-// a screen you can only arrive at and not leave is the cul-de-sac complaint the
-// person page already earned once. The crumb below is the way back.
-$fromProject = null;
-if ($fromId > 0) {
-    $st = $pdo->prepare('SELECT id, name, code FROM projects WHERE id = ?');
-    $st->execute([$fromId]);
-    $fromProject = $st->fetch() ?: null;
-}
-
-$pageTitle = 'Ideal quotas · ' . $type;
+$pageTitle = 'Ideal quotas · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<p class="crumb">
-  <?php if ($fromProject): ?>
-    <?php // Back to the side of the project the reader can actually open. This
-          // sheet is not admin-only — it is production planning data — so an
-          // editor reaching it from a step detail must not be pointed at a
-          // finance screen that would turn them away at the door. ?>
-    <?php if (is_admin()): ?>
-      <a href="finance_project.php?project=<?= (int)$fromProject['id'] ?>&tab=overview">←
-        Finance management · <?= e($fromProject['name']) ?></a>
-    <?php else: ?>
-      <a href="project.php?id=<?= (int)$fromProject['id'] ?>">← <?= e($fromProject['name']) ?></a>
-    <?php endif; ?>
-  <?php else: ?>
-    <a href="index.php">← Projects</a>
-  <?php endif; ?>
-</p>
+<?php // Inside the project's Finance management bar for administrators, like the
+      // other money tabs. Anybody else cannot open Finance management at all, so
+      // they get the production bar of the same show rather than a dead end. ?>
+<?php if (is_admin()): ?>
+  <?php finance_nav($project, 'standards'); ?>
+<?php else: ?>
+  <?php project_nav($project, ''); ?>
+<?php endif; ?>
 
-<h2 class="wizard-title">Ideal quotas <span class="muted">· base sheet for <?= e($type) ?> projects</span></h2>
+<h2 class="wizard-title">Ideal quotas <span class="muted">· this project only</span></h2>
 
 <p class="lead">
-  What the work <strong>should</strong> take when it is done properly, one sheet per kind of
-  project, written from experience and true across shows until experience changes it.
+  What each step of <?= e($project['name']) ?> <strong>should</strong> take when it is done
+  properly, as days per item. Its schedule, its quotas and its budget run on these numbers, and
+  changing one here changes nothing on any other project.
 </p>
 
 <div class="flash flash-warn">
@@ -193,251 +115,97 @@ require __DIR__ . '/includes/header.php';
   by the people on it.
 </div>
 
-<?php if (!$ready): ?>
+<?php if (!$perProject): ?>
   <div class="flash flash-err">
-    This screen needs database updates that haven't been applied (migration <strong>026</strong>).
-    <?= is_admin() ? '<a href="migrate.php">Apply them →</a>' : 'Ask an administrator to run them.' ?>
+    <strong>Ideal quotas become per project with database update 034</strong>, which has not been
+    applied yet. Until it is, these numbers still come from the <?= e((string)$project['type']) ?>
+    sheet shared by every <?= e((string)$project['type']) ?> project, and nothing here can be changed.
+    <?= is_admin() ? '<a href="migrate.php">Open the database updates →</a>' : 'Ask an administrator to apply it.' ?>
+  </div>
+<?php endif; ?>
+
+<?php if (!$steps): ?>
+  <div class="empty-state">
+    <h2>No pipeline steps yet</h2>
+    <p class="muted">Ideal quotas are kept per step.
+      <a href="wizard.php?project=<?= $projectId ?>&amp;step=2">Add the pipeline steps first →</a></p>
   </div>
 <?php else: ?>
 
-  <?php // THE TABS AND "+ New project type" ON ONE LINE. A type exists to own one
-        // of these sheets, so this is where they are added. The panel opens as a
-        // popover under its button rather than in the row, so opening it moves
-        // nothing on the line that was just clicked. ?>
-  <div class="type-bar">
-    <p class="page-actions">
-      <?php foreach ($types as $t): ?>
-        <a class="proj-tab <?= $t === $type ? 'current' : '' ?>"
-           href="standards.php?type=<?= urlencode($t) ?><?= e($fromQs) ?>"><?= e($t) ?></a>
-      <?php endforeach; ?>
-    </p>
-    <?php if (is_admin()): ?>
-      <?php if ($typesReady): ?>
-        <?php project_type_new_form($pdo, $type); ?>
-      <?php else: ?>
-        <span class="muted small">New project types arrive with database update 032.</span>
-      <?php endif; ?>
-    <?php endif; ?>
-  </div>
+  <?php if ($canEdit): ?>
+    <?php project_ideals_copy_form($pdo, $project); ?>
+  <?php endif; ?>
 
-  <?php
-  // WHAT IS FILED UNDER THIS TYPE, said for everyone: it is also what a number
-  // changed on this sheet reaches. And for an administrator, the way to remove a
-  // type nothing uses, which only appears when that is true. A type in use cannot
-  // be removed at all, see remove_project_type().
-  $usage = project_type_usage($pdo, $type);
-  $inUse = $usage['projects'] || $usage['templates'];
-  $removable = !$inUse && $typesReady && is_admin()
-            && count(project_types($pdo)) > 1 && in_array($type, project_types($pdo), true);
-  ?>
-  <div class="type-usage muted small">
-    <?php if ($inUse): ?>
-      Used by <?= e(project_type_usage_phrase($usage)) ?>.
-    <?php else: ?>
-      No project or pipeline template is <?= e($type) ?> yet.
-    <?php endif; ?>
-    <?php if ($removable): ?>
-      <?php $confirm = sprintf('Remove the %s project type?', $type)
-                     . ($usage['ideals'] > 0
-                        ? sprintf(' The %d ideal quota%s on its sheet %s with it, and %s in the history of changes.',
-                                  $usage['ideals'], $usage['ideals'] === 1 ? '' : 's',
-                                  $usage['ideals'] === 1 ? 'goes' : 'go',
-                                  $usage['ideals'] === 1 ? 'stays' : 'stay')
-                        : ' Its sheet is empty.')
-                     . ' Nothing uses it, so no project changes.'; ?>
-      <form method="post" class="type-remove" onsubmit="return confirm(<?= e(json_encode($confirm)) ?>);">
-        <input type="hidden" name="action" value="remove_type">
-        <input type="hidden" name="remove_type" value="<?= e($type) ?>">
-        <button type="submit" class="row-btn row-btn-danger">Remove the <?= e($type) ?> type</button>
-      </form>
-    <?php endif; ?>
-  </div>
-
-  <?php
-  // ADMINS SET IT, EVERYONE READS IT. The standard is a business decision — what
-  // the studio is prepared to say the work takes — so editing sits with the
-  // people who own that call. Reading is deliberately open: it appears on the
-  // production dashboard and on every step detail beside the pace the deadline
-  // demands, and a number a producer cannot see is a number they cannot plan
-  // against.
-  ?>
-  <?php if (is_admin()): ?>
   <form method="post">
-    <input type="hidden" name="project_type" value="<?= e($type) ?>">
+    <input type="hidden" name="action" value="save">
     <?php
-    // ⚠ NO .grid-scroll WRAPPER HERE, and that is the whole reason the heading
-    // sticks. `overflow-x: auto` creates a scrolling box, and `position: sticky`
-    // sticks to the nearest scrolling ancestor — so inside that wrapper the
-    // heading stuck to a box that never scrolls vertically, which looks exactly
-    // like sticky being broken. The global `th { position: sticky }` rule was
-    // there the whole time.
-    //
-    // Without a scroller the table has to fit on its own, which is what the
-    // colgroup below is for. Eight columns is comfortable; the two free-text
-    // columns give up the width.
+    // ⚠ NO .grid-scroll WRAPPER, which is what keeps the heading sticky: an
+    // overflow box becomes the thing `position: sticky` sticks to, and that box
+    // never scrolls vertically. The colgroup makes the table fit without one.
     ?>
     <table class="grid-table standards-table">
-      <?php
-      // Covers and Asset type stopped being columns: with the scope printed under
-      // the step name — the way Dates & headcount prints it — they were the same
-      // fact written twice, in three columns instead of one.
-      ?>
       <colgroup>
-        <col style="width:22%"> <?php // Step + scope ?>
-        <col style="width:10%"> <?php // Days per item ?>
-        <col style="width:9%">  <?php // Which is ?>
-        <col style="width:11%"> <?php // Typical headcount ?>
-        <col style="width:26%"> <?php // Where the number came from ?>
-        <col style="width:22%"> <?php // Notes ?>
+        <col style="width:30%"> <?php // Step ?>
+        <col style="width:14%"> <?php // Days per item ?>
+        <col style="width:14%"> <?php // Which is ?>
+        <col style="width:42%"> <?php // Where the number came from ?>
       </colgroup>
-        <thead>
-          <tr>
-            <th>Step</th>
-            <th>Days per item</th><th>Which is</th>
-            <th>Typical headcount</th><th>Where the number came from</th><th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-        <?php
-        // Existing standards first, then a row per step identity used on this
-        // type of project that has none yet, then five blanks. The middle group
-        // is the useful one: it is the studio saying "you run this step and have
-        // never written down what it takes".
-        $r = 0;
-        foreach ($standards as $s): $n = 'rows[' . $r++ . ']'; ?>
-          <?php
-          // ⚠ THE STEP IS AN IDENTITY, NOT A FIELD. Editing the name here would not
-          // rename anything — it is half of the key this row is stored under
-          // (project type + name + scope), so a changed name silently creates a
-          // SECOND standard and orphans the first, which then goes on pricing
-          // nothing. Shown, carried in hidden inputs, and not typeable.
-          //
-          // Drawn exactly as Dates & headcount draws it — the step's own colour,
-          // its name, and the scope underneath — because the two screens are read
-          // against each other and should look like they describe the same thing.
-          ?>
-          <tr>
-            <td class="wf-name">
-              <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['step_name']) ?>
-              <div class="muted small step-scope"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?: null)) ?></div>
-              <input type="hidden" name="<?= $n ?>[step_name]" value="<?= e($s['step_name']) ?>">
-              <input type="hidden" name="<?= $n ?>[applies_to]" value="<?= e($s['applies_to']) ?>">
-              <input type="hidden" name="<?= $n ?>[applies_to_asset_type]" value="<?= e($s['applies_to_asset_type']) ?>">
-            </td>
-            <?php // THREE decimals, matching DECIMAL(6,3) exactly — not a display
-                  // preference, a correctness requirement. This is an EDITABLE
-                  // field, so whatever it renders is what comes back on the next
-                  // save. At two decimals a stored 0.435 rendered "0.44", and
-                  // saving the form without touching the row wrote 0.44 back:
-                  // a 1.15% budget increase nobody typed, on every re-save.
-                  //
-                  // fmt_num strips trailing zeros, so the clean values still read
-                  // clean — 0.500 shows as 0.5, not 0.500. Only the values that
-                  // genuinely need the third decimal show it. ?>
-            <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"
-                       value="<?= e(fmt_num((float)$s['days_per_unit'], 3)) ?>"></td>
-            <td class="muted small"><?= e(fmt_num(1 / max(0.001, (float)$s['days_per_unit']), 2)) ?> a day</td>
-            <td><input name="<?= $n ?>[typical_headcount]" inputmode="decimal" size="5"
-                       value="<?= $s['typical_headcount'] !== null ? e(fmt_num((float)$s['typical_headcount'], 2)) : '' ?>"></td>
-            <td><input name="<?= $n ?>[source]" value="<?= e($s['source'] ?? '') ?>" size="24"
-                       placeholder="e.g. measured on RTC + two shorts"></td>
-            <td><input name="<?= $n ?>[notes]" value="<?= e($s['notes'] ?? '') ?>" size="22"></td>
-          </tr>
-        <?php endforeach; ?>
-
-        <?php foreach ($missing as $m): $n = 'rows[' . $r++ . ']'; ?>
-          <?php // Same identity treatment as the rows above: these come straight
-                // out of real pipelines, so their name and scope are facts rather
-                // than fields. Only the standard itself is typed. ?>
-          <tr class="has-problem">
-            <td class="wf-name">
-              <span class="dot" style="background:<?= e($m['color'] ?: '#ccc') ?>"></span><?= e($m['name']) ?>
-              <div class="muted small step-scope"><?= e(applies_to_phrase($m['applies_to'], $m['asset_type'] ?: null)) ?></div>
-              <input type="hidden" name="<?= $n ?>[step_name]" value="<?= e($m['name']) ?>">
-              <input type="hidden" name="<?= $n ?>[applies_to]" value="<?= e($m['applies_to']) ?>">
-              <input type="hidden" name="<?= $n ?>[applies_to_asset_type]" value="<?= e($m['asset_type']) ?>">
-            </td>
-            <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6" placeholder=""></td>
-            <td class="muted small">
-              planned at <?= e(fmt_num((float)$m['avg_days'], 2)) ?> on
-              <?= (int)$m['projects'] ?> project<?= (int)$m['projects'] === 1 ? '' : 's' ?>
-            </td>
-            <td><input name="<?= $n ?>[typical_headcount]" inputmode="decimal" size="5"></td>
-            <td><input name="<?= $n ?>[source]" size="24" placeholder="no standard yet"></td>
-            <td><input name="<?= $n ?>[notes]" size="22"></td>
-          </tr>
-        <?php endforeach; ?>
-
-        <?php for ($k = 0; $k < 5; $k++): $n = 'rows[' . $r++ . ']'; ?>
-          <?php // The blank rows DO keep their fields — this is the only way to
-                // write a standard for a step no project runs yet, and there is no
-                // identity to display because there isn't one until it is typed.
-                // All three parts stack into the one Step column. ?>
-          <tr>
-            <td>
-              <input name="<?= $n ?>[step_name]" placeholder="A new step">
-              <select name="<?= $n ?>[applies_to]" class="new-standard-scope">
-                <option value="shot">shots</option>
-                <option value="asset">assets</option>
-                <option value="both">both</option>
-                <option value="project">whole project</option>
-              </select>
-              <input name="<?= $n ?>[applies_to_asset_type]" placeholder="asset type, or any">
-            </td>
-            <td><input name="<?= $n ?>[days_per_unit]" inputmode="decimal" size="6"></td>
-            <td class="muted small">—</td>
-            <td><input name="<?= $n ?>[typical_headcount]" inputmode="decimal" size="5"></td>
-            <td><input name="<?= $n ?>[source]" size="24"></td>
-            <td><input name="<?= $n ?>[notes]" size="22"></td>
-          </tr>
-        <?php endfor; ?>
-        </tbody>
-    </table>
-    <div class="actions"><button type="submit">Save the <?= e($type) ?> sheet</button></div>
-    <p class="muted small">
-      <strong>Days per item</strong> is the number; the column beside it shows the same fact the
-      other way round, because "half a day each" and "two a day" are the same standard and people
-      say whichever suits the step.
-      <strong>Clearing the days removes that standard</strong> rather than storing zero, zero days
-      per item is not a slow standard, it is a step that takes no time, and nothing could plan
-      against it.
-      <strong>Where the number came from</strong> earns its place: a figure somebody guessed and a
-      figure measured across four finished shows are both worth having and must never be mistaken
-      for each other.
-    </p>
-  </form>
-  <?php else: ?>
-    <table class="grid-table">
-      <thead><tr><th>Step</th><th>Covers</th><th>Ideal</th><th>Typical headcount</th><th>Source</th></tr></thead>
-      <tbody>
-      <?php foreach ($standards as $s): ?>
+      <thead>
         <tr>
-          <td><?= e($s['step_name']) ?></td>
-          <td class="muted small"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?: null)) ?></td>
-          <td><?= e(fmt_standard((float)$s['days_per_unit'])) ?></td>
-          <td class="muted small"><?= $s['typical_headcount'] !== null ? e(fmt_num((float)$s['typical_headcount'], 2)) : '—' ?></td>
-          <td class="muted small"><?= e($s['source'] ?? '—') ?></td>
+          <th>Step</th>
+          <th>Days per item</th>
+          <th>Which is</th>
+          <th>Where the number came from</th>
+        </tr>
+      </thead>
+      <tbody>
+      <?php foreach ($steps as $s):
+        $id = (int)$s['id'];
+        $days = effective_days_per_unit($pdo, $projectId, $s);
+        $note = $perProject ? ideal_source_note($s)
+                            : (string)$project['type'] . ' sheet, until update 034'; ?>
+        <tr>
+          <?php // Drawn the way Dates & headcount draws a step, colour, name and scope
+                // beneath, because the two screens show the same number and should
+                // look like they describe the same thing. ?>
+          <td class="wf-name">
+            <span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?>
+            <div class="muted small step-scope"><?= e(applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?><?= $s['tracks_seconds'] ? ' · per second' : '' ?></div>
+          </td>
+          <?php if ($canEdit): ?>
+            <?php // THREE decimals, the column's own precision: shown rounded, 0.125
+                  // would post back as 0.13 and saving the page would rewrite a
+                  // number nobody touched. ?>
+            <td><input type="number" name="days[<?= $id ?>]" step="any" min="0.001" required
+                       value="<?= e(fmt_num($days, 3)) ?>"
+                       aria-label="Days per item for <?= e($s['name']) ?>"></td>
+            <td class="muted small"><?= e(fmt_num(1 / max(0.001, $days), 2)) ?> a day</td>
+            <td><input name="source[<?= $id ?>]" maxlength="120" value="<?= e($note) ?>"
+                       placeholder="e.g. measured on FC Mobile"
+                       aria-label="Where the number for <?= e($s['name']) ?> came from"></td>
+          <?php else: ?>
+            <td><strong><?= e(fmt_num($days, 3)) ?></strong></td>
+            <td class="muted small"><?= e(fmt_num(1 / max(0.001, $days), 2)) ?> a day</td>
+            <td class="muted small"><?= $note !== '' ? e($note) : '&mdash;' ?></td>
+          <?php endif; ?>
         </tr>
       <?php endforeach; ?>
       </tbody>
     </table>
-  <?php endif; ?>
-
-  <?php if ($missing && is_admin()): ?>
-    <p class="muted small warn-text">
-      <?= count($missing) ?> step identit<?= count($missing) === 1 ? 'y is' : 'ies are' ?>
-      already in use on <?= e($type) ?> projects with no standard recorded, highlighted above,
-      showing what they have actually been planned at so far. That average is a starting point to
-      argue from, not a measurement: it is what somebody estimated, not what the work took.
-    </p>
-  <?php endif; ?>
+    <?php if ($canEdit): ?>
+      <div class="actions"><button type="submit">Save this project's ideal quotas</button></div>
+    <?php endif; ?>
+  </form>
 
   <p class="muted small">
-    <strong>Later, this becomes measured rather than believed.</strong> The cross-project benchmark
-    designed in <code>docs/ROADMAP.md</code> compares estimate against actual on exactly the same
-    step identity used here, so when it exists it can propose an observed median for each row,
-    written into <em>where the number came from</em>, never applied silently. Until then these are
-    the studio's stated standards, which is already more than lived in anyone's head before.
+    <strong>Days per item</strong> is the number, and the column beside it says the same thing the
+    other way round, because "half a day each" and "two a day" are one standard. It is the same
+    number as the Days per item box on
+    <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">Dates &amp; headcount</a>, editable from
+    either screen. <strong>Where the number came from</strong> earns its place: a figure somebody
+    guessed and a figure measured on a finished show are both worth having and must never be
+    mistaken for each other. Change a number without touching its note, and the note becomes who
+    changed it and when.
   </p>
 
 <?php endif; ?>

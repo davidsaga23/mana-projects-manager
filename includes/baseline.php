@@ -45,11 +45,11 @@ function capture_baseline(PDO $pdo, int $projectId, string $reason = 'setup comp
             $ins->execute([
                 $projectId, (int)$s['id'], $s['name'],
                 $s['applies_to'], $s['applies_to_asset_type'] ?? '', (int)$s['tracks_seconds'],
-                // What the project was actually PLANNED against, which since
-                // 2026-08-17 is the studio ideal wherever one exists. Recording
-                // the raw column would freeze a number the plan never used, and
-                // the whole point of a baseline is comparing what was believed
-                // with what happened.
+                // What the project was actually PLANNED against: its own ideal
+                // since 2026-09-17, and from 2026-08-17 until then the type
+                // sheet's ideal wherever one existed. Always through the one
+                // reader, because a baseline freezing a number the plan never
+                // used would compare the wrong belief with what happened.
                 effective_days_per_unit($pdo, $projectId, $s), (float)($s['coverage_pct'] ?? 100),
                 $s['planned_headcount'] !== null ? (float)$s['planned_headcount'] : null,
                 $retakePct,

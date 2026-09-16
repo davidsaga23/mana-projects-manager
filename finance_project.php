@@ -519,8 +519,9 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 //            remaining over working days left over headcount. Nobody types it
 //            and nobody can edit it — it is arithmetic on the dates and the
 //            progress, and it rises on its own every time either slips.
-//   IDEAL    what the studio says that work actually takes, for this kind of
-//            project. Typed on the base sheet from experience.
+//   IDEAL    what this project says that work actually takes, per step, on its
+//            Ideal quotas tab. Typed from experience, or copied from another
+//            project and changed from there.
 //
 // A minimum ABOVE the ideal is the finding. It does not mean somebody is lazy;
 // it means the plan requires a pace the studio does not believe in, and the only
@@ -551,40 +552,34 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 // screens agree — which is the rule this codebase keeps having to relearn.
 $quotaRows = [];
 $quotaOver = 0;
-if (standards_available($pdo)) {
-    $sheet = standards_for_type($pdo, (string)$project['type']);
-    if ($sheet) {
-        try {
-            $qEstimates = project_estimates($pdo, $projectId);
-            $qRetake    = project_retake_pct($pdo, $projectId);
+try {
+    $qEstimates = project_estimates($pdo, $projectId);
+    $qRetake    = project_retake_pct($pdo, $projectId);
 
-            foreach (pipeline_steps($pdo, $projectId) as $st) {
-                $std = $sheet[standard_key($st['name'], $st['applies_to'] ?? 'shot',
-                                           $st['applies_to_asset_type'] ?? '')] ?? null;
-                if ($std === null) continue;                 // no standard to compare against
+    foreach (pipeline_steps($pdo, $projectId) as $st) {
+        $q = step_quota($pdo, $projectId, $st, null, $qEstimates, $qRetake);
 
-                $q = step_quota($pdo, $projectId, $st, null, $qEstimates, $qRetake);
+        // The number the budget below is built on, from its one reader: this
+        // project's own ideal since 2026-09-17. Every step has one, so every step
+        // is a row; until then only steps the type sheet covered were.
+        $idealDays    = effective_days_per_unit($pdo, $projectId, $st);
+        $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
+        $minPerArtist = isset($q['per_artist_day']) && $q['per_artist_day'] !== null
+                      ? (float)$q['per_artist_day'] : null;
 
-                $idealDays    = (float)$std['days_per_unit'];
-                $idealPerDay  = $idealDays > 0 ? 1 / $idealDays : null;
-                $minPerArtist = isset($q['per_artist_day']) && $q['per_artist_day'] !== null
-                              ? (float)$q['per_artist_day'] : null;
+        $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
+              ? $minPerArtist / $idealPerDay : null;
+        if ($over !== null && $over > 1.05) $quotaOver++;
 
-                $over = ($minPerArtist !== null && $idealPerDay !== null && $idealPerDay > 0)
-                      ? $minPerArtist / $idealPerDay : null;
-                if ($over !== null && $over > 1.05) $quotaOver++;
-
-                $quotaRows[] = [
-                    'q' => $q, 'step' => $st, 'std' => $std,
-                    'ideal_per_day' => $idealPerDay,
-                    'min_per_artist' => $minPerArtist,
-                    'over' => $over,
-                ];
-            }
-        } catch (Throwable $e) {
-            $quotaRows = [];
-        }
+        $quotaRows[] = [
+            'q' => $q, 'step' => $st,
+            'ideal_per_day' => $idealPerDay,
+            'min_per_artist' => $minPerArtist,
+            'over' => $over,
+        ];
     }
+} catch (Throwable $e) {
+    $quotaRows = [];
 }
 ?>
 
@@ -594,30 +589,20 @@ if (standards_available($pdo)) {
   Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
   one person per day, remaining work over the working days left, divided by the people on it. It
   is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
-  closer or work slips. <strong>Ideal</strong> is what the studio says that work actually takes,
-  from the <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)$project['type']) ?>">base sheet</a>
-  for <?= e($project['type']) ?> projects.
+  closer or work slips. <strong>Ideal</strong> is what this project says that work actually takes,
+  from its <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>.
 </p>
 
-<?php if (!standards_available($pdo)): ?>
-  <p class="muted small warn-text">
-    Ideal quotas need migration <strong>026</strong>, which hasn't been applied, so there is
-    nothing to compare against yet.
-  </p>
-<?php elseif (!$quotaRows): ?>
+<?php if (!$quotaRows): ?>
   <div class="empty-state">
-    <p>No step on this project has an ideal recorded for <?= e($project['type']) ?> projects yet.</p>
-    <p class="muted">Write them down on the
-      <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)$project['type']) ?>">base sheet</a> and
-      this comparison fills in. It is the one thing that can tell you a budget is buying a plan
-      nobody can deliver.</p>
+    <p>This project has no pipeline steps yet, so there is nothing to compare.</p>
   </div>
 <?php else: ?>
 
   <?php if ($quotaOver > 0): ?>
     <div class="flash flash-err">
       <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
-      <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above the studio standard. That is not
+      <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above this project's ideal. That is not
       an ambitious plan, it is one the people on it are not expected to hit. The three fixes are
       more people, more time, or less work, and all three land on this page.
     </div>
@@ -675,11 +660,11 @@ if (standards_available($pdo)) {
           <?php if ($over === null): ?>
             <span class="muted">No deadline on this step, so there is no pace to be behind.</span>
           <?php elseif ($over > 1.05): ?>
-            <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the standard.</span>
+            <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the ideal.</span>
           <?php elseif ($over < 0.95): ?>
-            <span class="ok">Comfortable, <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the standard.</span>
+            <span class="ok">Comfortable, <?= e(fmt_num((1 - $over) * 100, 0)) ?>% under the ideal.</span>
           <?php else: ?>
-            <span class="muted">Right at the standard.</span>
+            <span class="muted">Right at the ideal.</span>
           <?php endif; ?>
         </td>
       </tr>
@@ -688,8 +673,7 @@ if (standards_available($pdo)) {
   </table>
 
   <p class="muted small">
-    Steps with no ideal recorded are left out rather than shown blank, a comparison against
-    nothing is not a row. The minimum here is the same figure the
+    The minimum here is the same figure the
     <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
     <em>required</em>, from the same calculation, so the two cannot disagree.
   </p>
@@ -697,14 +681,19 @@ if (standards_available($pdo)) {
 <?php endif; ?>
 
 <?php
-// WHERE THE DAYS CAME FROM. The budget is built on the IDEAL quota — the studio
-// standard for this kind of project — and falls back to what this project was
-// planned at only where no standard exists. Said here in one line rather than
-// left to be worked out from the per-row marks below.
+// WHERE THE DAYS CAME FROM, said in one line rather than left to be worked out
+// from the per-row marks below. Since 2026-09-17 every row is costed from this
+// project's own ideal quotas. Before database update 034 the old rule stands: the
+// type sheet's standard, falling back to what this project was planned at.
 $onIdeal    = (int)($proj['rows_on_ideal'] ?? 0);
 $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
 ?>
-<?php if (!($proj['standards_ready'] ?? false)): ?>
+<?php if (ideals_per_project($pdo)): ?>
+  <p class="muted small ok">
+    Every row below is costed from this project's own
+    <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>, which no other project shares.
+  </p>
+<?php elseif (!($proj['standards_ready'] ?? false)): ?>
   <div class="flash flash-warn">
     <strong>Ideal quotas are not available</strong> (migration 026 has not been applied), so every
     figure below is costed from this project's own estimates instead of the studio standard.
@@ -715,8 +704,7 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
     <strong>no studio standard</strong> for <?= e($proj['project_type'] ?? '') ?> projects, so they
     are costed from what this project was planned at. Those are marked
     <em>est.</em> below.
-    <a href="standards.php?from=<?= $projectId ?>&amp;type=<?= urlencode((string)($proj['project_type'] ?? '')) ?>">Set the
-    ideal quotas →</a>
+    <a href="standards.php?project=<?= $projectId ?>">See the ideal quotas →</a>
   </div>
 <?php elseif ($onIdeal > 0): ?>
   <p class="muted small ok">

@@ -21,7 +21,9 @@ without re-deriving context.
 - **⚠ Deploy state (2026-08-31):** 024–027 are all applied, confirmed by David — hiring,
   freelancer fields, ideal quotas, archived projects. **028 (timeline milestones), 029
   (tying a milestone to a step) 030 (an artist can exist without a project) and 031 (the reel
-  password) are NEW and pending.** Until it is applied the timeline says so and the panel is inert; everything else
+  password) are NEW and pending.** **2026-09-17: 032 (project types), 033 (days per item to three
+  decimals) and 034 (ideal quotas per project) added.** 034 changes which number every budget reads,
+  and the code waits for it. Until it is applied the timeline says so and the panel is inert; everything else
   works. Still open `migrate.php` and look before assuming, rather than trusting this line: it
   is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
@@ -485,8 +487,10 @@ change of habit rather than a migration. Read the two paired Plaky entries in
     either.** Settled 2026-08-17, and it replaces the split that existed for part of that day.
 
    **`effective_days_per_unit()` in `includes/standards.php` is the ONLY reader of
-   days-per-item.** The studio standard wins; `pipeline_steps.days_per_unit` is the
-   fallback for steps the base sheet has no answer for. Six separate readers were folded
+   days-per-item.** Since 2026-09-17 it returns the project's own
+   `pipeline_steps.days_per_unit`, because ideal quotas are per project (migration 034, see
+   DECISIONS). Until 034 is recorded as applied it keeps the old rule: the type sheet's standard,
+   falling back to the step's own number. Six separate readers were folded
    into it — the quota, the scheduler, the budget, the time-log comparison, the CSV export
    and the estimate baseline — plus the live check in `assets/wizard.js`, which applies the
    same rule so the screen cannot describe a plan the server would not build.

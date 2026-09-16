@@ -1429,6 +1429,7 @@ was found. The exported file states the allowance it used, for the same reason: 
 both files needs to know which side applied it.
 
 ## 2026-08-17 — The IDEAL quota: a base sheet per kind of project
+**Superseded 2026-09-17:** ideal quotas are per project now, see that entry. Kept for why they began as sheets.
 **Decision, David's request:** `quota_standards` (migration 026) holds what the work *should* take
 for each kind of project, edited on `standards.php` — a studio-wide reference, not a project
 setting. *"The ideal quotas, not the minimal quotas we currently have that are based on the head
@@ -1598,6 +1599,7 @@ server would not build.
   moving data between a template and a project, not planning with it.
 
 ## 2026-09-16 — Dates & headcount edits the number the plan uses, the studio ideal included
+**Superseded 2026-09-17:** the box still holds the number the plan uses, but that number is the project's own, see that entry.
 **Decision, David's:** *"It makes no sense to have an editable field that's not used in this
 context. Please switch them for the studio ideal, so it just brings the same variable here to be
 edited if needed."*
@@ -1673,6 +1675,50 @@ save would store it.
 **Not built: renaming a type.** It would have to rewrite projects, templates, the sheet and its log in
 step. The workaround: create the right name as a copy of the wrong one, move the projects, then remove
 the wrong one.
+
+**Superseded the next day** for everything about sheets: see 2026-09-17 below. Types stay a list;
+they no longer own a sheet, so creating one is a name.
+
+## 2026-09-17 — Ideal quotas belong to each project
+**Decision, David's:** *"the ideal quotas that impact the budget should remain the same because
+between project (even if they're the same type) might have different ideal quotas and that will change
+my budget so this needs to be per project. We can start copying another one but if I change something
+it shouldn't affect other projects at all."*
+
+**This reverses the per-type sheet** of 2026-08-17 and what was built on it: the 2026-09-16 Days per
+item box that edited a studio ideal from one project, and the same day's sheet copy when creating a
+project type. The motion comic made the cost visible: two shows of one type can differ, and a sheet
+shared by type moves one show's budget whenever another's number is corrected.
+
+**What changed.**
+- **One number per step per project.** `pipeline_steps.days_per_unit` IS the project's ideal quota.
+  `effective_days_per_unit()` returns it and is still the only reader, so the schedule, the quotas, the
+  budget, baselines and exports all moved together.
+- **Nothing moved on the switch.** Migration 034 copies each type sheet's number into every step that
+  was planning on it, and into template steps from the sheet of the type they were saved for, after
+  keeping the values it overwrites in `days_per_unit_before_034`. The code switches when 034 is
+  **recorded as applied** (`migration_applied()`), not when a column exists, so no budget can move to the
+  old ignored values while the update waits.
+- **Three decimals.** Migration 033 widens days per item from DECIMAL(5,2) to (6,3), the sheets' own
+  precision: copying 0.435 into the old column would have stored 0.44, a budget change nobody typed.
+  033 also adds `days_source`, where a step's number came from. A separate file because ADD COLUMN
+  cannot run twice, and 034 must be safe to re-run.
+- **Edited in two places, stored once:** the project's **Ideal quotas** tab, now a Finance management
+  tab like the others with a note per step, and the **Days per item** box on Dates & headcount.
+  Administrators only, as ideal quotas always were. A changed number whose note was left alone gets
+  "Set by (who) on (date)", so "Copied from FC Mobile" never outlives the copy.
+- **Copy from another project**, offered on both screens: matched by step name, scope and asset type;
+  steps the other project lacks keep their number and are named. A copy, never a link.
+- **Types are labels.** A type files a project and puts its templates first. "+ New project type" lives
+  on Basics only, takes a name, and lists the unused types with a Remove each (`project_types.php`).
+  Changing a project's type changes no number.
+- **The type sheets stay in `quota_standards`**, untouched and unread, with their log.
+
+**Given up:** typical headcount and notes per standard, which the per-project sheet does not carry
+(planned headcount per step already lives on Dates & headcount). And the studio-wide statement "this is
+what Concept takes on a 2D show": it now lives in whichever project you copy from.
+
+**Before 034 is applied** the old rule stands, the boxes are read-only, and both screens say why.
 
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
