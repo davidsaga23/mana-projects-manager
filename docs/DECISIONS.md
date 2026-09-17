@@ -1720,6 +1720,33 @@ what Concept takes on a 2D show": it now lives in whichever project you copy fro
 
 **Before 034 is applied** the old rule stands, the boxes are read-only, and both screens say why.
 
+## 2026-09-17 — A project's ideal quotas can be matched to its approved expense projection
+**Asked by David:** *"can you re-adjust the budget for FCM to match this approved project expense?
+Comparing the current budget for that project is what made me realize something was changing."* The
+approved sheet is `RTC_ExpenseProjection_v01.xlsx`, which the platform matched on 2026-08-17 apart from
+the retake allowance. Since then FCM planned on the 2D sheet, edited from other projects, and drifted.
+
+**Built as a tool on the Ideal quotas tab, not typed in by hand**, because the numbers cannot be worked
+out anywhere but the live project: every footage row in the sheet leaves its count blank, and the
+runtime lives in FCM's own shots. Upload the approved sheet, see a preview, apply.
+- **Each role's person-days** (its artist rows added up) become days per item for the matching step:
+  days ÷ (this project's count after coverage × retake factor), the same counts `step_quota()` and the
+  projection use. Snapped to the plainest number within the sheet's own rounding, half a hundredth per
+  row, so 5.58 days over 5.577 items is 1, not 1.001.
+- **Preview, always.** Roles typed by hand do not always name a step the way the platform does
+  ("Character Sheet" against "CH sheet"), so every match is shown, can be changed, and can be previewed
+  again. Roles are matched by the export's own "Name (scope)" label, else by a name only one step has.
+- **Days per item only.** Rates are compared and differences noted, never changed. Flat fees (their cost
+  does not depend on days) and rows without days (Art Director, the "(old)" rows) are named and left.
+  After applying, the projection's new total is shown beside the sheet's, and any gap is attributed to
+  rates or other expenses, since the days now agree.
+- Each matched step's note reads "Matched to (file) by (who) on (date)".
+
+**Checked against the real file** by replaying the reader, the grouping and the snapping in Python (no
+PHP on the workstation): 20 roles with days, 2 flat fees, 4 rows without days, total 43,442.40. Where
+the sheet states a count, days per item came out 4, 5, 0.3, 1, 0.2, 2, 0.5, 2, 3, 0.33 and 1, each
+reproducing the sheet's days to the hundredth. Those are the numbers FCM planned on in August.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

@@ -227,6 +227,20 @@ label.inline input { width: auto; }
 /* The project picker for copying another project's ideal quotas. width:auto, or
    the global `input, select { width: 100% }` pushes the button under it. */
 .ideals-copy select { width: auto; max-width: 100%; }
+/* --- matching an approved expense projection (Ideal quotas tab) ----------
+   The preview reads as a check before a change: the roles as the sheet names
+   them, the step each lands on, and what days per item becomes. Fixed layout so
+   the colgroup binds and the step pickers share their column. */
+.ideals-match input[type=file] { width: auto; max-width: 100%; padding: 4px; font-size: 13px; }
+.match-preview { margin: 18px 0 26px; padding: 12px 14px; border: 1px solid #dbe2e8; border-radius: 6px; background: #fbfcfd; }
+.match-preview h3 { margin-top: 0; }
+.match-table { width: 100%; table-layout: fixed; }
+.match-table th, .match-table td { padding: 6px; vertical-align: top; word-break: break-word; }
+/* width:100% of the column, or the widest step name sets the column's width. */
+.match-table select { width: 100%; padding: 4px 6px; font-size: 13px; }
+/* The numbers that will actually move, so a preview of twenty rows shows its
+   five changes at a glance. */
+.match-changes { color: #2f6fb2; }
 /* A small button that removes something: .row-btn's shape, in the red the admin
    tag already uses, and quieter than button.danger. It only appears on a type
    nothing uses, so it should not shout over the sheet. */
