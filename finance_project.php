@@ -567,6 +567,11 @@ try {
     foreach (pipeline_steps($pdo, $projectId) as $st) {
         $planFrom = !empty($st['start_date']) ? (string)$st['start_date'] : null;
         $q = step_quota($pdo, $projectId, $st, $planFrom, $qEstimates, $qRetake);
+        // Measured from its own start, a deadline before the start is not one that
+        // "has already passed", which is how step_quota() words it. Said as it is.
+        if ($planFrom !== null && !empty($st['deadline']) && $st['deadline'] < $planFrom) {
+            array_unshift($q['problems'], 'The deadline is before the start date.');
+        }
 
         // The number the budget below is built on, from its one reader: this
         // project's own ideal since 2026-09-17. Every step has one, so every step
