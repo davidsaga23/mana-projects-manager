@@ -535,21 +535,29 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 // CH sheet, this table said 1.86. Both were arithmetically correct and they were
 // answering different questions.
 //
-//   step_quota()      applies coverage_pct — 39% of 13 characters is 5.1 items —
-//                     and counts working days from the step's own START DATE.
+//   step_quota()      applies coverage_pct — 39% of 13 characters is 5.1 items.
 //   dashboard_steps() ignores coverage by design (2026-08-12: real N/A markings
 //                     beat the coverage estimate) and counts from TODAY.
 //
 // The dashboard's reading is right for a show in flight, where items have been
 // marked N/A and what matters is the pace from here. It is wrong for THIS table,
 // which asks whether the plan as drawn can be delivered — where coverage is the
-// only statement of scope there is, and a step that has not started yet has its
-// own start date rather than beginning this morning. Counting all 13 characters
-// through a step that touches 5 overstates the required pace by two and a half
-// times, and counting from today rather than the start quietly adds a day.
+// only statement of scope there is. Counting all 13 characters through a step
+// that touches 5 overstates the required pace by two and a half times.
 //
-// So it now uses exactly what the Dates & headcount screen uses, and the two
-// screens agree — which is the rule this codebase keeps having to relearn.
+// ⚠ AND THE WINDOW IS THE STEP'S OWN DATES, START TO DEADLINE, passed to
+// step_quota() as its "today". Left to itself step_quota() counts from today once
+// a step has started, and that is a different question. David, 2026-09-17: on its
+// deadline day the Animatic read 0.5 a day here, the whole deliverable over the one
+// day left, while Dates & headcount read 0.13, the same deliverable over the four
+// working days it was planned in, and the verdict called a finished plan 50% over
+// the ideal. The planning window is what Dates & headcount has used since
+// 2026-09-01, for the reason written at `var from` in assets/wizard.js: a plan must
+// not rot while you look at it. A step with no start date is counted from today,
+// exactly as that screen counts it.
+//
+// So this table and Dates & headcount give the same minimum for every step, by
+// construction. "Can we still make it from today" is the dashboard's question.
 $quotaRows = [];
 $quotaOver = 0;
 try {
@@ -557,7 +565,8 @@ try {
     $qRetake    = project_retake_pct($pdo, $projectId);
 
     foreach (pipeline_steps($pdo, $projectId) as $st) {
-        $q = step_quota($pdo, $projectId, $st, null, $qEstimates, $qRetake);
+        $planFrom = !empty($st['start_date']) ? (string)$st['start_date'] : null;
+        $q = step_quota($pdo, $projectId, $st, $planFrom, $qEstimates, $qRetake);
 
         // The number the budget below is built on, from its one reader: this
         // project's own ideal since 2026-09-17. Every step has one, so every step
@@ -586,11 +595,11 @@ try {
 <h3>Minimum against ideal</h3>
 
 <p class="muted small">
-  Two numbers from opposite directions. <strong>Minimum</strong> is what the deadline demands of
-  one person per day, remaining work over the working days left, divided by the people on it. It
-  is arithmetic, <strong>not editable</strong>, and it climbs on its own every time a date gets
-  closer or work slips. <strong>Ideal</strong> is what this project says that work actually takes,
-  from its <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>.
+  Two numbers from opposite directions. <strong>Minimum</strong> is what the plan demands of one
+  person per day: the step's work spread over the working days from its start to its deadline,
+  divided by the people on it, the same figure Dates &amp; headcount shows. It is arithmetic and
+  <strong>not editable</strong>. <strong>Ideal</strong> is what this project says that work actually
+  takes, from its <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>.
 </p>
 
 <?php if (!$quotaRows): ?>
@@ -620,7 +629,7 @@ try {
     <colgroup>
       <col style="width:16%"> <?php // Step ?>
       <col style="width:12%"> <?php // Covers ?>
-      <col style="width:10%"> <?php // Remaining ?>
+      <col style="width:10%"> <?php // Work ?>
       <col style="width:8%">  <?php // People ?>
       <col style="width:12%"> <?php // Minimum / person / day ?>
       <col style="width:12%"> <?php // Ideal / person / day ?>
@@ -629,7 +638,7 @@ try {
     <thead>
       <tr>
         <th>Step</th><th>Covers</th>
-        <th class="num">Remaining</th>
+        <th class="num">Work</th>
         <th class="num">People</th>
         <th class="num">Minimum / person / day</th>
         <th class="num">Ideal / person / day</th>
@@ -658,7 +667,10 @@ try {
         <td class="num"><?= $q['ideal_per_day'] !== null ? e(fmt_num($q['ideal_per_day'], 2)) : '—' ?></td>
         <td class="small">
           <?php if ($over === null): ?>
-            <span class="muted">No deadline on this step, so there is no pace to be behind.</span>
+            <?php // Whatever stopped the pace being worked out: no deadline, no
+                  // people, a deadline before the start. Said as the quota says it,
+                  // not as one guess that was only right for the first of those. ?>
+            <span class="muted"><?= e((string)($qq['problems'][0] ?? 'There is no pace to compare yet.')) ?></span>
           <?php elseif ($over > 1.05): ?>
             <span class="err">Asks for <?= e(fmt_num(($over - 1) * 100, 0)) ?>% more than the ideal.</span>
           <?php elseif ($over < 0.95): ?>
@@ -673,9 +685,12 @@ try {
   </table>
 
   <p class="muted small">
-    The minimum here is the same figure the
-    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> shows as
-    <em>required</em>, from the same calculation, so the two cannot disagree.
+    The minimum here is the one on
+    <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">Dates &amp; headcount</a>, over each
+    step's own dates, so the two cannot disagree. The
+    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> asks the other
+    question, what the work still left needs from today, and on a step that is running late that
+    is the number that goes red first.
   </p>
 
 <?php endif; ?>
