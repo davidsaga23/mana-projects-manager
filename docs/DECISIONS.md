@@ -1773,6 +1773,29 @@ for good; and the person hired kept a record reading "hired", so when they left,
 No schema change: `hire_stage_log.to_stage` was already free text, and `hires.stage` did not need a
 new value.
 
+## 2026-09-18 — On the general timeline a bar moves wherever it is dragged
+**Asked by David:** *"do you know why I can't move the File Prep bar in this MSD timeline?"*
+
+**The chart library, not the plan.** Frappe Gantt 0.6.1 refuses to place a bar left of a step it
+depends on ("child task must not go before parent", in `update_bar_position()`), and through a quirk
+of that check compares only with the LAST dependency listed. File prep waits for two colour steps
+that start in October while it is planned in September, so every position it was dragged to was
+refused, silently. The decision of 2026-08-31 is the opposite: dependencies are drawn, a violated
+one turns red, the bar stays where it is dropped. So the library's method now runs with the task's
+dependency list emptied for the length of the call (patched once on the Bar prototype, because every
+re-render builds new bars). Reproduced before and after with the real library on MSD's shape.
+
+**Found on the way, both fixed:**
+- **A refused drag was not harmless.** The library still moved, and the page SAVED, every step
+  downstream of the bar that would not move: trying to move File prep shifted Comp · shots and wrote
+  its new dates. Anybody who tried to move File prep may have moved Comp.
+- **Hovering any bar that waits for another threw an error**, so those bars had no popup at all.
+  Frappe turns the dependency list into an array in place; the popup still split it as text. The
+  popup also names two steps that share a name in full ("Color · shots"), not "Color, Color".
+
+**Still true, and David's call:** dragging a bar carries every step downstream of it along, and saves
+them, as it always has on this chart.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

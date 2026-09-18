@@ -520,15 +520,26 @@
     var t = generalById(id);
     if (!t || !t.dependencies) return [];
     var out = [];
-    t.dependencies.split(',').forEach(function (depId) {
-      depId = depId.trim();
+    // ⚠ A LIST OR A STRING. PHP sends "12,14", but Frappe turns it into ['12','14']
+    // IN PLACE on these very objects when it builds the chart, so by the time a
+    // popup asks, .split() no longer exists and the popup died with an error on
+    // every bar that waits for anything.
+    var deps = Array.isArray(t.dependencies) ? t.dependencies : String(t.dependencies).split(',');
+    deps.forEach(function (depId) {
+      depId = String(depId).trim();
       if (!depId) return;
       var d = generalById(depId);
       // Compared as YYYY-MM-DD strings, which sort correctly as text and avoid
       // constructing Date objects entirely -- see rule 2 at the top of this file.
-      if (d && t.start <= d.end) out.push(String(d.name).split(' · ')[0]);
+      if (d && t.start <= d.end) out.push(d);
     });
-    return out;
+    // The step's name alone ("Color"), unless two of them share it, when only
+    // the full label tells them apart: "starts before Color, Color finishes"
+    // named nothing.
+    var short = function (d) { return String(d.name).split(' · ')[0]; };
+    var seen = {};
+    out.forEach(function (d) { seen[short(d)] = (seen[short(d)] || 0) + 1; });
+    return out.map(function (d) { return seen[short(d)] > 1 ? String(d.name) : short(d); });
   }
 
   /**
@@ -549,6 +560,47 @@
       var broken = !!(f && t && t.start <= f.end);
       a.element.classList.toggle('dep-broken', broken);
     });
+  }
+
+  /**
+   * Let a bar go where it is dropped, whatever it depends on.
+   *
+   * ⚠ FRAPPE 0.6.1 REFUSES TO MOVE A BAR LEFT OF A STEP IT DEPENDS ON. Bar's
+   * update_bar_position() compares the new x with its dependencies' and, when it
+   * is earlier, silently does nothing ("child task must not go before parent").
+   * That is the library enforcing the very wall this chart decided against on
+   * 2026-08-31: dependencies are drawn, a violated one turns red, and the bar
+   * stays where it is dropped. Worse, a step ALREADY planned before a step it
+   * waits for could not be moved at all, left or right, until dragged past that
+   * step's start (David, 2026-09-18: File prep on MSD, wired to wait for two
+   * colour steps starting weeks after it, would not budge).
+   *
+   * So the library's method runs with the task's dependency list emptied for the
+   * length of the call: its check finds nothing to compare and passes, and all
+   * the rest of what it does (handles, label, the arrows following the bar) is
+   * still the library's own. Patched once, on the Bar prototype, because
+   * applyWidth() re-renders and every render builds new bars. The detailed chart
+   * shares the class and sends no dependencies, so nothing changes there.
+   *
+   * Guarded like paintDependencies(): a version that renames this keeps its rule
+   * rather than breaking the chart.
+   */
+  function freeBarsFromDependencies(gantt) {
+    var first = gantt && gantt.bars && gantt.bars[0];
+    var proto = first ? Object.getPrototypeOf(first) : null;
+    if (!proto || proto.tlFreeOfDeps || typeof proto.update_bar_position !== 'function') return;
+    var original = proto.update_bar_position;
+    proto.update_bar_position = function (args) {
+      var deps = this.task && this.task.dependencies;
+      if (!deps || !deps.length) return original.call(this, args);
+      this.task.dependencies = [];
+      try {
+        return original.call(this, args);
+      } finally {
+        this.task.dependencies = deps;
+      }
+    };
+    proto.tlFreeOfDeps = true;
   }
 
   var stepSaveTimer = null;
@@ -628,6 +680,7 @@
         });
       }
     });
+    freeBarsFromDependencies(generalGantt);
     applyWidth(generalGantt, z.w);
     setTimeout(function () {
       paintBars(el, window.GENERAL_TASKS);
