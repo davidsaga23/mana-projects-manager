@@ -12,8 +12,8 @@ is probably not the next thing.
 | 2 | Budget | **Built** 2026-08-18 | `finance_project.php` — agreed amount, currency, terms |
 | 3 | New brief | **Built** 2026-08-18 | `brief.php` — the ask, deliverables, reference, files |
 | 4 | Breakdown | **Built** | Wizard (paste) + Plaky import |
-| 5 | Project expense | **Built** 2026-08-18 | Expense projection, computed live in the shape of `RTC_ExpenseProjection_v01.xlsx` |
-| 6 | Hiring | **Built** 2026-08-17 | `hiring.php` — candidates per slot, stages, quotes (admin), and hiring renames the slot |
+| 5 | Project expense | **Built** 2026-08-18 | Expense projection, computed live in the shape of `RTC_ExpenseProjection_v01.xlsx`, costed from **each project's own ideal quotas** (2026-09-17), which can be copied from another project or matched to an approved sheet |
+| 6 | Hiring | **Built** 2026-08-17, **reworked 2026-09-02/03** | **Staffing** (`crew.php`) — positions by department, candidates on each position with stage and Hire, the artist database as the source, every past candidate kept (2026-09-18). Hiring LINKS a person to a position. `hiring.php` is orphaned, see the last section |
 | 7 | Detailed timeline | **Built** | Per-task Gantt, drag, regenerate |
 | 8 | Contracts | **Built** 2026-08-17 | Status and dates per person, "who hasn't signed" per project, the Drive link as before |
 | 9 | Invoices | **Built** 2026-08-18 | Per position, with paid/overdue and unattached handling |
@@ -33,6 +33,10 @@ generates a slot, a slot gets candidates, a candidate agrees a rate, hiring rena
 its planned work becomes theirs, the agreed rate lands on their terms so their days stop counting as
 unpriced, a contract is chased to signature, and invoices settle against the position. Every link is
 joined on ids that never move.
+
+*(Since 2026-09-02 hiring does not rename the slot: it points the position at the person through
+`assign_crew_to_lane()`, which moves the planned work across. Renaming made a new copy of an artist
+for every position they were hired into. The rest of the chain is unchanged.)*
 
 **What is deliberately still missing inside it:** the scheduler does not read engagement dates. A
 person's start and end dates are recorded and compared against the plan, but nothing moves a bar —
@@ -54,6 +58,12 @@ carry most of the value.
 ---
 
 ## What appears in each shot — linking assets to the shot list
+
+**BUILT 2026-09-02** (`shots.php`, `includes/breakdown.php`): assets per shot as chips in a
+column per asset type, frames per shot, and an export. `shot_assets` now has a writer, so the
+scheduler's per-shot asset rule can fire. **Re-run the schedule on a show once its breakdown is
+filled in** — a saved schedule does not improve on its own. What follows is the reasoning it was
+built on, kept for why.
 
 David, 2026-08-17: *"we need to link props, vehicles, characters, environments and any other
 asset to the shot list so the production team knows what is required to feature in each shot."*
@@ -149,15 +159,15 @@ separate database — see `DECISIONS.md` 2026-08-12)
 |---|---|---|---|
 | Project setup page | P | — | **Done** (Phase 2) |
 | Crew management — name, position, days off | P | — | Small. Extends `crew`, which already exists |
-| Crew management — time log | P | Phase 3 | Per-day entries, not one total per task |
+| Crew management — time log | P | Phase 3 | **Done** — `time_logs` (migration 022), entered from My tasks |
 | Crew management — invoice upload + status | **F** | time log | Documents and money; not this codebase |
 | Budget expense projections | **F** | rates, headcount | **Verified against a real sheet — see below.** Production half exports from here; money stays finance-side |
-| Step departments (pre-prod / production / post) | P | — | Small, and the expense projection's grouping depends on it. Also bands the timeline |
+| Step departments (pre-prod / production / post) | P | — | **Done** — `pipeline_steps.department` (migration 015); groups the projection and Staffing |
 | Budget vs actual at project end | **F** | time log, rates | Needs real logged hours to mean anything |
 | Budget simulator — "what if we add people?" | **F** | scheduler | Production already computes the hard half |
 | Payments / invoice tracking hub | **F** | invoice upload | Which invoices are paid |
 | Cross-project benchmarking — estimated vs actual per step | P | estimate baseline, time log | **Read the section below.** The capture half is urgent; the reporting half isn't |
-| **What appears in each shot** — link assets to shots | P | — | **Read the section below.** No schema needed: `shot_assets` has existed since v1 and the SCHEDULER ALREADY READS IT. Nothing writes it, so the scheduler is running degraded today |
+| **What appears in each shot** — link assets to shots | P | — | **Done 2026-09-02** — `shots.php`. See the section above |
 
 ### Deliberately last (decided 2026-08-12)
 
@@ -380,7 +390,10 @@ Per step identity, across every project that has run it:
 - **Feeding it forward:** when a new project picks a step from the library, offer the observed
   median as the default `days_per_unit`, labelled as coming from N previous shows. That is the
   loop closing — the estimate improves because the tool remembers, not because someone
-  remembers.
+  remembers. *(Since 2026-09-17 days per item IS each project's ideal quota, so the median is
+  offered as a copy into one project, with `days_source` saying where it came from — the same
+  shape as "Copy from another project" on the Ideal quotas tab. Never a shared number: that is
+  what per-project quotas were for.)*
 
 **Scale caveat worth designing for:** two or three finished projects is not a sample. Show the
 number of observations next to any figure, and never present a median drawn from one previous
@@ -516,3 +529,54 @@ works for anybody who knows the address.
 **Do not link to it again without deciding this.** A screen that is reachable
 from two places and shows the same positions as another one is what this whole
 run of work removed.
+
+---
+
+## Waiting on a decision, or offered and not built (2026-09-18)
+
+Everything here came up in the 2 to 18 September run of work. None of it is urgent, and each
+one is a choice David has not made yet rather than work anybody forgot.
+
+### Should a timeline bar carry the steps downstream of it?
+
+Dragging a bar on the general timeline moves **every step that waits for it** by the same
+amount, and saves them all. That is Frappe Gantt's own behaviour, and it has always worked this
+way here. It was never chosen, and it sits awkwardly with the 2026-08-31 rule that dependencies
+are drawn, not enforced. It surfaced on 2026-09-18, when a drag the library refused still moved
+MSD's Comp · shots. The refusal is fixed; the carrying is not changed.
+
+- **Keep it:** shifting Animatic shifts the whole show, which is sometimes exactly the point.
+- **Stop it:** every bar moves alone and the red arrows say what the move broke. Small to
+  build, the same way the refusal was lifted: `freeBarsFromDependencies()` in
+  `assets/timeline.js` shows how to change one library behaviour for the general chart only.
+
+### Backgrounds: work counted per background, not per environment
+
+Doomsday has 4 environments and needs 2 to 3 times as many backgrounds. David
+asked whether coverage could go above 100%. **Advised against** (2026-09-16): the percentage only
+reaches the planning maths and the budget, while the calendar, the dashboard and progress count
+real items, so they would go on counting 4 environments and call Layout finished after 4.
+
+The recommendation is to track **Background** as an asset type of its own, since that is what
+is made, reviewed and delivered one at a time: environments keep their once-per-location steps,
+and Layout and BG paint move to Background. Two ways to plan it before the list exists:
+
+1. **Placeholders now, no build:** paste `BG 01, Background` … on the Assets screen and rename
+   them when the animatic settles. The calendar, dashboard and budget all count the same items.
+2. **A "roughly how many" estimate per asset type**, used by `step_work_units()` until real
+   items of that type exist, exactly as `estimated_assets` already stands in for untyped steps.
+   Small; it would sit in the Work cell of Dates & headcount.
+
+David has not chosen, nor said which steps happen once per background.
+
+### Renaming a project type
+
+Not built. It would have to rewrite `projects.type` and `pipeline_templates.project_type`
+together. The workaround: create the right name, move each project on its Basics screen, re-save
+any template for the new type, then remove the old type from the Basics panel.
+
+### Crew records nothing points at
+
+Offered 2026-09-03, not built: a clean-up for `crew` rows left behind by the old
+rename-the-slot hiring, which no position, task, ticket or login refers to any more. The merge
+tool (`people_merge.php`) handles the duplicates that ARE referred to.

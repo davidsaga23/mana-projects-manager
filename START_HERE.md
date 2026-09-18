@@ -7,25 +7,22 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status (2026-08-31):** in real use on "Return to Club" at
-  <https://mana.davidsaga.com>. Built and deployed: setup, Plaky import, scheduler, crew slots,
-  timeline, dashboard, per-step detail, **tickets, the tracking grid, item detail, team and
-  person performance, per-day time logs, the project brief, the whole money side, and now
-  hiring and contracts**. **All ten steps of David's production cycle are covered** — see the
-  table at the top of `docs/ROADMAP.md`, which is the thing to check new work against. The one
-  thing left is the **client loop**, which was never on that list.
-  Since 17 August: the navigation was rebuilt around **one home** with Project/Finance
-  management as sections inside a project; the projection and its Excel export were corrected
-  to agree to the cent (see the 2026-08-18 money entries in `docs/DECISIONS.md`); and the
-  projects list gained **status, rename, archive and delete**.
-- **⚠ Deploy state (2026-08-31):** 024–027 are all applied, confirmed by David — hiring,
-  freelancer fields, ideal quotas, archived projects. **028 (timeline milestones), 029
-  (tying a milestone to a step) 030 (an artist can exist without a project) and 031 (the reel
-  password) are NEW and pending.** **2026-09-17: 032 (project types), 033 (days per item to three
-  decimals) and 034 (ideal quotas per project) added.** 034 changes which number every budget reads,
-  and the code waits for it. Until it is applied the timeline says so and the panel is inert; everything else
-  works. Still open `migrate.php` and look before assuming, rather than trusting this line: it
-  is only ever as fresh as the last person who edited it.
+- **Status (2026-09-18):** in real use at <https://mana.davidsaga.com> on several shows, among
+  them **FCM** (budgeted on the Return to Club sheet, `RTC_ExpenseProjection_v01.xlsx`), **MSD**
+  and **Doomsday**, plus a 2D motion comic. Built and deployed: setup,
+  Plaky import, scheduler, **Staffing** (positions + hiring on one page), timeline with
+  milestones, dashboard, per-step detail, tickets, the tracking grid, item detail, the shot
+  breakdown, team and person performance, time logs, the brief, the whole money side, the artist
+  database, historic quotas and fees, and **ideal quotas per project**. **All ten steps of David's
+  production cycle are covered** — see the table at the top of `docs/ROADMAP.md`, the thing to
+  check new work against. The one thing left is the **client loop**, never on that list.
+  **§0 below says what changed from 1 to 18 September and what is waiting on David.**
+- **⚠ Deploy state (2026-09-18):** 024–027 confirmed applied on 2026-08-31. **028–034 have been
+  added since** (milestones, milestone-to-step, artists without a project, reel password,
+  project types, days per item to three decimals, ideal quotas per project). David was asked to
+  apply them on 2026-09-17, **not yet confirmed**. **034 is the one that matters** — the code
+  switches ideal quotas to per project only once it is recorded as applied. Open `migrate.php` and look before assuming,
+  rather than trusting this line: it is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
@@ -60,6 +57,75 @@ without re-deriving context.
 
 ---
 
+## 0. Where things stand (2026-09-18)
+
+A long run of work since the last update, almost all of it asked for by David screen by
+screen. `docs/DECISIONS.md` has an entry for every item below; read those before changing one.
+
+### Built, 1–18 September
+
+- **Timeline:** milestones for client reviews (drag, double-click to edit, tied to a step's row),
+  shaded weekends, remembered zoom, whole-chart exports. **Bars move wherever they are dragged**
+  (2026-09-18): Frappe refused to place a bar before a step it depends on, which contradicted the
+  "drawn, not enforced" rule of 2026-08-31; the popup on dependent bars was also broken.
+- **Staffing (`crew.php`)** replaced the separate Crew and Hiring tabs (2026-09-02/03): positions
+  grouped by department, each carrying its candidates, their stage and the Hire button; the
+  artist database offered wherever a position is filled; a loud cue for unfilled positions; an
+  Excel sheet for the other supervisors. **Hiring now LINKS a person to a position**
+  (`assign_crew_to_lane()`), instead of renaming the slot, which is where every duplicate person
+  came from; `people_merge.php` folds the duplicates back together. **Every candidate stays on
+  the position** (2026-09-18): filled positions keep their backups, and "Talked to before" lists
+  declined, passed and whoever left, with **Line up again**. `hiring.php` still works but nothing
+  links to it — ROADMAP says what to do with it.
+- **Artists** — the artist database as a screen: edit in the row, bulk add, import/export the
+  freelancer sheet, reel password (migration 031), artists with no project yet (030).
+- **Shots** — the shot breakdown: assets per shot, frames per shot, an export. This is also the
+  scheduler fix ROADMAP had flagged: `shot_assets` finally has a writer.
+- **Ideal quotas are PER PROJECT** (2026-09-17, migrations 033/034). A step's own
+  `days_per_unit` is the number the schedule, the quotas and the budget run on; it is edited on
+  the project's **Ideal quotas** tab (Finance management) or on Dates & headcount, and it reaches
+  no other project. Numbers can be **copied from another project**, or **matched to an approved
+  expense projection** (.xlsx upload, preview, apply). The per-type sheets of 2026-08-17 are kept
+  in `quota_standards`, unread. **Project types** (032) are now labels a person can add.
+- **Minimum against ideal** (Finance) judges each step over its own dates, exactly like Dates &
+  headcount; the dashboard keeps the "from today" reading.
+- Smaller: buttons instead of links and one line of row actions everywhere; commas instead of
+  dashes in the text; a progress capsule per project on the front door; **the page keeps its
+  scroll position after a save** (`assets/keepplace.js`); workflow links drawn by dragging on
+  the diagram, and a PNG download; a Deadline card on each step page; Historic quotas (both
+  quotas, several shows, type and step filters) and Historic fees beside Artists in the top bar;
+  an administrator can borrow the editor or view-only role from Users to see what others see.
+- `tools/check_php_blocks.py` has a **seventh pass**: nested transactions (lesson 18).
+
+### Waiting on David
+
+1. **Push** (GitHub Desktop), then **`migrate.php`** — anything from 028 to 034 still pending.
+2. **FCM:** once 034 is applied, Finance management → Ideal quotas → *Match an approved expense
+   projection* with `RTC_ExpenseProjection_v01.xlsx`; "Character Sheet" probably has to be pointed
+   at the CH sheet step by hand. Then **change the Rough Animation slots' rate from "per second"
+   to "per day"** (200 per second is a day rate with the wrong unit: 2,700 per artist instead of
+   1,486) and check the other footage rows. The projection should then read **45,742.40**: the
+   sheet's 43,442.40 plus the two "(old)" costs, which were entered as Other expenses in August.
+3. **MSD:** check **Comp · shots**' dates — every failed attempt to drag File prep moved and saved
+   Comp. Also whether File prep really waits for the colour steps (its bar is red because of it).
+4. **Decisions:** (a) should dragging a timeline bar carry every step downstream of it along, as it
+   does today, or move alone? (b) Doomsday **backgrounds**: placeholder assets of a new type
+   "Background", or a "roughly how many" estimate box per asset type — and which steps happen once
+   per background; (c) what becomes of `hiring.php` (ROADMAP).
+5. **Housekeeping** carried over: rotate the two database passwords (§4 item 14); delete
+   `install.php` from the live server; re-import the freelancer sheet with "update people already
+   here" ticked.
+
+### Not built, on purpose or not yet
+
+- Renaming a project type (create the right one, move the projects, remove the wrong one).
+- A clean-up for crew records nothing points at (offered, not built).
+- Coverage above 100% was asked about and **advised against** (2026-09-16): the calendar, the
+  dashboard and progress count real items, so the percentage would change the budget alone.
+  Backgrounds as their own asset type is the recommended route (decision 4b above).
+
+---
+
 ## 1. What we're building
 
 A **multi-project production tracking platform** for a small animation studio. Mana runs
@@ -72,7 +138,7 @@ a project, then drives scheduling and reporting from it:
 |---|---|
 | Project name | |
 | Project code | Short slug, e.g. `STFC2` |
-| Type | 2D / 3D / Mixed / Other |
+| Type | 2D / 3D / Mixed / Other, plus any added since migration 032. A label: it files the project and puts matching templates first, and decides no number |
 | Asset breakdown | Import (CSV/Excel) **and** create in-page — both must work |
 | Shot breakdown | Import **and** create in-page |
 | Pipeline steps | Differ by project type; must be creatable on the fly |
@@ -255,6 +321,33 @@ Hard-won, all from real incidents:
    pass was verified by putting the bug back and watching it fire, because a check nobody has
    seen fail is a check nobody knows works. **Before adding a block, look up the file for the
    nearest unmatched `<?php` or `?>` — not at the indentation.** (2026-08-17.)
+
+17. **A number shared across projects reaches further than the screen it is edited on.** Ideal
+   quotas were one sheet per project TYPE, and from 2026-09-16 the Dates & headcount box edited
+   that sheet directly. Correcting a step on one 2D show moved the budget of every other 2D show,
+   including FCM, whose approved budget stopped matching its sheet — which is how David noticed.
+   A confirm dialog saying "this reaches every 2D project" did not make it safe, because the
+   person saving is looking at one show. **Ideal quotas became per project** (2026-09-17); sharing
+   is now a copy somebody asks for, never a link. **When a number is shared, the question is not
+   whether the screen warns — it is whether anybody editing it can see everything it moves.**
+
+18. **MySQL has no nested transactions.** `hire_candidate()` wraps the hire in a transaction; it
+   was changed to fill the position through `assign_crew_to_lane()`, which opened its own. The
+   second `beginTransaction()` threw "There is already an active transaction" and the hire failed
+   the first time David pressed Hire (2026-09-03). Nothing was half-written, but only because the
+   inner function rolled back before rethrowing. **A function that opens a transaction must work
+   when called inside one**: open only when outermost, commit only what it opened, and never roll
+   back a transaction it did not start. `tools/check_php_blocks.py` has checked this statically
+   ever since (the seventh pass).
+
+19. **A library can enforce a rule you decided against, silently.** The general timeline was
+   settled on 2026-08-31 as "dependencies are drawn, not enforced". Frappe Gantt 0.6.1 enforces
+   them anyway: it refuses to place a bar before a step it depends on, and says nothing. MSD's
+   File prep, planned before the colour steps it was wired to wait for, could not be moved at all
+   — and each refused drag still MOVED AND SAVED the step downstream of it. Found only by reading
+   the library's source (`update_bar_position()`) and reproducing with the real library in a
+   browser. **When a chart or widget "just won't do" something, read the library before the app,**
+   and check what else it does on the same gesture. (2026-09-18.)
 
 ---
 
@@ -441,7 +534,11 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      grouped by department, months = days ÷ 22. It was read, not approximated.
    - **`includes/money.php` is the only door to the finance database.** Keep it that way.
 
-11. ~~**Hiring and contracts**~~ — **built 2026-08-17.** `migrations/024_hiring.sql`,
+11. ~~**Hiring and contracts**~~ — **built 2026-08-17.** *(⚠ Two things below were changed on
+   2026-09-02/03 and the rest stands: hiring no longer RENAMES the slot, it links a person to a
+   position through `assign_crew_to_lane()`; and Crew and Hiring became one screen, **Staffing**
+   (`crew.php`), with `hiring.php` kept but linked from nowhere. See §0 and ROADMAP.)*
+   `migrations/024_hiring.sql`,
    `finance_install_04.sql`, `includes/hiring.php`, `hiring.php`, plus additions to
    `includes/money.php`, `crew.php` and `person.php`. This closed the last two numbered steps of
    the production cycle. Read the six `2026-08-17` entries in `docs/DECISIONS.md` before changing
@@ -505,47 +602,21 @@ change of habit rather than a migration. Read the two paired Plaky entries in
    a step not measured in seconds is reported as a mismatch and counted unpriced — never
    multiplied by an item count.
 
-   **Still open, and NOT decided:** nothing. The two questions that were open here have been
-   answered above.
-
-   **(a) Seconds-based rates — designed, not built.** For steps with `tracks_seconds`
-   the day maths is already correct: `units` is total seconds, `days_per_unit` is days
-   PER SECOND, so person-days come out right and dividing by lanes distributes evenly.
-   What is missing is only the RATE — `crew_terms.rate_unit` is `ENUM('day','hour','flat')`
-   with no per-second option, so those artists are entered as day rates and costed as
-   days × day-rate. To build: `finance_install_06.sql` adding `'second'` to that enum and
-   to `hire_quotes`; a per-second branch in `expense_projection()` **guarded so it only
-   fires on steps that genuinely track seconds** (a per-second rate on a step measured in
-   shots would multiply by the shot count and produce a confident, wrong number); the
-   rate dropdowns on `person.php` and `hiring.php`; and the Excel formula moving from
-   `E×F` to `E×I`.
-   **The question David has not answered:** does a retake allowance inflate a per-second
-   cost? The standing rule (2026-08-12) is that retakes scale DAYS and never UNITS — so
-   the days rise 10% and the seconds do not, and the cost stays flat. That is usually the
-   point of a per-second deal: it caps the price and moves revision risk to the artist.
-   The alternative is billing retakes on top. **Do not guess this one** — it is a
-   commercial term, and on 380 seconds at $8/second it is the difference between $3,040
-   and $3,344.
-
-   **(b) The plan and the budget run on different numbers.** Since 2026-08-17 the expense
-   projection is computed from the IDEAL quota (`quota_standards`), while Duration, the
-   minimum quota and the SCHEDULER still run on `pipeline_steps.days_per_unit`. That is
-   why the Dates & headcount screen needs a "planned slower — beyond the budgeted days"
-   warning at all: if both used the same number there would be nothing to disagree about.
-   Driving everything from the ideal was offered and not chosen; it moves every date on
-   every timeline, so it wants to be deliberate rather than a side effect.
+   **Settled, and no longer open:**
+   - **Retakes do not inflate a per-second cost** (David, asked directly, 2026-08-17): the
+     seconds delivered do not change, so the cost is flat while the days grow.
+   - **The plan and the budget run on ONE number** — the ideal, through the one reader, since
+     2026-08-17 (final) — and **per project since 2026-09-17**. The per-type sheets
+     (`quota_standards`) are kept but unread once migration 034 is applied.
+   - **A per-second rate is priced as rate × the step's seconds ÷ its positions**, never × days.
+     Easy to set by mistake: FCM's Rough Animation slots carried "200 per second" where the
+     approved sheet pays 200 per day (2,700 per artist instead of 1,486).
 
 13. **Next.** In rough order of value:
-   - **What appears in each shot** — link assets (characters, props, vehicles, environments and
-     anything else) to the shot list. David asked for it on 2026-08-17 as a production need, and it
-     turns out to be **a live defect as well as a feature**. `shot_assets` has existed since v1 and
-     `includes/scheduler.php` already reads it — but **nothing in the codebase writes a single row**,
-     so the scheduler's per-shot asset dependency never fires and every shot falls back to waiting
-     for the WHOLE asset step. Every shot currently waits for the last character to be rigged,
-     including shots with no characters in them. The error is in the *pessimistic* direction, so
-     filling this in should SHORTEN the plan rather than lengthen it. No migration needed — read
-     the section in `docs/ROADMAP.md`, and re-run the schedule afterwards, because a saved schedule
-     is a stored snapshot and will not improve on its own.
+   - ~~**What appears in each shot**~~ — **built 2026-09-02** (`shots.php`, `includes/breakdown.php`):
+     `shot_assets` finally has a writer, so the scheduler's per-shot asset dependency can fire.
+     **Re-run the schedule on any show whose breakdown has been filled in** — a saved schedule is a
+     stored snapshot and will not improve on its own.
    - **The client loop** — the step missing from David's own list, and now the only numbered gap
      left in the cycle. Nothing records a delivery: version sent, notes back, round two. Usually
      where a schedule actually dies.
@@ -561,9 +632,8 @@ change of habit rather than a migration. Read the two paired Plaky entries in
      history table here.
 
 14. **Then: run it all against the real show.** The specific things still to watch:
-   - **Apply migration 024 and import `finance_install_04.sql`** — the hiring phase needs both,
-     and they are applied in two different places by two different methods. Until then the
-     Hiring tab reports that it cannot work rather than half-working.
+   - ~~Apply migration 024 and import `finance_install_04.sql`~~ — done by 2026-08-31. The live
+     list of what is pending is §0 and `migrate.php`, not this line.
    - Check the seeded board columns suit how the team actually works, on the Statuses screen.
    - `crew_absences` — now genuinely buildable and paired with the timeline in `ROADMAP.md`.
    - `time_logs` — the per-day table that turns "actual" from elapsed duration into effort.
@@ -595,14 +665,18 @@ Ship each phase end-to-end before starting the next.
 
 ## 5. Open questions
 
-- **Hosting.** STFC's shared host (`md-13.webhostbox.net`) currently flaps on and offline —
-  suspected cPanel resource limits (508). Worth resolving *before* putting a second
-  production tool on the same box. Check cPanel → Metrics → Resource Usage.
-- **Where does the platform live?** URL/subdirectory not yet decided; needed for the deploy
-  config (`docs/GIT_SETUP.md`).
+*Settled since this list was first written: hosting stays where it is; the platform lives at
+`mana.davidsaga.com` (`public_html/mana`); Plaky stays the source of truth for now, with the
+schema built as though the platform owned the data. See "Settled earlier" at the foot of
+`docs/DECISIONS.md`.*
+
 - **Does STFC data get imported later,** or does that dashboard simply retire?
-- **Is Plaky still the source of truth** for the new project, or does the platform own the
-  data directly? STFC's whole import layer assumes daily Plaky CSV exports.
+- **The four decisions waiting on David** in §0: timeline drag carrying downstream steps,
+  backgrounds on Doomsday, the fate of `hiring.php`, and whether MSD's File prep really waits
+  for colour.
+- **The longer-running ones** are in the "Still open" list of `docs/DECISIONS.md`: who updates
+  status once Plaky goes, where the finance app lives, credit on shared tasks, one owner per
+  ticket, and more.
 
 ---
 
@@ -610,16 +684,32 @@ Ship each phase end-to-end before starting the next.
 
 - Start by reading this file and `docs/ARCHITECTURE.md`.
 - **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
-  binary on the dev machine, so no `php -l`; this is the only gate. It makes six passes,
+  binary on the dev machine, so no `php -l`; this is the only gate. It makes seven passes,
   each earned by a bug that actually shipped: unbalanced `endif;`/`endforeach;`, unterminated
-  strings, a `<?php` opened while already in PHP mode, duplicate function names, and — where
+  strings, a `<?php` opened while already in PHP mode, duplicate function names, a function
+  that opens a transaction and calls another that opens one (lesson 18), and — where
   `node` is installed — `node --check` over `assets/*.js`. Four of those are outright parse
   errors: the file never compiles, so *every* page requiring it 500s, not just the feature
   being worked on. A broken .js is quieter and worse — the page renders, the script never
-  runs, and the feature simply does nothing. The sixth pass catches **English prose that
+  runs, and the feature simply does nothing. The remaining pass catches **English prose that
   escaped a string** — an apostrophe inside `'...'` closing it early — which the
   unterminated-string pass cannot see, because the quotes re-pair further down the file. Counting braces with grep is *not* a substitute
   and produced false alarms on healthy files; `tools/README.md` says why.
+- **The checker proves a file compiles, not that a screen works.** With no PHP here, the rest
+  is verified the way this whole run of work was: **build a static HTML page from the markup
+  the PHP would print, with the REAL `assets/style.css` and the real script, serve it with
+  `python -m http.server`, and drive it in the built-in browser** — measuring positions,
+  capturing what a form would post (override `fetch` or listen for `submit`), and comparing the
+  current script against the changed one. Where logic has to be checked against real data (an
+  uploaded spreadsheet, say), **replay it in Python line for line**. Say plainly in the commit
+  and to David that PHP itself was not run.
+- **David's standing preferences for any screen** (said repeatedly, 2026-09-02 on): **buttons,
+  not text links**; a row's actions **on one aligned line**; **commas, never dashes**, in any text
+  on screen; plain words rather than the database's vocabulary ("Nobody yet", not
+  "placeholder"); saving keeps your place on the page. When he asks "what's the difference
+  between X and Y", the answer is usually that one of them should go.
+- **Commit locally; David pushes.** He deploys from GitHub Desktop himself, so a commit is not
+  live until he pushes, and a migration is not applied until he opens `migrate.php`.
 - Work **one phase per conversation**, not one feature — related work should share context.
 - Use `/compact` when a chat gets long rather than starting over.
 - Update `docs/DECISIONS.md` whenever something is settled, so it survives context loss.

@@ -1886,6 +1886,11 @@ variation might be problematic."*
 
 ## Still open
 
+- **Waiting on David, from the 2–18 September run** (the detail is in `docs/ROADMAP.md`, last
+  section): whether dragging a timeline bar should carry every step downstream of it, as Frappe
+  does today; how to plan backgrounds on Doomsday (placeholder "Background"
+  assets, or a per-type estimate), and which steps happen once per background; what becomes of
+  `hiring.php`; and whether MSD's File prep really waits for the colour steps.
 - **What Plaky is actually relied on for** day to day — notifications, comments, phone
   access, or just the board. Worth listing before the eventual switch, so the platform
   replaces what matters rather than guessing.

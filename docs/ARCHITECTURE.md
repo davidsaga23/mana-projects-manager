@@ -35,20 +35,41 @@ Per-project configuration lives in `project_settings (project_id, key, value)` �
 flexible pattern STFC used, but scoped. Truly global config (SMTP, upload limits) stays in
 `config.php`.
 
+```sql
+project_types                        -- migration 032, 2026-09-16
+  id, name VARCHAR(20) UNIQUE,       -- unique ignoring case, as MySQL compares
+  sort_order, created_at, created_by
+```
+
+A type is a **label**: it files a project and puts templates saved for it first. It decides
+no number — it briefly owned an ideal quotas sheet, and since 2026-09-17 ideal quotas are per
+project (below). `project_types()` in `functions.php` is the one list every picker reads.
+
 ### Pipeline — the important part
 
 ```sql
 pipeline_steps
   id, project_id, name, step_order,
   tracks_seconds TINYINT,        -- seconds-based vs shot-count based
-  applies_to ENUM('shot','asset','both'),
-  deadline DATE,
+  applies_to ENUM('shot','asset','both','project'),
+  applies_to_asset_type,         -- '' for any asset type (migration 009)
+  start_date DATE, deadline DATE,
+  days_per_unit DECIMAL(6,3),    -- THIS PROJECT'S IDEAL QUOTA: days per item (migration 033/034)
+  days_source VARCHAR(120),      -- where that number came from: copied, matched, set by whom
+  coverage_pct, planned_headcount, department,
   show_in_dashboard TINYINT,
   color VARCHAR(7)
 
 step_dependencies
   step_id, depends_on_step_id     -- composite PK
 ```
+
+**Days per item is the number the schedule, the quotas and the budget all run on, and it is
+read through exactly one function, `effective_days_per_unit()` (`includes/standards.php`).** It
+belongs to the project: edited on the Ideal quotas tab or on Dates & headcount, copied from
+another project, or matched to an approved expense projection — never shared. The per-type
+sheets that held it from 2026-08-17 to 2026-09-17 are still in `quota_standards`, unread once
+migration 034 is applied; until then the function keeps the old rule.
 
 **Why a dependency table rather than order alone.** Parallelism becomes a property of the
 data: two steps that share a dependency run side by side, and a step depending on both waits
@@ -171,6 +192,23 @@ crew_aliases
 `is_team` marks non-person assignees such as "Animation" — valid for tickets, but excluded
 from scheduling and per-artist reporting.
 
+**Positions and candidates** (migrations 012 and 024 on, reworked 2026-09-02):
+
+```sql
+crew_lanes                           -- a POSITION: step + lane number -> who holds it
+  id, project_id, step_id, lane_no, crew_id
+  -- an empty position holds a placeholder crew row (is_placeholder = 1)
+
+hires                                -- a CANDIDATE for a position, one row per approach
+  id, project_id, lane_id, crew_id, candidate_name, stage, stage_changed_at, ...
+hire_stage_log                       -- append-only; to_stage is free text
+```
+
+Hiring **links** a person to a position (`assign_crew_to_lane()`, which moves the planned work
+across); it does not rename the slot. Taking somebody out writes a `left` line to their stage
+log, and "has left" is derived — the record's person is no longer the position's. Staffing
+(`crew.php`) shows every candidate a position has ever had.
+
 ### Scheduling
 
 ```sql
@@ -279,6 +317,12 @@ per_artist_day   = team_per_day ÷ headcount          # falls as the team grows
 
 `team_per_day` deliberately does not depend on headcount — the work required to hit a date is
 fixed. Only the per-artist share moves. This confused people on STFC; label it clearly in the UI.
+
+**Two windows, on purpose.** Screens that PLAN — Dates & headcount, and Minimum against ideal
+on Finance management — judge a step over its own dates, start to deadline, so a plan does not
+change as the days pass. Screens that TRACK — the dashboard and the review screen — count from
+today. Do not reconcile them by changing one to match the other; they answer different
+questions (see `var from` in `assets/wizard.js`, and DECISIONS 2026-09-17).
 
 ### Forward (auto-schedule)
 
