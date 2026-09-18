@@ -17,12 +17,11 @@ without re-deriving context.
   production cycle are covered** — see the table at the top of `docs/ROADMAP.md`, the thing to
   check new work against. The one thing left is the **client loop**, never on that list.
   **§0 below says what changed from 1 to 18 September and what is waiting on David.**
-- **⚠ Deploy state (2026-09-18):** 024–027 confirmed applied on 2026-08-31. **028–034 have been
-  added since** (milestones, milestone-to-step, artists without a project, reel password,
-  project types, days per item to three decimals, ideal quotas per project). David was asked to
-  apply them on 2026-09-17, **not yet confirmed**. **034 is the one that matters** — the code
-  switches ideal quotas to per project only once it is recorded as applied. Open `migrate.php` and look before assuming,
-  rather than trusting this line: it is only ever as fresh as the last person who edited it.
+- **⚠ Deploy state (2026-09-18):** everything up to **034 is applied**, confirmed by David on
+  2026-09-18, so ideal quotas are per project on the live site. **035 was added the same day**
+  (timeline versions) and is **not yet applied**: until it is, the Timeline says so instead of
+  offering "Save timeline's version". Open `migrate.php` and look before assuming, rather than
+  trusting this line: it is only ever as fresh as the last person who edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
@@ -64,6 +63,13 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Built, 1–18 September
 
+- **Timeline versions** (2026-09-18, migration 035): **Save timeline's version** keeps a copy of
+  both charts and the milestones, named `V00_09182026`, `V01_09182026` and on (a number per
+  project, then the date saved). The **Version** picker opens one on warm paper, read only, with
+  **See the current timeline** beside it. Stored as the drawing, not as ids, so a later rename or
+  deletion cannot rewrite an old version. `includes/timeline_versions.php`; DECISIONS says why.
+- **A project with no saved schedule says so** on the timeline, with **Build the detailed
+  schedule**. That is why MSD had a general chart and no detailed one: none had ever been saved.
 - **Timeline:** milestones for client reviews (drag, double-click to edit, tied to a step's row),
   shaded weekends, remembered zoom, whole-chart exports. **Bars move wherever they are dragged**
   (2026-09-18): Frappe refused to place a bar before a step it depends on, which contradicted the
@@ -99,8 +105,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Waiting on David
 
-1. **Push** (GitHub Desktop), then **`migrate.php`** — anything from 028 to 034 still pending.
-2. **FCM:** once 034 is applied, Finance management → Ideal quotas → *Match an approved expense
+1. **Push** (GitHub Desktop), then **`migrate.php`** for **035** (timeline versions).
+2. **FCM:** 034 is applied, so: Finance management → Ideal quotas → *Match an approved expense
    projection* with `RTC_ExpenseProjection_v01.xlsx`; "Character Sheet" probably has to be pointed
    at the CH sheet step by hand. Then **change the Rough Animation slots' rate from "per second"
    to "per day"** (200 per second is a day rate with the wrong unit: 2,700 per artist instead of
@@ -108,6 +114,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
    sheet's 43,442.40 plus the two "(old)" costs, which were entered as Other expenses in August.
 3. **MSD:** check **Comp · shots**' dates — every failed attempt to drag File prep moved and saved
    Comp. Also whether File prep really waits for the colour steps (its bar is red because of it).
+   Then **build its detailed schedule** (Timeline, *Build the detailed schedule*, or the Schedule
+   tab): none has ever been saved, which is why it has no detailed chart.
 4. **Decisions:** (a) should dragging a timeline bar carry every step downstream of it along, as it
    does today, or move alone? (b) Doomsday **backgrounds**: placeholder assets of a new type
    "Background", or a "roughly how many" estimate box per asset type — and which steps happen once
@@ -118,6 +126,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Not built, on purpose or not yet
 
+- For timeline versions: restoring one onto the live plan (it overwrites what is there, so it is
+  David's call first), deleting them, a note per version, and comparing two.
 - Renaming a project type (create the right one, move the projects, remove the wrong one).
 - A clean-up for crew records nothing points at (offered, not built).
 - Coverage above 100% was asked about and **advised against** (2026-09-16): the calendar, the
