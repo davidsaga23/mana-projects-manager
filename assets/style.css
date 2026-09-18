@@ -2013,6 +2013,19 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .cand .row-btn { padding: 3px 9px; font-size: 12.5px; }
 .cand-hire { display: inline-block; margin: 0; }
 .cand-add { margin-top: 6px; }
+/* --- the people talked to before, kept on the position (David, 2026-09-18) --
+   Declined, passed, and whoever was hired and has left. Quieter than the people
+   in the running: the name reads normally, and how it ended sits in a small grey
+   label, amber only for somebody who LEFT, because that is the case the list was
+   asked for and the one worth spotting first. */
+.cand-earlier { color: #43535f; }
+.cand-was {
+  display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 8px;
+  background: #eef1f4; color: #5a6a7a; white-space: nowrap;
+}
+.cand-was-left { background: #fbf1dc; color: #8a6d1a; }
+.cand-earlier-list > summary, .cand-backups > summary { font-size: 12.5px; }
+.cand-backups { margin-top: 4px; }
 .cand-add > summary { font-size: 12.5px; padding: 3px 9px; }
 .cand-add-form { margin-top: 6px !important; flex-wrap: wrap; }
 .cand-add-form input { min-width: 130px; }

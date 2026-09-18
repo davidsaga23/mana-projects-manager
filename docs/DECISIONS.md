@@ -1747,6 +1747,32 @@ PHP on the workstation): 20 roles with days, 2 flat fees, 4 rows without days, t
 the sheet states a count, days per item came out 4, 5, 0.3, 1, 0.2, 2, 0.5, 2, 3, 0.33 and 1, each
 reproducing the sheet's days to the hundredth. Those are the numbers FCM planned on in August.
 
+## 2026-09-18 — Staffing keeps everybody lined up for a position
+**Asked by David:** *"is there a way we can keep the lined up artists in the staffing tab? It happens
+that they leave the project and I need to see who I talked to and what other options I have."*
+
+**What was hiding them.** Nothing was deleted: every candidate stays attached to the position they
+were lined up for. The Staffing screen simply listed only the open stages, and only on empty
+positions. Hiring somebody took every other name off the row; declining or passing took that name off
+for good; and the person hired kept a record reading "hired", so when they left, they vanished too.
+
+**What changed.**
+- **Empty position:** the people in the running as before, then a fold, **Talked to before**, with
+  everybody whose conversation ended (declined, passed, hired and since left), how it ended and when.
+  It opens by itself when nobody is in the running, because that is the moment it is the answer.
+- **Filled position:** a folded **Also lined up for this position** with the backups: the open ones
+  with their stage in place (no Hire while somebody holds the position), and the ended ones.
+- **Line up again** puts any of them back at Approached on the same record, so each person keeps one
+  history per position and the stage log still says how it went the first time.
+- **Leaving is recorded.** "Remove assignee" and "Change assignee" write a *left* line into the hired
+  person's stage log. The record itself keeps reading "hired", because that is what happened; "has
+  left" is DERIVED (the record's person is no longer the position's), so nothing has to be kept in
+  step, and the log only supplies the date. A hired record may now be lined up again once its person
+  has left the position, and is refused while they still hold it, as before.
+
+No schema change: `hire_stage_log.to_stage` was already free text, and `hires.stage` did not need a
+new value.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

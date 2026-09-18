@@ -16,6 +16,89 @@ require_once __DIR__ . '/includes/people_merge.php';
 require_once __DIR__ . '/includes/artists.php';   // artist_missing(), for the gaps marker
 require_login();
 
+/**
+ * One candidate in the running for a position: the stage in place, Hire when the
+ * position is empty, and the way to their record. Drawn on empty positions and,
+ * without Hire, among a filled position's backups.
+ */
+function staffing_candidate(array $h, bool $canHire): void {
+    ?>
+    <div class="cand">
+      <strong><?= e($h['candidate_name']) ?></strong>
+      <?php if (can_edit()): ?>
+        <?php // The stage moves in place. "Hired" is NOT in this list:
+              // set_hire_stage() would run the real hire from a dropdown with no
+              // confirmation, and hiring somebody by mis-clicking a select is not
+              // a mistake this screen should make possible. It has its own button. ?>
+        <form method="post" class="inline-form cand-stage">
+          <select name="stage" onchange="this.form.submit()"
+                  aria-label="Stage for <?= e($h['candidate_name']) ?>">
+            <?php foreach (HIRE_STAGES as $k => $lbl): if ($k === 'hired') continue; ?>
+              <option value="<?= e($k) ?>" <?= $h['stage'] === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <input type="hidden" name="action" value="stage:<?= (int)$h['id'] ?>">
+        </form>
+        <?php if ($canHire): ?>
+          <form method="post" class="cand-hire"
+                onsubmit="return confirm('Hire <?= e(addslashes($h['candidate_name'])) ?> into this position? Everything already planned for it becomes theirs.');">
+            <button type="submit" class="row-btn row-btn-go" name="action"
+                    value="hire:<?= (int)$h['id'] ?>">Hire</button>
+          </form>
+        <?php endif; ?>
+      <?php else: ?>
+        <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
+      <?php endif; ?>
+      <?php // ⚠ IT GOES TO THE PERSON, not to the Hiring screen (David, 2026-09-02:
+            // "the view details should take you to the detailed page of that
+            // person"). A CANDIDATE HAS NO person.php PAGE, and cannot: that page is
+            // built on a crew record, and somebody being talked to deliberately
+            // does not have one until they are hired. Their record is their entry
+            // in the artist database, where every fact about them lives. ?>
+      <a class="row-btn" href="artists.php?q=<?= urlencode((string)$h['candidate_name']) ?>">View details</a>
+      <?php // WHAT IS STILL BLANK, said where the conversation is actually
+            // happening. Nothing is mandatory, so this is the only thing standing
+            // between a thin entry and a book nobody trusts. Quiet on purpose: a
+            // reminder, not a fault. ?>
+      <?php $gaps = artist_missing($h); if ($gaps): ?>
+        <span class="cand-gaps"
+              title="Their artist database entry has no <?= e(implode(', no ', $gaps)) ?>. Nothing here is required, but a record with these filled in is one the next show can use.">needs <?= e(implode(', ', $gaps)) ?></span>
+      <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Somebody talked to for a position whose conversation has ended: they said no,
+ * we said no, or they were hired and have since left it.
+ *
+ * David, 2026-09-18: "It happens that they leave the project and I need to see who
+ * I talked to and what other options I have." So they stay on the position, with
+ * how it ended and when, and one click puts them back in the running.
+ */
+function staffing_earlier_candidate(array $h, array $leftDates): void {
+    $left = hire_has_left($h);
+    $how  = $left ? 'Left the position' : hire_stage_label($h['stage']);
+    // When it ended: the day they left, from the stage log, or the day the stage
+    // last moved. Somebody who left before departures were recorded has no date.
+    $when = $left ? ($leftDates[(int)$h['id']] ?? null) : ($h['stage_changed_at'] ?? null);
+    $stamp = $when ? strtotime((string)$when) : false;
+    ?>
+    <div class="cand cand-earlier">
+      <strong><?= e($h['candidate_name']) ?></strong>
+      <span class="cand-was cand-was-<?= $left ? 'left' : e((string)$h['stage']) ?>"><?= e($how) ?><?=
+        $stamp ? ', ' . e(date('j M Y', $stamp)) : '' ?></span>
+      <?php if (can_edit()): ?>
+        <form method="post" class="cand-hire">
+          <button type="submit" class="row-btn" name="action"
+                  value="reopen:<?= (int)$h['id'] ?>">Line up again</button>
+        </form>
+      <?php endif; ?>
+      <a class="row-btn" href="artists.php?q=<?= urlencode((string)$h['candidate_name']) ?>">View details</a>
+    </div>
+    <?php
+}
+
 $projectId = (int)($_GET['project'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
 $stmt->execute([$projectId]);
@@ -125,6 +208,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('ok', set_hire_stage($pdo, $projectId, (int)$m[1],
                                        (string)($_POST['stage'] ?? ''), '', current_user_display()));
 
+        } elseif (preg_match('/^reopen:(\d+)$/', $action, $m)) {
+            // "LINE UP AGAIN", from the people talked to before (David,
+            // 2026-09-18). The same record goes back to Approached, so the person
+            // keeps one history on this position rather than a second, empty copy
+            // of them, and the stage log still says how it went the first time.
+            // set_hire_stage() refuses anybody who still holds the position.
+            $h = get_hire($pdo, (int)$m[1]);
+            set_hire_stage($pdo, $projectId, (int)$m[1], 'approached', 'Lined up again',
+                           current_user_display());
+            flash('ok', sprintf('%s is lined up for this position again, at Approached.',
+                                $h['candidate_name'] ?? 'They'));
+
         } elseif (preg_match('/^addcand:(\d+)$/', $action, $m)) {
             // TWO WAYS IN, one handler. Picking somebody the studio already
             // knows carries their record across; typing a name starts a new
@@ -145,13 +240,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (preg_match('/^assign:(\d+)$/', $action, $m)) {
             $crewId = (int)($_POST['assign_crew'][$m[1]] ?? 0);
             if ($crewId <= 0) throw new RuntimeException('Pick somebody to put in that slot.');
+            $was = lane_crew_id($pdo, $projectId, (int)$m[1]);
             assign_crew_to_lane($pdo, $projectId, (int)$m[1], $crewId);
+            // Whoever was hired into it has now left it, and their history says when.
+            if ($was !== $crewId) note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
             flash('ok', 'Slot filled. Any work already scheduled on that track moved with it.');
 
         } elseif (preg_match('/^unassign:(\d+)$/', $action, $m)) {
             // Empties the slot without removing it — see unassign_lane() for why
             // that is a placeholder going back in rather than a NULL.
+            $was = lane_crew_id($pdo, $projectId, (int)$m[1]);
             flash('ok', unassign_lane($pdo, $projectId, (int)$m[1]));
+            // The person hired into it has left it: said in their history, and
+            // shown with everybody else talked to for this position.
+            note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
 
         } elseif (preg_match('/^remove_work:(\d+)$/', $action, $m)) {
             // THE WAY THROUGH. remove: refuses while a slot carries scheduled
@@ -304,6 +406,13 @@ $hiringReady = hiring_available($pdo);
 // wherever somebody is looked up.
 $book = $hiringReady ? known_candidates($pdo) : [];
 $candidatesByLane = $hiringReady ? hires_by_lane($pdo, $projectId) : [];
+// When each person hired into a position they have since left, left it: read once
+// for the page, for the "Left, 18 Sep 2026" beside their name. See hire_has_left().
+$leftIds = [];
+foreach ($candidatesByLane as $laneHires) {
+    foreach ($laneHires as $h) if (hire_has_left($h)) $leftIds[] = (int)$h['id'];
+}
+$leftDates = $hiringReady ? hire_left_dates($pdo, $leftIds) : [];
 
 // Steps with a headcount but no slots yet — the reason to press Generate.
 $stmt = $pdo->prepare(
@@ -558,10 +667,15 @@ require __DIR__ . '/includes/header.php';
           //
           // Computed here rather than inside the cell below, because the whole
           // ROW carries the cue and the row opens first.
-          $liveHere = $isPh && $hiringReady
-              ? array_filter($candidatesByLane[(int)$l['id']] ?? [],
-                             fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true))
-              : [];
+          $allHere = $hiringReady ? ($candidatesByLane[(int)$l['id']] ?? []) : [];
+          $openHere = array_values(array_filter($allHere,
+              fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true)));
+          // Everybody whose conversation about this position has ended. Not the
+          // person holding it: their record reads hired and they are the name on
+          // the row already.
+          $earlierHere = array_values(array_filter($allHere,
+              fn($h) => in_array($h['stage'], ['declined', 'passed'], true) || hire_has_left($h)));
+          $liveHere = $isPh ? $openHere : [];
           $slotState = !$isPh ? 'filled' : ($liveHere ? 'inplay' : 'nobody');
         ?>
         <?php // ⚠ FILLED ROWS CARRY NO COLOUR AT ALL, and that is the design
@@ -619,65 +733,27 @@ require __DIR__ . '/includes/header.php';
               <div class="lined-up">
                 <?php if ($live): ?>
                   <?php foreach ($live as $h): ?>
-                    <div class="cand">
-                      <strong><?= e($h['candidate_name']) ?></strong>
-                      <?php if (can_edit()): ?>
-                        <?php // The stage moves in place. "Hired" is NOT in this
-                              // list: set_hire_stage() would run the real hire
-                              // from a dropdown with no confirmation, and hiring
-                              // somebody by mis-clicking a select is not a
-                              // mistake this screen should make possible. It has
-                              // its own button. ?>
-                        <form method="post" class="inline-form cand-stage">
-                          <select name="stage" onchange="this.form.submit()"
-                                  aria-label="Stage for <?= e($h['candidate_name']) ?>">
-                            <?php foreach (HIRE_STAGES as $k => $lbl): if ($k === 'hired') continue; ?>
-                              <option value="<?= e($k) ?>" <?= $h['stage'] === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
-                            <?php endforeach; ?>
-                          </select>
-                          <input type="hidden" name="action" value="stage:<?= (int)$h['id'] ?>">
-                        </form>
-                        <form method="post" class="cand-hire"
-                              onsubmit="return confirm('Hire <?= e(addslashes($h['candidate_name'])) ?> into this position? Everything already planned for it becomes theirs.');">
-                          <button type="submit" class="row-btn row-btn-go" name="action"
-                                  value="hire:<?= (int)$h['id'] ?>">Hire</button>
-                        </form>
-                      <?php else: ?>
-                        <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
-                      <?php endif; ?>
-                      <?php // ⚠ IT GOES TO THE PERSON, not to the Hiring screen
-                            // (David, 2026-09-02: "the view details should take
-                            // you to the detailed page of that person").
-                            //
-                            // It pointed at hiring.php, and that was wrong twice
-                            // over: that screen is a second list of these same
-                            // positions rather than a page about anybody, so the
-                            // button promised a person and delivered a rival copy
-                            // of the screen you were already on.
-                            //
-                            // A CANDIDATE HAS NO person.php PAGE, and cannot: that
-                            // page is built on a crew record, and somebody being
-                            // talked to deliberately does not have one until they
-                            // are hired. Their record is their entry in the artist
-                            // database, which is where every fact about them lives
-                            // and is editable in place. ?>
-                      <a class="row-btn" href="artists.php?q=<?= urlencode((string)$h['candidate_name']) ?>">View details</a>
-                      <?php // WHAT IS STILL BLANK, said where the conversation is
-                            // actually happening. Nothing is mandatory, so this is
-                            // the only thing standing between a thin entry and a
-                            // book nobody trusts: it has to be visible at the
-                            // moment somebody is looking at the person, not
-                            // discovered later on a screen nobody opens.
-                            //
-                            // Quiet on purpose. It is a reminder, not a fault. ?>
-                      <?php $gaps = artist_missing($h); if ($gaps): ?>
-                        <span class="cand-gaps"
-                              title="Their artist database entry has no <?= e(implode(', no ', $gaps)) ?>. Nothing here is required, but a record with these filled in is one the next show can use.">needs <?= e(implode(', ', $gaps)) ?></span>
-                      <?php endif; ?>
-                    </div>
+                    <?php staffing_candidate($h, true); ?>
                   <?php endforeach; ?>
+                <?php elseif ($earlierHere): ?>
+                  <div class="muted small warn-text">Nobody in the running for this position right now.</div>
                 <?php else: ?>
                   <div class="muted small warn-text">Nobody lined up for this position yet.</div>
+                <?php endif; ?>
+
+                <?php // EVERYBODY TALKED TO BEFORE, kept on the position (David,
+                      // 2026-09-18: "It happens that they leave the project and I
+                      // need to see who I talked to and what other options I
+                      // have"). Declined, passed, and whoever was hired and has
+                      // since left. OPEN when nobody is in the running, because
+                      // that is the moment this list is the answer. ?>
+                <?php if ($earlierHere): ?>
+                  <details class="closed-cands cand-earlier-list" <?= $live ? '' : 'open' ?>>
+                    <summary>Talked to before (<?= count($earlierHere) ?>)</summary>
+                    <?php foreach ($earlierHere as $h): ?>
+                      <?php staffing_earlier_candidate($h, $leftDates); ?>
+                    <?php endforeach; ?>
+                  </details>
                 <?php endif; ?>
 
                 <?php if (can_edit()): ?>
@@ -722,6 +798,28 @@ require __DIR__ . '/includes/header.php';
                   </details>
                 <?php endif; ?>
               </div>
+            <?php endif; ?>
+
+            <?php // THE BACKUPS, ON A FILLED POSITION (David, 2026-09-18: "is there
+                  // a way we can keep the lined up artists in the staffing tab?").
+                  // Hiring somebody used to take every other name off this row,
+                  // so the people who might replace them were out of sight
+                  // exactly when they were needed. Folded, because a filled row
+                  // stays quiet; counted in the button, so the list is known to
+                  // be there. No Hire button while somebody holds the position:
+                  // taking them out comes first, and that is its own decision. ?>
+            <?php if (!$isPh && ($openHere || $earlierHere)): ?>
+              <details class="closed-cands cand-backups">
+                <summary>Also lined up for this position (<?= count($openHere) + count($earlierHere) ?>)</summary>
+                <div class="lined-up">
+                  <?php foreach ($openHere as $h): ?>
+                    <?php staffing_candidate($h, false); ?>
+                  <?php endforeach; ?>
+                  <?php foreach ($earlierHere as $h): ?>
+                    <?php staffing_earlier_candidate($h, $leftDates); ?>
+                  <?php endforeach; ?>
+                </div>
+              </details>
             <?php endif; ?>
           </td>
           <?php // THREE BUTTONS ON ONE LINE, right-aligned (David, 2026-08-31).

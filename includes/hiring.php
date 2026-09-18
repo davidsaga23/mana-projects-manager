@@ -135,6 +135,10 @@ const HIRE_GRID_COLUMNS = [
 ];
 
 function hire_stage_label(?string $stage): string {
+    // 'left' is not a stage a record can be in; it is a line in the stage log,
+    // written when somebody hired into a position is taken out of it. See
+    // note_left_position().
+    if ($stage === 'left') return 'Left the position';
     return HIRE_STAGES[$stage ?? ''] ?? ($stage ?: 'Unknown');
 }
 
@@ -354,7 +358,7 @@ function project_hires(PDO $pdo, int $projectId): array {
     if (!hiring_available($pdo)) return [];
     $stmt = $pdo->prepare(
         'SELECT h.*,
-                cl.lane_no, cl.step_id AS lane_step_id,
+                cl.lane_no, cl.step_id AS lane_step_id, cl.crew_id AS lane_crew_id,
                 ps.name AS live_step_name, ps.color AS step_color,
                 ps.applies_to, ps.applies_to_asset_type,
                 c.name AS slot_name, c.is_placeholder
@@ -368,6 +372,69 @@ function project_hires(PDO $pdo, int $projectId): array {
     );
     $stmt->execute([$projectId]);
     return $stmt->fetchAll();
+}
+
+/**
+ * Was this person hired into a position they no longer hold?
+ *
+ * David, 2026-09-18: "It happens that they leave the project and I need to see who
+ * I talked to and what other options I have." Somebody taken out of a position,
+ * or replaced in it, keeps a record reading "hired", which on its own says they
+ * are still there.
+ *
+ * DERIVED, NOT STORED: the record says who was hired, the position says who holds
+ * it now, and when the two differ the person has left it. Nothing has to be kept
+ * in step. A record with no person linked (older ones) is never called left,
+ * because there is nothing to compare.
+ */
+function hire_has_left(array $h): bool {
+    return ($h['stage'] ?? '') === 'hired'
+        && !empty($h['lane_id'])
+        && (int)($h['crew_id'] ?? 0) > 0
+        && (int)$h['crew_id'] !== (int)($h['lane_crew_id'] ?? 0);
+}
+
+/** When each of these records last left its position, from the stage log: id => datetime. */
+function hire_left_dates(PDO $pdo, array $hireIds): array {
+    $hireIds = array_values(array_filter(array_map('intval', $hireIds)));
+    if (!$hireIds || !column_exists($pdo, 'hire_stage_log', 'to_stage')) return [];
+    $in = implode(',', array_fill(0, count($hireIds), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT hire_id, MAX(changed_at) AS at FROM hire_stage_log
+          WHERE to_stage = 'left' AND hire_id IN ($in) GROUP BY hire_id"
+    );
+    $stmt->execute($hireIds);
+    $out = [];
+    foreach ($stmt as $r) $out[(int)$r['hire_id']] = (string)$r['at'];
+    return $out;
+}
+
+/** Who holds a position right now: its crew id, or 0 when it is not on this project. */
+function lane_crew_id(PDO $pdo, int $projectId, int $laneId): int {
+    $stmt = $pdo->prepare('SELECT crew_id FROM crew_lanes WHERE id = ? AND project_id = ?');
+    $stmt->execute([$laneId, $projectId]);
+    return (int)($stmt->fetchColumn() ?: 0);
+}
+
+/**
+ * Record that the person hired into a position has left it.
+ *
+ * Called once a position has been emptied or given to somebody else. Their
+ * record keeps reading "hired", because that is what happened; this adds the line
+ * to its history saying when it ended, which is the date the Staffing screen
+ * shows beside their name.
+ */
+function note_left_position(PDO $pdo, int $projectId, int $laneId, int $crewId, string $who = ''): void {
+    if ($crewId <= 0 || !hiring_available($pdo)) return;
+    $stmt = $pdo->prepare(
+        "SELECT id, candidate_name FROM hires
+          WHERE project_id = ? AND lane_id = ? AND crew_id = ? AND stage = 'hired'"
+    );
+    $stmt->execute([$projectId, $laneId, $crewId]);
+    foreach ($stmt->fetchAll() as $h) {
+        log_hire_stage($pdo, (int)$h['id'], (string)$h['candidate_name'], 'hired', 'left',
+                       'Taken out of the position', $who);
+    }
 }
 
 /** Hiring records grouped by the lane they are for. Key 0 holds the unattached ones. */
@@ -621,7 +688,12 @@ function set_hire_stage(PDO $pdo, int $projectId, int $hireId, string $stage,
     if (!$hire || (int)$hire['project_id'] !== $projectId) {
         throw new RuntimeException('That hiring record is not on this project.');
     }
-    if ($hire['stage'] === 'hired') {
+    // ⚠ A HIRED RECORD ONLY MOVES ONCE ITS PERSON HAS LEFT THE POSITION. While they
+    // hold it, moving the record would not move the work, so it is refused. Once
+    // they have been taken out or replaced (hire_has_left()), the record is a
+    // conversation again, and lining them up once more is how somebody coming
+    // back, or a second attempt, is recorded (David, 2026-09-18).
+    if ($hire['stage'] === 'hired' && !hire_has_left($hire)) {
         throw new RuntimeException(
             '"' . $hire['candidate_name'] . '" has already been hired. Change who is in the slot '
             . 'on the Staffing screen instead, moving the hiring record would not move the work.'
