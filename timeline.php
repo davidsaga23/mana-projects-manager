@@ -12,12 +12,19 @@
 //   * its `end` is the INCLUSIVE last day, which is this platform's convention
 //     too — so nothing is added or subtracted anywhere;
 //   * never toISOString() a date in the browser (lesson 3).
+//
+// VERSIONS (2026-09-18). "Save timeline's version" keeps a copy of what this
+// page draws, and the Version picker opens one again: ?version=ID draws that
+// copy instead of the live tables, on a tinted page, with every control that
+// would change something taken away. includes/timeline_versions.php builds the
+// drawing for both, so a version can only look the way this page did.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/scheduler.php';
+require __DIR__ . '/includes/timeline_versions.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -162,125 +169,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regenerate'])) {
     exit;
 }
 
-$steps    = pipeline_steps($pdo, $projectId);
-$episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
+// ---------------------------------------------------------------------------
+// VERSIONS — a saved copy of what this page draws, to look back at later.
+// Numbered per project, V00_09182026 onwards (includes/timeline_versions.php).
+// ---------------------------------------------------------------------------
+$tvReady = timeline_versions_ready($pdo);
 
-// --- the detailed chart ------------------------------------------------------
-$stmt = $pdo->prepare(
-    "SELECT sc.id, sc.start_date, sc.end_date, sc.crew_id, sc.is_manual, sc.lane,
-            sc.shot_id, sc.asset_id, sc.item_key,
-            ps.id AS step_id, ps.name AS step_name, ps.step_order, ps.color,
-            sh.episode, sh.shot_code, a.name AS asset_name,
-            c.name AS crew_name,
-            COALESCE(pr.is_approved, 0) AS is_approved
-       FROM schedule sc
-       JOIN pipeline_steps ps ON ps.id = sc.step_id
-       LEFT JOIN shots  sh ON sh.id = sc.shot_id
-       LEFT JOIN assets a  ON a.id  = sc.asset_id
-       LEFT JOIN crew   c  ON c.id  = sc.crew_id
-       LEFT JOIN progress pr ON pr.step_id = sc.step_id AND pr.item_key = sc.item_key
-      WHERE sc.project_id = ?
-      ORDER BY sc.start_date, ps.step_order, sc.lane, sc.id"
-);
-$stmt->execute([$projectId]);
-$rows = $stmt->fetchAll();
-
-$episodes = [];
-$tasks = [];
-foreach ($rows as $r) {
-    // What the bar is FOR. A shot carries its episode when the project has them;
-    // an asset is just its name; a band or whole-project deliverable has neither
-    // and falls back to the step, which is exactly what it represents.
-    if ($r['shot_code'] !== null) {
-        $item = trim(($r['episode'] ? $r['episode'] . ' ' : '') . $r['shot_code']);
-    } elseif ($r['asset_name'] !== null) {
-        $item = $r['asset_name'];
-    } else {
-        $item = $r['step_name'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['version_action'])) {
+    try {
+        if (!$tvReady) {
+            throw new RuntimeException(
+                'The database update that keeps timeline versions has not been applied yet '
+              . '(migration 035), so nothing was saved. An administrator can apply it from Migrations.'
+            );
+        }
+        $v = save_timeline_version($pdo, $project, current_user_display());
+        // What was kept, not just that something was: a version holding no
+        // schedule reads very differently from one holding 400 tasks.
+        flash('ok', sprintf(
+            'Saved as %s: %d step bar%s, %d scheduled task%s and %d milestone%s. '
+          . 'Pick it under Version to look at it again.',
+            $v['label'],
+            $v['steps'], $v['steps'] === 1 ? '' : 's',
+            $v['tasks'], $v['tasks'] === 1 ? '' : 's',
+            $v['milestones'], $v['milestones'] === 1 ? '' : 's'
+        ));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
     }
-    if ($r['episode']) $episodes[$r['episode']] = true;
-
-    $tasks[] = [
-        'id'          => (string)$r['id'],
-        // Frappe draws this to the RIGHT of the bar — the item and what is being
-        // done to it, which is the pairing a supervisor scans for.
-        'name'        => $item . ' · ' . $r['step_name'],
-        'start'       => $r['start_date'],
-        // NOT extended by a day. Frappe treats `end` as the inclusive last day and
-        // stretches it internally; this platform stores it inclusive too. STFC had
-        // both sides adding a day and the two errors hid each other for weeks.
-        'end'         => $r['end_date'],
-        'progress'    => (int)$r['is_approved'] === 1 ? 100 : 0,
-        'episode'     => $r['episode'] ?? '',
-        'step_id'     => (int)$r['step_id'],
-        'step_name'   => $r['step_name'],
-        'step_order'  => (int)$r['step_order'],
-        'item_label'  => $item,
-        'color'       => $r['color'] ?: '#4A90D9',
-        'crew_id'     => $r['crew_id'] !== null ? (int)$r['crew_id'] : null,
-        'crew_name'   => $r['crew_name'] ?? '',
-        'is_approved' => (int)$r['is_approved'] === 1,
-        'is_manual'   => (int)$r['is_manual'] === 1,
-    ];
-}
-ksort($episodes);
-$episodes = array_keys($episodes);
-
-// --- the general chart: one bar per pipeline step ----------------------------
-//
-// THE PLAN, NOT THE SCHEDULE (David, 2026-08-31). This used to span
-// MIN/MAX(schedule) for the step and fall back to its planned dates only when
-// nothing was scheduled. That made the bar a DERIVED value, which is why
-// dragging it never stuck: there was nothing to write to, and a reload
-// recomputed it from the scheduled items.
-//
-// Now the bar IS pipeline_steps.start_date / deadline — the same two fields the
-// Dates & headcount screen edits. Drag it and you are editing that screen
-// graphically; edit that screen and the bar moves. One number, two ways in.
-//
-// The detailed chart below still shows where work actually landed, which is the
-// half this one deliberately no longer answers.
-$depsMap = step_dependencies_map($pdo, $projectId);
-
-$general = [];
-$undated = [];          // steps with no window yet: reported, never silently dropped
-foreach ($steps as $s) {
-    $start = $s['start_date'] ?: null;
-    $end   = $s['deadline'] ?: null;
-    if (!$start || !$end) { $undated[] = $s['name']; continue; }
-    // A backwards pair would draw as a negative-width bar. The planning screen
-    // already flags it in red; here it is simply clamped so the chart still draws.
-    if ($end < $start) $end = $start;
-
-    // DEPENDENCIES ARE DRAWN, NOT ENFORCED. The arrows come from the workflow
-    // graph so the shape is visible while you drag, but nothing here blocks a
-    // move and nothing snaps back — David plans the general timeline to the
-    // dates, and accepts that a dependency-respecting schedule may run longer.
-    // A violated arrow turns red in the browser and that is the whole of it.
-    $depIds = [];
-    foreach ($depsMap[(int)$s['id']] ?? [] as $d) $depIds[] = 'step-' . (int)$d;
-
-    $general[] = [
-        'id'         => 'step-' . (int)$s['id'],
-        'step_id'    => (int)$s['id'],
-        'name'       => $s['name'] . ' · ' . applies_to_phrase($s['applies_to'], $s['applies_to_asset_type'] ?? null),
-        'start'      => $start,
-        'end'        => $end,
-        'progress'   => 0,
-        'color'      => $s['color'] ?: '#4A90D9',
-        // Frappe 0.6.1 reads this as a comma-separated list of task ids.
-        'dependencies' => implode(',', $depIds),
-        // Late now means "past the DELIVERY date". It used to mean "the schedule
-        // ran past the step's own deadline", which cannot happen any more: the
-        // bar and the deadline are the same field.
-        'delivery'   => $project['delivery_date'] ?: null,
-        'late'       => ($project['delivery_date'] && $end > $project['delivery_date']) ? 1 : 0,
-    ];
+    header('Location: timeline.php?project=' . $projectId);
+    exit;
 }
 
-$crewList = $pdo->query(
+// Which timeline this page draws: the live one, or a saved version.
+$version   = null;
+$versionId = (int)($_GET['version'] ?? 0);
+if ($versionId > 0) {
+    try {
+        $version = $tvReady ? load_timeline_version($pdo, $projectId, $versionId) : null;
+        if ($version === null) {
+            throw new RuntimeException('That saved version is not on this project, so here is the '
+                                     . 'current timeline instead.');
+        }
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+        header('Location: timeline.php?project=' . $projectId);
+        exit;
+    }
+}
+
+// NOTHING ON A SAVED VERSION CAN BE CHANGED. Every control that writes asks
+// this rather than can_edit(). The bars of an old version carry the ids of the
+// live rows, so a drag there would save into the CURRENT plan, putting today's
+// bar back where it sat last week, while the person dragging believes they are
+// only looking. Nothing is quieter or worse than that.
+$editable = can_edit() && $version === null;
+
+$steps = pipeline_steps($pdo, $projectId);
+$pic   = $version !== null ? $version['picture'] : timeline_picture($pdo, $project, $steps);
+
+$general     = $pic['general'];
+$tasks       = $pic['tasks'];
+$milestones  = $pic['milestones'];
+$filterSteps = $pic['steps'];
+$episodes    = $pic['episodes'];
+$episodic    = !empty($pic['episodic']);
+$undated     = $pic['undated'];
+
+$versions = $tvReady ? timeline_versions($pdo, $projectId) : [];
+
+// Only for the task editor, which a saved version does not draw.
+$crewList = $editable ? $pdo->query(
     'SELECT id, name, role, is_placeholder FROM crew WHERE active = 1 ORDER BY is_placeholder, name'
-)->fetchAll();
+)->fetchAll() : [];
 
 // Is what's drawn still what the setup implies?
 //
@@ -289,60 +250,90 @@ $crewList = $pdo->query(
 // plan looks exactly like a complete one: fewer bars, no warning, nothing to
 // suggest the picture is out of date. So the plan is recomputed here purely to
 // compare the COUNT against what is stored.
-$fresh = build_schedule($pdo, $project);
-$freshCount  = count($fresh['tasks']);
-$storedCount = count($rows);
-$stale = $freshCount !== $storedCount;
-
-// The milestones themselves, for the charts and the panel below them.
-$milestones = [];
-if ($msReady) {
-    $ms = $pdo->prepare(
-        $msSteps
-            ? 'SELECT m.id, m.name, m.milestone_date, m.notes, m.step_id,
-                      ps.name AS step_name, ps.deadline AS step_end,
-                      ps.applies_to AS step_applies, ps.applies_to_asset_type AS step_asset_type
-                 FROM project_milestones m
-                 LEFT JOIN pipeline_steps ps ON ps.id = m.step_id
-                WHERE m.project_id = ? ORDER BY m.milestone_date, m.id'
-            : 'SELECT id, name, milestone_date, notes FROM project_milestones
-                WHERE project_id = ? ORDER BY milestone_date, id'
-    );
-    $ms->execute([$projectId]);
-    foreach ($ms as $m) {
-        $stepEnd = $m['step_end'] ?? null;
-        $milestones[] = [
-            'id'    => (int)$m['id'],
-            'name'  => $m['name'],
-            'date'  => $m['milestone_date'],
-            'notes' => $m['notes'] ?? '',
-            // The bar id the general chart uses, so the browser can put the
-            // marker on that row without a second lookup.
-            'step_id'   => isset($m['step_id']) && $m['step_id'] ? (int)$m['step_id'] : null,
-            // Named the same way in the chart tooltip and the panel as it is in
-            // the picker, so "reviews Concept" can never mean a different
-            // Concept from the one that was chosen.
-            'step_name' => isset($m['step_name']) && $m['step_name'] !== null
-                ? $m['step_name'] . ' · ' . applies_to_phrase($m['step_applies'],
-                                                              $m['step_asset_type'] ?? null)
-                : '',
-            // EARLY means the step it reviews has not finished by then, so the
-            // thing being reviewed will not exist. Worked out here because the
-            // step's dates are already to hand.
-            'early' => ($stepEnd && $m['milestone_date'] < $stepEnd) ? 1 : 0,
-            'step_end' => $stepEnd,
-        ];
-    }
+//
+// Live timeline only. A saved version is SUPPOSED to differ from today's setup;
+// that is what it is for.
+$stale       = false;
+$freshCount  = 0;
+$storedCount = count($tasks);
+if ($version === null) {
+    $fresh      = build_schedule($pdo, $project);
+    $freshCount = count($fresh['tasks']);
+    $stale      = $freshCount !== $storedCount;
 }
 
-$pageTitle = 'Timeline · ' . $project['name'];
+$pageTitle = 'Timeline · ' . $project['name'] . ($version !== null ? ' · ' . $version['label'] : '');
 require __DIR__ . '/includes/header.php';
 ?>
 
 <?php project_nav($project, 'timeline'); ?>
 <h2 class="wizard-title">Timeline</h2>
 
-<?php if ($rows && $stale): ?>
+<?php // A SAVED VERSION IS DRAWN ON WARM PAPER (.tl-page-old), from here to the
+      // foot of the page, so it cannot be mistaken for the plan being worked on.
+      // The live page gets the same wrapper with no tint, so the two share one
+      // layout and only the colour changes. ?>
+<div class="tl-page<?= $version !== null ? ' tl-page-old' : '' ?>">
+
+<?php // ---- versions ---------------------------------------------------------
+      // One bar above both charts, because a version is both charts. On an old
+      // version it becomes the banner that says so, with the way back beside
+      // the picker rather than somewhere else on the page. ?>
+<?php if ($tvReady): ?>
+  <div class="tl-versions<?= $version !== null ? ' is-old' : '' ?>">
+    <?php if ($version !== null): ?>
+      <div class="tl-version-msg">
+        <strong>You are looking at <?= e($version['label']) ?></strong>, saved on
+        <?= e(substr($version['created_at'], 0, 10)) ?> at <?= e(substr($version['created_at'], 11, 5)) ?><?php
+          if ($version['created_by'] !== ''): ?> by <?= e($version['created_by']) ?><?php endif; ?>.
+        It is a saved copy, not the current timeline, so nothing on it can be moved or changed.
+      </div>
+    <?php endif; ?>
+
+    <?php // A plain GET form, so picking a version is an ordinary page load
+          // with its own address: it can be bookmarked, reloaded, or sent to
+          // somebody, and it works even if the chart script does not. ?>
+    <form method="get" class="tl-version-pick">
+      <input type="hidden" name="project" value="<?= (int)$projectId ?>">
+      <label for="tlVersion">Version</label>
+      <select id="tlVersion" name="version" onchange="this.form.submit()">
+        <option value="">Current timeline</option>
+        <?php foreach ($versions as $v): ?>
+          <option value="<?= (int)$v['id'] ?>"<?= $version !== null && $version['id'] === $v['id'] ? ' selected' : '' ?>><?=
+            e($v['label']) ?> · <?= e($v['time']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <noscript><button type="submit" class="secondary">Show</button></noscript>
+    </form>
+
+    <?php if ($version !== null): ?>
+      <a class="button" href="timeline.php?project=<?= (int)$projectId ?>">See the current timeline</a>
+    <?php elseif (can_edit()): ?>
+      <?php // The action rides in a hidden field, not on the button: the button
+            // is disabled as the form goes, so a double click cannot save two
+            // identical versions, and a disabled button is not posted. ?>
+      <form method="post" class="tl-version-save" onsubmit="this.querySelector('button').disabled = true;">
+        <input type="hidden" name="version_action" value="save">
+        <button type="submit">Save timeline's version</button>
+      </form>
+    <?php endif; ?>
+
+    <span class="muted small">
+      <?php if (!$versions): ?>
+        No versions saved yet.
+      <?php elseif ($version === null): ?>
+        <?= count($versions) ?> saved, the latest is <?= e($versions[0]['label']) ?>.
+      <?php else: ?>
+        <?= count($versions) ?> saved.
+      <?php endif; ?>
+    </span>
+  </div>
+<?php elseif (can_edit()): ?>
+  <p class="muted small">Saving versions of this timeline needs database update <strong>035</strong>.
+    <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
+<?php endif; ?>
+
+<?php if ($tasks && $stale): ?>
   <div class="flash flash-warn">
     <strong>This timeline is out of date.</strong>
     It shows <?= $storedCount ?> saved task<?= $storedCount === 1 ? '' : 's' ?>, but the setup
@@ -356,7 +347,7 @@ require __DIR__ . '/includes/header.php';
       drawn than the setup now calls for, usually because work was approved, marked not
       applicable, or items were removed.
     <?php endif; ?>
-    <?php if (can_edit()): ?>Press <em>Regenerate</em> to bring it in line.<?php endif; ?>
+    <?php if ($editable): ?>Press <em>Regenerate</em> to bring it in line.<?php endif; ?>
   </div>
 <?php endif; ?>
 
@@ -364,17 +355,22 @@ require __DIR__ . '/includes/header.php';
       // planned window from Dates & headcount. So the page is only empty when
       // there is neither a plan nor a schedule — it used to hide both charts
       // whenever nothing had been scheduled, which hid a perfectly good plan. ?>
-<?php if (!$rows && !$general): ?>
+<?php if (!$tasks && !$general): ?>
   <div class="empty-state">
-    <h2>Nothing planned or scheduled yet</h2>
-    <p>The general chart draws each step's planned dates; the detailed one draws the
-       saved schedule. Neither exists yet.</p>
-    <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set the dates →</a>
-       <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
+    <?php if ($version !== null): ?>
+      <h2>Nothing was drawn in this version</h2>
+      <p>No step had dates and no schedule had been saved when it was taken.</p>
+    <?php else: ?>
+      <h2>Nothing planned or scheduled yet</h2>
+      <p>The general chart draws each step's planned dates; the detailed one draws the
+         saved schedule. Neither exists yet.</p>
+      <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set the dates →</a>
+         <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
+    <?php endif; ?>
   </div>
 <?php else: ?>
 
-<?php if ($undated): ?>
+<?php if ($undated && $version === null): ?>
   <div class="flash flash-warn">
     <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no start or
     deadline yet, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn below:
@@ -382,6 +378,13 @@ require __DIR__ . '/includes/header.php';
       if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
     <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set them on Dates &amp; headcount →</a>
   </div>
+<?php elseif ($undated): ?>
+  <p class="muted small">
+    <?= count($undated) ?> step<?= count($undated) === 1 ? '' : 's' ?> had no dates when this
+    version was saved, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn:
+    <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
+      if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
+  </p>
 <?php endif; ?>
 
 <?php if ($general): ?>
@@ -399,7 +402,7 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
   <div id="generalGantt" class="tl-chart"></div>
-  <?php if (can_edit()): ?>
+  <?php if ($editable): ?>
     <p class="muted small tl-note">
       Drag a bar to change that step's dates, it saves straight into
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Dates &amp; headcount</a>,
@@ -417,7 +420,7 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
 
   <?php // ---- milestones ------------------------------------------------- ?>
-  <?php if (!$msReady): ?>
+  <?php if (!$msReady && $version === null): ?>
     <p class="muted small">Milestones need database update <strong>028</strong>.
       <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
   <?php else: ?>
@@ -428,7 +431,7 @@ require __DIR__ . '/includes/header.php';
         <span class="ms-flag">dashed line</span> down both charts. Typed by hand and never moved
         by the scheduler, the point of a review date is that the work bends around it, not the
         other way about.
-        <?php if (can_edit()): ?>
+        <?php if ($editable): ?>
           <br><strong>Drag a marker</strong> on the chart to move it, or
           <strong>double-click</strong> it to change it, the same gestures the task bars use.
           Grab it anywhere down the line, not just the diamond.
@@ -465,7 +468,7 @@ require __DIR__ . '/includes/header.php';
                 <?= e($m['notes']) ?>
               </td>
               <td class="row-actions">
-                <?php if (can_edit()): ?>
+                <?php if ($editable): ?>
                   <?php // The id only — the modal reads the rest from the same
                         // array the chart draws from, so a name with a quote in
                         // it needs no escaping into an onclick. ?>
@@ -477,10 +480,10 @@ require __DIR__ . '/includes/header.php';
           <?php endforeach; ?>
         </table>
       <?php else: ?>
-        <p class="muted small">None yet.</p>
+        <p class="muted small"><?= $version !== null ? 'None when this version was saved.' : 'None yet.' ?></p>
       <?php endif; ?>
 
-      <?php if (can_edit()): ?>
+      <?php if ($editable): ?>
         <form method="post" class="inline-form">
           <input name="ms_name" placeholder="e.g. Client review 01" size="24" maxlength="120">
           <input type="date" name="ms_date" value="<?= e($project['delivery_date'] ?: '') ?>">
@@ -506,7 +509,7 @@ require __DIR__ . '/includes/header.php';
 </section>
 <?php endif; ?>
 
-<?php if ($rows): ?>
+<?php if ($tasks): ?>
 <section class="tl-section">
   <div class="tl-head">
     <h3>Detailed schedule</h3>
@@ -522,7 +525,9 @@ require __DIR__ . '/includes/header.php';
         </label>
       <?php endif; ?>
 
-      <?php // A checkbox panel rather than <select multiple>, which needs ctrl+click. ?>
+      <?php // A checkbox panel rather than <select multiple>, which needs ctrl+click.
+            // The steps come with the drawing, so an old version offers the
+            // pipeline it was drawn with, even a step deleted since. ?>
       <span class="muted small multiselect" id="stepFilterWrap">Step
         <button type="button" class="multiselect-toggle" id="stepFilterToggle"
                 aria-haspopup="true" aria-expanded="false">
@@ -532,11 +537,11 @@ require __DIR__ . '/includes/header.php';
           <label class="multiselect-opt"><input type="checkbox" id="stepFilterAll" checked>
             <strong>All steps</strong></label>
           <div class="multiselect-divider"></div>
-          <?php foreach ($steps as $st): ?>
+          <?php foreach ($filterSteps as $st): ?>
             <label class="multiselect-opt">
               <input type="checkbox" class="step-cb" value="<?= (int)$st['id'] ?>">
               <?= e($st['name']) ?>
-              <span class="muted small"><?= e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></span>
+              <span class="muted small"><?= e($st['scope']) ?></span>
             </label>
           <?php endforeach; ?>
         </div>
@@ -563,12 +568,17 @@ require __DIR__ . '/includes/header.php';
 
       <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','DetailedTimeline','png')">PNG</button>
       <button type="button" class="secondary" onclick="downloadTimeline('detailedGantt','DetailedTimeline','pdf')">PDF</button>
-      <button type="button" class="secondary" onclick="downloadGan()"
-              title="Download as a GanttProject file, honouring the filters above">.gan ↓</button>
-      <a class="tl-linkbtn" href="timeline_import.php?project=<?= $projectId ?>"
-         title="Read a refined GanttProject file back into the schedule">.gan ↑</a>
+      <?php // The .gan files read and write the LIVE schedule, so neither is
+            // offered on a saved version: a download there would hand over
+            // today's plan under an old version's name. ?>
+      <?php if ($version === null): ?>
+        <button type="button" class="secondary" onclick="downloadGan()"
+                title="Download as a GanttProject file, honouring the filters above">.gan ↓</button>
+        <a class="tl-linkbtn" href="timeline_import.php?project=<?= $projectId ?>"
+           title="Read a refined GanttProject file back into the schedule">.gan ↑</a>
+      <?php endif; ?>
 
-      <?php if (can_edit()): ?>
+      <?php if ($editable): ?>
         <form method="post" class="tl-inline"
               onsubmit="return confirm('Recalculate and save the schedule? Hand-locked tasks are preserved.');">
           <input type="hidden" name="regenerate" value="1">
@@ -579,12 +589,64 @@ require __DIR__ . '/includes/header.php';
   </div>
 
   <p class="muted small">
-    <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
-    the name to the <strong>left</strong> of each bar is who is on it, a placeholder slot
-    until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
-    scheduler won't move it · click a bar to edit it, or drag it.
+    <?php if ($version !== null): ?>
+      <?= count($tasks) ?> task<?= count($tasks) === 1 ? ' was' : 's were' ?> scheduled when this
+      version was saved · the name to the <strong>left</strong> of each bar is who was on it ·
+      <span class="warn-text">amber outline</span> = hand-locked at the time.
+    <?php else: ?>
+      <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
+      the name to the <strong>left</strong> of each bar is who is on it, a placeholder slot
+      until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
+      scheduler won't move it · click a bar to edit it, or drag it.
+    <?php endif; ?>
   </p>
   <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
+</section>
+<?php elseif ($general): ?>
+<?php // NO SAVED SCHEDULE, SAID RATHER THAN LEFT BLANK (David, 2026-09-18: "why
+      // does the MSD project doesn't have a detailed timeline like FCM?"). This
+      // section used to vanish outright, taking Regenerate with it, so a show
+      // whose schedule had never been saved looked as if the feature did not
+      // exist, with no hint of the one button that makes it. ?>
+<section class="tl-section">
+  <div class="tl-head"><h3>Detailed schedule</h3></div>
+  <?php if ($version !== null): ?>
+    <p class="muted">This version has no detailed schedule: none had been saved for the project
+      when it was taken.</p>
+  <?php else: ?>
+    <p class="tl-note">
+      <strong>Not built yet.</strong> This chart draws the saved schedule, every shot and asset on
+      its own bar, and none has been saved for this project. The chart above does not need one:
+      it draws each step's planned dates.
+      <?php if ($freshCount > 0): ?>
+        The setup as it stands works out to
+        <strong><?= $freshCount ?> task<?= $freshCount === 1 ? '' : 's' ?></strong>.
+      <?php else: ?>
+        The setup as it stands does not work out to any tasks yet, and the Schedule screen
+        lists why.
+      <?php endif; ?>
+    </p>
+    <?php if ($editable): ?>
+      <?php // Two real buttons, the pairing every other screen uses. A link
+            // styled as a button renders in the page font and a <button> in
+            // the browser's, so side by side they came out 5px apart in height. ?>
+      <div class="actions">
+        <?php if ($freshCount > 0): ?>
+          <form method="post" class="tl-inline"
+                onsubmit="return confirm('Work out the schedule from the setup and save it? You can regenerate it at any time.');">
+            <input type="hidden" name="regenerate" value="1">
+            <button type="submit">Build the detailed schedule</button>
+          </form>
+        <?php endif; ?>
+        <form method="get" action="schedule.php" class="tl-inline">
+          <input type="hidden" name="project" value="<?= (int)$projectId ?>">
+          <button type="submit" class="secondary">Preview it on the Schedule screen</button>
+        </form>
+      </div>
+    <?php else: ?>
+      <p class="muted small">An editor can build it from the Schedule screen.</p>
+    <?php endif; ?>
+  <?php endif; ?>
 </section>
 <?php endif; ?>   <?php // closes: the detailed chart needs a saved schedule ?>
 
@@ -592,7 +654,7 @@ require __DIR__ . '/includes/header.php';
       // opens a task. Posts to this page rather than the JSON API: a drag must
       // not reload, but finishing an edit may, and reusing the server-side
       // validation that already exists beats a second copy of it. ?>
-<?php if ($msReady && can_edit()): ?>
+<?php if ($msReady && $editable): ?>
 <div id="msEditor" class="tl-modal" style="display:none;">
   <div class="tl-modal-box">
     <h3>Edit milestone</h3>
@@ -629,6 +691,7 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php if ($editable): ?>
 <div id="taskEditor" class="tl-modal" style="display:none;">
   <div class="tl-modal-box">
     <h3>Edit task</h3>
@@ -656,6 +719,7 @@ require __DIR__ . '/includes/header.php';
     </form>
   </div>
 </div>
+<?php endif; ?>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
@@ -669,7 +733,10 @@ window.TL_PROJECT   = <?= (int)$projectId ?>;
 window.TL_CODE      = <?= json_encode(
     trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$project['code']), '-') ?: 'project'
 ) ?>;
-window.TL_CAN_EDIT  = <?= can_edit() ? 'true' : 'false' ?>;
+window.TL_CAN_EDIT  = <?= $editable ? 'true' : 'false' ?>;
+<?php // The saved version being shown, or null for the live timeline. Names the
+      // PNG and PDF downloads, so a picture of V03 cannot pass for today's plan. ?>
+window.TL_VERSION   = <?= json_encode($version !== null ? $version['label'] : null) ?>;
 window.MILESTONES   = <?= json_encode($milestones, JSON_UNESCAPED_UNICODE) ?>;
 window.GENERAL_TASKS = <?= json_encode($general, JSON_UNESCAPED_UNICODE) ?>;
 window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;
@@ -677,6 +744,8 @@ window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;
 <script src="assets/timeline.js<?= asset_ver('timeline.js') ?>"></script>
 
 <?php endif; ?>
+
+</div>   <?php // closes .tl-page ?>
 
 </div>
 </body></html>

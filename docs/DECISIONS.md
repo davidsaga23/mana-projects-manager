@@ -1796,6 +1796,67 @@ re-render builds new bars). Reproduced before and after with the real library on
 **Still true, and David's call:** dragging a bar carries every step downstream of it along, and saves
 them, as it always has on this chart.
 
+## 2026-09-18 — Timeline versions: a saved copy of the page, read only
+**Asked by David:** *"Timeline already has persistent memory and stores the timeline as I adjust it.
+However, I need to check the historic changes."* A **Save timeline's version** button, a dropdown of
+previous versions, names `V00_09182026`, `V01_09182026`, `V02_09192026` and on, a subtle new
+background on an old one, and a button back to the current timeline. Migration 035,
+`includes/timeline_versions.php`, `timeline.php`.
+
+**What a version is.** A copy of what the page drew when the button was pressed: both charts and the
+milestones, with every name, colour, lock and approval as they were. Stored as the drawing itself
+(JSON in `timeline_versions.payload`), **not as ids** into `pipeline_steps` and `schedule`: those rows
+keep moving, and a step renamed or a shot deleted next month would otherwise quietly rewrite what an
+old version shows. **One builder,** `timeline_picture()`, is both what the page draws from and what a
+version freezes, moved out of `timeline.php` unchanged. So a version can only look the way the page
+did; a second copy of that code for the save would have drifted within a month.
+
+**Settled in building it:**
+- **The name is derived, never stored:** `V` + the number, two digits, + `_` + MMDDYYYY, from `seq`
+  and `created_at`, like ticket references. The number is **per project and runs on across days**
+  (V02 then V03 the next morning, not V00 again), so it alone says which came first. `created_at` is
+  written by PHP in the studio's timezone, not defaulted by MySQL, whose clock may be elsewhere; the
+  name's date is cut from that text, never converted.
+- **Read only, and enforced by the page, not the browser.** On an old version `$editable` is false:
+  no Save, Regenerate, task editor, milestone editing or add form, and `TL_CAN_EDIT` is false so a
+  drag snaps back. It matters more than it looks: an old version's bars carry the LIVE rows' ids, so
+  a drag there would save into today's plan while the person believes they are only looking.
+  Verified by dragging on both charts in a harness: nothing was sent, while the same drag on the live
+  copy saved four steps.
+- **The .gan buttons are hidden on an old version.** Both read or write the live schedule, so a
+  download there would hand over today's plan under an old version's name. PNG and PDF stay, named
+  after the version (`MSD_GeneralTimeline_V01_09182026.png`) instead of today's date, and they keep
+  the tint. Keeping the tint was the outcome, not the first plan: html2canvas copies an SVG's computed
+  colours inline WHILE cloning, so taking the class off in `onclone` arrived too late (measured). A
+  picture of an old plan that looks old is the right result anyway.
+- **The picker is a plain GET form** (`?project=12&version=5`), so a version has its own address and
+  opens even if the chart script fails. Newest first, "Current timeline" at the top.
+- **Warm paper** (`.tl-page-old`), a colour used nowhere else, including the chart rows, which are
+  Frappe's own fills and would otherwise stay white exactly where you read.
+- **The staleness check is skipped on an old version.** It exists to say the saved schedule no longer
+  matches the setup; an old version is supposed to differ.
+- Saving refuses an empty timeline, reports what it kept ("6 step bars, 212 scheduled tasks and 2
+  milestones"), and checks the size against `max_allowed_packet` first, because that failure
+  otherwise reads "MySQL server has gone away". No transaction: one INSERT, with UNIQUE
+  (project_id, seq) and a retry for two saves in the same second.
+
+**Not built, on purpose:** restoring a version onto the live plan (overwrites what is there, so it is
+David's call first), deleting versions, a note per version, and comparing two versions.
+
+## 2026-09-18 — A project with no saved schedule says so on the timeline
+**Asked by David:** *"why does the MSD project doesn't have a detailed timeline like FCM?"* Because
+none had been saved. The general chart draws each step's planned dates and needs nothing else; the
+detailed chart draws the saved `schedule` rows, which exist only once somebody presses **Save this
+schedule** on the Schedule tab or Regenerate. The section used to vanish entirely when there were no
+rows, taking the Regenerate button with it, so nothing on the page hinted that a schedule was
+missing, let alone how to make one. The same shape as lesson 11: a feature that is absent without
+saying why looks exactly like one that was never built.
+
+Now the section stays and says **Not built yet**, with the task count the setup works out to (the
+page already computes it for the staleness check), **Build the detailed schedule** (the same POST
+Regenerate makes, behind a confirm) and **Preview it on the Schedule screen**. When the setup yields
+no tasks, only the preview is offered, since that screen lists why.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

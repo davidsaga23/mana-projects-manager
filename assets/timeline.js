@@ -1040,9 +1040,16 @@
         c.style.width     = fullW + 'px';
       }
     }).then(function (canvas) {
-      // Built from local parts for the same reason as every other date here.
-      var d = new Date();
-      var stamp = fmtDate(d);
+      // A saved VERSION is named after itself, "RTC_GeneralTimeline_V03_09192026",
+      // so a picture of an old plan cannot pass for today's. The live timeline
+      // takes today's date, built from local parts for the same reason as every
+      // other date here.
+      //
+      // The picture keeps the version's warm tint, as the screen does. That is
+      // deliberate, and could not easily be otherwise: html2canvas copies an
+      // SVG's computed colours inline WHILE cloning, so taking the tint's class
+      // off in onclone arrives too late (tried, 2026-09-18, and measured).
+      var stamp = window.TL_VERSION || fmtDate(new Date());
       // CODE _ WHAT _ WHEN — "RTC_GeneralTimeline_2026-08-31.png" (David,
       // 2026-08-31). The code comes first because a downloads folder sorts by
       // name: every export for one show lands together, and the descriptive

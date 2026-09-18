@@ -233,7 +233,19 @@ daily_snapshots
   project_id, step_id, snapshot_date,
   shots_delivered_cum, shots_approved_cum,
   seconds_delivered_cum, seconds_approved_cum
+
+timeline_versions                    -- migration 035, 2026-09-18: "Save timeline's version"
+  id, project_id, seq,               -- seq per project from 0; UNIQUE (project_id, seq)
+  created_at, created_by,            -- studio time, written by PHP; the name as it read
+  step_count, task_count, milestone_count,
+  payload MEDIUMTEXT                 -- JSON: what the page drew, names and colours included
 ```
+
+**A timeline version is the drawing, not ids.** `timeline_picture()` (`includes/timeline_versions.php`)
+builds what `timeline.php` draws, and a version stores exactly that, so a step renamed or a shot
+deleted later cannot rewrite an old version. Its name, `V00_09182026`, is derived from `seq` and
+`created_at` at display time. Read only: an old version is drawn with every control that writes
+taken away, and nothing restores one onto the live plan.
 
 **End dates are inclusive everywhere** — database, API and UI. Convert only at the boundary
 of external tools (Frappe Gantt, GanttProject). STFC lost days to two layers each applying

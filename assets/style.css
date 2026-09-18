@@ -1715,6 +1715,52 @@ body.lightbox-lock { overflow: hidden; }
 .tl-chart .tl-ms-g.is-early .tl-ms { stroke: #b02a37; fill: #b02a37; }
 .tl-chart .tl-ms-g.is-early .tl-ms-label { fill: #b02a37; }
 .ms-onstep { color: #7b3fb8; }
+
+/* --- timeline versions (2026-09-18) ----------------------------------------
+   The Version picker and "Save timeline's version" share one bar above both
+   charts, because a version is both charts. */
+.tl-versions {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+.tl-versions form { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.tl-versions label { margin: 0; font-weight: 600; }
+.tl-versions select { width: auto; min-width: 210px; padding: 6px 9px; font-size: 14px; }
+.tl-versions button, .tl-versions .button { margin: 0; padding: 7px 14px; font-size: 14px; }
+
+/* A SAVED VERSION IS DRAWN ON WARM PAPER, so it cannot be mistaken for the plan
+   being worked on. Subtle on purpose, as David asked: it is still the timeline,
+   only older. A colour used nowhere else in the app, like the preview banner's
+   violet, and quieter than that one, because a preview changes what you can do
+   on every screen while this changes only what you are looking at, on one.
+
+   The chart rows are Frappe's own fills (white, and #f5f5f5 on every other
+   row), so they are recoloured too, or the tint would stop at the edge of each
+   chart and the part you actually read would look exactly like the live one.
+   Frappe's stylesheet is linked after this file and wins ties, hence the extra
+   classes on every rule that reaches into the chart. */
+.tl-page-old {
+  background: #f4ede0; border: 1px solid #e2d5b9; border-radius: 8px;
+  padding: 12px 14px 2px;
+}
+.tl-versions.is-old {
+  background: #ebdfc5; border-left: 4px solid #9a7636; border-radius: 4px;
+  padding: 10px 14px; color: #5a4320;
+}
+.tl-versions.is-old .tl-version-msg { flex: 1 1 100%; }
+.tl-versions.is-old .tl-version-msg strong { color: #3f2e14; }
+.tl-versions.is-old .muted { color: #7a6440; }
+.tl-page-old .tl-section { background: #fffbf3; border-color: #e6dac1; }
+.tl-page-old table { background: #fffbf3; }
+.tl-page-old th { background: #f1e7d3; box-shadow: inset 0 -1px 0 #ddcfb0; }
+.tl-page-old th, .tl-page-old td { border-bottom-color: #ebe1cc; }
+.tl-page-old .tl-chart .gantt .grid-row { fill: #fffaf1; }
+.tl-page-old .tl-chart .gantt .grid-row:nth-child(even) { fill: #f8f0e1; }
+.tl-page-old .tl-chart .gantt .row-line { stroke: #eee4cf; }
+.tl-page-old .tl-chart .gantt .tl-sticky .grid-header { fill: #f2e9d6; stroke: #e2d5b9; }
+/* The plate behind a milestone name on a step's row matches the paper, or it
+   shows as a white smudge round every label. */
+.tl-page-old .tl-chart .tl-ms-g.on-row .tl-ms-label { stroke: #fffaf1; }
 /* The studio-wide artist list. Wide by nature — a dozen columns about a person
    — so it scrolls sideways inside its own box rather than pushing the page. */
 .artist-table { min-width: 1100px; }
