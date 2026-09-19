@@ -8,7 +8,7 @@ is probably not the next thing.
 
 | # | Step | Coverage | Where |
 |---|---|---|---|
-| 1 | Timeline | **Built** | `schedule.php`, `timeline.php`, `.gan` both directions, saved versions to look back at (2026-09-18) |
+| 1 | Timeline | **Built** | `schedule.php`, `timeline.php`, `.gan` both directions, saved versions to look back at, a step editor with progress, drags that keep working days (all 2026-09-18) |
 | 2 | Budget | **Built** 2026-08-18 | `finance_project.php` — agreed amount, currency, terms |
 | 3 | New brief | **Built** 2026-08-18 | `brief.php` — the ask, deliverables, reference, files |
 | 4 | Breakdown | **Built** | Wizard (paste) + Plaky import |

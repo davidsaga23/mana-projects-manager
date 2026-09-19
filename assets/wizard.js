@@ -240,6 +240,9 @@
     // "Is that enough?" answers whether the people fit the date; this answers
     // how many days the work itself needs, which is the number you compare
     // against the gap between Starts and Deadline.
+    //
+    // ⚠ MIRRORED IN PHP by step_duration() in includes/quota.php, which the
+    // timeline's step editor shows (2026-09-18). Change the arithmetic in both.
     var durationCell = row.querySelector('.duration');
     function sayDuration(html, cls) {
       if (!durationCell) return;

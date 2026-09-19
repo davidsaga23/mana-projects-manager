@@ -1761,6 +1761,40 @@ body.lightbox-lock { overflow: hidden; }
 /* The plate behind a milestone name on a step's row matches the paper, or it
    shows as a white smudge round every label. */
 .tl-page-old .tl-chart .tl-ms-g.on-row .tl-ms-label { stroke: #fffaf1; }
+
+/* --- progress and the step editor (2026-09-18) ------------------------------
+   A step's recorded progress is Frappe's own progress rect, drawn over the bar.
+   Its default fill is a lilac that fights every step colour, so here it is a
+   darker shade of the bar's OWN colour: the done part reads as the same step,
+   further along. The id keeps it off the detailed chart, where a filled bar
+   means approved and is green. */
+#generalGantt .gantt .bar-wrapper .bar-progress { fill: #1c2733; fill-opacity: .3; }
+/* Nobody who cannot save gets the handles for stretching a bar or dragging its
+   progress: the gesture could only ever snap back. */
+.tl-readonly .gantt .handle { display: none; }
+
+/* Wide enough that "Finish after 9 working days, on Thu 1 Oct" and "Open Dates &
+   headcount" sit on one line, as a row of actions should. */
+.tl-step-box { width: 560px; max-height: 92vh; overflow-y: auto; }
+.tl-step-box .se-scope { margin: -8px 0 12px; }
+.se-dates { display: flex; gap: 12px; }
+.se-dates label { flex: 1 1 0; margin-top: 0; }
+.se-need {
+  background: #f4f6f8; border: 1px solid #e4e8ec; border-radius: 6px;
+  padding: 10px 12px; margin: 14px 0 2px; line-height: 1.5;
+}
+.se-need small { margin-top: 4px; }
+.se-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.se-buttons button { margin: 0; padding: 5px 10px; font-size: 13px; }
+.se-progress { display: flex; align-items: center; gap: 10px; }
+.se-progress input[type=range] { flex: 1 1 auto; width: auto; padding: 0; border: 0; }
+.se-progress input[type=number] { width: 78px; }
+.se-tracked { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.se-tracked small { margin-top: 0; }
+.se-tracked button { margin: 0; padding: 3px 9px; font-size: 12.5px; }
+@media (max-width: 520px) {
+  .se-dates { flex-direction: column; gap: 0; }
+}
 /* The studio-wide artist list. Wide by nature — a dozen columns about a person
    — so it scrolls sideways inside its own box rather than pushing the page. */
 .artist-table { min-width: 1100px; }

@@ -225,6 +225,11 @@ if ($versionId > 0) {
 // only looking. Nothing is quieter or worse than that.
 $editable = can_edit() && $version === null;
 
+// Progress recorded by hand on a step (migration 036). Until it has run the step
+// editor shows its progress box switched off, with the reason, rather than
+// offering a field that cannot save.
+$progressReady = column_exists($pdo, 'pipeline_steps', 'progress_pct');
+
 $steps = pipeline_steps($pdo, $projectId);
 $pic   = $version !== null ? $version['picture'] : timeline_picture($pdo, $project, $steps);
 
@@ -273,7 +278,9 @@ require __DIR__ . '/includes/header.php';
       // foot of the page, so it cannot be mistaken for the plan being worked on.
       // The live page gets the same wrapper with no tint, so the two share one
       // layout and only the colour changes. ?>
-<div class="tl-page<?= $version !== null ? ' tl-page-old' : '' ?>">
+<?php // tl-readonly hides the bars' stretch and progress handles, which would
+      // otherwise be offered to somebody whose drag can only snap back. ?>
+<div class="tl-page<?= $version !== null ? ' tl-page-old' : '' ?><?= $editable ? '' : ' tl-readonly' ?>">
 
 <?php // ---- versions ---------------------------------------------------------
       // One bar above both charts, because a version is both charts. On an old
@@ -406,7 +413,10 @@ require __DIR__ . '/includes/header.php';
     <p class="muted small tl-note">
       Drag a bar to change that step's dates, it saves straight into
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Dates &amp; headcount</a>,
-      so the two always agree. Arrows show what the
+      so the two always agree. A moved bar keeps its <strong>working days</strong>: slid over a
+      weekend or a studio holiday it stretches, rather than losing a day to it.
+      <strong>Double-click</strong> a bar to type its dates, see how many working days it needs,
+      and record its progress. Arrows show what the
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=3') ?>">workflow</a> says waits
       for what; a <strong class="dep-legend">red one</strong> means you have planned a step to
       start before the thing it waits for has finished. That is allowed here, it is a warning,
@@ -597,7 +607,8 @@ require __DIR__ . '/includes/header.php';
       <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
       the name to the <strong>left</strong> of each bar is who is on it, a placeholder slot
       until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
-      scheduler won't move it · click a bar to edit it, or drag it.
+      scheduler won't move it · double-click a bar to edit it, or drag it, and it keeps its
+      working days.
     <?php endif; ?>
   </p>
   <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
@@ -721,6 +732,78 @@ require __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 
+<?php // ---- the step editor ------------------------------------------------------
+      // Opened by DOUBLE-CLICKING a bar on the general chart (David, 2026-09-18),
+      // the gesture the task bars and the milestones already use: Frappe raises
+      // its click on a double-click. The step's dates, how many working days it
+      // needs at its settings (the Duration column of Dates & headcount), and its
+      // progress, typed here or dragged with the handle under the bar.
+      //
+      // Drawn for everyone. Without the right to edit, and on a saved version, it
+      // opens read only (assets/timeline.js), because reading the numbers is half
+      // of what it is for; only the controls that write are left out here. ?>
+<?php if ($general): ?>
+<div id="stepEditor" class="tl-modal" style="display:none;">
+  <div class="tl-modal-box tl-step-box" role="dialog" aria-modal="true" aria-labelledby="seTitle">
+    <h3 id="seTitle">Step</h3>
+    <p id="seScope" class="muted small se-scope"></p>
+    <form id="stepEditForm">
+      <div class="se-dates">
+        <label>Starts <input type="date" id="seStart" required>
+          <small id="seStartDay"></small></label>
+        <label>Finishes <input type="date" id="seEnd" required>
+          <small id="seEndDay"></small></label>
+      </div>
+
+      <div class="se-need">
+        <div id="seWindow"></div>
+        <div id="seNeed"></div>
+        <small id="seNeedHow"></small>
+        <?php if ($editable): ?>
+          <div class="se-buttons">
+            <button type="button" class="secondary" id="seFit" hidden></button>
+            <?php // Where the duration's ingredients are changed: days per item,
+                  // people, coverage. A real button in the same font as the one
+                  // beside it, posting a GET form of its own, since a form cannot
+                  // sit inside another. ?>
+            <button type="submit" class="secondary" form="seToPlanning">Open Dates &amp; headcount</button>
+          </div>
+        <?php endif; ?>
+      </div>
+
+      <label for="seProgress">Progress</label>
+      <div class="se-progress">
+        <input type="range" id="seProgressRange" min="0" max="100" step="1" aria-label="Progress, percent">
+        <input type="number" id="seProgress" min="0" max="100" step="1"> %
+      </div>
+      <?php if (!$progressReady && $editable): ?>
+        <small class="warn-text">Recording progress needs database update <strong>036</strong>.
+          <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></small>
+      <?php endif; ?>
+      <small id="seProgressSource"></small>
+      <div class="se-tracked">
+        <small id="seTracked"></small>
+        <?php if ($editable): ?>
+          <button type="button" class="secondary" id="seUseTracked" hidden></button>
+        <?php endif; ?>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="secondary" id="seCancel">Cancel</button>
+        <span class="spacer"></span>
+        <?php if ($editable): ?><button type="submit" id="seSave">Save</button><?php endif; ?>
+      </div>
+    </form>
+    <?php if ($editable): ?>
+      <form id="seToPlanning" method="get" action="wizard.php" hidden>
+        <input type="hidden" name="project" value="<?= (int)$projectId ?>">
+        <input type="hidden" name="step" value="4">
+      </form>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -734,6 +817,12 @@ window.TL_CODE      = <?= json_encode(
     trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string)$project['code']), '-') ?: 'project'
 ) ?>;
 window.TL_CAN_EDIT  = <?= $editable ? 'true' : 'false' ?>;
+<?php // The studio calendar, every non-working day as date => name. The charts
+      // shade them, a dragged bar keeps its working days across them, and the
+      // step editor counts with them: the same set calendar.php reads. An object
+      // even when empty, which (object) makes it. ?>
+window.TL_DAYS_OFF  = <?= json_encode((object)non_working_days($pdo), JSON_UNESCAPED_UNICODE) ?>;
+window.TL_PROGRESS_READY = <?= $progressReady ? 'true' : 'false' ?>;
 <?php // The saved version being shown, or null for the live timeline. Names the
       // PNG and PDF downloads, so a picture of V03 cannot pass for today's plan. ?>
 window.TL_VERSION   = <?= json_encode($version !== null ? $version['label'] : null) ?>;

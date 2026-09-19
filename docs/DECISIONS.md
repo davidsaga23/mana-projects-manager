@@ -1857,6 +1857,98 @@ page already computes it for the staleness check), **Build the detailed schedule
 Regenerate makes, behind a confirm) and **Preview it on the Schedule screen**. When the setup yields
 no tasks, only the preview is offered, since that screen lists why.
 
+## 2026-09-18 — Double-click a step's bar: its dates, the days it needs, and its progress
+**Asked by David:** *"open a display menu when you double click a bar or a milestone so we can
+manually change the start/end date, reflect the duration (minimum days to finish) from the
+dates&headcount and register the progress of that task manually."* Migration 036, the step editor in
+`timeline.php` and `assets/timeline.js`, `step_edit` / `step_progress` in `schedule_api.php`.
+
+**Milestones and task bars already did this.** Frappe 0.6.1 raises its click event on a DOUBLE-click
+(read in its `setup_click_event()`), so the detailed chart's task editor has always opened that way,
+and milestones open theirs on a double-click too. The page used to say "click a bar to edit it"; it
+now says double-click. What had no editor was the general chart's step bars, and that is what this
+adds.
+
+**What the editor holds:**
+- **The two dates**, each with its weekday underneath, and "a day off" (with the holiday's name) when
+  it falls on one.
+- **The working days between them**, saying what it left out ("not counting 4 weekend days and
+  Independence Day"), against **what the step needs at its settings**: the Duration column of Dates &
+  headcount, in the same words ("needs 9 working days, so 6 spare", or "4 more than these dates
+  allow"), and the sentence it is made of ("45 shots at 0.5 days each, plus 10% retakes, shared by 3
+  people"). **Finish after 9 working days** sets the end to fit; **Open Dates & headcount** goes where
+  the ingredients are changed.
+- **Progress**, a slider and a box, 0 to 100, who set it and when, and beside it **what the tracking
+  grid says** ("3 of 45 approved on the tracking grid, 7%") with a button to use that figure.
+
+**Settled in building it:**
+- **The duration is computed in PHP by `step_duration()`** (`includes/quota.php`), which mirrors
+  `updateDuration()` in `assets/wizard.js`: the arithmetic lives twice, in the browser for the live
+  check and on the server for this, and each now names the other. It was replayed against David's
+  own screenshot of Dates & headcount (5, 2, 6, 8, 1, 9 and 16 days) and matched every row.
+- **Progress is a percentage somebody types, not a count** (`pipeline_steps.progress_pct`,
+  `progress_source`). For a step that is one deliverable, the grid can only say 0% or 100% until the
+  day it is approved; this is the producer's own reading, and it sits next to the grid's figure so
+  the two are never taken for each other. Drawn as Frappe's own progress fill, in a darker shade of
+  the step's colour; dragging the little handle under a bar changes it too (Frappe draws that handle
+  only between 1% and 99%, so a step's first progress is typed). **Only a changed number is
+  re-attributed**: saving new dates does not stamp "set by" on a progress nobody touched.
+- **Dates and progress save in ONE request** (`step_edit`), so the two cannot half-save.
+- **The editor opens for everybody**, read only without the right to edit and on a saved version,
+  where it shows the numbers as they were: they travel with the bar in `timeline_picture()`, so a
+  version saved from today on keeps them. Versions saved earlier carry no duration or grid figure,
+  and the editor leaves those lines empty rather than inventing them.
+- Before 036 is applied, the progress box is switched off with the reason, and the server refuses a
+  request carrying a progress rather than saving only its dates.
+
+**Not built:** a history of progress (only the latest number is kept, though every saved timeline
+version freezes the numbers of its day), and a marker on the bar for where the minimum duration ends.
+
+## 2026-09-18 — A dragged bar keeps its working days
+**Asked by David:** *"when I move around the bars in the timeline, the total/minimum duration is
+respected when moved through the weekends which are days off? Otherwise, the bar needs to adjust by
+subtracting those days and extending the bar when a weekend interferes."*
+
+**It was not.** Frappe moves a bar by calendar days, so a bar slid so that a weekend or a holiday fell
+inside it, where none had before, silently lost a working day, and gained one the other way. Both
+charts. The scheduler had always counted in working days (`add_working_days()`); a drag was the one
+place a bar could change length without anybody saying so.
+
+Now, on both charts (`landOnWorkingDays()` in `assets/timeline.js`):
+- **Moved** (both ends travelled): it keeps the working days it held, starting on the first working
+  day on or after the drop and stretching over any weekend or holiday on the way.
+- **Stretched from the left**: it starts on the first working day on or after the drop.
+- **Stretched from the right**: it finishes on the last working day on or before it, so a deadline
+  dragged onto a Saturday lands on the Friday.
+- A bar holding no working day at all keeps its calendar length, having nothing else to keep.
+
+The calendar is the studio's own, `non_working_days`, handed to the page as `TL_DAYS_OFF`, and the
+helpers mirror `includes/calendar.php` (`is_working_day()`, `next_working_day()`,
+`working_days_between()`, `add_working_days()`), plus one that steps back to the previous working
+day, which only a stretched end needs. Holidays are now **shaded** on
+both charts in Day view, like weekends, which the old comment there had been waiting for: a bar
+stretching over a holiday stretches over a shaded column. The chart is redrawn once per drag, only
+when a bar had to move from where it was dropped, and **keeps its scroll position** (milestone drags
+and editor saves too; every redraw used to throw the view back to the start of the show).
+
+Verified in a harness with the real Frappe 0.6.1: Layout moved 4 days kept its 9 working days and
+landed Friday to Wednesday over a weekend, and the three steps it carried kept theirs across the 2 and
+16 November holidays, all four on dates counted by hand beforehand.
+
+## 2026-09-18 — A drag on the detailed chart was unassigning the task
+**Found while building the above.** Dragging a task bar posts only its dates, and `schedule_api.php`
+read the missing `crew_id` as "nobody", so **every task ever dragged on the detailed chart lost its
+person or slot**, silently. The same drag locks the task, so Regenerate, which leaves locked tasks
+alone, never gave it back. The chart hid it until the next reload, because the browser kept the old
+name in memory.
+
+Fixed: an ABSENT `crew_id` now means unchanged, and only an empty one means nobody (the task editor
+always sends the field, its blank option included, so it can still clear an assignment). **Tasks
+already dragged are still unassigned**: they show no name to the left of their bar. Each still
+carries its lane, and `crew_lanes` says who holds that lane now, so a one-off repair could put the
+names back. Offered to David, not run: it would also fill any task somebody deliberately set to
+"nobody" in the editor.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.
@@ -1947,6 +2039,10 @@ variation might be problematic."*
 
 ## Still open
 
+- **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
+  unassigned the task until that day (see the entry above). Each such task keeps its lane, and the
+  lane's current holder could be written back in one pass. Not run: it would also fill any task
+  somebody deliberately set to "nobody", so it is David's call.
 - **Waiting on David, from the 2–18 September run** (the detail is in `docs/ROADMAP.md`, last
   section): whether dragging a timeline bar should carry every step downstream of it, as Frappe
   does today; how to plan backgrounds on Doomsday (placeholder "Background"

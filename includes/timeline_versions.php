@@ -24,6 +24,8 @@
 // READ ONLY. Nothing here writes a version back onto the live plan.
 
 require_once __DIR__ . '/pipeline.php';
+require_once __DIR__ . '/quota.php';       // step_duration(), for the step editor
+require_once __DIR__ . '/dashboard.php';   // dashboard_steps(), what the grid has approved
 
 /** Has migration 035 run? */
 function timeline_versions_ready(PDO $pdo): bool {
@@ -131,6 +133,19 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
     // half this one deliberately no longer answers.
     $depsMap = step_dependencies_map($pdo, $projectId);
 
+    // WHAT THE STEP EDITOR SHOWS BESIDE EACH BAR (2026-09-18): how long the step
+    // needs at its settings, the Duration column of Dates & headcount, and what
+    // the tracking grid has approved, the dashboard's own figure from the same
+    // function, so the two screens cannot disagree. Carried on the bars rather
+    // than fetched when the editor opens, so a saved version shows them as they
+    // were on the day it was saved.
+    $estimates = project_estimates($pdo, $projectId);
+    $retakePct = project_retake_pct($pdo, $projectId);
+    $trackedBy = [];
+    foreach (dashboard_steps($pdo, $projectId, $project['delivery_date'] ?: null) as $ds) {
+        $trackedBy[(int)$ds['step']['id']] = $ds;
+    }
+
     $general = [];
     $undated = [];      // steps with no window yet: reported, never silently dropped
     $filter  = [];      // every step, dated or not, for the step filter
@@ -155,14 +170,27 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
         $depIds = [];
         foreach ($depsMap[(int)$s['id']] ?? [] as $d) $depIds[] = 'step-' . (int)$d;
 
+        $dur = step_duration($pdo, $projectId, $s, $estimates, $retakePct);
+        $trk = $trackedBy[(int)$s['id']] ?? null;
+
         $general[] = [
             'id'         => 'step-' . (int)$s['id'],
             'step_id'    => (int)$s['id'],
             'name'       => $s['name'] . ' · ' . $scope,
             'start'      => $start,
             'end'        => $end,
-            'progress'   => 0,
+            // Frappe's own field, drawn as the darker part of the bar: the
+            // progress somebody recorded by hand (migration 036), 0 before it.
+            'progress'   => max(0, min(100, (int)($s['progress_pct'] ?? 0))),
+            'progress_source' => (string)($s['progress_source'] ?? ''),
             'color'      => $s['color'] ?: '#4A90D9',
+            // For the step editor.
+            'step_name'  => $s['name'],
+            'scope'      => $scope,
+            'need_days'  => $dur['days'],
+            'need_text'  => timeline_need_text($dur),
+            'tracked_pct'  => ($trk && (int)$trk['tracked'] > 0) ? $trk['pct'] : null,
+            'tracked_text' => timeline_tracked_text($trk),
             // Frappe 0.6.1 reads this as a comma-separated list of task ids.
             'dependencies' => implode(',', $depIds),
             // Late now means "past the DELIVERY date". It used to mean "the
@@ -227,6 +255,50 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
         'episodic'   => $episodic,
         'undated'    => $undated,
     ];
+}
+
+/**
+ * How a step's duration is made up, in one sentence, for the step editor.
+ *
+ * Numbers formatted the way Dates & headcount prints them (fmt_rate() for the
+ * work, the box's own value for days per item), so the sentence can be checked
+ * against that screen line by line.
+ */
+function timeline_need_text(array $d): string {
+    if ($d['units'] <= 0) return 'Nothing to schedule for this step yet.';
+    $work = fmt_rate($d['units']) . ' ' . $d['label'];
+    if ($d['days'] === null) {
+        return $work . ', ' . fmt_rate($d['person_days']) . ' person-days of work. Set how many '
+             . 'people are on it, on Dates & headcount, to get a duration.';
+    }
+    $one = abs($d['per_unit'] - 1) < 0.0005;
+    $s = $work . ' at ' . fmt_num($d['per_unit'], 3) . ' day' . ($one ? '' : 's') . ' each';
+    if ($d['retake_pct'] > 0) $s .= ', plus ' . fmt_num($d['retake_pct']) . '% retakes';
+    $s .= abs($d['people'] - 1) < 0.0005 ? ', one person'
+                                          : ', shared by ' . fmt_num($d['people']) . ' people';
+    if ($d['estimated']) $s .= ', from the pre-production estimate';
+    return $s . '.';
+}
+
+/**
+ * What the tracking grid says about a step, for the step editor.
+ *
+ * "Nothing tracked" rather than "0 of 26 approved" when the grid holds no row
+ * for the step at all: zero means nothing got done, and nothing tracked means
+ * nobody knows, which are different statements (the same rule as the pace).
+ */
+function timeline_tracked_text(?array $t): string {
+    if ($t === null || (int)$t['tracked'] === 0) {
+        return 'Nothing tracked for this step on the grid yet.';
+    }
+    if ((float)$t['target'] <= 0) {
+        return 'Tracked on the grid, but there is nothing yet to count it against.';
+    }
+    $fmt = function ($v) use ($t) {
+        return $t['unit'] === 'sec' ? fmt_secs((float)$v) : (string)(int)round((float)$v);
+    };
+    return sprintf('%s of %s approved on the tracking grid, %d%%.',
+                   $fmt($t['approved_v']), $fmt($t['target']), (int)$t['pct']);
 }
 
 /**

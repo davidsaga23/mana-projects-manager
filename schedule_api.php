@@ -23,6 +23,64 @@ function api_fail(string $msg, int $code = 400): void {
 $action = $_GET['action'] ?? '';
 
 // ---------------------------------------------------------------------------
+// PROGRESS — a step's percentage, typed on the step editor or dragged with the
+// bar's progress handle (migration 036, 2026-09-18). A number somebody
+// recorded, not a count: the tracking grid's count is shown beside it on the
+// editor and is never written from here.
+// ---------------------------------------------------------------------------
+
+/** 0 to 100 from the request, or a refusal saying what was wrong. */
+function progress_pct_from_post(): int {
+    $raw = trim((string)($_POST['progress_pct'] ?? ''));
+    if ($raw === '' || !is_numeric($raw) || (float)$raw < 0 || (float)$raw > 100) {
+        api_fail('Progress has to be a number from 0 to 100.');
+    }
+    return (int)round((float)$raw);
+}
+
+/** "Set by David Salinas on 2026-09-18": the same shape as days_source. */
+function progress_set_by(): string {
+    $who = trim(current_user_display());
+    return mb_substr(sprintf('Set by %s on %s', $who !== '' ? $who : 'somebody', date('Y-m-d')), 0, 120);
+}
+
+const PROGRESS_NEEDS_036 = 'Recording progress needs database update 036, so nothing was saved. '
+                         . 'An administrator can apply it from Migrations.';
+
+if ($action === 'step_progress') {
+    $stepId    = (int)($_POST['step_id'] ?? 0);
+    $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+    if (!column_exists($pdo, 'pipeline_steps', 'progress_pct')) api_fail(PROGRESS_NEEDS_036);
+    $pct = progress_pct_from_post();
+
+    $chk = $pdo->prepare(
+        'SELECT name, progress_pct, progress_source FROM pipeline_steps WHERE id = ? AND project_id = ?'
+    );
+    $chk->execute([$stepId, $projectId]);
+    $row = $chk->fetch();
+    if (!$row) api_fail('That step is not on this project.');
+
+    // Only a CHANGED number is re-attributed, so "set by" always names whoever
+    // last actually moved it.
+    $source = (string)($row['progress_source'] ?? '');
+    if ($pct !== (int)$row['progress_pct']) {
+        $source = progress_set_by();
+        $pdo->prepare(
+            'UPDATE pipeline_steps SET progress_pct = ?, progress_source = ? WHERE id = ? AND project_id = ?'
+        )->execute([$pct, $source, $stepId, $projectId]);
+    }
+    echo json_encode([
+        'ok'       => true,
+        'step'     => $row['name'],
+        'progress' => $pct,
+        'progress_source' => $source,
+        'note'     => $row['name'] . ': ' . $pct . '% done',
+    ]);
+    exit;
+}
+
+// ---------------------------------------------------------------------------
 // STEP DATES — the general timeline's bars, which ARE Dates & headcount.
 //
 // A different table from everything below: this writes pipeline_steps, not
@@ -35,7 +93,9 @@ $action = $_GET['action'] ?? '';
 // (2026-08-31); a violated arrow is drawn red in the browser and that is all.
 // Refusing the drag here would be a wall where a warning was asked for.
 // ---------------------------------------------------------------------------
-if ($action === 'step_dates') {
+// step_edit is the step editor's Save: the same dates, plus the progress when
+// the editor sends one. One request, so the two can never half-save.
+if ($action === 'step_dates' || $action === 'step_edit') {
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
     if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
@@ -52,26 +112,55 @@ if ($action === 'step_dates') {
     }
     if ($end < $start) api_fail('A step cannot end before it starts.');
 
+    // Before 036 the editor sends no progress and says why; a request that
+    // sends one anyway is refused whole rather than saving only the dates.
+    $progressReady = column_exists($pdo, 'pipeline_steps', 'progress_pct');
+    $pct = null;
+    if ($action === 'step_edit' && array_key_exists('progress_pct', $_POST)) {
+        if (!$progressReady) api_fail(PROGRESS_NEEDS_036);
+        $pct = progress_pct_from_post();
+    }
+
     // Scoped to the project the caller names, exactly as the task update below
     // is — a step id from another show must not be writable from this page.
-    $chk = $pdo->prepare('SELECT name FROM pipeline_steps WHERE id = ? AND project_id = ?');
-    $chk->execute([$stepId, $projectId]);
-    $name = $chk->fetchColumn();
-    if ($name === false) api_fail('That step is not on this project.');
-
-    $upd = $pdo->prepare(
-        'UPDATE pipeline_steps SET start_date = ?, deadline = ? WHERE id = ? AND project_id = ?'
+    $chk = $pdo->prepare(
+        'SELECT name' . ($progressReady ? ', progress_pct, progress_source' : '')
+      . ' FROM pipeline_steps WHERE id = ? AND project_id = ?'
     );
-    $upd->execute([$start, $end, $stepId, $projectId]);
+    $chk->execute([$stepId, $projectId]);
+    $row = $chk->fetch();
+    if (!$row) api_fail('That step is not on this project.');
+    $name = $row['name'];
+
+    $set  = 'start_date = ?, deadline = ?';
+    $args = [$start, $end];
+    $progress = $progressReady ? (int)$row['progress_pct'] : 0;
+    $source   = $progressReady ? (string)($row['progress_source'] ?? '') : '';
+    // Only a CHANGED number is re-attributed: saving new dates must not stamp
+    // "set by" on a progress nobody touched.
+    if ($pct !== null && $pct !== $progress) {
+        $progress = $pct;
+        $source   = progress_set_by();
+        $set     .= ', progress_pct = ?, progress_source = ?';
+        $args[]   = $progress;
+        $args[]   = $source;
+    }
+    $args[] = $stepId;
+    $args[] = $projectId;
+    $pdo->prepare('UPDATE pipeline_steps SET ' . $set . ' WHERE id = ? AND project_id = ?')
+        ->execute($args);
 
     echo json_encode([
         'ok'    => true,
         'step'  => $name,
         'start' => $start,
         'end'   => $end,
+        'progress' => $progress,
+        'progress_source' => $source,
         // Said back so the browser can show what it actually changed rather than
         // assuming the write matched the drag.
-        'note'  => $name . ': ' . $start . ' to ' . $end,
+        'note'  => $name . ': ' . $start . ' to ' . $end
+                 . ($pct !== null ? ', ' . $progress . '% done' : ''),
     ]);
     exit;
 }
@@ -139,14 +228,24 @@ foreach ([$start, $end] as $d) {
 // inverted range would store a task that renders as a negative-width bar.
 if ($end < $start) api_fail('The end date cannot be before the start date.');
 
-// crew_id is optional. An empty string means "unassigned" rather than "unchanged"
-// — the editor's blank option has to be able to clear it.
-$crewId = null;
-if (array_key_exists('crew_id', $_POST) && trim((string)$_POST['crew_id']) !== '') {
-    $crewId = (int)$_POST['crew_id'];
-    $check = $pdo->prepare('SELECT id FROM crew WHERE id = ?');
-    $check->execute([$crewId]);
-    if (!$check->fetch()) api_fail('That person is not on the crew list.');
+// crew_id: ABSENT means unchanged, an empty string means nobody. The editor
+// always sends the field, its blank option included, so it can clear an
+// assignment; a drag sends only the dates.
+//
+// ⚠ Until 2026-09-18 a missing field was read as "nobody", so every task ever
+// dragged on the detailed chart lost its person or slot, silently, and the lock
+// the same drag set kept Regenerate from ever giving it back. An absent field is
+// not an empty one.
+$crewId = $task['crew_id'] !== null ? (int)$task['crew_id'] : null;
+if (array_key_exists('crew_id', $_POST)) {
+    $rawCrew = trim((string)$_POST['crew_id']);
+    $crewId  = null;
+    if ($rawCrew !== '') {
+        $crewId = (int)$rawCrew;
+        $check = $pdo->prepare('SELECT id FROM crew WHERE id = ?');
+        $check->execute([$crewId]);
+        if (!$check->fetch()) api_fail('That person is not on the crew list.');
+    }
 }
 
 // is_manual defaults to 1 for the reason in the header comment, but the editor

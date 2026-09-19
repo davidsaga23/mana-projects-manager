@@ -219,6 +219,54 @@ function step_quota(PDO $pdo, int $projectId, array $step, ?string $today = null
     return $out;
 }
 
+/**
+ * How long a step takes at its settings, in whole working days.
+ *
+ * The work, times days per item, times the retake allowance, divided by the
+ * people on it, rounded up, never less than one day. It is the "Duration at
+ * these settings" column on Dates & headcount, which works it out in the browser
+ * as the boxes are typed (updateDuration() in assets/wizard.js). ⚠ THE TWO MUST
+ * STAY IN STEP: the timeline's step editor shows this one beside the dates it is
+ * judged against, and a step that needs 5 days on one screen and 6 on the other
+ * is the kind of disagreement that makes both untrustworthy.
+ *
+ * Needs no dates at all, like the column: work divided by people is knowable as
+ * soon as both exist. 'days' is null when there is no work yet or nobody set.
+ *
+ * Returns ['days' => ?int, 'person_days' => float, 'units' => float,
+ *          'label' => string, 'estimated' => bool, 'per_unit' => float,
+ *          'retake_pct' => float, 'people' => ?float].
+ */
+function step_duration(PDO $pdo, int $projectId, array $step, ?array $estimates = null,
+                       ?float $retakePct = null): array {
+    $work      = step_work_units($pdo, $projectId, $step, $estimates);
+    $retakePct = $retakePct ?? project_retake_pct($pdo, $projectId);
+    $perUnit   = effective_days_per_unit($pdo, $projectId, $step);
+    $units     = (float)$work['units'];
+
+    // Retakes lengthen each item, as in step_quota(); they never add items.
+    $personDays = $units * ($perUnit > 0 ? $perUnit : 1) * retake_factor($retakePct);
+    $people = ($step['planned_headcount'] ?? null) !== null && $step['planned_headcount'] !== ''
+            ? (float)$step['planned_headcount'] : null;
+
+    $days = null;
+    if ($units > 0 && $people !== null && $people > 0) {
+        // The same epsilon as the browser, so 4.0000001 is 4 days on both.
+        $days = max(1, (int)ceil($personDays / $people - 0.0001));
+    }
+
+    return [
+        'days'        => $days,
+        'person_days' => $personDays,
+        'units'       => $units,
+        'label'       => (string)$work['label'],
+        'estimated'   => !empty($work['estimated']),
+        'per_unit'    => $perUnit,
+        'retake_pct'  => $retakePct,
+        'people'      => $people,
+    ];
+}
+
 /** Quotas for every step in a project, in pipeline order. */
 function project_quotas(PDO $pdo, int $projectId, array $steps): array {
     // Read once, not per step.

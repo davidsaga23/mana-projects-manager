@@ -56,6 +56,9 @@ pipeline_steps
   start_date DATE, deadline DATE,
   days_per_unit DECIMAL(6,3),    -- THIS PROJECT'S IDEAL QUOTA: days per item (migration 033/034)
   days_source VARCHAR(120),      -- where that number came from: copied, matched, set by whom
+  progress_pct TINYINT,          -- progress somebody RECORDED, 0-100, not a count (migration 036);
+                                 -- the general timeline's fill. The grid's count is shown beside it
+  progress_source VARCHAR(120),  -- who set it and when, in the same shape as days_source
   coverage_pct, planned_headcount, department,
   show_in_dashboard TINYINT,
   color VARCHAR(7)

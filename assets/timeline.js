@@ -69,6 +69,115 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  // --- the studio calendar ------------------------------------------------------
+  //
+  // Weekends plus the studio's own days off (non_working_days, handed over by
+  // timeline.php as TL_DAYS_OFF), the same set working_days_between() and
+  // add_working_days() read in includes/calendar.php. ⚠ These mirror those and
+  // must move with them: a bar holding 8 working days here and 7 on Dates &
+  // headcount would be worse than no count at all.
+  //
+  // Dates stay 'YYYY-MM-DD' strings throughout, which compare correctly as
+  // text, and only ever become a Date built from their parts (rule 2 above).
+  var DAYS_OFF = window.TL_DAYS_OFF || {};
+  function parseYmd(s) {
+    var p = String(s).split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  function shiftDay(s, n) {
+    var d = parseYmd(s);
+    d.setDate(d.getDate() + n);
+    return fmtDate(d);
+  }
+  function dayOffName(s) {
+    return Object.prototype.hasOwnProperty.call(DAYS_OFF, s) ? String(DAYS_OFF[s] || 'a day off') : '';
+  }
+  function isWorkingDay(s) {
+    if (dayOffName(s)) return false;
+    var dow = parseYmd(s).getDay();
+    return dow !== 0 && dow !== 6;
+  }
+  /** The working day on or after s, as next_working_day() finds it. */
+  function nextWorkingDay(s) {
+    for (var d = s, i = 0; i < 400; i++, d = shiftDay(d, 1)) if (isWorkingDay(d)) return d;
+    return s;
+  }
+  /** The working day on or before s: where work stretched to s really finishes. */
+  function prevWorkingDay(s) {
+    for (var d = s, i = 0; i < 400; i++, d = shiftDay(d, -1)) if (isWorkingDay(d)) return d;
+    return s;
+  }
+  /** Working days from a to b, both INCLUSIVE, as working_days_between() counts them. */
+  function workingDaysBetween(a, b) {
+    if (!a || !b || b < a) return 0;
+    var n = 0;
+    for (var d = a, i = 0; d <= b && i < 20000; i++, d = shiftDay(d, 1)) if (isWorkingDay(d)) n++;
+    return n;
+  }
+  /** n working days on from `from`, its first working day being day zero: add_working_days(). */
+  function addWorkingDays(from, n) {
+    var d = nextWorkingDay(from), added = 0;
+    for (var i = 0; added < n && i < 4000; i++) {
+      d = shiftDay(d, 1);
+      if (isWorkingDay(d)) added++;
+    }
+    return d;
+  }
+
+  /**
+   * Where a dragged bar really lands (David, 2026-09-18: "the bar needs to adjust
+   * by subtracting those days and extending the bar when a weekend interferes").
+   *
+   * Frappe moves a bar by CALENDAR days, so a bar slid across a weekend or a
+   * holiday quietly gained or lost working days: a step planned at 8 came out
+   * at 7 or 9 depending on where it was dropped. Now:
+   *
+   *   MOVED, both ends travelled: it keeps the working days it held. It starts
+   *     on the first working day on or after the drop and runs on from there,
+   *     stretching over a weekend or holiday instead of losing a day to it.
+   *   STRETCHED from the left: it starts on the first working day on or after
+   *     the drop.
+   *   STRETCHED from the right: it finishes on the last working day on or
+   *     before the drop.
+   *
+   * A bar holding no working day at all has nothing to keep, and lands where it
+   * was dropped. The scheduler has always counted this way (add_working_days());
+   * a drag was the one place a bar could lose a day without anybody saying so.
+   */
+  function landOnWorkingDays(was, dropped) {
+    var s = dropped.start, e = dropped.end;
+    if (s !== was.start && e !== was.end) {
+      var held = workingDaysBetween(was.start, was.end);
+      if (held <= 0) return { start: s, end: e };
+      var ms = nextWorkingDay(s);
+      return { start: ms, end: addWorkingDays(ms, held - 1) };
+    }
+    if (s !== was.start) {
+      var ls = nextWorkingDay(s);
+      return { start: ls <= e ? ls : s, end: e };
+    }
+    var re = prevWorkingDay(e);
+    return { start: s, end: re >= s ? re : e };
+  }
+
+  // --- keeping your place across a redraw -----------------------------------------
+  // Frappe scrolls every chart it draws back to its first task, so a redraw after
+  // a drag or a save threw the view to the start of the show, away from the bar
+  // just touched. Both scrollers are kept: the chart box scrolls up and down,
+  // Frappe's own container across.
+  function placeOf(el) {
+    var gc = el.querySelector('.gantt-container');
+    return { top: el.scrollTop, left: el.scrollLeft,
+             gcLeft: gc ? gc.scrollLeft : 0, gcTop: gc ? gc.scrollTop : 0 };
+  }
+  function restorePlace(el, p) {
+    if (!p) return;
+    el.scrollTop = p.top;
+    el.scrollLeft = p.left;
+    var gc = el.querySelector('.gantt-container');
+    if (gc) { gc.scrollLeft = p.gcLeft; gc.scrollTop = p.gcTop; }
+  }
+
   /**
    * Apply a zoom level's column width.
    *
@@ -138,9 +247,10 @@
   // view where a column is not a day. The letters are skipped again on a narrow
   // column, where M T W T F S S would simply overlap into a smear.
   //
-  // Weekend shading only. Studio holidays are known -- the wizard collects them
-  // -- but they are not on this page yet, and shading only some non-working days
+  // EVERY DAY OFF, not only weekends (2026-09-18). The studio's holidays reached
+  // this page with the working-day drags, and shading only some non-working days
   // would be worse than shading none: it would read as "these are the days off".
+  // Now a bar that stretches over a holiday stretches over a shaded column.
   function decorateCalendar(g, container) {
     if (!g || !g.dates || !g.options) return;
     var svg = container.querySelector('svg.gantt');
@@ -175,8 +285,9 @@
     g.dates.forEach(function (d, i) {
       var dow = d.getDay();
       var x = i * cw;
+      var off = dow === 0 || dow === 6 || !!dayOffName(fmtDate(d));
 
-      if (dow === 0 || dow === 6) {
+      if (off) {
         var r = document.createElementNS(ns, 'rect');
         r.setAttribute('class', 'tl-weekend');
         r.setAttribute('x', x);
@@ -190,7 +301,7 @@
       // one that starts the day, not on both.
       if (!showLetters || d.getHours() !== 0) return;
       var t = document.createElementNS(ns, 'text');
-      t.setAttribute('class', 'tl-dow' + (dow === 0 || dow === 6 ? ' tl-dow-end' : ''));
+      t.setAttribute('class', 'tl-dow' + (off ? ' tl-dow-end' : ''));
       t.setAttribute('x', x + cw / 2);
       t.setAttribute('y', ly - 11);
       t.textContent = LETTERS[dow];
@@ -436,8 +547,8 @@
           var newDate = iso(dayAt(x + snapped));
           saveMilestoneDate(m.id, newDate).then(function () {
             m.date = newDate;                 // keep the in-memory copy honest
-            renderGeneral();
-            renderDetailed();
+            renderGeneral(true);
+            renderDetailed(true);
           }).catch(function () {
             grp.removeAttribute('transform');
           });
@@ -483,20 +594,7 @@
   });
 
   function saveMilestoneDate(id, date) {
-    var body = new URLSearchParams();
-    body.append('id', id);
-    body.append('date', date);
-    return fetch('schedule_api.php?action=milestone_date&project=' + window.TL_PROJECT,
-                 { method: 'POST', body: body })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (!d.ok) { alert(d.error || 'Save failed.'); throw new Error(d.error || 'failed'); }
-        return d;
-      })
-      .catch(function (err) {
-        if (err instanceof SyntaxError) alert('Save failed, try reloading the page.');
-        throw err;
-      });
+    return postApi('milestone_date', { id: id, date: date });
   }
 
   // --- dependencies on the general chart --------------------------------------
@@ -614,12 +712,16 @@
     stepSaveTimer = setTimeout(function () { el.hidden = true; }, 4000);
   }
 
-  function saveStepDates(stepId, start, end) {
+  /**
+   * POST a form to schedule_api.php and hand back its JSON, or report and throw.
+   *
+   * The response is inspected rather than assumed: a rejection nobody reads
+   * leaves a bar showing a change that was never stored.
+   */
+  function postApi(action, fields) {
     var body = new URLSearchParams();
-    body.append('step_id', stepId);
-    body.append('start_date', start);
-    body.append('end_date', end);
-    return fetch('schedule_api.php?action=step_dates&project=' + window.TL_PROJECT,
+    for (var k in fields) body.append(k, fields[k] === null ? '' : fields[k]);
+    return fetch('schedule_api.php?action=' + action + '&project=' + window.TL_PROJECT,
                  { method: 'POST', body: body })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -632,10 +734,22 @@
       });
   }
 
+  function saveStepDates(stepId, start, end) {
+    return postApi('step_dates', { step_id: stepId, start_date: start, end_date: end });
+  }
+
+  // One drag can move several bars, since Frappe carries the steps downstream
+  // along, and each reports on its own. The chart is redrawn ONCE, after the last
+  // save of the gesture is back, and only when a bar has to sit somewhere other
+  // than where it was dropped, or a save was refused.
+  var generalGesture = { pending: 0, redraw: false };
+
   // --- general chart ---------------------------------------------------------
-  function renderGeneral() {
+  // keep: hold the scroll position, for a redraw after a drag or a save.
+  function renderGeneral(keep) {
     var el = $('generalGantt');
     if (!el || !window.GENERAL_TASKS || !window.GENERAL_TASKS.length) return;
+    var place = keep ? placeOf(el) : null;
     var z = ZOOM[generalZoomIdx];
     if ($('generalZoomLabel')) $('generalZoomLabel').textContent = z.label;
     el.innerHTML = '';
@@ -647,6 +761,7 @@
       popup_trigger: 'mouseover',
       custom_popup_html: function (t) {
         var src = generalById(t.id) || {};
+        var held = workingDaysBetween(src.start, src.end);
         var late = src.late ? '<br><span style="color:#8a6d1a">past the delivery date of '
                             + src.delivery + '</span>' : '';
         var brk = violationsFor(t.id);
@@ -654,34 +769,75 @@
           ? '<br><span style="color:#b02a37">starts before ' + escapeHtml(brk.join(', '))
             + ' finishes</span>'
           : '';
+        // One line for progress and the hint, so the box stays short: Frappe
+        // draws it inside the chart, and a tall one near the bottom row pushes
+        // a scrollbar onto the chart for as long as it is open.
+        var done = +src.progress > 0 ? (+src.progress) + '% done · ' : '';
         return '<div class="tl-popup"><strong>' + escapeHtml(t.name) + '</strong><br>'
-             + t.start + ' → ' + t.end + late + dep + '</div>';
+             + t.start + ' → ' + t.end + ' · ' + held + ' working day' + (held === 1 ? '' : 's')
+             + late + dep
+             + '<br><span class="muted">' + done + 'double-click for '
+             + (window.TL_CAN_EDIT ? 'dates and progress' : 'details') + '</span></div>';
       },
+      // Frappe raises its click on a DOUBLE-click, which is the gesture the task
+      // bars and the milestones already use for their editors.
+      on_click: function (task) { openStepEditor(task); },
       // THE BAR IS THE PLAN. These are pipeline_steps.start_date / deadline --
       // the same two fields Dates & headcount edits -- so dragging here edits
       // that screen graphically. Nothing is checked against the dependency
       // arrows: they are drawn as a warning, and a violated one turns red
       // rather than snapping the bar back (David, 2026-08-31).
+      //
+      // Where it lands is counted in WORKING days (landOnWorkingDays(), above).
       on_date_change: function (task, start, end) {
-        if (!window.TL_CAN_EDIT) { renderGeneral(); return; }
+        if (!window.TL_CAN_EDIT) { renderGeneral(true); return; }
         var src = generalById(task.id);
         if (!src) return;
-        var s = fmtDate(start), e = fmtDate(end);
+        var dropped = { start: fmtDate(start), end: fmtDate(end) };
+        var land = landOnWorkingDays({ start: src.start, end: src.end }, dropped);
         var wasStart = src.start, wasEnd = src.end;
         // Optimistic, so the arrows recolour under the cursor rather than after
         // the round trip; rolled back below if the save is refused.
-        src.start = s; src.end = e;
+        src.start = land.start; src.end = land.end;
+        markLate(src);
         paintDependencies();
-        saveStepDates(src.step_id, s, e).then(function (d) {
+        generalGesture.pending++;
+        if (land.start !== dropped.start || land.end !== dropped.end) generalGesture.redraw = true;
+        saveStepDates(src.step_id, land.start, land.end).then(function (d) {
           stepSaved(d.note || 'Saved.');
         }).catch(function () {
           src.start = wasStart; src.end = wasEnd;
-          renderGeneral();
+          markLate(src);
+          generalGesture.redraw = true;
+        }).then(function () {
+          if (--generalGesture.pending === 0 && generalGesture.redraw) {
+            generalGesture.redraw = false;
+            renderGeneral(true);
+          }
+        });
+      },
+      // The small handle under a bar that has progress: drag it to change the
+      // percentage. Frappe only draws it between 1% and 99%, so a step's first
+      // progress is set on the step editor.
+      on_progress_change: function (task, progress) {
+        var src = generalById(task.id);
+        if (!src) return;
+        if (!window.TL_CAN_EDIT || !window.TL_PROGRESS_READY) { renderGeneral(true); return; }
+        var was = src.progress;
+        src.progress = progress;
+        postApi('step_progress', { step_id: src.step_id, progress_pct: progress }).then(function (d) {
+          src.progress = d.progress;
+          src.progress_source = d.progress_source;
+          stepSaved(d.note || 'Saved.');
+        }).catch(function () {
+          src.progress = was;
+          renderGeneral(true);
         });
       }
     });
     freeBarsFromDependencies(generalGantt);
     applyWidth(generalGantt, z.w);
+    restorePlace(el, place);
     setTimeout(function () {
       paintBars(el, window.GENERAL_TASKS);
       paintDependencies();
@@ -692,6 +848,7 @@
       // header has to float as well, or the months scroll away and the bars
       // below have nothing to be read against.
       stickyHeader(el);
+      restorePlace(el, place);
     }, 60);
   }
 
@@ -745,9 +902,11 @@
     return out;
   }
 
-  function renderDetailed() {
+  // keep: hold the scroll position, for a redraw after a drag or a save.
+  function renderDetailed(keep) {
     var el = $('detailedGantt');
     if (!el) return;
+    var place = keep ? placeOf(el) : null;
     var z = ZOOM[zoomIdx];
     $('zoomLabel').textContent = z.label;
 
@@ -771,23 +930,31 @@
              + '<br><span class="muted">' + escapeHtml(o.crew_name || 'nobody assigned')
              + '</span></div>';
       },
+      // Frappe raises its click on a DOUBLE-click.
       on_click: function (task) { if (window.TL_CAN_EDIT) openEditor(task); },
       on_date_change: function (task, start, end) {
-        if (!window.TL_CAN_EDIT) { renderDetailed(); return; }
-        // See rule 1 at the top: `end` already IS the inclusive last day.
-        var s = fmtDate(start), e = fmtDate(end);
-        saveTask(task.id, { start_date: s, end_date: e, is_manual: 1 }).then(function () {
+        if (!window.TL_CAN_EDIT) { renderDetailed(true); return; }
+        var o = byId(task.id);
+        if (!o) return;
+        // See rule 1 at the top: `end` already IS the inclusive last day. Where
+        // the bar lands is counted in WORKING days, as on the general chart.
+        var dropped = { start: fmtDate(start), end: fmtDate(end) };
+        var land = landOnWorkingDays({ start: o.start, end: o.end }, dropped);
+        var nudged = land.start !== dropped.start || land.end !== dropped.end;
+        // Dates and the lock only. The person stays: the server reads a missing
+        // crew_id as "unchanged" (it read it as "nobody" until 2026-09-18).
+        saveTask(task.id, { start_date: land.start, end_date: land.end, is_manual: 1 }).then(function () {
           // Keep the in-memory copy in step with what was stored, or the editor
           // would reopen showing the pre-drag dates and write those stale values
           // back on save — snapping the bar backwards.
-          var o = byId(task.id);
-          if (o) { o.start = s; o.end = e; o.is_manual = true; }
-          decorate();
-        }).catch(function () { renderDetailed(); });
+          o.start = land.start; o.end = land.end; o.is_manual = true;
+          if (nudged) renderDetailed(true); else decorate();
+        }).catch(function () { renderDetailed(true); });
       }
     });
 
     applyWidth(detailedGantt, z.w);
+    restorePlace(el, place);
     setTimeout(function () {
       decorate();
       addTodayLine(detailedGantt, el);
@@ -796,6 +963,7 @@
       // Last, so the floating header paints over the bars and the today line
       // rather than under them.
       stickyHeader(el);
+      restorePlace(el, place);
     }, 80);
   }
 
@@ -943,23 +1111,236 @@
   });
 
   function saveTask(id, payload) {
-    var body = new URLSearchParams();
-    body.append('id', id);
-    for (var k in payload) body.append(k, payload[k] === null ? '' : payload[k]);
-    return fetch('schedule_api.php?action=update&project=' + window.TL_PROJECT,
-                 { method: 'POST', body: body })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        // The response is inspected rather than assumed: a rejection that nobody
-        // reads leaves the bar showing a change that was never stored.
-        if (!d.ok) { alert(d.error || 'Save failed.'); throw new Error(d.error || 'failed'); }
-        return d;
-      })
-      .catch(function (err) {
-        if (err instanceof SyntaxError) alert('Save failed, try reloading the page.');
-        throw err;
-      });
+    var fields = { id: id };
+    for (var k in payload) fields[k] = payload[k];
+    return postApi('update', fields);
   }
+
+  // --- the step editor, on the general chart -----------------------------------
+  //
+  // David, 2026-09-18: double-clicking a bar opens "a display menu ... so we can
+  // manually change the start/end date, reflect the duration (minimum days to
+  // finish) from the dates&headcount and register the progress".
+  //
+  // Everything it shows came with the bar from timeline_picture(), so a saved
+  // version opens with its own numbers. Read only without the right to edit,
+  // and on a saved version: being able to read the numbers is half its use.
+  var stepEd = null;          // the GENERAL_TASKS entry on show
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function validYmd(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+  function shortDate(s) {
+    var d = parseYmd(s);
+    return WEEKDAYS[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+  }
+  function andList(items) {
+    if (items.length < 2) return items.join('');
+    return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+  }
+  /** Past the delivery date, as timeline_picture() decides it, after a date moved. */
+  function markLate(src) {
+    src.late = (src.delivery && src.end > src.delivery) ? 1 : 0;
+  }
+
+  /** "Friday", "Saturday, a day off", "Wednesday, Independence Day, a day off". */
+  function dayNote(s) {
+    if (!validYmd(s)) return '';
+    var dow = parseYmd(s).getDay(), name = WEEKDAYS[dow];
+    if (Object.prototype.hasOwnProperty.call(DAYS_OFF, s)) {
+      var holiday = String(DAYS_OFF[s] || '').trim();
+      return name + (holiday ? ', ' + holiday : '') + ', a day off';
+    }
+    return (dow === 0 || dow === 6) ? name + ', a day off' : name;
+  }
+
+  /** " (not counting 4 weekend days and Independence Day)", or nothing. */
+  function offNote(a, b) {
+    var weekend = 0, named = [];
+    for (var d = a, i = 0; d <= b && i < 20000; i++, d = shiftDay(d, 1)) {
+      var dow = parseYmd(d).getDay();
+      if (dow === 0 || dow === 6) weekend++;
+      else if (dayOffName(d)) named.push(String(DAYS_OFF[d] || '').trim() || 'a studio day off');
+    }
+    var parts = [];
+    if (weekend) parts.push(weekend + ' weekend day' + (weekend === 1 ? '' : 's'));
+    if (named.length > 2) parts.push(named.length + ' studio days off');
+    else parts = parts.concat(named);
+    return parts.length ? ' (not counting ' + andList(parts) + ')' : '';
+  }
+
+  function setProgressInputs(v) {
+    v = Math.max(0, Math.min(100, Math.round(+v || 0)));
+    $('seProgress').value = v;
+    $('seProgressRange').value = v;
+  }
+
+  /** Recount everything that depends on the two dates, as they are typed. */
+  function refreshStepEditor() {
+    var src = stepEd;
+    if (!src) return;
+    var s = $('seStart').value, e = $('seEnd').value;
+    var ok = validYmd(s) && validYmd(e);
+    var backwards = ok && e < s;
+    $('seStartDay').textContent = dayNote(s);
+    $('seEndDay').textContent = dayNote(e);
+
+    var held = ok && !backwards ? workingDaysBetween(s, e) : 0;
+    var win = $('seWindow');
+    if (!ok) {
+      win.innerHTML = '<span class="muted">Give it both dates.</span>';
+    } else if (backwards) {
+      win.innerHTML = '<span class="err">It finishes before it starts.</span>';
+    } else {
+      win.innerHTML = '<strong>' + held + '</strong> working day' + (held === 1 ? '' : 's')
+                    + ' between these dates' + escapeHtml(offNote(s, e)) + '.';
+    }
+
+    // The Duration column of Dates & headcount (step_duration() in PHP), which
+    // needs no dates: work divided by the people on it.
+    var need = (src.need_days === undefined || src.need_days === null) ? null : +src.need_days;
+    var html = '';
+    if (need !== null) {
+      html = 'At its settings it needs <strong>' + need + '</strong> working day'
+           + (need === 1 ? '' : 's');
+      if (ok && !backwards) {
+        if (need > held) {
+          html += ', <span class="warn-text"><strong>' + (need - held)
+                + ' more</strong> than these dates allow</span>';
+        } else if (need === held) {
+          html += ', exactly what these dates hold';
+        } else {
+          html += ', so <strong>' + (held - need) + '</strong> spare';
+        }
+      }
+      html += '.';
+    }
+    $('seNeed').innerHTML = html;
+    $('seNeedHow').textContent = src.need_text || '';
+
+    var fit = $('seFit');
+    if (fit) {
+      var fitEnd = (need !== null && need > 0 && validYmd(s)) ? addWorkingDays(s, need - 1) : null;
+      fit.hidden = !fitEnd;
+      if (fitEnd) {
+        fit.textContent = 'Finish after ' + need + ' working day' + (need === 1 ? '' : 's')
+                        + ', on ' + shortDate(fitEnd);
+        fit.setAttribute('data-end', fitEnd);
+        fit.disabled = fitEnd === e;
+      }
+    }
+    var save = $('seSave');
+    if (save) save.disabled = !ok || backwards;
+  }
+
+  function openStepEditor(task) {
+    var src = generalById(task.id);
+    var box = $('stepEditor');
+    if (!src || !box) return;
+    stepEd = src;
+    var ro = !window.TL_CAN_EDIT;
+    var progressOff = ro || !window.TL_PROGRESS_READY;
+
+    $('seTitle').textContent = src.step_name || String(src.name).split(' · ')[0];
+    $('seScope').textContent = src.scope || '';
+    $('seStart').value = src.start;
+    $('seEnd').value = src.end;
+    $('seStart').disabled = ro;
+    $('seEnd').disabled = ro;
+    setProgressInputs(src.progress);
+    $('seProgress').disabled = progressOff;
+    $('seProgressRange').disabled = progressOff;
+    $('seProgressSource').textContent = src.progress_source
+      ? src.progress_source + '.' : (+src.progress ? '' : 'Not recorded yet.');
+
+    $('seTracked').textContent = src.tracked_text || '';
+    var use = $('seUseTracked');
+    if (use) {
+      var tp = (src.tracked_pct === undefined || src.tracked_pct === null) ? null : +src.tracked_pct;
+      use.hidden = tp === null || progressOff;
+      if (tp !== null) {
+        use.textContent = 'Use ' + tp + '%';
+        use.setAttribute('data-pct', tp);
+      }
+    }
+    $('seCancel').textContent = ro ? 'Close' : 'Cancel';
+    refreshStepEditor();
+    box.style.display = 'flex';
+    (ro ? $('seCancel') : $('seStart')).focus();
+  }
+
+  window.closeStepEditor = function () {
+    var box = $('stepEditor');
+    if (box) box.style.display = 'none';
+    stepEd = null;
+  };
+
+  (function stepEditorWiring() {
+    var form = $('stepEditForm');
+    if (!form) return;
+    ['seStart', 'seEnd'].forEach(function (id) {
+      $(id).addEventListener('input', refreshStepEditor);
+      $(id).addEventListener('change', refreshStepEditor);
+    });
+    $('seProgressRange').addEventListener('input', function () {
+      $('seProgress').value = this.value;
+    });
+    $('seProgress').addEventListener('input', function () {
+      if (this.value === '') return;
+      $('seProgressRange').value = Math.max(0, Math.min(100, Math.round(+this.value || 0)));
+    });
+    $('seProgress').addEventListener('change', function () { setProgressInputs(this.value); });
+    $('seCancel').addEventListener('click', window.closeStepEditor);
+    if ($('seFit')) {
+      $('seFit').addEventListener('click', function () {
+        $('seEnd').value = this.getAttribute('data-end');
+        refreshStepEditor();
+      });
+    }
+    if ($('seUseTracked')) {
+      $('seUseTracked').addEventListener('click', function () {
+        setProgressInputs(this.getAttribute('data-pct'));
+      });
+    }
+
+    // Dates and progress in ONE request (step_edit), so the two cannot half-save.
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var src = stepEd;
+      if (!src || !window.TL_CAN_EDIT) return;
+      var fields = { step_id: src.step_id, start_date: $('seStart').value, end_date: $('seEnd').value };
+      if (window.TL_PROGRESS_READY) {
+        setProgressInputs($('seProgress').value);
+        fields.progress_pct = $('seProgress').value;
+      }
+      var save = $('seSave');
+      if (save) save.disabled = true;
+      postApi('step_edit', fields).then(function (d) {
+        src.start = d.start;
+        src.end = d.end;
+        markLate(src);
+        if (window.TL_PROGRESS_READY) {
+          src.progress = d.progress;
+          src.progress_source = d.progress_source;
+        }
+        window.closeStepEditor();
+        renderGeneral(true);
+        stepSaved(d.note || 'Saved.');
+      }).catch(function () {
+        if (save) save.disabled = false;
+      });
+    });
+  })();
+
+  // Escape closes whichever editor is open, as it already closes the step filter.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    ['taskEditor', 'msEditor'].forEach(function (id) {
+      var m = $(id);
+      if (m) m.style.display = 'none';
+    });
+    window.closeStepEditor();
+  });
 
   // Local parts only. See rule 2 at the top.
   function fmtDate(d) {
