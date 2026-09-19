@@ -18,10 +18,12 @@ without re-deriving context.
   check new work against. The one thing left is the **client loop**, never on that list.
   **§0 below says what changed from 1 to 18 September and what is waiting on David.**
 - **⚠ Deploy state (2026-09-18):** everything up to **034 is applied**, confirmed by David on
-  2026-09-18, so ideal quotas are per project on the live site. **035 was added the same day**
-  (timeline versions) and is **not yet applied**: until it is, the Timeline says so instead of
-  offering "Save timeline's version". Open `migrate.php` and look before assuming, rather than
-  trusting this line: it is only ever as fresh as the last person who edited it.
+  2026-09-18, so ideal quotas are per project on the live site. **035** (timeline versions) and
+  **036** (progress on a step) were added the same day and are **not confirmed applied**: until
+  they are, the Timeline says so instead of offering "Save timeline's version", and the step
+  editor's progress box is switched off with the reason. Open `migrate.php` and look before
+  assuming, rather than trusting this line: it is only ever as fresh as the last person who
+  edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
   **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
@@ -70,6 +72,16 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   deletion cannot rewrite an old version. `includes/timeline_versions.php`; DECISIONS says why.
 - **A project with no saved schedule says so** on the timeline, with **Build the detailed
   schedule**. That is why MSD had a general chart and no detailed one: none had ever been saved.
+- **Double-click a step's bar** (2026-09-18, migration 036): its dates with their weekdays, the
+  working days between them against the days it needs at its settings (the Duration column of
+  Dates & headcount, now also `step_duration()` in PHP), **Finish after N working days**, and its
+  **progress**, typed or dragged with the handle under the bar and drawn as the bar's darker part,
+  beside what the tracking grid has approved. Read only for viewers and on saved versions.
+- **A dragged bar keeps its working days** (2026-09-18), on both charts: slid over a weekend or a
+  studio holiday it stretches instead of losing a day; a stretched end lands on a working day.
+  Holidays are shaded like weekends, and a redraw keeps your scroll position.
+- **Fixed: a drag on the detailed chart unassigned the task** (2026-09-18). Tasks dragged before
+  the fix still have nobody on them, see Waiting on David.
 - **Timeline:** milestones for client reviews (drag, double-click to edit, tied to a step's row),
   shaded weekends, remembered zoom, whole-chart exports. **Bars move wherever they are dragged**
   (2026-09-18): Frappe refused to place a bar before a step it depends on, which contradicted the
@@ -105,7 +117,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Waiting on David
 
-1. **Push** (GitHub Desktop), then **`migrate.php`** for **035** (timeline versions).
+1. **Push** (GitHub Desktop), then **`migrate.php`** for **035** (timeline versions) and **036**
+   (progress on a step), whichever is still pending.
 2. **FCM:** 034 is applied, so: Finance management → Ideal quotas → *Match an approved expense
    projection* with `RTC_ExpenseProjection_v01.xlsx`; "Character Sheet" probably has to be pointed
    at the CH sheet step by hand. Then **change the Rough Animation slots' rate from "per second"
@@ -119,7 +132,10 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 4. **Decisions:** (a) should dragging a timeline bar carry every step downstream of it along, as it
    does today, or move alone? (b) Doomsday **backgrounds**: placeholder assets of a new type
    "Background", or a "roughly how many" estimate box per asset type — and which steps happen once
-   per background; (c) what becomes of `hiring.php` (ROADMAP).
+   per background; (c) what becomes of `hiring.php` (ROADMAP); (d) **tasks dragged on the
+   detailed chart before 2026-09-18 lost their person** and show no name left of the bar: run a
+   one-off repair giving each back the current holder of its lane? Not run yet, because it would
+   also fill a task somebody set to "nobody" on purpose.
 5. **Housekeeping** carried over: rotate the two database passwords (§4 item 14); delete
    `install.php` from the live server; re-import the freelancer sheet with "update people already
    here" ticked.
@@ -128,6 +144,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 - For timeline versions: restoring one onto the live plan (it overwrites what is there, so it is
   David's call first), deleting them, a note per version, and comparing two.
+- For progress: a history of it (only the latest number is kept, though each saved timeline
+  version freezes the numbers of its day), and a mark on the bar where its minimum duration ends.
 - Renaming a project type (create the right one, move the projects, remove the wrong one).
 - A clean-up for crew records nothing points at (offered, not built).
 - Coverage above 100% was asked about and **advised against** (2026-09-16): the calendar, the
@@ -358,6 +376,14 @@ Hard-won, all from real incidents:
    the library's source (`update_bar_position()`) and reproducing with the real library in a
    browser. **When a chart or widget "just won't do" something, read the library before the app,**
    and check what else it does on the same gesture. (2026-09-18.)
+
+20. **An absent field is not an empty one.** `schedule_api.php` read a missing `crew_id` as
+   "nobody". Right for the task editor, whose blank option sends an empty string on purpose; wrong
+   for a drag, which sends only the dates. So every task ever dragged on the detailed chart lost its
+   person, and the lock the same drag set kept Regenerate from giving it back. It stayed hidden
+   because the browser kept the old name on screen until the next reload, so the drag LOOKED
+   harmless. **When an endpoint serves several callers, decide what a missing field means apart
+   from what an empty one means, and check every caller against both.** (2026-09-18.)
 
 ---
 
@@ -681,9 +707,9 @@ schema built as though the platform owned the data. See "Settled earlier" at the
 `docs/DECISIONS.md`.*
 
 - **Does STFC data get imported later,** or does that dashboard simply retire?
-- **The four decisions waiting on David** in §0: timeline drag carrying downstream steps,
-  backgrounds on Doomsday, the fate of `hiring.php`, and whether MSD's File prep really waits
-  for colour.
+- **The five decisions waiting on David** in §0: timeline drag carrying downstream steps,
+  backgrounds on Doomsday, the fate of `hiring.php`, whether MSD's File prep really waits for
+  colour, and whether to give dragged tasks back their person.
 - **The longer-running ones** are in the "Still open" list of `docs/DECISIONS.md`: who updates
   status once Plaky goes, where the finance app lives, credit on shared tasks, one owner per
   ticket, and more.
