@@ -1949,6 +1949,39 @@ carries its lane, and `crew_lanes` says who holds that lane now, so a one-off re
 names back. Offered to David, not run: it would also fill any task somebody deliberately set to
 "nobody" in the editor.
 
+## 2026-09-21 — Backgrounds are assets of their own type
+**David:** *"I'm about to create a new asset type called Backgrounds, should I create a pipeline step
+first or populate the asset link first? Remember that we might have 4 environments but out of those
+we can have several and different backgrounds based on that environment's concept."* This settles
+half of the backgrounds question left open on 2026-09-16 (START_HERE §0, decision 4b): one asset per
+background, of a type of its own, rather than an estimate box. Still open: which steps each goes
+through.
+
+**The assets come first, and the code decides it, not taste.** A step's "Applies to" dropdown offers
+only the types `asset_types()` knows: the five starters (Character, Environment, Prop, Vehicle, FX)
+plus every type an asset or a step already uses, on any project. The pipeline screen has no box for
+a new type; the Assets screen does ("Or a new type"). So the first backgrounds create the type, and
+only then can a step be scoped to "Assets, Background only". The same moment gives the Shots screen a
+Background column, generated from the types the project has.
+
+**Advised with it:**
+- **"Background", singular**, like Character, Environment and Prop, so steps read "Color · Background
+  assets". The platform matches the spelling exactly, and a step scoped to one spelling counts
+  nothing of the other (the Assets screen flags Background/Backgrounds as one type spelled twice).
+- **Name each background after its environment** ("Forest BG01") and say so in its note. That is the
+  only place the relation lives today.
+- **Before adding them, check for steps that apply to every asset** ("Assets", no type): those start
+  counting the backgrounds the moment they exist, and their work, duration and budget grow with them.
+- **Regenerate afterwards**: the saved schedule does not pick new items up by itself.
+
+**What the platform cannot do yet: the environment a background comes from.** `assets` has no parent,
+so a background step that waits for the environments' concept waits for the WHOLE of that step, all
+four environments, not the one it was painted from: `scheduler_item_earliest()` matches the same
+item, or for a shot the assets it uses, and otherwise falls back to the whole step. Offered, not
+built: a "from environment" link on each background (one nullable column on `assets`, a picker on the
+Assets screen), and a fourth rule in that function, an asset waiting on an asset step waits for its
+parent there. It would also let a shot's backgrounds pull in their environment.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.
@@ -2045,9 +2078,9 @@ variation might be problematic."*
   somebody deliberately set to "nobody", so it is David's call.
 - **Waiting on David, from the 2–18 September run** (the detail is in `docs/ROADMAP.md`, last
   section): whether dragging a timeline bar should carry every step downstream of it, as Frappe
-  does today; how to plan backgrounds on Doomsday (placeholder "Background"
-  assets, or a per-type estimate), and which steps happen once per background; what becomes of
-  `hiring.php`; and whether MSD's File prep really waits for the colour steps.
+  does today; which steps backgrounds go through, now that they are their own asset type
+  (2026-09-21), and whether to build the link from each background to its environment; what
+  becomes of `hiring.php`; and whether MSD's File prep really waits for the colour steps.
 - **What Plaky is actually relied on for** day to day — notifications, comments, phone
   access, or just the board. Worth listing before the eventual switch, so the platform
   replaces what matters rather than guessing.

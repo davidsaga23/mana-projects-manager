@@ -130,9 +130,10 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
    Then **build its detailed schedule** (Timeline, *Build the detailed schedule*, or the Schedule
    tab): none has ever been saved, which is why it has no detailed chart.
 4. **Decisions:** (a) should dragging a timeline bar carry every step downstream of it along, as it
-   does today, or move alone? (b) Doomsday **backgrounds**: placeholder assets of a new type
-   "Background", or a "roughly how many" estimate box per asset type — and which steps happen once
-   per background; (c) what becomes of `hiring.php` (ROADMAP); (d) **tasks dragged on the
+   does today, or move alone? (b) **backgrounds: half settled 2026-09-21**, they are assets of
+   their own type, Background, one per background (DECISIONS). Still open: which steps each one
+   goes through, and whether to build the link to the environment it comes from (offered, see
+   DECISIONS); (c) what becomes of `hiring.php` (ROADMAP); (d) **tasks dragged on the
    detailed chart before 2026-09-18 lost their person** and show no name left of the bar: run a
    one-off repair giving each back the current holder of its lane? Not run yet, because it would
    also fill a task somebody set to "nobody" on purpose.
@@ -708,7 +709,8 @@ schema built as though the platform owned the data. See "Settled earlier" at the
 
 - **Does STFC data get imported later,** or does that dashboard simply retire?
 - **The five decisions waiting on David** in §0: timeline drag carrying downstream steps,
-  backgrounds on Doomsday, the fate of `hiring.php`, whether MSD's File prep really waits for
+  which steps backgrounds go through and whether they get an environment link, the fate of
+  `hiring.php`, whether MSD's File prep really waits for
   colour, and whether to give dragged tasks back their person.
 - **The longer-running ones** are in the "Still open" list of `docs/DECISIONS.md`: who updates
   status once Plaky goes, where the finance app lives, credit on shared tasks, one owner per
