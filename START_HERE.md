@@ -65,6 +65,11 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Built, 1–21 September
 
+- **The app is dark, in Mana's own colours** (2026-09-22): #101010, white, sky blue #5FB2FF and
+  spring green #26FE89, the four mana.tv declares. Every colour in `assets/style.css` is now a
+  token in `:root` and nothing outside it holds a literal, so the theme is one block; `@media
+  print` turns it back to light, because a printer given a black page wastes a cartridge.
+  **Never write a colour into a rule again**, add a role to `:root` (lesson 21).
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
@@ -396,6 +401,16 @@ Hard-won, all from real incidents:
    the library's source (`update_bar_position()`) and reproducing with the real library in a
    browser. **When a chart or widget "just won't do" something, read the library before the app,**
    and check what else it does on the same gesture. (2026-09-18.)
+
+21. **A colour written into a rule is a decision you cannot re-make.** `assets/style.css` held
+   about 210 colour literals, each one right where it stood and none of them saying what it was
+   FOR, so "the app should match Mana" meant editing every rule that mentioned a shade of grey.
+   Converted to roles (`--surface`, `--border`, `--on-primary`) the same change became one block,
+   and printing became a second one. Two traps the conversion found: the same hex meant different
+   things in different rules (white is a card, and also the label on a coloured button, and those
+   two must move in opposite directions), and the browser draws things no rule reaches, so a dark
+   page needs `color-scheme: dark` for its date pickers, dropdown lists and scrollbars. **Add a
+   role to `:root`; never write a colour into a rule.** (2026-09-22.)
 
 20. **An absent field is not an empty one.** `schedule_api.php` read a missing `crew_id` as
    "nobody". Right for the task editor, whose blank option sends an empty string on purpose; wrong

@@ -762,11 +762,11 @@
       custom_popup_html: function (t) {
         var src = generalById(t.id) || {};
         var held = workingDaysBetween(src.start, src.end);
-        var late = src.late ? '<br><span style="color:#8a6d1a">past the delivery date of '
+        var late = src.late ? '<br><span class="tl-pop-late">past the delivery date of '
                             + src.delivery + '</span>' : '';
         var brk = violationsFor(t.id);
         var dep = brk.length
-          ? '<br><span style="color:#b02a37">starts before ' + escapeHtml(brk.join(', '))
+          ? '<br><span class="tl-pop-dep">starts before ' + escapeHtml(brk.join(', '))
             + ' finishes</span>'
           : '';
         // One line for progress and the hint, so the box stays short: Frappe
@@ -1403,7 +1403,7 @@
     }
 
     html2canvas(el, {
-      backgroundColor: '#ffffff',
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
       scale: scale,
       useCORS: true,
       scrollX: 0, scrollY: 0,

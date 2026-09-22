@@ -22,7 +22,7 @@
 
   // A colour per show, in the order the page lists them. Chosen to stay apart
   // from each other and from the red that means a clash.
-  var PALETTE = ['#3E7CB1', '#D9822B', '#4E9F5D', '#8E5BB5', '#1F9A93', '#B89B2E', '#6B7C8F', '#C2577F'];
+  var PALETTE = ['#5FB2FF', '#F0A45F', '#5FD08A', '#B98CE8', '#4FD1C5', '#E8C55F', '#9AA7B3', '#F080A8'];
   // Pixels per day, widest span first, like the timeline's ladder.
   var ZOOM = [
     { w: 1.5, label: 'Months' }, { w: 3, label: 'Months' }, { w: 5, label: 'Weeks' },

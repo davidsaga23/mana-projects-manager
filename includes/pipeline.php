@@ -1002,11 +1002,11 @@ function workflow_diagram_svg(array $steps, array $depsMap,
     // Copied from assets/style.css rather than read from it: a file that has
     // left the building cannot follow a stylesheet, and four rules inlined here
     // are cheaper than a build step. If those rules change, change these.
-    $css = '.wf-edge{fill:none;stroke:#b6c2cd;stroke-width:1.6}'
-         . '.wf-box{fill:#f7f9fb;stroke:#dbe2e8;stroke-width:1}'
-         . '.wf-label{font:600 12px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#1c2733}'
-         . '.wf-sub{font:400 10.5px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#7b8894}'
-         . '.wf-cap{font:600 13px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#43535f}';
+    $css = '.wf-edge{fill:none;stroke:#3a3a3a;stroke-width:1.6}'
+         . '.wf-box{fill:#1f1f1f;stroke:#2b2b2b;stroke-width:1}'
+         . '.wf-label{font:600 12px -apple-system,"Segoe UI",Roboto,sans-serif;fill:#ededed}'
+         . '.wf-sub{font:400 10.5px -apple-system,"Segoe UI",Roboto,sans-serif;fill:rgba(255,255,255,.6)}'
+         . '.wf-cap{font:600 13px -apple-system,"Segoe UI",Roboto,sans-serif;fill:rgba(255,255,255,.78)}';
 
     $head = $caption !== '' ? 36 : 0;
     $full = $height + $head;
@@ -1020,7 +1020,7 @@ function workflow_diagram_svg(array $steps, array $depsMap,
          . '<style>' . $css . '</style>'
          // Painted, not assumed. A transparent SVG dropped into a dark slide
          // deck loses every label it has.
-         . '<rect x="0" y="0" width="' . $width . '" height="' . $full . '" fill="#ffffff"/>';
+         . '<rect x="0" y="0" width="' . $width . '" height="' . $full . '" fill="#191919"/>';
 
     if ($caption !== '') {
         $out .= '<text x="' . $padX . '" y="22" class="wf-cap">' . e($caption) . '</text>';

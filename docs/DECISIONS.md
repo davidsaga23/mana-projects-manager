@@ -2073,6 +2073,42 @@ Frames box beside it works (`breakdown_set_note()`, `action=notes`). Empty clear
 column reads as a dash again; a note over 2,000 characters is cut, and the cut is reported rather
 than left to be discovered.
 
+## 2026-09-22 — Anima wears Mana's colours, and the app is dark
+**Asked by David:** *"based on this page (https://www.mana.tv/) please try to match the colors so
+they match the visual identity of Mana."* Previewed as two options on a canvas first, at his ask;
+he chose the dark one, the studio's own.
+
+**The palette is not a guess.** mana.tv declares it in its stylesheet: `--black #101010`,
+`--white`, `--light-sky-blue #5FB2FF`, `--spring-green #26FE89`, set in Aeonik with Space Grotesk.
+Aeonik is licensed per site, so no typeface changed here; the colours did.
+
+**Every colour became a TOKEN first.** About 210 literals in `assets/style.css` were converted to
+roles in one pass (`--surface`, `--border`, `--muted`, `--on-primary`, and so on), the role decided
+by the property AND by the rule's own background: a white label inside a block that fills itself
+blue is "ink on primary", not a surface. `:root` then says what each role looks like. Nothing
+outside that block holds a colour any more, which is what made the theme a block rather than a
+rewrite, and what makes a second theme cheap.
+
+**Settled while doing it:**
+- **The ink on Mana's two accents is black.** Sky blue and spring green are bright: white text on
+  them fails, black passes, and that is the pairing the site itself uses. Hence the `--on-*` tokens.
+- **Danger and warning keep their own hues**, lightened for a black ground (#FF6B6B, #F0C33C).
+  Mana's palette has no red or amber, and a studio with no colour for "this is late" still needs one.
+- **`color-scheme: dark` is the one line that is not ours to draw.** Date pickers, the list a
+  `<select>` drops down, scrollbars and autofill are the browser's; no rule reaches them. Fields also
+  had no colours of their own, which was right by accident on a white page and a torch on a black one.
+- **Frappe Gantt paints its own grid white** from the CDN, after this stylesheet: rows, header,
+  ticks and today-highlight are all answered now, carrying `.tl-chart` to win on specificity rather
+  than with `!important`. Shading drawn OVER a chart (weekends, a bar's finished part) flipped from
+  dark-on-light to light-on-dark: `--shade`.
+- **The workflow diagram keeps literal colours**, in the dark values, because it is downloaded and
+  dropped into decks: a stylesheet does not travel with an SVG. Its comment says so.
+- **On paper the palette turns back over.** `@media print` redefines every token light, with the
+  darkened accents that pass 4.5:1 on white: a printer given a black page wastes a cartridge and
+  prints white letters. The PNG and PDF buttons are not this, they photograph the screen, and a dark
+  export is the studio's own look to send.
+- Step, status and crew colours are still each show's data, untouched. Only the app around them moved.
+
 ## 2026-09-22 — The shot breakdown totals its frames and its footage
 **Asked by David:** *"let's add frame and second count in this page (both top and bottom)."* A line
 above the table and a footer row under it: shots, frames, seconds, the running time once there is a

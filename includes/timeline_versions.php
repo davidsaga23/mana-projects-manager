@@ -106,7 +106,7 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
             'step_name'   => $r['step_name'],
             'step_order'  => (int)$r['step_order'],
             'item_label'  => $item,
-            'color'       => $r['color'] ?: '#4A90D9',
+            'color'       => $r['color'] ?: '#5FB2FF',
             'crew_id'     => $r['crew_id'] !== null ? (int)$r['crew_id'] : null,
             'crew_name'   => $r['crew_name'] ?? '',
             'is_approved' => (int)$r['is_approved'] === 1,
@@ -183,7 +183,7 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
             // progress somebody recorded by hand (migration 036), 0 before it.
             'progress'   => max(0, min(100, (int)($s['progress_pct'] ?? 0))),
             'progress_source' => (string)($s['progress_source'] ?? ''),
-            'color'      => $s['color'] ?: '#4A90D9',
+            'color'      => $s['color'] ?: '#5FB2FF',
             // For the step editor.
             'step_name'  => $s['name'],
             'scope'      => $scope,

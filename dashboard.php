@@ -153,7 +153,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
       <?php // The bar carries the step's own colour, as it does on the timeline,
             // until the step is finished: then it is green like everything else
             // that means done here. ?>
-      <div class="mini-bar"><span style="width:<?= (float)($s['pct'] ?? 0) ?>%;background:<?= e($done ? '#1e7e34' : ($s['step']['color'] ?: '#4A90D9')) ?>"></span></div>
+      <div class="mini-bar"><span style="width:<?= (float)($s['pct'] ?? 0) ?>%;background:<?= $done ? 'var(--ok)' : e($s['step']['color'] ?: 'var(--step-default)') ?>"></span></div>
       <div class="mini-num">
         <?= e(fmt_unit($s['approved_v'], $s['unit'])) ?><span class="mini-total">/<?= e(fmt_unit($s['target'], $s['unit'])) ?></span>
       </div>
@@ -414,7 +414,7 @@ function downloadDashboard() {
   var el = document.querySelector('.wrap');
   var btn = event.target;
   btn.disabled = true; btn.textContent = 'Rendering…';
-  html2canvas(el, { backgroundColor: '#f4f6f8', scale: 2, useCORS: true,
+  html2canvas(el, { backgroundColor: getComputedStyle(document.body).backgroundColor, scale: 2, useCORS: true,
                     windowWidth: el.scrollWidth, width: el.scrollWidth })
     .then(function (canvas) {
       // Local date parts, never toISOString, it shifts a day at UTC−6.

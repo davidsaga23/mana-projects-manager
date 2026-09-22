@@ -290,7 +290,7 @@ function grid_donut_svg(array $slices, int $ready, int $itemCount, int $size = 1
 
     if ($total === 0) {
         $svg .= '<circle cx="' . $r . '" cy="' . $r . '" r="' . $ro
-              . '" fill="none" stroke="#e4e8ec" stroke-width="' . ($ro - $ri) . '"></circle>';
+              . '" fill="none" style="stroke: var(--border)" stroke-width="' . ($ro - $ri) . '"></circle>';
     } else {
         $angle = -M_PI / 2;   // start at twelve o'clock
         foreach ($slices as $s) {

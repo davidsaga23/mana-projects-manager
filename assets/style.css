@@ -1,16 +1,121 @@
 /* Anima | Project manager — base styles. Kept small; grows with the UI phases. */
 
+/* ============================================================================
+   THE COLOURS, ALL OF THEM, IN ONE PLACE (David, 2026-09-22)
+   ============================================================================
+   Mana's own palette, as mana.tv declares it in its own stylesheet: black
+   #101010, white, light sky blue #5FB2FF, spring green #26FE89. The studio's
+   identity is dark, so the app is dark.
+
+   Every colour below is a ROLE, never a shade: a rule says what a thing IS
+   (a surface, a border, the ink on a primary fill) and this block decides what
+   that looks like. Nothing outside this block holds a colour literal any more,
+   about 210 of them were converted the day this was written, so a second theme
+   is a second block rather than a second stylesheet.
+
+   ⚠ TWO RULES WORTH KEEPING when adding a colour:
+   1. Text needs 4.5:1 against what is behind it. Mana's two accents are bright
+      and fail that on white, which is why the light theme this replaced used
+      darkened versions of them; on black they pass comfortably, and the ink on
+      TOP of them has to be black, which is what the --on-* tokens are for.
+   2. Mana's palette has no red and no amber. Danger and warning keep their own
+      hues, lightened for a black ground, because a studio with no colour for
+      "this is late" still needs one.
+   ========================================================================== */
+:root {
+  /* the ground, and the surfaces raised off it */
+  --bg: #101010;
+  --surface: #191919;
+  --surface-2: #1f1f1f;
+  --surface-3: #242424;
+  --border: #2b2b2b;
+  --border-soft: #232323;
+  --border-strong: #3a3a3a;
+
+  /* ink */
+  --text: #ededed;                        /* not pure white, which glares on black */
+  --text-2: rgba(255, 255, 255, .78);
+  --muted: rgba(255, 255, 255, .60);
+  --faint: rgba(255, 255, 255, .42);
+  --tooltip: #2b2b2b;
+  /* ink that sits ON a filled thing, so it follows the fill and not the page */
+  --on-accent: #ffffff;
+  --on-accent-2: rgba(255, 255, 255, .72);
+  --on-primary: #101010;
+  --on-ok: #101010;
+  --on-danger: #101010;
+  --on-violet: #101010;
+  --on-warn: #101010;
+
+  /* Mana's sky blue: anything you press or follow */
+  --primary: #5fb2ff;
+  --primary-hover: #8ac8ff;
+  --primary-tint: rgba(95, 178, 255, .12);
+  --primary-fill: rgba(95, 178, 255, .38);
+  --primary-soft: rgba(95, 178, 255, .60);
+  --primary-border: rgba(95, 178, 255, .45);
+  --step-default: #5fb2ff;
+
+  /* Mana's spring green: work that is finished */
+  --ok: #26fe89;
+  --ok-strong: #7dffb8;
+  --ok-tint: rgba(38, 254, 137, .10);
+  --ok-border: rgba(38, 254, 137, .38);
+
+  /* late, and heading that way */
+  --danger: #ff6b6b;
+  --danger-strong: #ff9a9a;
+  --danger-tint: rgba(255, 107, 107, .10);
+  --danger-tint-2: rgba(255, 107, 107, .18);
+  --danger-border: rgba(255, 107, 107, .40);
+  --clash-band: rgba(255, 107, 107, .16);
+  --warn: #f0c33c;
+  --warn-strong: #ffd76a;
+  --warn-tint: rgba(240, 195, 60, .10);
+  --warn-border: rgba(240, 195, 60, .40);
+
+  /* milestones, and the banner for wearing somebody else's role */
+  --violet: #c08cf0;
+  --violet-strong: #d7b3ff;
+  --violet-tint: rgba(192, 140, 240, .14);
+
+  /* chips that carry a category by hue */
+  --chip-indigo-bg: rgba(126, 140, 255, .16);  --chip-indigo-ink: #a9b4ff;
+  --chip-grey-bg:   rgba(255, 255, 255, .08);  --chip-grey-ink:   rgba(255, 255, 255, .60);
+  --chip-teal-bg:   rgba(69, 184, 172, .16);   --chip-teal-ink:   #6fd8cc;
+  --chip-violet-bg: rgba(142, 124, 195, .18);  --chip-violet-ink: #b9a7ea;
+  --chip-orange-bg: rgba(230, 126, 34, .16);   --chip-orange-ink: #f0a45f;
+
+  /* a saved timeline version: old paper, in the dark */
+  --paper: #1b1813;
+  --paper-2: #241f17;
+  --paper-surface: #1f1b15;
+  --paper-row: #262019;
+  --paper-border: #3a3226;
+  --paper-ink: #e8d9b8;
+  --paper-ink-2: rgba(232, 217, 184, .72);
+
+  /* shading drawn OVER something: light on a dark ground, dark on a light one */
+  --shade: #ffffff;
+
+  /* ⚠ THE ONE LINE THAT IS NOT OURS TO DRAW. A date picker, the list a
+     <select> drops down, scrollbars and the yellow of an autofilled field are
+     the browser's own, and no rule here reaches them. This tells it which way
+     round the page is, and it dresses them to match. */
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
-  color: #1c2733;
-  background: #f4f6f8;
+  color: var(--text);
+  background: var(--bg);
 }
-a { color: #2f6fb2; text-decoration: none; }
+a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
-code { background: #eef1f4; padding: 1px 5px; border-radius: 3px; font-size: 0.92em; }
+code { background: var(--surface-3); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; }
 
 /* Full width — the dense screens (18 pipeline steps, the dependency grid, the
    planning table) all benefit, and none of them are prose. */
@@ -23,16 +128,16 @@ code { background: #eef1f4; padding: 1px 5px; border-radius: 3px; font-size: 0.9
 
 .topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .topbar h1 { font-size: 22px; margin: 0 0 16px; }
-.topbar-right { color: #5a6a7a; }
+.topbar-right { color: var(--muted); }
 
 h1 { font-size: 22px; }
 h2 { font-size: 18px; }
 
-.ok  { color: #1e7e34; }
-.err { color: #b02a37; }
+.ok  { color: var(--ok); }
+.err { color: var(--danger); }
 
-table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e4e8ec; }
+table { border-collapse: collapse; width: 100%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 /* Sticky header row on EVERY table.
    Applied globally rather than table by table: there are thirty-odd tables
    across the app and every one of them can grow past a screen — the planning
@@ -45,42 +150,42 @@ th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e4e8ec; 
    border-collapse: collapse a sticky cell leaves its border behind when it
    detaches, so the heading floats over the rows with nothing under it. */
 th {
-  background: #eef1f4; font-weight: 600;
+  background: var(--surface-3); font-weight: 600;
   position: sticky; top: 0; z-index: 5;
-  box-shadow: inset 0 -1px 0 #d7dde3;
+  box-shadow: inset 0 -1px 0 var(--border-strong);
 }
 /* Above the rows, below the step filter panel (40) and the task editor (100). */
 
 .empty-state {
-  background: #fff; border: 1px dashed #c3ccd4; border-radius: 8px;
-  padding: 40px; text-align: center; color: #5a6a7a; margin-top: 24px;
+  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 8px;
+  padding: 40px; text-align: center; color: var(--muted); margin-top: 24px;
 }
 
 .status { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
-.status-setup   { background: #e8eaf6; color: #3949ab; }
-.status-active  { background: #e3f6e8; color: #1e7e34; }
-.status-on_hold { background: #fff3cd; color: #8a6d1a; }
-.status-wrapped { background: #eceff1; color: #546e7a; }
+.status-setup   { background: var(--chip-indigo-bg); color: var(--chip-indigo-ink); }
+.status-active  { background: var(--ok-tint); color: var(--ok); }
+.status-on_hold { background: var(--warn-tint); color: var(--warn); }
+.status-wrapped { background: var(--surface-3); color: var(--text-2); }
 /* Archived reads quieter than wrapped: wrapped is delivered, archived is
    merely out of the way, and the list should not celebrate the second. */
-.status-archived { background: #f2f3f5; color: #77838f; }
+.status-archived { background: var(--chip-grey-bg); color: var(--chip-grey-ink); }
 
 /* Migration runner rows */
-.mig-applied td { background: #f0faf2; }
-.mig-failed  td { background: #fdf0f1; }
-.mig-pending td { background: #fffbee; }
-.mig-na      td { color: #8a97a3; }
+.mig-applied td { background: var(--ok-tint); }
+.mig-failed  td { background: var(--danger-tint); }
+.mig-pending td { background: var(--warn-tint); }
+.mig-na      td { color: var(--faint); }
 
 /* ---------------------------------------------------------------- shared */
 .topbar h1 a { color: inherit; }
-.topbar h1 a:hover { text-decoration: none; color: #2f6fb2; }
+.topbar h1 a:hover { text-decoration: none; color: var(--primary); }
 
 /* Brand lockup — logo beside the product name, on every page */
 .brand { display: inline-flex; align-items: center; gap: 10px; }
 .site-logo { height: 24px; width: auto; display: block; }
 .site-logo-text {
   font-weight: 800; letter-spacing: .06em; font-size: 17px;
-  font-style: italic; color: #1c2733;
+  font-style: italic; color: var(--text);
 }
 .brand-name { font-size: 19px; }
 .brand-name .muted { font-weight: 400; }
@@ -91,17 +196,17 @@ th {
   .brand-name { font-size: 16px; }
   .brand-name .muted { display: none; }
 }
-.muted { color: #5a6a7a; }
+.muted { color: var(--muted); }
 .small { font-size: 13px; }
-.lead { color: #43535f; margin-top: 0; }
-.warn-text { color: #8a6d1a; }
-small { display: block; color: #5a6a7a; font-size: 12.5px; font-weight: 400; margin-top: 3px; }
+.lead { color: var(--text-2); margin-top: 0; }
+.warn-text { color: var(--warn); }
+small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 3px; }
 
 a.button, .page-actions .button {
   display: inline-block; padding: 9px 18px; border-radius: 4px;
-  background: #2f6fb2; color: #fff; text-decoration: none;
+  background: var(--primary); color: var(--on-primary); text-decoration: none;
 }
-a.button:hover { background: #275d95; text-decoration: none; }
+a.button:hover { background: var(--primary-hover); text-decoration: none; }
 /* Bordered rather than flat grey — a low-contrast filled button reads as
    disabled, which hid the plain "Save" option next to "Save and continue".
    
@@ -115,17 +220,17 @@ a.button:hover { background: #275d95; text-decoration: none; }
    element-qualified, and a class that silently does nothing is worse than one
    that does not exist. */
 button.secondary, .button.secondary {
-  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); font-weight: 600;
 }
-button.secondary:hover, .button.secondary:hover { background: #eef4fa; border-color: #2f6fb2; }
-button:disabled { background: #c3ccd4; cursor: not-allowed; }
-button.danger { background: #b02a37; }
-button.danger:hover { background: #8f222c; }
+button.secondary:hover, .button.secondary:hover { background: var(--primary-tint); border-color: var(--primary); }
+button:disabled { background: var(--border-strong); cursor: not-allowed; }
+button.danger { background: var(--danger); }
+button.danger:hover { background: var(--danger-strong); }
 .link-danger {
-  background: none; border: 0; color: #b02a37; cursor: pointer;
+  background: none; border: 0; color: var(--danger); cursor: pointer;
   padding: 0; margin: 0; font-size: 13px; text-decoration: underline;
 }
-.link-danger:hover { background: none; color: #8f222c; }
+.link-danger:hover { background: none; color: var(--danger-strong); }
 .page-actions { margin-bottom: 16px; }
 /* A ROW OF BUTTONS, opt-in. Scoped to a modifier rather than applied to
    .page-actions itself: three other screens use that class for a button sitting
@@ -141,10 +246,10 @@ button.danger:hover { background: #8f222c; }
 /* "Stay here and save" is a different intention from "move on" — give them a
    visible gap so they don't read as one control with two halves. */
 .actions .spacer { flex: 0 0 18px; }
-.actions .hint { color: #5a6a7a; font-size: 12.5px; }
+.actions .hint { color: var(--muted); font-size: 12.5px; }
 .inline-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
 .toggle-form {
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 14px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px;
 }
 .toggle-form small { flex: 1 1 100%; margin-top: 0; }
 .inline-form button { margin-top: 0; }
@@ -197,7 +302,7 @@ label.inline input { width: auto; }
    the moment it opened. Same construction as .slot-change-bar. */
 .type-new { position: relative; margin: 0; }
 /* Held down while the panel is open, so it reads as the thing that opened it. */
-.type-new[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
+.type-new[open] > .row-btn { background: var(--primary-tint); border-color: var(--primary); }
 .type-new-form {
   /* max-content, or the popover shrink-fits to the button it hangs from and
      stacks every control. Capped, so the small print wraps instead of running
@@ -206,7 +311,7 @@ label.inline input { width: auto; }
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
   width: max-content; max-width: min(560px, calc(100vw - 40px));
   display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
-  background: #fff; border: 1px solid #dbe2e8; border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
   padding: 12px 14px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
   font-weight: 400;
 }
@@ -232,7 +337,7 @@ label.inline input { width: auto; }
    them, the step each lands on, and what days per item becomes. Fixed layout so
    the colgroup binds and the step pickers share their column. */
 .ideals-match input[type=file] { width: auto; max-width: 100%; padding: 4px; font-size: 13px; }
-.match-preview { margin: 18px 0 26px; padding: 12px 14px; border: 1px solid #dbe2e8; border-radius: 6px; background: #fbfcfd; }
+.match-preview { margin: 18px 0 26px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
 .match-preview h3 { margin-top: 0; }
 .match-table { width: 100%; table-layout: fixed; }
 .match-table th, .match-table td { padding: 6px; vertical-align: top; word-break: break-word; }
@@ -240,12 +345,12 @@ label.inline input { width: auto; }
 .match-table select { width: 100%; padding: 4px 6px; font-size: 13px; }
 /* The numbers that will actually move, so a preview of twenty rows shows its
    five changes at a glance. */
-.match-changes { color: #2f6fb2; }
+.match-changes { color: var(--primary); }
 /* A small button that removes something: .row-btn's shape, in the red the admin
    tag already uses, and quieter than button.danger. It only appears on a type
    nothing uses, so it should not shout over the sheet. */
-.row-btn-danger { color: #8f222c; border-color: #e0b4ba; }
-.row-btn-danger:hover { background: #fdf0f1; border-color: #8f222c; color: #8f222c; }
+.row-btn-danger { color: var(--danger-strong); border-color: var(--danger-border); }
+.row-btn-danger:hover { background: var(--danger-tint); border-color: var(--danger-strong); color: var(--danger-strong); }
 
 /* The Minimum-against-ideal table on the Expense projection tab. Read-only, so
    this is simpler than .standards-table — fixed layout for the colgroup to
@@ -258,7 +363,7 @@ label.inline input { width: auto; }
    changes every figure below it, and walking back to step 1 to try 5% instead
    of 10% is enough friction that nobody does it. */
 .retake-bar {
-  background: #fffbee; border: 1px solid #e8d9a8; border-radius: 4px;
+  background: var(--warn-tint); border: 1px solid var(--warn-border); border-radius: 4px;
   padding: 9px 12px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
   flex-wrap: wrap;
 }
@@ -266,13 +371,13 @@ label.inline input { width: auto; }
 .retake-bar label { display: inline; margin: 0; }
 
 .planning-table th.col-sep,
-.planning-table td.col-sep { border-left: 2px solid #b9c4cd; }
+.planning-table td.col-sep { border-left: 2px solid var(--border-strong); }
 
-.quota-short { background: #fdf0f1; }
-.quota-short strong, .quota-short .ok { color: #8f222c; }
+.quota-short { background: var(--danger-tint); }
+.quota-short strong, .quota-short .ok { color: var(--danger-strong); }
 
 /* Splits the top bar's three main destinations from the occasional ones. */
-.nav-sep { margin: 0 8px; color: #b9c4cd; }
+.nav-sep { margin: 0 8px; color: var(--border-strong); }
 
 /* The budget form reads as ONE horizontal line: amount, currency, terms, notes,
    save. Three things are needed for that and each fixes a real symptom.
@@ -295,18 +400,18 @@ label.inline input { width: auto; }
    lower than the inputs it lines up with. */
 .money-form .row label { margin-bottom: 0; }
 .money-form textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; height: 39px; resize: vertical;
 }
 .money-form .row-save { flex: 0 0 auto; }
 .money-form .row-save button { margin: 0; }
-.summary-line { background: #eef1f4; padding: 8px 12px; border-radius: 4px; }
+.summary-line { background: var(--surface-3); padding: 8px 12px; border-radius: 4px; }
 
 /* Flash messages — every save says what it did */
 .flash { padding: 10px 14px; border-radius: 4px; margin: 12px 0; border-left: 4px solid; }
-.flash-ok   { background: #f0faf2; border-color: #1e7e34; color: #1a5c28; }
-.flash-warn { background: #fffbee; border-color: #d6a72a; color: #7a5f12; }
-.flash-err  { background: #fdf0f1; border-color: #b02a37; color: #8f222c; }
+.flash-ok   { background: var(--ok-tint); border-color: var(--ok); color: var(--ok-strong); }
+.flash-warn { background: var(--warn-tint); border-color: var(--warn-strong); color: var(--warn); }
+.flash-err  { background: var(--danger-tint); border-color: var(--danger); color: var(--danger-strong); }
 
 /* ---------------------------------------------------------------- wizard */
 .crumb {
@@ -324,33 +429,33 @@ label.inline input { width: auto; }
    the position in the file stops mattering. */
 p.crumb a { white-space: normal; }
 /* One of two crumbs is the lesser one. It stays a button, but a quieter one. */
-.crumb a.muted { color: #5a6a7a; border-color: #d3dae1; }
-.crumb a.muted:hover { color: #2f6fb2; }
+.crumb a.muted { color: var(--muted); border-color: var(--border); }
+.crumb a.muted:hover { color: var(--primary); }
 .wizard-title { font-size: 20px; margin: 4px 0 14px; }
 .wizard-nav {
   list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
   padding: 0; margin: 0 0 20px;
 }
 .wizard-nav li {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 4px;
-  font-size: 13px; color: #5a6a7a;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  font-size: 13px; color: var(--muted);
 }
 /* Only the wrapper gets block styling — naming it explicitly keeps the rule off
    the number circle inside it. */
 .wizard-nav li > a, .wizard-nav li > .step-label {
   display: flex; align-items: center; gap: 5px; padding: 7px 12px; color: inherit;
 }
-.wizard-nav li a:hover { background: #eef1f4; text-decoration: none; }
-.wizard-nav li.current { background: #2f6fb2; border-color: #2f6fb2; color: #fff; font-weight: 600; }
+.wizard-nav li a:hover { background: var(--surface-3); text-decoration: none; }
+.wizard-nav li.current { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
 .wizard-nav .num {
   flex: 0 0 18px;                 /* never stretched or squashed by the flex row */
   width: 18px; height: 18px; line-height: 18px;
-  text-align: center; border-radius: 50%; background: #eef1f4; color: #5a6a7a;
+  text-align: center; border-radius: 50%; background: var(--surface-3); color: var(--muted);
   font-size: 11px; font-weight: 600;
 }
-.wizard-nav li.current .num { background: rgba(255,255,255,.25); color: #fff; }
+.wizard-nav li.current .num { background: rgba(255,255,255,.25); color: var(--on-accent); }
 .wizard-body {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 22px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 22px;
 }
 .wizard-body h3 { margin: 24px 0 8px; font-size: 16px; }
 .wizard-body h3:first-child { margin-top: 0; }
@@ -359,10 +464,10 @@ p.crumb a { white-space: normal; }
 /* Pipeline templates */
 .template-grid { display: flex; gap: 12px; flex-wrap: wrap; }
 .template-card {
-  flex: 1 1 210px; border: 1px solid #c3ccd4; border-radius: 6px; padding: 14px;
+  flex: 1 1 210px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 14px;
   cursor: pointer; font-weight: 400; margin: 0; display: block;
 }
-.template-card:hover { border-color: #2f6fb2; background: #f7fafd; }
+.template-card:hover { border-color: var(--primary); background: var(--primary-tint); }
 .template-card input { width: auto; margin-right: 6px; }
 .template-card strong { display: inline; }
 .template-card span { display: block; margin-top: 4px; font-size: 12.5px; }
@@ -419,10 +524,10 @@ p.crumb a { white-space: normal; }
    by wizard.js as either date is edited. The border goes on the inputs
    themselves, not just the cell, so it is obvious WHICH pair of fields is
    contradictory when several rows are on screen. */
-.planning-table .date-pair.dates-backwards { background: #fdf0f1; }
+.planning-table .date-pair.dates-backwards { background: var(--danger-tint); }
 .planning-table .date-pair.dates-backwards input {
-  border-color: #b02a37;
-  background: #fff;
+  border-color: var(--danger);
+  background: var(--surface);
 }
 
 /* The step name and its scope, stacked. Overrides .wf-name's nowrap, which is
@@ -444,30 +549,30 @@ p.crumb a { white-space: normal; }
 .planning-table th { white-space: normal; }
 .drag-handle {
   cursor: grab; user-select: none; white-space: nowrap;
-  color: #8a97a3; padding-right: 4px;
+  color: var(--faint); padding-right: 4px;
 }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle .grip { margin-right: 5px; font-size: 15px; letter-spacing: -1px; }
-.step-table tbody tr.dragging { opacity: .45; background: #eef4fa; }
-.step-table tbody tr { background: #fff; }
+.step-table tbody tr.dragging { opacity: .45; background: var(--primary-tint); }
+.step-table tbody tr { background: var(--surface); }
 
 /* Step categories — one colour per kind of work, used on the row and the chip */
 .cat-chip {
   display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 9px;
   font-size: 11px; white-space: nowrap; vertical-align: middle;
 }
-.cat-chip-shot    { background: #e3f0fb; color: #1c4f7c; }
-.cat-chip-asset   { background: #e0f5f2; color: #14675e; }
-.cat-chip-both    { background: #efe6f7; color: #5b3a7e; }
-.cat-chip-project { background: #fdeee0; color: #8a4b12; }
+.cat-chip-shot    { background: var(--primary-tint); color: var(--primary-hover); }
+.cat-chip-asset   { background: var(--chip-teal-bg); color: var(--chip-teal-ink); }
+.cat-chip-both    { background: var(--chip-violet-bg); color: var(--chip-violet-ink); }
+.cat-chip-project { background: var(--chip-orange-bg); color: var(--chip-orange-ink); }
 .cat-row td:first-child { border-left: 3px solid transparent; }
-.cat-row.cat-shot    td:first-child { border-left-color: #4A90D9; }
-.cat-row.cat-asset   td:first-child { border-left-color: #45B8AC; }
-.cat-row.cat-both    td:first-child { border-left-color: #8E7CC3; }
-.cat-row.cat-project td:first-child { border-left-color: #E67E22; }
+.cat-row.cat-shot    td:first-child { border-left-color: var(--step-default); }
+.cat-row.cat-asset   td:first-child { border-left-color: var(--chip-teal-ink); }
+.cat-row.cat-both    td:first-child { border-left-color: var(--chip-violet-ink); }
+.cat-row.cat-project td:first-child { border-left-color: var(--chip-orange-ink); }
 .step-filter {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 8px 12px; margin-bottom: 10px;
 }
 .step-filter select { width: auto; }
@@ -475,7 +580,7 @@ p.crumb a { white-space: normal; }
 
 /* Workflow diagram */
 .wf-diagram-wrap {
-  overflow-x: auto; background: #fff; border: 1px solid #e4e8ec;
+  overflow-x: auto; background: var(--surface); border: 1px solid var(--border);
   border-radius: 6px; padding: 8px; margin-bottom: 6px;
 }
 .wf-diagram { display: block; }
@@ -488,27 +593,27 @@ p.crumb a { white-space: normal; }
    button says so and cannot be pressed twice into two downloads. */
 .wf-export.is-busy { opacity: .7; pointer-events: none; cursor: progress; }
 .png-note { display: block; flex-basis: 100%; text-align: right; margin-top: 4px; }
-.wf-edge { fill: none; stroke: #b6c2cd; stroke-width: 1.6; }
-.wf-box { fill: #f7f9fb; stroke: #dbe2e8; stroke-width: 1; }
-.wf-label { font: 600 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
-.wf-sub   { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #7b8894; }
+.wf-edge { fill: none; stroke: var(--border-strong); stroke-width: 1.6; }
+.wf-box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+.wf-label { font: 600 12px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
+.wf-sub   { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--muted); }
 
 /* --- drawing on the diagram (assets/workflow-edit.js) ----------------------
    The handle is the dot on a box's right edge, the side every line leaves
    from, so it reads as "a line starts here" without a word of explanation. */
-.wf-handle { fill: #fff; stroke: #2f6fb2; stroke-width: 1.6; pointer-events: none;
+.wf-handle { fill: var(--surface); stroke: var(--primary); stroke-width: 1.6; pointer-events: none;
              transition: r .12s; }
 /* The real target is the invisible ring around it. touch-action:none, or a
    finger dragging from it scrolls the page instead of drawing. */
 .wf-handle-hit { fill: transparent; cursor: crosshair; touch-action: none; }
-.wf-node:hover .wf-handle { r: 6.5; fill: #2f6fb2; }
-.wf-drag-line { fill: none; stroke: #2f6fb2; stroke-width: 2; stroke-dasharray: 5 4;
+.wf-node:hover .wf-handle { r: 6.5; fill: var(--primary); }
+.wf-drag-line { fill: none; stroke: var(--primary); stroke-width: 2; stroke-dasharray: 5 4;
                 pointer-events: none; }
 .wf-dragging { cursor: crosshair; }
 .wf-dragging .wf-edge-hit { pointer-events: none; }
 /* Where the line would land, and whether it can. */
-.wf-target-ok  .wf-box { stroke: #1e7e34; stroke-width: 2.5; fill: #eef8f1; }
-.wf-target-bad .wf-box { stroke: #b02a37; stroke-width: 2.5; fill: #fdeff0; }
+.wf-target-ok  .wf-box { stroke: var(--ok); stroke-width: 2.5; fill: var(--ok-tint); }
+.wf-target-bad .wf-box { stroke: var(--danger); stroke-width: 2.5; fill: var(--danger-tint); }
 
 /* A line is selected before it is removed - see workflow-edit.js for why. The
    hit path is wide and invisible; the visible one only changes colour. */
@@ -519,10 +624,10 @@ p.crumb a { white-space: normal; }
    is a picture and never sees this rule. */
 .wf-diagram .wf-edge { pointer-events: none; }
 .wf-edge-hit:hover + .wf-edge,
-.wf-edge.is-selected { stroke: #b02a37; stroke-width: 2.4; }
+.wf-edge.is-selected { stroke: var(--danger); stroke-width: 2.4; }
 .wf-edge-x { cursor: pointer; }
-.wf-edge-x circle { fill: #b02a37; stroke: #fff; stroke-width: 2; }
-.wf-edge-x text { fill: #fff; font: 700 14px -apple-system, "Segoe UI", Roboto, sans-serif;
+.wf-edge-x circle { fill: var(--danger); stroke: var(--surface); stroke-width: 2; }
+.wf-edge-x text { fill: var(--surface); font: 700 14px -apple-system, "Segoe UI", Roboto, sans-serif;
                   pointer-events: none; }
 
 /* The sentence beside the pointer. Fixed, not inside the SVG, so the diagram's
@@ -530,10 +635,10 @@ p.crumb a { white-space: normal; }
 .wf-hint {
   position: fixed; z-index: 250; pointer-events: none; max-width: 320px;
   padding: 5px 9px; border-radius: 4px; font-size: 12.5px; line-height: 1.35;
-  background: #1c2733; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  background: var(--tooltip); color: var(--on-accent); box-shadow: 0 2px 8px rgba(0,0,0,.2);
 }
-.wf-hint.is-ok  { background: #1e7e34; }
-.wf-hint.is-bad { background: #b02a37; }
+.wf-hint.is-ok  { background: var(--ok); }
+.wf-hint.is-bad { background: var(--danger); }
 /* While the save reloads the page, the picture cannot take a second gesture. */
 .wf-saving { opacity: .55; pointer-events: none; }
 .wf-howto { margin-bottom: 2px; }
@@ -550,11 +655,11 @@ p.crumb a { white-space: normal; }
 .row-actions { white-space: nowrap; }
 .row-actions button {
   margin-top: 0; padding: 4px 9px; font-size: 13px;
-  background: #e4e8ec; color: #1c2733;
+  background: var(--border); color: var(--text);
 }
-.row-actions button:hover { background: #d5dbe1; }
-.row-actions button.danger { background: #f3d9dc; color: #8f222c; }
-.row-actions button.danger:hover { background: #e9c2c7; }
+.row-actions button:hover { background: var(--border-strong); }
+.row-actions button.danger { background: var(--danger-tint-2); color: var(--danger-strong); }
+.row-actions button.danger:hover { background: var(--danger-border); }
 .wf-name { font-weight: 600; white-space: nowrap; }
 .wf-toggle { width: 45%; }
 .wf-deps { font-size: 13px; }
@@ -569,19 +674,19 @@ p.crumb a { white-space: normal; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
-  background: #eef1f4; border-radius: 12px; padding: 3px 4px 3px 11px; font-size: 13px;
+  background: var(--surface-3); border-radius: 12px; padding: 3px 4px 3px 11px; font-size: 13px;
 }
 .chip .muted { font-size: 11.5px; }
 .chip button {
   margin: 0; padding: 0; width: 17px; height: 17px; line-height: 15px;
-  border-radius: 50%; background: #ccd4db; color: #43535f; font-size: 11px;
+  border-radius: 50%; background: var(--border-strong); color: var(--text-2); font-size: 11px;
 }
-.chip button:hover { background: #b02a37; color: #fff; }
+.chip button:hover { background: var(--danger); color: var(--on-danger); }
 .chip input[type=checkbox] { width: auto; margin: 0 1px 0 0; }
-.check-all { font-weight: 400; font-size: 12px; color: #5a6a7a; margin-left: 8px; }
+.check-all { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 8px; }
 .retype-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 10px 14px; margin-top: 16px;
 }
 .asset-table input[type=text], .asset-table input:not([type]) { width: 100%; padding: 5px 7px; font-size: 14px; }
@@ -597,18 +702,18 @@ p.crumb a { white-space: normal; }
 /* Paste / generate tools */
 .tool-grid { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 22px; }
 .tool {
-  flex: 1 1 300px; background: #f7f9fb; border: 1px solid #e4e8ec;
+  flex: 1 1 300px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 6px; padding: 14px;
 }
 .tool strong { display: block; margin-bottom: 8px; }
 .tool textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: ui-monospace, Consolas, monospace; font-size: 13px;
 }
 .tool button { margin-top: 12px; }
 .add-row {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  margin-top: 20px; padding-top: 16px; border-top: 1px solid #e4e8ec;
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
 }
 .add-row input, .add-row select { width: auto; }
 .add-row button { margin-top: 0; }
@@ -616,64 +721,64 @@ p.crumb a { white-space: normal; }
 /* Project hub */
 .hub-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0 26px; }
 .hub-card {
-  flex: 1 1 200px; background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  flex: 1 1 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 14px; color: inherit; text-decoration: none;
 }
-.hub-card:hover { border-color: #2f6fb2; background: #f7fafd; text-decoration: none; }
+.hub-card:hover { border-color: var(--primary); background: var(--primary-tint); text-decoration: none; }
 .hub-card strong { display: block; margin-bottom: 4px; }
 .hub-card span { font-size: 12.5px; }
 
-.pct-field { white-space: nowrap; color: #5a6a7a; font-size: 13px; }
+.pct-field { white-space: nowrap; color: var(--muted); font-size: 13px; }
 .pct-field input { width: 62px; padding: 5px 6px; font-size: 14px; margin-right: 2px; }
 /* 260px here used to force the table wider than the window on its own. The
    verdict is prose and wraps happily; it only needs enough width not to break
    after every word. Kept BELOW the fitting block above so this is the rule that
    actually applies — equal specificity, later wins. */
 .planning-table .verdict { font-size: 12.5px; line-height: 1.4; }
-.planning-table .verdict-short { background: #fdf0f1; color: #8f222c; }
-.planning-table .verdict-ok    { background: #f0faf2; color: #1a5c28; }
+.planning-table .verdict-short { background: var(--danger-tint); color: var(--danger-strong); }
+.planning-table .verdict-ok    { background: var(--ok-tint); color: var(--ok-strong); }
 .planning-table .verdict .muted { font-size: 11.5px; }
 
 /* Users */
 /* Pending migrations — visible without having to go and look */
-.topbar-right a.needs-action { color: #8a6d1a; font-weight: 600; }
+.topbar-right a.needs-action { color: var(--warn); font-weight: 600; }
 .pending-badge {
   display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 5px;
-  background: #d6a72a; color: #fff; border-radius: 8px;
+  background: var(--warn-strong); color: var(--on-warn); border-radius: 8px;
   font-size: 11px; line-height: 16px; text-align: center; font-weight: 700;
 }
 
 .role-badge {
-  background: #fff3cd; color: #7a5f12; border-radius: 3px;
+  background: var(--warn-tint); color: var(--warn); border-radius: 3px;
   padding: 1px 6px; font-size: 11.5px; margin-left: 4px;
 }
-.row-inactive td { background: #f7f8f9; color: #8a97a3; }
+.row-inactive td { background: var(--surface-2); color: var(--faint); }
 .row-inactive td strong { font-weight: 400; }
 .role-table td { vertical-align: top; }
-.inline-actions summary { cursor: pointer; font-size: 13px; color: #2f6fb2; }
+.inline-actions summary { cursor: pointer; font-size: 13px; color: var(--primary); }
 .inline-actions[open] summary { margin-bottom: 6px; }
 .inline-actions .inline-form { margin: 0; }
 .topbar-right .inline-form { display: inline-flex; }
 
 .est-tag {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
-  background: #fff3cd; color: #8a6d1a; border-radius: 3px; padding: 1px 4px; margin-left: 4px;
+  background: var(--warn-tint); color: var(--warn); border-radius: 3px; padding: 1px 4px; margin-left: 4px;
 }
 
 /* Import */
-.unit-choice { border: 1px solid #e4e8ec; border-radius: 6px; padding: 12px 14px; margin: 16px 0; background: #f7f9fb; }
+.unit-choice { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin: 16px 0; background: var(--surface-2); }
 .unit-choice legend { font-weight: 600; padding: 0 6px; }
 .unit-choice label.inline { margin-right: 16px; }
 .checkbox-note { display: inline-flex; margin: 12px 0 2px; }
 .step-scope { display: inline-flex; align-items: center; gap: 6px; margin-top: 5px; }
 .step-scope .muted { margin: 0; }
 .step-scope select { width: auto; }
-.plain-list { color: #43535f; padding-left: 20px; }
+.plain-list { color: var(--text-2); padding-left: 20px; }
 .plain-list li { margin-bottom: 6px; }
 a.button-link { font-size: 14px; }
 .review-table form { display: inline; }
 .review-table form button { margin-top: 0; }
-input[type=file] { padding: 6px; background: #fff; }
+input[type=file] { padding: 6px; background: var(--surface); }
 
 /* Statuses */
 .status-table input:not([type]), .status-table select { padding: 5px 7px; font-size: 14px; }
@@ -683,21 +788,21 @@ input[type=file] { padding: 6px; background: #fff; }
 /* Review */
 .review-grid { display: flex; gap: 16px; flex-wrap: wrap; }
 .review-card {
-  flex: 1 1 240px; background: #f7f9fb; border: 1px solid #e4e8ec;
+  flex: 1 1 240px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 6px; padding: 14px;
 }
 .review-card h4 { margin: 0 0 8px; font-size: 14px; }
 .review-card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
-.review-card dt { color: #5a6a7a; font-size: 13px; }
+.review-card dt { color: var(--muted); font-size: 13px; }
 .review-card dd { margin: 0; font-size: 13px; }
 .quota-table td { font-variant-numeric: tabular-nums; }
-.has-problem td { background: #fffbee; }
-.problem-row td { border-bottom: 1px solid #e4e8ec; font-size: 13px; padding-top: 0; }
+.has-problem td { background: var(--warn-tint); }
+.problem-row td { border-bottom: 1px solid var(--border); font-size: 13px; padding-top: 0; }
 
 /* Scheduler */
 .sched-headline {
   display: flex; gap: 28px; flex-wrap: wrap;
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px 16px; margin: 16px 0;
 }
 .sched-headline > div { display: flex; flex-direction: column; gap: 2px; }
@@ -709,7 +814,7 @@ input[type=file] { padding: 6px; background: #fff; }
 .lane-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
 .lane-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  background: #eef1f4; border-radius: 12px; padding: 3px 11px; font-size: 12.5px;
+  background: var(--surface-3); border-radius: 12px; padding: 3px 11px; font-size: 12.5px;
 }
 
 /* Studio calendar */
@@ -722,18 +827,18 @@ input[type=file] { padding: 6px; background: #fff; }
 .suggest-item .muted { margin-left: 5px; }
 button.linkish {
   background: none; border: 0; padding: 0; margin: 0;
-  color: #2f6fb2; font-size: 13px; cursor: pointer; text-decoration: underline;
+  color: var(--primary); font-size: 13px; cursor: pointer; text-decoration: underline;
 }
-button.linkish:hover { background: none; color: #1d4e80; }
+button.linkish:hover { background: none; color: var(--primary-hover); }
 .danger-actions { margin-top: 28px; }
 
 .duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.duration.verdict-short strong { color: #8a6d1a; }
+.duration.verdict-short strong { color: var(--warn); }
 
 /* Timeline — Frappe Gantt plus the bits it doesn't do (step colours, the
    assignee label glued to the left of each bar, the lock outline). */
 .tl-section {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px 14px; margin: 16px 0;
 }
 .tl-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -747,55 +852,59 @@ button.linkish:hover { background: none; color: #1d4e80; }
 /* An <a> that has to sit in a row of <button>s without looking like an outsider. */
 .tl-linkbtn {
   display: inline-block; padding: 5px 10px; font-size: 13px; font-weight: 600;
-  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; border-radius: 4px;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); border-radius: 4px;
 }
-.tl-linkbtn:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
+.tl-linkbtn:hover { background: var(--primary-tint); border-color: var(--primary); text-decoration: none; }
 .tl-chart { overflow: auto; max-height: 420px; }
 .tl-chart-tall { max-height: 620px; }
 
 .zoom-controls { display: inline-flex; align-items: center; gap: 6px; }
-.zoom-label { font-size: 12.5px; color: #5a6a7a; min-width: 42px; text-align: center; }
+.zoom-label { font-size: 12.5px; color: var(--muted); min-width: 42px; text-align: center; }
 .zoom-btn { min-width: 30px; }
 
 /* Step multi-select */
 .multiselect { position: relative; display: inline-flex; align-items: center; gap: 5px; }
 .multiselect-toggle {
-  background: #fff; border: 1px solid #c3ccd4; border-radius: 4px;
-  padding: 4px 9px; font-size: 13px; color: #1c2733; cursor: pointer; margin: 0;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px;
+  padding: 4px 9px; font-size: 13px; color: var(--text); cursor: pointer; margin: 0;
 }
-.multiselect-toggle:hover { background: #eef4fa; border-color: #2f6fb2; }
+.multiselect-toggle:hover { background: var(--primary-tint); border-color: var(--primary); }
 .multiselect-panel {
   position: absolute; top: 100%; left: 0; z-index: 40; margin-top: 4px;
-  background: #fff; border: 1px solid #c3ccd4; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
   box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 8px; min-width: 230px;
   max-height: 300px; overflow: auto;
 }
 .multiselect-opt { display: flex; align-items: center; gap: 7px; padding: 3px 4px; font-weight: 400; margin: 0; }
-.multiselect-opt:hover { background: #f2f6fa; }
+.multiselect-opt:hover { background: var(--primary-tint); }
 .multiselect-opt input { width: auto; }
-.multiselect-divider { height: 1px; background: #e4e8ec; margin: 6px 0; }
-.caret { color: #5a6a7a; font-size: 10px; }
+.multiselect-divider { height: 1px; background: var(--border); margin: 6px 0; }
+.caret { color: var(--muted); font-size: 10px; }
 
 /* Frappe overrides */
-.gantt .bar-wrapper.tl-locked .bar { stroke: #b8860b; stroke-width: 1.6; stroke-dasharray: 3 2; }
-.gantt .bar-wrapper.tl-done .bar-progress { fill: #1e7e34; }
-.gantt .bar-label { fill: #1c2733; font-size: 11.5px; }
-.gantt .bar-label.big { fill: #1c2733; }
-.tl-crew-label { font-size: 11px; font-weight: 700; fill: #43535f; }
-.tl-today { stroke: #b02a37; stroke-width: 1.5; pointer-events: none; }
-.tl-today-label { font-size: 10.5px; font-weight: 700; fill: #b02a37; }
+.gantt .bar-wrapper.tl-locked .bar { stroke: var(--warn-strong); stroke-width: 1.6; stroke-dasharray: 3 2; }
+.gantt .bar-wrapper.tl-done .bar-progress { fill: var(--ok); }
+.gantt .bar-label { fill: var(--text); font-size: 11.5px; }
+.gantt .bar-label.big { fill: var(--text); }
+.tl-crew-label { font-size: 11px; font-weight: 700; fill: var(--text-2); }
+.tl-today { stroke: var(--danger); stroke-width: 1.5; pointer-events: none; }
+.tl-today-label { font-size: 10.5px; font-weight: 700; fill: var(--danger); }
 /* The floating date header. It is moved to the end of the SVG so it paints over
    the bars, which only works if it is actually opaque — Frappe's default fill
    is white but a transparent one would let every bar show straight through. */
-.gantt .tl-sticky .grid-header { fill: #f4f6f8; stroke: #dfe4e9; stroke-width: 1; }
+.gantt .tl-sticky .grid-header { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
 .gantt .tl-sticky { pointer-events: none; }
 .gantt .tl-sticky .upper-text,
-.gantt .tl-sticky .lower-text { fill: #43535f; }
+.gantt .tl-sticky .lower-text { fill: var(--text-2); }
 .tl-popup {
-  background: #1c2733; color: #fff; padding: 8px 10px;
+  background: var(--tooltip); color: var(--on-accent); padding: 8px 10px;
   border-radius: 5px; font-size: 12.5px; line-height: 1.45;
 }
-.tl-popup .muted { color: #b8c2cc; }
+.tl-popup .muted { color: var(--on-accent-2); }
+/* The two warnings the hover box can carry. Classes rather than colours written
+   into the script (2026-09-22), so the theme decides them like everything else. */
+.tl-pop-late { color: var(--warn); }
+.tl-pop-dep { color: var(--danger); }
 
 /* Task editor */
 .tl-modal {
@@ -803,7 +912,7 @@ button.linkish:hover { background: none; color: #1d4e80; }
   display: flex; align-items: center; justify-content: center; z-index: 100;
 }
 .tl-modal-box {
-  background: #fff; border-radius: 8px; padding: 22px 24px;
+  background: var(--surface); border-radius: 8px; padding: 22px 24px;
   width: 380px; max-width: 92vw; box-shadow: 0 6px 26px rgba(0,0,0,.22);
 }
 .tl-modal-box h3 { margin-top: 0; }
@@ -813,23 +922,60 @@ button.linkish:hover { background: none; color: #1d4e80; }
   .tl-chart, .tl-chart-tall { max-height: none; overflow: visible; }
 }
 
+/* ON PAPER, THE LIGHT PALETTE (2026-09-22). The screen is Mana's black; a
+   printer given that lays down a black page and white letters, which wastes a
+   cartridge and is unreadable besides. Because every colour in this file is a
+   token, the whole app turns back over in one block, and the accents darken to
+   the versions that pass 4.5:1 on white.
+
+   The PNG and PDF buttons are NOT this: they photograph the screen, and an
+   export of a dark chart stays dark, which is the studio's own look to send. */
+@media print {
+  :root {
+    color-scheme: light;
+    --bg: #ffffff; --surface: #ffffff; --surface-2: #fafafa; --surface-3: #f1f3f5;
+    --border: #d8dde2; --border-soft: #e7eaee; --border-strong: #aab3bb;
+    --text: #101010; --text-2: #26323d; --muted: #4a5763; --faint: #6b7885;
+    --tooltip: #101010;
+    --on-accent: #ffffff; --on-accent-2: rgba(255, 255, 255, .8);
+    --on-primary: #ffffff; --on-ok: #ffffff; --on-danger: #ffffff;
+    --on-violet: #ffffff; --on-warn: #101010;
+    --primary: #1173d4; --primary-hover: #0d5aa8;
+    --primary-tint: #eef4fa; --primary-fill: #cfe3f6; --primary-soft: #9fc4e8;
+    --primary-border: #9fb6cc; --step-default: #1173d4;
+    --ok: #0b7f45; --ok-strong: #086636; --ok-tint: #f0faf2; --ok-border: #bfe0c7;
+    --danger: #b02a37; --danger-strong: #8f222c; --danger-tint: #fdf0f1;
+    --danger-tint-2: #f3d9dc; --danger-border: #e0b4ba; --clash-band: rgba(176, 42, 55, .13);
+    --warn: #8a6d1a; --warn-strong: #d6a72a; --warn-tint: #fffbee; --warn-border: #e0c98a;
+    --violet: #7b3fb8; --violet-strong: #4d2374; --violet-tint: #efe7fb;
+    --chip-indigo-bg: #e8eaf6; --chip-indigo-ink: #3949ab;
+    --chip-grey-bg: #f2f3f5;   --chip-grey-ink: #77838f;
+    --chip-teal-bg: #e0f5f2;   --chip-teal-ink: #14675e;
+    --chip-violet-bg: #efe6f7; --chip-violet-ink: #5b3a7e;
+    --chip-orange-bg: #fdeee0; --chip-orange-ink: #8a4b12;
+    --paper: #f4ede0; --paper-2: #ebdfc5; --paper-surface: #fffbf3; --paper-row: #f8f0e1;
+    --paper-border: #e2d5b9; --paper-ink: #5a4320; --paper-ink-2: #7a6440;
+    --shade: #101010;
+  }
+}
+
 /* Project tab bar — on every screen belonging to a project */
 .proj-bar {
-  border-bottom: 1px solid #e4e8ec; margin: 0 0 18px; padding-bottom: 0;
+  border-bottom: 1px solid var(--border); margin: 0 0 18px; padding-bottom: 0;
 }
 .proj-bar-title { font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .proj-bar-title a { color: inherit; }
-.proj-bar-title a:hover { color: #2f6fb2; }
+.proj-bar-title a:hover { color: var(--primary); }
 .proj-tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .proj-tab {
   display: inline-block; padding: 7px 12px; font-size: 13.5px;
-  color: #43535f; border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0;
+  color: var(--text-2); border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0;
 }
-.proj-tab:hover { background: #eef4fa; color: #2f6fb2; text-decoration: none; }
-.proj-tab.current { color: #1c2733; font-weight: 600; border-bottom-color: #2f6fb2; background: #f7f9fb; }
+.proj-tab:hover { background: var(--primary-tint); color: var(--primary); text-decoration: none; }
+.proj-tab.current { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); background: var(--surface-2); }
 /* The set-up-and-fix screens read one notch quieter than the daily ones. */
-.proj-tab.tab-data { color: #5a6a7a; font-size: 13px; }
-.proj-tab-sep { width: 1px; height: 18px; background: #dfe4e9; margin: 0 8px; }
+.proj-tab.tab-data { color: var(--muted); font-size: 13px; }
+.proj-tab-sep { width: 1px; height: 18px; background: var(--border); margin: 0 8px; }
 
 /* SECTION SWITCHER — the level ABOVE the tabs: which side of the project you
    are on, run it or pay for it.
@@ -840,20 +986,20 @@ button.linkish:hover { background: none; color: #1d4e80; }
    one" before a word of it is read. */
 .proj-sections {
   display: inline-flex; gap: 2px; margin-bottom: 10px; padding: 2px;
-  background: #f2f5f8; border: 1px solid #e0e6eb; border-radius: 5px;
+  background: var(--primary-tint); border: 1px solid var(--border); border-radius: 5px;
 }
 .proj-section {
   display: inline-block; padding: 5px 16px; font-size: 13px; font-weight: 600;
-  color: #5a6a7a; border-radius: 3px; line-height: 1.5; white-space: nowrap;
+  color: var(--muted); border-radius: 3px; line-height: 1.5; white-space: nowrap;
 }
-.proj-section:hover { background: #e6edf4; color: #2f6fb2; text-decoration: none; }
-.proj-section.current { background: #2f6fb2; color: #fff; }
-.proj-section.current:hover { background: #2f6fb2; color: #fff; }
+.proj-section:hover { background: var(--primary-tint); color: var(--primary); text-decoration: none; }
+.proj-section.current { background: var(--primary); color: var(--on-primary); }
+.proj-section.current:hover { background: var(--primary); color: var(--on-primary); }
 /* Money wears the administrators-only red, so the finance side of a project is
    never mistaken at a glance for another production screen. */
 .proj-bar-finance .proj-section.current,
-.proj-bar-finance .proj-section.current:hover { background: #8f222c; color: #fff; }
-.proj-bar-finance .proj-tab.current { border-bottom-color: #8f222c; }
+.proj-bar-finance .proj-section.current:hover { background: var(--danger-strong); color: var(--on-danger); }
+.proj-bar-finance .proj-tab.current { border-bottom-color: var(--danger-strong); }
 
 @media print { .proj-bar { display: none; } }
 
@@ -862,7 +1008,7 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .dash-hero .wizard-title { margin-bottom: 4px; }
 
 .dash-primary {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   padding: 18px 20px; margin: 16px 0;
 }
 .dash-primary-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
@@ -871,51 +1017,51 @@ button.linkish:hover { background: none; color: #1d4e80; }
 .dash-big { text-align: right; }
 .big-pct { font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .unit-badge {
-  background: #eef1f4; color: #43535f; border-radius: 3px;
+  background: var(--surface-3); color: var(--text-2); border-radius: 3px;
   padding: 2px 7px; font-size: 11px; font-weight: 600; margin-left: 7px;
   text-transform: uppercase; letter-spacing: .03em;
 }
 
 .stacked-progress {
-  position: relative; height: 14px; background: #e8ecef;
+  position: relative; height: 14px; background: var(--surface-3);
   border-radius: 7px; overflow: hidden; margin: 16px 0 8px;
 }
 .stacked-progress span { position: absolute; top: 0; bottom: 0; }
-.band-approved { left: 0; background: #2fa84f; }
-.band-delivered { background: #4A90D9; }
-.dash-legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: #43535f; }
+.band-approved { left: 0; background: var(--ok-strong); }
+.band-delivered { background: var(--step-default); }
+.dash-legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); }
 .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
-.sw-approved { background: #2fa84f; }
-.sw-delivered { background: #4A90D9; }
+.sw-approved { background: var(--ok-strong); }
+.sw-delivered { background: var(--step-default); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }
 .kpi-grid-6 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 16px 0; }
-.kpi-grid > div { background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 13px; }
-.kpi-label { font-size: 11.5px; color: #5a6a7a; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 5px; }
+.kpi-grid > div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 13px; }
+.kpi-label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 5px; }
 .kpi-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.kpi-value .unit { font-size: 12px; font-weight: 400; color: #5a6a7a; }
-.kpi-value.ok, .status-ontrack { color: #1e7e34; }
-.kpi-value.info { color: #2f6fb2; }
-.kpi-value.warn, .status-behind { color: #8a6d1a; }
-.status-critical { color: #b02a37; }
-.status-unknown { color: #5a6a7a; }
+.kpi-value .unit { font-size: 12px; font-weight: 400; color: var(--muted); }
+.kpi-value.ok, .status-ontrack { color: var(--ok); }
+.kpi-value.info { color: var(--primary); }
+.kpi-value.warn, .status-behind { color: var(--warn); }
+.status-critical { color: var(--danger); }
+.status-unknown { color: var(--muted); }
 .trend { font-size: 11.5px; font-weight: 600; margin-left: 5px; }
 
 .step-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
-.step-card { background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 12px 14px; }
-.step-card.overdue { border-color: #e0b4ba; background: #fdf6f7; }
+.step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+.step-card.overdue { border-color: var(--danger-border); background: var(--danger-tint); }
 /* Finished: everything that applies to the step is approved (David, 2026-09-22).
    The same green the rest of the app means "done" with, and quiet enough that a
    wall of finished steps does not shout. */
-.step-card.done { border-color: #bfe0c7; background: #f4faf5; }
-.done-text { color: #1e7e34; font-weight: 600; }
+.step-card.done { border-color: var(--ok-border); background: var(--ok-tint); }
+.done-text { color: var(--ok); font-weight: 600; }
 .step-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .step-card-head h4 { margin: 0; font-size: 14px; }
-.mini-bar { height: 5px; background: #e8ecef; border-radius: 3px; overflow: hidden; margin: 9px 0 7px; }
+.mini-bar { height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; margin: 9px 0 7px; }
 .mini-bar span { display: block; height: 100%; border-radius: 3px; }
 .mini-num { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.mini-total { font-size: 13px; color: #5a6a7a; font-weight: 400; }
-.mini-pace { margin-top: 8px; font-size: 12.5px; color: #43535f; border-top: 1px solid #eef1f4; padding-top: 7px; }
+.mini-total { font-size: 13px; color: var(--muted); font-weight: 400; }
+.mini-pace { margin-top: 8px; font-size: 12.5px; color: var(--text-2); border-top: 1px solid var(--border-soft); padding-top: 7px; }
 
 /* A wide table gets its own scroll box. overflow-x: auto forces overflow-y to
    compute as auto too — the spec doesn't allow one axis to stay visible — so
@@ -925,42 +1071,42 @@ button.linkish:hover { background: none; color: #1d4e80; }
    episodes scroll under it, and short tables never hit the limit at all. */
 .table-scroll { overflow: auto; max-height: 70vh; }
 .grid-table td.num, .grid-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.health-green   { background: #eef8f0; color: #1e7e34; }
-.health-amber   { background: #fdf6e3; color: #8a6d1a; }
-.health-red     { background: #fdeff0; color: #b02a37; }
-.health-neutral { color: #5a6a7a; }
+.health-green   { background: var(--ok-tint); color: var(--ok); }
+.health-amber   { background: var(--warn-tint); color: var(--warn); }
+.health-red     { background: var(--danger-tint); color: var(--danger); }
+.health-neutral { color: var(--muted); }
 .hdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; }
-.hdot.green { background: #2fa84f; } .hdot.amber { background: #d9a520; } .hdot.red { background: #b02a37; }
+.hdot.green { background: var(--ok-strong); } .hdot.amber { background: var(--warn-strong); } .hdot.red { background: var(--danger); }
 .legend-key { margin-top: 8px; }
-.row-done td { color: #8a97a3; }
+.row-done td { color: var(--faint); }
 .row-done td strong { font-weight: 400; }
 
 .dash-strip, .dash-pace {
   display: flex; gap: 28px; flex-wrap: wrap;
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px 16px; margin: 16px 0;
 }
 .dash-strip > div, .dash-pace > div { display: flex; flex-direction: column; gap: 2px; }
 .dash-strip strong, .dash-pace strong { font-size: 20px; font-variant-numeric: tabular-nums; }
-.dash-attention { color: #43535f; padding-left: 20px; max-width: 92ch; }
+.dash-attention { color: var(--text-2); padding-left: 20px; max-width: 92ch; }
 .dash-attention li { margin-bottom: 7px; }
 .dash-steps td { vertical-align: middle; }
 
 /* Two bands in one bar: delivered behind, approved in front. */
 .pbar {
   position: relative; height: 9px; width: 100%; min-width: 90px;
-  background: #e8ecef; border-radius: 5px; overflow: hidden;
+  background: var(--surface-3); border-radius: 5px; overflow: hidden;
 }
 .pbar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; }
-.pbar-delivered { background: #c3d4e5; }
-.pbar-approved { background: #4A90D9; }
+.pbar-delivered { background: var(--primary-fill); }
+.pbar-approved { background: var(--step-default); }
 
 .burnup { display: block; max-width: 660px; margin: 6px 0; }
-.bu-line { stroke: #2f6fb2; stroke-width: 2; }
-.bu-dot { fill: #2f6fb2; }
-.bu-target { stroke: #9fb6cc; stroke-width: 1; stroke-dasharray: 4 3; }
-.bu-delivery { stroke: #b02a37; stroke-width: 1.2; stroke-dasharray: 3 3; }
-.bu-axis { font-size: 10px; fill: #5a6a7a; }
+.bu-line { stroke: var(--primary); stroke-width: 2; }
+.bu-dot { fill: var(--primary); }
+.bu-target { stroke: var(--primary-border); stroke-width: 1; stroke-dasharray: 4 3; }
+.bu-delivery { stroke: var(--danger); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.bu-axis { font-size: 10px; fill: var(--muted); }
 
 /* Crew */
 .col-num { width: 3.5rem; font-variant-numeric: tabular-nums; }
@@ -977,20 +1123,30 @@ button.linkish:hover { background: none; color: #1d4e80; }
 /* Login / installer */
 .login-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; }
 .login-box {
-  background: #fff; padding: 32px; border-radius: 8px;
+  background: var(--surface); padding: 32px; border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0,0,0,.08); width: 360px; max-width: 92vw;
 }
 .login-box h1 { font-size: 18px; margin-top: 0; }
 label { display: block; margin: 12px 0 4px; font-weight: 600; }
-input, select {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+input, select, textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-size: 15px;
+  background: var(--surface-2); color: var(--text);
+}
+/* The ones the browser draws itself: a swatch, a tick, a slider. Giving them
+   a background paints over the control. */
+input[type=checkbox], input[type=radio], input[type=color], input[type=range] {
+  background: none; padding: 0;
+}
+input::placeholder, textarea::placeholder { color: var(--faint); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 1px;
 }
 button {
   margin-top: 16px; padding: 9px 18px; border: 0; border-radius: 4px;
-  background: #2f6fb2; color: #fff; font-size: 15px; cursor: pointer;
+  background: var(--primary); color: var(--on-primary); font-size: 15px; cursor: pointer;
 }
-button:hover { background: #275d95; }
+button:hover { background: var(--primary-hover); }
 
 /* ==========================================================================
    TASKS AND TICKETS (Phase 7)
@@ -1018,82 +1174,82 @@ button:hover { background: #275d95; }
   margin: 14px 0 18px; overflow-x: auto; padding-bottom: 6px;
 }
 .board-col {
-  background: #eef1f4; border: 1px solid #e4e8ec; border-radius: 8px;
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
   display: flex; flex-direction: column; min-height: 180px;
 }
 .board-col-head {
   display: flex; align-items: center; gap: 7px;
-  padding: 10px 12px 8px; border-bottom: 1px solid #dde3e9;
+  padding: 10px 12px 8px; border-bottom: 1px solid var(--border);
 }
 .board-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .board-col-name { font-size: 13px; font-weight: 600; flex: 1; }
 .board-col-flag {
   font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
-  background: #fff3cd; color: #8a6d1a; border: 1px solid #e0c98a;
+  background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn-border);
   padding: 1px 6px; border-radius: 9px;
 }
 .board-col-count {
-  font-size: 11px; color: #5a6a7a; background: #fff;
-  border: 1px solid #dde3e9; padding: 1px 7px; border-radius: 10px;
+  font-size: 11px; color: var(--muted); background: var(--surface);
+  border: 1px solid var(--border); padding: 1px 7px; border-radius: 10px;
 }
 .board-cards {
   padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 7px;
   min-height: 70px; transition: background .15s;
 }
-.board-cards.drag-over { background: #e3f0fb; border-radius: 0 0 8px 8px; }
+.board-cards.drag-over { background: var(--primary-tint); border-radius: 0 0 8px 8px; }
 
 /* --- cards --- */
 .board-card {
-  background: #fff; border: 1px solid #e4e8ec; border-left: 3px solid #c3ccd4;
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
   border-radius: 6px; padding: 9px 11px; cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,.05);
   transition: box-shadow .15s, border-color .15s;
 }
 .board-card[draggable="true"] { cursor: grab; }
 .board-card[draggable="true"]:active { cursor: grabbing; }
-.board-card:hover { border-color: #9fb6cc; box-shadow: 0 2px 8px rgba(0,0,0,.09); }
-.board-card.overdue { background: #fdf6f7; }
+.board-card:hover { border-color: var(--primary-border); box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+.board-card.overdue { background: var(--danger-tint); }
 .board-card.filtered-out { display: none; }
 
 /* Priority is the left stripe: readable without a legend, and it never competes
    with the crew colour, which is a bar along the top. */
-.board-card.priority-low    { border-left-color: #b6c2cd; }
-.board-card.priority-medium { border-left-color: #2f6fb2; }
-.board-card.priority-high   { border-left-color: #d6a72a; }
-.board-card.priority-urgent { border-left-color: #b02a37; }
+.board-card.priority-low    { border-left-color: var(--border-strong); }
+.board-card.priority-medium { border-left-color: var(--primary); }
+.board-card.priority-high   { border-left-color: var(--warn-strong); }
+.board-card.priority-urgent { border-left-color: var(--danger); }
 
 .card-crew-bar { height: 3px; border-radius: 2px; margin: -3px -7px 7px; }
 .card-ref { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-.ref-ticket { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: #2f6fb2; }
-.ref-task   { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: #5a6a7a; }
+.ref-ticket { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--primary); }
+.ref-task   { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
 .off-board {
-  font-size: 10px; background: #fff3cd; color: #8a6d1a;
-  border: 1px solid #e0c98a; border-radius: 9px; padding: 0 6px;
+  font-size: 10px; background: var(--warn-tint); color: var(--warn);
+  border: 1px solid var(--warn-border); border-radius: 9px; padding: 0 6px;
 }
 .card-title { font-size: 13.5px; font-weight: 500; line-height: 1.35; }
-.card-desc { font-size: 11.5px; color: #5a6a7a; margin-top: 3px; line-height: 1.4; }
+.card-desc { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
 .card-context { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
 .card-meta {
   display: flex; align-items: center; gap: 7px; margin-top: 7px;
-  font-size: 11px; color: #5a6a7a;
+  font-size: 11px; color: var(--muted);
 }
 .card-owner {
   padding: 1px 6px; border-radius: 4px; font-size: 10.5px;
   font-weight: 600; border: 1px solid transparent;
 }
-.card-due.is-overdue { color: #b02a37; font-weight: 600; }
+.card-due.is-overdue { color: var(--danger); font-weight: 600; }
 .card-badge { font-size: 10.5px; }
 .prio-dot {
   width: 7px; height: 7px; border-radius: 50%; margin-left: auto;
   display: inline-block; flex-shrink: 0;
 }
-.prio-dot.priority-low    { background: #b6c2cd; }
-.prio-dot.priority-medium { background: #2f6fb2; }
-.prio-dot.priority-high   { background: #d6a72a; }
-.prio-dot.priority-urgent { background: #b02a37; }
+.prio-dot.priority-low    { background: var(--border-strong); }
+.prio-dot.priority-medium { background: var(--primary); }
+.prio-dot.priority-high   { background: var(--warn-strong); }
+.prio-dot.priority-urgent { background: var(--danger); }
 .card-archive-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 8px; padding-top: 7px; border-top: 1px dashed #dde3e9;
+  margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border);
 }
 .card-archive-row form { margin: 0; display: inline; }
 .card-archive-row button { margin-top: 0; padding: 3px 9px; font-size: 12px; }
@@ -1104,15 +1260,15 @@ button:hover { background: #275d95; }
   display: inline-block; padding: 1px 7px; border-radius: 9px;
   font-size: 10.5px; font-weight: 500; margin-right: 3px;
 }
-.ctx-chip.ctx-shot  { background: #e3f0fb; color: #1c4f7c; }
-.ctx-chip.ctx-asset { background: #e0f5f2; color: #14675e; }
-.ctx-chip.ctx-step  { background: #efe6f7; color: #5b3a7e; }
+.ctx-chip.ctx-shot  { background: var(--primary-tint); color: var(--primary-hover); }
+.ctx-chip.ctx-asset { background: var(--chip-teal-bg); color: var(--chip-teal-ink); }
+.ctx-chip.ctx-step  { background: var(--chip-violet-bg); color: var(--chip-violet-ink); }
 
 .status-chip {
   display: inline-block; padding: 1px 8px; border-radius: 10px;
   font-size: 11.5px; font-weight: 600;
 }
-tr.row-overdue td { background: #fdf6f7; }
+tr.row-overdue td { background: var(--danger-tint); }
 
 /* --- modals --- */
 .modal {
@@ -1121,50 +1277,50 @@ tr.row-overdue td { background: #fdf6f7; }
   padding: 24px 16px;
 }
 .modal-box {
-  background: #fff; border-radius: 8px; padding: 22px 26px;
+  background: var(--surface); border-radius: 8px; padding: 22px 26px;
   width: 540px; max-width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,.18);
   margin: auto;
 }
 .modal-box h3 { margin: 0 0 4px; font-size: 17px; }
 .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .modal-box textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 .form-error {
-  background: #fdf0f1; border-left: 4px solid #b02a37; color: #8f222c;
+  background: var(--danger-tint); border-left: 4px solid var(--danger); color: var(--danger-strong);
   padding: 9px 12px; border-radius: 4px; margin: 12px 0 0; font-size: 14px;
 }
-.req-mark { color: #b02a37; font-weight: 700; }
+.req-mark { color: var(--danger); font-weight: 700; }
 
 /* --- ticket detail --- */
 .panel {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
 }
 .panel > h2:first-child { margin-top: 0; }
 .ticket-ref-lg { font-size: 14px; font-weight: 700; letter-spacing: .04em; margin-right: 6px; }
 .ticket-body {
-  background: #f7f9fb; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px 14px; margin-top: 14px; line-height: 1.55; white-space: pre-wrap;
 }
 .detail-form textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 
 .attachment-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .attachment {
-  width: 190px; background: #f7f9fb; border: 1px solid #e4e8ec;
+  width: 190px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 6px; overflow: hidden;
 }
 .attachment img, .attachment video {
-  display: block; width: 100%; height: 118px; object-fit: cover; background: #1c2733;
+  display: block; width: 100%; height: 118px; object-fit: cover; background: var(--tooltip);
 }
 .attachment .file-link { display: block; padding: 24px 10px; text-align: center; font-size: 13px; }
 .attachment-meta {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-  font-size: 10.5px; color: #5a6a7a; border-top: 1px solid #e4e8ec;
+  font-size: 10.5px; color: var(--muted); border-top: 1px solid var(--border);
 }
 .attachment-meta span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attachment-meta form { margin: 0; display: inline; }
@@ -1174,17 +1330,17 @@ tr.row-overdue td { background: #fdf6f7; }
    with them, but they are visibly THERE, which is the whole point of writing
    them. STFC's version showed only what people typed, so "who moved this to
    Done" was unanswerable. */
-.comment { border-left: 2px solid #e4e8ec; padding: 3px 0 10px 12px; margin-bottom: 13px; }
+.comment { border-left: 2px solid var(--border); padding: 3px 0 10px 12px; margin-bottom: 13px; }
 .comment-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
 .comment-body { line-height: 1.5; white-space: pre-wrap; }
-.comment-system { border-left-color: #c3ccd4; }
+.comment-system { border-left-color: var(--border-strong); }
 .comment-system .comment-body {
-  color: #5a6a7a; font-size: 13px; background: #f7f9fb;
+  color: var(--muted); font-size: 13px; background: var(--surface-2);
   border-radius: 4px; padding: 6px 10px; display: inline-block;
 }
-.comment-form { margin-top: 18px; border-top: 1px solid #e4e8ec; padding-top: 14px; }
+.comment-form { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
 .comment-form textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 .comment-form input[type=file] { padding: 6px 0; border: 0; }
@@ -1193,51 +1349,51 @@ tr.row-overdue td { background: #fdf6f7; }
 .file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
 .file-chip {
   display: flex; align-items: center; gap: 8px;
-  background: #f7f9fb; border: 1px solid #e4e8ec;
+  background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 5px; padding: 5px 8px; font-size: 13px;
 }
-.file-chip.too-big { border-color: #e0b4ba; background: #fdf0f1; }
+.file-chip.too-big { border-color: var(--danger-border); background: var(--danger-tint); }
 .file-chip-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-chip-size { color: #5a6a7a; font-size: 12px; white-space: nowrap; }
-.file-chip.too-big .file-chip-size { color: #b02a37; font-weight: 600; }
+.file-chip-size { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.file-chip.too-big .file-chip-size { color: var(--danger); font-weight: 600; }
 .file-chip-remove {
-  background: none; border: 0; color: #5a6a7a; cursor: pointer;
+  background: none; border: 0; color: var(--muted); cursor: pointer;
   font-size: 17px; line-height: 1; padding: 0 2px; margin: 0;
 }
-.file-chip-remove:hover { background: none; color: #b02a37; }
+.file-chip-remove:hover { background: none; color: var(--danger); }
 
 .upload-progress { margin-top: 12px; }
 .progress-track {
-  height: 6px; background: #eef1f4; border: 1px solid #dde3e9;
+  height: 6px; background: var(--surface-3); border: 1px solid var(--border);
   border-radius: 3px; overflow: hidden;
 }
-.progress-fill { height: 100%; width: 0; background: #2f6fb2; transition: width .2s ease; }
+.progress-fill { height: 100%; width: 0; background: var(--primary); transition: width .2s ease; }
 .progress-label { margin-top: 5px; }
 
 .danger-zone {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   flex-wrap: wrap; margin-top: 22px; padding: 14px 16px;
-  border: 1px solid #e0b4ba; border-radius: 6px; background: #fdf6f7;
+  border: 1px solid var(--danger-border); border-radius: 6px; background: var(--danger-tint);
 }
 .danger-zone form { margin: 0; }
 .danger-zone button { margin-top: 0; }
 
 .share-url {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 8px 12px; margin-bottom: 16px;
 }
 .share-url-label {
   font-size: 11px; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: #5a6a7a; flex-shrink: 0;
+  text-transform: uppercase; color: var(--muted); flex-shrink: 0;
 }
 .share-url input {
   flex: 1; min-width: 220px; padding: 6px 9px; font-size: 13px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #f7f9fb;
+  background: var(--surface-2);
 }
 .share-url button { margin-top: 0; flex-shrink: 0; }
-.share-url button.copied { background: #1e7e34; color: #fff; }
+.share-url button.copied { background: var(--ok); color: var(--on-ok); }
 
 /* ==========================================================================
    TRACKING GRID / PRODUCTION (Phase 8)
@@ -1254,36 +1410,36 @@ tr.row-overdue td { background: #fdf6f7; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .legend-tag {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  background: #e3f6e8; color: #1e7e34; border-radius: 8px; padding: 0 6px;
+  background: var(--ok-tint); color: var(--ok); border-radius: 8px; padding: 0 6px;
 }
-.legend-tag.warn { background: #fff3cd; color: #8a6d1a; }
-.legend-tag.muted-tag { background: #eceff1; color: #546e7a; }
+.legend-tag.warn { background: var(--warn-tint); color: var(--warn); }
+.legend-tag.muted-tag { background: var(--surface-3); color: var(--text-2); }
 
 /* The cell. Square, small, and the same element in the legend as in the grid —
    if they were styled separately they would eventually stop matching. */
 .cell-chip {
   display: inline-block; width: 16px; height: 16px; border-radius: 3px;
   border: 1px solid rgba(0,0,0,.14); padding: 0; margin: 0; vertical-align: middle;
-  background: #8a97a3;
+  background: var(--faint);
 }
 button.cell-chip { cursor: default; }
 button.cell-chip.is-editable { cursor: pointer; }
-button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset: 1px; }
-.cell-none { background: #fff; border: 1px dashed #c3ccd4; }
+button.cell-chip.is-editable:hover { outline: 2px solid var(--primary); outline-offset: 1px; }
+.cell-none { background: var(--surface); border: 1px dashed var(--border-strong); }
 .cell-chip.is-saving { opacity: .45; }
-.cell-chip.just-saved { outline: 2px solid #1e7e34; outline-offset: 1px; }
-.cell-dash { color: #b6c2cd; }
+.cell-chip.just-saved { outline: 2px solid var(--ok); outline-offset: 1px; }
+.cell-dash { color: var(--border-strong); }
 
-.bar-outer { height: 10px; background: #eef1f4; border: 1px solid #dde3e9; border-radius: 5px; overflow: hidden; }
-.bar-inner { height: 100%; background: #1e7e34; }
+.bar-outer { height: 10px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.bar-inner { height: 100%; background: var(--ok); }
 
 .step-counters {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px; margin-top: 16px;
 }
-.counter-label { font-size: 12px; color: #5a6a7a; text-transform: uppercase; letter-spacing: .03em; }
+.counter-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .counter-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.counter-of { font-size: 14px; color: #5a6a7a; font-weight: 400; }
+.counter-of { font-size: 14px; color: var(--muted); font-weight: 400; }
 
 /* Donuts — one per group, drawn only for groups that exist. */
 .donut-row { display: flex; flex-wrap: wrap; gap: 18px; }
@@ -1292,8 +1448,8 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .donut { display: block; }
 .donut-seg { cursor: pointer; transition: opacity .12s; }
 .donut-seg:hover { opacity: .75; }
-.donut-num { font: 700 19px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #1c2733; }
-.donut-cap { font: 400 10px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5a6a7a; }
+.donut-num { font: 700 19px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
+.donut-cap { font: 400 10px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--muted); }
 
 /* ⚠ THE max-height IS WHAT MAKES THE STICKY HEADER WORK. Do not remove it
    thinking it is cosmetic.
@@ -1324,7 +1480,7 @@ button.cell-chip.is-editable:hover { outline: 2px solid #2f6fb2; outline-offset:
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
 /* Trend chart on the step page. Hand-rolled SVG — no chart library. */
-.trend-wrap { background: #fff; border: 1px solid #e4e8ec; border-radius: 6px; padding: 10px 12px; }
+.trend-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
 .trend { display: block; }
 /* ⚠ CLASS COLLISION, fixed for the chart only. `.trend` is ALSO the "on track /
    behind" indicator beside a pace figure, and that rule, much further up, gives
@@ -1344,16 +1500,16 @@ svg.trend { margin: 0; }
    the target's dashes drawn two and a half times longer on a wide screen than on
    a narrow one. This keeps every line its real width and every dash 6px. */
 .trend-grid, .trend-target, .trend-approved, .trend-delivered { vector-effect: non-scaling-stroke; }
-.trend-grid { stroke: #eef1f4; stroke-width: 1; }
-.trend-target { stroke: #b02a37; stroke-width: 1.6; stroke-dasharray: 6 4; }
-.trend-approved { fill: none; stroke: #1e7e34; stroke-width: 2.2; }
-.trend-delivered { fill: none; stroke: #2f6fb2; stroke-width: 1.8; }
-.trend-axis { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #7b8894; }
-.trend-cap { font: 400 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: #8a97a3; }
+.trend-grid { stroke: var(--surface-3); stroke-width: 1; }
+.trend-target { stroke: var(--danger); stroke-width: 1.6; stroke-dasharray: 6 4; }
+.trend-approved { fill: none; stroke: var(--ok); stroke-width: 2.2; }
+.trend-delivered { fill: none; stroke: var(--primary); stroke-width: 1.8; }
+.trend-axis { font: 400 10.5px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--muted); }
+.trend-cap { font: 400 11px -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--faint); }
 .trend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
-.trend-swatch.approved { background: #1e7e34; }
-.trend-swatch.delivered { background: #2f6fb2; }
-.trend-swatch.target { background: repeating-linear-gradient(90deg, #b02a37 0 5px, transparent 5px 9px); }
+.trend-swatch.approved { background: var(--ok); }
+.trend-swatch.delivered { background: var(--primary); }
+.trend-swatch.target { background: repeating-linear-gradient(90deg, var(--danger) 0 5px, transparent 5px 9px); }
 
 /* The .mywork- class names below are deliberately left alone after the screen
    was renamed to My tasks: they are internal, and renaming markup across a
@@ -1379,25 +1535,25 @@ svg.trend { margin: 0; }
 .item-table .ver-input { width: 90px; padding: 5px 7px; font-size: 14px; }
 .item-table .notes-input {
   width: 100%; min-width: 180px; padding: 5px 7px; font-size: 14px;
-  border: 1px solid #c3ccd4; border-radius: 4px; font-family: inherit; resize: vertical;
+  border: 1px solid var(--border-strong); border-radius: 4px; font-family: inherit; resize: vertical;
 }
-.item-table tr.is-done td { background: #f4fbf6; }
+.item-table tr.is-done td { background: var(--ok-tint); }
 .item-table tr.is-na td { opacity: .6; }
 .item-table small { display: block; margin-top: 2px; }
 
 /* People screens */
 .slot-tag {
   display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; background: #eceff1; color: #546e7a;
+  text-transform: uppercase; background: var(--surface-3); color: var(--text-2);
   border-radius: 8px; padding: 1px 7px; margin-left: 6px;
 }
-tr.row-slot td { background: #fbfcfd; }
+tr.row-slot td { background: var(--surface-2); }
 /* Marks a block only administrators can see. Deliberately loud: somebody
    screen-sharing should know before they scroll into it. */
 .admin-only-tag {
   display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; background: #fdf0f1; color: #8f222c;
-  border: 1px solid #e0b4ba; border-radius: 8px; padding: 1px 8px; margin-left: 8px;
+  text-transform: uppercase; background: var(--danger-tint); color: var(--danger-strong);
+  border: 1px solid var(--danger-border); border-radius: 8px; padding: 1px 8px; margin-left: 8px;
   vertical-align: middle;
 }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -1405,37 +1561,37 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* The scope under a repeated step name — "Concept / Characters" vs
    "Concept / Environments". Shown only where the name really is repeated. */
 .step-scope {
-  display: block; font-weight: 400; font-size: 10.5px; color: #5a6a7a;
+  display: block; font-weight: 400; font-size: 10.5px; color: var(--muted);
   text-transform: none; letter-spacing: 0; margin-top: 1px;
 }
 .track-table th.track-done, .track-table td.track-done { text-align: right; white-space: nowrap; }
 .track-name { white-space: nowrap; font-weight: 500; }
-.track-row.is-ready .track-name { color: #1e7e34; }
-.track-row.is-ready td { background: #f4fbf6; }
+.track-row.is-ready .track-name { color: var(--ok); }
+.track-row.is-ready td { background: var(--ok-tint); }
 .ready-tag {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  background: #e3f6e8; color: #1e7e34; border-radius: 8px; padding: 0 6px; margin-left: 6px;
+  background: var(--ok-tint); color: var(--ok); border-radius: 8px; padding: 0 6px; margin-left: 6px;
 }
-.track-group td { background: #eef1f4; border-top: 2px solid #dde3e9; }
+.track-group td { background: var(--surface-3); border-top: 2px solid var(--border); }
 .group-badge {
-  display: inline-block; background: #e3f0fb; color: #1c4f7c; border-radius: 9px;
+  display: inline-block; background: var(--primary-tint); color: var(--primary-hover); border-radius: 9px;
   padding: 1px 9px; font-size: 11px; font-weight: 700; letter-spacing: .04em; margin-right: 8px;
 }
 
 /* The status dropdown. Positioned against the document because the grid scrolls
    inside its own container. */
 .status-menu {
-  position: absolute; z-index: 120; background: #fff;
-  border: 1px solid #c3ccd4; border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.16);
+  position: absolute; z-index: 120; background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.16);
   padding: 4px; min-width: 210px; max-height: 60vh; overflow-y: auto;
 }
 .status-opt {
   display: flex; align-items: center; gap: 8px; width: 100%;
-  background: none; border: 0; color: #1c2733; text-align: left;
+  background: none; border: 0; color: var(--text); text-align: left;
   padding: 6px 8px; margin: 0; border-radius: 4px; font-size: 14px; cursor: pointer;
 }
-.status-opt:hover { background: #eef4fa; }
-.status-opt.is-current { background: #e3f0fb; font-weight: 600; }
+.status-opt:hover { background: var(--primary-tint); }
+.status-opt.is-current { background: var(--primary-tint); font-weight: 600; }
 
 /* tasks.php shows its modals by writing style.display; this screen uses the
    `hidden` attribute, which is tidier but leaves display at its default block —
@@ -1448,13 +1604,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .slice-list { max-height: 55vh; overflow-y: auto; }
 .slice-row {
   display: flex; justify-content: space-between; gap: 12px;
-  padding: 6px 0; border-bottom: 1px solid #e4e8ec;
+  padding: 6px 0; border-bottom: 1px solid var(--border);
 }
 .stale-banner a { font-weight: 600; }
 
 /* A link styled as a secondary button, for the Assets / Shots toggle. */
-.button.secondary-link { background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; }
-.button.secondary-link:hover { background: #eef4fa; }
+.button.secondary-link { background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); }
+.button.secondary-link:hover { background: var(--primary-tint); }
 
 /* Attachment lightbox — an image opens over the ticket rather than in a new tab,
    so looking at a reference doesn't cost you the page you were reading. */
@@ -1467,22 +1623,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .lightbox.is-open { display: flex; }
 .lightbox img {
   max-width: 100%; max-height: 100%;
-  object-fit: contain; border-radius: 4px; background: #1c2733;
+  object-fit: contain; border-radius: 4px; background: var(--tooltip);
   box-shadow: 0 10px 40px rgba(0,0,0,.5);
 }
 .lightbox-bar {
   position: absolute; top: 0; left: 0; right: 0;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 16px; color: #eef1f4; font-size: 13px;
+  padding: 10px 16px; color: var(--on-accent-2); font-size: 13px;
 }
 .lightbox-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lightbox-open { color: #9fc4e8; }
-.lightbox-open:hover { color: #fff; }
+.lightbox-open { color: var(--primary-soft); }
+.lightbox-open:hover { color: var(--on-accent); }
 .lightbox-close {
-  background: none; border: 0; color: #eef1f4; cursor: pointer;
+  background: none; border: 0; color: var(--on-accent-2); cursor: pointer;
   font-size: 26px; line-height: 1; padding: 0 6px; margin: 0;
 }
-.lightbox-close:hover { background: none; color: #fff; }
+.lightbox-close:hover { background: none; color: var(--on-accent); }
 /* Stop the page behind scrolling while the overlay is up. */
 body.lightbox-lock { overflow: hidden; }
 .att-zoom { cursor: zoom-in; display: block; }
@@ -1495,7 +1651,7 @@ body.lightbox-lock { overflow: hidden; }
 /* Project brief — prose, so the fields are wide and the measure stays readable. */
 .brief-form { max-width: 92ch; }
 .brief-form textarea {
-  width: 100%; padding: 9px 11px; border: 1px solid #c3ccd4; border-radius: 4px;
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
 }
 .brief-form small { margin-top: 4px; }
@@ -1503,8 +1659,8 @@ body.lightbox-lock { overflow: hidden; }
 /* Expense projection — laid out like the studio's own spreadsheet. */
 .proj-table { min-width: 1000px; }
 .proj-table td, .proj-table th { padding: 6px 10px; }
-.proj-table tr.subtotal td { background: #f7f9fb; font-weight: 600; border-top: 1px solid #dde3e9; }
-.proj-table tfoot th { background: #eef1f4; font-size: 14px; }
+.proj-table tr.subtotal td { background: var(--surface-2); font-weight: 600; border-top: 1px solid var(--border); }
+.proj-table tfoot th { background: var(--surface-3); font-size: 14px; }
 .proj-table .small { font-size: 12.5px; }
 
 /* --- The project list's inline editing ------------------------------------
@@ -1547,11 +1703,11 @@ body.lightbox-lock { overflow: hidden; }
 .cell-btns button { border: 1px solid transparent; margin-top: 0; }
 .row-btn, .crumb a {
   display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px;
-  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); font-weight: 600;
   text-decoration: none; white-space: nowrap; cursor: pointer;
   user-select: none; list-style: none;
 }
-.row-btn:hover, .crumb a:hover { background: #eef4fa; border-color: #2f6fb2; text-decoration: none; }
+.row-btn:hover, .crumb a:hover { background: var(--primary-tint); border-color: var(--primary); text-decoration: none; }
 /* Both spellings, because the disclosure triangle is a ::-webkit-details-marker
    in one engine and a ::marker in the other, and a stray arrowhead inside a
    button looks like a bug. */
@@ -1575,20 +1731,20 @@ body.lightbox-lock { overflow: hidden; }
   display: inline-block; box-sizing: border-box;
   min-width: 54px; padding: 4px 8px; border-radius: 4px;
   font-size: 13px; font-weight: 600; text-align: right; white-space: nowrap;
-  color: #1c2733; border: 1px solid #dbe2e8;
-  background: linear-gradient(to right, #cfe3f6 0 var(--fill), #f1f4f7 var(--fill) 100%);
+  color: var(--text); border: 1px solid var(--border);
+  background: linear-gradient(to right, var(--primary-fill) 0 var(--fill), var(--surface-3) var(--fill) 100%);
 }
 /* "Nothing to count yet" is not 0% and must not look like it: no track, no
    fill, no number - an em dash and the title attribute. */
 .pct-cap.pct-none {
-  background: none; border-color: transparent; color: #8a97a3;
+  background: none; border-color: transparent; color: var(--faint);
   font-weight: 400; text-align: center;
 }
 
 /* ONE of the three is the one you came for. Open — or Resume setup, on a show
    that never finished the wizard — is filled; the other two are not. */
-.row-btn-go { background: #2f6fb2; color: #fff; border-color: #2f6fb2; }
-.row-btn-go:hover { background: #275d95; border-color: #275d95; color: #fff; }
+.row-btn-go { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.row-btn-go:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary); }
 
 /* Rename and delete live behind a disclosure, and CLOSED it is just the third
    button on the line (David, 2026-09-02).
@@ -1604,7 +1760,7 @@ body.lightbox-lock { overflow: hidden; }
 .project-edit[open], .pw-edit[open] { flex-basis: 100%; }
 .pw-edit { margin-top: 0; white-space: normal; }
 /* Held down while the panel is open, so it reads as the thing that opened it. */
-.project-edit[open] > .row-btn { background: #eef4fa; border-color: #2f6fb2; }
+.project-edit[open] > .row-btn { background: var(--primary-tint); border-color: var(--primary); }
 .project-edit .inline-form { margin: 0 0 8px; gap: 8px; }
 .project-edit .danger-form small { flex-basis: 100%; margin-top: 0; line-height: 1.45; }
 
@@ -1648,37 +1804,57 @@ body.lightbox-lock { overflow: hidden; }
 .asset-table .asset-note { width: 100%; min-width: 220px; }
 .asset-table td:nth-child(4) { width: 40%; }
 
+/* --- the chart library's own surfaces, in the dark (2026-09-22) -------------
+   frappe-gantt.css is linked from the CDN after this file and paints its grid
+   white: rows #ffffff, every other row #f5f5f5, a white header, pale ticks. On
+   a black page that is a lightbox in the middle of the screen, so every one of
+   them is answered here. Carrying .tl-chart keeps these above the library's own
+   rules without !important. */
+.tl-chart .gantt .grid-background { fill: none; }
+.tl-chart .gantt .grid-row { fill: var(--surface); }
+.tl-chart .gantt .grid-row:nth-child(even) { fill: var(--surface-2); }
+.tl-chart .gantt .row-line { stroke: var(--border-soft); }
+.tl-chart .gantt .tick { stroke: var(--border); }
+.tl-chart .gantt .tick.thick { stroke: var(--border-strong); }
+.tl-chart .gantt .today-highlight { fill: var(--warn-tint); opacity: 1; }
+.tl-chart .gantt .grid-header { fill: var(--surface-3); stroke: var(--border); }
+.tl-chart .gantt .upper-text, .tl-chart .gantt .lower-text { fill: var(--muted); }
+/* A bar with no colour of its own, and the handles for stretching one. */
+.tl-chart .gantt .bar { fill: var(--border-strong); }
+.tl-chart .gantt .bar-wrapper .handle { fill: var(--faint); }
+.tl-chart .gantt .bar-label { fill: var(--text); }
+
 /* --- dependency arrows on the general timeline -----------------------------
    Frappe's own stylesheet is linked from the CDN inside timeline.php, i.e.
    AFTER this file, so an equally specific rule of ours would lose on order.
    Its arrow rule is `.gantt .arrow` (two classes); everything here carries
    three or more so specificity decides it and load order stops mattering. */
-.tl-chart .gantt .arrow { stroke: #b6c2cd; stroke-width: 1.4; }
+.tl-chart .gantt .arrow { stroke: var(--border-strong); stroke-width: 1.4; }
 
 /* Planned to start before the thing it waits for has finished. Deliberately
    loud: it is the one thing on this chart that is not simply a fact. */
-.tl-chart .gantt .arrow.dep-broken { stroke: #b02a37; stroke-width: 2.2; }
+.tl-chart .gantt .arrow.dep-broken { stroke: var(--danger); stroke-width: 2.2; }
 
 .tl-note { max-width: 78ch; margin-top: 10px; line-height: 1.5; }
-.dep-legend { color: #b02a37; }
-.tl-saved { margin-left: 8px; color: #1e7e34; font-weight: 600; }
+.dep-legend { color: var(--danger); }
+.tl-saved { margin-left: 8px; color: var(--ok); font-weight: 600; }
 /* Declined and passed candidates, folded under the ones still in play. */
 .closed-cands { margin-top: 6px; }
-.closed-cands > summary { cursor: pointer; font-size: 13px; color: #5a6a7a; }
+.closed-cands > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .closed-cands[open] > summary { margin-bottom: 6px; }
 /* --- milestones on the timeline --------------------------------------------
    A dashed line so it never reads as a bar, and a colour of its own so it is
    not confused with the solid red "today". Frappe's stylesheet loads from the
    CDN after this file, so these carry the container class to win on
    specificity rather than on order. */
-.tl-chart .tl-ms { stroke: #7b3fb8; stroke-width: 1.6; stroke-dasharray: 5 4; fill: #7b3fb8; }
+.tl-chart .tl-ms { stroke: var(--violet); stroke-width: 1.6; stroke-dasharray: 5 4; fill: var(--violet); }
 .tl-chart .tl-ms-label {
   font: 600 11px -apple-system, "Segoe UI", Roboto, sans-serif;
-  fill: #7b3fb8;
+  fill: var(--violet);
 }
 .ms-panel { margin-top: 12px; }
 .ms-panel table { margin: 8px 0; }
-.ms-flag { color: #7b3fb8; font-weight: 700; }
+.ms-flag { color: var(--violet); font-weight: 700; }
 /* --- the calendar header ----------------------------------------------------
    Weekend columns and the day-of-week letter above each date. Carrying the
    container class for the usual reason: Frappe's stylesheet is linked from the
@@ -1687,28 +1863,28 @@ body.lightbox-lock { overflow: hidden; }
 /* Very light, and NOT a colour that means anything else on this chart. A
    weekend is context, not a warning -- it must sit behind the work without
    competing with a red deadline or a purple milestone for attention. */
-.tl-chart .tl-weekend { fill: #1c2733; fill-opacity: .045; pointer-events: none; }
+.tl-chart .tl-weekend { fill: var(--shade); fill-opacity: .07; pointer-events: none; }
 
 .tl-chart .tl-dow {
   font: 600 9px -apple-system, "Segoe UI", Roboto, sans-serif;
-  fill: #9aa6b2; text-anchor: middle; pointer-events: none;
+  fill: var(--faint); text-anchor: middle; pointer-events: none;
 }
 /* Saturday and Sunday named as such, so the letters agree with the shading
    rather than leaving you to match them up. */
-.tl-chart .tl-dow-end { fill: #5a6a7a; }
+.tl-chart .tl-dow-end { fill: var(--muted); }
 /* Milestone markers: grabbable, and big enough to look it. */
 .tl-chart .tl-ms-hit { fill: transparent; }
 .tl-chart .tl-ms-g.is-draggable { cursor: ew-resize; }
 .tl-chart .tl-ms-g.is-draggable:hover .tl-ms { stroke-width: 2.4; }
-.tl-chart .tl-ms-g.is-draggable:hover .tl-ms-dia { stroke: #4d2374; stroke-width: 1.5; }
+.tl-chart .tl-ms-g.is-draggable:hover .tl-ms-dia { stroke: var(--violet-strong); stroke-width: 1.5; }
 /* While dragging, the dashes stop and the marker goes solid: it is being
    placed now rather than merely marking a date. */
 .tl-chart .tl-ms-g.is-dragging .tl-ms { stroke-dasharray: none; stroke-width: 2.4; }
-.tl-chart .tl-ms-g.is-dragging .tl-ms-label { fill: #4d2374; }
+.tl-chart .tl-ms-g.is-dragging .tl-ms-label { fill: var(--violet-strong); }
 /* A milestone sitting on the row of the step it reviews. The label is nudged
    clear of the diamond and given a plate, because on a row it lands over the
    grid stripes and sometimes over a bar. */
-.tl-chart .tl-ms-g.on-row .tl-ms-label { paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.tl-chart .tl-ms-g.on-row .tl-ms-label { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
 /* Dropped into the strip under its bar, where nothing else is written: no
    outline needed, and one size down so a row of them reads as annotation
    rather than competing with the bar names. */
@@ -1717,9 +1893,9 @@ body.lightbox-lock { overflow: hidden; }
 /* Dated before the step it reviews has finished: the thing being reviewed will
    not exist yet. The same red the broken dependency arrows use, for the same
    reason — it is the one thing here that is not simply a fact. */
-.tl-chart .tl-ms-g.is-early .tl-ms { stroke: #b02a37; fill: #b02a37; }
-.tl-chart .tl-ms-g.is-early .tl-ms-label { fill: #b02a37; }
-.ms-onstep { color: #7b3fb8; }
+.tl-chart .tl-ms-g.is-early .tl-ms { stroke: var(--danger); fill: var(--danger); }
+.tl-chart .tl-ms-g.is-early .tl-ms-label { fill: var(--danger); }
+.ms-onstep { color: var(--violet); }
 
 /* --- timeline versions (2026-09-18) ----------------------------------------
    The Version picker and "Save timeline's version" share one bar above both
@@ -1739,33 +1915,33 @@ body.lightbox-lock { overflow: hidden; }
    violet, and quieter than that one, because a preview changes what you can do
    on every screen while this changes only what you are looking at, on one.
 
-   The chart rows are Frappe's own fills (white, and #f5f5f5 on every other
+   The chart rows are Frappe's own fills (white, and var(--surface-2) on every other
    row), so they are recoloured too, or the tint would stop at the edge of each
    chart and the part you actually read would look exactly like the live one.
    Frappe's stylesheet is linked after this file and wins ties, hence the extra
    classes on every rule that reaches into the chart. */
 .tl-page-old {
-  background: #f4ede0; border: 1px solid #e2d5b9; border-radius: 8px;
+  background: var(--paper); border: 1px solid var(--paper-border); border-radius: 8px;
   padding: 12px 14px 2px;
 }
 .tl-versions.is-old {
-  background: #ebdfc5; border-left: 4px solid #9a7636; border-radius: 4px;
-  padding: 10px 14px; color: #5a4320;
+  background: var(--paper-2); border-left: 4px solid var(--paper-ink); border-radius: 4px;
+  padding: 10px 14px; color: var(--paper-ink);
 }
 .tl-versions.is-old .tl-version-msg { flex: 1 1 100%; }
-.tl-versions.is-old .tl-version-msg strong { color: #3f2e14; }
-.tl-versions.is-old .muted { color: #7a6440; }
-.tl-page-old .tl-section { background: #fffbf3; border-color: #e6dac1; }
-.tl-page-old table { background: #fffbf3; }
-.tl-page-old th { background: #f1e7d3; box-shadow: inset 0 -1px 0 #ddcfb0; }
-.tl-page-old th, .tl-page-old td { border-bottom-color: #ebe1cc; }
-.tl-page-old .tl-chart .gantt .grid-row { fill: #fffaf1; }
-.tl-page-old .tl-chart .gantt .grid-row:nth-child(even) { fill: #f8f0e1; }
-.tl-page-old .tl-chart .gantt .row-line { stroke: #eee4cf; }
-.tl-page-old .tl-chart .gantt .tl-sticky .grid-header { fill: #f2e9d6; stroke: #e2d5b9; }
+.tl-versions.is-old .tl-version-msg strong { color: var(--paper-ink); }
+.tl-versions.is-old .muted { color: var(--paper-ink-2); }
+.tl-page-old .tl-section { background: var(--paper-surface); border-color: var(--paper-border); }
+.tl-page-old table { background: var(--paper-surface); }
+.tl-page-old th { background: var(--paper-2); box-shadow: inset 0 -1px 0 var(--paper-border); }
+.tl-page-old th, .tl-page-old td { border-bottom-color: var(--paper-border); }
+.tl-page-old .tl-chart .gantt .grid-row { fill: var(--paper-surface); }
+.tl-page-old .tl-chart .gantt .grid-row:nth-child(even) { fill: var(--paper-row); }
+.tl-page-old .tl-chart .gantt .row-line { stroke: var(--paper-border); }
+.tl-page-old .tl-chart .gantt .tl-sticky .grid-header { fill: var(--paper-2); stroke: var(--paper-border); }
 /* The plate behind a milestone name on a step's row matches the paper, or it
    shows as a white smudge round every label. */
-.tl-page-old .tl-chart .tl-ms-g.on-row .tl-ms-label { stroke: #fffaf1; }
+.tl-page-old .tl-chart .tl-ms-g.on-row .tl-ms-label { stroke: var(--paper-surface); }
 
 /* --- progress and the step editor (2026-09-18) ------------------------------
    A step's recorded progress is Frappe's own progress rect, drawn over the bar.
@@ -1773,7 +1949,7 @@ body.lightbox-lock { overflow: hidden; }
    darker shade of the bar's OWN colour: the done part reads as the same step,
    further along. The id keeps it off the detailed chart, where a filled bar
    means approved and is green. */
-#generalGantt .gantt .bar-wrapper .bar-progress { fill: #1c2733; fill-opacity: .3; }
+#generalGantt .gantt .bar-wrapper .bar-progress { fill: var(--shade); fill-opacity: .32; }
 /* Nobody who cannot save gets the handles for stretching a bar or dragging its
    progress: the gesture could only ever snap back. */
 .tl-readonly .gantt .handle { display: none; }
@@ -1785,7 +1961,7 @@ body.lightbox-lock { overflow: hidden; }
 .se-dates { display: flex; gap: 12px; }
 .se-dates label { flex: 1 1 0; margin-top: 0; }
 .se-need {
-  background: #f4f6f8; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
   padding: 10px 12px; margin: 14px 0 2px; line-height: 1.5;
 }
 .se-need small { margin-top: 4px; }
@@ -1812,30 +1988,30 @@ body.lightbox-lock { overflow: hidden; }
 .bk-views button { border-radius: 0; }
 .bk-views button:first-child { border-radius: 4px 0 0 4px; }
 .bk-views button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
-.bk-views button.is-on { background: #2f6fb2; border-color: #2f6fb2; color: #fff; }
+.bk-views button.is-on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .bk-shows { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 12px; }
 .bk-chip {
   display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400;
-  background: #fff; border: 1px solid #dfe4e9; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
   padding: 3px 11px 3px 7px; font-size: 13px; cursor: pointer;
 }
 .bk-chip input { width: auto; margin: 0; }
 .bk-chip.is-off { opacity: .5; }
 .bk-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
 .bk-summary { margin: 0 0 12px; max-width: 110ch; }
-.bk-summary h3 { margin: 0 0 6px; font-size: 15px; color: #b02a37; }
+.bk-summary h3 { margin: 0 0 6px; font-size: 15px; color: var(--danger); }
 .bk-summary ul { margin: 0; padding-left: 20px; }
 .bk-summary li { margin: 3px 0; line-height: 1.45; }
-.bk-clash-text { color: #b02a37; }
+.bk-clash-text { color: var(--danger); }
 .bk-chart-wrap {
   overflow: auto; max-height: 72vh; margin-bottom: 10px;
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
 }
 .bk-chart { position: relative; width: max-content; min-width: 100%; }
-.bk-row { display: flex; border-bottom: 1px solid #eef1f4; }
+.bk-row { display: flex; border-bottom: 1px solid var(--border-soft); }
 .bk-label {
   position: sticky; left: 0; z-index: 2; flex: 0 0 220px; width: 220px;
-  background: #fff; border-right: 1px solid #e4e8ec; padding: 6px 10px;
+  background: var(--surface); border-right: 1px solid var(--border); padding: 6px 10px;
   font-size: 13px; line-height: 1.3; overflow: hidden;
 }
 .bk-label small { display: block; margin: 1px 0 0; font-size: 11.5px; }
@@ -1843,41 +2019,41 @@ body.lightbox-lock { overflow: hidden; }
    of whatever width the zoom gives a day. */
 .bk-track {
   position: relative; flex: 0 0 auto;
-  background-image: linear-gradient(to right, #eef1f4 1px, transparent 1px);
+  background-image: linear-gradient(to right, var(--surface-3) 1px, transparent 1px);
 }
 .bk-head { position: sticky; top: 0; z-index: 3; }
-.bk-head .bk-label { background: #f4f6f8; z-index: 4; font-weight: 600; }
-.bk-head .bk-track { height: 40px; background: #f4f6f8; }
+.bk-head .bk-label { background: var(--bg); z-index: 4; font-weight: 600; }
+.bk-head .bk-track { height: 40px; background: var(--bg); }
 .bk-month {
-  position: absolute; top: 4px; padding-left: 4px; border-left: 1px solid #c3ccd4;
-  font-size: 12px; font-weight: 600; color: #43535f; white-space: nowrap;
+  position: absolute; top: 4px; padding-left: 4px; border-left: 1px solid var(--border-strong);
+  font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap;
 }
 .bk-week {
-  position: absolute; top: 22px; height: 18px; padding-left: 3px; border-left: 1px solid #dfe4e9;
-  font-size: 11px; color: #5a6a7a;
+  position: absolute; top: 22px; height: 18px; padding-left: 3px; border-left: 1px solid var(--border);
+  font-size: 11px; color: var(--muted);
 }
 .bk-bar {
   position: absolute; height: 20px; padding: 0 6px; border-radius: 4px;
-  color: #fff; font-size: 11.5px; line-height: 20px; white-space: nowrap;
+  color: var(--on-accent); font-size: 11.5px; line-height: 20px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 1px rgba(0,0,0,.14);
 }
-.bk-bar:hover { color: #fff; text-decoration: none; filter: brightness(1.1); }
-.bk-bar.is-clash { box-shadow: 0 0 0 2px #b02a37; }
+.bk-bar:hover { color: var(--on-accent); text-decoration: none; filter: brightness(1.1); }
+.bk-bar.is-clash { box-shadow: 0 0 0 2px var(--danger); }
 /* The days the clash covers, shaded across the whole row behind the bars. */
 .bk-band {
   position: absolute; top: 0; bottom: 0;
-  background: rgba(176, 42, 55, .13);
-  border-left: 1px dashed #b02a37; border-right: 1px dashed #b02a37;
+  background: var(--clash-band);
+  border-left: 1px dashed var(--danger); border-right: 1px dashed var(--danger);
 }
-.bk-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid #b02a37; opacity: .5; pointer-events: none; }
-.bk-group .bk-label { background: #f7f9fb; }
-.bk-group .bk-track { background-color: #f7f9fb; }
-.bk-delivery { position: absolute; top: 6px; font-size: 11px; color: #7b3fb8; white-space: nowrap; }
+.bk-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--danger); opacity: .5; pointer-events: none; }
+.bk-group .bk-label { background: var(--surface-2); }
+.bk-group .bk-track { background-color: var(--surface-2); }
+.bk-delivery { position: absolute; top: 6px; font-size: 11px; color: var(--violet); white-space: nowrap; }
 .bk-badge {
   display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px;
-  background: #b02a37; color: #fff; font-size: 11px; line-height: 16px; font-weight: 600;
+  background: var(--danger); color: var(--on-danger); font-size: 11px; line-height: 16px; font-weight: 600;
 }
-.bk-empty { padding: 18px 16px; color: #5a6a7a; }
+.bk-empty { padding: 18px 16px; color: var(--muted); }
 @media (max-width: 640px) {
   .bk-label { flex-basis: 140px; width: 140px; }
 }
@@ -1893,7 +2069,7 @@ body.lightbox-lock { overflow: hidden; }
 .reel-cell { max-width: 260px; }
 .reel-cell a { display: inline-block; max-width: 100%; overflow: hidden;
                text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.reel-pw { background: #eef1f4; padding: 1px 5px; border-radius: 3px; user-select: all; }
+.reel-pw { background: var(--surface-3); padding: 1px 5px; border-radius: 3px; user-select: all; }
 /* The artists grid: every cell an input. Compact, because thirteen columns of
    full-size fields would be a page nobody can scan. */
 .artist-grid td, .artist-grid th { padding: 4px 6px; vertical-align: middle; }
@@ -1903,12 +2079,12 @@ body.lightbox-lock { overflow: hidden; }
 .artist-grid .a-name { font-weight: 600; }
 /* Saved as you go, said per row: a page-wide message cannot name which row
    failed, and a failure nobody can find is an edit somebody believes they made. */
-.artist-grid tr.is-saving td { background: #fffbe6; }
-.artist-grid tr.is-saved  td { background: #f2fbf4; }
-.artist-grid tr.is-failed td { background: #fdf0f1; }
-.a-status { font-size: 11px; white-space: nowrap; color: #7b8894; }
-.a-status.saved  { color: #1e7e34; }
-.a-status.failed { color: #b02a37; font-weight: 700; }
+.artist-grid tr.is-saving td { background: var(--warn-tint); }
+.artist-grid tr.is-saved  td { background: var(--ok-tint); }
+.artist-grid tr.is-failed td { background: var(--danger-tint); }
+.a-status { font-size: 11px; white-space: nowrap; color: var(--muted); }
+.a-status.saved  { color: var(--ok); }
+.a-status.failed { color: var(--danger); font-weight: 700; }
 
 /* The reel reads as a link and edits on double-click. */
 .reel-link { display: inline-block; max-width: 230px; overflow: hidden;
@@ -1925,9 +2101,9 @@ body.lightbox-lock { overflow: hidden; }
    it needs to lay out in columns. */
 .pos-filter {
   flex: 1 1 100%; width: 100%; box-sizing: border-box;
-  border: 1px solid #dbe2e8; border-radius: 4px; padding: 10px 14px; margin: 10px 0;
+  border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; margin: 10px 0;
 }
-.pos-filter legend { font-size: 12px; color: #5a6a7a; padding: 0 4px; }
+.pos-filter legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
 .pos-all { display: block; margin-bottom: 8px; }
 .pos-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -1979,16 +2155,16 @@ body.lightbox-lock { overflow: hidden; }
    spelled out here rather than borrowed. */
 .slot-btn {
   display: inline-block; padding: 9px 18px; border-radius: 4px; font-size: 15px;
-  background: #fff; color: #2f6fb2; border: 1px solid #9fb6cc; font-weight: 600;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); font-weight: 600;
   cursor: pointer; user-select: none; list-style: none;
 }
-.slot-btn:hover { background: #eef4fa; border-color: #2f6fb2; }
+.slot-btn:hover { background: var(--primary-tint); border-color: var(--primary); }
 /* Both spellings, because the marker is a pseudo-element in one engine and a
    ::marker in the other, and a stray triangle inside a button looks like a bug. */
 .slot-btn::-webkit-details-marker { display: none; }
 .slot-btn::marker { content: ''; }
 /* Held down while the picker is open, so it reads as the thing that opened it. */
-.slot-change[open] > .slot-btn { background: #eef4fa; border-color: #2f6fb2; }
+.slot-change[open] > .slot-btn { background: var(--primary-tint); border-color: var(--primary); }
 
 /* The picker OVERLAYS rather than taking space in the row. Left in the flow it
    widened its own <details>, which is a flex item, and pushed "Remove slot"
@@ -2005,7 +2181,7 @@ body.lightbox-lock { overflow: hidden; }
      under the picker instead of beside it, which is the one thing this bar has
      to get right. */
   margin: 0; gap: 8px; display: flex; align-items: center; flex-wrap: nowrap;
-  background: #fff; border: 1px solid #dbe2e8; border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
 }
 /* width:auto is load-bearing: the global `input, select { width: 100% }` would
@@ -2027,15 +2203,15 @@ body.lightbox-lock { overflow: hidden; }
 
 /* A danger button that is still a button: the row already has a primary and a
    secondary, and a third in plain blue would read as the safe choice. */
-button.secondary.danger { background: #f3d9dc; color: #8f222c; }
-button.secondary.danger:hover { background: #e9c2c7; }
+button.secondary.danger { background: var(--danger-tint-2); color: var(--danger-strong); }
+button.secondary.danger:hover { background: var(--danger-border); }
 /* The popover's dismiss. Small and quiet — it is the way out, not an action. */
 .popover-close {
   margin: 0 0 0 2px; padding: 2px 7px; line-height: 1;
-  background: none; color: #7b8894; font-size: 17px; border: 0; cursor: pointer;
+  background: none; color: var(--muted); font-size: 17px; border: 0; cursor: pointer;
   align-self: center;
 }
-.popover-close:hover { background: #eef1f4; color: #1c2733; border-radius: 3px; }
+.popover-close:hover { background: var(--surface-3); color: var(--text); border-radius: 3px; }
 /* In the hire popover it sits in the corner rather than in either row, since
    neither of those two lines is the one it belongs to. */
 /* .popover-close still earns its keep: the "Change assignee" popover on a
@@ -2051,7 +2227,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .rate-edit .muted { white-space: nowrap; font-size: 11px; line-height: 1.2; }
 /* Unpriced rows are the ones the warning under the table is about, so the empty
    box says so rather than looking like any other blank field. */
-.rate-edit input.rate-unset { border-color: #d9a406; background: #fffbe6; }
+.rate-edit input.rate-unset { border-color: var(--warn-strong); background: var(--warn-tint); }
 
 /* ---- the history screens ---------------------------------------------------
    Long lists of small tables under repeated headings. The headings have to
@@ -2059,8 +2235,8 @@ button.secondary.danger:hover { background: #e9c2c7; }
    above them do the work a card border would, without boxing every table. */
 .history-dept {
   margin: 32px 0 4px; padding-bottom: 6px;
-  border-bottom: 2px solid #c3ccd4;
-  font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: #44515e;
+  border-bottom: 2px solid var(--border-strong);
+  font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2);
 }
 .history-head {
   margin: 20px 0 6px; font-size: 15px; font-weight: 600;
@@ -2097,7 +2273,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .h-fee th:nth-child(5) { width: 16%; }
 /* Marks a placeholder seat — the rows whose rate is genuinely this project's. */
 .slot-tag {
-  background: #e8eaf6; color: #3949ab; border-radius: 3px;
+  background: var(--chip-indigo-bg); color: var(--chip-indigo-ink); border-radius: 3px;
   padding: 1px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
 }
 /* A filter bar whose controls size to their content.
@@ -2123,13 +2299,13 @@ button.secondary.danger:hover { background: #e9c2c7; }
   font-size: 13px;
 }
 .fc-label {
-  font-weight: 600; color: #43535f; min-width: 52px;
+  font-weight: 600; color: var(--text-2); min-width: 52px;
 }
 /* ⚠ The checkbox itself needs width:auto or the global `input, select { width:
    100% }` gives every one of them its own line. label.inline already carries
    that rule, which is why these are label.inline and not a bare span. */
 .filter-checks label.inline { gap: 5px; white-space: nowrap; }
-.filter-checks label.inline.muted { color: #8a97a3; }
+.filter-checks label.inline.muted { color: var(--faint); }
 
 /* The step list is as long as the pipeline, several times over, so it folds.
    The summary is a .row-btn and says what is on without being opened. */
@@ -2144,7 +2320,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
    list of alternating sizes. */
 .crew-dept-head {
   margin: 26px 0 4px; font-size: 16px; font-weight: 700;
-  padding-bottom: 5px; border-bottom: 2px solid #e4e8ec;
+  padding-bottom: 5px; border-bottom: 2px solid var(--border);
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
 }
 .crew-dept-head .muted { font-weight: 400; }
@@ -2184,12 +2360,12 @@ button.secondary.danger:hover { background: #e9c2c7; }
    in the running: the name reads normally, and how it ended sits in a small grey
    label, amber only for somebody who LEFT, because that is the case the list was
    asked for and the one worth spotting first. */
-.cand-earlier { color: #43535f; }
+.cand-earlier { color: var(--text-2); }
 .cand-was {
   display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 8px;
-  background: #eef1f4; color: #5a6a7a; white-space: nowrap;
+  background: var(--surface-3); color: var(--muted); white-space: nowrap;
 }
-.cand-was-left { background: #fbf1dc; color: #8a6d1a; }
+.cand-was-left { background: var(--warn-tint); color: var(--warn); }
 .cand-earlier-list > summary, .cand-backups > summary { font-size: 12.5px; }
 .cand-backups { margin-top: 4px; }
 .cand-add > summary { font-size: 12.5px; padding: 3px 9px; }
@@ -2203,14 +2379,14 @@ button.secondary.danger:hover { background: #e9c2c7; }
    this project's own yet: before database update 034, when it is still the type
    sheet's, shared by every project of the type. */
 .dpu-cell input { width: 100%; }
-.dpu-source { font-size: 11px; line-height: 1.3; margin-top: 3px; color: #7b8894; }
-.dpu-source.is-studio { color: #6f42c1; font-weight: 600; }
+.dpu-source { font-size: 11px; line-height: 1.3; margin-top: 3px; color: var(--muted); }
+.dpu-source.is-studio { color: var(--violet); font-weight: 600; }
 .ideal-readonly { display: block; font-size: 15px; padding: 4px 0; }
 
 /* --- the Deadline card on a step's page -----------------------------------
    Sits directly above the daily quota, which is worked back from it. */
 .deadline-card {
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px 16px 6px; margin: 16px 0 8px;
 }
 .deadline-card h3 { margin: 0 0 8px; }
@@ -2241,10 +2417,10 @@ button.secondary.danger:hover { background: #e9c2c7; }
   box-shadow: 0 3px 14px rgba(15, 22, 30, .18);
   border-left: 4px solid;
 }
-.keepplace-toast.is-ok  { background: #e8f6ec; border-color: #1e7e34; color: #17542a; }
+.keepplace-toast.is-ok  { background: var(--ok-tint); border-color: var(--ok); color: var(--ok-strong); }
 /* An error does not time out and does not fade: it is the only thing telling
    somebody their change did not happen. */
-.keepplace-toast.is-err { background: #fdecee; border-color: #b02a37; color: #8f222c; }
+.keepplace-toast.is-err { background: var(--danger-tint); border-color: var(--danger); color: var(--danger-strong); }
 .keepplace-x {
   position: absolute; top: 4px; right: 6px;
   background: none; border: 0; margin: 0; padding: 0 4px;
@@ -2273,14 +2449,14 @@ button.secondary.danger:hover { background: #e9c2c7; }
    ⚠ AFTER .has-problem ON PURPOSE. A surplus slot tints its row #fffbee at the
    same weight; a row that is both surplus and unfilled should say unfilled,
    which is the more urgent of the two, so this wins on source order. */
-.slot-inplay > td { background: #fff6e0; }
-.slot-nobody > td { background: #fdecee; }
+.slot-inplay > td { background: var(--warn-tint); }
+.slot-nobody > td { background: var(--danger-tint); }
 
 /* The stripe stays and thickens. Inset shadow, not border-left: a border
    changes the cell's width and would shunt the lane number half a character
    right on exactly the rows that are already the odd ones out. */
-.slot-inplay > td:first-child { box-shadow: inset 5px 0 0 #c8901f; }
-.slot-nobody > td:first-child { box-shadow: inset 5px 0 0 #b02a37; }
+.slot-inplay > td:first-child { box-shadow: inset 5px 0 0 var(--warn-strong); }
+.slot-nobody > td:first-child { box-shadow: inset 5px 0 0 var(--danger); }
 
 /* Solid badges, not pale ones. Uppercase because it is a state, not a
    sentence, and it has to be readable at the speed somebody scans a column. */
@@ -2291,17 +2467,17 @@ button.secondary.danger:hover { background: #e9c2c7; }
 }
 /* RED IS RESERVED for the one that needs doing something about. Amber is
    "in hand, keep going"; if both shouted equally the split would be pointless. */
-.slot-state-inplay { background: #a8791c; color: #fff; }
-.slot-state-nobody { background: #b02a37; color: #fff; }
+.slot-state-inplay { background: var(--warn-strong); color: var(--on-accent); }
+.slot-state-nobody { background: var(--danger); color: var(--on-danger); }
 
 /* What a record is still missing, on the candidate row and in the artists
    filter. Quiet on purpose: a reminder, not a fault. Nothing here is required,
    and a marker that shouted would train people to stop reading it. */
 .cand-gaps {
-  font-size: 11.5px; color: #8a6d1a; background: #fff8e6;
+  font-size: 11.5px; color: var(--warn); background: var(--warn-tint);
   border-radius: 3px; padding: 1px 6px; white-space: nowrap;
 }
-.thin-toggle { font-size: 13px; color: #8a6d1a; white-space: nowrap; }
+.thin-toggle { font-size: 13px; color: var(--warn); white-space: nowrap; }
 .thin-toggle input { width: auto; }
 
 /* --- the duplicate-people screen ------------------------------------------
@@ -2317,7 +2493,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
    for the numbers, not one of them. */
 .type-tag {
   display: inline-block; font-size: 11px; font-weight: 600;
-  background: #eef1f4; color: #5a6a7a;
+  background: var(--surface-3); color: var(--muted);
   border-radius: 3px; padding: 1px 5px; vertical-align: 1px;
 }
 
@@ -2326,16 +2502,16 @@ button.secondary.danger:hover { background: #e9c2c7; }
    are wearing a borrowed role will read every missing menu item as a fault in
    the app, so this has to be the most obvious thing on the page. */
 .flash-preview {
-  background: #efe7fb; border-left: 4px solid #6f42c1; color: #4a2d86;
+  background: var(--violet-tint); border-left: 4px solid var(--violet); color: var(--violet-strong);
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
-.flash-preview strong { color: #3c2270; }
+.flash-preview strong { color: var(--violet-strong); }
 .preview-msg { flex: 1 1 340px; }
 /* The way out sits IN the banner, never in the menu — the menu is wearing the
    borrowed role and may not be able to show it. */
 .preview-exit { margin: 0 0 0 auto; }
 .preview-exit button { margin: 0; white-space: nowrap; }
-.role-badge-preview { background: #6f42c1; color: #fff; }
+.role-badge-preview { background: var(--violet); color: var(--on-violet); }
 
 /* ---- the project glance -----------------------------------------------------
    Replaces the grey sentence that used to run above Overall progress. The dates
@@ -2343,31 +2519,31 @@ button.secondary.danger:hover { background: #e9c2c7; }
    in the middle of it, so here they are the largest thing on the row. */
 .glance {
   display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start;
-  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   padding: 18px 20px; margin: 16px 0;
 }
 .glance-dates { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 .date-capsule {
-  border: 1px solid #d7dde3; border-radius: 10px; padding: 10px 18px;
-  background: #f7f9fb; min-width: 148px;
+  border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 18px;
+  background: var(--surface-2); min-width: 148px;
 }
 .cap-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6b7885;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
 }
 /* tabular-nums so two capsules side by side have their dates the same width and
    the eye can compare them rather than re-reading each one. */
 .cap-date { font-size: 22px; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.cap-note { font-size: 12px; color: #5a6a7a; margin-top: 2px; }
+.cap-note { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
 /* Delivery is the date that matters, so it carries the weight - and turns red
    only when the schedule genuinely runs past it. */
-.cap-delivery { border-color: #b9c6d1; background: #eef3f7; }
-.cap-late { border-color: #e6a6ac; background: #fdeff0; }
-.cap-late .cap-date { color: #b02a37; }
+.cap-delivery { border-color: var(--border-strong); background: var(--primary-tint); }
+.cap-late { border-color: var(--danger-border); background: var(--danger-tint); }
+.cap-late .cap-date { color: var(--danger); }
 
-.cap-span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5a6a7a; }
-.cap-arrow { font-size: 20px; color: #9aa7b3; }
+.cap-span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.cap-arrow { font-size: 20px; color: var(--faint); }
 
 /* The export row at the foot of the Overview. Three sheets, three buttons. */
 .export-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; }
@@ -2379,7 +2555,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
    facts about one show, not two panels. */
 .glance-counts {
   list-style: none; margin: 0; padding: 0 0 0 28px; min-width: 230px;
-  border-left: 1px solid #e9edf1;
+  border-left: 1px solid var(--border);
 }
 .glance-counts li {
   display: flex; align-items: baseline; gap: 10px; padding: 2px 0; font-size: 14px;
@@ -2388,14 +2564,14 @@ button.secondary.danger:hover { background: #e9c2c7; }
   min-width: 42px; text-align: right; font-weight: 600; font-size: 17px;
   font-variant-numeric: tabular-nums;
 }
-.gc-l { color: #2c3844; }
-.gc-sub { color: #6b7885; font-size: 12px; }
+.gc-l { color: var(--text); }
+.gc-sub { color: var(--muted); font-size: 12px; }
 /* Indented and quieter: a part of the total above, not another total. */
 .gc-child { padding-left: 18px; }
-.gc-child .gc-n { font-size: 14px; font-weight: 500; color: #5a6a7a; }
-.gc-child .gc-l { color: #5a6a7a; font-size: 13px; }
-.gc-meta { margin-top: 6px; color: #8b97a3; font-size: 12px; }
-.gc-meta .gc-l { color: #8b97a3; }
+.gc-child .gc-n { font-size: 14px; font-weight: 500; color: var(--muted); }
+.gc-child .gc-l { color: var(--muted); font-size: 13px; }
+.gc-meta { margin-top: 6px; color: var(--faint); font-size: 12px; }
+.gc-meta .gc-l { color: var(--faint); }
 
 /* ---- the shot breakdown grid ------------------------------------------------
    Rows of shots, a column per asset type, chips inside the cells. Dense on
@@ -2415,7 +2591,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
    and separated by a heavier line so a long list cannot be misread as having
    one more shot in it. */
 .bd-totals { margin: 0 0 8px; }
-.breakdown-table tfoot td { background: #f7f9fb; border-top: 2px solid #d7dde3; }
+.breakdown-table tfoot td { background: var(--surface-2); border-top: 2px solid var(--border-strong); }
 /* The note box: one line by default, dragged taller for a long one, and the
    same quiet type as the note it replaced, so a column of them still reads as
    notes rather than as a column of fields. */
@@ -2428,14 +2604,14 @@ button.secondary.danger:hover { background: #e9c2c7; }
 .bd-cell { min-width: 180px; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
-  background: #eef3f7; border: 1px solid #d7dde3; border-radius: 12px;
+  background: var(--primary-tint); border: 1px solid var(--border-strong); border-radius: 12px;
   padding: 1px 4px 1px 9px; margin: 0 4px 4px 0; font-size: 12px; white-space: nowrap;
 }
 .chip-x {
-  background: none; border: 0; color: #7c8896; cursor: pointer;
+  background: none; border: 0; color: var(--muted); cursor: pointer;
   font-size: 14px; line-height: 1; padding: 0 3px; margin: 0; width: auto;
 }
-.chip-x:hover { color: #b02a37; background: none; }
+.chip-x:hover { color: var(--danger); background: none; }
 /* The picker reads as the "+" it shows until it is opened — a full-width select
    in every cell would swamp the chips it sits beside. */
 /* ⚠ A FIXED WIDTH, not `auto`. A <select> sizes itself to its WIDEST OPTION, so
@@ -2445,7 +2621,7 @@ button.secondary.danger:hover { background: #e9c2c7; }
    full width, because a dropdown is not clipped by its control. */
 .bd-add {
   width: 46px; padding: 2px 3px; font-size: 12px; margin-bottom: 4px;
-  border-radius: 12px; color: #5a6a7a; vertical-align: top;
+  border-radius: 12px; color: var(--muted); vertical-align: top;
 }
 /* Horizontal scroll on the table alone. A project with six asset types is wider
    than a laptop, and the page itself must never scroll sideways.
