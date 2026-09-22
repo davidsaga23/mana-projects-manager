@@ -73,6 +73,15 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **The breakdown picks assets with TICK BOXES** (2026-09-22, no migration): each cell's `+` opens
+  one shared panel listing that column's assets, the ones already in the shot ticked, so five
+  players go into a shot without five trips through a dropdown. Ticking links and unticking unlinks
+  immediately, one request each, and a failure puts back both the chip and the tick. The panel lives
+  in `<body>` because `.bd-scroll` clips its cells. `assets/shots.js`, `window.BD_ASSETS`.
+- **Its columns read in production order** — Character, Environment, BG, Prop, FX — not
+  alphabetically. `BREAKDOWN_TYPE_ORDER` in `includes/breakdown.php` is a RANKING, not a list of
+  allowed columns: a new asset type still appears on its own, alphabetically after the named five.
+  The CSV export follows the screen, because both read `breakdown_asset_types()`.
 - **A shot's note is typed on the breakdown** (2026-09-22). Nothing edited one before; it arrived
   with an import and stayed. Saved on leaving the box, like the frames beside it.
 - **The breakdown totals frames and footage** (2026-09-22), above the table and in its foot, over

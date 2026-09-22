@@ -4,14 +4,15 @@
 // decisions and a Save button would either be pressed after each one anyway or
 // batch the lot and lose them together. Same reasoning as the tracking grid.
 //
-// Reads globals set by shots.php: BD_PROJECT, BD_CAN_EDIT. Both are `window.`
-// assignments there — a top-level `const` does not become a window property,
-// which cost the tasks board a day.
+// Reads globals set by shots.php: BD_PROJECT, BD_CAN_EDIT, BD_ASSETS. All are
+// `window.` assignments there — a top-level `const` does not become a window
+// property, which cost the tasks board a day.
 (function () {
   'use strict';
 
   var projectId = window.BD_PROJECT;
   var canEdit = window.BD_CAN_EDIT === true;
+  var byType = window.BD_ASSETS || {};
   if (!projectId || !canEdit) return;
 
   var table = document.querySelector('.breakdown-table');
@@ -63,46 +64,225 @@
     return chip;
   }
 
-  // --- adding ---------------------------------------------------------------
-  table.addEventListener('change', function (ev) {
-    var sel = ev.target;
-    if (!sel.classList || !sel.classList.contains('bd-add')) return;
-    var assetId = sel.value;
-    if (!assetId) return;
-
-    var cell = sel.closest('.bd-cell');
-    var shotId = shotOf(sel);
-    var name = sel.options[sel.selectedIndex].textContent;
-
-    // Already there? Say so and reset, rather than sending a request whose only
-    // effect would be nothing. INSERT IGNORE would accept it silently, and a
-    // second identical chip appearing would be worse than either.
-    if (cell.querySelector('.chip[data-asset="' + assetId + '"]')) {
-      sel.value = '';
-      say(name + ' is already in this shot.', false);
-      return;
+  /** Chips stay in the server's order (by name) however they were ticked. */
+  function insertChip(cell, chip, name) {
+    var at = null;
+    var chips = cell.querySelectorAll('.chip');
+    for (var i = 0; i < chips.length; i++) {
+      var other = chips[i].textContent.replace(/\s*\u00d7\s*$/, '').trim();
+      if (other.localeCompare(name, undefined, { sensitivity: 'base' }) > 0) { at = chips[i]; break; }
     }
+    cell.insertBefore(chip, at || cell.querySelector('.bd-add'));
+  }
 
-    // Drawn BEFORE the request answers, then taken back if it fails. Forty of
-    // these in a row is the actual job, and waiting on a round trip for each one
-    // is what makes a grid feel broken.
-    var chip = makeChip(assetId, name);
-    cell.insertBefore(chip, sel);
-    sel.value = '';
-    sel.disabled = true;
+  // --- the picker -----------------------------------------------------------
+  //
+  // A list of tick boxes instead of a dropdown (David, 2026-09-22: "have each
+  // character with a check box so I can click and add several assets at the same
+  // time"). A dropdown is one trip through twenty-five names per player, and an
+  // FC Mobile shot carries five of them.
+  //
+  // ONE panel, moved from cell to cell, living in <body> rather than inside the
+  // cell it belongs to: .bd-scroll clips its contents, so a list drawn in a cell
+  // would be cut off at the edge of the table.
+  //
+  // Each tick saves on its own, immediately — the same rule as the rest of this
+  // screen. No Done button to forget, and a failure names the one asset that
+  // failed instead of losing the batch.
+  var picker = null, pkList = null, pkFilter = null, pkTitle = null, pkCount = null, pkNote = null;
+  var pkCell = null, pkButton = null;
+
+  function buildPicker() {
+    picker = document.createElement('div');
+    picker.className = 'bd-picker';
+    picker.hidden = true;
+    picker.setAttribute('role', 'dialog');
+    picker.innerHTML =
+      '<div class="bd-picker-head">' +
+        '<strong class="bd-picker-title"></strong>' +
+        '<button type="button" class="bd-picker-close" aria-label="Close">\u00d7</button>' +
+      '</div>' +
+      '<input type="search" class="bd-picker-filter" placeholder="Type to narrow the list" ' +
+             'aria-label="Filter the list">' +
+      '<div class="bd-picker-list"></div>' +
+      '<p class="bd-picker-note err small" hidden></p>' +
+      '<p class="bd-picker-count muted small"></p>';
+    document.body.appendChild(picker);
+    pkList   = picker.querySelector('.bd-picker-list');
+    pkFilter = picker.querySelector('.bd-picker-filter');
+    pkTitle  = picker.querySelector('.bd-picker-title');
+    pkCount  = picker.querySelector('.bd-picker-count');
+    pkNote   = picker.querySelector('.bd-picker-note');
+
+    pkFilter.addEventListener('input', applyFilter);
+    picker.querySelector('.bd-picker-close').addEventListener('click', function () { closePicker(true); });
+    picker.addEventListener('change', onTick);
+    // Clicks inside must not reach the document handler that closes it.
+    picker.addEventListener('mousedown', function (ev) { ev.stopPropagation(); });
+  }
+
+  function pickerSay(msg) {
+    pkNote.textContent = msg || '';
+    pkNote.hidden = !msg;
+  }
+
+  function countTicked() {
+    var boxes = pkList.querySelectorAll('input[type=checkbox]');
+    var on = 0;
+    for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) on++;
+    pkCount.textContent = on + ' of ' + boxes.length + ' ticked';
+  }
+
+  function applyFilter() {
+    var q = pkFilter.value.trim().toLowerCase();
+    var rows = pkList.querySelectorAll('.bd-picker-row'), shown = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var hit = !q || rows[i].getAttribute('data-name').indexOf(q) !== -1;
+      rows[i].hidden = !hit;
+      if (hit) shown++;
+    }
+    if (rows.length) pickerSay(shown === 0 ? 'Nothing here matches that.' : '');
+  }
+
+  function placePicker() {
+    if (!picker || picker.hidden || !pkButton) return;
+    var r = pkButton.getBoundingClientRect();
+    // Fixed, so a table scrolled sideways carries the panel with the button
+    // rather than leaving it behind. Flipped above, or pulled left, when it
+    // would otherwise run off the bottom or the right edge of the window.
+    var w = picker.offsetWidth, h = picker.offsetHeight;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    var top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    picker.style.left = left + 'px';
+    picker.style.top = top + 'px';
+  }
+
+  function openPicker(button) {
+    if (!picker) buildPicker();
+    if (pkButton === button && !picker.hidden) { closePicker(true); return; }
+
+    var cell = button.closest('.bd-cell');
+    if (!cell) return;
+    pkCell = cell;
+    pkButton = button;
+
+    var type = cell.getAttribute('data-type') || '';
+    var list = byType[type] || [];
+    var row = button.closest('tr[data-shot]');
+    var code = row && row.querySelector('strong') ? row.querySelector('strong').textContent : '';
+    pkTitle.textContent = (type !== '' ? type : 'No type set') + (code ? ' \u00b7 ' + code : '');
+
+    // Rebuilt on every open rather than cached per type: what is ticked differs
+    // by shot, and twenty-five rows of HTML cost nothing to write.
+    pkList.textContent = '';
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      var line = document.createElement('label');
+      line.className = 'bd-picker-row';
+      line.setAttribute('data-name', String(a.name).toLowerCase());
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = a.id;
+      box.checked = !!cell.querySelector('.chip[data-asset="' + a.id + '"]');
+      line.appendChild(box);
+      line.appendChild(document.createTextNode(' ' + a.name));
+      pkList.appendChild(line);
+    }
+    pkFilter.hidden = list.length < 8; // a short list is read, not searched
+    pickerSay(list.length ? '' : 'This project has no ' +
+      (type !== '' ? type : 'untyped') + ' assets yet. Add them on Setup.');
+
+    pkFilter.value = '';
+    applyFilter();
+    countTicked();
+    button.setAttribute('aria-expanded', 'true');
+    picker.hidden = false;
+    placePicker();
+    if (!pkFilter.hidden) pkFilter.focus();
+  }
+
+  function closePicker(focusBack) {
+    if (!picker || picker.hidden) return;
+    picker.hidden = true;
+    if (pkButton) {
+      pkButton.setAttribute('aria-expanded', 'false');
+      if (focusBack) pkButton.focus();
+    }
+    pkCell = null;
+    pkButton = null;
+  }
+
+  /** Tick = link, untick = unlink. One request each, sent as it happens. */
+  function onTick(ev) {
+    var box = ev.target;
+    if (!box.matches || !box.matches('input[type=checkbox]')) return;
+    var cell = pkCell;
+    if (!cell) return;
+
+    var assetId = box.value;
+    var name = box.parentNode.textContent.trim();
+    var shotId = shotOf(cell);
+    var adding = box.checked;
+    var existing = cell.querySelector('.chip[data-asset="' + assetId + '"]');
+
+    // Drawn BEFORE the request answers and taken back if it fails. Ticking five
+    // players in a row is the actual job, and waiting on a round trip for each
+    // one is what makes a grid feel broken.
+    var chip = null;
+    if (adding) {
+      if (existing) { countTicked(); return; }
+      chip = makeChip(assetId, name);
+      insertChip(cell, chip, name);
+    } else {
+      if (!existing) { countTicked(); return; }
+      existing.hidden = true;
+    }
+    countTicked();
+    box.disabled = true;
 
     var body = new URLSearchParams();
-    body.append('action', 'link');
+    body.append('action', adding ? 'link' : 'unlink');
     body.append('shot_id', shotId);
     body.append('asset_id', assetId);
     post(body)
-      .then(function () { say(''); })
-      .catch(function (err) {
-        chip.remove();
-        say(err.message, true);
+      .then(function () {
+        if (!adding && existing) existing.remove();
+        pickerSay('');
+        say('');
       })
-      .then(function () { sel.disabled = false; });
+      .catch(function (err) {
+        // Both halves go back: the chip in the grid and the tick in the list,
+        // so the panel and the row underneath never disagree.
+        if (adding) { if (chip) chip.remove(); }
+        else if (existing) existing.hidden = false;
+        box.checked = !adding;
+        countTicked();
+        pickerSay(err.message);
+        say(name + ': ' + err.message, true);
+      })
+      .then(function () { box.disabled = false; });
+  }
+
+  // --- adding ---------------------------------------------------------------
+  table.addEventListener('click', function (ev) {
+    var button = ev.target.closest ? ev.target.closest('.bd-add') : null;
+    if (!button) return;
+    ev.preventDefault();
+    openPicker(button);
   });
+
+  // Outside click, Escape, and anything that moves the page under the panel.
+  document.addEventListener('mousedown', function (ev) {
+    if (!picker || picker.hidden) return;
+    if (ev.target.closest && ev.target.closest('.bd-add')) return; // its own handler
+    closePicker(false);
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') closePicker(true);
+  });
+  window.addEventListener('resize', placePicker);
+  window.addEventListener('scroll', placePicker, true);
 
   // --- removing -------------------------------------------------------------
   table.addEventListener('click', function (ev) {

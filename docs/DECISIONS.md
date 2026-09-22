@@ -2124,6 +2124,53 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-22 — The breakdown picks assets with tick boxes, and reads in production order
+**Asked by David:** *"when selecting the players in the dropdown menu, I'm wondering if it's best to
+have each character with a check box so I can click and add several assets at the same time. This
+applies to all the assets."* And, in the same sitting: *"let's also change the order of the columns
+to EP, Shot, Frames, Character, Environment, BG, Prop, FX, Notes."*
+
+**The dropdown is gone.** Each cell now shows a `+` button that opens ONE panel of tick boxes — the
+project's assets of that column's type, with the ones already in the shot ticked. FC Mobile has
+twenty-five characters and a shot carries five of them, so a dropdown meant five separate trips
+through the same list. Ticking links, unticking unlinks, **each as its own request, sent as it
+happens**, which is the rule the rest of this screen already follows: no Done button to forget, and a
+failure names the one asset that failed instead of losing the batch. Both halves roll back together
+on a failure — the chip in the grid and the tick in the list — so the panel and the row under it can
+never disagree.
+
+**One panel, in `<body>`, not one list per cell.** Forty rows by five columns would be thousands of
+checkboxes in the page, nearly all never looked at; and `.bd-scroll` clips its contents, so a panel
+drawn inside a cell is cut off at the edge of the table. It is `position: fixed` and repositioned on
+scroll and resize, so it stays under its own `+` when the table is scrolled sideways, flips above the
+button near the bottom of the window, and is clamped inside the right edge. The filter box appears
+only for lists of eight or more: a list of three props is read, not searched.
+
+The asset names are sent once, as `window.BD_ASSETS`, rather than repeated in every cell — the same
+twenty-five names would otherwise be written into the page two hundred times.
+
+**The columns are ordered the way a breakdown is read**, not alphabetically: who is in it, where it
+happens, what is behind them, what they hold, what happens on top. Alphabetical put BG in front of
+Character and FX between Environment and Prop, which is nobody's order.
+
+**⚠ It is a RANKING, not a list of allowed columns.** `BREAKDOWN_TYPE_ORDER` in
+`includes/breakdown.php` gives the five named types a rank; anything else still appears, immediately,
+alphabetically after them — a new type called Vehicle needs no code, which is the v1 decision this
+screen was bought with (2026-08-11, *asset types are a dropdown built from data*). Names are matched
+loosely, ignoring case, spaces and a trailing "s", so Props and Prop are one column's worth of
+ordering. Add a name there only to move it up.
+
+`breakdown_asset_types()` is the single source, so **the CSV export reorders with the screen** and
+the two cannot drift.
+
+**Not run in PHP** — there is no PHP on the machine. The ordering was replayed line for line in
+Python against FC Mobile's five types, and the picker was driven in a browser against a static copy
+of the page with the real `style.css` and the real `shots.js`: open, filter, tick, untick, a failing
+link rolled back, outside click, Escape, the same button toggling shut, a second cell reading its own
+ticks, the flip above the button, and the clamp at the right edge. That harness also caught the
+panel's shadow being drawn in `var(--shade)`, which is **`#ffffff` on the dark theme** — a white glow
+round the panel. Every other shadow in `style.css` is a literal `rgba(0,0,0,…)`; this one is now too.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

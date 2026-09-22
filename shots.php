@@ -185,15 +185,18 @@ $missingNote = $noFrames > 0
               </span>
             <?php endforeach; ?>
             <?php if (can_edit()): ?>
-              <?php // A <select> rather than a search box: an asset list is tens
-                    // of items, not thousands, and a picker that needs no typing
-                    // is faster for the same name repeated across forty shots. ?>
-              <select class="bd-add" aria-label="Add <?= e($t !== '' ? $t : 'an asset') ?> to <?= e($r['shot_code']) ?>">
-                <option value="">+</option>
-                <?php foreach ($byType[$t] ?? [] as $a): ?>
-                  <option value="<?= $a['id'] ?>"><?= e($a['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
+              <?php // A BUTTON that opens a list of tick boxes, not a dropdown
+                    // (David, 2026-09-22: "have each character with a check box
+                    // so I can click and add several assets at the same time").
+                    // A dropdown adds one thing per trip through the list, and a
+                    // shot of FC Mobile carries five players out of twenty-five.
+                    // The list itself is built by assets/shots.js from the types
+                    // below: forty rows by five columns of tick boxes would be
+                    // thousands of inputs in the page, nearly all never looked
+                    // at. ?>
+              <button type="button" class="bd-add"
+                      aria-label="Add <?= e($t !== '' ? $t : 'an asset') ?> to <?= e($r['shot_code']) ?>"
+                      aria-haspopup="true">+</button>
             <?php endif; ?>
           </td>
         <?php endforeach; ?>
@@ -235,6 +238,14 @@ $missingNote = $noFrames > 0
 <script>
   window.BD_PROJECT = <?= $projectId ?>;
   window.BD_CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
+  <?php // Every asset this project has, by type, for the picker. Sent once
+        // rather than repeated in every cell: the same twenty-five names would
+        // otherwise be written into the page two hundred times. ?>
+  window.BD_ASSETS = <?= json_encode(array_map(function ($list) {
+      return array_map(function ($a) {
+          return ['id' => (int)$a['id'], 'name' => (string)$a['name']];
+      }, $list);
+  }, $byType), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 </script>
 <script src="assets/shots.js<?= asset_ver('shots.js') ?>"></script>
 

@@ -2612,17 +2612,65 @@ button.secondary.danger:hover { background: var(--danger-border); }
   font-size: 14px; line-height: 1; padding: 0 3px; margin: 0; width: auto;
 }
 .chip-x:hover { color: var(--danger); background: none; }
-/* The picker reads as the "+" it shows until it is opened — a full-width select
-   in every cell would swamp the chips it sits beside. */
-/* ⚠ A FIXED WIDTH, not `auto`. A <select> sizes itself to its WIDEST OPTION, so
-   `width: auto` made every picker as wide as the longest asset name — a 90px
-   control that pushed itself onto its own line under the chips it belongs
-   beside. Pinned narrow it reads as the "+" it shows; the list still opens at
-   full width, because a dropdown is not clipped by its control. */
+/* The picker reads as the "+" it shows until it is opened — a full-width control
+   in every cell would swamp the chips it sits beside.
+   ⚠ A FIXED WIDTH, not `auto`. This was a <select> until 2026-09-22, and a
+   <select> sizes itself to its WIDEST OPTION: `width: auto` made every picker as
+   wide as the longest asset name, a 90px control that pushed itself onto its own
+   line under the chips it belongs beside. The button that replaced it keeps the
+   pinned width for the same reason — a row of "+"s of different sizes reads as
+   noise. */
 .bd-add {
   width: 46px; padding: 2px 3px; font-size: 12px; margin-bottom: 4px;
   border-radius: 12px; color: var(--muted); vertical-align: top;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  cursor: pointer; line-height: 1.4;
 }
+.bd-add:hover, .bd-add[aria-expanded="true"] { color: var(--text); border-color: var(--primary); }
+
+/* THE TICK-BOX PICKER (David, 2026-09-22: "have each character with a check box
+   so I can click and add several assets at the same time").
+   ⚠ POSITION: FIXED, and a child of <body>, not of the cell. .bd-scroll clips
+   its contents, so a panel drawn inside a cell is cut off at the table's edge;
+   fixed coordinates also keep it under its own "+" when the table is scrolled
+   sideways, which an absolutely-positioned panel would not. assets/shots.js
+   works out the position and flips the panel above the button near the bottom of
+   the window. */
+.bd-picker {
+  position: fixed; z-index: 60; width: 260px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.38);
+  /* A literal black, NOT var(--shade): that token is #ffffff on the dark
+     theme (it is a fill for low-opacity overlays), and it drew a white
+     glow around the panel. Every other shadow in this file is an rgba
+     black for the same reason. */
+  padding: 8px; font-size: 13px;
+}
+.bd-picker[hidden] { display: none; }
+.bd-picker-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.bd-picker-title { font-size: 12px; letter-spacing: .02em; }
+.bd-picker-close {
+  background: none; border: 0; color: var(--muted); cursor: pointer;
+  font-size: 16px; line-height: 1; padding: 0 4px; width: auto; margin: 0;
+}
+.bd-picker-close:hover { color: var(--text); background: none; }
+.bd-picker-filter { margin-bottom: 6px; padding: 4px 6px; font-size: 12.5px; }
+.bd-picker-filter[hidden] { display: none; }
+/* Capped and scrolled: twenty-five players is a list, not a page. */
+.bd-picker-list { max-height: 46vh; overflow-y: auto; }
+.bd-picker-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 4px; border-radius: 4px; cursor: pointer; line-height: 1.3;
+}
+.bd-picker-row[hidden] { display: none; }
+.bd-picker-row:hover { background: var(--surface-2); }
+/* The box keeps its own size against the global `input { width: 100% }`. */
+.bd-picker-row input[type="checkbox"] { width: auto; margin: 0; flex: none; }
+.bd-picker-note { margin: 6px 0 0; }
+.bd-picker-count { margin: 6px 0 0; }
 /* Horizontal scroll on the table alone. A project with six asset types is wider
    than a laptop, and the page itself must never scroll sideways.
    ⚠ ITS OWN CLASS, not the tracking grid's .grid-scroll — that one carries

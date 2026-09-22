@@ -38,13 +38,44 @@
 require_once __DIR__ . '/functions.php';
 
 /**
+ * READING ORDER, not alphabetical (David, 2026-09-22: "let's also change the
+ * order of the columns to EP, Shot, Frames, Character, Environment, BG, Prop,
+ * FX, Notes").
+ *
+ * A breakdown is read the way a shot is built: who is in it, where it happens,
+ * what is behind them, what they hold, what happens on top. Alphabetical put BG
+ * in front of Character and FX between Environment and Prop, which is nobody's
+ * order.
+ *
+ * Only a RANKING, not a list of allowed columns. The screen is still generated
+ * from whatever types the project has — a new one called Vehicle needs no code
+ * and appears immediately, alphabetically after the five named here. Add it
+ * below only to move it up. The names are matched loosely (case, spaces and a
+ * trailing "s" are ignored) so Props, props and Prop are one column's worth of
+ * ordering, and the common spellings of the same thing sit together.
+ */
+const BREAKDOWN_TYPE_ORDER = [
+    'character' => 1, 'char' => 1, 'cast' => 1,
+    'environment' => 2, 'env' => 2, 'location' => 2, 'set' => 2,
+    'bg' => 3, 'background' => 3,
+    'prop' => 4,
+    'fx' => 5, 'vfx' => 5, 'effect' => 5,
+];
+
+/** The key a type name is ranked under: lower case, no spaces, no trailing s. */
+function breakdown_type_key(string $type): string {
+    $k = mb_strtolower(trim($type));
+    $k = str_replace([' ', '-', '_'], '', $k);
+    if (mb_strlen($k) > 1 && mb_substr($k, -1) === 's') $k = mb_substr($k, 0, -1);
+    return $k;
+}
+
+/**
  * The asset types this project actually uses, in a stable order.
  *
- * ALPHABETICAL, deliberately. The column order has to be the same on every load
- * and the same in the export, and it has to be predictable across shows —
- * ordering by how many of each type exist would reshuffle the sheet every time
- * somebody added an asset. Character, Environment, FX, Prop, Vehicle happens to
- * be the order a breakdown is usually read in anyway.
+ * Stable is the point: the same on every load, the same in the export, and the
+ * same across shows. Ordering by how many of each type exist would reshuffle
+ * the sheet every time somebody added an asset.
  *
  * An asset with no type set gets its own column at the END rather than being
  * dropped: it is real work that somebody has not filed yet, and a breakdown that
@@ -62,6 +93,18 @@ function breakdown_asset_types(PDO $pdo, int $projectId): array {
         if ($r['t'] === '') { $untyped = true; continue; }
         $types[] = (string)$r['t'];
     }
+
+    // Ranked ones first in house order, then everything else alphabetically —
+    // which is the order the query already returned them in, so usort's
+    // tie-break on the name keeps it. 99 rather than PHP_INT_MAX so an unranked
+    // type never collides with a rank if the list above ever grows.
+    usort($types, function ($a, $b) {
+        $ra = BREAKDOWN_TYPE_ORDER[breakdown_type_key($a)] ?? 99;
+        $rb = BREAKDOWN_TYPE_ORDER[breakdown_type_key($b)] ?? 99;
+        if ($ra !== $rb) return $ra <=> $rb;
+        return strcasecmp($a, $b);
+    });
+
     if ($untyped) $types[] = '';
     return $types;
 }
