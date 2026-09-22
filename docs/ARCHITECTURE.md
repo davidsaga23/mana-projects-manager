@@ -212,6 +212,11 @@ across); it does not rename the slot. Taking somebody out writes a `left` line t
 log, and "has left" is derived — the record's person is no longer the position's. Staffing
 (`crew.php`) shows every candidate a position has ever had.
 
+**Across shows** (`bookings.php`, 2026-09-21): a real person in a position on a dated step is
+*booked* for that step's window, and two bookings of one person on different shows that share a
+working day are a *clash*. Derived on every load from `crew_lanes` and `pipeline_steps`, never
+stored, so it can never disagree with the timelines it is read from.
+
 ### Scheduling
 
 ```sql

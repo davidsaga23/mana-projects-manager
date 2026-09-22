@@ -1982,6 +1982,47 @@ built: a "from environment" link on each background (one nullable column on `ass
 Assets screen), and a fourth rule in that function, an asset waiting on an asset step waits for its
 parent there. It would also let a shot's backgrounds pull in their environment.
 
+## 2026-09-21 — Bookings: who is needed where, across every show
+**Asked by David:** *"is there a way I can see the overlapping of artists across projects and
+general timelines?"* There was not. It is the reason crew was made global on 2026-08-11 ("per-project
+crew makes cross-project workload invisible"), and every people screen since has looked inside one
+show. `bookings.php` (top bar, beside Artists), `includes/bookings.php`, `assets/bookings.js`. No
+migration.
+
+**What a booking is.** A real person holding a position on a step whose dates are set on its show's
+general timeline: needed from the step's start to its deadline. Read from `crew_lanes` (filled by
+Staffing) and `pipeline_steps`, so it says what the plans say. Placeholder slots book nobody, but
+the By show view counts them ("2 positions not filled yet"); a team is never booked; positions on
+undated steps are listed under the chart rather than dropped. Shows in setup, active or on hold;
+wrapped and archived ones are over and would only add clashes nobody can act on.
+
+**What a clash is.** One person booked on two DIFFERENT shows whose dates cross on at least one
+working day (`bookings_clashes()`, with `working_days_between()`, so the studio's holidays count):
+a step ending on a Friday and another starting that Saturday is no clash. Two steps of the same show
+at once are left out on purpose: that is usually one job, a department carrying on, and the question
+was about shows.
+
+**Two views of the same facts**, buttons at the top:
+- **By person**: a row per person, each booking a bar in its show's colour, stacked when two cross,
+  the clash shaded red across the row and both bars outlined, with a count beside the name.
+- **By show**: every show's general timeline stacked, a row per dated step, who holds it named on the
+  bar, red where one of them is needed on another show then, the delivery date on the show's row.
+
+Above both, the clashes in sentences ("Ana López: MSD · Animation (5 Oct to 6 Nov) and DOOM · Layout
+(12 Oct to 30 Oct) cross for 15 working days"). A chip per show switches it off, and its clashes
+with it; "only clashes" narrows either view; zoom keeps the date at the left edge; a bar opens its
+show's timeline.
+
+**Drawn as positioned HTML, not with Frappe Gantt,** because Frappe puts one bar on a row and a
+person's shows side by side on ONE row is the whole point of the first view. The clash arithmetic is
+in PHP, so it was replayed line for line in Python on a sample built to catch the edges: a clash
+across a holiday (4 working days, not 5), two shows that share only a Saturday, and two steps of one
+show at once. The drawing was checked in a browser against those numbers, pixel for pixel.
+
+**Not built:** the detailed schedule as a second source (the task days rather than the step window),
+engagement dates and part-time allocation (`crew_projects.start_date`, `end_date`, `allocation_pct`:
+someone on two shows at 50% each is not really double-booked), and clashes inside one show.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

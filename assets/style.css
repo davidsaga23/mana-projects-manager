@@ -1795,6 +1795,87 @@ body.lightbox-lock { overflow: hidden; }
 @media (max-width: 520px) {
   .se-dates { flex-direction: column; gap: 0; }
 }
+
+/* --- bookings: every show at once (2026-09-21) --------------------------------
+   Rows of positioned bars drawn by assets/bookings.js. The name column sticks to
+   the left and the calendar to the top, inside a box that scrolls both ways, so
+   neither is lost however far across or down you go. */
+.bk-toolbar { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 4px 0 10px; }
+.bk-toolbar button { margin: 0; padding: 6px 12px; font-size: 13.5px; }
+.bk-toolbar .zoom-btn { padding: 5px 10px; }
+.bk-views { display: inline-flex; }
+.bk-views button { border-radius: 0; }
+.bk-views button:first-child { border-radius: 4px 0 0 4px; }
+.bk-views button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.bk-views button.is-on { background: #2f6fb2; border-color: #2f6fb2; color: #fff; }
+.bk-shows { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 12px; }
+.bk-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400;
+  background: #fff; border: 1px solid #dfe4e9; border-radius: 14px;
+  padding: 3px 11px 3px 7px; font-size: 13px; cursor: pointer;
+}
+.bk-chip input { width: auto; margin: 0; }
+.bk-chip.is-off { opacity: .5; }
+.bk-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
+.bk-summary { margin: 0 0 12px; max-width: 110ch; }
+.bk-summary h3 { margin: 0 0 6px; font-size: 15px; color: #b02a37; }
+.bk-summary ul { margin: 0; padding-left: 20px; }
+.bk-summary li { margin: 3px 0; line-height: 1.45; }
+.bk-clash-text { color: #b02a37; }
+.bk-chart-wrap {
+  overflow: auto; max-height: 72vh; margin-bottom: 10px;
+  background: #fff; border: 1px solid #e4e8ec; border-radius: 6px;
+}
+.bk-chart { position: relative; width: max-content; min-width: 100%; }
+.bk-row { display: flex; border-bottom: 1px solid #eef1f4; }
+.bk-label {
+  position: sticky; left: 0; z-index: 2; flex: 0 0 220px; width: 220px;
+  background: #fff; border-right: 1px solid #e4e8ec; padding: 6px 10px;
+  font-size: 13px; line-height: 1.3; overflow: hidden;
+}
+.bk-label small { display: block; margin: 1px 0 0; font-size: 11.5px; }
+/* A faint line at every Monday; the size is set per row by the script, a week
+   of whatever width the zoom gives a day. */
+.bk-track {
+  position: relative; flex: 0 0 auto;
+  background-image: linear-gradient(to right, #eef1f4 1px, transparent 1px);
+}
+.bk-head { position: sticky; top: 0; z-index: 3; }
+.bk-head .bk-label { background: #f4f6f8; z-index: 4; font-weight: 600; }
+.bk-head .bk-track { height: 40px; background: #f4f6f8; }
+.bk-month {
+  position: absolute; top: 4px; padding-left: 4px; border-left: 1px solid #c3ccd4;
+  font-size: 12px; font-weight: 600; color: #43535f; white-space: nowrap;
+}
+.bk-week {
+  position: absolute; top: 22px; height: 18px; padding-left: 3px; border-left: 1px solid #dfe4e9;
+  font-size: 11px; color: #5a6a7a;
+}
+.bk-bar {
+  position: absolute; height: 20px; padding: 0 6px; border-radius: 4px;
+  color: #fff; font-size: 11.5px; line-height: 20px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 1px rgba(0,0,0,.14);
+}
+.bk-bar:hover { color: #fff; text-decoration: none; filter: brightness(1.1); }
+.bk-bar.is-clash { box-shadow: 0 0 0 2px #b02a37; }
+/* The days the clash covers, shaded across the whole row behind the bars. */
+.bk-band {
+  position: absolute; top: 0; bottom: 0;
+  background: rgba(176, 42, 55, .13);
+  border-left: 1px dashed #b02a37; border-right: 1px dashed #b02a37;
+}
+.bk-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid #b02a37; opacity: .5; pointer-events: none; }
+.bk-group .bk-label { background: #f7f9fb; }
+.bk-group .bk-track { background-color: #f7f9fb; }
+.bk-delivery { position: absolute; top: 6px; font-size: 11px; color: #7b3fb8; white-space: nowrap; }
+.bk-badge {
+  display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px;
+  background: #b02a37; color: #fff; font-size: 11px; line-height: 16px; font-weight: 600;
+}
+.bk-empty { padding: 18px 16px; color: #5a6a7a; }
+@media (max-width: 640px) {
+  .bk-label { flex-basis: 140px; width: 140px; }
+}
 /* The studio-wide artist list. Wide by nature — a dozen columns about a person
    — so it scrolls sideways inside its own box rather than pushing the page. */
 .artist-table { min-width: 1100px; }
