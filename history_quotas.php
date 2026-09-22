@@ -283,7 +283,7 @@ function quota_row(array $r, string $identity): void {
                 // view puts the step's scope tag, so every column after the
                 // first lines up between the two. ?>
           <?php quota_row($r, sprintf(
-                '<a href="wizard.php?project=%d&amp;step=4">%s</a>%s<div class="muted small">%s</div>',
+                '<a href="wizard.php?project=%d&amp;step=6">%s</a>%s<div class="muted small">%s</div>',
                 (int)$r['project_id'], e($r['project_code']),
                 $r['project_type'] ? ' <span class="type-tag">' . e($r['project_type']) . '</span>' : '',
                 e(substr((string)$r['captured_at'], 0, 10)))); ?>
@@ -296,9 +296,9 @@ function quota_row(array $r, string $identity): void {
   <?php // ---- per project, the way it was asked for --------------------------- ?>
   <?php foreach ($batches as $b): ?>
     <h3 class="history-head">
-      <?php // Straight to the screen that produced this record — step 4 is Dates
+      <?php // Straight to the screen that produced this record — step 6 is Dates
             // & headcount, where a new capture is taken. ?>
-      <a href="wizard.php?project=<?= $b['project_id'] ?>&amp;step=4"><?= e($b['project_code']) ?></a>
+      <a href="wizard.php?project=<?= $b['project_id'] ?>&amp;step=6"><?= e($b['project_code']) ?></a>
       <span class="muted"><?= e($b['project_name']) ?></span>
       <?php if (!empty($b['project_type'])): ?>
         <span class="type-tag"><?= e($b['project_type']) ?></span>

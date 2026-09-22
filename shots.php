@@ -59,7 +59,7 @@ require __DIR__ . '/includes/header.php';
   <div class="flash flash-warn">
     <p><strong>This project has no assets yet.</strong></p>
     <p class="small">Characters, environments, props and the rest are added on the
-      <a href="wizard.php?project=<?= $projectId ?>&amp;step=3">Setup</a> screen or through
+      <a href="wizard.php?project=<?= $projectId ?>&amp;step=5">Setup</a> screen or through
       <a href="import.php?project=<?= $projectId ?>">Import</a>. Once they exist, this screen
       grows a column for each kind.</p>
   </div>

@@ -371,7 +371,7 @@ require __DIR__ . '/includes/header.php';
       <h2>Nothing planned or scheduled yet</h2>
       <p>The general chart draws each step's planned dates; the detailed one draws the
          saved schedule. Neither exists yet.</p>
-      <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set the dates →</a>
+      <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Set the dates →</a>
          <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
     <?php endif; ?>
   </div>
@@ -383,7 +383,7 @@ require __DIR__ . '/includes/header.php';
     deadline yet, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn below:
     <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
       if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
-    <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Set them on Dates &amp; headcount →</a>
+    <a href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Set them on Dates &amp; headcount →</a>
   </div>
 <?php elseif ($undated): ?>
   <p class="muted small">
@@ -412,7 +412,7 @@ require __DIR__ . '/includes/header.php';
   <?php if ($editable): ?>
     <p class="muted small tl-note">
       Drag a bar to change that step's dates, it saves straight into
-      <a href="<?= e('wizard.php?project=' . $projectId . '&step=4') ?>">Dates &amp; headcount</a>,
+      <a href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Dates &amp; headcount</a>,
       so the two always agree. A moved bar keeps its <strong>working days</strong>: slid over a
       weekend or a studio holiday it stretches, rather than losing a day to it.
       <strong>Double-click</strong> a bar to type its dates, see how many working days it needs,
@@ -797,7 +797,7 @@ require __DIR__ . '/includes/header.php';
     <?php if ($editable): ?>
       <form id="seToPlanning" method="get" action="wizard.php" hidden>
         <input type="hidden" name="project" value="<?= (int)$projectId ?>">
-        <input type="hidden" name="step" value="4">
+        <input type="hidden" name="step" value="6">
       </form>
     <?php endif; ?>
   </div>
