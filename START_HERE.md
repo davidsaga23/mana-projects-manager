@@ -7,7 +7,7 @@ without re-deriving context.
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11
 - **Repo:** `mana-projects-manager` (private, GitHub) — local copy at `D:\Work\Mana\mana-platform`
-- **Status (2026-09-18):** in real use at <https://mana.davidsaga.com> on several shows, among
+- **Status (2026-09-21):** in real use at <https://mana.davidsaga.com> on several shows, among
   them **FCM** (budgeted on the Return to Club sheet, `RTC_ExpenseProjection_v01.xlsx`), **MSD**
   and **Doomsday**, plus a 2D motion comic. Built and deployed: setup,
   Plaky import, scheduler, **Staffing** (positions + hiring on one page), timeline with
@@ -16,7 +16,7 @@ without re-deriving context.
   database, historic quotas and fees, and **ideal quotas per project**. **All ten steps of David's
   production cycle are covered** — see the table at the top of `docs/ROADMAP.md`, the thing to
   check new work against. The one thing left is the **client loop**, never on that list.
-  **§0 below says what changed from 1 to 18 September and what is waiting on David.**
+  **§0 below says what changed from 1 to 21 September and what is waiting on David.**
 - **⚠ Deploy state (2026-09-18):** everything up to **034 is applied**, confirmed by David on
   2026-09-18, so ideal quotas are per project on the live site. **035** (timeline versions) and
   **036** (progress on a step) were added the same day and are **not confirmed applied**: until
@@ -58,13 +58,18 @@ without re-deriving context.
 
 ---
 
-## 0. Where things stand (2026-09-18)
+## 0. Where things stand (2026-09-21)
 
 A long run of work since the last update, almost all of it asked for by David screen by
 screen. `docs/DECISIONS.md` has an entry for every item below; read those before changing one.
 
-### Built, 1–18 September
+### Built, 1–21 September
 
+- **Bookings** (2026-09-21, top bar beside Artists, no migration): who is needed on which show
+  and when, across every show in setup, active or on hold, read from positions (Staffing) and
+  each step's general-timeline dates. **By person** (a row each, red where one person is needed on
+  two shows on the same working days) and **By show** (every general timeline stacked, the people
+  named on each step). `includes/bookings.php`, `assets/bookings.js`.
 - **Timeline versions** (2026-09-18, migration 035): **Save timeline's version** keeps a copy of
   both charts and the milestones, named `V00_09182026`, `V01_09182026` and on (a number per
   project, then the date saved). The **Version** picker opens one on warm paper, read only, with
@@ -147,6 +152,9 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   David's call first), deleting them, a note per version, and comparing two.
 - For progress: a history of it (only the latest number is kept, though each saved timeline
   version freezes the numbers of its day), and a mark on the bar where its minimum duration ends.
+- For Bookings: the detailed schedule as a second source (task days, not step windows),
+  engagement dates and part-time allocation (50% on two shows is not a double booking), and
+  clashes inside one show.
 - Renaming a project type (create the right one, move the projects, remove the wrong one).
 - A clean-up for crew records nothing points at (offered, not built).
 - Coverage above 100% was asked about and **advised against** (2026-09-16): the calendar, the
@@ -206,8 +214,8 @@ is the expensive scenario we're deliberately avoiding.
 
 ### 2.2 Crew is global, assigned per project
 One org-wide crew list; a join table records who is on which project. This enables
-cross-project workload views (e.g. one artist booked on two shows the same week) — currently
-impossible and considered valuable.
+cross-project workload views (e.g. one artist booked on two shows the same week), which was
+impossible before and considered valuable. **Built 2026-09-21 as Bookings** (§0).
 
 ### 2.3 Pipeline workflow is data, not code
 In STFC, step parallelism was hardcoded (`$overlapsWithPrevious = ['render']` — Lighting and
