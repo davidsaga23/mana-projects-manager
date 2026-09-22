@@ -73,6 +73,14 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **The breakdown's headings stick** (2026-09-22), and its totals row with them, because the scroll
+  box finally has a height bound — `th` was already sticky everywhere and had nothing to pin
+  against. Both come off in print. The `.grid-scroll` comment has the full diagnosis.
+- **⚠ The Plaky importer wrote its GROUP NAME in as an episode** (fixed 2026-09-22). A flat shot
+  list under a group called "Shots" was looked up as episode `''` and stored as episode `'Shots'`,
+  so importer-made rows never matched again and the project counted as episodic. **FC Mobile still
+  carries three of them** — 45 shots against a list of 42, no frame count, under their own "Shots"
+  heading on wizard step 4. Delete them there; the project goes back to non-episodic by itself.
 - **The breakdown picks assets with TICK BOXES** (2026-09-22, no migration): each cell's `+` opens
   one shared panel listing that column's assets, the ones already in the shot ticked, so five
   players go into a shot without five trips through a dropdown. Ticking links and unticking unlinks

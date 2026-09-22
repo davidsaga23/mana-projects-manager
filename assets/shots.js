@@ -147,6 +147,26 @@
   function placePicker() {
     if (!picker || picker.hidden || !pkButton) return;
     var r = pkButton.getBoundingClientRect();
+
+    // ⚠ CLOSE WHEN THE BUTTON SCROLLS OUT OF SIGHT. The table got its own
+    // scroll box on 2026-09-22 so the headings could stick, which means a cell
+    // can now leave the visible area while the page itself has not moved. The
+    // panel tracks its button faithfully, so without this it followed one
+    // straight off the top of the window — or, worse, hung over an unrelated
+    // part of the page pointing at a cell nobody can see. Measured against the
+    // scroll box AND the window, since either can hide it.
+    var box = pkButton.closest('.bd-scroll');
+    var top = 0, bottom = window.innerHeight, left = 0, right = window.innerWidth;
+    if (box) {
+      var b = box.getBoundingClientRect();
+      top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom);
+      left = Math.max(left, b.left); right = Math.min(right, b.right);
+    }
+    if (r.bottom <= top || r.top >= bottom || r.right <= left || r.left >= right) {
+      closePicker(false);
+      return;
+    }
+
     // Fixed, so a table scrolled sideways carries the panel with the button
     // rather than leaving it behind. Flipped above, or pulled left, when it
     // would otherwise run off the bottom or the right edge of the window.

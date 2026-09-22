@@ -1002,6 +1002,13 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .proj-bar-finance .proj-tab.current { border-bottom-color: var(--danger-strong); }
 
 @media print { .proj-bar { display: none; } }
+/* The breakdown prints straight through: the box that makes the heading stick on
+   screen would otherwise put one screenful on the page and drop the rest. The
+   heading repeats on each printed page by itself, which is what thead is for. */
+@media print {
+  .bd-scroll { overflow: visible; max-height: none; min-height: 0; }
+  .breakdown-table tfoot td { position: static; }
+}
 
 /* Dashboard — hero, primary step, KPI tiles, step cards, breakdown grid */
 .dash-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
@@ -2591,7 +2598,14 @@ button.secondary.danger:hover { background: var(--danger-border); }
    and separated by a heavier line so a long list cannot be misread as having
    one more shot in it. */
 .bd-totals { margin: 0 0 8px; }
-.breakdown-table tfoot td { background: var(--surface-2); border-top: 2px solid var(--border-strong); }
+/* ⚠ The rule is an INSET SHADOW, not border-top. A sticky cell leaves its
+   border behind when it detaches under border-collapse: collapse — the same
+   reason the <th> heading draws its own line. Under the header (5) so a table
+   scrolled to its very end does not stack the two. */
+.breakdown-table tfoot td {
+  background: var(--surface-2); position: sticky; bottom: 0; z-index: 4;
+  box-shadow: inset 0 2px 0 var(--border-strong);
+}
 /* The note box: one line by default, dragged taller for a long one, and the
    same quiet type as the note it replaced, so a column of them still reads as
    notes rather than as a column of fields. */
@@ -2671,10 +2685,24 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bd-picker-row input[type="checkbox"] { width: auto; margin: 0; flex: none; }
 .bd-picker-note { margin: 6px 0 0; }
 .bd-picker-count { margin: 6px 0 0; }
-/* Horizontal scroll on the table alone. A project with six asset types is wider
+/* Scroll on the table alone, both ways. A project with six asset types is wider
    than a laptop, and the page itself must never scroll sideways.
-   ⚠ ITS OWN CLASS, not the tracking grid's .grid-scroll — that one carries
-   `max-height: 78vh` to keep a 200-row status grid in a box, and a breakdown
-   wants to scroll with the page so it can be read and printed straight through.
-   Reusing the name would have inherited the cap silently. */
-.bd-scroll { overflow-x: auto; }
+   ⚠ THE max-height IS WHAT MAKES THE HEADINGS STICK (David, 2026-09-22: "let's
+   do a sticky header at the top of the shot tab so we can see them when I scroll
+   down"). `th` is sticky everywhere in this file, but `overflow-x: auto` already
+   made this div a scroll container — the Overflow spec forces overflow-y away
+   from `visible` the moment overflow-x is anything else — and sticky resolves
+   against the nearest scroll container, not the page. With no height bound the
+   box was exactly as tall as its table, never scrolled vertically, and the
+   heading had nothing to stick against: sticky in name, motionless in practice.
+   The long note on .grid-scroll has the full diagnosis; this is the same fix.
+   It keeps its OWN class all the same: .grid-scroll's cap is 78vh for a 200-row
+   status grid, and this screen has more above it — nav, the breakdown warning,
+   the totals line — so it gets a bound measured from the window instead.
+   Short shot lists never reach it and are unaffected.
+   ⚠ max(), NOT a min-height. A min-height would hold the box 300px tall for a
+   five-shot project and leave a band of empty grey under the last row; this
+   raises the CAP on a short window instead, and a table shorter than the cap
+   still ends where it ends. The 210px is the chrome above it — nav, tabs, the
+   breakdown warning, the totals line. */
+.bd-scroll { overflow: auto; max-height: max(300px, calc(100vh - 210px)); }

@@ -2124,6 +2124,74 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-22 — The importer stamped its group name in as an episode (bug)
+**Asked by David:** *"what's the deal with the additional shots at the end of the shotlist? Where are
+they coming from?"* FC Mobile counted 45 shots where the list is 42, and the three extras carried no
+frame count.
+
+**They were made by the Plaky importer, and they are identifiable because of the bug that made
+them.** In `plaky_import.php`, a group mapped as `shots` — a flat shot list, no episodes — computed
+`$episode = ''` and looked shots up on that key, then INSERTED `$p['Group']` instead: the group's
+own name. FC Mobile's group is called "Shots", so anything the importer created landed with
+`episode = 'Shots'` while everything typed or pasted in has `episode = ''`. The line sat directly
+under a comment saying the opposite — *"stamping the group name in as an episode would invent
+structure that isn't there"* — which is exactly what it did.
+
+**Three consequences, all of them visible before anyone knew why:**
+- Anything the importer created **never matched again**, because the lookup key and the stored row
+  disagreed. A re-import of the same item makes another row rather than updating the first.
+- `wizard_shots_episodic()` infers episodic from `COUNT(*) WHERE episode <> ''`, so **three rows
+  nobody meant to have an episode made the whole project episodic** — which is why the breakdown
+  grew an **Ep** column reading "—" on every real shot.
+- The scheduler counts them: 45 shots of animation planned against 42 that exist.
+
+Fixed by writing `$episode`. **The three existing rows are left alone** — deleting production rows
+on David's behalf is not a migration's job, and they are easy to find precisely because they are the
+only ones under "Shots": wizard step 4 groups by episode, so they sit under their own heading with a
+✕ each. Removing them cascades to their progress, asset links and schedule rows, and drops the
+project back to non-episodic on its own.
+
+**Not caught by a test, caught by a question.** Nothing in the codebase compares what the importer
+looked up with what it wrote; the only symptom was a count three too high on one screen. Worth
+remembering the shape: a key built one way and a row written another is silent until something
+counts.
+
+## 2026-09-22 — The shot breakdown's headings stick, and so does its total
+**Asked by David:** *"let's do a sticky header at the top of the shot tab so we can see them when I
+scroll down."* Forty-five rows by nine columns, and once the headings scroll off, a cell of chips
+does not say whether it is Prop or FX.
+
+**`th` was ALREADY sticky — it just had nothing to stick to.** The blanket `th { position: sticky;
+top: 0 }` has been in `style.css` since the start. `.bd-scroll` carried `overflow-x: auto` for wide
+projects, which makes it a scroll container (the Overflow spec forces `overflow-y` away from
+`visible` the moment `overflow-x` is anything else), and sticky resolves against the nearest scroll
+container rather than the page. With no height bound that box was exactly as tall as its table, so it
+never scrolled vertically and the heading had nothing to pin against: sticky in name, motionless in
+practice. **The fix is the height bound, not the sticky.** `.grid-scroll` already carries the same
+diagnosis in a long comment — this is the second table to hit it.
+
+`max-height: max(300px, calc(100vh - 210px))` rather than `.grid-scroll`'s flat 78vh: this screen
+has more above it (nav, the breakdown warning, the totals line). **`max()`, not a `min-height`** — a
+min-height would hold the box 300px tall for a five-shot project and leave a band of empty grey under
+the last row.
+
+**The totals row sticks to the bottom** for the same money, so the frame count stays on screen while
+the list is read. Its rule is an inset shadow, not `border-top`: a sticky cell leaves its border
+behind under `border-collapse: collapse`, which is why the heading draws its own line too.
+
+**In print both come off** — a printer handed a scrolling div prints one screenful and drops the
+rest — and `thead` repeats per page by itself, which is what it is for.
+
+**One consequence that had to be handled:** a cell can now leave the visible area while the page
+itself has not moved, and the asset picker tracks its button faithfully. It followed one straight off
+the top of the window. The picker now **closes when its button scrolls out of sight**, measured
+against the scroll box and the window, since either can hide it.
+
+**Not run in PHP.** Driven in a browser against a static copy of the page with the real CSS and the
+real `shots.js`: 45 rows, the heading pinned to the top of the box and the total to the bottom at
+every scroll position, a short table ending where it ends with no scrollbar and no empty band, the
+picker tracking a small scroll and closing on a large one, and reopening correctly afterwards.
+
 ## 2026-09-22 — The breakdown picks assets with tick boxes, and reads in production order
 **Asked by David:** *"when selecting the players in the dropdown menu, I'm wondering if it's best to
 have each character with a check box so I can click and add several assets at the same time. This
