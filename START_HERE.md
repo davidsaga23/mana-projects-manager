@@ -70,6 +70,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   empty, and stays as it was.
 - **A shot's note is typed on the breakdown** (2026-09-22). Nothing edited one before; it arrived
   with an import and stayed. Saved on leaving the box, like the frames beside it.
+- **The breakdown totals frames and footage** (2026-09-22), above the table and in its foot, over
+  the rows shown, naming any shot with no frame count instead of counting it as zero.
 - **N/A is the way to say "this item skips this step"** (2026-09-22, nothing built): it leaves the
   step's count, rather than counting as approved. FCM's Concept reads 3.0 of 4.0 that way. The
   planning side still reads coverage %, so keep the two in step; DECISIONS says why and what was

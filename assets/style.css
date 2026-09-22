@@ -2411,6 +2411,11 @@ button.secondary.danger:hover { background: #e9c2c7; }
   width: 4.5em; padding: 3px 6px; font-size: 13px; text-align: right;
 }
 .bd-secs { line-height: 1.3; min-height: 14px; }
+/* The totals, above the table and repeated in its foot. The foot row is shaded
+   and separated by a heavier line so a long list cannot be misread as having
+   one more shot in it. */
+.bd-totals { margin: 0 0 8px; }
+.breakdown-table tfoot td { background: #f7f9fb; border-top: 2px solid #d7dde3; }
 /* The note box: one line by default, dragged taller for a long one, and the
    same quiet type as the note it replaced, so a column of them still reads as
    notes rather than as a column of fields. */

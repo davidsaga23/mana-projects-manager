@@ -301,18 +301,10 @@ function breakdown_cell_total(array $st, array $group, string $kind): ?float {
     return (float)$group['count'];
 }
 
-/**
- * Seconds as a running time: 233.62 → "3:53.62".
- *
- * A step measured in footage is quoted in minutes and seconds by everyone who
- * works on it; printing "233.62 sec" makes people do the arithmetic themselves.
- */
-function fmt_secs(float $s): string {
-    if ($s < 0) $s = 0;
-    $m = (int)floor($s / 60);
-    $r = $s - $m * 60;
-    return $m . ':' . str_pad(number_format($r, 2, '.', ''), 5, '0', STR_PAD_LEFT);
-}
+// fmt_secs() lived here until 2026-09-22 and now sits in functions.php, which
+// every page loads: the shot breakdown's footage totals needed it, and pulling
+// the whole dashboard into that screen to reach one formatter was the wrong way
+// round. Callers are unchanged.
 
 /**
  * What a step has actually been finishing per working day, from the snapshots.

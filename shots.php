@@ -106,6 +106,38 @@ require __DIR__ . '/includes/header.php';
   </p>
 <?php endif; ?>
 
+<?php
+// FRAMES AND FOOTAGE, TOTALLED (David, 2026-09-22), above the table and again
+// under it: the list runs to forty rows and more, and the number people come
+// here for is the sum.
+//
+// Counted over the rows SHOWN, so the episode filter narrows it too, and shots
+// with no frame count are NAMED rather than counted as zero: a total that
+// quietly leaves five shots out is worse than one that says it did.
+$totalFrames = 0;
+$totalSecs   = 0.0;
+$noFrames    = 0;
+foreach ($rows as $r) {
+    if ($r['frames'] === null) { $noFrames++; continue; }
+    $totalFrames += (int)$r['frames'];
+    $totalSecs   += (float)($r['seconds'] ?? 0);
+}
+$shotWord = count($rows) === 1 ? 'shot' : 'shots';
+// The running time only once there is a minute of it: "0:04.08" for a four
+// second show is arithmetic nobody asked for.
+$runningTime = $totalSecs >= 60 ? ' · ' . fmt_secs($totalSecs) : '';
+$missingNote = $noFrames > 0
+    ? ', <span class="warn-text">' . $noFrames . ' without a frame count yet</span>'
+    : '';
+?>
+<p class="muted small bd-totals">
+  <strong><?= e(number_format(count($rows))) ?></strong> <?= $shotWord ?><?= $episode !== ''
+    ? ' in ' . e($episode) : '' ?> ·
+  <strong><?= e(number_format($totalFrames)) ?></strong> frames ·
+  <strong><?= e(fmt_num($totalSecs, 3)) ?>s</strong><?= e($runningTime) ?>
+  at <?= (int)$project['fps'] ?> fps<?= $missingNote ?>
+</p>
+
 <div class="bd-scroll">
 <table class="grid-table breakdown-table">
   <thead>
@@ -179,6 +211,22 @@ require __DIR__ . '/includes/header.php';
       </tr>
     <?php endforeach; ?>
   </tbody>
+  <?php // The same totals under the table, the frames sitting in the frames
+        // column so the sum lines up with what it adds. ?>
+  <tfoot>
+    <tr>
+      <?php if (count($episodes) > 1): ?><td></td><?php endif; ?>
+      <td><strong>Total</strong></td>
+      <td class="num bd-frames">
+        <strong><?= e(number_format($totalFrames)) ?></strong>
+        <div class="bd-secs muted small"><?= e(fmt_num($totalSecs, 3)) ?>s<?= e($runningTime) ?></div>
+      </td>
+      <td class="muted small" colspan="<?= count($types) + 1 ?>">
+        <?= e(number_format(count($rows))) ?> <?= $shotWord ?><?= $episode !== ''
+          ? ' in ' . e($episode) : '' ?><?= $missingNote ?>
+      </td>
+    </tr>
+  </tfoot>
 </table>
 </div>
 

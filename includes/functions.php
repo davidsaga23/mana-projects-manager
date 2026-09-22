@@ -275,6 +275,25 @@ function fmt_num($v, int $decimals = 2): string {
 }
 
 /**
+ * Seconds as a running time: 233.62 → "3:53.62".
+ *
+ * Footage is quoted in minutes and seconds by everyone who works on it, and
+ * printing "233.62 sec" leaves them doing the arithmetic.
+ *
+ * Here rather than in includes/dashboard.php, where it was written, since
+ * 2026-09-22: the shot breakdown totals footage too, and pulling the whole
+ * dashboard into that screen to reach one formatter was the wrong way round.
+ * One formatter shared, because two would drift the first time either was
+ * corrected.
+ */
+function fmt_secs(float $s): string {
+    if ($s < 0) $s = 0;
+    $m = (int)floor($s / 60);
+    $r = $s - $m * 60;
+    return $m . ':' . str_pad(number_format($r, 2, '.', ''), 5, '0', STR_PAD_LEFT);
+}
+
+/**
  * The label for a shot, following the project's own episode setting.
  *
  * STFC could hardcode EP002_SH050 because that show is a series. Here `episodic`

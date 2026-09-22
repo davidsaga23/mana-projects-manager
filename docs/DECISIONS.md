@@ -2073,6 +2073,21 @@ Frames box beside it works (`breakdown_set_note()`, `action=notes`). Empty clear
 column reads as a dash again; a note over 2,000 characters is cut, and the cut is reported rather
 than left to be discovered.
 
+## 2026-09-22 — The shot breakdown totals its frames and its footage
+**Asked by David:** *"let's add frame and second count in this page (both top and bottom)."* A line
+above the table and a footer row under it: shots, frames, seconds, the running time once there is a
+minute of it, and the project's fps. The footer keeps the frame sum in the frames column, under the
+numbers it adds.
+
+**Counted over the rows SHOWN**, so the episode filter narrows the totals too, and **shots with no
+frame count are named** ("3 without a frame count yet") rather than counted as zero: a total quietly
+missing five shots is worse than one that says what it left out. It is also the number the expense
+projection prices, so an understated one is money.
+
+`fmt_secs()` moved from `includes/dashboard.php` to `functions.php` on the way: this screen needed
+it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
+formatter, because two would drift the first time either was corrected.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.
