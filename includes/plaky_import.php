@@ -518,7 +518,15 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                         $report['shots_created']++;
                         $parentTarget[$plakyId] = ['kind' => 'shot', 'id' => 0];
                     } else {
-                        $insShot->execute([$projectId, $p['Group'], $title, $frames, $plakyId]);
+                        // ⚠ $episode, NOT $p['Group'] — this line read the group
+                        // name until 2026-09-22 and contradicted the comment
+                        // above it. A flat shot list under a Plaky group called
+                        // "Shots" was LOOKED UP as episode '' and INSERTED as
+                        // episode 'Shots', so anything the importer created
+                        // never matched again, and the project counted as
+                        // episodic on the strength of rows nobody meant to have
+                        // an episode. FC Mobile carried three of them.
+                        $insShot->execute([$projectId, $episode, $title, $frames, $plakyId]);
                         $newId = (int)$pdo->lastInsertId();
                         $shotIds[$key] = $newId;
                         $report['shots_created']++;
