@@ -135,12 +135,25 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <h3>Every step, and what it needs per day</h3>
 <div class="step-cards">
   <?php foreach ($others as $s): ?>
-    <article class="step-card <?= $s['overdue'] ? 'overdue' : '' ?>">
+    <?php
+    // FINISHED (David, 2026-09-22): everything that applies to this step has
+    // been approved, so the card and its bar go green.
+    //
+    // It needs target > 0 as well as nothing to go. A step with nothing
+    // applicable at all — every item marked N/A, or no items added yet — has
+    // "0 to go" too, and painting that green would say the work was done when
+    // there was never any work. Those cards stay as they were.
+    $done = (float)$s['target'] > 0 && (float)$s['remaining'] <= 0.0001;
+    ?>
+    <article class="step-card <?= $done ? 'done' : ($s['overdue'] ? 'overdue' : '') ?>">
       <div class="step-card-head">
         <h4><a href="step.php?project=<?= $projectId ?>&step=<?= (int)$s['step']['id'] ?>"><?= e($s['step']['name']) ?></a></h4>
         <span class="unit-badge"><?= e(applies_to_phrase($s['step']['applies_to'], $s['step']['applies_to_asset_type'] ?? null)) ?></span>
       </div>
-      <div class="mini-bar"><span style="width:<?= (float)($s['pct'] ?? 0) ?>%;background:<?= e($s['step']['color'] ?: '#4A90D9') ?>"></span></div>
+      <?php // The bar carries the step's own colour, as it does on the timeline,
+            // until the step is finished: then it is green like everything else
+            // that means done here. ?>
+      <div class="mini-bar"><span style="width:<?= (float)($s['pct'] ?? 0) ?>%;background:<?= e($done ? '#1e7e34' : ($s['step']['color'] ?: '#4A90D9')) ?>"></span></div>
       <div class="mini-num">
         <?= e(fmt_unit($s['approved_v'], $s['unit'])) ?><span class="mini-total">/<?= e(fmt_unit($s['target'], $s['unit'])) ?></span>
       </div>
@@ -153,7 +166,11 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
           items until they do.</div>
       <?php endif; ?>
       <div class="mini-pace">
-        <?php if ($s['overdue']): ?>
+        <?php // A finished step needs no pace: "0.00/day each across 2, 0 working
+              // days left" is arithmetic about work that no longer exists. ?>
+        <?php if ($done): ?>
+          <span class="done-text">✓ Finished</span>
+        <?php elseif ($s['overdue']): ?>
           <span class="warn-text">Overdue since <?= e($s['deadline']) ?></span>
         <?php elseif ($s['required_pace'] === null): ?>
           <span class="muted">No deadline set</span>

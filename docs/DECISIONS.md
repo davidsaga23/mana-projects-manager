@@ -2023,6 +2023,56 @@ show at once. The drawing was checked in a browser against those numbers, pixel 
 engagement dates and part-time allocation (`crew_projects.start_date`, `end_date`, `allocation_pct`:
 someone on two shows at 50% each is not really double-booked), and clashes inside one show.
 
+## 2026-09-22 — N/A leaves a step's count, rather than counting as done
+**Asked by David:** *"there are some exceptional occasions where I can list all the assets/shots but
+not all of them need to go through that task/department. In this case for FCM only 4 characters
+require concept. How can we adjust that? Easiest solution might be to count N/A as
+completed/approved."*
+
+**Nothing to build: that is what N/A already does**, and it does the better half of it. An item whose
+status is marked *not applicable* (`statuses.is_excluded`, seeded as "N/A" in migration 004 and
+flagged in 010) leaves the step's denominator through `step_applicable_count()`, so FCM's Concept
+reads 3.0 of 4.0 rather than 3.0 of 27. Counting those items as approved instead would have read
+26 of 27: the same colour on the card, but approved feeds the pace, the percentage, the burn-up and
+the project's overall figure, so the team would have been credited with 23 pieces of work that never
+existed. The advice was to set it in Plaky and let the import carry it, which is what David did.
+
+**Worth knowing, and it caught him for a day:** the platform REMEMBERS what it decided about an
+incoming status text the first time it sees one (`resolve_external_status()`). A text with no
+matching status is stored with no meaning and imported as a row with no status, and every later
+import reuses that decision, so re-importing the same word changes nothing. The Names tab lists those
+under "Status values with no meaning", and giving one a meaning repairs the rows already stored
+(`reapply_status_mapping()`), no second import.
+
+**Still true and not reconciled:** N/A marks change the TRACKING side (the dashboard, the grid, and
+the scheduler, which stops making tasks for them). The PLANNING side, the duration, the quota and the
+budget, reads the step's coverage percentage instead (`step_work_units()`). FCM's Concept had
+coverage at 12.5% already, so the two agree; nothing keeps them in step by itself. Offered, not
+built: once items are marked, the real count could replace the coverage guess. It would move budget
+figures, so it is David's call.
+
+## 2026-09-22 — A finished step goes green
+**Asked by David:** *"Can we change the card and bar color to green when it's finished that
+department?"* On the dashboard, a step whose applicable work is all approved now draws its card and
+its bar green (`#1e7e34`, the green the rest of the app means "done" with), and the pace block, which
+for a finished step says "0.00/day each across 2, 0 working days left", becomes **✓ Finished**.
+
+**It needs work to have existed.** `target > 0` as well as nothing to go: a step with everything
+marked N/A, or with no items yet, also has "0 to go", and green there would claim work was completed
+where there was none. Those cards stay as they were. The bar keeps the step's own colour until it is
+finished, so the timeline and the dashboard still agree about which step is which.
+
+## 2026-09-22 — A shot's note can be typed where it is read
+**Asked by David:** *"how can I edit these notes?"* You could not. A shot's note arrived with an
+import and stayed whatever the spreadsheet said: the breakdown printed it, the setup screen has no
+field for it, and the item page shows it read only. An asset's note has been editable since the
+wizard was built, which is what made the gap hard to see.
+
+The Notes column on the shot breakdown is now a box, saved on leaving the field, exactly as the
+Frames box beside it works (`breakdown_set_note()`, `action=notes`). Empty clears the note so the
+column reads as a dash again; a note over 2,000 characters is cut, and the cut is reported rather
+than left to be discovered.
+
 ## 2026-08-17 — Paying by the second, and why retakes do not touch it
 **Decision:** `rate_unit` gains `'second'` (`finance_install_06.sql`) for footage steps — rough
 animation, tie-down, cleanup — quoted per second of screen time.

@@ -65,6 +65,15 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 ### Built, 1–21 September
 
+- **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
+  of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
+  empty, and stays as it was.
+- **A shot's note is typed on the breakdown** (2026-09-22). Nothing edited one before; it arrived
+  with an import and stayed. Saved on leaving the box, like the frames beside it.
+- **N/A is the way to say "this item skips this step"** (2026-09-22, nothing built): it leaves the
+  step's count, rather than counting as approved. FCM's Concept reads 3.0 of 4.0 that way. The
+  planning side still reads coverage %, so keep the two in step; DECISIONS says why and what was
+  offered.
 - **Bookings** (2026-09-21, top bar beside Artists, no migration): who is needed on which show
   and when, across every show in setup, active or on hold, read from positions (Staffing) and
   each step's general-timeline dates. **By person** (a row each, red where one person is needed on

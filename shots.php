@@ -166,7 +166,16 @@ require __DIR__ . '/includes/header.php';
           </td>
         <?php endforeach; ?>
 
-        <td class="bd-notes muted small"><?= e($r['notes']) ?: '—' ?></td>
+        <?php // Typed here since 2026-09-22: it was the one column on this screen
+              // that nothing but an importer could fill. ?>
+        <td class="bd-notes">
+          <?php if (can_edit()): ?>
+            <textarea class="bd-note-input" rows="1" placeholder="—"
+                      aria-label="Note on <?= e($r['shot_code']) ?>"><?= e($r['notes']) ?></textarea>
+          <?php else: ?>
+            <span class="muted small"><?= e($r['notes']) ?: '—' ?></span>
+          <?php endif; ?>
+        </td>
       </tr>
     <?php endforeach; ?>
   </tbody>

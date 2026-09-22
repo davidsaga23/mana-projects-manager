@@ -238,6 +238,35 @@ function breakdown_set_frames(PDO $pdo, array $project, int $shotId, string $raw
 }
 
 /**
+ * A shot's own note, typed on the breakdown.
+ *
+ * David, 2026-09-22: "how can I edit these notes?" You could not. A shot's note
+ * arrived with an import and stayed whatever the spreadsheet said: this screen
+ * printed it, the setup screen has no field for it, and the item page shows it
+ * read only. An asset's note has been editable since the wizard was built, which
+ * is what made the gap hard to see.
+ *
+ * Empty clears it rather than storing a blank, so the column reads as a dash
+ * again. Cut at 2,000 characters, and the cut is REPORTED: the column holds far
+ * more, but a note that long is a document, and a silent truncation is the kind
+ * of loss nobody notices until the note is needed.
+ */
+function breakdown_set_note(PDO $pdo, array $project, int $shotId, string $raw): array {
+    $projectId = (int)$project['id'];
+    $stmt = $pdo->prepare('SELECT id FROM shots WHERE id = ? AND project_id = ?');
+    $stmt->execute([$shotId, $projectId]);
+    if (!$stmt->fetch()) throw new RuntimeException('That shot is not on this project.');
+
+    $note = trim($raw);
+    $cut  = mb_strlen($note) > 2000;
+    if ($cut) $note = mb_substr($note, 0, 2000);
+
+    $pdo->prepare('UPDATE shots SET notes = ? WHERE id = ?')
+        ->execute([$note === '' ? null : $note, $shotId]);
+    return ['notes' => $note, 'cut' => $cut];
+}
+
+/**
  * How much of the show has been broken down, for the line above the grid.
  *
  * Counts shots with NO asset against the total. Said plainly because the

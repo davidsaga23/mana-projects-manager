@@ -64,6 +64,18 @@ try {
         exit;
     }
 
+    if ($action === 'notes') {
+        $r = breakdown_set_note($pdo, $project, $shotId, (string)($_POST['notes'] ?? ''));
+        echo json_encode([
+            'ok'    => true,
+            'notes' => $r['notes'],
+            // Said, not silently done: a note cut to fit would otherwise look
+            // saved in full until the next page load.
+            'message' => $r['cut'] ? 'That note was longer than 2,000 characters, so it was cut.' : '',
+        ]);
+        exit;
+    }
+
     throw new RuntimeException('Unknown action.');
 
 } catch (Throwable $e) {

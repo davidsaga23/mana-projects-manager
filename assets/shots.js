@@ -157,4 +157,30 @@
       .catch(function (err) { say(err.message, true); })
       .then(function () { input.disabled = false; });
   });
+
+  // --- notes -----------------------------------------------------------------
+  //
+  // Same `change` rule as the frames box: it saves when you leave the field, not
+  // on every keystroke. Enter inside a textarea makes a new line rather than
+  // saving, which is what somebody typing a note expects, so leaving the field
+  // is the only moment that means "done".
+  table.addEventListener('change', function (ev) {
+    var box = ev.target;
+    if (!box.classList || !box.classList.contains('bd-note-input')) return;
+
+    var body = new URLSearchParams();
+    body.append('action', 'notes');
+    body.append('shot_id', shotOf(box));
+    body.append('notes', box.value);
+    box.disabled = true;
+    post(body)
+      .then(function (d) {
+        // What was stored, not what was typed: trimmed, and cut if it was very
+        // long, so the box shows the note the rest of the app will read.
+        box.value = d.notes || '';
+        say(d.message || '', !!d.message);
+      })
+      .catch(function (err) { say(err.message, true); })
+      .then(function () { box.disabled = false; });
+  });
 }());
