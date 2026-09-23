@@ -2124,6 +2124,37 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-23 — An empty reel was dressed as a link and did nothing
+**Asked by David**, circling the Reel column on Artists: *"how can I update these fields?"*
+
+**The answer was always "double-click the cell"** — that column is the one cell on the grid that
+shows a LINK rather than a field, because a reel is something you open far more often than you
+retype, and an input cannot be clicked through to the site. Every other column is an input, so the
+one that isn't looks like the one that can't be edited.
+
+**The cell made that worse for exactly the rows that needed the hint.** An empty reel rendered
+`href="#"` — a real anchor, so it took a link's blue and a link's pointer, and then did nothing at
+all when clicked. The dash advertised a single click, ignored it, and gave no sign that a double one
+would work. An `<a>` with **no href** is not a link: plain text, no pointer, not focusable, which is
+what an empty cell should have been all along. Now it is faint, carries a text cursor, says
+*"Double-click to add a reel"*, and its cell lights up under the mouse — the only visible cue that
+the gesture exists. The title on a filled one reads *"<address> — double-click to edit"* rather than
+starting with a stray comma.
+
+`artists.js` matches on the way back out, removing the href when the box is emptied instead of
+writing `'#'`, so a cleared reel and a reloaded page agree.
+
+**Still open, and NOT fixed here:** the field is unreachable by keyboard. The input is `hidden`
+until a double-click, and `hidden` is not focusable, so tabbing through the grid skips the reel
+entirely. Opening it on F2, or on Enter when the anchor has no href, is the fix; it is a bigger
+change than the question asked for.
+
+**Not run in PHP.** Driven in a browser against a static copy of the column with the real CSS and
+the real `artists.js`: the empty cell faint with no href, the filled one blue with `target`/`rel`,
+double-click opening and focusing the box, typing an address turning it back into a working link,
+clearing one turning it back into a dash, and the row writing itself — three saves with the right
+`portfolio_url`, the cleared one included.
+
 ## 2026-09-22 — The import result screen could say "no loose ends" while dropping work
 **Asked by David:** *"I've just imported this csv and the animatic still appears as pending but it's
 marked as complete."*

@@ -387,11 +387,19 @@ require __DIR__ . '/includes/header.php';
                     // milestone on the timeline. The input is only hidden, never
                     // disabled, so its value posts either way and a row saved
                     // without ever opening this cell keeps its address. ?>
+              <?php // ⚠ NO href WHEN THERE IS NO REEL. It used to be href="#", which
+                    // gave an empty cell a link's blue and a link's pointer and
+                    // then did nothing at all when clicked — the rows that most
+                    // needed the double-click were the ones dressed up to look
+                    // like they wanted a single one. An <a> without href is not
+                    // a link: plain text, not focusable, no pointer. ?>
               <td class="reel-cell" data-reel>
-                <a class="reel-link" href="<?= e($p['portfolio_url'] ?: '#') ?>"
-                   target="_blank" rel="noopener"
-                   title="<?= e($p['portfolio_url'] ?: '') ?>, double-click to edit"><?=
-                   e($p['portfolio_url'] ?: '—') ?></a>
+                <a class="reel-link"<?php if ($p['portfolio_url']): ?>
+                   href="<?= e($p['portfolio_url']) ?>" target="_blank" rel="noopener"
+                   title="<?= e($p['portfolio_url']) ?> — double-click to edit"
+                 <?php else: ?>
+                   title="Double-click to add a reel"
+                 <?php endif; ?>><?= e($p['portfolio_url'] ?: '—') ?></a>
                 <input name="<?= $n ?>[portfolio_url]" value="<?= e($p['portfolio_url'] ?? '') ?>"
                        size="22" maxlength="500" class="reel-input" hidden>
               </td>

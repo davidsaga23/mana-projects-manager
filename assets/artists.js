@@ -170,8 +170,21 @@
     if (!link) return;
     var url = box.value.trim();
     link.textContent = url || '—';
-    link.setAttribute('href', url || '#');
-    link.setAttribute('title', url + ', double-click to edit');
+    // The href is REMOVED when the box is emptied, not set to '#'. An <a> with
+    // no href is plain text: no pointer, no blue, not focusable — which is what
+    // an empty cell should look like. Matches what artists.php prints, so a
+    // cleared reel and a reloaded page agree.
+    if (url) {
+      link.setAttribute('href', url);
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener');
+      link.setAttribute('title', url + ' \u2014 double-click to edit');
+    } else {
+      link.removeAttribute('href');
+      link.removeAttribute('target');
+      link.removeAttribute('rel');
+      link.setAttribute('title', 'Double-click to add a reel');
+    }
     box.hidden = true;
     link.hidden = false;
   });

@@ -2096,6 +2096,15 @@ body.lightbox-lock { overflow: hidden; }
 /* The reel reads as a link and edits on double-click. */
 .reel-link { display: inline-block; max-width: 230px; overflow: hidden;
              text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+/* An EMPTY reel is not a link and must not look like one: no href, so no blue
+   and no pointer. It still has to look editable, though, or the dash reads as
+   "nothing here" rather than "nothing here yet" — hence the text cursor and the
+   cell lighting up under the mouse, which is the only cue that a double-click
+   does anything. */
+.reel-link:not([href]) { color: var(--faint); cursor: text; }
+.reel-cell { cursor: text; }
+.reel-cell:hover { background: var(--surface-2); }
+.reel-cell:hover .reel-link:not([href]) { color: var(--text-2); }
 
 /* Positions as a panel of ticks: sixty of them in a six-row scrolling list means
    reading a handful at a time and holding ctrl to keep what you picked. In
