@@ -2124,6 +2124,49 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-22 — The import result screen could say "no loose ends" while dropping work
+**Asked by David:** *"I've just imported this csv and the animatic still appears as pending but it's
+marked as complete."*
+
+**The result screen's reassurance ignored half the report.** `done.php` decided whether to print
+*"Everything in the file matched something here, no loose ends"* by looking at unmatched PEOPLE and
+unmapped STATUSES only. A whole-project item that matched no step — counted all along as
+`skipped_no_project_step` — did not enter that test, so the screen could print the green line
+directly underneath its own table saying it had skipped one. **That is the precise failure this
+importer exists to prevent**, on the screen whose entire job is reporting it. The test now includes
+the skip counters and the unmatched project steps.
+
+**And it counted them without naming them.** `preview.php` has always listed which whole-project
+items failed to match; `done.php` gave a number and left you to work out which two rows of five
+hundred it meant. A whole-project deliverable matches **by name**, and unlike a subitem step it has
+**no dropdown on the mapping screen** — so the name is the only thing that makes it fixable. It is
+now listed, with a pointer to Workflow, where the project's step names live.
+
+### The column that wasn't there
+The same export carried a heading spelled **`Asignee`**, one "s". `Assignee` is not a required
+column, so the file passed every check, imported cleanly, and attached **nobody** to any of its 510
+records — and `unmatched_people` was empty, because nothing had been read to be unmatched. That
+emptiness then helped print "no loose ends".
+
+`plaky_read_csv()` now canonicalises headings: a name already right is left alone, a different case
+is accepted, and a **known** misspelling is read as what it means. `PLAKY_COLUMN_ALIASES` is an
+**explicit list, not an edit distance** — a fuzzy match on a heading means reading a column the file
+never offered, which is the "let the file dictate meaning" failure this importer is built against. A
+spelling earns its place by turning up in a real export, and every rename is **reported** on the
+mapping and preview screens rather than applied quietly, the same deal `plaky_canonical_asset_type()`
+makes with asset types.
+
+`PLAKY_OPTIONAL_COLUMNS` also names what each missing column COSTS — "no shot will get a frame count
+from this file" — because "Total frames not found" means nothing to somebody who did not write the
+export. This file has no `Total frames` either.
+
+**What this does NOT settle:** why FC Mobile's Animatic reads as untouched. Three things could cause
+it and the code cannot tell them apart without the project's own rows — the "Pre-prodcution" group
+mapped to something other than *whole-project deliverables*, no project-wide step spelled
+"Animatic", or "Completed" mapped to a status that is not *approved*. The third is unlikely, since
+three characters share that status and read correctly. **The point of this change is that the next
+import says which**, instead of finishing green.
+
 ## 2026-09-22 — The importer stamped its group name in as an episode (bug)
 **Asked by David:** *"what's the deal with the additional shots at the end of the shotlist? Where are
 they coming from?"* FC Mobile counted 45 shots where the list is 42, and the three extras carried no

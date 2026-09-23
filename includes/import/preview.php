@@ -12,6 +12,29 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
 ?>
 <p class="summary-line"><strong><?= e($state['name']) ?></strong> · nothing has been changed yet</p>
 
+<?php // THE COLUMNS, said before the import rather than discovered after it.
+      // A heading this file does not carry costs whole fields without failing
+      // anything: FC Mobile's board spells it "Asignee", and 510 records came in
+      // with nobody attached and nothing said. Shown here, where it can still be
+      // fixed by renaming the column in Plaky and exporting again. ?>
+<?php if (!empty($parsed['renamed_columns']) || !empty($parsed['missing_columns'])): ?>
+  <div class="flash flash-warn">
+    <?php foreach ($parsed['renamed_columns'] as $from => $to): ?>
+      <p><strong><?= e($from) ?></strong> read as <strong><?= e($to) ?></strong>
+         — a known misspelling of that heading.</p>
+    <?php endforeach; ?>
+    <?php if (!empty($parsed['missing_columns'])): ?>
+      <p><strong>This file has no
+        <?php $names = array_keys($parsed['missing_columns']);
+              echo e(count($names) === 1 ? $names[0] . ' column' : implode(', ', $names) . ' columns'); ?>.</strong>
+        The import will still run:
+        <?= e(implode('; ', $parsed['missing_columns'])) ?>.
+        If that is wrong, add the column in Plaky and export again — nothing here
+        can invent it.</p>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <h3>What this import will do</h3>
 <table class="review-table">
   <tr><th>Records</th><th>Total</th><th>New</th><th>Already here, will be updated</th></tr>

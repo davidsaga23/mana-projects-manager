@@ -18,6 +18,29 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   time read as <strong><?= e($state['time_unit']) ?></strong>
 </p>
 
+<?php // THE COLUMNS, said before the import rather than discovered after it.
+      // A heading this file does not carry costs whole fields without failing
+      // anything: FC Mobile's board spells it "Asignee", and 510 records came in
+      // with nobody attached and nothing said. Shown here, where it can still be
+      // fixed by renaming the column in Plaky and exporting again. ?>
+<?php if (!empty($parsed['renamed_columns']) || !empty($parsed['missing_columns'])): ?>
+  <div class="flash flash-warn">
+    <?php foreach ($parsed['renamed_columns'] as $from => $to): ?>
+      <p><strong><?= e($from) ?></strong> read as <strong><?= e($to) ?></strong>
+         — a known misspelling of that heading.</p>
+    <?php endforeach; ?>
+    <?php if (!empty($parsed['missing_columns'])): ?>
+      <p><strong>This file has no
+        <?php $names = array_keys($parsed['missing_columns']);
+              echo e(count($names) === 1 ? $names[0] . ' column' : implode(', ', $names) . ' columns'); ?>.</strong>
+        The import will still run:
+        <?= e(implode('; ', $parsed['missing_columns'])) ?>.
+        If that is wrong, add the column in Plaky and export again — nothing here
+        can invent it.</p>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <?php if ($unmatchedSteps || $unmatchedPeople || $unmatchedStatus): ?>
   <div class="flash flash-warn">
     Some values in this file aren't known here yet:

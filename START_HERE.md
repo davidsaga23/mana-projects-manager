@@ -76,6 +76,15 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **The breakdown's headings stick** (2026-09-22), and its totals row with them, because the scroll
   box finally has a height bound — `th` was already sticky everywhere and had nothing to pin
   against. Both come off in print. The `.grid-scroll` comment has the full diagnosis.
+- **⚠ The import result screen could print "no loose ends" while dropping work** (fixed
+  2026-09-22). Its test looked at unmatched people and statuses only, so a whole-project item that
+  matched no step was counted in one table and contradicted in the next line. It now counts the
+  skips, and NAMES the unmatched whole-project items — they match by name and have no dropdown on
+  the mapping screen, so the name is the only fixable thing about them.
+- **Headings are canonicalised, and what is missing is priced** (2026-09-22). FCM's export spells it
+  `Asignee`: the file passed every check and attached nobody to 510 records. `PLAKY_COLUMN_ALIASES`
+  is an explicit list of spellings seen in real exports, never an edit distance, and every rename is
+  reported on the mapping screen. Missing optional columns are named with what they cost.
 - **⚠ The Plaky importer wrote its GROUP NAME in as an episode** (fixed 2026-09-22). A flat shot
   list under a group called "Shots" was looked up as episode `''` and stored as episode `'Shots'`,
   so importer-made rows never matched again and the project counted as episodic. **FC Mobile still

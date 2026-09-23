@@ -15,6 +15,34 @@ require_once __DIR__ . '/activity.php';   // the status-change log (migration 02
 const PLAKY_REQUIRED_COLUMNS = ['Group', 'Item Parent Id', 'Item/Subitem Id', 'Title', 'Status'];
 
 /**
+ * Columns the importer READS but can do without — and whose absence costs real
+ * data, silently, which is why plaky_read_csv() now reports on them.
+ *
+ * FC Mobile's export on 2026-09-22 had a column called "Asignee", one 's': the
+ * file passed every check, imported cleanly, and attached nobody to any of its
+ * 510 records. Nothing said so, because nothing was looking.
+ */
+const PLAKY_OPTIONAL_COLUMNS = [
+    'Assignee'     => 'nobody will be attached to any of this work',
+    'Total frames' => 'no shot will get a frame count from this file',
+    'Time spent'   => 'no logged time will be imported',
+];
+
+/**
+ * Misspellings of a heading that a real export has actually used, lower-cased.
+ *
+ * An explicit list, NOT an edit distance. A fuzzy match on a heading means
+ * reading a column the file never offered, which is the "let the file dictate
+ * meaning" failure this importer is built against. A name earns its place here
+ * by turning up in a real file, and every rename is reported rather than applied
+ * quietly — the same deal as plaky_canonical_asset_type() makes with types.
+ */
+const PLAKY_COLUMN_ALIASES = [
+    'asignee'   => 'Assignee',        // FC Mobile's board, seen 2026-09-22
+    'assignees' => 'Assignee',
+];
+
+/**
  * Read the CSV into associative rows.
  * Throws with a readable explanation rather than returning something half-formed.
  */
@@ -34,6 +62,29 @@ function plaky_read_csv(string $path): array {
     // become part of the first column's name and break every lookup on it.
     $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0]);
     $headers = array_map('trim', $headers);
+
+    // Headings, canonicalised: a name already right is left alone, a different
+    // case is accepted, and a KNOWN misspelling is read as what it means. Every
+    // change is recorded, so the screens can say what was done instead of it
+    // being something the file quietly got away with.
+    $known = array_merge(PLAKY_REQUIRED_COLUMNS, array_keys(PLAKY_OPTIONAL_COLUMNS));
+    $byLower = [];
+    foreach ($known as $k) $byLower[mb_strtolower($k)] = $k;
+    $renamed = [];
+    foreach ($headers as $i => $h) {
+        if ($h === '' || in_array($h, $known, true)) continue;
+        $lower = mb_strtolower($h);
+        $canonical = $byLower[$lower] ?? (PLAKY_COLUMN_ALIASES[$lower] ?? null);
+        // Never displace a heading the file already carries under its right name.
+        if ($canonical === null || in_array($canonical, $headers, true)) continue;
+        $headers[$i] = $canonical;
+        $renamed[$h] = $canonical;
+    }
+
+    $missingOptional = [];
+    foreach (PLAKY_OPTIONAL_COLUMNS as $name => $cost) {
+        if (!in_array($name, $headers, true)) $missingOptional[$name] = $cost;
+    }
 
     $missing = array_diff(PLAKY_REQUIRED_COLUMNS, $headers);
     if ($missing) {
@@ -55,7 +106,8 @@ function plaky_read_csv(string $path): array {
     fclose($fh);
 
     if (!$rows) throw new RuntimeException('That file has a header row but no data.');
-    return ['headers' => $headers, 'rows' => $rows];
+    return ['headers' => $headers, 'rows' => $rows,
+            'renamed_columns' => $renamed, 'missing_columns' => $missingOptional];
 }
 
 /**
