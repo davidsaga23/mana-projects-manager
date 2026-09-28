@@ -73,6 +73,13 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **A viewer gets five project tabs** (2026-09-28): Overview, Brief, Shots, Production tracking,
+  Tasks. The other ten are listed in `PROJECT_TABS_HIDDEN_FROM_VIEWERS` in `includes/project_nav.php`,
+  applied by `project_nav_items()` and keyed on `can_edit()`, so preview-as-viewer shows the real
+  thing. Overview's own links into those screens go too, the three Export buttons included.
+  **⚠ It hides tabs, it does not block pages** — a typed URL or a bookmark still works, and Shots,
+  Production tracking and Tasks still carry eleven "go fix this" links into the hidden screens. The
+  guard, if wanted, belongs in `require_login()` reading that same list.
 - **The breakdown's headings stick** (2026-09-22), and its totals row with them, because the scroll
   box finally has a height bound — `th` was already sticky everywhere and had nothing to pin
   against. Both come off in print. The `.grid-scroll` comment has the full diagnosis.

@@ -2124,6 +2124,50 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-28 — A viewer gets five project tabs, not fifteen
+**Asked by David**, naming all ten: *"we need to hide some tabs for only viewers... Dashboard,
+Staffing, Timeline, Schedule, Team performance, Setup, Import, Statuses, Names, Export. We only leave
+the rest."*
+
+**A viewer keeps Overview, Brief, Shots, Production tracking and Tasks** — what the show contains and
+how far it has got. What goes is everything about how it is RUN (the pace, who is on it, when, how
+they are doing) and every screen for setting up or repairing data. With the data group gone entirely,
+the separator that divided the bar is gone too, which falls out of the filter rather than being a
+second rule.
+
+`PROJECT_TABS_HIDDEN_FROM_VIEWERS` lives beside the tab list in `includes/project_nav.php`, and
+`project_nav_items()` applies it, so anything that ever reads that list gets the same answer the bar
+draws. `hidden_from_viewers()` is keyed on `can_edit()` rather than on the role name, so it follows
+the admin's **preview-as-viewer** without being taught about it — which is also how to check it.
+
+**Overview's own links went with the tabs.** It is a viewer's landing page, and it carried five doors
+into screens they no longer have tabs for: *"See the pace behind this →"* (Dashboard), *"Review them
+→"* (Names), the Schedule and Setup links in the two empty-state sentences, and the three **Export**
+buttons — which are the Export tab by another name. Hiding a tab and then opening the same screen
+from a link on the first page they see would be tidying nothing.
+
+Where a link sat inside a sentence, **the fact stayed and the instruction went**: a viewer reads
+"Nothing scheduled yet." rather than a pointer to a screen they cannot use. The count of unmapped
+statuses stays for the same reason — hiding a fact is a larger decision than hiding a way to act on
+it, and was not what was asked.
+
+### ⚠ THIS HIDES A TAB, IT DOES NOT CLOSE A DOOR
+Nothing here refuses a page. A viewer who types `dashboard.php?project=1`, follows a bookmark, or
+follows one of the links still sitting on Shots, Production tracking and Tasks — eleven of them,
+all "go and fix this data" prompts aimed at somebody who can — still arrives. **Said plainly to David
+rather than implied**, because a half-measure that looks like a permission is worse than no measure.
+
+If those screens must be genuinely out of reach, the guard belongs in `require_login()` where the
+read-only rule already lives, and it should read `PROJECT_TABS_HIDDEN_FROM_VIEWERS` so the two can
+never disagree. That is a behaviour change — bookmarks stop working, and those eleven links need
+hiding too — so it waits for a decision rather than arriving unasked.
+
+The top bar is untouched: Artists, Bookings, Migrations and the rest were not on the list.
+
+**Not run in PHP** — there is none on this machine. `check_php_blocks.py` passes all seven, and the
+filter was replayed in Python for all three roles: admin and editor keep fifteen tabs and one
+separator, a viewer gets five and none, and the ten that disappear are the ten that were named.
+
 ## 2026-09-23 — An empty reel was dressed as a link and did nothing
 **Asked by David**, circling the Reel column on Artists: *"how can I update these fields?"*
 

@@ -258,9 +258,16 @@ $startIn = $daysTo($project['start_date']);
 <?php // Compact: the shape of where the show is. The rates and deltas behind it
        // live on the dashboard, which is one click away and lit in the tab bar. ?>
 <?php render_overall_progress($overall, true); ?>
-<p class="muted small">
-  <a href="dashboard.php?project=<?= $projectId ?>">See the pace behind this →</a>
-</p>
+<?php // ⚠ OVERVIEW IS THE VIEWER'S LANDING PAGE, so its links into the screens
+      // they no longer have tabs for come out with the tabs (David, 2026-09-28).
+      // Hiding a tab and then opening the same screen from a link on the first
+      // page they see would be tidying nothing. hidden_from_viewers() reads the
+      // same list the tab bar does, so the two cannot drift. ?>
+<?php if (!hidden_from_viewers('dashboard')): ?>
+  <p class="muted small">
+    <a href="dashboard.php?project=<?= $projectId ?>">See the pace behind this →</a>
+  </p>
+<?php endif; ?>
 
 <?php if ($unmatchedPeople || $unmappedStatuses): ?>
   <div class="flash flash-warn">
@@ -272,7 +279,9 @@ $startIn = $daysTo($project['start_date']);
       <strong><?= $unmappedStatuses ?></strong> status value<?= $unmappedStatuses === 1 ? '' : 's' ?>
       arrived without a meaning.
     <?php endif; ?>
-    <a href="aliases.php?project=<?= $projectId ?>">Review them →</a>
+    <?php if (!hidden_from_viewers('aliases')): ?>
+      <a href="aliases.php?project=<?= $projectId ?>">Review them →</a>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
@@ -289,8 +298,12 @@ $startIn = $daysTo($project['start_date']);
           // and this line just counts the work. ?>
     <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled.
   <?php else: ?>
-    Nothing scheduled yet, the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
-    screen works the pipeline forwards into real dates.
+    <?php if (hidden_from_viewers('schedule')): ?>
+      Nothing scheduled yet.
+    <?php else: ?>
+      Nothing scheduled yet, the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
+      screen works the pipeline forwards into real dates.
+    <?php endif; ?>
   <?php endif; ?>
   <?php if ($slotCount): ?>
     <?= $slotCount ?> crew slot<?= $slotCount === 1 ? '' : 's' ?><?php
@@ -300,7 +313,11 @@ $startIn = $daysTo($project['start_date']);
 
 <h3>Progress by step</h3>
 <?php if (!$steps): ?>
-  <p class="muted">No pipeline steps yet, <a href="wizard.php?project=<?= $projectId ?>&step=2">add them</a>.</p>
+  <?php if (hidden_from_viewers('setup')): ?>
+    <p class="muted">No pipeline steps yet.</p>
+  <?php else: ?>
+    <p class="muted">No pipeline steps yet, <a href="wizard.php?project=<?= $projectId ?>&amp;step=2">add them</a>.</p>
+  <?php endif; ?>
 <?php else: ?>
   <?php if ($blocked): ?>
     <p class="flash flash-warn"><strong><?= $blocked ?></strong> tracked
@@ -339,11 +356,13 @@ $startIn = $daysTo($project['start_date']);
         // explanation of the Tracked column. Each names the FILE it produces
         // rather than the act of exporting, so the row reads as a choice of
         // three sheets rather than three ways to press Export. ?>
-  <div class="export-row">
-    <a class="button secondary" href="export.php?project=<?= $projectId ?>">Export progress ↓</a>
-    <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=shots">Export shot list ↓</a>
-    <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=assets">Export asset list ↓</a>
-  </div>
+  <?php if (!hidden_from_viewers('export')): ?>
+    <div class="export-row">
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>">Export progress ↓</a>
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=shots">Export shot list ↓</a>
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=assets">Export asset list ↓</a>
+    </div>
+  <?php endif; ?>
 <?php endif; ?>
 
 </div>

@@ -11,11 +11,51 @@
 // scheduler ended up reachable from nowhere for an afternoon.
 
 /**
+ * The tabs a VIEWER is not offered (David, 2026-09-28, naming all ten).
+ *
+ * A viewer keeps Overview, Brief, Shots, Production tracking and Tasks — what
+ * the show contains and how far it has got. What goes is everything about how it
+ * is RUN: the pace, who is on it, when, how they are doing, and every screen for
+ * setting up or repairing data.
+ *
+ * ⚠ THIS HIDES A TAB, IT DOES NOT CLOSE A DOOR. Nothing here refuses the page.
+ * A viewer who follows a bookmark, or a link from a screen they still have, still
+ * reaches it — project.php's own "See the pace behind this" is one such link, and
+ * is hidden alongside these for that reason. If these screens must be genuinely
+ * out of reach rather than merely out of the way, the guard belongs in
+ * require_login() where the read-only rule already lives, and this list is what
+ * it should read so the two can never disagree.
+ *
+ * Keyed on can_edit() rather than on the role name, so it follows the admin's
+ * preview-as-viewer without being taught about it separately.
+ */
+const PROJECT_TABS_HIDDEN_FROM_VIEWERS = [
+    'dashboard',   // Dashboard
+    'crew',        // Staffing
+    'timeline',    // Timeline
+    'schedule',    // Schedule
+    'team',        // Team performance
+    'setup',       // Setup
+    'import',      // Import
+    'statuses',    // Statuses
+    'aliases',     // Names
+    'export',      // Export
+];
+
+/** Is this tab, or a link to it, one a viewer should not be shown? */
+function hidden_from_viewers(string $key): bool {
+    return !can_edit() && in_array($key, PROJECT_TABS_HIDDEN_FROM_VIEWERS, true);
+}
+
+/**
  * The tabs, in the order they are used rather than the order they were built.
  *
  * 'group' splits the daily screens from the ones you open occasionally to set
  * something up or fix some data — a flat list of ten reads as ten equally
  * likely destinations, which none of them are.
+ *
+ * Filtered HERE rather than at the point of drawing, so anything that ever reads
+ * this list gets the same answer as the bar does.
  */
 function project_nav_items(int $projectId): array {
     $p = '?project=' . $projectId;
@@ -23,7 +63,7 @@ function project_nav_items(int $projectId): array {
     // the show stands, who is on it, when things happen, then the two screens
     // work is tracked in. The setup and data-fixing screens follow behind the
     // separator — opened occasionally, not daily.
-    return [
+    $items = [
         ['key' => 'overview',   'label' => 'Overview',            'href' => 'project.php?id=' . $projectId, 'group' => 'work'],
         ['key' => 'brief',      'label' => 'Brief',               'href' => 'brief.php' . $p,              'group' => 'work'],
         ['key' => 'dashboard',  'label' => 'Dashboard',           'href' => 'dashboard.php' . $p,          'group' => 'work'],
@@ -50,6 +90,10 @@ function project_nav_items(int $projectId): array {
         // A download rather than a screen, marked so nobody expects a page.
         ['key' => 'export',     'label' => 'Export ↓',            'href' => 'export.php' . $p,             'group' => 'data'],
     ];
+
+    return array_values(array_filter($items, function ($it) {
+        return !hidden_from_viewers($it['key']);
+    }));
 }
 
 /**
