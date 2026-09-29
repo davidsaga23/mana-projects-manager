@@ -73,6 +73,13 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **The artist grid filters and sorts by column** (2026-09-29, no migration): each heading is a
+  sort button with a filter under it, and a line above the table counts the matches. Built by
+  `assets/artists.js` from what the cells actually are — dropdowns where the cells are dropdowns,
+  text boxes elsewhere. **All client-side on purpose**: this grid holds unsaved edits and a
+  server-side filter would reload the page under them. **Hidden rows still save** (hidden by class,
+  never removed), and a `<select>` sorts by option order, so Seniority reads Junior→Lead rather than
+  alphabetically.
 - **The read-only role is now `artist`** (2026-09-28, **migration 037**), and it has exactly one
   write: the status of work assigned to them, on **My tasks** and nowhere else. `artist_may_post()`
   in `includes/auth.php` is an allow-list of script + POST field and is the COMPLETE answer to what

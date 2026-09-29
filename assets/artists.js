@@ -222,4 +222,211 @@
     ev.preventDefault();
     ev.returnValue = '';
   });
+
+  // --- column filters, sorting, and a live count ------------------------------
+  //
+  // David, 2026-09-29: "in the headers add a filter, a sort order and so we know
+  // how many results that filter produced."
+  //
+  // ⚠ ENTIRELY IN THE BROWSER, and that is correctness rather than speed. The
+  // search box at the top of this page is a GET and reloads; this grid holds
+  // EDITS. Filtering or sorting server-side would reload the page under whatever
+  // somebody had half-typed, which is the one thing a screen that saves as you go
+  // must never do. It also means the two filters compose: the server narrows who
+  // is on the page, these narrow what you look at within that.
+  //
+  // ⚠ HIDDEN ROWS STILL SAVE. Rows are hidden with a class, not removed, so their
+  // fields stay in the DOM and in the form — an edit made before a filter was
+  // typed is not silently dropped by the filter.
+  //
+  // The controls are built HERE rather than printed by artists.php because they
+  // are made of what the table actually holds: a column of <select>s is offered
+  // as a dropdown of the values in use, everything else as a box to type in.
+  var table = document.querySelector('.artist-table');
+  var tbody = table ? table.tBodies[0] : null;
+  if (!table || !tbody || !table.tHead) return;
+
+  var headRow = table.tHead.rows[0];
+  var rows = Array.prototype.slice.call(tbody.rows);
+  var sortCol = -1, sortDir = 1;
+  var clear = null;                      // built below, read by applyFilters()
+
+  /**
+   * What a cell SAYS, whatever it is made of.
+   *
+   * Order matters: the name cell leads with a hidden field and the reel cell's
+   * box is `hidden` by attribute rather than by type, so its address is read even
+   * while the anchor is what shows.
+   */
+  function cellText(td) {
+    if (!td) return '';
+    var box = td.querySelector('input[type=checkbox]');
+    if (box) return box.checked ? 'yes' : 'no';
+    var sel = td.querySelector('select');
+    if (sel) return sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text.trim() : '';
+    var f = td.querySelector('input:not([type=hidden]), textarea');
+    if (f) return (f.value || '').trim();
+    return (td.textContent || '').trim();
+  }
+
+  /**
+   * The key a column SORTS on, which is not always what it shows.
+   *
+   * A <select> sorts by the position of the chosen option, so Seniority reads
+   * Junior, Mid, Senior, Lead — the order the app itself put them in — rather
+   * than alphabetically, and Rating sorts by stars rather than by the width of
+   * a string of them. Numbers sort as numbers. Everything else is text.
+   * An empty cell always sinks, whichever direction is asked for, because
+   * "nothing recorded" is not a value that belongs at either extreme.
+   */
+  function sortKey(td) {
+    var box = td && td.querySelector('input[type=checkbox]');
+    if (box) return [0, box.checked ? 1 : 0];
+    var sel = td && td.querySelector('select');
+    if (sel) return sel.selectedIndex > 0 ? [0, sel.selectedIndex] : [1, 0];
+    var v = cellText(td);
+    if (v === '' || v === '—') return [1, 0];
+    var n = parseFloat(v.replace(/[^0-9.\-]/g, ''));
+    if (!isNaN(n) && /^[^A-Za-z]*$/.test(v)) return [0, n];
+    return [0, v.toLowerCase()];
+  }
+
+  function isChoice(col) {
+    var td = rows.length ? rows[0].cells[col] : null;
+    return !!(td && (td.querySelector('select') || td.querySelector('input[type=checkbox]')));
+  }
+
+  /** Every value in use in one column, in the order the column itself implies. */
+  function choices(col) {
+    var seen = Object.create(null), out = [];
+    rows.forEach(function (tr) {
+      var td = tr.cells[col];
+      var v = cellText(td);
+      if (v === '' || seen[v]) return;
+      seen[v] = true;
+      var sel = td.querySelector('select');
+      out.push({ text: v, at: sel ? sel.selectedIndex : out.length });
+    });
+    out.sort(function (a, b) { return a.at - b.at; });
+    return out.map(function (o) { return o.text; });
+  }
+
+  // --- the count --------------------------------------------------------------
+  var countLine = document.createElement('p');
+  countLine.className = 'muted small col-count';
+  var scroll = table.closest('.grid-scroll');
+  if (scroll && scroll.parentNode) scroll.parentNode.insertBefore(countLine, scroll);
+
+  function filters() {
+    return Array.prototype.slice.call(headRow.querySelectorAll('.col-filter'));
+  }
+
+  function applyFilters() {
+    var active = filters().filter(function (f) { return f.value !== ''; });
+    var shown = 0;
+    rows.forEach(function (tr) {
+      var hit = active.every(function (f) {
+        var col = +f.getAttribute('data-col');
+        var want = f.value.toLowerCase();
+        var got = cellText(tr.cells[col]).toLowerCase();
+        // A dropdown means "exactly this one"; a typed box means "contains".
+        return f.tagName === 'SELECT' ? got === want : got.indexOf(want) !== -1;
+      });
+      tr.classList.toggle('col-hidden', !hit);
+      if (hit) shown++;
+    });
+    filters().forEach(function (f) { f.classList.toggle('on', f.value !== ''); });
+    // Decided HERE, not in a listener on the header: pressing Clear sets the
+    // boxes from script, which fires no `input` event, so a listener left the
+    // button offering to clear what it had just cleared.
+    if (clear) clear.hidden = active.length === 0;
+
+    countLine.textContent = active.length
+      ? shown + ' of ' + rows.length + (rows.length === 1 ? ' person' : ' people') +
+        ' match' + (shown === 1 ? 'es' : '') + ' the column filters'
+      : rows.length + (rows.length === 1 ? ' person' : ' people') + ' on this page';
+    countLine.classList.toggle('col-count-on', active.length > 0);
+    // Said out loud as well as shown: somebody who filters to nothing should not
+    // be left wondering whether the page broke.
+    countLine.classList.toggle('err', active.length > 0 && shown === 0);
+  }
+
+  // --- sorting ----------------------------------------------------------------
+  function applySort() {
+    if (sortCol < 0) return;
+    var order = rows.slice();
+    order.sort(function (a, b) {
+      var ka = sortKey(a.cells[sortCol]), kb = sortKey(b.cells[sortCol]);
+      if (ka[0] !== kb[0]) return ka[0] - kb[0];        // empties last, always
+      if (ka[1] < kb[1]) return -1 * sortDir;
+      if (ka[1] > kb[1]) return 1 * sortDir;
+      return 0;
+    });
+    // Reattaching a <tr> MOVES it; the fields and their values come with it, and
+    // a save already in flight holds the row itself rather than its position.
+    var frag = document.createDocumentFragment();
+    order.forEach(function (tr) { frag.appendChild(tr); });
+    tbody.appendChild(frag);
+
+    Array.prototype.forEach.call(headRow.cells, function (th) {
+      var b = th.querySelector('.col-sort');
+      if (!b) return;
+      var on = +th.cellIndex === sortCol;
+      b.setAttribute('data-dir', on ? (sortDir > 0 ? 'up' : 'down') : '');
+      th.setAttribute('aria-sort', on ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+    });
+  }
+
+  // --- build the headers ------------------------------------------------------
+  Array.prototype.forEach.call(headRow.cells, function (th) {
+    var label = (th.textContent || '').trim();
+    if (label === '') return;                 // the per-row status column
+    var col = th.cellIndex;
+    th.textContent = '';
+
+    var sort = document.createElement('button');
+    sort.type = 'button';
+    sort.className = 'col-sort';
+    sort.textContent = label;
+    sort.title = 'Sort by ' + label;
+    sort.addEventListener('click', function () {
+      sortDir = (sortCol === col) ? -sortDir : 1;
+      sortCol = col;
+      applySort();
+    });
+    th.appendChild(sort);
+
+    var f;
+    if (isChoice(col)) {
+      f = document.createElement('select');
+      f.appendChild(new Option('any', ''));
+      choices(col).forEach(function (v) { f.appendChild(new Option(v, v)); });
+    } else {
+      f = document.createElement('input');
+      f.type = 'search';
+      f.placeholder = 'filter';
+    }
+    f.className = 'col-filter';
+    f.setAttribute('data-col', col);
+    f.setAttribute('aria-label', 'Filter by ' + label);
+    // `input` rather than `change`, so the list narrows as it is typed. These
+    // are not form fields of the grid and carry no name, so nothing here is ever
+    // posted with a row.
+    f.addEventListener('input', applyFilters);
+    th.appendChild(f);
+  });
+
+  // A filter and a sort are worth clearing together, and one control says so.
+  clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'secondary small col-clear';
+  clear.textContent = 'Clear column filters';
+  clear.hidden = true;
+  clear.addEventListener('click', function () {
+    filters().forEach(function (f) { f.value = ''; });
+    applyFilters();
+  });
+  countLine.parentNode.insertBefore(clear, countLine.nextSibling);
+
+  applyFilters();
 }());

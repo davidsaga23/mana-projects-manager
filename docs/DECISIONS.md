@@ -2124,6 +2124,56 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-29 — The artist grid gets column filters, sorting, and a count
+**Asked by David:** *"in the headers add a filter, a sort order and so we know how many results that
+filter produced."*
+
+Every column heading is now a **sort button** with a **filter** under it, and a line above the table
+says **"N of M people match the column filters"**.
+
+**⚠ ENTIRELY IN THE BROWSER, and that is correctness rather than speed.** The search box at the top
+of this screen is a GET and reloads the page. This grid holds EDITS and saves as you go, so a
+server-side filter would reload under whatever somebody had half-typed — the one thing a screen like
+this must never do. It also means the two compose: the search narrows who is on the page, these
+narrow what you look at within that.
+
+**⚠ HIDDEN ROWS STILL SAVE.** Rows are hidden with a class, never removed, so their fields stay in
+the DOM and in the form. Edit somebody, then filter them off the screen, and the edit still reaches
+the server — checked, not assumed. Sorting moves the `<tr>`s, which carries their fields with them; a
+save already in flight holds the row itself rather than its position, and a row edited after being
+sorted from first place to last still saved under its own id.
+
+**The controls are built by `artists.js`, not printed by `artists.php`**, because they are made of
+what the table actually holds. A column whose cells are `<select>`s or checkboxes gets a **dropdown
+of the values in use**; everything else gets a box to type in. A dropdown means *exactly this one*, a
+typed box means *contains*. JavaScript is already required to save this grid at all (stated on the
+screen since 2026-08-31), so nothing is lost by building them there.
+
+**What a column sorts on is not always what it shows.** A `<select>` sorts by the position of the
+chosen option, so **Seniority reads Junior, Mid, Senior, Lead** — the order the app itself put them
+in — rather than alphabetically, and Rating sorts by stars rather than by the length of a string of
+them. Numbers sort as numbers. **An empty cell always sinks**, in both directions: "nothing recorded"
+does not belong at either extreme.
+
+Both controls live inside the **one `<th>`**, stacked, rather than in a second header row: the head
+is already sticky, and a second row would need its own `top` measured against the height of the
+first — a number that changes with the font and goes wrong quietly.
+
+The count says *"11 people on this page"* with no filter and turns red at zero, because somebody who
+filters down to nothing should not be left wondering whether the page broke. A **Clear column
+filters** button appears beside it, and its visibility is decided inside the filter pass rather than
+by a listener — pressing Clear sets the boxes from script, which fires no `input` event, so a
+listener left the button offering to clear what it had just cleared.
+
+**Not run in PHP** — there is none on this machine, and this change touches none. Driven in a browser
+against a static copy of the grid with the real `style.css` and the real `artists.js`: the controls
+built per column (dropdowns only where the cells are dropdowns, nothing on the status column),
+contains-matching, two filters composing, a zero match reddening, Clear restoring, exact-match
+dropdowns, name sort both ways with the arrow and `aria-sort`, seniority in its own order, day rate
+numeric with blanks last, the sticky head still pinned, and the two save tests above. The harness
+also caught the sort arrows: written as CSS escapes they arrived as a control character, so they are
+written as the characters themselves now.
+
 ## 2026-09-28 — The read-only role becomes 'artist', and gains exactly one write
 **Asked by David:** *"there's one thing that the viewer permission settings should allow and it's the
 ability to adjust or change their status on their tasks or tickets. Let's also change the user
