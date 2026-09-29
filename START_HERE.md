@@ -73,6 +73,16 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **The read-only role is now `artist`** (2026-09-28, **migration 037**), and it has exactly one
+  write: the status of work assigned to them, on **My tasks** and nowhere else. `artist_may_post()`
+  in `includes/auth.php` is an allow-list of script + POST field and is the COMPLETE answer to what
+  an artist can change; `mytasks.php` separately checks the row is theirs. A preview still saves
+  nothing. **An artist cannot link themselves to a crew member** — that form takes any crew id, so
+  an admin does it on Users. `real_role()` maps a stored `viewer` to `artist`, so the app is right
+  before 037 runs and is the only file that still knows the old name.
+- **`check_php_blocks.py`'s string pass did not know that `?>` ends a `//` comment** (fixed
+  2026-09-28) — the first pass did. It read HTML as code and an apostrophe as an open string. If a
+  check fires eighty lines from anything you touched, suspect the checker's mode tracking.
 - **A viewer gets five project tabs** (2026-09-28): Overview, Brief, Shots, Production tracking,
   Tasks. The other ten are listed in `PROJECT_TABS_HIDDEN_FROM_VIEWERS` in `includes/project_nav.php`,
   applied by `project_nav_items()` and keyed on `can_edit()`, so preview-as-viewer shows the real

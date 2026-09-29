@@ -113,13 +113,20 @@ function current_user(): ?array {
  * The role this account ACTUALLY has, ignoring any preview.
  *
  * Everything that decides whether you may ENTER or LEAVE a preview asks this,
- * never user_role() — otherwise previewing as a viewer would take away the very
+ * never user_role() — otherwise previewing as an artist would take away the very
  * permission needed to stop previewing, and the only way out would be clearing
  * the session cookie.
+ *
+ * ⚠ 'viewer' IS READ HERE AND NOWHERE ELSE. The role was renamed to 'artist' on
+ * 2026-09-28 (migration 037), and this is the one place that still knows the old
+ * name — so the app behaves correctly on a database where 037 has not been
+ * applied yet, and every other file can be written as though only 'artist' ever
+ * existed. Delete the mapping once no install is behind.
  */
 function real_role(): string {
     $u = current_user();
-    return $u['role'] ?? 'viewer';
+    $role = (string)($u['role'] ?? 'artist');
+    return $role === 'viewer' ? 'artist' : $role;
 }
 
 /** The role being previewed, or '' when not previewing. */
@@ -128,13 +135,14 @@ function preview_role(): string {
     // started. An admin demoted to editor mid-session stops previewing at once
     // rather than keeping a session key that outlives the authority to hold it.
     //
-    // ⚠ AND ONLY EVER DOWNWARD. The whitelist is editor and viewer — both
+    // ⚠ AND ONLY EVER DOWNWARD. The whitelist is editor and artist — both
     // strictly less than admin — so this can take permissions away and has no
     // path to granting one. A tampered session value is either a lesser role or
     // nothing at all.
     if (real_role() !== 'admin') return '';
     $p = (string)($_SESSION['preview_role'] ?? '');
-    return in_array($p, ['editor', 'viewer'], true) ? $p : '';
+    if ($p === 'viewer') $p = 'artist';        // a session started before 037
+    return in_array($p, ['editor', 'artist'], true) ? $p : '';
 }
 
 /** Is an admin currently looking at the app as somebody else? */
@@ -162,6 +170,49 @@ function is_admin(): bool {
 /** Can this account change anything at all? */
 function can_edit(): bool {
     return in_array(user_role(), ['admin', 'editor'], true);
+}
+
+/** The read-mostly role: everything visible, almost nothing writable. */
+function is_artist(): bool {
+    return user_role() === 'artist';
+}
+
+/**
+ * THE ONE HOLE IN READ-ONLY: an artist setting the status of their own work.
+ *
+ * David, 2026-09-28: "the viewer permission settings should allow... the ability
+ * to adjust or change their status on their tasks or tickets."
+ *
+ * ⚠ AN ALLOW-LIST OF EXACT POSTS, not a role check scattered through the
+ * screens. It names the script AND the field, so this function is the complete
+ * answer to "what can an artist write?" — and a screen added next year is
+ * refused by default rather than let through by an oversight. The ownership
+ * check is a SECOND lock, in mytasks.php, on the row itself: this says which
+ * action is allowed, that says whose row it may touch. Neither is sufficient
+ * alone and both are cheap.
+ *
+ * What is deliberately NOT here:
+ *   set_crew   — that form takes any crew id, so letting an artist self-link is
+ *                a way to claim to be somebody else and then change their work.
+ *                An admin links the account on the Users screen, which checks
+ *                the choice. See migration 037.
+ *   log_time   — not asked for. Status was.
+ *   ticket.php — its `update` rewrites the whole card, assignee and title
+ *                included. The status-only path lives on My tasks instead.
+ */
+function artist_may_post(): bool {
+    if (!is_artist()) return false;
+
+    $allowed = [
+        'mytasks.php' => ['set_status', 'set_ticket_status'],
+    ];
+    // SCRIPT_NAME is the file the server resolved, not anything the caller typed
+    // — unlike REQUEST_URI, which the redirect below has to defend against.
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    foreach ($allowed[$script] ?? [] as $field) {
+        if (isset($_POST[$field])) return true;
+    }
+    return false;
 }
 
 function require_login(): void {
@@ -206,11 +257,17 @@ function require_login(): void {
     // they are only looking — and "I was just seeing what they see" is a poor
     // account of how a rate got changed. The controls all still DRAW, which is
     // the point of the preview; only the saving stops.
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!can_edit() || in_preview())) {
+    //
+    // ONE EXCEPTION, and it is a named list rather than a role: an artist may set
+    // the status of work assigned to them. artist_may_post() says which POSTs
+    // those are; mytasks.php checks the row is theirs. A preview still saves
+    // nothing at all, artist or not — the rule above has no exceptions.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST'
+        && ((!can_edit() && !artist_may_post()) || in_preview())) {
         if (function_exists('flash')) {
             flash('err', in_preview()
                 ? 'Nothing saves while you are previewing as someone else, leave the preview first.'
-                : 'Your account has view-only access, so that change was not saved.');
+                : 'Your account can change the status of your own work, but not this.');
         }
         // Back to the same screen as a GET, so the reader sees the page and the
         // message rather than a dead POST.

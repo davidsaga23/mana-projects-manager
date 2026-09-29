@@ -26,7 +26,14 @@ $ready  = column_exists($pdo, 'tickets', 'id') && column_exists($pdo, 'users', '
 $canLog = time_logs_available($pdo);
 
 // --- claim a crew row -------------------------------------------------------
-if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])) {
+//
+// ⚠ EDITORS AND ADMINS ONLY, and artist_may_post() leaves it out of the artist
+// allow-list for the same reason: this accepts ANY crew id, so a self-link is a
+// way to claim to be somebody else and then change their work. An admin links
+// the account on the Users screen, which checks the choice against the crew list.
+// The guard in require_login() already refuses the POST; this is the second lock,
+// here so the reason sits next to the code it protects.
+if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])) {
     try {
         if ($_POST['set_crew'] === 'new') {
             $me = current_user();
@@ -45,6 +52,12 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])
     header('Location: mytasks.php');
     exit;
 }
+
+// WHO MAY MOVE A STATUS ON THIS SCREEN. An editor may, and so may an artist —
+// on their own rows, which is what every query below already enforces. Written
+// once and read by each control, so the buttons and the guard in
+// require_login() cannot disagree about who is allowed.
+$canSetStatus = can_edit() || is_artist();
 
 $me = current_user();
 $myCrewId = 0;
@@ -97,6 +110,63 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_stat
             ]);
 
         flash('ok', $row['step_name'] . ' set to ' . ($status['name'] ?? 'nothing recorded') . '.');
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: mytasks.php');
+    exit;
+}
+
+// --- change the status of one TICKET ----------------------------------------
+//
+// Added 2026-09-28 with the artist role. The ticket screen's own `update` was
+// not reusable: it rewrites the whole card — title, assignee, priority, due
+// date — and an artist saying "this is ready for review" should not be able to
+// hand the ticket to somebody else in the same request.
+//
+// The ownership test is the same shape as the production task above, and matters
+// for the same reason: without it the form's hidden id is a way to move anybody's
+// ticket.
+if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_status'])) {
+    try {
+        $ticketId = (int)$_POST['ticket_id'];
+        $statusId = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
+
+        $q = $pdo->prepare(
+            'SELECT t.*, p.code AS project_code FROM tickets t
+               JOIN projects p ON p.id = t.project_id
+              WHERE t.id = ? AND t.assigned_crew_id = ?'
+        );
+        $q->execute([$ticketId, $myCrewId]);
+        $tk = $q->fetch();
+        if (!$tk) throw new RuntimeException('That ticket is not assigned to you.');
+
+        $map = statuses_by_id($pdo, (int)$tk['project_id']);
+        if ($statusId !== null && !isset($map[$statusId])) {
+            throw new RuntimeException('That status is not part of that project.');
+        }
+        $status = $statusId ? $map[$statusId] : null;
+        $oldId  = $tk['status_id'] !== null ? (int)$tk['status_id'] : null;
+
+        if ($oldId === $statusId) {
+            flash('ok', 'That was already its status, nothing changed.');
+            header('Location: mytasks.php');
+            exit;
+        }
+
+        $pdo->prepare('UPDATE tickets SET status_id = ? WHERE id = ?')
+            ->execute([$statusId, $ticketId]);
+        // Closing a card is a property of the STATUS, not of a separate tick, so
+        // the same helper the ticket screen uses keeps the two screens agreeing.
+        sync_ticket_completion($pdo, $ticketId, $status);
+
+        // Into the card's own thread, so its history reads the same whoever moved
+        // it and from wherever.
+        $was = $oldId && isset($map[$oldId]) ? $map[$oldId]['name'] : 'no status';
+        $now = $status['name'] ?? 'no status';
+        log_ticket_event($pdo, $ticketId, $userId, 'Status: ' . $was . ' → ' . $now);
+
+        flash('ok', ticket_ref($tk) . ' set to ' . $now . '.');
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -192,7 +262,11 @@ if ($ready && $myCrewId) {
     $t->execute([$myCrewId, $myCrewId]);
     $tasks = $t->fetchAll();
 
-    foreach ($tasks as $row) {
+    // ⚠ TICKETS TOO, since 2026-09-28. This loop covered the production tasks
+    // only, which was invisible while a ticket's status was a read-only chip:
+    // give a ticket a picker and one on a project with no tasks assigned draws
+    // an empty list.
+    foreach (array_merge($tasks, $tickets) as $row) {
         $pid = (int)$row['project_id'];
         if (!isset($statusesByProject[$pid])) $statusesByProject[$pid] = statuses_by_id($pdo, $pid);
     }
@@ -231,6 +305,19 @@ require __DIR__ . '/includes/header.php';
     <p class="muted">Migration <code>017_tickets.sql</code> creates the tasks tables and the link
        between a login and a person.</p>
     <?php if (is_admin()): ?><p><a class="button" href="migrate.php">Review and apply it →</a></p><?php endif; ?>
+  </div>
+
+<?php elseif (!$myCrewId && !can_edit()): ?>
+  <?php // ⚠ NOT A FORM FOR AN ARTIST. The claim below accepts any crew id, so
+        // offering it here would be offering a way to be somebody else. An admin
+        // makes the link on the Users screen, which checks the choice. Saying who
+        // to ask beats a control that would be refused. ?>
+  <div class="empty-state">
+    <p><strong>This account is not linked to anyone in the crew yet.</strong></p>
+    <p class="muted">Work is assigned to crew members and logins are separate from people, so
+       until the two are joined up there is nothing to show here. An administrator does it on
+       the Users screen — ask for <strong><?= e($me['display_name'] ?: $me['username']) ?></strong>
+       to be linked to your crew record.</p>
   </div>
 
 <?php elseif (!$myCrewId): ?>
@@ -330,7 +417,7 @@ require __DIR__ . '/includes/header.php';
             <form method="post" class="inline-form" style="margin:0;">
               <input type="hidden" name="set_status" value="1">
               <input type="hidden" name="progress_id" value="<?= (int)$row['progress_id'] ?>">
-              <select name="status_id" onchange="this.form.submit()" <?= can_edit() ? '' : 'disabled' ?>>
+              <select name="status_id" onchange="this.form.submit()" <?= $canSetStatus ? '' : 'disabled' ?>>
                 <option value="">not started</option>
                 <?php foreach (($statusesByProject[$pid] ?? []) as $sid => $s): ?>
                   <?php if ((int)($s['is_excluded'] ?? 0) === 1) continue; ?>
@@ -387,8 +474,32 @@ require __DIR__ . '/includes/header.php';
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>" class="<?= $t3['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($t3)) ?></a></td>
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>"><?= e($t3['title']) ?></a></td>
           <td class="muted small"><?= e($t3['project_code']) ?></td>
-          <td><span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
-              <?= e($t3['status_name'] ?? 'no status') ?></span></td>
+          <?php // The same control the production tasks above carry, for the same
+                // reason: this is the screen an artist opens to say where their
+                // work has got to, and a ticket is half of what is on it. Still
+                // a coloured chip when it cannot be changed — a disabled select
+                // reads as broken, not as read-only. ?>
+          <td>
+            <?php if ($canSetStatus): ?>
+              <form method="post" class="inline-form" style="margin:0;">
+                <input type="hidden" name="set_ticket_status" value="1">
+                <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
+                <select name="status_id" onchange="this.form.submit()"
+                        style="border-color:<?= e($c) ?>44;color:<?= e($c) ?>;">
+                  <option value="">no status</option>
+                  <?php foreach (($statusesByProject[(int)$t3['project_id']] ?? []) as $sid => $st): ?>
+                    <?php if ((int)($st['is_excluded'] ?? 0) === 1) continue; ?>
+                    <option value="<?= (int)$sid ?>" <?= (int)$t3['status_id'] === (int)$sid ? 'selected' : '' ?>>
+                      <?= e($st['name']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </form>
+            <?php else: ?>
+              <span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
+                <?= e($t3['status_name'] ?? 'no status') ?></span>
+            <?php endif; ?>
+          </td>
           <td><span class="prio-dot priority-<?= e($t3['priority']) ?>"></span> <?= ucfirst($t3['priority']) ?></td>
           <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($t3['due_date'] ?: '—') ?></td>
           <?php if ($canLog): ?>

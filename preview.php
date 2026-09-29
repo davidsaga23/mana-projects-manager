@@ -19,7 +19,7 @@
 // explicitly, and they are the same two: logged in, and still active.
 //
 // Nothing here can raise a permission. Starting a preview only ever swaps in a
-// role BELOW admin (preview_role() whitelists editor and viewer and re-checks
+// role BELOW admin (preview_role() whitelists editor and artist and re-checks
 // the real role every time it is asked), and stopping one only puts back the
 // role the account already had.
 
@@ -60,17 +60,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif (isset($_POST['start'])) {
         // real_role(), not is_admin(): is_admin() reads the EFFECTIVE role, so an
-        // admin already previewing as a viewer would be refused permission to
+        // admin already previewing as an artist would be refused permission to
         // switch to previewing as an editor.
         if (real_role() !== 'admin') {
             flash('err', 'Only an administrator can preview the app as another role.');
         } else {
             $want = (string)($_POST['role'] ?? '');
-            if (!in_array($want, ['editor', 'viewer'], true)) {
+            if (!in_array($want, ['editor', 'artist'], true)) {
                 flash('err', 'That is not a role you can preview.');
             } else {
                 $_SESSION['preview_role'] = $want;
-                flash('ok', 'Previewing as ' . ($want === 'viewer' ? 'a view-only account' : 'an editor')
+                flash('ok', 'Previewing as ' . ($want === 'artist' ? 'an artist' : 'an editor')
                           . '. Nothing will save until you leave the preview.');
                 // Straight to the projects list rather than back where they were:
                 // the screen they started from is very often one the borrowed

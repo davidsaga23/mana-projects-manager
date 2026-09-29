@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             session_regenerate_id(true);
             // A LOGIN NEVER INHERITS A PREVIEW. session_regenerate_id() carries
             // $_SESSION across, so signing in over a session that was previewing
-            // as a viewer would drop the new arrival straight into somebody
+            // as an artist would drop the new arrival straight into somebody
             // else's preview — harmless, since a preview only ever reduces what
             // you can do, but baffling.
             unset($_SESSION['preview_role']);

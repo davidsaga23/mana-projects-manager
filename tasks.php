@@ -14,10 +14,12 @@
 //
 // One rule STFC has that is deliberately NOT ported: there, non-admin
 // submissions were forced into Backlog for triage. This platform's roles are
-// admin / editor / viewer, and a viewer cannot POST at all (enforced once, in
-// require_login()). So there is nobody here who may file a ticket but should not
-// be trusted to place it, and a rule guarding against a role that doesn't exist
-// is just a surprise waiting for whoever hits it.
+// admin / editor / artist, and an artist cannot POST to this screen at all
+// (enforced once, in require_login(); artist_may_post() names the only writes
+// they have, and all of them are on My tasks). So there is nobody here who may
+// file a ticket but should not be trusted to place it, and a rule guarding
+// against a role that doesn't exist is just a surprise waiting for whoever
+// hits it.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';

@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/crew.php';
 require_admin();
 
 $currentUserId = (int)$_SESSION['user_id'];
-const USER_ROLES = ['admin', 'editor', 'viewer'];
+const USER_ROLES = ['admin', 'editor', 'artist'];
 
 // Which PERSON a login is. Arrives with the tickets phase (migration 017);
 // hidden rather than breaking the screen if that hasn't run.
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $display  = trim($_POST['display_name'] ?? '');
             $password = $_POST['password'] ?? '';
-            $role     = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'viewer';
+            $role     = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'artist';
 
             if ($username === '')        throw new RuntimeException('A username is required.');
             if (strlen($password) < 8)   throw new RuntimeException('The password must be at least 8 characters.');
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'set_role') {
             $id   = (int)($_POST['user_id'] ?? 0);
-            $role = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'viewer';
+            $role = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'artist';
 
             // Losing the last admin would leave nobody able to manage accounts,
             // and no way back in short of editing the database by hand.
@@ -257,7 +257,7 @@ require __DIR__ . '/includes/header.php';
           <select name="role" onchange="this.form.submit()">
             <option value="admin"  <?= $u['role']==='admin'  ? 'selected':'' ?>>Admin</option>
             <option value="editor" <?= $u['role']==='editor' ? 'selected':'' ?>>Editor</option>
-            <option value="viewer" <?= $u['role']==='viewer' ? 'selected':'' ?>>View only</option>
+            <option value="artist" <?= $u['role']==='artist' ? 'selected':'' ?>>Artist</option>
           </select>
         </form>
       </td>
@@ -352,7 +352,7 @@ require __DIR__ . '/includes/header.php';
     See Anima as
     <select name="role">
       <option value="editor">an Editor</option>
-      <option value="viewer">a View-only account</option>
+      <option value="artist">an Artist</option>
     </select>
   </label>
   <button class="button secondary" type="submit">Start preview</button>
@@ -369,7 +369,7 @@ require __DIR__ . '/includes/header.php';
     <label>Password <input type="password" name="password" required minlength="8" placeholder="At least 8 characters"></label>
     <label>Role
       <select name="role">
-        <option value="viewer" selected>View only, can look, can't change</option>
+        <option value="artist" selected>Artist, reads everything, sets the status of their own work</option>
         <option value="editor">Editor, full production access</option>
         <option value="admin">Admin, full access, can manage users</option>
       </select>

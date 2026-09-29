@@ -20,9 +20,9 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       <?php // Names the role being WORN, so the top bar and the app agree about
             // who you are while a preview is running. ?>
       <?php if (in_preview()): ?>
-        <span class="role-badge role-badge-preview">as <?= e(preview_role() === 'viewer' ? 'view only' : 'editor') ?></span>
+        <span class="role-badge role-badge-preview">as <?= e(preview_role() === 'artist' ? 'an artist' : 'an editor') ?></span>
       <?php elseif (!can_edit()): ?>
-        <span class="role-badge">view only</span>
+        <span class="role-badge">artist</span>
       <?php endif; ?>
       <?php
       // ONE HOME, settled with David 2026-08-17. This bar used to offer
@@ -106,7 +106,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
           // mid-clause after every <strong>. Two items: what is happening, and
           // the way out. ?>
     <div class="preview-msg">
-      <strong>Previewing as <?= preview_role() === 'viewer' ? 'a view-only account' : 'an editor' ?>.</strong>
+      <strong>Previewing as <?= preview_role() === 'artist' ? 'an artist' : 'an editor' ?>.</strong>
       This is what they see: the menu, the screens they can open, the buttons they get.
       <strong>Nothing saves</strong> while you are in here, whichever role you are wearing.
     </div>

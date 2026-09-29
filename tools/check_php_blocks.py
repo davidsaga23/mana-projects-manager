@@ -231,10 +231,21 @@ def unterminated_string(text):
         c = text[i]
         if c == '?' and text.startswith('?>', i):
             in_php = False; i += 2; continue
-        if c == '/' and text.startswith('//', i):
-            e = text.find(chr(10), i); i = n if e == -1 else e; continue
-        if c == '#':
-            e = text.find(chr(10), i); i = n if e == -1 else e; continue
+        if (c == '/' and text.startswith('//', i)) or c == '#':
+            # STOPS AT '?>' AS WELL AS AT THE NEWLINE. PHP ends a one-line
+            # comment on '?>' and leaves PHP mode there; skipping blindly to the
+            # newline swallowed the tag, left this pass believing it was still
+            # in PHP, and then read the HTML below as code — where an apostrophe
+            # in ordinary prose ("they're") opened a string that never closed.
+            #
+            # The FIRST pass in this file already models this and says why; this
+            # one never learned it, and the two disagreed silently until
+            # users.php lost an unrelated apostrophe that had been balancing the
+            # count by accident (2026-09-28). Three state machines, one rule:
+            # when one of them is taught something, check the others.
+            while i < n and text[i] != chr(10) and not text.startswith('?>', i):
+                i += 1
+            continue
         if c == '/' and text.startswith('/*', i):
             e = text.find('*/', i + 2); i = n if e == -1 else e + 2; continue
         if c in ('"', "'"):

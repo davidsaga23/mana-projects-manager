@@ -16,7 +16,7 @@
  * base64 is encoding, not encryption.
  *
  * ADMIN ONLY. It reveals the sending address and whether a password is set, and
- * it can send mail — neither is something a viewer or editor account needs.
+ * it can send mail — neither is something an artist or editor account needs.
  */
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';

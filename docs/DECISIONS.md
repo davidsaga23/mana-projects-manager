@@ -2124,6 +2124,77 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-28 — The read-only role becomes 'artist', and gains exactly one write
+**Asked by David:** *"there's one thing that the viewer permission settings should allow and it's the
+ability to adjust or change their status on their tasks or tickets. Let's also change the user
+permission group to artist please."*
+
+**The name follows the job.** `viewer` described a limit; `artist` describes the person holding the
+account. Migration **037** renames it in three statements — add the new value, move the rows, drop
+the old one — so no row ever holds a value its own column disallows. One statement would have asked
+MySQL to rewrite every row against an ENUM that no longer contained what they held, and on a
+non-strict server `'viewer'` becomes `''`.
+
+`real_role()` maps a stored `'viewer'` onto `'artist'` and is **the only place that still knows the
+old name**, so the app is correct on a database where 037 has not run yet and every other file reads
+as though only `'artist'` ever existed.
+
+### The hole in read-only, and its shape
+Every write in this app is a POST, and `require_login()` refuses them all for anyone who cannot
+edit. That stays. What changes is one named exception:
+
+`artist_may_post()` is **an allow-list of exact POSTs** — script *and* field — not a role check
+sprinkled through the screens. It is the complete answer to "what can an artist write?", and a screen
+added next year is refused by default rather than let through by an oversight. Today it holds two
+entries, both on `mytasks.php`: `set_status` and `set_ticket_status`.
+
+**Two locks, not one.** The allow-list says which ACTION is permitted; `mytasks.php` says whose ROW
+it may touch, with the same ownership test the production-task path already used (`crew_id`, or a
+`progress_crew` row; for a ticket, `assigned_crew_id`). Without the second, the form's hidden id is a
+way to move anybody's work. Neither is sufficient alone and both are cheap.
+
+**A preview still saves nothing**, artist or not. That rule has no exceptions and did not grow one.
+
+### What is deliberately NOT allowed
+- **`set_crew`** — the "which of the crew are you?" form takes any crew id, so letting an artist
+  self-link is a way to claim to be somebody else and then change their work. An **admin** links the
+  account on the Users screen, which validates the choice against the crew list. An artist who is
+  not linked yet sees a message naming who to ask, rather than a control that would be refused.
+  Guarded twice as well: the allow-list omits it, and the branch in `mytasks.php` now tests
+  `can_edit()`.
+- **`log_time`** — status was asked for; logging hours was not. The controls stay disabled.
+- **`ticket.php`'s `update`** — it rewrites the whole card, assignee and title included, so an
+  artist saying "ready for review" could hand the ticket to somebody else in the same request. A
+  status-only path was added to My tasks instead, which writes the change into the card's own thread
+  and calls `sync_ticket_completion()`, so a card closed from either screen behaves the same.
+
+A ticket's status was a **read-only chip** on My tasks and is now the same picker the production
+tasks carry. Two things fell out of that: `$statusesByProject` was built from the tasks loop only, so
+a ticket on a project with no tasks assigned would have drawn an empty list — invisible while the
+chip was read-only; and the chip is kept for anyone who cannot change it, because a disabled `select`
+reads as broken rather than as read-only.
+
+### A checker that had learned the lesson in one pass and not the others
+Renaming an option's text removed an apostrophe from `users.php`, and `check_php_blocks.py` began
+reporting an unterminated string eighty lines away, in the plain-HTML sentence *"Ask them to change
+it once they're in."*
+
+The cause was not the rename. **PHP ends a one-line `//` comment on `?>` and leaves PHP mode there**,
+and `users.php` has a `<?php // … ?>` comment block that relies on it. The FIRST state machine in the
+checker models this and carries a comment explaining why (it is lesson 9 in `START_HERE`); the
+`unterminated_string()` pass skipped blindly to the newline, swallowed the tag, and read the HTML
+below as code — where an apostrophe opened a string that never closed. `can't` on the line I edited
+had been closing it again by pure coincidence.
+
+Three state machines, one rule: when one of them is taught something, check the others. Fixed, and
+checked against three cases — a `?>`-in-comment file with apostrophes now passes, and two files with
+genuinely unclosed strings are still caught at the right line.
+
+**Not run in PHP** — there is none on this machine. All seven checks pass, and the guard was replayed
+in Python across sixteen cases: every role, the allowed pair, the refused neighbours (`set_crew`,
+`log_time`, `ticket.php`, `tasks.php`, `users.php`, `shots_api.php`), a stored `'viewer'` on a
+database behind 037, and a preview refusing to save whichever role it wears.
+
 ## 2026-09-28 — A viewer gets five project tabs, not fifteen
 **Asked by David**, naming all ten: *"we need to hide some tabs for only viewers... Dashboard,
 Staffing, Timeline, Schedule, Team performance, Setup, Import, Statuses, Names, Export. We only leave
