@@ -247,6 +247,8 @@ $missingNote = $noFrames > 0
       }, $list);
   }, $byType), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 </script>
+<?php // gridtools first: shots.js calls into it as it loads. ?>
+<script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
 <script src="assets/shots.js<?= asset_ver('shots.js') ?>"></script>
 
 <?php endif; ?>

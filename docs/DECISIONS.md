@@ -2124,6 +2124,57 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-30 — The same column tools on the shot breakdown, and one copy of them
+**Asked by David:** *"do the same for the shot tab."*
+
+**Moved to `assets/gridtools.js` rather than copied.** A second implementation is where the two start
+disagreeing about what "empty sorts last" means, and this codebase has paid for that shape before
+(one `effective_days_per_unit()`, one `step_applicable_count()`, one `fmt_secs()`). `artists.js` lost
+its copy and calls the module; `shots.js` calls it too and passes only what a breakdown does
+differently. Both pages load `gridtools.js` first, because both call into it as they load.
+
+Nothing about the columns is declared. The module reads what each one actually holds: a column of
+`<select>`s or checkboxes becomes a dropdown of the values in use, everything else a box to type in.
+
+### What a breakdown needed that an artist list did not
+**An asset cell is chips, not a field.** Read with the default reader it comes back
+`"Mbappe × Bellingham × +"` — the remove buttons and the picker's `+` included. `shots.js` passes a
+reader that collects the chip names, so filtering **Character** for `wonderkid` finds the shots that
+have Wonderkid in them, and sorting that column orders by the list of names with empty cells last.
+
+**⚠ THE TOTALS HAD TO FOLLOW THE FILTER.** The line above the table and the Total row under it are
+printed by PHP for the whole episode. Leaving them alone while five of forty-five shots are on screen
+is a number that is wrong in the most expensive direction, on the screen the expense projection
+prices. They now recompute from what is VISIBLE — **by adding up the figures PHP already put in the
+rows**, never by re-deriving them, so there is no second copy of frames-to-seconds to drift. With no
+filter on, the server's own text is put back character for character, which is checked.
+
+The running time (`0:49.8`) is deliberately **not** recomputed: it is formatted by `fmt_secs()` in
+PHP, and a second formatter here is exactly the copy this entry is about. Seconds are shown instead.
+
+**A picker open over a row the filter has just hidden** would float there pointing at nothing, so the
+filter pass closes it. That needed the function handed out through a `var`: `function closePicker()`
+is a DECLARATION, and declarations are block-scoped in strict mode, so it is not visible outside the
+editing half of the file.
+
+**The edit gate moved down `shots.js`.** It used to return early for anyone who could not edit, which
+was right while everything in the file WROTE something. Filtering and sorting read — an artist, who
+cannot change a breakdown, still has forty-five rows to find something in. The editing half is now
+wrapped in that test and the column tools are not.
+
+**Not run in PHP** — there is none on this machine, and this touches almost none. Driven in a browser
+against static copies of BOTH grids with the real CSS and the real scripts. The breakdown: controls
+on all nine columns, a chip-column filter finding the two shots with Wonderkid, the totals following
+to *2 of 45 shots · 95 frames · 3.959s* and restoring exactly on Clear, frames sorting numerically
+with blanks last both ways, a chip column sorting by its list, the foot never sorted into the body,
+hidden rows keeping their fields, and the picker closing on a filter and reopening after. The artist
+grid was re-run whole after the extraction and behaves as before.
+
+One thing the harness taught rather than the product: with the browser pane hidden the window reports
+**0×0**, so the picker's own "close when the button scrolls out of sight" fired on every open. Not a
+bug — but a reminder that a test environment that is not being painted will report a viewport that
+does not exist, and that a check against `window.innerWidth` is the kind that notices.
+
 ## 2026-09-29 — The artist grid gets column filters, sorting, and a count
 **Asked by David:** *"in the headers add a filter, a sort order and so we know how many results that
 filter produced."*

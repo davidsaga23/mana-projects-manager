@@ -541,6 +541,8 @@ require __DIR__ . '/includes/header.php';
 
   <?php // ---- the one editor ------------------------------------------------ ?>
   <?php if (can_edit()): ?>
+    <?php // gridtools first: artists.js calls into it as it loads. ?>
+    <script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
     <script src="assets/artists.js<?= asset_ver('artists.js') ?>"></script>
   <?php endif; ?>
 

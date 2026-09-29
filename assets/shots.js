@@ -13,11 +13,21 @@
   var projectId = window.BD_PROJECT;
   var canEdit = window.BD_CAN_EDIT === true;
   var byType = window.BD_ASSETS || {};
-  if (!projectId || !canEdit) return;
+  // ⚠ Handed out through a var, because `function closePicker() {}` is a
+  // DECLARATION and declarations are block-scoped in strict mode — it is not
+  // visible outside the editing block below, and the column filters need it.
+  var shutPicker = null;
 
   var table = document.querySelector('.breakdown-table');
   if (!table) return;
   var statusLine = document.getElementById('bdStatus');
+
+  // ⚠ THE EDIT CHECK MOVED DOWN (2026-09-30). It used to return here, which was
+  // right while everything in this file WROTE something. Filtering and sorting
+  // read: an artist, who cannot change a breakdown, still has forty-five rows to
+  // find something in. So the editing half is now wrapped in this test and the
+  // column tools at the foot of the file are not.
+  if (projectId && canEdit) {
 
   /**
    * The page-level line, shown ONLY when something failed.
@@ -222,6 +232,7 @@
     if (!pkFilter.hidden) pkFilter.focus();
   }
 
+  shutPicker = closePicker;
   function closePicker(focusBack) {
     if (!picker || picker.hidden) return;
     picker.hidden = true;
@@ -383,4 +394,94 @@
       .catch(function (err) { say(err.message, true); })
       .then(function () { box.disabled = false; });
   });
+
+  }   // end of the editing half
+
+  // --- column filters, sorting, and live totals -------------------------------
+  //
+  // David, 2026-09-30: "do the same for the shot tab." The machinery is
+  // assets/gridtools.js, shared with the Artists grid; what is here is the two
+  // things a breakdown needs and an artist list does not.
+  //
+  // 1. AN ASSET CELL IS CHIPS, not a field. Read as-is it would come back
+  //    "Mbappe × Bellingham × +", so the chips are collected and the buttons
+  //    left out.
+  // 2. THE TOTALS HAVE TO FOLLOW THE FILTER. The line above the table and the
+  //    Total row under it are printed by PHP for the whole episode; leaving them
+  //    alone while five of forty-five shots are on screen is a number that is
+  //    wrong in the most expensive direction, on the screen the expense
+  //    projection prices. They are recomputed from what is VISIBLE, by adding up
+  //    the figures PHP already put in the rows — summing what is shown, never
+  //    re-deriving it, so there is no second copy of frames-to-seconds to drift.
+  if (window.GridTools && table.tHead) {
+    var above = document.querySelector('.bd-totals');
+    var foot = table.tFoot ? table.tFoot.rows[0] : null;
+    var footFrames = foot ? foot.querySelector('.bd-frames strong') : null;
+    var footSecs = foot ? foot.querySelector('.bd-frames .bd-secs') : null;
+    var footNote = foot ? foot.querySelector('td.muted') : null;
+    // What the server said, kept so an unfiltered table shows ITS numbers rather
+    // than a client-side re-run of them.
+    var asPrinted = {
+      above: above ? above.innerHTML : null,
+      frames: footFrames ? footFrames.textContent : null,
+      secs: footSecs ? footSecs.textContent : null,
+      note: footNote ? footNote.innerHTML : null
+    };
+
+    function chipText(td) {
+      return Array.prototype.map.call(td.querySelectorAll('.chip'), function (c) {
+        return c.textContent.replace(/\s*×\s*$/, '').trim();
+      }).join(', ');
+    }
+
+    window.GridTools.attach(table, {
+      noun: ['shot', 'shots'],
+      mount: document.querySelector('.bd-scroll'),
+      cellText: function (td) {
+        if (td && td.classList && td.classList.contains('bd-cell')) return chipText(td);
+        return window.GridTools.cellText(td);
+      },
+      onChange: function (shown, all, filtering) {
+        // A picker open over a row that has just been filtered away would float
+        // there pointing at nothing; it is closed rather than left hanging.
+        if (shutPicker) shutPicker(false);
+
+        if (!filtering) {
+          if (above && asPrinted.above !== null) above.innerHTML = asPrinted.above;
+          if (footFrames) footFrames.textContent = asPrinted.frames;
+          if (footSecs) footSecs.textContent = asPrinted.secs;
+          if (footNote && asPrinted.note !== null) footNote.innerHTML = asPrinted.note;
+          return;
+        }
+
+        var frames = 0, secs = 0, noFrames = 0;
+        shown.forEach(function (tr) {
+          var box = tr.querySelector('.bd-frame-input');
+          var raw = box ? box.value.trim() : (tr.cells[2] ? tr.cells[2].textContent.trim() : '');
+          if (raw === '' || raw === '—') { noFrames++; return; }
+          frames += parseInt(raw, 10) || 0;
+          var s = tr.querySelector('.bd-secs');
+          if (s) secs += parseFloat((s.textContent || '').replace('s', '')) || 0;
+        });
+
+        // Agrees with the TOTAL, not the count: "1 of 45 shots", never "1 of 45
+        // shot". The number the noun belongs to is the one after "of".
+        var word = all.length === 1 ? 'shot' : 'shots';
+        var missing = noFrames
+          ? ', ' + noFrames + ' without a frame count yet'
+          : '';
+        var line = shown.length.toLocaleString() + ' of ' + all.length + ' ' + word +
+                   ' · ' + frames.toLocaleString() + ' frames · ' +
+                   secs.toFixed(3) + 's' + missing;
+        // ⚠ The running time (0:49.8) is deliberately NOT recomputed. It is
+        // formatted by fmt_secs() in PHP, and a second formatter here is exactly
+        // the kind of copy that drifts. Seconds are shown instead, which is the
+        // figure this screen is really about.
+        if (above) above.textContent = line + ' — filtered';
+        if (footFrames) footFrames.textContent = frames.toLocaleString();
+        if (footSecs) footSecs.textContent = secs.toFixed(3) + 's';
+        if (footNote) footNote.textContent = shown.length + ' of ' + all.length + ' ' + word + missing;
+      }
+    });
+  }
 }());

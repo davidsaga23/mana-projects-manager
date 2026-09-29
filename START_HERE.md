@@ -73,6 +73,11 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **`assets/gridtools.js` is the one implementation of column filters + sorting + a count**
+  (2026-09-30). Artists and the shot breakdown both call it; a third screen is one call. It reads
+  what each column HOLDS rather than being told. On the breakdown it also **recomputes the totals
+  from what is visible** — by summing the figures PHP already put in the rows, never re-deriving
+  them — because a Total row printed for the whole episode is wrong the moment a filter is on.
 - **The artist grid filters and sorts by column** (2026-09-29, no migration): each heading is a
   sort button with a filter under it, and a line above the table counts the matches. Built by
   `assets/artists.js` from what the cells actually are — dropdowns where the cells are dropdowns,

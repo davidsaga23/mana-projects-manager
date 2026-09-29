@@ -2145,8 +2145,11 @@ body.lightbox-lock { overflow: hidden; }
    Both controls live INSIDE the one <th>, stacked, rather than in a second
    header row: the head is already sticky, and a second row would need its own
    `top` measured against the height of the first — a number that changes with
-   the font and goes wrong quietly. One cell, one sticky block. */
-.artist-grid thead th { vertical-align: top; }
+   the font and goes wrong quietly. One cell, one sticky block.
+   ⚠ NOT SCOPED TO ONE TABLE since 2026-09-30 ("do the same for the shot
+   tab"). assets/gridtools.js equips whatever grid asks, so these rules name
+   the classes IT writes rather than the screens that happen to use them. */
+.artist-grid thead th, .breakdown-table thead th { vertical-align: top; }
 .col-sort {
   display: block; width: 100%; text-align: left; background: none; border: 0;
   padding: 0 0 4px; margin: 0; font: inherit; font-weight: 600; color: var(--text);
@@ -2158,17 +2161,17 @@ body.lightbox-lock { overflow: hidden; }
 .col-sort::after { content: ''; display: inline-block; width: 1em; color: var(--muted); }
 .col-sort[data-dir="up"]::after   { content: ' ↑'; color: var(--primary); }
 .col-sort[data-dir="down"]::after { content: ' ↓'; color: var(--primary); }
-.artist-grid thead .col-filter {
+thead .col-filter {
   width: 100%; padding: 2px 5px; font-size: 12px; font-weight: 400; margin: 0;
   background: var(--surface-2);
 }
 /* Lit only while it is actually narrowing something. A <select> is always
    :valid without a `required`, so the state comes from a class the script sets
    rather than from a pseudo-class that would light every dropdown on the page. */
-.artist-grid thead .col-filter.on { border-color: var(--primary); }
+thead .col-filter.on { border-color: var(--primary); }
 /* Hidden, NOT removed — the fields stay in the form, so an edit made before the
    filter was typed still saves. */
-.artist-grid tr.col-hidden { display: none; }
+tr.col-hidden { display: none; }
 .col-count { margin: 0 0 6px; }
 .col-count-on { color: var(--text-2); }
 .col-clear { margin: 0 0 8px; padding: 2px 8px; font-size: 12px; width: auto; }
