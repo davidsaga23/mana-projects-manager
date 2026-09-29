@@ -73,6 +73,10 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **A finished step is green** on the dashboard (2026-09-22): card, bar, and **✓ Finished** in place
   of a pace for work that no longer exists. A step with nothing applicable is not finished, it is
   empty, and stays as it was.
+- **A new candidate starts at Lead** (2026-09-28). `HIRE_STAGE_NEW` in `includes/hiring.php` is the
+  single answer, read by both ways in and both fallbacks; the schema had defaulted to `lead` since
+  024 and only the two add paths overrode it. **"Line up again" still goes to Approached** — a named
+  transition, not a default. Existing rows were not rewritten.
 - **`assets/gridtools.js` is the one implementation of column filters + sorting + a count**
   (2026-09-30). Artists and the shot breakdown both call it; a third screen is one call. It reads
   what each column HOLDS rather than being told. On the breakdown it also **recomputes the totals

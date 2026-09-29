@@ -2124,6 +2124,35 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-09-28 — A new candidate starts at Lead, not Approached
+**Asked by David:** *"in the staffing section let's make sure the default option is lead instead of
+approached."*
+
+**Lead, because adding somebody to a slot is a note that they might do it — not a claim that anyone
+has written to them yet.** Starting at Approached made the board say a conversation had happened the
+moment a name was typed, and the one number a producer reads off this screen is how many people are
+actually waiting on a reply.
+
+**The schema already agreed.** `hires.stage` has defaulted to `'lead'` since migration 024, and both
+fallbacks in `includes/hiring.php` chose it too. Only the two ADD paths overrode it, and they did it
+twice, in two files: `add_known_candidate()` for somebody picked out of the artist database, and the
+typed-name branch of `addcand` in `crew.php`. So the answer depended on which door was used, and
+neither door was the schema's.
+
+Now `HIRE_STAGE_NEW` holds it once and all four read it — the two ways in and the two fallbacks.
+
+**⚠ "Line up again" is deliberately NOT changed.** It has its own button, its own message
+("...again, at Approached") and its own decision from 2026-09-18: somebody talked to before goes back
+onto the same record rather than getting a second, empty copy. That is a named transition, not a
+default, and moving it is a separate question — raised with David rather than changed quietly.
+
+**Existing rows keep the stage they have.** A default decides where new records start; it does not
+rewrite old ones, and nothing here does. The candidates already sitting at Approached stay there
+until somebody moves them, which is a data decision.
+
+**Not run in PHP** — there is none on this machine. All seven checks pass, and the only remaining
+write of `'approached'` in the codebase is the "Line up again" branch above.
+
 ## 2026-09-30 — The same column tools on the shot breakdown, and one copy of them
 **Asked by David:** *"do the same for the shot tab."*
 

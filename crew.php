@@ -233,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                       'candidate_name' => $_POST['candidate_name'] ?? '',
                       'email'          => $_POST['candidate_email'] ?? '',
                       'lane_id'        => $laneId,
-                      'stage'          => 'approached',
+                      'stage'          => HIRE_STAGE_NEW,
                   ], current_user_display());
             foreach ((array)$r as $said) if (is_string($said)) flash('ok', $said);
 

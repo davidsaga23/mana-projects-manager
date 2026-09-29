@@ -68,6 +68,23 @@ const HIRE_STAGES = [
     'passed'     => 'Passed',
 ];
 
+/**
+ * Where a candidate STARTS (David, 2026-09-28: "in the staffing section let's
+ * make sure the default option is lead instead of approached").
+ *
+ * Lead, because adding somebody to a slot is a note that they might do it, not
+ * a claim that anyone has written to them yet. Starting at Approached made the
+ * board say a conversation had happened the moment a name was typed — and the
+ * one number a producer reads off this screen is how many people are actually
+ * waiting on a reply.
+ *
+ * Named rather than repeated: the two ways in (pick from the book, type a name)
+ * and save_hire()'s own fallback all read this, so the answer cannot differ by
+ * which door was used. `hires.stage` has defaulted to 'lead' in the schema since
+ * migration 024; this brings the code back in line with it.
+ */
+const HIRE_STAGE_NEW = 'lead';
+
 /** Still in play — the ones that mean somebody should be doing something. */
 const HIRE_STAGES_OPEN = ['lead', 'approached', 'in_talks', 'offer_out'];
 
@@ -228,7 +245,7 @@ function add_known_candidate(PDO $pdo, int $projectId, int $laneId, int $fromHir
         'portfolio_url'  => $src['portfolio_url'] ?? '',
         'source'         => $src['source'] ?? '',
         'lane_id'        => $laneId,
-        'stage'          => 'approached',
+        'stage'          => HIRE_STAGE_NEW,
     ];
     if (hire_extras_available($pdo)) {
         foreach (['location', 'position', 'seniority', 'project_type', 'rating'] as $f) {
@@ -578,7 +595,8 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
         $stepName = $lane['name'];
     }
 
-    $stage = in_array($in['stage'] ?? '', array_keys(HIRE_STAGES), true) ? $in['stage'] : 'lead';
+    $stage = in_array($in['stage'] ?? '', array_keys(HIRE_STAGES), true)
+           ? $in['stage'] : HIRE_STAGE_NEW;
     $id    = (int)($in['hire_id'] ?? 0);
 
     // The same person, for the same job, twice. Refused rather than merged:
@@ -1119,7 +1137,7 @@ function save_hires_bulk(PDO $pdo, int $projectId, array $rows, string $who = ''
         }
 
         $stage = in_array($row['stage'] ?? '', array_keys(HIRE_STAGES), true)
-               ? $row['stage'] : 'lead';
+               ? $row['stage'] : HIRE_STAGE_NEW;
 
         try {
             // Created at a non-final stage first and hired as a second step, so
