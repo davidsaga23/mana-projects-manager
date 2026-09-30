@@ -2124,6 +2124,55 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-01 — The breakdown's filters become dropdowns, and the count moves into the table
+**Asked by David:** *"instead of a text box, let's create a dropdown menu with all the options
+available (the same way all the options of that column are presented when linking them per shot).
+Additionally, I didn't see the total count of shots that complied with the selected filter... below
+the headers I want to see the total shot count."*
+
+### Everything that COULD be there, not only what already is
+An asset column's filter now lists **every asset of that type on the project**, from `window.BD_ASSETS`
+— the same array, in the same order, that the per-shot picker offers. The two agree by construction
+rather than by two people remembering to keep them the same. A character who is in the project but
+not yet in any shot is still offered, and picking them correctly finds nothing, which is itself an
+answer.
+
+**A chip cell is a LIST, and is matched item by item.** A shot's Prop cell reads "Boots, SoccerBall";
+picking SoccerBall has to find it, and must not also match a prop called "Ball" for being inside its
+name. `cellList()` hands gridtools the chips and the comparison is against each one, whole.
+
+**"(nothing)" is offered wherever a column has an empty cell to find** — which shots have no
+character, which artists have no reel. Worth having: it is a question the old text box could not ask
+at all.
+
+**Ep, Shot, Frames and Notes keep a box, deliberately.** A dropdown of forty-five shot codes is
+slower than typing three characters, and you cannot type half a dropdown to see the nine shots
+beginning SH0. Ep would get one if the project had episodes; on a flat show there is nothing to
+offer, so it stays a box.
+
+### The count moved into the table
+It was a line **above** the table, which scrolls away with the first few rows — exactly when a list
+of forty-five makes the number worth having. It is now a second row in `<thead>`, sticky, sitting
+under the filters that produced it, with **Clear column filters** beside it.
+
+Its `top` is **measured** from the heading row and re-measured on resize, because the head's height
+changes with the font, the window width and whether a heading wraps. That measurement is the reason
+the filters themselves were put inside the one `<th>` rather than in a second row; a count row earns
+it because it has nothing to line up with horizontally. Set on the **cell**, not the row: `sticky`
+applies to the `<td>` under `border-collapse`, and a `top` on the `<tr>` is ignored.
+
+**Three numbers, three jobs**, so none of them is one you have to work out which set it belongs to:
+- the line **above** the table — the whole episode, as PHP printed it, now left alone so there is
+  always a total to compare against;
+- the row **under the headings** — what is on screen now, with its frames and seconds;
+- the **Total** row at the foot — the same, beside the column it sums.
+
+**Not run in PHP** — there is none on this machine, and this touches none. Driven in a browser
+against static copies of both grids: Prop filtered to **SoccerBall gives "2 of 45 shots · 95 frames
+· 3.959s"** with the foot agreeing and the line above unchanged; "(nothing)" finds the 43 shots with
+no prop; a character who is in no shot gives 0 and reddens; the count row is sticky at the measured
+offset on both grids; and the artist grid was re-run whole.
+
 ## 2026-09-28 — A new candidate starts at Lead, not Approached
 **Asked by David:** *"in the staffing section let's make sure the default option is lead instead of
 approached."*

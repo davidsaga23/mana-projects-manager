@@ -414,7 +414,7 @@
   //    the figures PHP already put in the rows — summing what is shown, never
   //    re-deriving it, so there is no second copy of frames-to-seconds to drift.
   if (window.GridTools && table.tHead) {
-    var above = document.querySelector('.bd-totals');
+    var rows0 = table.tBodies[0] ? table.tBodies[0].rows[0] : null;
     var foot = table.tFoot ? table.tFoot.rows[0] : null;
     var footFrames = foot ? foot.querySelector('.bd-frames strong') : null;
     var footSecs = foot ? foot.querySelector('.bd-frames .bd-secs') : null;
@@ -422,7 +422,6 @@
     // What the server said, kept so an unfiltered table shows ITS numbers rather
     // than a client-side re-run of them.
     var asPrinted = {
-      above: above ? above.innerHTML : null,
       frames: footFrames ? footFrames.textContent : null,
       secs: footSecs ? footSecs.textContent : null,
       note: footNote ? footNote.innerHTML : null
@@ -434,54 +433,105 @@
       }).join(', ');
     }
 
-    window.GridTools.attach(table, {
+    var grid = null;
+    grid = window.GridTools.attach(table, {
       noun: ['shot', 'shots'],
-      mount: document.querySelector('.bd-scroll'),
       cellText: function (td) {
         if (td && td.classList && td.classList.contains('bd-cell')) return chipText(td);
         return window.GridTools.cellText(td);
+      },
+      // A chip cell is a LIST, so a filter matches one item of it whole rather
+      // than a substring of the joined line — picking SoccerBall must not also
+      // match a prop called "Ball" for being inside its name.
+      cellList: function (td) {
+        if (!td || !td.classList || !td.classList.contains('bd-cell')) return null;
+        return Array.prototype.map.call(td.querySelectorAll('.chip'), function (c) {
+          return c.textContent.replace(/\s*×\s*$/, '').trim();
+        });
+      },
+      // ⚠ EVERY ASSET OF THAT TYPE, not only the ones already linked (David,
+      // 2026-10-01: "a dropdown menu with all the options available, the same way
+      // all the options of that column are presented when linking them per
+      // shot"). BD_ASSETS is the same list, in the same order, that the per-shot
+      // picker offers — so the two agree by construction rather than by two
+      // people remembering to keep them the same. A character in the project but
+      // not yet in any shot is still offered, and picking it correctly finds
+      // nothing, which is itself an answer.
+      //
+      // Ep gets one too: a handful of values, and nobody wants to type EP001.
+      // Shot, Frames and Notes keep a box — a dropdown of forty-five shot codes
+      // is slower than typing three characters, and you cannot type half a
+      // dropdown to see the nine shots beginning SH0.
+      options: function (col) {
+        var th = table.tHead.rows[0].cells[col];
+        var body = rows0 ? rows0.cells[col] : null;
+        if (body && body.classList && body.classList.contains('bd-cell')) {
+          var type = body.getAttribute('data-type') || '';
+          var all = (window.BD_ASSETS || {})[type] || [];
+          return all.map(function (a) { return { value: a.name, label: a.name }; });
+        }
+        if (th && th.classList && th.classList.contains('bd-ep')) {
+          var seen = Object.create(null), out = [];
+          Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) {
+            var v = (tr.cells[col].textContent || '').trim();
+            if (v === '' || v === '—' || seen[v]) return;
+            seen[v] = true;
+            out.push({ value: v, label: v });
+          });
+          return out.length ? out : null;
+        }
+        return null;
       },
       onChange: function (shown, all, filtering) {
         // A picker open over a row that has just been filtered away would float
         // there pointing at nothing; it is closed rather than left hanging.
         if (shutPicker) shutPicker(false);
 
-        if (!filtering) {
-          if (above && asPrinted.above !== null) above.innerHTML = asPrinted.above;
-          if (footFrames) footFrames.textContent = asPrinted.frames;
-          if (footSecs) footSecs.textContent = asPrinted.secs;
-          if (footNote && asPrinted.note !== null) footNote.innerHTML = asPrinted.note;
-          return;
-        }
-
+        // THREE PLACES, THREE JOBS, so none of them is ever a number you have to
+        // work out which set it belongs to:
+        //   the line above the table  — the whole episode, as PHP printed it,
+        //                               left alone so there is always a total to
+        //                               compare against;
+        //   the row under the headings — what is on screen now;
+        //   the Total row at the foot  — the same, beside the column it sums.
         var frames = 0, secs = 0, noFrames = 0;
         shown.forEach(function (tr) {
           var box = tr.querySelector('.bd-frame-input');
           var raw = box ? box.value.trim() : (tr.cells[2] ? tr.cells[2].textContent.trim() : '');
-          if (raw === '' || raw === '—') { noFrames++; return; }
+          if (raw === '' || raw === '\u2014') { noFrames++; return; }
           frames += parseInt(raw, 10) || 0;
-          var s = tr.querySelector('.bd-secs');
-          if (s) secs += parseFloat((s.textContent || '').replace('s', '')) || 0;
+          var sc = tr.querySelector('.bd-secs');
+          if (sc) secs += parseFloat((sc.textContent || '').replace('s', '')) || 0;
         });
 
         // Agrees with the TOTAL, not the count: "1 of 45 shots", never "1 of 45
         // shot". The number the noun belongs to is the one after "of".
         var word = all.length === 1 ? 'shot' : 'shots';
-        var missing = noFrames
-          ? ', ' + noFrames + ' without a frame count yet'
-          : '';
-        var line = shown.length.toLocaleString() + ' of ' + all.length + ' ' + word +
-                   ' · ' + frames.toLocaleString() + ' frames · ' +
+        var missing = noFrames ? ', ' + noFrames + ' without a frame count yet' : '';
+        var head = filtering
+          ? shown.length + ' of ' + all.length + ' ' + word
+          : all.length + ' ' + word;
+        var line = head + ' \u00b7 ' + frames.toLocaleString() + ' frames \u00b7 ' +
                    secs.toFixed(3) + 's' + missing;
-        // ⚠ The running time (0:49.8) is deliberately NOT recomputed. It is
-        // formatted by fmt_secs() in PHP, and a second formatter here is exactly
-        // the kind of copy that drifts. Seconds are shown instead, which is the
-        // figure this screen is really about.
-        if (above) above.textContent = line + ' — filtered';
+
+        // ⚠ The running time (0:49.8) is deliberately NOT recomputed. fmt_secs()
+        // formats it in PHP and a second formatter here is the kind of copy that
+        // drifts. Seconds are shown instead, which is what this screen is about.
+        if (grid && grid.countLine) grid.countLine.textContent = line;
+
+        if (!filtering) {
+          if (footFrames) footFrames.textContent = asPrinted.frames;
+          if (footSecs) footSecs.textContent = asPrinted.secs;
+          if (footNote && asPrinted.note !== null) footNote.innerHTML = asPrinted.note;
+          return;
+        }
         if (footFrames) footFrames.textContent = frames.toLocaleString();
         if (footSecs) footSecs.textContent = secs.toFixed(3) + 's';
         if (footNote) footNote.textContent = shown.length + ' of ' + all.length + ' ' + word + missing;
       }
     });
+    // onChange fires once inside attach(), before `grid` has been assigned, so
+    // the first pass could not reach the count row. Run it again now that it can.
+    if (grid) grid.apply();
   }
 }());
