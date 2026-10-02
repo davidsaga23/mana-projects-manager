@@ -2124,6 +2124,32 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-02 — "Worked with us" was missing from the add grid, so nobody ever arrived with it
+**Asked by David:** *"in the artist add section we need to see the worked with them before check
+box."*
+
+**The field was never the problem; the form was.** `worked_with_us` is in `ARTIST_FIELDS`,
+`artists_values()` has always read it, and the editable grid above has carried the column since
+migration 025. Only the five blank rows of **Add artists** left it out — so every person added there
+was written with `worked_with_us = 0`, whoever they were, and the only way to correct it was to find
+them again in the grid above and tick it. Silent, and wrong in the direction that loses information.
+
+Added last, as it is in the grid above, so the two tables read the same way, and gated on the same
+`$has('worked_with_us')` as everything else, so the screen still degrades one feature at a time on a
+database without migration 025.
+
+**One thing it uncovered.** The rule keeping a checkbox its own size was written
+`.artist-grid input[type=checkbox]`. The editable grid carries BOTH classes (`artist-table
+artist-grid`); the add table carries only the first — so the new box was stretched to the full column
+width by the global `input { width: 100% }`. The selector is now `.artist-table`, which covers both.
+Worth noting as a shape: a rule scoped to the more specific of two class names on the same element
+works until the day something else wears only the general one.
+
+**Not run in PHP** — there is none on this machine. The header and body conditionals were replayed in
+Python across **all 128 combinations** of the seven optional columns and agree in every one; the
+table was then drawn in a browser with the real stylesheet — thirteen headers, thirteen cells, Worked
+last, the checkbox 13px rather than a stretched field, and no sideways scroll on the page.
+
 ## 2026-10-02 — Progress is drawn as a bar inside the bar
 **Asked by David:** *"in the timeline whenever there's progress registered, add an overlay color or
 an inside bar that shows the progress."*

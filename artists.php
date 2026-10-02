@@ -503,6 +503,14 @@ require __DIR__ . '/includes/header.php';
                 <th>Email</th><th>Phone</th><th>Reel</th>
                 <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
                 <th>Where from</th><th>Notes</th>
+                <?php // Missing until 2026-10-02 (David: "in the artist add section we
+                      // need to see the worked with them before check box"). The
+                      // column exists on the grid above and artists_values() has
+                      // always accepted it — the form simply never sent it, so
+                      // everybody added here arrived as somebody the studio had
+                      // never worked with, whoever they were. Last, as it is above,
+                      // so the two tables read the same way. ?>
+                <?php if ($has('worked_with_us')): ?><th>Worked</th><?php endif; ?>
               </tr>
             </thead>
             <tbody>
@@ -527,6 +535,9 @@ require __DIR__ . '/includes/header.php';
                 <?php endif; ?>
                 <td><input name="<?= $n ?>[source]" size="12" maxlength="100"></td>
                 <td><input name="<?= $n ?>[notes]" size="22"></td>
+                <?php if ($has('worked_with_us')): ?>
+                  <td class="num"><input type="checkbox" name="<?= $n ?>[worked_with_us]" value="1"></td>
+                <?php endif; ?>
               </tr>
             <?php endfor; ?>
             </tbody>

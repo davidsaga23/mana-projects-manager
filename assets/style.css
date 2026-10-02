@@ -2164,7 +2164,11 @@ body.lightbox-lock { overflow: hidden; }
    knowing this rule bites every new checkbox in this stylesheet. */
 .pos-grid input[type=checkbox],
 .pos-all input[type=checkbox] { width: auto; padding: 0; margin: 0 6px 0 0; vertical-align: -1px; }
-.artist-grid input[type=checkbox] { width: auto; padding: 0; margin: 0; }
+/* ⚠ .artist-table, NOT .artist-grid. The editable grid carries both classes;
+   the "Add artists" table below it carries only the first, so a checkbox there
+   was stretched to the full column by the global `input { width: 100% }`. Found
+   when the Worked box was added to it (2026-10-02). */
+.artist-table input[type=checkbox] { width: auto; padding: 0; margin: 0; }
 
 /* COLUMN FILTERS AND SORTING (David, 2026-09-29: "in the headers add a filter,
    a sort order and so we know how many results that filter produced").
