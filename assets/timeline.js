@@ -828,6 +828,8 @@
         postApi('step_progress', { step_id: src.step_id, progress_pct: progress }).then(function (d) {
           src.progress = d.progress;
           src.progress_source = d.progress_source;
+          var host = $('generalGantt');
+          if (host) paintProgress(host, window.GENERAL_TASKS);
           stepSaved(d.note || 'Saved.');
         }).catch(function () {
           src.progress = was;
@@ -840,6 +842,7 @@
     restorePlace(el, place);
     setTimeout(function () {
       paintBars(el, window.GENERAL_TASKS);
+      paintProgress(el, window.GENERAL_TASKS);
       paintDependencies();
       addTodayLine(generalGantt, el);
       addMilestones(generalGantt, el);
@@ -974,6 +977,76 @@
   // --- per-step colours + the lock outline -----------------------------------
   // Frappe colours every bar identically; the step colour is what makes a
   // thousand-row chart readable at a glance.
+  /**
+   * PROGRESS, DRAWN INSIDE THE BAR (David, 2026-10-02: "whenever there's progress
+   * registered, add an overlay color or an inside bar that shows the progress").
+   *
+   * Frappe draws a `.bar-progress` rect the full height of the bar, which the
+   * stylesheet tinted. That reads as a slightly different shade of the same
+   * block — and at 100% it tints the WHOLE bar, so the one state that most
+   * wants announcing looked exactly like a bar with nothing recorded at all.
+   *
+   * So the rect is re-laid as an INSET bar: shorter than its bar top and bottom,
+   * held off the left and right edges, with its own rounded ends. It reads as a
+   * meter inside the bar rather than as a wash over it, and at 100% it is a full
+   * inner bar with the step's own colour still framing it.
+   *
+   * ⚠ GENERAL CHART ONLY. On the detailed chart `progress` means something else
+   * entirely — 100 for an approved task, 0 otherwise — and `.tl-done
+   * .bar-progress` already paints that green. Two meanings, one class name;
+   * the caller says which chart it is rather than this guessing.
+   *
+   * Re-run after every redraw, because Frappe rebuilds the SVG from scratch on a
+   * zoom, a drag or a date change and takes these attributes with it.
+   */
+  function paintProgress(container, source) {
+    container.querySelectorAll('.bar-wrapper').forEach(function (w) {
+      var o = source.find(function (x) { return String(x.id) === String(w.getAttribute('data-id')); });
+      var fill = w.querySelector('.bar-progress');
+      var bar = w.querySelector('.bar');
+      if (!o || !fill || !bar) return;
+
+      var pct = Math.max(0, Math.min(100, +o.progress || 0));
+      w.querySelectorAll('.tl-pct').forEach(function (n) { n.remove(); });
+      if (pct <= 0) { fill.style.display = 'none'; return; }
+      fill.style.display = '';
+
+      var x = parseFloat(bar.getAttribute('x'));
+      var y = parseFloat(bar.getAttribute('y'));
+      var h = parseFloat(bar.getAttribute('height'));
+      var wd = parseFloat(bar.getAttribute('width'));
+      // The inset is a share of the bar's height rather than a fixed number of
+      // pixels, so it holds its proportions at every zoom level.
+      var pad = Math.max(2, Math.round(h * 0.22));
+      var innerH = h - pad * 2;
+      var innerW = Math.max(1, (wd - pad * 2) * pct / 100);
+
+      fill.setAttribute('x', x + pad);
+      fill.setAttribute('y', y + pad);
+      fill.setAttribute('height', innerH);
+      fill.setAttribute('width', innerW);
+      fill.setAttribute('rx', Math.round(innerH / 2));
+      fill.setAttribute('ry', Math.round(innerH / 2));
+
+      // ⚠ THE STEP'S LABEL GOES BACK ON TOP. Frappe draws it before the progress
+      // rect, so an opaque meter covers the name of the step it belongs to —
+      // worst at 100%, where the bar is otherwise unreadable. SVG has no
+      // z-index: painting order IS document order, so the label is moved to the
+      // end of the wrapper.
+      var lbl = w.querySelector('.bar-label');
+      if (lbl) w.appendChild(lbl);
+
+      // The number, outside the bar's right edge. On the bar it would sit under
+      // the step's own label, which is centred and already there.
+      var tag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      tag.setAttribute('class', 'tl-pct');
+      tag.setAttribute('x', x + wd + 6);
+      tag.setAttribute('y', y + h / 2 + 4);
+      tag.textContent = pct + '%';
+      w.appendChild(tag);
+    });
+  }
+
   function paintBars(container, source) {
     container.querySelectorAll('.bar-wrapper').forEach(function (w) {
       var o = source.find(function (x) { return String(x.id) === String(w.getAttribute('data-id')); });

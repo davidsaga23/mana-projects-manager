@@ -2124,6 +2124,48 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-02 — Progress is drawn as a bar inside the bar
+**Asked by David:** *"in the timeline whenever there's progress registered, add an overlay color or
+an inside bar that shows the progress."*
+
+**It was already drawn, and that was the problem.** Frappe's own `.bar-progress` rect was tinted at
+32% over the FULL height of the bar, so it read as a slightly different shade of the same block — and
+at 100% it tinted the whole bar, which looked exactly like a step with nothing recorded at all. The
+one state most worth announcing was the one that disappeared.
+
+`paintProgress()` in `timeline.js` re-lays that rect as an **inset meter**: shorter than its bar top
+and bottom, held off the left and right edges, with rounded ends. The step's own colour frames it at
+every percentage, 100 included, and the figure is written just past the end of the bar. The inset is
+a share of the bar's HEIGHT rather than a fixed number of pixels, so it holds its proportions at
+every zoom.
+
+**At 0% nothing is drawn.** Most bars on most shows have no progress recorded, and a meter on every
+one of them would be noise; the chart only changes where there is something to say.
+
+**The step's label is moved back on top.** Frappe draws it before the progress rect, and SVG has no
+`z-index` — painting order IS document order — so an opaque meter covered the name of the step it
+belonged to, worst at 100%. The label is re-appended last and outlined in the background colour so it
+survives both the bar and the lighter part inside it.
+
+**⚠ GENERAL CHART ONLY.** On the detailed chart `progress` means something else entirely — 100 for an
+approved task, 0 otherwise — and `.tl-done .bar-progress` already paints that green. Two meanings,
+one class name: the caller says which chart it is rather than the function guessing. Checked: the
+detailed chart's rects keep their full height and gain no figure.
+
+### One thing the harness caught
+An old version is drawn on a panel the code calls "paper", so the first fix flipped `--shade` dark
+there, reasoning that paper is cream. **It is not** — `--paper` is warm DARK on the dark theme
+(`#1b1813`) and only turns cream in `@media print`, where `--shade` already flips with every other
+token. The override made the meter invisible on the one screen it was meant to fix. Reverted; what
+stayed is `--bg: var(--paper-surface)` on that panel, so the label's outline blends into the paper
+behind it rather than into the page.
+
+**Not run in PHP** — there is none on this machine, and this touches none. Driven in a browser
+against the timeline harness with the real `timeline.js` and `style.css`, over bars at 0, 7, 25, 60
+and 100%: the inner widths measure to the percentage they claim, 0% draws nothing, the figures
+appear only where there is one, the label paints last, a zoom redraw rebuilds all of it identically,
+the detailed chart is untouched, and a saved version on the paper panel shows its meter too.
+
 ## 2026-10-01 — The breakdown's filters become dropdowns, and the count moves into the table
 **Asked by David:** *"instead of a text box, let's create a dropdown menu with all the options
 available (the same way all the options of that column are presented when linking them per shot).

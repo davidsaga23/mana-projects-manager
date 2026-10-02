@@ -1930,6 +1930,13 @@ body.lightbox-lock { overflow: hidden; }
 .tl-page-old {
   background: var(--paper); border: 1px solid var(--paper-border); border-radius: 8px;
   padding: 12px 14px 2px;
+  /* The label outline on the progress meter is drawn in --bg so it blends into
+     whatever is behind the text; on this panel that is the PAPER, not the page.
+     ⚠ --shade is deliberately NOT overridden here. "Paper" is warm DARK on the
+     dark theme (#1b1813, see :root) and only turns cream in @media print, where
+     --shade already flips with every other token. Forcing it dark here made the
+     meter invisible on screen — caught in the harness, on this very panel. */
+  --bg: var(--paper-surface);
 }
 .tl-versions.is-old {
   background: var(--paper-2); border-left: 4px solid var(--paper-ink); border-radius: 4px;
@@ -1950,13 +1957,32 @@ body.lightbox-lock { overflow: hidden; }
    shows as a white smudge round every label. */
 .tl-page-old .tl-chart .tl-ms-g.on-row .tl-ms-label { stroke: var(--paper-surface); }
 
-/* --- progress and the step editor (2026-09-18) ------------------------------
-   A step's recorded progress is Frappe's own progress rect, drawn over the bar.
-   Its default fill is a lilac that fights every step colour, so here it is a
-   darker shade of the bar's OWN colour: the done part reads as the same step,
-   further along. The id keeps it off the detailed chart, where a filled bar
-   means approved and is green. */
-#generalGantt .gantt .bar-wrapper .bar-progress { fill: var(--shade); fill-opacity: .32; }
+/* --- progress and the step editor (2026-09-18, redrawn 2026-10-02) ----------
+   A step's recorded progress is Frappe's own progress rect, re-laid by
+   paintProgress() in timeline.js as an INSET bar inside the step's own bar.
+   ⚠ It used to be a 32% wash over the full height of the bar, which read as a
+   slightly different shade of the same block — and at 100% it tinted the whole
+   bar, so the one state that most wants announcing looked exactly like a step
+   with nothing recorded (David, 2026-10-02). Opaque and inset, it reads as a
+   meter: the step's own colour frames it at every percentage, 100 included.
+   The id keeps it off the detailed chart, where `progress` means approved and
+   `.tl-done .bar-progress` paints it green. */
+#generalGantt .gantt .bar-wrapper .bar-progress {
+  fill: var(--shade); fill-opacity: .7;
+}
+/* The step's name is moved above the meter by paintProgress(), and outlined so
+   it stays readable over both the bar and the lighter part inside it. */
+#generalGantt .gantt .bar-wrapper .bar-label {
+  paint-order: stroke; stroke: var(--bg); stroke-width: 2.5px;
+  stroke-linejoin: round; stroke-opacity: .55;
+}
+/* The figure, just past the end of the bar. Same weight as the crew label on the
+   detailed chart, because it does the same job: a fact about the bar that has
+   nowhere to live inside it. */
+#generalGantt .tl-pct {
+  font-size: 10.5px; font-weight: 700; fill: var(--text-2);
+  paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round;
+}
 /* Nobody who cannot save gets the handles for stretching a bar or dragging its
    progress: the gesture could only ever snap back. */
 .tl-readonly .gantt .handle { display: none; }

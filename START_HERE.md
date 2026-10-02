@@ -77,6 +77,11 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   single answer, read by both ways in and both fallbacks; the schema had defaulted to `lead` since
   024 and only the two add paths overrode it. **"Line up again" still goes to Approached** — a named
   transition, not a default. Existing rows were not rewritten.
+- **A step's progress is a bar INSIDE its bar** on the general timeline (2026-10-02), with the
+  figure beside it. `paintProgress()` in `assets/timeline.js` re-lays Frappe's own `.bar-progress`
+  rect, re-run after every redraw. Nothing is drawn at 0%. **General chart only** — on the detailed
+  chart `progress` means approved and is green. The step label is re-appended last, because SVG
+  paints in document order and the meter would otherwise cover it.
 - **`assets/gridtools.js` is the one implementation of column filters + sorting + a count**
   (2026-09-30). Artists and the shot breakdown both call it; a third screen is one call. It reads
   what each column HOLDS rather than being told. On the breakdown it also **recomputes the totals
