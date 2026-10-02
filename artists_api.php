@@ -32,8 +32,26 @@ function artists_fail(string $msg, int $code = 400): void {
     exit;
 }
 
-if (($_GET['action'] ?? '') !== 'save_row') artists_fail('Unknown action.');
-if (!hiring_available($pdo))               artists_fail('The hiring database updates are not applied.');
+$action = $_GET['action'] ?? '';
+if (!in_array($action, ['save_row', 'delete_person'], true)) artists_fail('Unknown action.');
+if (!hiring_available($pdo)) artists_fail('The hiring database updates are not applied.');
+
+// --- removing somebody from the book ---------------------------------------
+//
+// TWO CALLS, and the first one writes nothing. It comes back with the server's
+// own count of what would go, which is what the page then puts in the question;
+// asking "delete 3 records?" from a number the page guessed at would be a
+// confirmation of the wrong thing. The second carries confirm=1.
+if ($action === 'delete_person') {
+    try {
+        $info = artists_delete_person($pdo, (string)($_POST['name'] ?? ''),
+                                      ($_POST['confirm'] ?? '') === '1');
+    } catch (Throwable $e) {
+        artists_fail($e->getMessage());
+    }
+    echo json_encode(['ok' => true] + $info);
+    exit;
+}
 
 $hireId = (int)($_POST['id'] ?? 0);
 $orig   = trim((string)($_POST['orig_name'] ?? ''));

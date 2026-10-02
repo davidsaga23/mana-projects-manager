@@ -169,6 +169,11 @@
     if (window.ResizeObserver) new ResizeObserver(placeCountRow).observe(headRow);
 
     function applyFilters() {
+      // ⚠ A ROW THE PAGE HAS REMOVED IS NO LONGER ONE OF THE ROWS. `rows` is
+      // captured once at attach; the Artists grid deletes a person out of the
+      // DOM, and without this the count kept saying eleven of a list of ten and
+      // a filter still measured a node nobody could see.
+      rows = rows.filter(function (tr) { return tr.isConnected; });
       var active = filters().filter(function (f) { return f.value !== ''; });
       var shown = [];
       rows.forEach(function (tr) {

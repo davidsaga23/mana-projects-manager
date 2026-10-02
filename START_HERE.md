@@ -87,6 +87,12 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   what each column HOLDS rather than being told. On the breakdown it also **recomputes the totals
   from what is visible** — by summing the figures PHP already put in the rows, never re-deriving
   them — because a Total row printed for the whole episode is wrong the moment a filter is on.
+- **An artist can be deleted from the book** (2026-10-02, no migration): the ✕ at the end of a row
+  on Artists removes **every record of that person, on every show** — the same rows an edit there
+  writes to. Two calls: the first writes nothing and returns the real count for the question.
+  **Refused for anyone hired** (that record is how a crew member got onto a slot) and
+  **administrator-only while finance is configured**, because the quoted rate in the other database
+  has to go with them. `artists_delete_person()` in `includes/artists.php`.
 - **The artist grid filters and sorts by column** (2026-09-29, no migration): each heading is a
   sort button with a filter under it, and a line above the table counts the matches. Built by
   `assets/artists.js` from what the cells actually are — dropdowns where the cells are dropdowns,

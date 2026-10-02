@@ -2124,6 +2124,52 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-02 — An artist can be deleted, person-wide, from the book
+**Asked by David:** *"we also need to be able to delete a record."* Raised the day before as a gap:
+the only delete that existed was per-candidate on a project's Staffing screen, which could not reach
+anybody imported from the freelancer spreadsheet at all — they belong to no project, so they appear
+on no Staffing screen. That was most of the database.
+
+**PERSON-WIDE, BECAUSE THIS SCREEN IS.** `hires` holds one row per APPROACH, so somebody put up for
+three jobs is three rows; the Artists screen merges them into one line and `artists_save_person()`
+writes an edit across all of them. Deleting one row would leave a person who still appears, now
+missing part of their history. `artists_delete_person()` matches rows **the same way the edit does**,
+deliberately, so the two can never disagree about who "this person" is.
+
+**Two calls, and the first writes nothing.** It returns the server's own count, the shows involved,
+and any refusal; THAT count is what goes in the question. Asking "remove 3 records?" from a number
+the page had guessed would be a confirmation of the wrong thing. The refusals arrive before anybody
+is asked to agree to anything.
+
+**Refused for anyone hired**, naming the show. That record is how the crew member on a slot got
+there, and removing it would leave somebody on a show with no explanation of how — the same rule, and
+the same reason, as the per-candidate Remove on `hiring.php`. Passed keeps the history instead.
+
+**The rate goes first, and outside the transaction.** It lives in the other database, keyed to a hire
+id with no foreign key, so there is no one transaction covering both. That order is the recoverable
+one: a failure between the two leaves the person intact with their rate gone. The other way round
+leaves a rate attached to an id that no longer exists and nothing to find it by. While finance is
+configured this makes the whole action **administrator-only** — an editor who cannot see the other
+half must not delete the half they can — and says so rather than half-doing it.
+
+`hire_stage_log` is `ON DELETE CASCADE`, so a person's stage history goes with them rather than
+being left pointing at nothing.
+
+**The button is quiet until pointed at.** A row of red crosses down a list of three hundred people
+reads as a page full of errors, and this is the one control on the screen that cannot be undone.
+
+### What it uncovered
+`gridtools.js` captures its rows once at attach, so after a delete the count still said eleven of a
+list of ten and a filter still measured a node nobody could see. It now drops rows the page has
+removed. Worth knowing generally: anything that equips a table and remembers its rows has to cope
+with the page changing them.
+
+**Not run in PHP** — there is none on this machine. Driven in a browser against a copy of the grid
+with the real `artists.js` and a stubbed endpoint: declining the question sends the dry run and
+nothing else and removes nobody; accepting sends exactly two calls, the second carrying `confirm=1`,
+and the row and the count both follow; a hired person is refused with the reason on screen and their
+row still there; and the column filters agree with what is left ("3 of 10", not "3 of 11").
+
 ## 2026-10-02 — "Worked with us" was missing from the add grid, so nobody ever arrived with it
 **Asked by David:** *"in the artist add section we need to see the worked with them before check
 box."*

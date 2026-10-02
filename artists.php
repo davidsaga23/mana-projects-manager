@@ -332,7 +332,12 @@ require __DIR__ . '/includes/header.php';
               <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
               <th>Where from</th><th>Notes</th>
               <?php if ($has('worked_with_us')): ?><th>Worked</th><?php endif; ?>
+              <?php // Two unlabelled columns: the per-row save message, and the
+                    // remove button. Both stay out of the column tools, which
+                    // skip a heading with no text — there is nothing to sort a
+                    // status by and nothing to filter a button on. ?>
               <th></th>
+              <?php if (can_edit()): ?><th></th><?php endif; ?>
             </tr>
           </thead>
           <tbody>
@@ -418,6 +423,16 @@ require __DIR__ . '/includes/header.php';
                     // failed — and a failure nobody can locate is an edit
                     // somebody believes they made. ?>
               <td class="a-status"></td>
+              <?php // REMOVE THEM FROM THE BOOK (David, 2026-10-02). It asks the
+                    // server what would go before it asks the person, so the
+                    // number in the question is the real one. Not a form button:
+                    // this row lives inside #artistGrid, whose submit is
+                    // cancelled, and HTML cannot nest a second form inside it. ?>
+              <?php if (can_edit()): ?>
+                <td><button type="button" class="a-del" title="Remove <?= e($p['candidate_name']) ?> from the artist database"
+                            data-name="<?= e($p['candidate_name']) ?>"
+                            aria-label="Remove <?= e($p['candidate_name']) ?>">✕</button></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
           </tbody>

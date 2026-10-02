@@ -309,6 +309,104 @@ function artists_add_bulk(PDO $pdo, array $rows, array $extra): array {
     return $out;
 }
 
+/**
+ * REMOVE A PERSON FROM THE BOOK — every record of them, on every show.
+ *
+ * David, 2026-10-02: "we also need to be able to delete a record."
+ *
+ * ⚠ PERSON-WIDE, BECAUSE THIS SCREEN IS. `hires` holds one row per APPROACH, so
+ * somebody put up for three jobs is three rows; the Artists screen merges them
+ * into one line and artists_save_person() writes an edit across all of them.
+ * Deleting one row would leave a person who still appears, now missing part of
+ * their history. The rows matched are exactly the rows that edit would have
+ * written to — same comparison, deliberately, so the two can never disagree
+ * about who "this person" is.
+ *
+ * ⚠ REFUSED FOR ANYONE HIRED. That record is how the crew member on a slot got
+ * there; removing it would leave somebody on a show with no explanation of how.
+ * The Staffing screen takes them off the slot first. Same rule, and the same
+ * reason, as the per-candidate Remove on hiring.php.
+ *
+ * ⚠ THE RATE LIVES IN THE OTHER DATABASE, keyed to a hire id with no foreign
+ * key, so it has to be removed deliberately or it outlives the person it was
+ * for. Only an administrator can reach it, so only an administrator can do this
+ * while finance is configured — an editor who cannot see the other half must not
+ * delete the half they can.
+ *
+ * DRY RUN FIRST. With $confirmed false nothing is written and the return says
+ * what WOULD go, so the question put to the user is the server's own count
+ * rather than the page's guess at it.
+ *
+ * @return array{records:int, projects:array, hired:array, quotes:int, done:bool}
+ */
+function artists_delete_person(PDO $pdo, string $name, bool $confirmed): array {
+    $key = mb_strtolower(trim($name));
+    if ($key === '') throw new RuntimeException('No artist named.');
+
+    $stmt = $pdo->prepare(
+        'SELECT h.id, h.candidate_name, h.stage, p.code AS project_code
+           FROM hires h
+           LEFT JOIN projects p ON p.id = h.project_id
+          WHERE LOWER(h.candidate_name) = ?'
+    );
+    $stmt->execute([$key]);
+    $rows = $stmt->fetchAll();
+    if (!$rows) throw new RuntimeException('There is no artist by that name to remove.');
+
+    $projects = [];
+    $hired    = [];
+    foreach ($rows as $r) {
+        $code = $r['project_code'] !== null ? (string)$r['project_code'] : '';
+        if ($code !== '' && !in_array($code, $projects, true)) $projects[] = $code;
+        if (($r['stage'] ?? '') === 'hired') $hired[] = $code !== '' ? $code : 'no project';
+    }
+
+    $info = [
+        'name'     => (string)$rows[0]['candidate_name'],
+        'records'  => count($rows),
+        'projects' => $projects,
+        'hired'    => $hired,
+        'quotes'   => 0,
+        'done'     => false,
+    ];
+
+    if ($hired) {
+        throw new RuntimeException(
+            '"' . $info['name'] . '" has been hired on ' . implode(', ', array_unique($hired))
+          . ', and that record is how the crew member on that slot got there. Take them off the '
+          . 'slot on Staffing first, or move the record to Passed, which keeps the history.'
+        );
+    }
+
+    $financeOn = function_exists('finance_configured') && finance_configured();
+    if ($financeOn && !can_see_money()) {
+        throw new RuntimeException(
+            'This person may have a quoted rate in the finance database, which this account '
+          . 'cannot see or remove. Ask an administrator to delete them.'
+        );
+    }
+
+    if (!$confirmed) return $info;
+
+    // The quotes go first and OUTSIDE the transaction below: they are in another
+    // database entirely, so there is no one transaction that could cover both.
+    // This order is the safe one — a failure here leaves the person intact with
+    // their rate gone, which is recoverable; the other way round leaves a rate
+    // attached to an id that no longer exists and nothing to find it by.
+    if ($financeOn) {
+        foreach ($rows as $r) $info['quotes'] += delete_hire_quote((int)$r['id']);
+    }
+
+    // hire_stage_log is ON DELETE CASCADE from hires, so a person's stage history
+    // goes with them rather than being left pointing at nothing.
+    $in = implode(',', array_fill(0, count($rows), '?'));
+    $del = $pdo->prepare('DELETE FROM hires WHERE id IN (' . $in . ')');
+    $del->execute(array_map(function ($r) { return (int)$r['id']; }, $rows));
+    $info['records'] = $del->rowCount();
+    $info['done'] = true;
+    return $info;
+}
+
 /* ---------------------------------------------------------------------------
  * IMPORTING THE STUDIO'S EXISTING SPREADSHEET.
  *

@@ -2221,6 +2221,16 @@ tr.col-hidden { display: none; }
 .col-count.err { color: var(--danger); }
 .col-clear { margin: 0 0 0 12px; padding: 1px 8px; font-size: 11.5px; width: auto; }
 
+/* Remove a person from the book. Quiet until pointed at: a row of red crosses
+   down a list of three hundred people reads as a page full of errors, and this
+   is the one control here that cannot be undone. */
+.a-del {
+  width: auto; margin: 0; padding: 0 5px; background: none; border: 0;
+  color: var(--faint); font-size: 13px; line-height: 1; cursor: pointer;
+}
+.a-del:hover, .a-del:focus-visible { color: var(--danger); background: none; }
+.a-del[disabled] { opacity: .4; cursor: default; }
+
 /* The grid fills the page rather than shrinking to its contents. min-width keeps
    the columns readable when the window is narrow, and the wrapper scrolls. */
 .artist-grid { width: 100%; }

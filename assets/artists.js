@@ -223,6 +223,62 @@
     ev.returnValue = '';
   });
 
+  // --- removing somebody from the book ----------------------------------------
+  //
+  // David, 2026-10-02: "we also need to be able to delete a record."
+  //
+  // TWO CALLS, and the first writes nothing: it asks the server what would go,
+  // and THAT count is what goes in the question. Asking "remove 3 records?" from
+  // a number this page had guessed would be a confirmation of the wrong thing.
+  // The refusals — hired, or a rate this account cannot reach — come back from
+  // the first call too, so they are read before anybody is asked to agree to
+  // anything.
+  //
+  // ⚠ PERSON-WIDE. This screen shows one line per person and an edit here writes
+  // across every record of them; a delete does the same. The sentence says so,
+  // with the shows named, because "remove Ana" and "remove Ana from four shows"
+  // are different questions.
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.a-del') : null;
+    if (!btn) return;
+    var row = btn.closest('tr');
+    var name = btn.getAttribute('data-name') || '';
+
+    function send(confirmed) {
+      var body = new URLSearchParams();
+      body.append('name', name);
+      if (confirmed) body.append('confirm', '1');
+      return fetch('artists_api.php?action=delete_person', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (!d.ok) throw new Error(d.error || 'That did not work.'); return d; });
+    }
+
+    btn.disabled = true;
+    send(false)
+      .then(function (d) {
+        var where = d.projects && d.projects.length
+          ? ' on ' + d.projects.join(', ')
+          : ', who is on no show';
+        var msg = 'Remove ' + d.name + ' from the artist database?' + String.fromCharCode(10, 10)
+                + d.records + (d.records === 1 ? ' record' : ' records') + where + '.'
+                + String.fromCharCode(10)
+                + 'This cannot be undone.';
+        if (!window.confirm(msg)) return null;
+        return send(true);
+      })
+      .then(function (d) {
+        if (!d) return;
+        // Taken out of the page as well as the database. Leaving the row behind
+        // after a successful delete is the same lie as leaving an edit on screen
+        // that did not save.
+        row.remove();
+        if (grid) grid.apply();        // the count and any filter, without it
+        say('');
+      })
+      .catch(function (err) { say(err.message); })
+      .then(function () { btn.disabled = false; });
+  });
+
   // --- column filters, sorting, and a live count ------------------------------
   //
   // David, 2026-09-29: "in the headers add a filter, a sort order and so we know
@@ -236,8 +292,9 @@
   // order; Worked is a checkbox, so it reads yes/no; everything else is a box to
   // type in. The reel cell yields its address rather than the dash, because the
   // default reader prefers a field to the text around it.
+  var grid = null;
   if (window.GridTools) {
-    window.GridTools.attach(document.querySelector('.artist-table'), {
+    grid = window.GridTools.attach(document.querySelector('.artist-table'), {
       noun: ['person', 'people']
     });
   }
