@@ -66,7 +66,7 @@ New repository secret**. Add four:
 | `FTP_SERVER` | `ftp.davidsaga.com` |
 | `FTP_USERNAME` | your FTP username |
 | `FTP_PASSWORD` | your FTP password |
-| `FTP_TARGET_DIR` | `/public_html/mana/` — **verified 2026-10-03, see below** |
+| `FTP_TARGET_DIR` | ⚠ **depends on the FTP account — see below** |
 
 Secrets are write-only — GitHub never displays them again, and they don't appear in logs. That
 cuts both ways: once set, nobody can read the target directory back out of GitHub to check it.
@@ -83,11 +83,26 @@ cuts both ways: once set, nobody can read the target directory back out of GitHu
 > `config.php` the live app actually loaded. The directory holding that file, written relative to
 > the FTP account's home and ending in a slash, is `FTP_TARGET_DIR`.
 >
-> **Done on 2026-10-03.** The app reported `/home2/davideei/public_html/mana/config.php`. The FTP
-> account lands in `/home2/davideei`, so the value above is that path with the home part removed.
-> It is corroborated by the deploys having worked for weeks before the move — whatever the old
-> repo's secret held, it reached this folder. Re-run the check rather than trusting this line if
-> the site is ever moved.
+> **⚠ KNOWING WHERE THE APP LIVES IS ONLY HALF OF IT.** `server-dir` is not an absolute path on
+> the server — it is the path from **wherever the FTP account lands when it logs in**. So the same
+> folder has two different correct answers depending on which account the deploy uses:
+>
+> | FTP account's Directory (cPanel → FTP Accounts) | `FTP_TARGET_DIR` |
+> |---|---|
+> | `/home2/davideei` (the main account) | `/public_html/mana/` |
+> | `/home2/davideei/public_html/mana` (scoped to the app) | `/` |
+>
+> **Match the username in `FTP_USERNAME` to a row on that page and read ITS Directory.** Not any
+> row — there are several, and they land in different places.
+>
+> **This is what the stray folder above is.** `/home2/davideei/mana/public_html/mana` has exactly
+> the shape of an account homed in one place plus a target repeating part of it, and getting it
+> wrong a second time would quietly build a third copy rather than failing. The deploy creates
+> what it cannot find.
+>
+> Written on 2026-10-03, after confidently recording `/public_html/mana/` here as "verified" on
+> the strength of the config path alone. The config path says where the APP is; it says nothing
+> about where the ACCOUNT starts, and those are the same thing only for the main account.
 >
 > Getting it wrong does not delete anything — the deploy would simply build a second copy of the
 > app somewhere nobody serves, which is how the abandoned folder described above came to exist in
