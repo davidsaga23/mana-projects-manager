@@ -33,13 +33,11 @@ jobs:
           # Show what would change without transferring anything:
           # flip to true, push, and read the Actions log.
           #
-          # ⚠ ON, deliberately, since the repo moved accounts on 2026-10-03. The
-          # four secrets had to be typed in again, and FTP_TARGET_DIR is the one
-          # that cannot be read back out of GitHub to check. Set here BEFORE the
-          # secrets existed, so the first push that can actually reach the server
-          # is one that cannot write to it. Read the Actions log, confirm the
-          # paths, then set this back to false.
-          dry-run: true
+          # Was ON through the account move of 2026-10-03, until run #159 reported
+          # "Making changes to 0 files" — which is the proof that mattered: a
+          # wrong target folder reads as hundreds of files to upload, because the
+          # action cannot find the sync state file previous deploys left behind.
+          dry-run: false
           exclude: |
             **/.git*
             **/.git*/**
