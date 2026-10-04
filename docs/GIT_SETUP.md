@@ -66,7 +66,7 @@ New repository secret**. Add four:
 | `FTP_SERVER` | `ftp.davidsaga.com` |
 | `FTP_USERNAME` | your FTP username |
 | `FTP_PASSWORD` | your FTP password |
-| `FTP_TARGET_DIR` | ⚠ **check it, do not copy it — see below** |
+| `FTP_TARGET_DIR` | `/public_html/mana/` — **verified 2026-10-03, see below** |
 
 Secrets are write-only — GitHub never displays them again, and they don't appear in logs. That
 cuts both ways: once set, nobody can read the target directory back out of GitHub to check it.
@@ -78,10 +78,16 @@ cuts both ways: once set, nobody can read the target directory back out of GitHu
 > nothing on screen to say which. Found on 2026-10-03, when the repo moved accounts and the
 > secrets had to be typed in again from this page.
 >
-> **Read it off the running application instead of trusting any document, including this one.**
+> **Read it off the running application rather than trusting any document, including this one.**
 > Open `smtp_test.php` while signed in as an administrator: it prints the absolute path of the
 > `config.php` the live app actually loaded. The directory holding that file, written relative to
 > the FTP account's home and ending in a slash, is `FTP_TARGET_DIR`.
+>
+> **Done on 2026-10-03.** The app reported `/home2/davideei/public_html/mana/config.php`. The FTP
+> account lands in `/home2/davideei`, so the value above is that path with the home part removed.
+> It is corroborated by the deploys having worked for weeks before the move — whatever the old
+> repo's secret held, it reached this folder. Re-run the check rather than trusting this line if
+> the site is ever moved.
 >
 > Getting it wrong does not delete anything — the deploy would simply build a second copy of the
 > app somewhere nobody serves, which is how the abandoned folder described above came to exist in
