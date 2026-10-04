@@ -111,8 +111,60 @@ function project_nav_items(int $projectId): array {
  *
  * $section is 'project' or 'finance'.
  */
-function project_section_nav(array $project, string $section): void {
+/**
+ * Every project, for the switcher. Ordered as index.php orders them — active
+ * first, then setup, on hold, wrapped, archived — so the list reads the same way
+ * in both places.
+ *
+ * Archived shows are included deliberately: looking up how a finished one was
+ * set up is a reason to switch, and it is the reason David gave.
+ */
+function switchable_projects(PDO $pdo): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = $pdo->query(
+        "SELECT id, name, code, status FROM projects
+          ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','archived'), created_at DESC"
+    )->fetchAll();
+    return $cache;
+}
+
+/**
+ * THE SAME SCREEN ON ANOTHER SHOW (David, 2026-10-03: "I'm navigating through
+ * project expenses and I want to see how they're setup in another project.
+ * Currently I have to go to home, click the project I want and then navigate
+ * till I get there").
+ *
+ * ⚠ BUILT FROM THE TAB, NOT FROM THE CURRENT ADDRESS. Rewriting the URL in the
+ * address bar would be wrong on four screens that draw this bar while holding
+ * somebody ELSE's id: step.php, ticket.php, person.php and item.php are a step,
+ * a ticket, a person and an item — none of which exist on the project being
+ * switched to. Asking the nav which TAB is lit and looking its href up for the
+ * other project gives the right answer everywhere: the shots list goes to the
+ * shots list, and one ticket goes to the other show's board rather than to a
+ * ticket id that belongs to somebody else.
+ *
+ * It also inherits the viewer rules for free — project_nav_items() already drops
+ * the tabs an artist may not see, so a tab they do not have cannot be reached by
+ * switching project while standing on it.
+ */
+function project_switch_href(int $toProjectId, string $section, string $tab): string {
+    $items = $section === 'finance' && function_exists('finance_nav_items')
+        ? finance_nav_items($toProjectId)
+        : project_nav_items($toProjectId);
+    foreach ($items as $it) {
+        if ($it['key'] === $tab) return $it['href'];
+    }
+    // No such tab on the other side — an unlisted screen, or one this account is
+    // not offered. The project's front door is the honest fallback.
+    return $section === 'finance'
+        ? 'finance_project.php?project=' . $toProjectId . '&tab=overview'
+        : 'project.php?id=' . $toProjectId;
+}
+
+function project_section_nav(array $project, string $section, string $tab = ''): void {
     $projectId = (int)$project['id'];
+    global $pdo;
     $sections = [
         ['key' => 'project', 'label' => 'Project management',
          'href' => 'project.php?id=' . $projectId],
@@ -128,8 +180,25 @@ function project_section_nav(array $project, string $section): void {
     <div class="proj-bar-title">
       <a href="index.php" class="muted">Projects</a>
       <span class="muted">/</span>
-      <strong><?= e($project['name']) ?></strong>
-      <span class="muted">(<?= e($project['code']) ?>)</span>
+      <?php // THE NAME IS THE CONTROL. A separate "switch project" button beside
+            // it would be a second thing meaning the same thing; the show you
+            // are on is already written here, so it is the show you change.
+            // Drawn as plain text when there is only one project, because a
+            // dropdown with one entry is furniture. ?>
+      <?php $others = ($pdo instanceof PDO) ? switchable_projects($pdo) : []; ?>
+      <?php if (count($others) > 1): ?>
+        <select class="proj-switch" aria-label="Switch to another project"
+                onchange="if (this.value) location.href = this.value;">
+          <?php foreach ($others as $o): $oid = (int)$o['id']; ?>
+            <option value="<?= $oid === $projectId ? '' : e(project_switch_href($oid, $section, $tab)) ?>"
+                    <?= $oid === $projectId ? 'selected' : '' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)<?php
+              if ($o['status'] !== 'active') echo ' · ' . e(str_replace('_', ' ', $o['status'])); ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php else: ?>
+        <strong><?= e($project['name']) ?></strong>
+        <span class="muted">(<?= e($project['code']) ?>)</span>
+      <?php endif; ?>
       <?php if (isset($project['status'])): ?>
         <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
       <?php endif; ?>
@@ -161,7 +230,7 @@ function project_nav(array $project, string $current = ''): void {
     $items = project_nav_items($projectId);
     ?>
     <div class="proj-bar">
-      <?php project_section_nav($project, 'project'); ?>
+      <?php project_section_nav($project, 'project', $current); ?>
       <nav class="proj-tabs">
         <?php $lastGroup = null; foreach ($items as $it): ?>
           <?php if ($lastGroup !== null && $it['group'] !== $lastGroup): ?>

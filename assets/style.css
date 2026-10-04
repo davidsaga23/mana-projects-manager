@@ -966,6 +966,25 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .proj-bar-title { font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .proj-bar-title a { color: inherit; }
 .proj-bar-title a:hover { color: var(--primary); }
+/* THE PROJECT SWITCHER — the name you are already reading, made clickable
+   (David, 2026-10-03). Styled as the heading it replaced rather than as a form
+   field: no box until you point at it, because a permanent bordered dropdown in
+   the title line reads as something to fill in rather than as where you are.
+   width: auto against the global `select { width: 100% }`, which would otherwise
+   stretch it across the bar. */
+.proj-switch {
+  width: auto; margin: 0; padding: 1px 4px; font-size: inherit; font-weight: 700;
+  color: var(--text); background: none; border: 1px solid transparent;
+  border-radius: 4px; cursor: pointer; max-width: 42ch;
+}
+.proj-switch:hover, .proj-switch:focus-visible {
+  border-color: var(--border-strong); background: var(--surface-2);
+}
+/* On the money side the bar is tinted administrators-only red; the switcher
+   borrows that rather than the production blue, so a glance never mistakes
+   which side of a project it would land on. */
+.proj-bar-finance .proj-switch:hover,
+.proj-bar-finance .proj-switch:focus-visible { border-color: var(--danger-border); }
 .proj-tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .proj-tab {
   display: inline-block; padding: 7px 12px; font-size: 13.5px;

@@ -2124,6 +2124,46 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-03 — Switching project keeps you on the same screen
+**Asked by David:** *"I'd like to add a button at the top of the page so I can switch between
+projects. Let's say I'm navigating through project expenses and I want to see how they're setup in
+another project. Currently I have to go to home, click the project I want and then navigate till I
+get there."*
+
+**The name you are already reading IS the control.** A separate "switch project" button beside it
+would be a second thing meaning the same thing. The project name in the breadcrumb line is now a
+picker, drawn as the heading it replaced rather than as a form field — no box until you point at it,
+because a permanent bordered dropdown in a title line reads as something to fill in rather than as
+where you are. With one project it stays plain text; a dropdown with one entry is furniture.
+
+It lives in `project_section_nav()`, which **both** navs already call, so the production side and the
+money side got it from one change — and the money side was the half that was asked for.
+
+### ⚠ Built from the TAB, not from the current address
+The obvious implementation — take the URL in the address bar and swap the project number — is wrong
+on four screens. `step.php`, `ticket.php`, `person.php` and `item.php` all draw this bar while their
+`id` holds a step, a ticket, a person or an item. None of those exist on the project being switched
+to, so the swap would land on somebody else's record or on nothing.
+
+`project_switch_href()` asks which **tab** is lit and looks that tab's href up for the other project.
+Every screen then does the right thing without a list of special cases: the shots list goes to the
+shots list, the expense projection to the expense projection, and one ticket goes to the other show's
+**board** rather than to a ticket id belonging to a different project. Those four screens already
+pass a tab key to `project_nav()` — `step.php` says 'dashboard', `ticket.php` says 'tasks' — so the
+answer was already in the code and only needed asking for.
+
+It also inherits the artist rules for nothing: `project_nav_items()` already drops the tabs an artist
+may not see, so a tab they do not have cannot be reached by switching project while standing on it —
+it falls back to that project's front door.
+
+**Archived shows are listed deliberately.** Looking up how a finished one was set up is a reason to
+switch, and it is close to the reason David gave.
+
+**Not run in PHP** — there is none on this machine. `project_switch_href()` was replayed in Python
+against the real tab tables for both sections, the four id-holding screens, and an artist whose tab
+is hidden on the far side; the bar was then drawn in a browser with the real stylesheet, on the
+production and finance variants and the single-project case.
+
 ## 2026-10-02 — An artist can be deleted, person-wide, from the book
 **Asked by David:** *"we also need to be able to delete a record."* Raised the day before as a gap:
 the only delete that existed was per-candidate on a project's Staffing screen, which could not reach

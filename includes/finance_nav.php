@@ -67,7 +67,7 @@ function finance_nav(array $project, string $current = ''): void {
             // their own copy, and an "Open the project →" link tucked at the
             // end of a sentence is a poorer way to say "you are on the money
             // side of this project" than a lit button that says so. ?>
-      <?php project_section_nav($project, 'finance'); ?>
+      <?php project_section_nav($project, 'finance', $current); ?>
       <nav class="proj-tabs">
         <?php foreach (finance_nav_items($projectId, (string)($project['type'] ?? '')) as $it): ?>
           <a href="<?= e($it['href']) ?>"

@@ -110,6 +110,11 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 - **`check_php_blocks.py`'s string pass did not know that `?>` ends a `//` comment** (fixed
   2026-09-28) — the first pass did. It read HTML as code and an apostrophe as an open string. If a
   check fires eighty lines from anything you touched, suspect the checker's mode tracking.
+- **The project name in the bar is a switcher** (2026-10-03): it moves you to the SAME screen on
+  another show — expense projection to expense projection — rather than to its front door.
+  ⚠ `project_switch_href()` builds the target from the lit TAB, never from the current URL, because
+  `step.php`, `ticket.php`, `person.php` and `item.php` draw this bar while holding somebody else's
+  id. Both navs call `project_section_nav()`, so production and finance share it.
 - **A viewer gets five project tabs** (2026-09-28): Overview, Brief, Shots, Production tracking,
   Tasks. The other ten are listed in `PROJECT_TABS_HIDDEN_FROM_VIEWERS` in `includes/project_nav.php`,
   applied by `project_nav_items()` and keyed on `can_edit()`, so preview-as-viewer shows the real
