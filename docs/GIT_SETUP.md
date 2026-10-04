@@ -64,9 +64,9 @@ New repository secret**. Add four:
 | Name | Value |
 |---|---|
 | `FTP_SERVER` | `ftp.davidsaga.com` |
-| `FTP_USERNAME` | your FTP username |
+| `FTP_USERNAME` | the **full** `name@davidsaga.com` form, not the short name |
 | `FTP_PASSWORD` | your FTP password |
-| `FTP_TARGET_DIR` | ⚠ **depends on the FTP account — see below** |
+| `FTP_TARGET_DIR` | `/` for the deploy account — **read the note, it is not obvious** |
 
 Secrets are write-only — GitHub never displays them again, and they don't appear in logs. That
 cuts both ways: once set, nobody can read the target directory back out of GitHub to check it.
@@ -94,6 +94,12 @@ cuts both ways: once set, nobody can read the target directory back out of GitHu
 >
 > **Match the username in `FTP_USERNAME` to a row on that page and read ITS Directory.** Not any
 > row — there are several, and they land in different places.
+>
+> **For this install (checked 2026-10-03):** the deploy account is scoped to
+> `/home2/davideei/public_html/mana`, so it is already inside the app's folder on login and
+> `FTP_TARGET_DIR` is **`/`**. The username on that row is the full `name@davidsaga.com` form;
+> the short name is rejected with `530 Login authentication failed`, which is how this was found.
+> The password is not written down anywhere — cPanel can reset it on that same row.
 >
 > **This is what the stray folder above is.** `/home2/davideei/mana/public_html/mana` has exactly
 > the shape of an account homed in one place plus a target repeating part of it, and getting it
