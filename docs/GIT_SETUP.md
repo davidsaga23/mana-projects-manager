@@ -66,9 +66,26 @@ New repository secret**. Add four:
 | `FTP_SERVER` | `ftp.davidsaga.com` |
 | `FTP_USERNAME` | your FTP username |
 | `FTP_PASSWORD` | your FTP password |
-| `FTP_TARGET_DIR` | `/public_html/tools/ManaProjects/PLATFORM/` |
+| `FTP_TARGET_DIR` | ⚠ **check it, do not copy it — see below** |
 
-Secrets are write-only — GitHub never displays them again, and they don't appear in logs.
+Secrets are write-only — GitHub never displays them again, and they don't appear in logs. That
+cuts both ways: once set, nobody can read the target directory back out of GitHub to check it.
+
+> **⚠ THIS TABLE USED TO CARRY `/public_html/tools/ManaProjects/PLATFORM/`, and it was wrong.**
+> It was written on day one, before anything had been deployed, and never corrected — while the
+> paragraph above it, added later from the real server, says the live site is
+> `/home2/davideei/public_html/mana`. Two values, one of them a guess from before the fact, and
+> nothing on screen to say which. Found on 2026-10-03, when the repo moved accounts and the
+> secrets had to be typed in again from this page.
+>
+> **Read it off the running application instead of trusting any document, including this one.**
+> Open `smtp_test.php` while signed in as an administrator: it prints the absolute path of the
+> `config.php` the live app actually loaded. The directory holding that file, written relative to
+> the FTP account's home and ending in a slash, is `FTP_TARGET_DIR`.
+>
+> Getting it wrong does not delete anything — the deploy would simply build a second copy of the
+> app somewhere nobody serves, which is how the abandoned folder described above came to exist in
+> the first place.
 
 ### 5. Do a dry run first
 Before the first real deploy, open `.github/workflows/deploy.yml`, set `dry-run: false` to
