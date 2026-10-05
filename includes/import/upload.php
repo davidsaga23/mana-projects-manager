@@ -14,15 +14,26 @@
            including subitems, the subitems are the pipeline steps.</small>
   </label>
 
-  <fieldset class="unit-choice">
-    <legend>The "Time spent" column is in</legend>
-    <label class="inline"><input type="radio" name="time_unit" value="minutes" checked> minutes</label>
-    <label class="inline"><input type="radio" name="time_unit" value="hours"> hours</label>
-    <small><strong>Check this every time.</strong> Exports seen so far are in minutes, a value
-           of 960 meaning 16 hours. If time logging is ever switched to hours, the same 16 hours
-           arrives as <code>16</code>, and importing that as minutes would record 16 minutes:
-           a 60× error landing exactly in the figures used to check invoices.</small>
-  </fieldset>
+  <?php // THE CHOICE IS GONE, the assumption is not (David, 2026-10-05: "let's
+        // delete the time spent part of the import, every single project in
+        // plaky will be in hours from now on").
+        //
+        // It used to be a pair of radio buttons answered on every import. That
+        // was right while Plaky boards disagreed with each other; now they all
+        // log in hours, and a question with one correct answer is a question
+        // somebody eventually gets wrong.
+        //
+        // ⚠ THE RISK DID NOT GO AWAY, IT WAS DECIDED. Reading hours as minutes
+        // is a 60× error landing straight in the figures used to check invoices.
+        // So the assumption is still SAID, here and on the next screen, rather
+        // than buried in plaky_run(): if a board ever logs in minutes again,
+        // 960 would import as 960 hours and the line below is the only thing on
+        // screen that would have warned anybody. ?>
+  <p class="muted small">
+    <strong>Time spent is read as hours.</strong> Every Plaky board logs in hours, so
+    <code>16</code> imports as 16 hours. A board still logging in minutes would import
+    <code>960</code> as 960 hours — check the board before importing it if you are not sure.
+  </p>
 
   <div class="actions">
     <button type="submit">Read the file →</button>

@@ -15,7 +15,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   <strong><?= e($state['name']) ?></strong> ·
   <?= (int)$analysis['parent_count'] ?> items ·
   <?= (int)$analysis['subitem_count'] ?> step records ·
-  time read as <strong><?= e($state['time_unit']) ?></strong>
+  time read as <strong><?= e($state['time_unit'] ?? 'hours') ?></strong>
 </p>
 
 <?php // THE COLUMNS, said before the import rather than discovered after it.

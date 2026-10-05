@@ -229,7 +229,15 @@ function plaky_best_step(array $steps, string $name, string $group): ?array {
     return null;
 }
 
-/** Convert the file's time value into whole minutes, honouring the declared unit. */
+/**
+ * Convert the file's time value into whole minutes, honouring the declared unit.
+ *
+ * The platform stores minutes (DECISIONS, 2026-08-12) whatever the file says, so
+ * this is the one place the two meet. The `minutes` branch is no longer reachable
+ * from the screens — every board logs in hours since 2026-10-05 — but it stays,
+ * because the cost of keeping it is a single comparison and the cost of needing
+ * it back is rediscovering why the figures are sixty times too small.
+ */
 function plaky_time_to_minutes(string $raw, string $unit): ?int {
     $raw = trim($raw);
     if ($raw === '' || !is_numeric($raw)) return null;
@@ -404,7 +412,12 @@ function plaky_analyse(PDO $pdo, int $projectId, array $rows): array {
  */
 function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $dryRun): array {
     $split = plaky_split_rows($rows);
-    $timeUnit = ($mapping['time_unit'] ?? 'minutes') === 'hours' ? 'hours' : 'minutes';
+    // ⚠ DEFAULTS TO HOURS, and that default changed on 2026-10-05 when the
+    // upload screen stopped asking. It matters which way round a missing value
+    // falls: every board now logs in hours, so assuming minutes would divide
+    // every imported figure by sixty rather than simply being unhelpful. The
+    // mapping still carries the unit explicitly; this is only the fallback.
+    $timeUnit = ($mapping['time_unit'] ?? 'hours') === 'minutes' ? 'minutes' : 'hours';
     $groupKinds = $mapping['groups'] ?? [];
     $stepMap = $mapping['steps'] ?? [];        // external title => step_id (0/absent = skip)
     $statusMap = $mapping['statuses'] ?? [];   // external status => status_id (0/absent = unmapped)

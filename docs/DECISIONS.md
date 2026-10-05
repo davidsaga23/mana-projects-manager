@@ -2124,6 +2124,39 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-05 — The import stops asking what unit time is in
+**Asked by David:** *"let's delete the time spent part of the import, every single project in plaky
+will be in hours from now on."*
+
+The upload screen used to open with a pair of radio buttons — minutes or hours — to be answered on
+every import, with a warning to **check this every time**. That was right while Plaky boards
+disagreed with each other. Now they all log in hours, and **a question with one correct answer is a
+question somebody eventually gets wrong**: it defaulted to minutes, so the single most likely slip
+was leaving it alone.
+
+**⚠ THE RISK DID NOT GO AWAY, IT WAS DECIDED.** Reading hours as minutes is a 60× error landing
+straight in the figures used to check invoices — the reason the question existed at all. So the
+assumption is still **stated**, on the upload screen and again on the mapping screen, rather than
+buried in `plaky_run()`. If a board ever logs in minutes again, `960` would import as 960 hours, and
+that sentence is the only thing on screen that would have warned anybody.
+
+**The default flipped with it.** `plaky_run()` fell back to `'minutes'` when the mapping carried no
+unit; it now falls back to `'hours'`. Which way round a missing value falls matters here: the old
+fallback would quietly divide every imported figure by sixty rather than merely being unhelpful.
+
+**`plaky_time_to_minutes()` keeps its `minutes` branch** even though no screen can now reach it. The
+platform stores minutes whatever the file says (DECISIONS, 2026-08-12), so this function is where the
+two meet; the cost of keeping the branch is one comparison, and the cost of needing it back is
+rediscovering why every figure is sixty times too small.
+
+An import already part-way through when this deploys keeps the answer it was given — the session
+value still wins, and only a session with no answer at all gets today's rule.
+
+**Not run in PHP** — there is none on this machine. The unit resolution was replayed in Python for a
+mapping with the key set either way, absent, and holding nonsense; and the conversion over 16, 1.5,
+0.25, 8, 960, blank, zero and a non-number. The 60× trap was checked explicitly in both directions
+on the same input: `16` is now 960 minutes, where the old default made it 16.
+
 ## 2026-10-03 — Switching project keeps you on the same screen
 **Asked by David:** *"I'd like to add a button at the top of the page so I can switch between
 projects. Let's say I'm navigating through project expenses and I want to see how they're setup in
