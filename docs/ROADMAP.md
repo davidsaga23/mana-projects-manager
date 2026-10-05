@@ -532,6 +532,113 @@ run of work removed.
 
 ---
 
+## Asked for on 2026-10-05
+
+Four requests, in the order David gave them. Two of them are mostly **reporting on data the
+platform already captures**; the other two need a decision before they can be built at all.
+
+### Action items out of a call transcript, into the backlog
+
+> *"add a transcript auto task generation from the tasks and tickets tab. It should read an md file
+> and extract action items or to-dos from a call transcript and add them all to the backlog so we
+> can classify them and assign them"*
+
+**Where:** `tasks.php`, as a second way in beside the card form — the board already owns creating
+tickets, their statuses are the project's own, and `includes/uploads.php` already takes a file.
+
+**⚠ THE EXTRACTION IS THE WHOLE QUESTION, and it is not a small one.** "Read an md file and extract
+action items" is either naive parsing or a language model, and they are very different builds:
+
+1. **Parse a structured list.** The file arrives already shaped — markdown checkboxes or bullets,
+   one line per item, optionally `@name` and a date. Small, predictable, no credentials, nothing
+   leaves the studio. The transcript is turned into that list somewhere else, which today means
+   Claude in a separate window.
+2. **Send the transcript to a model from inside the platform.** Reads a raw transcript, which is
+   what was asked for. It needs an API key stored on the server, an outbound call during a page
+   load, a cost per use, and a decision about **client call transcripts leaving the building** —
+   which is a studio policy question, not an engineering one. Nothing in this platform calls
+   anything external today.
+
+**Whichever is chosen, it imports like everything else imports.** Upload → see exactly what would be
+created → confirm. The Plaky importer's whole shape exists for this reason and the lesson behind it
+is dear-bought (DECISIONS, 2026-10-03: a screen that says "no loose ends" while dropping work). A
+transcript reader that writes fifteen tickets straight onto the board would be the same mistake with
+a different input.
+
+**Open:** which of the two, and the policy answer if it is the second.
+
+### How many versions a task took
+
+> *"Once we migrate plaky to anima (or a separate platform) we need to count the number of versions
+> a task took"*
+
+**⚠ THE CAPTURE HALF IS ALREADY BUILT.** `progress_log` (migration 021) classifies every status move,
+and one of its classifications is **`retake`** — defined there as "went BACKWARDS: was delivered or
+approved, now is neither", and explicitly **a structural test rather than a name match, so it catches
+a retake whatever the show happens to call it**. A "version" in David's sense is one of those.
+
+So this is not blocked on schema and never was. It is blocked on exactly what he says: while Plaky
+owns the statuses, the platform only sees the end state at import time, and a shot that went to
+review and back three times in between arrives looking like one that went once. **The log can only
+count what passes through this platform.**
+
+**What it unlocks is bigger than a number.** The retake allowance is a percentage somebody types in
+(DECISIONS, 2026-08-12 — retakes inflate days-per-item and never work units). Counting real versions
+turns that guess into a measurement, per step and per show, which is the same argument the
+cross-project benchmarking section above makes for duration.
+
+**Where it would live:** the step page already lists per-item history; a versions column belongs
+beside it, and a per-step average belongs with the benchmarking work.
+
+### How many people were passed over for a position
+
+> *"Add a way to count how many people passed or weren't hire for a particular position"*
+
+**⚠ THIS DATA IS ALREADY THERE, in both shapes.** `hires.stage` carries `declined` (they said no) and
+`passed` (we said no) as **separate values on purpose** — DECISIONS, 2026-08-12: "they are identical
+in a count and opposite in meaning, and which one a pipeline is full of is the difference between
+paying too little and looking in the wrong place". And `hire_stage_log` (migration 024) records every
+move between stages with its date, so the *history* is there as well as the current state.
+
+Nothing needs capturing. This is a **report**, and a small one: group `hires` by lane and by stage.
+
+**Where:** the Staffing screen already draws each position with its candidates, so a line per
+position — *"5 approached · 2 declined · 1 passed · 1 hired"* — reads naturally there. A cross-show
+version belongs beside Historic fees and Historic quotas, which already answer "what does this
+position usually cost" and would then also answer "how hard is it usually to fill".
+
+**One thing to decide:** per position on one show, per position across every show, or both. The
+second is the one that tells you Compositors take four conversations and Layout artists take one.
+
+### Kick-off dates, and a warning when a delay runs past 15%
+
+> *"Register the kick off start and due date dates. So if a task gets delayed there's a way to get a
+> notification when the delay exceeds 15% of either the start or due dates."*
+
+**The baseline already exists.** `step_estimate_baseline` (DECISIONS, 2026-08-13: "the starting
+estimate is frozen, and never overwritten") is precisely a record of what was agreed at kick-off, and
+`schedule` holds what the plan says today. The comparison has both sides.
+
+**⚠ "15%" NEEDS PINNING DOWN BEFORE ANY OF IT CAN BE BUILT**, because the obvious readings give very
+different answers on the same task:
+
+- **15% of the task's own duration** — a four-day step warns at 0.6 of a day. Short steps shout,
+  long ones stay quiet through a week of slippage.
+- **15% of the time from kick-off to the date in question** — a step due three months out tolerates
+  two weeks; one due on Friday tolerates hours. Probably closer to what is meant.
+- **15% of the whole show's length** — one threshold for everything, which is the simplest to explain
+  and the least sensitive.
+
+**And delivery is its own question.** `notify_assignee()` sends mail inline, and DECISIONS already
+records that this **blocks the save** until SMTP answers — so a per-task warning cannot hang off the
+moment a date moves without making every date change slower. The honest options are an on-screen
+flag (free, and the dashboard already shows overdue steps), or a daily digest, which needs something
+to run once a day — and snapshots are deliberately taken on page load rather than by cron
+(DECISIONS, 2026-08-13), so a digest would be the first scheduled job this platform has.
+
+**Open:** which percentage of what, and whether a warning on screen is enough before anything is
+emailed.
+
 ## Waiting on a decision, or offered and not built (2026-09-18)
 
 Everything here came up in the 2 to 18 September run of work. None of it is urgent, and each
