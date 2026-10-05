@@ -1330,15 +1330,15 @@ button:hover { background: var(--primary-hover); }
 .mention-list { max-height: 40vh; overflow-y: auto; }
 .mention-row { padding: 5px 8px; border-radius: 4px; cursor: pointer; }
 .mention-row:hover { background: var(--surface-2); }
+/* The row Enter would take. Stronger than :hover, because the keyboard and
+   the mouse can disagree about which row is live and the keyboard is the
+   one being acted on. */
+.mention-row.is-active { background: var(--primary-tint); color: var(--primary); }
 /* An unread mention on My tasks. A left rule rather than a filled row: the
    table already colours an overdue row, and two filled states competing on
    one list is how both stop meaning anything. */
 .mention-new > td:first-child { box-shadow: inset 3px 0 0 var(--warn-strong); }
 .mention-new td { background: var(--warn-tint); }
-/* The tick that makes a comment wait for the mail server. Spelled out
-   rather than abbreviated, because the cost is the point. */
-.notify-tick { display: flex; align-items: baseline; gap: 7px; margin: 2px 0 10px; font-weight: 400; }
-.notify-tick input { width: auto; margin: 0; flex: none; }
 
 .status-chip {
   display: inline-block; padding: 1px 8px; border-radius: 10px;
@@ -2392,7 +2392,6 @@ tr.col-hidden { display: none; }
    line and a picker on the other. Both routes are gone: hiring makes duplicates
    and was removed, and "put somebody already on the crew in" had no use in a
    studio with three full-time people. Nothing carries the class now. */
-
 
 /* Removing the SLOT is a rarer, larger act than removing its assignee, and the
    two are one row apart — so it stays quiet text while those are buttons. */

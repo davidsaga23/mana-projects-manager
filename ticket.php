@@ -83,20 +83,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
     ticket_save_mentions($pdo, $commentId, $mentions);
 
     $notes = [$parentId ? 'Reply posted.' : 'Comment posted.'];
-    if ($mentions && !empty($_POST['email_mentions'])) {
-        // Asked for, so it is worth the wait. notify_mentioned() says who it
-        // reached AND who it could not, because a mention that silently goes
-        // nowhere is worse than none: the author has already moved on.
+    if ($mentions) {
+        // ⚠ ALWAYS, since David asked for it on 2026-10-06: "make the email the
+        // people not an option but something already built in by default". It
+        // was a tick for one day, unticked by default, because this mailer opens
+        // SMTP INLINE and the page waits for the mail server before it returns.
+        // That cost has not gone away — it has been accepted. Naming somebody now
+        // means telling them, which is what everyone expects an @ to do, and the
+        // pause is the price.
+        //
+        // The fix for the pause is to move the mailer off the save path, which
+        // would also speed up creating a ticket and changing a status. It is on
+        // the roadmap and this is now its third caller.
+        //
+        // notify_mentioned() says who it reached AND who it could not: a mention
+        // that silently goes nowhere is worse than none, because the author has
+        // already moved on believing it landed.
         [, $said] = notify_mentioned($pdo, $id, array_keys($mentions), $body, current_user_display());
         if ($said !== '') $notes[] = $said;
-    } elseif ($mentions) {
-        // ⚠ SAID OUT LOUD, because nothing emails them yet. Somebody who types
-        // @Ana and gets no warning will reasonably assume Ana has been told.
-        $notes[] = count($mentions) === 1
-            ? 'Named ' . reset($mentions) . ' — they are not notified by email, '
-              . 'so tell them if it is urgent.'
-            : 'Named ' . count($mentions) . ' people — they are not notified by email, '
-              . 'so tell them if it is urgent.';
     }
     if ($hasFiles) {
         $res = save_ticket_attachments($pdo, normalize_files_array($_FILES['attachments']), $id, $commentId, $userId);
@@ -475,16 +479,10 @@ require __DIR__ . '/includes/header.php';
       <textarea name="body" rows="3" id="commentBody"
                 placeholder="Reply, add what you found, or attach a reference… type @ to name somebody"></textarea>
     </label>
-    <?php // UNTICKED BY DEFAULT, deliberately. The mailer opens SMTP inline, so
-          // ticking this makes the page wait on the mail server before it comes
-          // back — which is right for "this needs looking at today" and wrong for
-          // a note somebody will read when they next open their list. Everyone
-          // named sees it on My tasks either way. ?>
-    <label class="inline notify-tick">
-      <input type="checkbox" name="email_mentions" value="1">
-      Email the people I named <span class="muted small">— they see it on My tasks regardless;
-      the page waits for the mail server when this is on</span>
-    </label>
+    <?php // No tick and no explanation: naming somebody emails them, full stop
+          // (David, 2026-10-06). The placeholder on the box above already says
+          // what @ does, and a line of small print explaining a thing that
+          // always happens is just something to read every time. ?>
     <label>Attach files
       <input type="file" name="attachments[]" multiple data-filepicker
              accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf">

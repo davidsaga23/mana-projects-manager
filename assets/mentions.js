@@ -50,6 +50,7 @@
 
   var panel = null, list = null;
   var at = -1;            // where the "@" that opened this sits, or -1
+  var active = 0;         // the row Enter would take
 
   function build() {
     panel = document.createElement('div');
@@ -119,7 +120,35 @@
       list.appendChild(row);
     });
     panel.hidden = false;
+    // The first match is live from the moment the list appears, so Enter works
+    // without pressing an arrow first — which is the whole point of typing a
+    // name rather than reaching for the mouse.
+    mark(0);
     place();
+  }
+
+  /** Which row Enter would take. Kept in view when the arrows run past the edge. */
+  function mark(i) {
+    var rows = list.querySelectorAll('.mention-row');
+    if (!rows.length) return;
+    active = Math.max(0, Math.min(rows.length - 1, i));
+    Array.prototype.forEach.call(rows, function (r, n) {
+      r.classList.toggle('is-active', n === active);
+    });
+    rows[active].scrollIntoView({ block: 'nearest' });
+  }
+
+  function move(delta) {
+    var rows = list.querySelectorAll('.mention-row');
+    if (!rows.length) return;
+    // Wraps, because a list of five with the cursor at the bottom should not
+    // need four presses to get back to the top.
+    mark((active + delta + rows.length) % rows.length);
+  }
+
+  function take() {
+    var row = list.querySelectorAll('.mention-row')[active];
+    if (row) choose(row.getAttribute('data-name') || '');
   }
 
   /**
@@ -149,8 +178,19 @@
     show(q.text);
   });
 
+  // ⚠ ONLY WHILE THE LIST IS OPEN. Enter in a textarea makes a new line, and it
+  // must go on doing that the rest of the time — a comment box that cannot take
+  // a paragraph break would be a worse trade than reaching for the mouse. So
+  // every key here is handled only when the panel is showing, and passed
+  // straight through otherwise.
   box.addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape' && panel && !panel.hidden) { ev.preventDefault(); close(); }
+    if (!panel || panel.hidden) return;
+    if (ev.key === 'Escape')     { ev.preventDefault(); close(); return; }
+    if (ev.key === 'ArrowDown')  { ev.preventDefault(); move(1);  return; }
+    if (ev.key === 'ArrowUp')    { ev.preventDefault(); move(-1); return; }
+    // Tab as well as Enter: it is what a picker like this does elsewhere, and it
+    // would otherwise jump focus out of the box mid-name.
+    if (ev.key === 'Enter' || ev.key === 'Tab') { ev.preventDefault(); take(); }
   });
   box.addEventListener('blur', function () { setTimeout(close, 120); });
   window.addEventListener('resize', function () { if (panel && !panel.hidden) place(); });
