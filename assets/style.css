@@ -1294,6 +1294,43 @@ button:hover { background: var(--primary-hover); }
    the teal that no pipeline step uses, so the two are never confused. */
 .ctx-chip.ctx-platform { background: var(--chip-teal-bg); color: var(--chip-teal-ink); }
 
+/* --- naming somebody, and replying (2026-10-06) --------------------------- */
+/* A mention reads as a reference to a person, not as a link — there is nowhere
+   for it to go yet, and a blue underline promising a page that does not exist is
+   worse than no colour at all. */
+.mention {
+  background: var(--primary-tint); color: var(--primary);
+  border-radius: 3px; padding: 0 3px; font-weight: 600; white-space: nowrap;
+}
+/* A reply is indented once and only once. The rule on the left does the work the
+   indent alone cannot at this width: it says where the thread is, even when the
+   reply is long enough that its first line has scrolled away. */
+.comment-reply {
+  margin-left: 26px; border-left: 2px solid var(--border-strong);
+  padding-left: 12px;
+}
+.comment-reply-btn { font-size: 12px; margin-left: auto; }
+.comment-head { display: flex; align-items: baseline; gap: 8px; }
+.reply-banner {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--primary); border-radius: 4px;
+  padding: 6px 10px; margin-bottom: 8px; font-size: 13px;
+}
+.reply-banner[hidden] { display: none; }
+.reply-banner .linkish { margin-left: 8px; font-size: 12px; }
+/* The @ picker. Fixed and in <body> for the reason the shot picker is: it must
+   not be clipped by the panel the comment box sits in. */
+.mention-panel {
+  position: fixed; z-index: 60; width: 260px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.38);
+  padding: 4px; font-size: 13px;
+}
+.mention-panel[hidden] { display: none; }
+.mention-list { max-height: 40vh; overflow-y: auto; }
+.mention-row { padding: 5px 8px; border-radius: 4px; cursor: pointer; }
+.mention-row:hover { background: var(--surface-2); }
+
 .status-chip {
   display: inline-block; padding: 1px 8px; border-radius: 10px;
   font-size: 11.5px; font-weight: 600;

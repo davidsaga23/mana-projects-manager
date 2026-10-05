@@ -227,6 +227,127 @@ function ticket_select_sql(): string {
            LEFT JOIN pipeline_steps ps ON ps.id = t.step_id';
 }
 
+/* ---------------------------------------------------------------------------
+ * REPLIES AND MENTIONS (David, 2026-10-06), migration 039.
+ * ------------------------------------------------------------------------- */
+
+/** Has migration 039 run? Probed per feature, so one can arrive without the other. */
+function ticket_threads_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'ticket_comments', 'parent_id');
+    return $ok;
+}
+
+function ticket_mentions_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'ticket_mentions', 'crew_id');
+    return $ok;
+}
+
+/**
+ * Find the people named in a comment.
+ *
+ * ⚠ MATCHED AGAINST THE KNOWN LIST, LONGEST NAME FIRST, not by a pattern. A
+ * name is not a word: "Ana Ruiz" has a space in it, and a rule like `@\w+` would
+ * read "@Ana Ruiz" as a mention of somebody called Ana and then leave "Ruiz"
+ * lying in the text. Sorting the candidates longest-first also means "@Ana Ruiz"
+ * is never mistaken for "@Ana" when both exist.
+ *
+ * Case-insensitive, because nobody capitalises consistently at speed.
+ *
+ * @param array $people rows with id and name, from ticket_assignees()
+ * @return array crew_id => the name as it was actually written
+ */
+function ticket_parse_mentions(string $body, array $people): array {
+    if (strpos($body, '@') === false) return [];
+
+    $byLength = $people;
+    usort($byLength, function ($a, $b) {
+        return mb_strlen((string)$b['name']) <=> mb_strlen((string)$a['name']);
+    });
+
+    $found = [];
+    $haystack = $body;
+    foreach ($byLength as $person) {
+        $name = trim((string)$person['name']);
+        if ($name === '') continue;
+        $needle = '@' . $name;
+        $at = mb_stripos($haystack, $needle);
+        if ($at === false) continue;
+        $found[(int)$person['id']] = $name;
+        // Blanked out rather than removed, so later offsets still line up and a
+        // shorter name inside this one cannot match the same characters twice.
+        $haystack = mb_substr($haystack, 0, $at)
+                  . str_repeat(' ', mb_strlen($needle))
+                  . mb_substr($haystack, $at + mb_strlen($needle));
+    }
+    return $found;
+}
+
+/** Record who a comment named. Replaces whatever was there, so an edit is clean. */
+function ticket_save_mentions(PDO $pdo, int $commentId, array $mentions): void {
+    if (!ticket_mentions_available($pdo)) return;
+    $pdo->prepare('DELETE FROM ticket_mentions WHERE comment_id = ?')->execute([$commentId]);
+    if (!$mentions) return;
+    $ins = $pdo->prepare(
+        'INSERT INTO ticket_mentions (comment_id, crew_id, named_as) VALUES (?, ?, ?)'
+    );
+    foreach ($mentions as $crewId => $named) $ins->execute([$commentId, (int)$crewId, $named]);
+}
+
+/**
+ * A comment body, escaped, with the people in it marked.
+ *
+ * ⚠ ESCAPED FIRST, MARKED SECOND, and never the other way round. Building the
+ * highlight into the raw text and escaping afterwards would escape our own
+ * markup; escaping afterwards per fragment is how an XSS gets in. So the whole
+ * body is escaped once, and the replacement operates on already-safe text with
+ * an already-safe name.
+ */
+function ticket_render_body(string $body, array $mentions): string {
+    $html = nl2br(e($body));
+    foreach ($mentions as $named) {
+        $safe = e('@' . $named);
+        $html = str_ireplace($safe, '<span class="mention">' . $safe . '</span>', $html);
+    }
+    return $html;
+}
+
+/**
+ * Comments arranged as threads: every top-level comment with its replies under it.
+ *
+ * ⚠ ONE LEVEL. A reply whose parent is itself a reply is attached to the
+ * grandparent instead of starting a third tier — see migration 039 for why. A
+ * reply whose parent has been deleted is shown at the top level rather than
+ * dropped; losing somebody's words to a missing parent would be worse than an
+ * odd position.
+ */
+function ticket_thread(array $comments): array {
+    $byId = [];
+    foreach ($comments as $c) $byId[(int)$c['id']] = $c;
+
+    $out = [];
+    $replies = [];
+    foreach ($comments as $c) {
+        $parent = (int)($c['parent_id'] ?? 0);
+        // Climb to the top of the chain, so depth can never exceed one.
+        $seen = [];
+        while ($parent > 0 && isset($byId[$parent]) && !isset($seen[$parent])) {
+            $seen[$parent] = true;
+            $next = (int)($byId[$parent]['parent_id'] ?? 0);
+            if ($next <= 0 || !isset($byId[$next])) break;
+            $parent = $next;
+        }
+        if ($parent > 0 && isset($byId[$parent]) && $parent !== (int)$c['id']) {
+            $replies[$parent][] = $c;
+        } else {
+            $out[] = $c;
+        }
+    }
+    foreach ($out as $i => $c) $out[$i]['replies'] = $replies[(int)$c['id']] ?? [];
+    return $out;
+}
+
 /**
  * WHAT A TICKET IS ABOUT, when it is not about a part of the pipeline.
  *

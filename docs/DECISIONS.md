@@ -2124,6 +2124,62 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-06 — Naming somebody in a comment, and replying to one
+**Asked by David:** *"can we also have the option to tag people in the ticket/task detail view and
+create threads if needed?"* — with a screenshot of the comment box containing a lone `@`, which is
+the clearest possible statement of what the control should be.
+
+Migration **039**: `ticket_comments.parent_id`, and a `ticket_mentions` table.
+
+### Threads, one level deep
+A reply's parent is always a **top-level** comment; replying to a reply attaches to the same thread
+rather than starting a third tier. The column could express deeper nesting and the code deliberately
+does not: a ticket is a conversation about one problem, not a forum, and past the first indent the
+indent stops carrying meaning in a column this narrow. A reply whose parent has been deleted is shown
+at the top level rather than dropped — losing somebody's words to a missing parent is worse than an
+odd position.
+
+**One box, not one per comment.** Reply sets a hidden field on the single comment form and says who
+it is answering, so there is one draft, one set of attachment controls, and one place to look.
+
+### ⚠ The text is not the record
+"@Ana Ruiz" in a comment is a string; a person is a crew id. `ticket_mentions` stores the id **and
+the name as written** — the id is who it means, the name is what it said, and a later rename must not
+rewrite history. Parsing the body at read time would re-resolve names on every page load and quietly
+lose the link the day somebody is renamed, which is the alias problem this platform exists to avoid
+(DECISIONS, 2026-08-11: ids, not names). It also makes "what was I mentioned in?" a query rather than
+a scan of every comment on every show.
+
+**⚠ Matched against the known list, longest name first, never by a pattern.** A name is not a word:
+`@\w+` would read "@Ana Ruiz" as a mention of Ana and leave "Ruiz" lying in the text. Longest-first
+also stops "@Ana Ruiz" being taken for "@Ana" when both people exist. The picker offers exactly the
+list the parser matches against, so a name it suggests can always be resolved — a picker offering
+somebody the parser cannot match would be a quiet lie.
+
+**⚠ Escaped first, marked second.** The whole body is escaped once and the highlight is applied to
+already-safe text with an already-safe name. Building the markup into the raw body and escaping after
+would escape our own tags; escaping per fragment is how an XSS gets in.
+
+### ⚠ Nothing is emailed, and the screen says so
+A mention notifies nobody. That is not an oversight — `notify_assignee()` opens SMTP **inline**, so
+posting a comment would wait on the mail server (DECISIONS: up to the 20-second timeout) before the
+page came back. Making every comment slow to deliver a notification nobody asked for yet is the wrong
+trade.
+
+So the flash after posting **names who was tagged and says they were not told**. Somebody who types
+@Ana and sees nothing will reasonably assume Ana has been told; this is the one case where saying
+less would be a lie. The honest next step is mentions appearing on **My tasks**, which is the screen
+an artist already opens — no mail server, no delay, and `ticket_mentions` is already the query.
+
+**Not run in PHP** — there is none on this machine. The parser was replayed in Python over nine cases
+(a bare name, a name with a space, mixed case, two mentions in one comment, a long name and a short
+one that is a prefix of it, an email address, an unknown name) and the threading over a reply to a
+reply and an orphan. The picker and the thread were then driven in a browser with the real
+`mentions.js` and stylesheet: typing `@` opens it, a name with a space stays reachable after the
+space is typed, picking inserts the full name and closes, a second mention in the same comment works,
+`me@example.com` opens nothing, Reply targets the right comment and cancels cleanly, and neither a
+system line nor a reply offers a Reply button.
+
 ## 2026-10-05 — Sortable headings on My tasks, and a date bug in the shared sorter
 **Asked by David:** *"sort by the header in this section"* — the Tickets list on My tasks.
 

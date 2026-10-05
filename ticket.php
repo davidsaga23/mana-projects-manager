@@ -60,11 +60,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
         finish_post($selfUrl);
     }
 
-    $pdo->prepare('INSERT INTO ticket_comments (ticket_id, user_id, kind, body) VALUES (?, ?, \'user\', ?)')
-        ->execute([$id, $userId ?: null, $body !== '' ? $body : '(attachment)']);
+    // A reply carries the comment it answers. Verified to belong to THIS ticket:
+    // without that check a posted id is a way to hang a reply on another show's
+    // conversation.
+    $parentId = null;
+    if (ticket_threads_available($pdo) && !empty($_POST['parent_id'])) {
+        $q = $pdo->prepare('SELECT id FROM ticket_comments WHERE id = ? AND ticket_id = ?');
+        $q->execute([(int)$_POST['parent_id'], $id]);
+        $parentId = $q->fetchColumn() ?: null;
+    }
+
+    $cols = 'ticket_id, user_id, kind, body';
+    $marks = '?, ?, \'user\', ?';
+    $args = [$id, $userId ?: null, $body !== '' ? $body : '(attachment)'];
+    if (ticket_threads_available($pdo)) { $cols .= ', parent_id'; $marks .= ', ?'; $args[] = $parentId; }
+    $pdo->prepare('INSERT INTO ticket_comments (' . $cols . ') VALUES (' . $marks . ')')
+        ->execute($args);
     $commentId = (int)$pdo->lastInsertId();
 
-    $notes = ['Comment posted.'];
+    // Who was named, resolved against this project's people and stored as ids.
+    $mentions = ticket_parse_mentions($body, $assignees);
+    ticket_save_mentions($pdo, $commentId, $mentions);
+
+    $notes = [$parentId ? 'Reply posted.' : 'Comment posted.'];
+    if ($mentions) {
+        // ⚠ SAID OUT LOUD, because nothing emails them yet. Somebody who types
+        // @Ana and gets no warning will reasonably assume Ana has been told.
+        $notes[] = count($mentions) === 1
+            ? 'Named ' . reset($mentions) . ' — they are not notified by email, '
+              . 'so tell them if it is urgent.'
+            : 'Named ' . count($mentions) . ' people — they are not notified by email, '
+              . 'so tell them if it is urgent.';
+    }
     if ($hasFiles) {
         $res = save_ticket_attachments($pdo, normalize_files_array($_FILES['attachments']), $id, $commentId, $userId);
         if ($res['saved'])  $notes[] = $res['saved'] . ' file(s) attached.';
@@ -208,6 +235,19 @@ $commentsQ = $pdo->prepare(
 );
 $commentsQ->execute([$id]);
 $comments = $commentsQ->fetchAll();
+
+// Who each comment named, for the highlight. One query for the page rather than
+// one per comment — a long ticket is forty comments.
+$mentionsByComment = [];
+if (ticket_mentions_available($pdo) && $comments) {
+    $ids = implode(',', array_map(function ($c) { return (int)$c['id']; }, $comments));
+    foreach ($pdo->query(
+        'SELECT comment_id, named_as FROM ticket_mentions WHERE comment_id IN (' . $ids . ')'
+    ) as $m) {
+        $mentionsByComment[(int)$m['comment_id']][] = (string)$m['named_as'];
+    }
+}
+$threaded = ticket_threads_available($pdo) ? ticket_thread($comments) : $comments;
 $userComments = array_filter($comments, fn($c) => ($c['kind'] ?? 'user') === 'user');
 
 $attQ = $pdo->prepare('SELECT * FROM ticket_attachments WHERE ticket_id = ? ORDER BY created_at ASC');
@@ -349,30 +389,65 @@ require __DIR__ . '/includes/header.php';
        recorded here automatically, alongside anything anyone writes.</p>
   <?php endif; ?>
 
-  <?php foreach ($comments as $c): $isSystem = ($c['kind'] ?? 'user') === 'system'; ?>
-    <div class="comment <?= $isSystem ? 'comment-system' : '' ?>">
-      <div class="comment-head">
-        <strong><?= e($c['display_name'] ?? 'Someone') ?></strong>
-        <?php if ($isSystem): ?><span class="muted small">changed</span><?php endif; ?>
-        <span class="muted small"><?= date('M j, Y · g:i A', strtotime($c['created_at'])) ?></span>
-      </div>
-      <div class="comment-body"><?= nl2br(e($c['body'])) ?></div>
-      <?php if (!empty($attachmentsByComment[(int)$c['id']])): ?>
-        <div class="attachment-grid">
-          <?php foreach ($attachmentsByComment[(int)$c['id']] as $a) {
-                  render_attachment($a, can_edit() && (is_admin() || (int)$a['uploaded_by'] === $userId));
-                } ?>
+  <?php
+  // ONE RENDERER, used for a comment and for a reply, so the two cannot drift
+  // apart in anything but their indent. $depth is 0 or 1 and nothing else —
+  // see migration 039 for why a ticket is not a forum.
+  $renderComment = function (array $c, int $depth) use (
+      $attachmentsByComment, $mentionsByComment, $userId, $pdo, $selfUrl
+  ) {
+      $isSystem = ($c['kind'] ?? 'user') === 'system';
+      $cid = (int)$c['id'];
+      $named = $mentionsByComment[$cid] ?? [];
+      ?>
+      <div class="comment <?= $isSystem ? 'comment-system' : '' ?><?= $depth > 0 ? ' comment-reply' : '' ?>"
+           id="c<?= $cid ?>">
+        <div class="comment-head">
+          <strong><?= e($c['display_name'] ?? 'Someone') ?></strong>
+          <?php if ($isSystem): ?><span class="muted small">changed</span><?php endif; ?>
+          <span class="muted small"><?= date('M j, Y · g:i A', strtotime($c['created_at'])) ?></span>
+          <?php // Only on a real comment, and only at the top level: a reply to a
+                // reply would be a third tier, and "changed the status" is not
+                // something to answer. ?>
+          <?php if (!$isSystem && $depth === 0 && can_edit() && ticket_threads_available($pdo)): ?>
+            <button type="button" class="comment-reply-btn linkish"
+                    data-reply-to="<?= $cid ?>"
+                    data-reply-name="<?= e($c['display_name'] ?? '') ?>">Reply</button>
+          <?php endif; ?>
         </div>
-      <?php endif; ?>
-    </div>
+        <div class="comment-body"><?= ticket_render_body((string)$c['body'], $named) ?></div>
+        <?php if (!empty($attachmentsByComment[$cid])): ?>
+          <div class="attachment-grid">
+            <?php foreach ($attachmentsByComment[$cid] as $a) {
+                    render_attachment($a, can_edit() && (is_admin() || (int)$a['uploaded_by'] === $userId));
+                  } ?>
+          </div>
+        <?php endif; ?>
+      </div>
+      <?php
+  };
+  ?>
+  <?php foreach ($threaded as $c): ?>
+    <?php $renderComment($c, 0); ?>
+    <?php foreach (($c['replies'] ?? []) as $r): ?>
+      <?php $renderComment($r, 1); ?>
+    <?php endforeach; ?>
   <?php endforeach; ?>
 
   <?php if (can_edit()): ?>
   <form method="post" enctype="multipart/form-data" class="comment-form"
         data-ticket-form data-redirect="<?= e($selfUrl) ?>">
     <input type="hidden" name="add_comment" value="1">
+    <input type="hidden" name="parent_id" value="" id="replyTo">
+    <?php // Says what the box will do before it does it. Hidden until Reply is
+          // pressed, because a bar saying "replying to nobody" is furniture. ?>
+    <div class="reply-banner" id="replyBanner" hidden>
+      Replying to <strong id="replyName"></strong>
+      <button type="button" class="linkish" id="replyCancel">post as a new comment instead</button>
+    </div>
     <label>Add a comment
-      <textarea name="body" rows="3" placeholder="Reply, add what you found, or attach a reference…"></textarea>
+      <textarea name="body" rows="3" id="commentBody"
+                placeholder="Reply, add what you found, or attach a reference… type @ to name somebody"></textarea>
     </label>
     <label>Attach files
       <input type="file" name="attachments[]" multiple data-filepicker
@@ -518,6 +593,19 @@ function copyTicketUrl() {
   }
 }
 </script>
+<?php // The people who can be named, which is exactly the list the owner
+      // dropdown offers — so a name the picker suggests is always a name
+      // ticket_parse_mentions() can resolve. Teams and unfilled slots are left
+      // out: naming a placeholder tells nobody anything. ?>
+<script>
+  window.TICKET_PEOPLE = <?= json_encode(array_values(array_map(
+      function ($a) { return ['name' => (string)$a['name'], 'role' => (string)($a['role'] ?? '')]; },
+      array_filter($assignees, function ($a) {
+          return (int)($a['is_team'] ?? 0) !== 1 && (int)($a['is_placeholder'] ?? 0) !== 1;
+      })
+  )), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
+</script>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
 <script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
 </div>
 </body></html>
