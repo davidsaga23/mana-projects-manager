@@ -2124,6 +2124,39 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-05 — The contract state and its link, on the staffing row
+**Asked by David:** *"in the staffing section please add the contract status in line and the contract
+link as a hyperlink (no editable in this context) for convenience. The contract link could be
+truncated instead of the whole string."*
+
+A filled slot now carries a line under the name: a state chip — **signed, sent, draft, declined, no
+contract** — and the contract itself as a link. **Read only, as asked.** Changing a contract stays on
+the Hiring screen, which has the dates, the history and the rate beside it; a state picker here would
+be a fourth control on a row whose other three are staffing decisions.
+
+**Signed is the only quiet colour.** It is the one state nobody has to do anything about. Sent is
+amber and carries **how many days it has been out** — free, because `contract_days_waiting()` already
+works it out, and it is the number that actually chases a contract.
+
+**⚠ ADMINISTRATORS ONLY, and absent rather than greyed.** `crew_terms` lives in the finance database,
+and `crew_terms()` returns an empty array for anybody who cannot see money — so an editor's page has
+no contract line at all, the same way the day rate is simply missing from the artist grid rather than
+shown disabled.
+
+**⚠ ONE CALL FOR THE WHOLE PAGE.** The terms are fetched once for every filled slot's crew id before
+the table is drawn. Thirty-seven slots must not be thirty-seven connections to a second database for
+one line of text each — the same reasoning as `$laneWork` beside it.
+
+**⚠ TRUNCATED IN CSS, NOT IN PHP**, which is the rule the artist grid's reel column already follows
+and the reason it is written there too: the whole address stays in the page, selectable and copyable,
+and the `title` carries it in full. Cutting the string server-side would hand somebody half a URL
+they cannot paste anywhere. Checked: the full address is in the DOM, the ellipsis is the browser's.
+
+**Not run in PHP** — there is none on this machine. The row was drawn in a browser with the real
+stylesheet across all five contract states plus a slot with no terms and a placeholder: the chips
+take their colours from the theme's own tokens, the link truncates while keeping its full text and
+title, a placeholder gets no line at all, and the page does not scroll sideways.
+
 ## 2026-10-05 — The import stops asking what unit time is in
 **Asked by David:** *"let's delete the time spent part of the import, every single project in plaky
 will be in hours from now on."*

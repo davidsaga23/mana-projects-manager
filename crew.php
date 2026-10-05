@@ -14,6 +14,7 @@ require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/people_merge.php';
 require_once __DIR__ . '/includes/artists.php';   // artist_missing(), for the gaps marker
+require_once __DIR__ . '/includes/money.php';    // crew_terms(), for the contract line on a filled slot
 require_login();
 
 /**
@@ -393,6 +394,26 @@ if ($schemaReady) {
             ['n' => (int)$r['n'], 'locked' => (int)$r['locked']];
     }
 }
+// CONTRACT STATE AND LINK, for the filled slots (David, 2026-10-05: "add the
+// contract status in line and the contract link as a hyperlink (no editable in
+// this context) for convenience").
+//
+// ⚠ ONE CALL FOR THE WHOLE PAGE, and it opens the OTHER database. crew_terms()
+// returns [] for anybody who cannot see money, so an editor's page simply has no
+// contract line rather than a blocked one — the same way the day rate is absent
+// from the artist grid rather than greyed out. Thirty-seven slots must not be
+// thirty-seven connections to a second database for one line of text each.
+$laneTerms = [];
+if ($schemaReady && can_see_money()) {
+    $ids = [];
+    foreach ($lanes as $l) {
+        if ((int)($l['is_placeholder'] ?? 0) !== 1 && (int)($l['crew_id'] ?? 0) > 0) {
+            $ids[] = (int)$l['crew_id'];
+        }
+    }
+    if ($ids) $laneTerms = crew_terms(array_values(array_unique($ids)));
+}
+
 $people   = $schemaReady ? assignable_crew($pdo) : [];
 $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 
@@ -695,6 +716,45 @@ require __DIR__ . '/includes/header.php';
                   // "what is Rough 02 carrying?" is a fair question before
                   // anyone is hired into it. ?>
             <strong><a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$l['crew_id'] ?>"><?= e($l['name']) ?></a></strong>
+            <?php // THE CONTRACT, READ ONLY (David, 2026-10-05). Changing one is
+                  // still the Hiring screen's job — it has the dates, the log and
+                  // the rate beside it, and a state picker on a row whose other
+                  // three controls are staffing decisions would read as a fourth
+                  // one. This is here "for convenience": to see at a glance who
+                  // is signed and to open the document.
+                  //
+                  // Administrators only, because crew_terms lives in the finance
+                  // database. An editor sees nothing here rather than a greyed
+                  // control, which is the rule the day rate already follows. ?>
+            <?php if (!$isPh && isset($laneTerms[(int)$l['crew_id']])):
+              $ct = $laneTerms[(int)$l['crew_id']];
+              $cStatus = (string)($ct['contract_status'] ?? '');
+              $cUrl = trim((string)($ct['contract_url'] ?? ''));
+              $waiting = function_exists('contract_days_waiting') ? contract_days_waiting($ct) : null;
+              if ($cStatus !== '' || $cUrl !== ''): ?>
+              <div class="slot-contract">
+                <?php if ($cStatus !== ''): ?>
+                  <span class="ct-chip ct-<?= e($cStatus) ?>"
+                        title="<?= e(contract_state_phrase($cStatus, $ct['contract_sent_date'] ?? null,
+                                                           $ct['contract_signed_date'] ?? null)) ?>"><?=
+                    e($cStatus === 'none' ? 'no contract' : $cStatus) ?></span>
+                  <?php // The number that actually chases a contract, and free
+                        // here because money.php already works it out. ?>
+                  <?php if ($waiting !== null): ?>
+                    <span class="muted small"><?= (int)$waiting ?> day<?= $waiting === 1 ? '' : 's' ?> out</span>
+                  <?php endif; ?>
+                <?php endif; ?>
+                <?php // ⚠ TRUNCATED IN CSS, NOT IN PHP — the rule the reel column
+                      // on the artist grid already follows: the whole address
+                      // stays selectable and copyable, and the tooltip carries it
+                      // in full. Cutting the string here would hand somebody a
+                      // half URL they cannot paste anywhere. ?>
+                <?php if ($cUrl !== ''): ?>
+                  <a class="ct-link" href="<?= e($cUrl) ?>" target="_blank" rel="noopener"
+                     title="<?= e($cUrl) ?>"><?= e($cUrl) ?></a>
+                <?php endif; ?>
+              </div>
+            <?php endif; endif; ?>
             <?php // "placeholder" was internal vocabulary printed at a reader:
                   // it is the database's word for an empty position, not
                   // anybody's word for one. What the row needs to say is what

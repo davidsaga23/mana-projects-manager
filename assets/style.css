@@ -2122,6 +2122,27 @@ body.lightbox-lock { overflow: hidden; }
 .reel-cell a { display: inline-block; max-width: 100%; overflow: hidden;
                text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .reel-pw { background: var(--surface-3); padding: 1px 5px; border-radius: 3px; user-select: all; }
+
+/* THE CONTRACT LINE on a filled staffing slot (David, 2026-10-05). Under the
+   name, quiet, and read-only — changing a contract is still the Hiring screen. */
+.slot-contract { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+.ct-chip {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  padding: 1px 6px; border-radius: 10px; border: 1px solid;
+}
+/* Signed is the only quiet one — it is the state that needs no action. The rest
+   are degrees of "somebody still has to do something about this". */
+.ct-signed   { color: var(--ok);     border-color: var(--ok-border);     background: var(--ok-tint); }
+.ct-sent     { color: var(--warn);   border-color: var(--warn-border);   background: var(--warn-tint); }
+.ct-declined { color: var(--danger); border-color: var(--danger-border); background: var(--danger-tint); }
+.ct-draft    { color: var(--text-2); border-color: var(--border-strong); background: var(--surface-2); }
+.ct-none     { color: var(--faint);  border-color: var(--border);        background: none; }
+/* ⚠ Truncated HERE, not in PHP, so the whole address stays selectable and the
+   tooltip carries it in full — the rule .reel-cell already follows. */
+.ct-link {
+  display: inline-block; max-width: 30ch; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; vertical-align: bottom; font-size: 12px;
+}
 /* The artists grid: every cell an input. Compact, because thirteen columns of
    full-size fields would be a page nobody can scan. */
 .artist-grid td, .artist-grid th { padding: 4px 6px; vertical-align: middle; }
