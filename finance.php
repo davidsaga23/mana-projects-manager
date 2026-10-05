@@ -6,7 +6,7 @@
 // production numbers from this database and money from a separate one whose
 // credential ordinary screens do not hold.
 //
-// The hub: every project as one row, budget against projected cost against what
+// The hub: every project as one row, budget against the current forecast against what
 // has actually been invoiced. finance_project.php is the detail.
 
 require __DIR__ . '/includes/db.php';
@@ -88,8 +88,8 @@ require __DIR__ . '/includes/header.php';
   <thead>
     <tr><th>Project</th><th>Status</th><th>Starts</th><th>Delivery</th>
         <th class="num">Budget</th>
-        <th class="num" title="Worked out afresh every time this page loads, from the current pipeline: person-days per step, the lanes staffed on it, and each person's rate. Never stored, so it cannot go stale when somebody changes a headcount.">Projected cost</th>
-        <th class="num" title="Budget minus projected cost. Means nothing until both exist.">Margin</th>
+        <th class="num" title="Worked out afresh every time this page loads, from the current pipeline: person-days per step, the lanes staffed on it, and each person's rate. Never stored, so it cannot go stale when somebody changes a headcount.">Current forecast cost</th>
+        <th class="num" title="Budget minus the current forecast cost. Means nothing until both exist.">Margin</th>
         <th class="num">Invoiced</th><th class="num">Paid</th><th></th></tr>
   </thead>
   <tbody>

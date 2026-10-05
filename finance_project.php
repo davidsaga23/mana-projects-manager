@@ -303,7 +303,12 @@ try {
 <div class="dash-strip">
   <div><span class="muted small">Budget</span>
     <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong></div>
-  <div><span class="muted small">Projected cost</span>
+  <?php // RENAMED 2026-10-05 (David): "Projected cost" sounded like a figure
+         // agreed once at the start. It is recomputed on every page load from
+         // the current pipeline, staffing and rates, so the name now says which
+         // of the two it is. Sentence case, like every other label on this strip.
+         ?>
+  <div><span class="muted small">Current forecast cost</span>
     <strong><?= $grandTotal > 0 ? e(fmt_money_plain($grandTotal, $proj['currency'])) : '—' ?></strong>
     <?php if (!empty($proj['other_total'])): ?>
       <span class="muted small">
@@ -327,14 +332,14 @@ try {
 <?php if ($proj['mixed_currency']): ?>
   <div class="flash flash-warn">
     People on this show are paid in more than one currency, and these totals simply add the
-    numbers together. <strong>Treat the projected cost as indicative until that is resolved</strong>,
+    numbers together. <strong>Treat the current forecast cost as indicative until that is resolved</strong>,
     nothing here converts between currencies, and inventing an exchange rate would be worse than
     saying so.
   </div>
 <?php endif; ?>
 
 <?php
-// The phase breakdown. Deliberately built to ADD UP to Projected cost above:
+// The phase breakdown. Deliberately built to ADD UP to the forecast above:
 // every labour department, plus the non-labour total, equals the grand total.
 // A breakdown whose parts do not reconcile with the headline is worse than no
 // breakdown, because somebody will trust one of the two and there is no way to
@@ -374,7 +379,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
     <div>
       <span class="muted small">Total</span>
       <strong><?= e(fmt_money_plain($grandTotal, $proj['currency'])) ?></strong>
-      <span class="muted small">matches Projected cost above</span>
+      <span class="muted small">matches the current forecast cost above</span>
     </div>
   </div>
 
@@ -942,7 +947,7 @@ if ($retakePct <= 0):
   Costs with no lane behind them, software seats, render or cloud time, a music licence, stock,
   equipment, travel. The projection above is computed from pipeline steps and can only ever contain
   people; <strong>these are the rest of what a show spends</strong>, and they count toward the
-  Projected cost and Margin at the top of this page.
+  Current forecast cost and Margin at the top of this page.
   <br>
   <strong>An invoice is a person billing you; an expense is everything that is not somebody's
   time.</strong> Put a freelancer's bill in Invoices below and a vendor's in here, and the two can
@@ -953,7 +958,7 @@ if ($retakePct <= 0):
   <div class="flash flash-warn">
     Other expenses need <code>finance_install_05.sql</code>, which hasn't been imported into the
     finance database yet. Until it is, this section cannot record anything, and
-    <strong>Projected cost and Margin above are people only</strong>.
+    <strong>Current forecast cost and Margin above are people only</strong>.
   </div>
 <?php else: ?>
 

@@ -2124,6 +2124,33 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-05 — "Projected cost" becomes "Current forecast cost"
+**Asked by David:** *"In Finance Management → Overview, rename Projected Cost to Current Forecast
+Cost. This label more clearly communicates that the number is the latest expected project cost based
+on current staffing, rates, workload, and changes."*
+
+He is right about what it is. The figure is **recomputed on every page load** from the current
+pipeline, the lanes staffed on it and each person's rate — it is never stored, precisely so it cannot
+go stale when a headcount changes. "Projected" reads like something agreed once at kick-off, which is
+the one thing it is not.
+
+**Renamed on the hub as well as the Overview**, which is one step past what was asked and deliberate:
+`finance.php` shows the *same figure* as a column for every project. Renaming only the Overview would
+have given one number two names on adjacent screens, at exactly the moment somebody is comparing
+them. Say so and revert the hub if that is wrong.
+
+**Sentence case, not Title Case.** David wrote it capitalised, but every other label on that strip is
+sentence case — Budget, Margin, Invoiced, Unpaid — and one capitalised label would read as a proper
+noun.
+
+**Two places deliberately NOT renamed:**
+- **`export_projection.php`** — the column heading in the exported sheet. That file is matched
+  against `RTC_ExpenseProjection_v01.xlsx` and may be read by something outside this platform;
+  renaming a spreadsheet column has consequences that do not stop at our own screens. A separate
+  decision.
+- **`person.php`** — "Projected cost on this project" is a different figure at a different scope: one
+  person, not the show. "Forecast" there would promise more than the number knows.
+
 ## 2026-10-05 — The contract state and its link, on the staffing row
 **Asked by David:** *"in the staffing section please add the contract status in line and the contract
 link as a hyperlink (no editable in this context) for convenience. The contract link could be
