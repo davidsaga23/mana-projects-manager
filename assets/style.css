@@ -1289,6 +1289,10 @@ button:hover { background: var(--primary-hover); }
 .ctx-chip.ctx-shot  { background: var(--primary-tint); color: var(--primary-hover); }
 .ctx-chip.ctx-asset { background: var(--chip-teal-bg); color: var(--chip-teal-ink); }
 .ctx-chip.ctx-step  { background: var(--chip-violet-bg); color: var(--chip-violet-ink); }
+/* "Anima Dev" — a ticket about the app rather than about the show. It sits
+   where the step chip sits because it answers the same question, and takes
+   the teal that no pipeline step uses, so the two are never confused. */
+.ctx-chip.ctx-platform { background: var(--chip-teal-bg); color: var(--chip-teal-ink); }
 
 .status-chip {
   display: inline-block; padding: 1px 8px; border-radius: 10px;

@@ -227,6 +227,67 @@ function ticket_select_sql(): string {
            LEFT JOIN pipeline_steps ps ON ps.id = t.step_id';
 }
 
+/**
+ * WHAT A TICKET IS ABOUT, when it is not about a part of the pipeline.
+ *
+ * David, 2026-10-05: "let's have a Anima Dev so they can relate tickets to the
+ * self improvement of the app". Offered on every project, because the app is the
+ * one thing every show has in common.
+ *
+ * ⚠ IT SHARES THE STEP DROPDOWN BUT IS NOT A STEP. See migration 038 for why a
+ * real pipeline step would have been the expensive answer. The select posts a
+ * step id OR this word, and ticket_about_from_post() tells them apart — one
+ * control on the form, two columns underneath.
+ */
+const TICKET_ABOUT_PLATFORM = 'platform';
+
+/** The label, where a step name would otherwise go. */
+function ticket_about_label(string $about): string {
+    return $about === TICKET_ABOUT_PLATFORM ? 'Anima Dev' : '';
+}
+
+/** Has migration 038 run? Probed, never assumed — the screens degrade one feature. */
+function ticket_about_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'tickets', 'about');
+    return $ok;
+}
+
+/**
+ * Read the one select into the two things it can mean.
+ *
+ * @return array{step_id:?int, about:string}
+ */
+function ticket_about_from_post($raw): array {
+    $raw = trim((string)$raw);
+    if ($raw === TICKET_ABOUT_PLATFORM) {
+        // No step, deliberately: a platform ticket is not about the show's work,
+        // and leaving a step on it would put it on that step's detail page.
+        return ['step_id' => null, 'about' => TICKET_ABOUT_PLATFORM];
+    }
+    return ['step_id' => $raw !== '' ? (int)$raw : null, 'about' => ''];
+}
+
+/**
+ * The one dropdown, drawn the same way on the new-ticket form and the ticket
+ * page, so the two cannot drift about what the options are.
+ *
+ * $selected is a step id, or TICKET_ABOUT_PLATFORM, or '' for neither.
+ */
+function ticket_step_options(array $steps, $selectedStep, string $about, bool $aboutReady): string {
+    $out = '<option value="">not step-specific</option>';
+    if ($aboutReady) {
+        $sel = $about === TICKET_ABOUT_PLATFORM ? ' selected' : '';
+        $out .= '<option value="' . TICKET_ABOUT_PLATFORM . '"' . $sel . '>'
+              . e(ticket_about_label(TICKET_ABOUT_PLATFORM)) . ' — about the app itself</option>';
+    }
+    foreach ($steps as $st) {
+        $sel = ($about === '' && (int)$selectedStep === (int)$st['id']) ? ' selected' : '';
+        $out .= '<option value="' . (int)$st['id'] . '"' . $sel . '>' . e($st['name']) . '</option>';
+    }
+    return $out;
+}
+
 /** Cards for one project's board, grouped by status_id. */
 function board_tickets(PDO $pdo, int $projectId, bool $archived = false): array {
     $stmt = $pdo->prepare(

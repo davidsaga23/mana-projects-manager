@@ -57,6 +57,10 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) 
     }
 
     $type = ($_POST['type'] ?? 'task') === 'ticket' ? 'ticket' : 'task';
+    // The step select can say "platform" instead of a step id; this splits the
+    // one posted value into the two columns that store it.
+    $aboutReady = ticket_about_available($pdo);
+    $about = ticket_about_from_post($_POST['step_id'] ?? '');
     $crewId = !empty($_POST['assigned_crew_id']) ? (int)$_POST['assigned_crew_id'] : null;
 
     // A ticket is a problem somebody owns. Without an assignee it sits unowned
@@ -80,18 +84,20 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) 
         $pdo->prepare(
             'INSERT INTO tickets
                (project_id, seq, type, title, description, status_id, priority,
-                assigned_crew_id, due_date, shot_id, asset_id, step_id, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        )->execute([
+                assigned_crew_id, due_date, shot_id, asset_id, step_id, created_by'
+             . ($aboutReady ? ', about' : '') . ')
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?'
+             . ($aboutReady ? ', ?' : '') . ')'
+        )->execute(array_merge([
             $projectId, $seq, $type, $title,
             trim($_POST['description'] ?? '') ?: null,
             $statusId, $priority, $crewId,
             !empty($_POST['due_date']) ? $_POST['due_date'] : null,
             resolve_shot_id($pdo, $projectId, $_POST['shot_label'] ?? ''),
             resolve_asset_id($pdo, $projectId, $_POST['asset_label'] ?? ''),
-            !empty($_POST['step_id']) ? (int)$_POST['step_id'] : null,
+            $about['step_id'],
             $userId ?: null,
-        ]);
+        ], $aboutReady ? [$about['about']] : []));
         $ticketId = (int)$pdo->lastInsertId();
         $pdo->commit();
     } catch (Throwable $e) {
@@ -371,11 +377,17 @@ foreach ($cards as $sid => $list) {
             <?php if (!empty($t['description'])): ?>
               <div class="card-desc"><?= e(mb_strimwidth($t['description'], 0, 90, '…')) ?></div>
             <?php endif; ?>
-            <?php if ($shot !== '' || !empty($t['asset_name']) || !empty($t['step_name'])): ?>
+            <?php if ($shot !== '' || !empty($t['asset_name']) || !empty($t['step_name'])
+                      || ($t['about'] ?? '') === TICKET_ABOUT_PLATFORM): ?>
               <div class="card-context">
                 <?php if ($shot !== ''): ?><span class="ctx-chip ctx-shot"><?= e($shot) ?></span><?php endif; ?>
                 <?php if (!empty($t['asset_name'])): ?><span class="ctx-chip ctx-asset"><?= e($t['asset_name']) ?></span><?php endif; ?>
                 <?php if (!empty($t['step_name'])): ?><span class="ctx-chip ctx-step"><?= e($t['step_name']) ?></span><?php endif; ?>
+                <?php // Where the step chip would be, because it answers the same
+                      // question: what is this card about? ?>
+                <?php if (($t['about'] ?? '') === TICKET_ABOUT_PLATFORM): ?>
+                  <span class="ctx-chip ctx-platform"><?= e(ticket_about_label(TICKET_ABOUT_PLATFORM)) ?></span>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
             <div class="card-meta">
@@ -462,11 +474,11 @@ foreach ($cards as $sid => $list) {
           </label>
         </div>
         <label>Pipeline step <span class="muted small">(which part of the pipeline this is about)</span>
+          <?php // One control, two meanings — a step id, or "the app itself".
+                // ticket_step_options() draws it for this form and for the ticket
+                // page, so the two cannot drift about what is on offer. ?>
           <select name="step_id">
-            <option value="">not step-specific</option>
-            <?php foreach ($steps as $st): ?>
-              <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
-            <?php endforeach; ?>
+            <?= ticket_step_options($steps, null, '', ticket_about_available($pdo)) ?>
           </select>
         </label>
       </div>

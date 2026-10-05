@@ -76,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
 
 // --- save the fields --------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
+    $aboutPair = ticket_about_from_post($_POST['step_id'] ?? '');
     $newStatus = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
     if ($newStatus !== null && !isset($statusMap[$newStatus])) $newStatus = null;
 
@@ -107,19 +108,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
         'due_date'         => !empty($_POST['due_date']) ? $_POST['due_date'] : null,
         'shot_id'          => resolve_shot_id($pdo, $projectId, $typedShot),
         'asset_id'         => resolve_asset_id($pdo, $projectId, $typedAsset),
-        'step_id'          => !empty($_POST['step_id']) ? (int)$_POST['step_id'] : null,
+        'step_id'          => $aboutPair['step_id'],
     ];
 
     $pdo->prepare(
         'UPDATE tickets
             SET title = ?, description = ?, status_id = ?, priority = ?,
-                assigned_crew_id = ?, due_date = ?, shot_id = ?, asset_id = ?, step_id = ?
+                assigned_crew_id = ?, due_date = ?, shot_id = ?, asset_id = ?, step_id = ?'
+          . (ticket_about_available($pdo) ? ', about = ?' : '') . '
           WHERE id = ?'
-    )->execute([
+    )->execute(array_merge([
         $after['title'], $after['description'], $after['status_id'], $after['priority'],
         $after['assigned_crew_id'], $after['due_date'], $after['shot_id'],
-        $after['asset_id'], $after['step_id'], $id,
-    ]);
+        $after['asset_id'], $after['step_id'],
+    ], ticket_about_available($pdo) ? [$aboutPair['about']] : [], [$id]));
 
     sync_ticket_completion($pdo, $id, $after['status_id'] ? ($statusMap[$after['status_id']] ?? null) : null);
 
@@ -314,11 +316,15 @@ require __DIR__ . '/includes/header.php';
     </p>
   <?php endif; ?>
 
-  <?php if ($currentShot !== '' || $t['asset_name'] || $t['step_name']): ?>
+  <?php if ($currentShot !== '' || $t['asset_name'] || $t['step_name']
+            || ($t['about'] ?? '') === TICKET_ABOUT_PLATFORM): ?>
     <p style="margin-top:8px;">
       <?php if ($currentShot !== ''): ?><span class="ctx-chip ctx-shot"><?= e($currentShot) ?></span><?php endif; ?>
       <?php if ($t['asset_name']): ?><span class="ctx-chip ctx-asset"><?= e($t['asset_name']) ?></span><?php endif; ?>
       <?php if ($t['step_name']): ?><span class="ctx-chip ctx-step"><?= e($t['step_name']) ?></span><?php endif; ?>
+      <?php if (($t['about'] ?? '') === TICKET_ABOUT_PLATFORM): ?>
+        <span class="ctx-chip ctx-platform"><?= e(ticket_about_label(TICKET_ABOUT_PLATFORM)) ?></span>
+      <?php endif; ?>
     </p>
   <?php endif; ?>
 
@@ -412,13 +418,11 @@ require __DIR__ . '/includes/header.php';
         </datalist>
       </label>
       <label>Pipeline step
+        <?php // Drawn by the same function the new-ticket form uses, so the two
+              // cannot disagree about what is on offer. ?>
         <select name="step_id" <?= can_edit() ? '' : 'disabled' ?>>
-          <option value="">not step-specific</option>
-          <?php foreach ($steps as $st): ?>
-            <option value="<?= (int)$st['id'] ?>" <?= (int)$t['step_id'] === (int)$st['id'] ? 'selected' : '' ?>>
-              <?= e($st['name']) ?>
-            </option>
-          <?php endforeach; ?>
+          <?= ticket_step_options($steps, $t['step_id'], (string)($t['about'] ?? ''),
+                                  ticket_about_available($pdo)) ?>
         </select>
       </label>
     </div>
