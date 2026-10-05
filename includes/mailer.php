@@ -217,6 +217,97 @@ function ticket_url(int $ticketId): string {
  *
  * @return array{0:bool, 1:string}  [sent, message for the user]
  */
+/**
+ * Tell the people a comment named, when the author asked for it.
+ *
+ * ⚠ ONLY WHEN ASKED. The box on the comment form is unticked by default, and
+ * that is the whole design: this mailer opens SMTP INLINE, so the page waits for
+ * the mail server before it comes back (DECISIONS — up to the 20-second
+ * timeout). Sending on every mention would make every comment with an @ in it
+ * slow, including the ones that are a note for later. The tick is the author
+ * saying "this one is worth the wait".
+ *
+ * Returns [sent?, a sentence], in the shape notify_assignee() uses, and NAMES
+ * ANYBODY IT COULD NOT REACH. A mention that silently goes nowhere is worse than
+ * no mention at all: the author has already moved on believing it landed.
+ *
+ * @param int[] $crewIds the people named, from ticket_parse_mentions()
+ */
+function notify_mentioned(PDO $pdo, int $ticketId, array $crewIds, string $body, string $byWho): array {
+    global $config;
+    if (!$crewIds) return [false, ''];
+
+    if (!SmtpMailer::isConfigured($config)) {
+        return [false, 'Email is not set up on this server, so nobody was emailed.'];
+    }
+
+    $ids = implode(',', array_map('intval', $crewIds));
+    $people = $pdo->query(
+        "SELECT id, name, email FROM crew WHERE id IN ({$ids})"
+    )->fetchAll();
+
+    $recipients = [];
+    $noEmail = [];
+    foreach ($people as $c) {
+        $addr = trim((string)($c['email'] ?? ''));
+        if ($addr !== '') $recipients[] = ['email' => $addr, 'name' => $c['name']];
+        else              $noEmail[] = (string)$c['name'];
+    }
+
+    $q = $pdo->prepare(
+        'SELECT t.id, t.seq, t.title, t.type, p.code AS project_code, p.name AS project_name
+           FROM tickets t JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
+    );
+    $q->execute([$ticketId]);
+    $t = $q->fetch();
+    if (!$t) return [false, 'That ticket no longer exists, so nobody was emailed.'];
+
+    if (!$recipients) {
+        return [false, 'Nobody was emailed: ' . implode(', ', $noEmail)
+            . ' ' . (count($noEmail) === 1 ? 'has' : 'have')
+            . ' no email address on file. Add one on the Staffing screen.'];
+    }
+
+    $label = ($t['project_code'] ?? '') . '-' . (int)$t['seq'];
+    $subject = sprintf('[%s] %s mentioned you on %s', $t['project_code'], $byWho, $label);
+    $url = ticket_url((int)$t['id']);
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+    // The comment itself, trimmed. Enough to know whether it needs answering now
+    // without turning the mail into a copy of the ticket.
+    $snippet = mb_substr(trim($body), 0, 600);
+    if (mb_strlen(trim($body)) > 600) $snippet .= '…';
+
+    $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
+        . '<p><strong>' . $esc($byWho) . '</strong> mentioned you on <strong>' . $esc($label) . '</strong>.</p>'
+        . '<h2 style="font-size:17px;margin:12px 0 6px;">' . $esc($t['title']) . '</h2>'
+        . '<p style="color:#5a6a7a;margin:0 0 12px;">' . $esc($t['project_name']) . '</p>'
+        . '<div style="background:#f4f6f8;padding:10px 12px;border-radius:6px;white-space:pre-wrap;">'
+        . $esc($snippet) . '</div>'
+        . '<p style="margin-top:16px;"><a href="' . $esc($url) . '" '
+        . 'style="background:#2f6fb2;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;display:inline-block;">'
+        . 'Open ' . ($t['type'] === 'ticket' ? 'ticket' : 'task') . '</a></p>'
+        . '<p style="color:#8a97a3;font-size:12px;margin-top:18px;">Anima | Project manager</p>'
+        . '</div>';
+
+    $text = "{$byWho} mentioned you on {$label}.\n\n{$t['title']}\n{$t['project_name']}\n\n"
+        . $snippet . "\n\nOpen: {$url}\n";
+
+    try {
+        (new SmtpMailer($config))->send($recipients, $subject, $html, $text);
+        $said = 'Emailed ' . implode(', ', array_column($recipients, 'name')) . '.';
+        if ($noEmail) {
+            $said .= ' ' . implode(', ', $noEmail) . ' ' . (count($noEmail) === 1 ? 'has' : 'have')
+                   . ' no email address on file and ' . (count($noEmail) === 1 ? 'was' : 'were')
+                   . ' not reached.';
+        }
+        return [true, $said];
+    } catch (Throwable $e) {
+        error_log('[Anima mention mail] ' . $e->getMessage());
+        return [false, 'The mention email failed: ' . $e->getMessage()];
+    }
+}
+
 function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): array {
     global $config;
 

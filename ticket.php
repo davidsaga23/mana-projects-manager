@@ -83,7 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
     ticket_save_mentions($pdo, $commentId, $mentions);
 
     $notes = [$parentId ? 'Reply posted.' : 'Comment posted.'];
-    if ($mentions) {
+    if ($mentions && !empty($_POST['email_mentions'])) {
+        // Asked for, so it is worth the wait. notify_mentioned() says who it
+        // reached AND who it could not, because a mention that silently goes
+        // nowhere is worse than none: the author has already moved on.
+        [, $said] = notify_mentioned($pdo, $id, array_keys($mentions), $body, current_user_display());
+        if ($said !== '') $notes[] = $said;
+    } elseif ($mentions) {
         // ⚠ SAID OUT LOUD, because nothing emails them yet. Somebody who types
         // @Ana and gets no warning will reasonably assume Ana has been told.
         $notes[] = count($mentions) === 1
@@ -235,6 +241,26 @@ $commentsQ = $pdo->prepare(
 );
 $commentsQ->execute([$id]);
 $comments = $commentsQ->fetchAll();
+
+// ⚠ OPENING THE TICKET IS WHAT MARKS A MENTION READ, not seeing it listed on My
+// tasks — a count there is a pointer, and clearing it on a glance would lose the
+// one signal saying where to go. Written on a GET, deliberately: it is a fact
+// about somebody having looked, and there is no form to submit. The daily
+// snapshot does the same thing for the same reason (DECISIONS, 2026-08-13).
+if (ticket_mentions_available($pdo) && column_exists($pdo, 'ticket_mentions', 'seen_at')
+    && $_SERVER['REQUEST_METHOD'] === 'GET' && $userId) {
+    $me = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
+    $me->execute([$userId]);
+    $myCrew = (int)$me->fetchColumn();
+    if ($myCrew > 0) {
+        $pdo->prepare(
+            'UPDATE ticket_mentions m
+               JOIN ticket_comments c ON c.id = m.comment_id
+                SET m.seen_at = NOW()
+              WHERE c.ticket_id = ? AND m.crew_id = ? AND m.seen_at IS NULL'
+        )->execute([$id, $myCrew]);
+    }
+}
 
 // Who each comment named, for the highlight. One query for the page rather than
 // one per comment — a long ticket is forty comments.
@@ -448,6 +474,16 @@ require __DIR__ . '/includes/header.php';
     <label>Add a comment
       <textarea name="body" rows="3" id="commentBody"
                 placeholder="Reply, add what you found, or attach a reference… type @ to name somebody"></textarea>
+    </label>
+    <?php // UNTICKED BY DEFAULT, deliberately. The mailer opens SMTP inline, so
+          // ticking this makes the page wait on the mail server before it comes
+          // back — which is right for "this needs looking at today" and wrong for
+          // a note somebody will read when they next open their list. Everyone
+          // named sees it on My tasks either way. ?>
+    <label class="inline notify-tick">
+      <input type="checkbox" name="email_mentions" value="1">
+      Email the people I named <span class="muted small">— they see it on My tasks regardless;
+      the page waits for the mail server when this is on</span>
     </label>
     <label>Attach files
       <input type="file" name="attachments[]" multiple data-filepicker

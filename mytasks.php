@@ -225,6 +225,7 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_l
 
 // --- load -------------------------------------------------------------------
 $tickets = []; $tasks = []; $candidates = []; $entries = []; $statusesByProject = [];
+$mentions = []; $unseenMentions = 0;
 $myCrewName = '';
 
 if ($ready && $myCrewId) {
@@ -275,6 +276,27 @@ if ($ready && $myCrewId) {
     foreach ($tasks as $i => $row) $tasks[$i]['logged'] = $logged[(int)$row['progress_id']] ?? 0;
 
     $entries = time_logs_for_crew($pdo, $myCrewId, null, 15);
+
+    // Who has named me, newest first, unread at the top. Capped: this is a
+    // prompt to go and look, not an archive.
+    if (ticket_mentions_available($pdo) && column_exists($pdo, 'ticket_mentions', 'seen_at')) {
+        $mq = $pdo->prepare(
+            'SELECT m.comment_id, m.seen_at, c.body, c.created_at, c.ticket_id,
+                    t.seq, t.title, t.type, p.code AS project_code,
+                    u.display_name AS said_by
+               FROM ticket_mentions m
+               JOIN ticket_comments c ON c.id = m.comment_id
+               JOIN tickets t         ON t.id = c.ticket_id
+               JOIN projects p        ON p.id = t.project_id
+               LEFT JOIN users u      ON u.id = c.user_id
+              WHERE m.crew_id = ? AND t.archived = 0
+              ORDER BY m.seen_at IS NULL DESC, c.created_at DESC
+              LIMIT 15'
+        );
+        $mq->execute([$myCrewId]);
+        $mentions = $mq->fetchAll();
+        foreach ($mentions as $m) if ($m['seen_at'] === null) $unseenMentions++;
+    }
 } elseif ($ready) {
     $candidates = $pdo->query(
         'SELECT id, name, role FROM crew
@@ -372,6 +394,9 @@ require __DIR__ . '/includes/header.php';
   <div class="dash-strip">
     <div><span class="muted small">Production tasks</span><strong><?= count($tasks) ?></strong></div>
     <div><span class="muted small">Tickets</span><strong><?= count($tickets) ?></strong></div>
+    <?php if ($unseenMentions): ?>
+      <div><span class="muted small">New mentions</span><strong class="warn-text"><?= $unseenMentions ?></strong></div>
+    <?php endif; ?>
     <?php if ($canLog): ?>
       <div><span class="muted small">Logged today</span><strong><?= e(fmt_hours($loggedToday)) ?></strong></div>
       <div><span class="muted small">Logged last 7 days</span><strong><?= e(fmt_hours($loggedWeek)) ?></strong></div>
@@ -450,6 +475,32 @@ require __DIR__ . '/includes/header.php';
               </form>
             </td>
           <?php endif; ?>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+
+  <?php // MENTIONED, before the lists, because it is the only thing on this page
+        // somebody else put there — the rest is work already assigned. Unread
+        // first and drawn only when there is something to read; a permanent
+        // "0 mentions" heading is furniture. ?>
+  <?php if ($mentions): ?>
+    <h3>Mentioned <span class="muted">· <?= count($mentions) ?><?php
+      if ($unseenMentions): ?>, <strong class="warn-text"><?= $unseenMentions ?> new</strong><?php endif; ?></span></h3>
+    <table class="mywork-table">
+      <thead><tr><th>Ref</th><th>Ticket</th><th>Project</th><th>Said by</th><th>What</th><th>When</th></tr></thead>
+      <tbody>
+      <?php foreach ($mentions as $m): ?>
+        <tr class="<?= $m['seen_at'] === null ? 'mention-new' : '' ?>">
+          <td><a href="ticket.php?id=<?= (int)$m['ticket_id'] ?>#c<?= (int)$m['comment_id'] ?>"
+                 class="<?= $m['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($m)) ?></a></td>
+          <td><a href="ticket.php?id=<?= (int)$m['ticket_id'] ?>#c<?= (int)$m['comment_id'] ?>"><?= e($m['title']) ?></a></td>
+          <td class="muted small"><?= e($m['project_code']) ?></td>
+          <td class="muted small"><?= e($m['said_by'] ?: 'Someone') ?></td>
+          <td class="muted small"><?= e(mb_substr(trim((string)$m['body']), 0, 90))
+                ?><?= mb_strlen(trim((string)$m['body'])) > 90 ? '…' : '' ?></td>
+          <td class="muted small"><?= e(date('M j', strtotime($m['created_at']))) ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

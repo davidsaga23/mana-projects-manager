@@ -2124,6 +2124,48 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-06 (later) — Both halves of the notification: a list, and an email on request
+**Asked by David**, when told a mention notified nobody: *"both"* — the list for everyone, email only
+when asked.
+
+Migration **040** adds `ticket_mentions.seen_at`.
+
+### The list
+**Mentioned** sits above the two work lists on My tasks, unread first, with a count in the strip at
+the top. It is the only thing on that page somebody else put there — the rest is work already
+assigned — so it goes first, and it is drawn only when there is something in it. A permanent
+"0 mentions" heading is furniture.
+
+**⚠ OPENING THE TICKET IS WHAT MARKS A MENTION READ**, not seeing it on the list. A count on My
+tasks is a pointer; clearing it because somebody glanced at the screen would destroy the one signal
+telling them where to go. It is stamped when they open the ticket it is on, which is the first moment
+they could actually have read it.
+
+That write happens on a **GET**, deliberately, and is the second thing here to do so — the daily
+snapshot is the first (2026-08-13). Both are the same shape: a fact about somebody having looked,
+with no form to submit.
+
+### The email, on a tick
+**Unticked by default, and the label says what ticking costs.** The mailer opens SMTP inline, so the
+page waits on the mail server before it returns (up to the 20-second timeout). Sending on every
+mention would make every comment with an `@` in it slow, including the ones that are a note for
+later. The tick is the author saying *this one is worth the wait*; everyone named sees it on My tasks
+either way.
+
+**⚠ IT NAMES WHO IT COULD NOT REACH.** Somebody with no email address on file, a team, an unconfigured
+SMTP — each gets its own sentence rather than a silence. A mention that quietly goes nowhere is worse
+than none at all, because the author has already moved on believing it landed. That is the same rule
+`notify_assignee()` follows for the same reason.
+
+**Still outstanding, and now affecting one more path:** the mailer blocks the save. The roadmap
+already carries it; this adds a third caller. Moving it off the save path would fix ticket creation,
+status changes and now mentions at once.
+
+**Not run in PHP** — there is none on this machine. The message the author sees was replayed in
+Python over six cases: no mention, a mention left unticked, a tick with an address, a tick with no
+address on file, one reachable and one not, and a tick with SMTP unconfigured. Each says what
+happened rather than nothing.
+
 ## 2026-10-06 — Naming somebody in a comment, and replying to one
 **Asked by David:** *"can we also have the option to tag people in the ticket/task detail view and
 create threads if needed?"* — with a screenshot of the comment box containing a lone `@`, which is
