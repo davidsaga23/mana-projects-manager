@@ -2124,6 +2124,35 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-05 — Sortable headings on My tasks, and a date bug in the shared sorter
+**Asked by David:** *"sort by the header in this section"* — the Tickets list on My tasks.
+
+`gridtools.js` already did this for Artists and Shots, so it was a call rather than a build. What it
+needed was a **`sortOnly`** mode: sortable headings and nothing else, no filter boxes, no count row,
+no Clear. Those two lists are one person's own work, short enough to read whole, and the heading was
+the whole request. Both tables on the screen get it, since they are the same shape.
+
+**Priority sorts by urgency, not the alphabet.** Left to the default it read High, Low, Medium,
+Urgent. The rank comes from `ticket_priorities()`' own order, read off the dot's class.
+
+### ⚠ The bug it uncovered: dates never sorted, anywhere
+The default sort key strips everything that is not a digit, a dot or a minus before reading a number
+— so `2026-10-05` became the **number 2026**. Every date in a column tied, the sort was stable, and
+the rows did not move at all. It looked like it worked on My tasks only because the list already
+arrives ordered by date.
+
+This was in the shared module, so it was true of **every date column on every grid** that has used it
+since 2026-09-29. ISO dates sort correctly as plain text — which is the whole reason the platform
+stores them that way — so they are now matched and returned as strings before the numeric branch.
+
+Worth remembering as a shape: a sorter that "works" on a column that was already in order is
+indistinguishable from one that does nothing.
+
+**Not run in PHP** — there is none on this machine, and this touches almost none. Driven in a browser
+against a copy of the Tickets table with the real `gridtools.js`: every heading sortable except Log
+time, no filters or count row drawn, priority in urgency order both ways, and dates in true
+chronological order both ways — the case that was broken.
+
 ## 2026-10-05 — "Projected cost" becomes "Current forecast cost"
 **Asked by David:** *"In Finance Management → Overview, rename Projected Cost to Current Forecast
 Cost. This label more clearly communicates that the number is the latest expected project cost based

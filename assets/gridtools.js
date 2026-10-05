@@ -61,6 +61,13 @@
     if (sel) return sel.selectedIndex > 0 ? [0, sel.selectedIndex] : [1, 0];
     var v = text;
     if (v === '' || v === '—') return [1, 0];
+    // ⚠ A DATE BEFORE A NUMBER. The numeric branch below strips everything that
+    // is not a digit, a dot or a minus, so "2026-10-05" became the NUMBER 2026 -
+    // every date in a column tied, the sort was stable, and the rows did not
+    // move at all. Found on My tasks (2026-10-05), where Due appeared sorted
+    // because it already was. ISO dates sort correctly as plain text, which is
+    // the whole reason the platform stores them that way.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return [0, v];
     var n = parseFloat(v.replace(/[^0-9.\-]/g, ''));
     if (!isNaN(n) && /^[^A-Za-z]*$/.test(v)) return [0, n];
     return [0, v.toLowerCase()];
@@ -80,6 +87,10 @@
    *                sortKey(td,text) -> [rank, value], overriding defaultKey
    *                skip(th, index)  -> true to leave a column without controls
    *                noun             ['person','people'], for the count line
+   *                sortOnly         true for sortable headings and NOTHING else:
+   *                                 no filter boxes, no count row, no Clear. For
+   *                                 a short list where the heading is the whole
+   *                                 request (My tasks, 2026-10-05).
    *                onChange(shown, all, filtering)  after every filter pass
    */
   function attach(table, opts) {
@@ -152,15 +163,20 @@
     // number that goes wrong quietly. This is the reason the filters were put
     // inside the one <th> in the first place; a count row is worth the
     // measurement because it has nothing to line up with horizontally.
-    var countRow = table.tHead.insertRow(-1);
-    countRow.className = 'col-count-row';
-    var countCell = countRow.insertCell(0);
-    countCell.colSpan = headRow.cells.length;
-    var countLine = document.createElement('span');
-    countLine.className = 'col-count';
-    countCell.appendChild(countLine);
+    var sortOnly = opts.sortOnly === true;
+    var countRow = sortOnly ? null : table.tHead.insertRow(-1);
+    var countCell = null, countLine = null;
+    if (countRow) {
+      countRow.className = 'col-count-row';
+      countCell = countRow.insertCell(0);
+      countCell.colSpan = headRow.cells.length;
+      countLine = document.createElement('span');
+      countLine.className = 'col-count';
+      countCell.appendChild(countLine);
+    }
 
     function placeCountRow() {
+      if (!countCell) return;
       // Set on the CELL, not the row: `position: sticky` applies to the <td>
       // under border-collapse, and a `top` on the <tr> is simply ignored.
       countCell.style.top = headRow.getBoundingClientRect().height + 'px';
@@ -169,6 +185,7 @@
     if (window.ResizeObserver) new ResizeObserver(placeCountRow).observe(headRow);
 
     function applyFilters() {
+      if (sortOnly) return;            // nothing filters, so nothing to recount
       // ⚠ A ROW THE PAGE HAS REMOVED IS NO LONGER ONE OF THE ROWS. `rows` is
       // captured once at attach; the Artists grid deletes a person out of the
       // DOM, and without this the count kept saying eleven of a list of ten and
@@ -270,6 +287,7 @@
       });
       th.appendChild(sort);
 
+      if (sortOnly) return;            // the heading is the whole control
       var f;
       var opened = choices(col);
       if (isChoice(col) || (opts.options && opts.options(col))) {
@@ -300,6 +318,7 @@
     });
 
     // A filter is worth clearing in one go, and one control says so.
+    if (!sortOnly) {
     clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'secondary small col-clear';
@@ -310,6 +329,7 @@
       applyFilters();
     });
     countCell.appendChild(clear);
+    }
 
     applyFilters();
     placeCountRow();

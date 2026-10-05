@@ -560,4 +560,35 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 </div>
+<?php // SORTABLE HEADINGS (David, 2026-10-05: "sort by the header in this
+      // section"). Sort only — no filter boxes and no count row: these two lists
+      // are one person's own work, short enough to read, and the heading was the
+      // whole request. assets/gridtools.js is the same machinery the Artists and
+      // Shots grids use, so clicking a heading behaves identically everywhere. ?>
+<script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
+<script>
+  (function () {
+    if (!window.GridTools) return;
+    // ⚠ PRIORITY SORTS BY URGENCY, not by the alphabet, which would read
+    // High, Low, Medium, Urgent. The order is ticket_priorities()' own.
+    var RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
+    function sortKey(td, text) {
+      var dot = td ? td.querySelector('.prio-dot') : null;
+      if (dot) {
+        var m = /priority-(\w+)/.exec(dot.className || '');
+        var r = m ? RANK[m[1]] : undefined;
+        if (r !== undefined) return [0, r];
+      }
+      return window.GridTools.sortKey(td, text);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.mywork-table'), function (t) {
+      window.GridTools.attach(t, {
+        sortOnly: true,
+        sortKey: sortKey,
+        // Nothing to sort a form by.
+        skip: function (th) { return th.textContent.trim() === 'Log time'; }
+      });
+    });
+  }());
+</script>
 </body></html>
