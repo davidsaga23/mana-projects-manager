@@ -403,7 +403,15 @@ if ($schemaReady) {
 // contract line rather than a blocked one — the same way the day rate is absent
 // from the artist grid rather than greyed out. Thirty-seven slots must not be
 // thirty-seven connections to a second database for one line of text each.
+//
+// ⚠ AND IT SAYS WHY IT IS EMPTY. The first cut of this just returned [] on every
+// failure, so "nobody has a contract recorded", "the column does not exist" and
+// "the finance database is unreachable" were one blank row — which is lesson 11,
+// and is exactly the comment hiring.php already carries three hundred lines
+// away. David reported the line missing on 2026-10-05 and there was nothing on
+// screen to tell him which of the three it was.
 $laneTerms = [];
+$contractsOff = null;          // a sentence when the state cannot be shown at all
 if ($schemaReady && can_see_money()) {
     $ids = [];
     foreach ($lanes as $l) {
@@ -411,7 +419,25 @@ if ($schemaReady && can_see_money()) {
             $ids[] = (int)$l['crew_id'];
         }
     }
-    if ($ids) $laneTerms = crew_terms(array_values(array_unique($ids)));
+    try {
+        if (!finance_configured()) {
+            $contractsOff = 'The finance database is not configured on this install, so contract '
+                          . 'states cannot be read.';
+        } elseif (contracts_need_upgrade()) {
+            $contractsOff = 'Contract states need <code>finance_install_04.sql</code>, which has '
+                          . 'not been imported yet. Contract links still show; the state does not.';
+        } elseif ($ids) {
+            $laneTerms = crew_terms(array_values(array_unique($ids)));
+        }
+        // The link lives on crew_terms whether or not 04 has run, so it is still
+        // worth fetching when only the STATE is unavailable.
+        if ($contractsOff !== null && $ids && finance_configured()) {
+            $laneTerms = crew_terms(array_values(array_unique($ids)));
+        }
+    } catch (Throwable $e) {
+        $contractsOff = 'The finance database could not be read, so contract states are missing '
+                      . 'from this page: ' . $e->getMessage();
+    }
 }
 
 $people   = $schemaReady ? assignable_crew($pdo) : [];
@@ -598,6 +624,10 @@ require __DIR__ . '/includes/header.php';
       //
       // One query over `crew`, only for an administrator. The expensive part,
       // counting what each record carries, happens on the merge screen itself. ?>
+<?php if ($contractsOff !== null): ?>
+  <div class="flash flash-warn"><?= $contractsOff ?></div>
+<?php endif; ?>
+
 <?php if (is_admin() && ($dupes = duplicate_crew_groups($pdo))): ?>
   <div class="flash flash-warn">
     <strong><?= count($dupes) ?></strong>
@@ -726,12 +756,24 @@ require __DIR__ . '/includes/header.php';
                   // Administrators only, because crew_terms lives in the finance
                   // database. An editor sees nothing here rather than a greyed
                   // control, which is the rule the day rate already follows. ?>
-            <?php if (!$isPh && isset($laneTerms[(int)$l['crew_id']])):
-              $ct = $laneTerms[(int)$l['crew_id']];
-              $cStatus = (string)($ct['contract_status'] ?? '');
+            <?php // ⚠ DRAWN EVEN WITH NO RECORD AT ALL, which is the fix for what
+                  // David saw on 2026-10-05: the first cut only drew this line
+                  // when crew_terms held a row, so everybody who had never had a
+                  // rate or a contract entered — which on a freshly staffed show
+                  // is everybody — looked exactly like the feature had not
+                  // shipped. "Nobody has started the contract" is the single most
+                  // actionable thing this line can say, so it is the one state it
+                  // must not stay silent about. ?>
+            <?php if (!$isPh && can_see_money()):
+              $ct = $laneTerms[(int)$l['crew_id']] ?? [];
               $cUrl = trim((string)($ct['contract_url'] ?? ''));
-              $waiting = function_exists('contract_days_waiting') ? contract_days_waiting($ct) : null;
-              if ($cStatus !== '' || $cUrl !== ''): ?>
+              // No state while $contractsOff explains why on the line at the top
+              // of the page — but a LINK still shows, because contract_url lives
+              // on crew_terms whether or not finance_install_04 has been run.
+              $showState = ($contractsOff === null);
+              $cStatus = $showState ? ((string)($ct['contract_status'] ?? '') ?: 'none') : '';
+              $waiting = ($showState && $ct) ? contract_days_waiting($ct) : null;
+              if ($showState || $cUrl !== ''): ?>
               <div class="slot-contract">
                 <?php if ($cStatus !== ''): ?>
                   <span class="ct-chip ct-<?= e($cStatus) ?>"

@@ -2152,10 +2152,32 @@ and the reason it is written there too: the whole address stays in the page, sel
 and the `title` carries it in full. Cutting the string server-side would hand somebody half a URL
 they cannot paste anywhere. Checked: the full address is in the DOM, the ellipsis is the browser's.
 
+### ⚠ Shipped silent, and that was the bug (same day)
+David: *"I still don't see the contract status in this view."* It was deployed. The line only drew
+when `crew_terms` held a row for that person — so everybody who had never had a rate or a contract
+entered, **which on a freshly staffed show is everybody**, looked exactly like a feature that had not
+shipped.
+
+Worse, three different situations produced the same blank row: nobody has started the contract, the
+`contract_status` column does not exist because `finance_install_04.sql` was never imported, or the
+finance database is unreachable. **That is lesson 11**, and `hiring.php` already carries a comment
+saying precisely this three hundred lines away: *"'no contract on file' and 'the finance database is
+unreachable' look identical otherwise"*. Written down, and still rebuilt.
+
+Two changes:
+- **A filled slot always shows a state**, defaulting to **no contract** when there is no record at
+  all. "Nobody has started this one" is the most actionable thing the line can say, so it is the one
+  state it must not stay silent about.
+- **The page says why when it cannot show state at all** — finance not configured, `04` not
+  imported, or an error, each with its own sentence. When only the state is unavailable the **link**
+  still shows, because `contract_url` lives on `crew_terms` whether or not `04` has run.
+
 **Not run in PHP** — there is none on this machine. The row was drawn in a browser with the real
 stylesheet across all five contract states plus a slot with no terms and a placeholder: the chips
 take their colours from the theme's own tokens, the link truncates while keeping its full text and
-title, a placeholder gets no line at all, and the page does not scroll sideways.
+title, a placeholder gets no line at all, and the page does not scroll sideways. The condition was
+then replayed in Python over seven cases — including the one that was broken, a filled slot with no
+terms row, and the two where only the link can be shown.
 
 ## 2026-10-05 — The import stops asking what unit time is in
 **Asked by David:** *"let's delete the time spent part of the import, every single project in plaky
