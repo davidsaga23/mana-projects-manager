@@ -30,28 +30,66 @@ require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/ai.php';
 require_login();
 
+// ⚠ A PROJECT IS OPTIONAL HERE, and that is the point (David, 2026-10-07: he
+// went looking for this button on the cross-project Tasks screen, which is
+// exactly where he had said he wanted it — "drop the transcript in that general
+// task and then as we assign them we can put them in a project or the other").
+//
+// A meeting is rarely about one show, and which show each action item belongs to
+// is often only decided while reading the list. So the file can be read with no
+// project at all, and WHERE THE CARDS GO IS CHOSEN ON THE REVIEW SCREEN, after
+// there is something to look at. Opened from a project's board, that project is
+// simply preselected.
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
-$stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
-$stmt->execute([$projectId]);
-$project = $stmt->fetch();
-if (!$project) {
-    flash('err', 'That project no longer exists.');
-    header('Location: index.php');
-    exit;
+$project = null;
+if ($projectId > 0) {
+    $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$projectId]);
+    $project = $stmt->fetch();
+    if (!$project) {
+        flash('err', 'That project no longer exists.');
+        header('Location: alltasks.php');
+        exit;
+    }
 }
 
-$selfUrl   = 'transcript.php?project=' . $projectId;
-$boardUrl  = 'tasks.php?project=' . $projectId;
+$selfUrl  = 'transcript.php' . ($projectId ? '?project=' . $projectId : '');
+$boardUrl = $projectId ? 'tasks.php?project=' . $projectId : 'alltasks.php';
+
+// Every show a card could be filed against.
+$projects = $pdo->query(
+    "SELECT id, code, name FROM projects WHERE status <> 'archived'
+      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped'), name"
+)->fetchAll();
 $userId    = (int)($_SESSION['user_id'] ?? 0);
 $ready     = column_exists($pdo, 'tickets', 'id');
-$assignees = $ready ? ticket_assignees($pdo, $projectId) : [];
-// The board's own columns, in the order it draws them, so a card lands in the
-// first one a person would look at rather than in whatever id sorts lowest.
-// ⚠ It returns a PAIR — the columns and whether they are a fallback — and the
-// columns are a plain list, not keyed by id.
-[$columns, ] = $ready ? ticket_board_columns($pdo, $projectId) : [[], false];
-$firstStatus = $columns ? (int)$columns[0]['id'] : null;
-$firstName   = $columns ? (string)$columns[0]['name'] : 'the first column';
+// Who the model may name. Scoped to the project when there is one; studio-wide
+// when there is not, because a meeting about three shows mentions people from
+// all of them and a name it cannot match becomes nobody either way.
+$assignees = [];
+if ($ready) {
+    $assignees = $projectId
+        ? ticket_assignees($pdo, $projectId)
+        : $pdo->query(
+            'SELECT id, name, role FROM crew
+              WHERE active = 1 AND is_team = 0 AND COALESCE(is_placeholder, 0) = 0
+              ORDER BY name'
+          )->fetchAll();
+}
+/**
+ * The column a new card lands in, for whichever project it is filed against.
+ *
+ * ⚠ Worked out PER PROJECT at the moment of writing, not once for the page: the
+ * target is chosen on the review screen, and columns are a project's own
+ * statuses, so a card filed against MSD must land in an MSD column.
+ *
+ * ticket_board_columns() returns a PAIR — the columns and whether they are a
+ * fallback — and the columns are a plain list, not keyed by id.
+ */
+function transcript_first_column(PDO $pdo, int $projectId): array {
+    [$cols, ] = ticket_board_columns($pdo, $projectId);
+    return $cols ? [(int)$cols[0]['id'], (string)$cols[0]['name']] : [null, 'the first column'];
+}
 
 $found = [];      // what the model returned, held in the session between screens
 $note  = '';
@@ -86,6 +124,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['read'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
     try {
         if (!can_edit()) throw new RuntimeException('Your account cannot create cards.');
+        // Where they go, decided on the review screen. Verified against the real
+        // list rather than trusted: a posted id is not a project until it is.
+        $to = (int)($_POST['to_project'] ?? 0);
+        $ok = false;
+        foreach ($projects as $pr) if ((int)$pr['id'] === $to) { $ok = true; $target = $pr; }
+        if (!$ok) throw new RuntimeException('Pick which project these belong to.');
+
+        [$firstStatus, ] = transcript_first_column($pdo, $to);
+
         $rows = is_array($_POST['t'] ?? null) ? $_POST['t'] : [];
         $made = 0;
 
@@ -99,14 +146,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
                       ? $r['priority'] : 'medium';
             $type = ($r['type'] ?? 'task') === 'ticket' ? 'ticket' : 'task';
 
-            $seq = next_ticket_seq($pdo, $projectId);
+            $seq = next_ticket_seq($pdo, $to);
             $pdo->prepare(
                 'INSERT INTO tickets
                    (project_id, seq, type, title, description, status_id, priority,
                     assigned_crew_id, created_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             )->execute([
-                $projectId, $seq, $type, mb_substr($title, 0, 255),
+                $to, $seq, $type, mb_substr($title, 0, 255),
                 trim((string)($r['description'] ?? '')) ?: null,
                 $firstStatus, $priority, $crewId, $userId ?: null,
             ]);
@@ -115,9 +162,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
 
         unset($_SESSION['transcript'][$projectId]);
         flash($made ? 'ok' : 'warn', $made
-            ? $made . ' card' . ($made === 1 ? '' : 's') . ' created, waiting to be started.'
+            ? $made . ' card' . ($made === 1 ? '' : 's') . ' created on ' . $target['name']
+              . ', waiting to be started.'
             : 'Nothing was ticked, so nothing was created.');
-        header('Location: ' . ($made ? $boardUrl : $selfUrl));
+        header('Location: ' . ($made ? 'tasks.php?project=' . $to : $selfUrl));
         exit;
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
@@ -136,11 +184,13 @@ $held  = $_SESSION['transcript'][$projectId] ?? null;
 $found = $held['tasks'] ?? [];
 $note  = $held['note'] ?? '';
 
-$pageTitle = $project['name'] . ' · Transcript';
+$pageTitle = ($project ? $project['name'] . ' · ' : '') . 'Transcript';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<?php project_nav($project, 'tasks'); ?>
+<?php // The project bar only when there is a project. Read from the
+      // cross-project Tasks screen there is no one show to be "on". ?>
+<?php if ($project) project_nav($project, 'tasks'); ?>
 
 <h2 class="wizard-title">Read a transcript
   <span class="muted">action items out of a meeting, into the backlog</span>
@@ -235,10 +285,23 @@ require __DIR__ . '/includes/header.php';
       </table>
     </div>
 
-    <p class="muted small">
-      They will be created on <strong><?= e($project['name']) ?></strong> in
-      <strong><?= e($firstName) ?></strong>.
-      A card on the wrong show can be moved from the card itself afterwards.
+    <?php // ⚠ CHOSEN HERE, AFTER READING, not before uploading. Which show a
+          // meeting's actions belong to is usually only clear once the list is
+          // in front of you — which is why the file can be read with no project
+          // at all. They all land on one show; a card that belongs elsewhere is
+          // moved from the card itself, which takes a click. ?>
+    <p class="muted small file-them">
+      File them on
+      <select name="to_project" required aria-label="Project to create these cards on">
+        <?php if (!$projectId): ?><option value="">choose a project…</option><?php endif; ?>
+        <?php foreach ($projects as $pr): ?>
+          <option value="<?= (int)$pr['id'] ?>" <?= $projectId === (int)$pr['id'] ? 'selected' : '' ?>>
+            <?= e($pr['name']) ?> (<?= e($pr['code']) ?>)
+          </option>
+        <?php endforeach; ?>
+      </select>
+      in that board's first column. A card on the wrong show can be moved from the card
+      itself afterwards.
     </p>
 
     <div class="actions">

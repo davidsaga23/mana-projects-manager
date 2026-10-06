@@ -25,6 +25,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/tickets.php';
+require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcript button
 require_login();
 
 $ready = column_exists($pdo, 'tickets', 'id');
@@ -68,9 +69,19 @@ $pageTitle = 'Tasks';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<h2 class="wizard-title">Tasks
-  <span class="muted">everything open, across every show</span>
-</h2>
+<div class="page-head">
+  <h2 class="wizard-title">Tasks
+    <span class="muted">everything open, across every show</span>
+  </h2>
+  <?php // HERE as well as on a project's board, because this is where David went
+        // looking for it — and he was right: a meeting is rarely about one show,
+        // so the natural place to drop its transcript is the screen that spans
+        // them. Which project the cards land on is chosen after reading. ?>
+  <?php if (can_edit() && ai_configured()): ?>
+    <a class="button secondary" href="transcript.php"
+       title="Read a meeting transcript and turn its action items into cards">Read a transcript</a>
+  <?php endif; ?>
+</div>
 
 <?php if (!$ready): ?>
   <div class="empty-state">

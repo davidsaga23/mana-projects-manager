@@ -2174,6 +2174,25 @@ transcript anywhere workable.
 **Sonnet rather than Opus:** the work is extraction rather than reasoning, and it is markedly cheaper
 and faster on a transcript that may run to thousands of words.
 
+### ⚠ It belongs on the cross-project screen, and that was the point all along (same day)
+Shipped with the button on a project's Tasks board only. David went looking for it on the
+cross-project **Tasks** screen and could not find it — and he was right to look there: *"we need a
+menu on top that says Tasks ... so we can drop the transcript in that general task"* is what he had
+asked for in the first place. **A meeting is rarely about one show**, so the natural place to drop
+its transcript is the screen that spans them.
+
+So a project is now **optional**, and **which show the cards are filed against is chosen on the
+review screen, after reading** — because which show each action item belongs to is usually only clear
+once the list is in front of you. Opened from a project's board, that project is simply preselected.
+
+Two things follow from having no project while reading:
+- **The names offered to the model are studio-wide** rather than one show's crew. A meeting about
+  three shows mentions people from all of them, and a name that does not match becomes nobody either
+  way.
+- **The first board column is worked out per project at the moment of writing**, not once for the
+  page. Columns are a project's own statuses, so a card filed against MSD must land in an MSD column.
+  The posted project id is checked against the real list before anything is written.
+
 **Not run in PHP** — there is none on this machine, and no call was made to Anthropic from here. All
 seven checks pass; the validation was replayed in Python over the ten cases above.
 

@@ -1345,6 +1345,15 @@ button:hover { background: var(--primary-hover); }
 }
 .move-zone form { margin: 0; flex: none; }
 .move-zone select { width: auto; min-width: 180px; }
+
+/* A heading with an action beside it. The button sits on the baseline of the
+   title rather than under it, so the page still opens with one line. */
+.page-head { display: flex; align-items: baseline; justify-content: space-between;
+             gap: 16px; flex-wrap: wrap; }
+.page-head .wizard-title { margin-bottom: 0; }
+/* The project a transcript's cards will be filed against, inline in the
+   sentence that says what is about to happen. */
+.file-them select { width: auto; margin: 0 2px; }
 /* An unread mention on My tasks. A left rule rather than a filled row: the
    table already colours an overdue row, and two filled states competing on
    one list is how both stop meaning anything. */
