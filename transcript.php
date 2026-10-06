@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['read'])) {
         $text = file_get_contents($_FILES['file']['tmp_name']);
         if ($text === false) throw new RuntimeException('That file could not be read.');
 
-        $res = ai_extract_tasks($text, $assignees);
+        $res = ai_extract_tasks($text, $assignees, $projects);
         if (!$res['ok']) throw new RuntimeException($res['error']);
 
         if (!$res['tasks']) {
@@ -124,22 +124,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['read'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
     try {
         if (!can_edit()) throw new RuntimeException('Your account cannot create cards.');
-        // Where they go, decided on the review screen. Verified against the real
-        // list rather than trusted: a posted id is not a project until it is.
-        $to = (int)($_POST['to_project'] ?? 0);
-        $ok = false;
-        foreach ($projects as $pr) if ((int)$pr['id'] === $to) { $ok = true; $target = $pr; }
-        if (!$ok) throw new RuntimeException('Pick which project these belong to.');
+        // ⚠ A PROJECT PER ROW (David, 2026-10-07: "not all of these will land on
+        // the same project"). One meeting covers several shows, which is exactly
+        // why reading it with no project at all is the normal case.
+        $known = [];
+        foreach ($projects as $pr) $known[(int)$pr['id']] = $pr;
 
-        [$firstStatus, ] = transcript_first_column($pdo, $to);
+        // The first column of each show it files against, worked out once per
+        // project rather than once per row: twenty cards on two shows is two
+        // lookups, not twenty.
+        $firstCol = [];
 
         $rows = is_array($_POST['t'] ?? null) ? $_POST['t'] : [];
         $made = 0;
+        $byProject = [];
+        $noProject = [];
 
         foreach ($rows as $r) {
             if (empty($r['keep'])) continue;            // unticked: not wanted
             $title = trim((string)($r['title'] ?? ''));
             if ($title === '') continue;                // emptied: the same answer
+
+            // Refused rather than guessed. A card quietly filed on whichever show
+            // happened to be first is the one mistake this screen exists to stop.
+            $to = (int)($r['project_id'] ?? 0);
+            if (!isset($known[$to])) { $noProject[] = $title; continue; }
+            if (!array_key_exists($to, $firstCol)) {
+                [$firstCol[$to], ] = transcript_first_column($pdo, $to);
+            }
 
             $crewId = !empty($r['crew_id']) ? (int)$r['crew_id'] : null;
             $priority = in_array($r['priority'] ?? '', ticket_priorities(), true)
@@ -155,17 +167,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
             )->execute([
                 $to, $seq, $type, mb_substr($title, 0, 255),
                 trim((string)($r['description'] ?? '')) ?: null,
-                $firstStatus, $priority, $crewId, $userId ?: null,
+                $firstCol[$to], $priority, $crewId, $userId ?: null,
             ]);
             $made++;
+            $byProject[$known[$to]['code']] = ($byProject[$known[$to]['code']] ?? 0) + 1;
         }
 
-        unset($_SESSION['transcript'][$projectId]);
-        flash($made ? 'ok' : 'warn', $made
-            ? $made . ' card' . ($made === 1 ? '' : 's') . ' created on ' . $target['name']
-              . ', waiting to be started.'
-            : 'Nothing was ticked, so nothing was created.');
-        header('Location: ' . ($made ? 'tasks.php?project=' . $to : $selfUrl));
+        // ⚠ WHAT WAS SKIPPED IS NAMED, not counted. "6 of 8 created" leaves
+        // somebody hunting for the two; naming them is the difference between a
+        // report and a riddle. The ones without a show are still in the session,
+        // so the screen comes back with them to finish.
+        $said = [];
+        if ($made) {
+            $parts = [];
+            foreach ($byProject as $code => $n) $parts[] = $n . ' on ' . $code;
+            $said[] = $made . ' card' . ($made === 1 ? '' : 's') . ' created ('
+                    . implode(', ', $parts) . '), waiting to be started.';
+        }
+        if ($noProject) {
+            $said[] = 'Left for now, with no project chosen: "'
+                    . implode('", "', array_map(fn($t) => mb_substr($t, 0, 60), $noProject)) . '".';
+        }
+        if (!$made && !$noProject) $said[] = 'Nothing was ticked, so nothing was created.';
+
+        // Everything filed and nothing left over: the list has done its job.
+        if ($made && !$noProject) unset($_SESSION['transcript'][$projectId]);
+
+        flash($made ? 'ok' : 'warn', implode(' ', $said));
+        header('Location: ' . ($made && !$noProject
+            ? 'tasks.php?project=' . array_key_last($byProject ? $known : []) : $selfUrl));
         exit;
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
@@ -245,8 +275,8 @@ require __DIR__ . '/includes/header.php';
     <div class="grid-scroll">
       <table class="grid-table">
         <thead>
-          <tr><th>Create</th><th>Title</th><th>What was said</th><th>Owner</th>
-              <th>Priority</th><th>Kind</th></tr>
+          <tr><th>Create</th><th>Title</th><th>What was said</th><th>Project</th>
+              <th>Owner</th><th>Priority</th><th>Kind</th></tr>
         </thead>
         <tbody>
         <?php foreach ($found as $i => $t): $n = 't[' . $i . ']'; ?>
@@ -254,6 +284,23 @@ require __DIR__ . '/includes/header.php';
             <td class="num"><input type="checkbox" name="<?= $n ?>[keep]" value="1" checked></td>
             <td><input name="<?= $n ?>[title]" value="<?= e($t['title']) ?>" size="40" maxlength="255"></td>
             <td><textarea name="<?= $n ?>[description]" rows="2" cols="34"><?= e($t['description']) ?></textarea></td>
+            <td>
+              <?php // ⚠ PER ROW (David, 2026-10-07: "not all of these will land on the
+                    // same project"). The model suggests one from the codes it was
+                    // given and leaves it empty when unsure, on the same terms as
+                    // the owner; what it suggested is preselected and is a guess
+                    // until somebody looks at it. ?>
+              <select name="<?= $n ?>[project_id]" class="t-project">
+                <option value="">no project yet</option>
+                <?php foreach ($projects as $pr): ?>
+                  <option value="<?= (int)$pr['id'] ?>" <?=
+                    (int)($t['project_id'] ?? 0) === (int)$pr['id'] ? 'selected'
+                      : ($projectId === (int)$pr['id'] && empty($t['project_id']) ? 'selected' : '') ?>>
+                    <?= e($pr['code']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </td>
             <td>
               <?php // Nobody is the FIRST option and the default, because it is the
                     // expected answer whenever the transcript was not plain. ?>
@@ -290,19 +337,26 @@ require __DIR__ . '/includes/header.php';
           // in front of you — which is why the file can be read with no project
           // at all. They all land on one show; a card that belongs elsewhere is
           // moved from the card itself, which takes a click. ?>
+    <?php // A convenience, not the control: most transcripts are mostly one show,
+          // so setting every row at once and then correcting two of them beats
+          // picking twenty times. The row is still what decides. ?>
     <p class="muted small file-them">
-      File them on
-      <select name="to_project" required aria-label="Project to create these cards on">
-        <?php if (!$projectId): ?><option value="">choose a project…</option><?php endif; ?>
+      Set every row to
+      <select id="setAll" aria-label="Set every row's project">
+        <option value="">—</option>
         <?php foreach ($projects as $pr): ?>
-          <option value="<?= (int)$pr['id'] ?>" <?= $projectId === (int)$pr['id'] ? 'selected' : '' ?>>
-            <?= e($pr['name']) ?> (<?= e($pr['code']) ?>)
-          </option>
+          <option value="<?= (int)$pr['id'] ?>"><?= e($pr['name']) ?> (<?= e($pr['code']) ?>)</option>
         <?php endforeach; ?>
       </select>
-      in that board's first column. A card on the wrong show can be moved from the card
-      itself afterwards.
+      — each card lands in that board's first column, and one on the wrong show can be
+      moved from the card itself afterwards.
     </p>
+    <script>
+      document.getElementById('setAll').addEventListener('change', function () {
+        if (!this.value) return;
+        document.querySelectorAll('.t-project').forEach(function (s) { s.value = this.value; }, this);
+      });
+    </script>
 
     <div class="actions">
       <button type="submit">Create the ticked ones</button>

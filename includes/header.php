@@ -51,7 +51,7 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
             // had three ways to reach it and one of them was a word in a row of
             // four. Check the brand is still a link before adding a fourth item
             // back here. ?>
-      · <a href="alltasks.php">Tasks</a>
+      · <a href="alltasks.php">Studio Tasks</a>
       <?php // ARTISTS is up here, not inside a project, because a freelancer is
             // not the property of the show that first spoke to them — the whole
             // value of writing them down is that the NEXT show can find them.

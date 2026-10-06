@@ -65,12 +65,15 @@ foreach ($rows as $r) {
     if (empty($r['assigned_crew_id'])) $unowned++;
 }
 
-$pageTitle = 'Tasks';
+$pageTitle = 'Studio Tasks';
 require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="page-head">
-  <h2 class="wizard-title">Tasks
+  <?php // "Studio Tasks", not "Tasks" (David, 2026-10-07). Next to "My tasks"
+        // the shorter name read as a subset of it; this one says whose they are,
+        // which is everybody's. ?>
+  <h2 class="wizard-title">Studio Tasks
     <span class="muted">everything open, across every show</span>
   </h2>
   <?php // HERE as well as on a project's board, because this is where David went
