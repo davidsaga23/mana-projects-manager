@@ -35,20 +35,34 @@ if (!$t) {
     exit;
 }
 
-$projectId = (int)$t['project_id'];
-$pstmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
-$pstmt->execute([$projectId]);
-$project = $pstmt->fetch();
+// ⚠ A CARD MAY HAVE NO PROJECT (migration 041). Everything below that is
+// scoped to one — the statuses, the board columns, the shot and asset pickers,
+// the nav bar — is therefore conditional. The card still opens, still takes a
+// title and a description, and carries one control that matters: move it to a
+// show.
+$projectId = (int)($t['project_id'] ?? 0);
+$project = null;
+if ($projectId > 0) {
+    $pstmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
+    $pstmt->execute([$projectId]);
+    $project = $pstmt->fetch() ?: null;
+}
+if (!$project) $projectId = 0;
 
 $selfUrl  = 'ticket.php?id=' . $id;
-$boardUrl = 'tasks.php?project=' . $projectId;
+$boardUrl = $projectId ? 'tasks.php?project=' . $projectId : 'alltasks.php';
 $isTicket = ($t['type'] ?? 'task') === 'ticket';
 $label    = ticket_ref($t);
 $canDeleteCard = is_admin() || (int)$t['created_by'] === $userId;
 
-$statusMap = statuses_by_id($pdo, $projectId);
-[$columns] = ticket_board_columns($pdo, $projectId);
-$assignees = ticket_assignees($pdo, $projectId);
+$statusMap = $projectId ? statuses_by_id($pdo, $projectId) : [];
+[$columns] = $projectId ? ticket_board_columns($pdo, $projectId) : [[], false];
+// Studio-wide when the card has no show, so it can still be handed to somebody
+// before anybody has decided which project it belongs to.
+$assignees = $projectId
+    ? ticket_assignees($pdo, $projectId)
+    : $pdo->query('SELECT id, name, role, email, is_team, is_placeholder FROM crew
+                    WHERE active = 1 ORDER BY name')->fetchAll();
 
 // --- post a comment ---------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
@@ -330,6 +344,9 @@ $assetOptions = $assetsQ->fetchAll(PDO::FETCH_COLUMN);
 
 $episodic  = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
 $currentShot = shot_label($t['episode'] ?? '', $t['shot_code'] ?? '');
+
+// Staffing is per show, so an unfiled card can only offer the studio-wide list.
+$staffHref = $projectId ? 'crew.php?project=' . $projectId : 'crew.php';
 $statusColor = $t['status_color'] ?: '#8a97a3';
 
 /** One attachment: previewed inline when the browser can show it, linked otherwise. */
@@ -360,11 +377,24 @@ function render_attachment(array $a, bool $canDelete): void {
     echo '</div></div>';
 }
 
-$pageTitle = $label . ' · ' . $project['name'];
+$pageTitle = $label . ' · ' . ($project['name'] ?? 'no project yet');
 require __DIR__ . '/includes/header.php';
 ?>
 
-<?php project_nav($project, 'tasks'); ?>
+<?php // ⚠ NO BAR WITHOUT A PROJECT. The bar is a show's own navigation —
+      // its board, its shots, its staffing — and there is no show to navigate.
+      // The card still opens, and the control that matters, filing it against a
+      // show, is at the bottom of this page. ?>
+<?php if ($project): ?>
+  <?php project_nav($project, 'tasks'); ?>
+<?php else: ?>
+  <p class="flash flash-warn">
+    <strong>This card is not on a project yet.</strong>
+    It has no board, no status and no reference number until it is filed against a
+    show — choose one at the bottom of this page. Until then it lives on
+    <a href="alltasks.php">Studio Tasks</a>.
+  </p>
+<?php endif; ?>
 
 <p class="crumb"><a href="<?= e($boardUrl) ?>">← Back to the board</a></p>
 
@@ -402,12 +432,12 @@ require __DIR__ . '/includes/header.php';
     <p class="flash flash-warn" style="margin-top:10px;">
       This is owned by <strong><?= e($t['crew_name']) ?></strong>, a planning slot that nobody
       fills yet, so no notification email was sent. Renaming the slot to a real person on the
-      <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a> makes this theirs, with nothing to move.
+      <a href="<?= e($staffHref) ?>">Staffing screen</a> makes this theirs, with nothing to move.
     </p>
   <?php elseif ($t['crew_name'] && empty($t['crew_email']) && (int)($t['is_team'] ?? 0) === 0): ?>
     <p class="flash flash-warn" style="margin-top:10px;">
       <strong><?= e($t['crew_name']) ?></strong> has no email address on file, so notifications about
-      this card go nowhere. Add one on the <a href="crew.php?project=<?= $projectId ?>">Staffing screen</a>.
+      this card go nowhere. Add one on the <a href="<?= e($staffHref) ?>">Staffing screen</a>.
     </p>
   <?php endif; ?>
 
@@ -537,6 +567,12 @@ require __DIR__ . '/includes/header.php';
     </label>
 
     <div class="row">
+      <?php // ⚠ HIDDEN, NOT EMPTY, WITHOUT A PROJECT. A shot and an asset both
+            // belong to one show, so with no show there is nothing either box could
+            // ever match, and two boxes that can only be wrong are worse than none.
+            // They appear the moment the card is filed. The pipeline step stays:
+            // "Anima Dev" is about the platform itself and needs no project. ?>
+      <?php if ($projectId): ?>
       <label>Shot <span class="muted small">(type to search)</span>
         <input name="shot_label" list="shotList" autocomplete="off" value="<?= e($currentShot) ?>"
                placeholder="<?= $episodic ? 'e.g. EP002_SH050' : 'e.g. SH050' ?>" <?= can_edit() ? '' : 'disabled' ?>>
@@ -551,6 +587,7 @@ require __DIR__ . '/includes/header.php';
           <?php foreach ($assetOptions as $a): ?><option value="<?= e($a) ?>"></option><?php endforeach; ?>
         </datalist>
       </label>
+      <?php endif; ?>
       <label>Pipeline step
         <?php // Drawn by the same function the new-ticket form uses, so the two
               // cannot disagree about what is on offer. ?>
@@ -564,6 +601,11 @@ require __DIR__ . '/includes/header.php';
     <div class="row">
       <label>Status
         <select name="status_id" <?= can_edit() ? '' : 'disabled' ?>>
+          <?php // Statuses are a project's own, so there are none to offer yet. Said
+                // out loud rather than drawn as an empty dropdown. ?>
+          <?php if (!$projectId): ?>
+            <option value="">no project, so no statuses yet</option>
+          <?php endif; ?>
           <?php
           // Every status, not only the board columns: a card can legitimately sit
           // in one that isn't a column ("Retake"), and hiding those here would
@@ -625,24 +667,33 @@ require __DIR__ . '/includes/header.php';
     if ($others): ?>
     <div class="move-zone">
       <div>
-        <strong>Move to another project</strong>
+        <strong><?= $projectId ? 'Move to another project' : 'File this on a project' ?></strong>
         <p class="muted small" style="margin:2px 0 0;">
-          Currently on <strong><?= e($t['project_name'] ?? $project['name']) ?></strong>.
-          Moving renumbers it — <?= e($label) ?> becomes the next number on the project it
-          goes to — and any shot, asset or step is cleared, because those belong to this
-          show. Comments, attachments and the assignee go with it.
+          <?php if ($projectId): ?>
+            Currently on <strong><?= e((string)($t['project_name'] ?? '')) ?></strong>.
+          <?php else: ?>
+            <strong>Not on a project yet.</strong> Filing it gives it a board, a status
+            and a reference number.
+          <?php endif; ?>
+          <?= e($label) ?> becomes the next number on the project it goes to.
+          <?php if ($projectId): ?>
+            Any shot, asset or step is cleared, because those belong to this show.
+          <?php else: ?>
+            It joins the first column on that board.
+          <?php endif; ?>
+          Comments, attachments and the assignee go with it.
         </p>
       </div>
       <form method="post" class="inline-form"
-            onsubmit="return confirm('Move <?= e($label) ?> to another project?
+            onsubmit="return confirm('<?= e($label) ?>: <?= $projectId ? 'move it to another project' : 'file it on this project' ?>?
 
-Its reference will change and any shot, asset or step will be cleared.');">
+Its reference will change<?= $projectId ? ' and any shot, asset or step will be cleared' : '' ?>.');">
         <select name="to_project" aria-label="Project to move this card to">
           <?php foreach ($others as $o): ?>
             <option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option>
           <?php endforeach; ?>
         </select>
-        <button type="submit" name="move_project" value="1" class="secondary">Move</button>
+        <button type="submit" name="move_project" value="1" class="secondary"><?= $projectId ? 'Move' : 'File' ?></button>
       </form>
     </div>
   <?php endif; endif; ?>

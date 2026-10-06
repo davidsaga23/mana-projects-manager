@@ -2124,6 +2124,85 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-07 — A card can exist before anybody says which show it is for
+
+David, reading the first real transcript: *"we should be able to add them without a project so we
+can organize them later."*
+
+He is right, and the transcript is the proof. A production meeting covers three shows and a dozen
+things that belong to none of them yet. Forcing a project at the moment of capture means guessing,
+and **a card filed against the wrong show is harder to find than one filed against nothing** — the
+wrong one looks handled.
+
+So `tickets.project_id` is nullable (migration 041).
+
+### ⚠ THE ROADMAP RECOMMENDED A PSEUDO-PROJECT AND THAT RECOMMENDATION WAS OVERTURNED
+
+An "Inbox" project would have given these cards statuses, a board, a sequence and a place in the
+switcher for free. The argument was good: the thing a general board needs most is to look and behave
+exactly like a board, and that is what a project already is.
+
+What overturned it was not a better argument but **noticing the requirement was different**. David
+did not ask for a board without a project. He asked to capture work before deciding where it goes,
+and to see everything open across every show in one list. Studio Tasks is a read-only list with
+filters — it has no columns, so it needs no statuses, so option 1's entire advantage bought nothing
+while its cost stayed: an inbox appearing as a show with no delivery date and 0% progress on the
+projects page, the dashboard, finance, the switcher and in bookings, forever.
+
+**The lesson is about the shape of the question.** "A board with no project" and "a card with no
+project" sound like the same feature and are not. One needs a status vocabulary invented for it; the
+other needs a column to accept NULL.
+
+### What a NULL project means, said once so it is not rediscovered
+
+* **No board.** `tasks.php` filters on `project_id`, so an unfiled card is on no board at all.
+  Studio Tasks is the only screen that shows it — which is the whole reason Studio Tasks exists.
+* **No status.** Columns are a project's own statuses, so there is no column to sit in. `status_id`
+  stays NULL, which the ticket page already tolerated.
+* **No reference.** `seq` is a per-project counter; unfiled cards carry 0, and `ticket_ref()` already
+  fell back to `#id`. `uniq_project_seq` permits many `(NULL, 0)` rows because MySQL does not compare
+  NULLs as equal.
+* **No shot, asset or step, and no time.** All belong to a show. The first three are *hidden* on the
+  ticket page rather than drawn empty; time logging is *refused*, because hours costed to no show are
+  hours quietly missing from every finance total.
+
+### ⚠ THE EXPENSIVE PART WAS THE INNER JOINS, AND NONE OF THEM WOULD HAVE ANNOUNCED ITSELF
+
+Six queries joined `projects` on a ticket's `project_id`. Left alone, every one would have made an
+unfiled card *invisible or denied* rather than visibly broken:
+
+* `ticket_select_sql()` — the shared query. An inner join would have hidden unfiled cards from the
+  board, Studio Tasks **and** My tasks at once. Silently.
+* `move_ticket_to_project()` — would have answered *"that card no longer exists"* for the one card
+  the function exists to file.
+* The mention mailer — would have returned *"that ticket no longer exists, so nobody was emailed"*
+  for a card that does exist.
+* My tasks' status save — would have told the owner of an unfiled card it *"is not assigned to you"*.
+
+Two were left inner on purpose: `item.php` is scoped to a shot or asset (an unfiled card has
+neither), and `person.php` filters `project_id = ?`, which is never NULL.
+
+This is **Lesson 11 in a new place**: a screen that quietly renders empty is the failure this codebase
+keeps paying for, and a nullable foreign key is a machine for producing them.
+
+### The foreign key changed direction, which is a real behaviour change
+
+It was `ON DELETE CASCADE`: deleting a project took its cards, which was right when a card could not
+exist without one. It is now `ON DELETE SET NULL` — deleting a show leaves its cards on Studio Tasks.
+The safer direction: a card nobody wants is one click to delete, and a card destroyed by a cascade
+nobody saw is simply gone.
+
+### Where it shows up
+
+The transcript reader creates unfiled rows instead of refusing them, and its report names the split
+(*"3 cards created (1 on FCM, 1 with no project yet)"*) plus where to find the unfiled ones. Studio
+Tasks prints **"no project"** in words rather than leaving the cell blank — a blank cell reads as a
+bug, and the Project filter is built from the text in the cells, so an empty one could not be picked.
+Filing one is a click from the card itself, which takes the next number in its new home, maps the
+status by name, and starts a previously statusless card in the target's first column.
+
+---
+
 ## 2026-10-07 — A call transcript, read by Claude, into cards
 **Asked by David:** *"we need to process the transcript through an API for Anthropic so you can
 summarize the task and ideally assign a potential user based on the transcript, when you have any

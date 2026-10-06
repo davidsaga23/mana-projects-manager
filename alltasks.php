@@ -59,8 +59,17 @@ if ($ready) {
 $open = 0; $overdue = 0; $unowned = 0;
 $today = date('Y-m-d');
 $byProject = [];
+// ⚠ COUNTED SEPARATELY, since migration 041. An unfiled card has no code, and
+// a null array key becomes "" in PHP — so without this the unfiled ones would all
+// pile into one nameless bucket and be counted as a show. They are not a show;
+// they are work that has not been given one.
+$unfiled = 0;
 foreach ($rows as $r) {
-    $byProject[$r['project_code']] = ($byProject[$r['project_code']] ?? 0) + 1;
+    if (($r['project_code'] ?? '') === '' || $r['project_code'] === null) {
+        $unfiled++;
+    } else {
+        $byProject[$r['project_code']] = ($byProject[$r['project_code']] ?? 0) + 1;
+    }
     if (!empty($r['due_date']) && $r['due_date'] < $today) $overdue++;
     if (empty($r['assigned_crew_id'])) $unowned++;
 }
@@ -110,6 +119,7 @@ require __DIR__ . '/includes/header.php';
     <strong><?= count($rows) ?></strong> card<?= count($rows) === 1 ? '' : 's' ?>
     across <strong><?= count($byProject) ?></strong>
     show<?= count($byProject) === 1 ? '' : 's' ?><?php
+      if ($unfiled): ?> · <span class="warn-text"><?= $unfiled ?> with no project yet</span><?php endif; ?><?php
       if ($overdue): ?> · <span class="err"><?= $overdue ?> past its date</span><?php endif; ?><?php
       if ($unowned): ?> · <span class="warn-text"><?= $unowned ?> with nobody on <?= $unowned === 1 ? 'it' : 'them' ?></span><?php endif; ?>
     ·
@@ -117,13 +127,14 @@ require __DIR__ . '/includes/header.php';
         ? 'hide finished work' : 'include finished work' ?></a>
   </p>
 
-  <?php // ⚠ NO CARD IS WITHOUT A PROJECT, and saying so beats an empty bucket.
-        // David asked to see tasks "with and without project". Every ticket has
-        // one — `tickets.project_id` is NOT NULL (migration 017) — so there is
-        // nothing to show in that half, and a heading over nothing would read as
-        // a fault. What makes the sorting workflow possible is moving a card
-        // between shows, which exists; the ROADMAP carries what a genuinely
-        // project-less board would cost. ?>
+  <?php // ⚠ CARDS WITH NO PROJECT LIVE HERE, and nowhere else. A project's board
+        // filters on project_id, so an unfiled card is on no board at all — this
+        // list is the only screen that shows it, which is why it reads "no project"
+        // in words rather than leaving the cell blank: a blank cell looks like a
+        // bug, and the Project filter is built from the words in the cells, so an
+        // empty one could not be picked. David, 2026-10-07: "we should be able to
+        // add them without a project so we can organize them later." Filing one is
+        // a click from the card. ?>
 
   <div class="grid-scroll">
     <table class="grid-table alltasks-table">
@@ -146,7 +157,9 @@ require __DIR__ . '/includes/header.php';
               <span class="ctx-chip ctx-platform"><?= e(ticket_about_label(TICKET_ABOUT_PLATFORM)) ?></span>
             <?php endif; ?>
           </td>
-          <td><?= e($r['project_code']) ?></td>
+          <td><?= ($r['project_code'] ?? '') !== ''
+                ? e($r['project_code'])
+                : '<span class="warn-text">no project</span>' ?></td>
           <td class="muted small"><?= $r['type'] === 'ticket' ? 'Ticket' : 'Task' ?></td>
           <td><span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
               <?= e($r['status_name'] ?? 'no status') ?></span></td>

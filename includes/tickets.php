@@ -142,6 +142,11 @@ function ticket_status_is_done(?array $status): bool {
  * somebody has already pasted into a chat.
  */
 function next_ticket_seq(PDO $pdo, int $projectId): int {
+    // ⚠ ZERO FOR AN UNFILED CARD. `seq` is a per-project counter and there is no
+    // project to count within; ticket_ref() falls back to "#id" when there is no
+    // code, so the card still has something to be called. The unique key permits
+    // many (NULL, 0) rows because MySQL does not compare NULLs as equal.
+    if ($projectId <= 0) return 0;
     $stmt = $pdo->prepare('SELECT COALESCE(MAX(seq), 0) + 1 FROM tickets WHERE project_id = ?');
     $stmt->execute([$projectId]);
     return (int)$stmt->fetchColumn();
@@ -218,7 +223,11 @@ function ticket_select_sql(): string {
                 (SELECT COUNT(*) FROM ticket_comments tc
                   WHERE tc.ticket_id = t.id AND tc.kind = \'user\') AS comment_count
            FROM tickets t
-           JOIN projects p        ON p.id  = t.project_id
+           -- ⚠ LEFT, since migration 041. An INNER JOIN here would have hidden
+           -- every card with no project yet from the board, from Studio Tasks and
+           -- from My tasks — which is to say it would have hidden them entirely,
+           -- and silently, which is the worst way for a card to be missing.
+           LEFT JOIN projects p   ON p.id  = t.project_id
            LEFT JOIN crew c       ON c.id  = t.assigned_crew_id
            LEFT JOIN users u      ON u.id  = t.created_by
            LEFT JOIN statuses st  ON st.id = t.status_id
@@ -262,14 +271,18 @@ function ticket_select_sql(): string {
  * @return array{ok:bool, said:string}
  */
 function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): array {
+    // ⚠ LEFT, since migration 041. An unfiled card is exactly the card this
+    // function exists to file, and an INNER JOIN would have told the user it "no
+    // longer exists" — a lie, about the one case that matters most.
     $q = $pdo->prepare(
         'SELECT t.*, p.code AS project_code FROM tickets t
-           JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
+           LEFT JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
     );
     $q->execute([$ticketId]);
     $t = $q->fetch();
     if (!$t) return ['ok' => false, 'said' => 'That card no longer exists.'];
-    if ((int)$t['project_id'] === $toProjectId) {
+    $wasUnfiled = $t['project_id'] === null;
+    if (!$wasUnfiled && (int)$t['project_id'] === $toProjectId) {
         return ['ok' => false, 'said' => 'That card is already on that project.'];
     }
 
@@ -281,9 +294,23 @@ function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): arra
     $oldRef = ticket_ref($t);
 
     // The status, by name in the new project.
+    // An unfiled card has no status to carry, so it lands in the new project's
+    // first column rather than arriving with none — a card with no status is on no
+    // board, which is the state filing it was meant to end.
     $newStatus = null;
     $statusNote = '';
-    if ($t['status_id'] !== null) {
+    if ($t['status_id'] === null) {
+        $first = $pdo->prepare(
+            'SELECT id, name FROM statuses WHERE project_id = ? ORDER BY sort_order, name LIMIT 1'
+        );
+        $first->execute([$toProjectId]);
+        if ($row = $first->fetch()) {
+            $newStatus  = (int)$row['id'];
+            $statusNote = ' It had no status, so it starts in "' . $row['name'] . '".';
+        } else {
+            $statusNote = ' ' . $target['code'] . ' has no statuses set up, so the card still has none.';
+        }
+    } elseif ($t['status_id'] !== null) {
         $was = $pdo->prepare('SELECT name FROM statuses WHERE id = ?');
         $was->execute([(int)$t['status_id']]);
         $wasName = (string)$was->fetchColumn();
@@ -334,7 +361,8 @@ function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): arra
     }
 
     $newRef = $target['code'] . '-' . $seq;
-    $said = 'Moved to ' . $target['name'] . '. ' . $oldRef . ' is now ' . $newRef . '.' . $statusNote;
+    $said = ($wasUnfiled ? 'Filed under ' : 'Moved to ') . $target['name'] . '. '
+          . $oldRef . ' is now ' . $newRef . '.' . $statusNote;
     if ($dropped) {
         $said .= ' ' . ucfirst(implode(', ', $dropped))
                . ' belonged to the old project, so ' . (count($dropped) === 1 ? 'it was' : 'they were')

@@ -567,35 +567,57 @@ a different input.
 
 **Open:** which of the two, and the policy answer if it is the second.
 
-### Where the transcript lands, and a general Tasks board (2026-10-07)
-David, asked for alongside the above: *"we need a menu on top that says Tasks (aside of my tasks) so
-we can drop the transcript in that general task and then as we assign them we can put them in a
-project or the other."* The cards arrive in **Waiting to start**, unassigned, and are sorted into
-shows while being read.
+### Where the transcript lands, and a general Tasks board (2026-10-07) — BUILT
 
-**⚠ HALF OF THIS IS ALREADY DONE, and it is the half that was blocking.** David's objection was
-*"If I process the transcript in a project task then I won't be able to move it to another project"*.
-Moving a card between projects was built on 2026-10-07 (`move_ticket_to_project()`), so a transcript
-can be processed on any show and the cards sorted out afterwards. **A general board is now a
-convenience, not a requirement** — worth knowing before anybody scopes it as the hard part.
+David: *"we need a menu on top that says Tasks (aside of my tasks) so we can drop the transcript in
+that general task and then as we assign them we can put them in a project or the other."* Then, after
+reading the first real transcript: *"we should be able to add them without a project so we can
+organize them later."*
 
-**The hard part of a general board is statuses.** A board's columns ARE the project's own statuses
-(`statuses.project_id`), and "Waiting to start" is a row belonging to a show. A board with no project
-has no columns. Two ways out, and they are not equal:
+**Shipped as Studio Tasks (`alltasks.php`) plus a nullable `tickets.project_id` (migration 041).**
 
-1. **A real project, flagged as the inbox.** It gets statuses, a code, a board, a sequence and a
-   place in the switcher for free, and "move between projects" is already built. The cost is one
-   flag and then remembering it everywhere a project list is drawn — the dashboard, finance, the
-   projects page, the switcher — so it does not appear as a show with no delivery date and 0%
-   progress.
-2. **`tickets.project_id` nullable.** Cleaner conceptually, more expensive everywhere: the board,
-   the sequence (`uniq_project_seq` permits many NULLs, so numbering needs its own answer), the
-   status vocabulary, and every query that joins `projects`.
+**⚠ THE RECOMMENDATION HERE WAS OPTION 1 — A PSEUDO-PROJECT — AND IT WAS NOT TAKEN.** That is
+worth recording, because the reasoning below was sound and the thing that overturned it was not a
+better argument but a different question. The two options were:
 
-**The recommendation is (1)**, because the thing a general board needs most is to look and behave
-exactly like a board, and that is what a project already is.
+1. **A real project, flagged as the inbox.** Statuses, a code, a board, a sequence and a place in
+   the switcher for free. Cost: one flag, then remembering it on the dashboard, in finance, on the
+   projects page, in the switcher and in bookings, so it does not appear as a show with no delivery
+   date and 0% progress.
+2. **`tickets.project_id` nullable.** Cleaner conceptually, more expensive everywhere.
 
-**Open:** whether a general board is wanted now that moving works.
+Option 1 wins if what you want is **a board**. But David did not ask for a board without a project —
+he asked to **capture work before deciding which show it belongs to**, and to see everything open
+across every show in one list. Those are different things, and the second needs no columns at all:
+Studio Tasks is a read-only list with filters, not a board. Once the board requirement went away,
+option 1's entire advantage — "it looks and behaves exactly like a board" — bought nothing, and its
+cost (an inbox showing up as a show in five other screens, forever) stayed.
+
+**What option 2 actually cost**, for the next person weighing a nullable foreign key here:
+
+* **Six inner joins became LEFT joins**, in `ticket_select_sql()`, `move_ticket_to_project()`, the
+  mention mailer, and the My tasks status save. Every one of them, left alone, would have made an
+  unfiled card *invisible or denied* rather than broken — "that ticket no longer exists", a mention
+  emailed and then missing from the screen the email points at. This is the expensive part and it is
+  the part that does not announce itself.
+* **Four screens had to be taught to say "no project" in words.** A blank cell reads as a bug, and
+  the grid filters are built from the text in the cells, so an empty one cannot be picked.
+* **The things that belong to a show are hidden, not emptied**: the shot and asset pickers, the
+  status dropdown, the time-log box. An empty dropdown reads as broken; a sentence does not. Time in
+  particular is refused outright — hours costed to no show would be hours missing from every total.
+* **The foreign key flipped from `ON DELETE CASCADE` to `ON DELETE SET NULL`.** Deleting a show now
+  leaves its cards on Studio Tasks instead of destroying them. A real behaviour change, and the
+  safer direction.
+* **`seq` and the reference**: an unfiled card carries `seq = 0`, and `ticket_ref()` already fell
+  back to `#id` when there is no project code, so nothing had to be invented. `uniq_project_seq`
+  permits many `(NULL, 0)` rows because MySQL does not compare NULLs as equal.
+
+Filing one later is `move_ticket_to_project()`, which takes the next number in its new home, maps the
+status by name, and now starts an unfiled card in the target's first column rather than leaving it
+statusless.
+
+**Still open:** nothing required. A per-project board that shows unfiled cards is deliberately *not*
+built — a card with no show has no business on one show's board.
 
 ### How many versions a task took
 

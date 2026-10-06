@@ -132,14 +132,23 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
         $ticketId = (int)$_POST['ticket_id'];
         $statusId = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
 
+        // ⚠ LEFT, since migration 041: an INNER JOIN would have told the owner
+        // of an unfiled card it "is not assigned to you", which is false.
         $q = $pdo->prepare(
             'SELECT t.*, p.code AS project_code FROM tickets t
-               JOIN projects p ON p.id = t.project_id
+               LEFT JOIN projects p ON p.id = t.project_id
               WHERE t.id = ? AND t.assigned_crew_id = ?'
         );
         $q->execute([$ticketId, $myCrewId]);
         $tk = $q->fetch();
         if (!$tk) throw new RuntimeException('That ticket is not assigned to you.');
+
+        if ($tk['project_id'] === null) {
+            throw new RuntimeException(
+                'That card is not on a project yet, so there are no statuses to choose from. '
+              . 'Open it and file it on a show first.'
+            );
+        }
 
         $map = statuses_by_id($pdo, (int)$tk['project_id']);
         if ($statusId !== null && !isset($map[$statusId])) {
@@ -269,7 +278,11 @@ if ($ready && $myCrewId) {
     // an empty list.
     foreach (array_merge($tasks, $tickets) as $row) {
         $pid = (int)$row['project_id'];
-        if (!isset($statusesByProject[$pid])) $statusesByProject[$pid] = statuses_by_id($pdo, $pid);
+        // 0 is an unfiled card (migration 041). There are no statuses to load for
+        // it, and asking would be one query per such card for an empty answer.
+        if ($pid && !isset($statusesByProject[$pid])) {
+            $statusesByProject[$pid] = statuses_by_id($pdo, $pid);
+        }
     }
 
     $logged = logged_by_progress($pdo, array_map(fn($r) => (int)$r['progress_id'], $tasks));
@@ -287,7 +300,10 @@ if ($ready && $myCrewId) {
                FROM ticket_mentions m
                JOIN ticket_comments c ON c.id = m.comment_id
                JOIN tickets t         ON t.id = c.ticket_id
-               JOIN projects p        ON p.id = t.project_id
+               -- ⚠ LEFT, since migration 041. An INNER JOIN here would drop a
+               -- mention on an unfiled card: named, notified by email, and then
+               -- nothing on the screen the email points at.
+               LEFT JOIN projects p   ON p.id = t.project_id
                LEFT JOIN users u      ON u.id = c.user_id
               WHERE m.crew_id = ? AND t.archived = 0
               ORDER BY m.seen_at IS NULL DESC, c.created_at DESC
@@ -524,14 +540,21 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $late ? 'row-overdue' : '' ?>">
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>" class="<?= $t3['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($t3)) ?></a></td>
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>"><?= e($t3['title']) ?></a></td>
-          <td class="muted small"><?= e($t3['project_code']) ?></td>
+          <td class="muted small"><?= ($t3['project_code'] ?? '') !== ''
+              ? e($t3['project_code']) : '<span class="warn-text">no project</span>' ?></td>
           <?php // The same control the production tasks above carry, for the same
                 // reason: this is the screen an artist opens to say where their
                 // work has got to, and a ticket is half of what is on it. Still
                 // a coloured chip when it cannot be changed — a disabled select
                 // reads as broken, not as read-only. ?>
           <td>
-            <?php if ($canSetStatus): ?>
+            <?php // ⚠ NO PICKER WITHOUT A PROJECT. Statuses are a show's own, so an
+                  // unfiled card has none to offer — an empty dropdown would read as
+                  // broken. Said in words, with the way out. ?>
+            <?php if (!$t3['project_id']): ?>
+              <a class="muted small" href="ticket.php?id=<?= (int)$t3['id'] ?>"
+                 title="Open the card and file it on a show">no project yet</a>
+            <?php elseif ($canSetStatus): ?>
               <form method="post" class="inline-form" style="margin:0;">
                 <input type="hidden" name="set_ticket_status" value="1">
                 <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
@@ -555,6 +578,12 @@ require __DIR__ . '/includes/header.php';
           <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($t3['due_date'] ?: '—') ?></td>
           <?php if ($canLog): ?>
             <td>
+              <?php // ⚠ NO TIME AGAINST AN UNFILED CARD. Hours are costed to a show
+                    // and read by Finance; a row with project_id 0 would be hours
+                    // belonging to nothing, quietly missing from every total. ?>
+              <?php if (!$t3['project_id']): ?>
+                <span class="muted small" title="Hours are costed to a show, so the card needs one first">—</span>
+              <?php else: ?>
               <form method="post" class="log-form">
                 <input type="hidden" name="log_time" value="1">
                 <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
@@ -564,6 +593,7 @@ require __DIR__ . '/includes/header.php';
                        class="day-input" <?= can_edit() ? '' : 'disabled' ?>>
                 <button type="submit" class="secondary" <?= can_edit() ? '' : 'disabled' ?>>Log</button>
               </form>
+              <?php endif; ?>
             </td>
           <?php endif; ?>
         </tr>

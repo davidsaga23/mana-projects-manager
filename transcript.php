@@ -137,19 +137,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
 
         $rows = is_array($_POST['t'] ?? null) ? $_POST['t'] : [];
         $made = 0;
-        $byProject = [];
-        $noProject = [];
+        $byProject = [];      // code => how many, for the report
+        $unfiled = 0;         // cards created with no project at all
+        $lastProject = 0;     // the one show to send him to, if there was only one
 
         foreach ($rows as $r) {
             if (empty($r['keep'])) continue;            // unticked: not wanted
             $title = trim((string)($r['title'] ?? ''));
             if ($title === '') continue;                // emptied: the same answer
 
-            // Refused rather than guessed. A card quietly filed on whichever show
-            // happened to be first is the one mistake this screen exists to stop.
+            // ⚠ NO PROJECT IS AN ANSWER, NOT AN ERROR (David, 2026-10-07: "we
+            // should be able to add them without a project so we can organize them
+            // later"). An unfiled card is created with project_id NULL — no board,
+            // no status, no reference — and lives on Studio Tasks until somebody
+            // files it. What is NOT done is guess a show: a card quietly filed on
+            // whichever happened to be first is the mistake this screen exists to
+            // stop, and migration 041 is what makes the honest answer possible.
             $to = (int)($r['project_id'] ?? 0);
-            if (!isset($known[$to])) { $noProject[] = $title; continue; }
-            if (!array_key_exists($to, $firstCol)) {
+            if (!isset($known[$to])) $to = 0;
+            if ($to && !array_key_exists($to, $firstCol)) {
                 [$firstCol[$to], ] = transcript_first_column($pdo, $to);
             }
 
@@ -158,44 +164,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
                       ? $r['priority'] : 'medium';
             $type = ($r['type'] ?? 'task') === 'ticket' ? 'ticket' : 'task';
 
-            $seq = next_ticket_seq($pdo, $to);
+            $seq = next_ticket_seq($pdo, $to);     // 0 when there is no project
             $pdo->prepare(
                 'INSERT INTO tickets
                    (project_id, seq, type, title, description, status_id, priority,
                     assigned_crew_id, created_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             )->execute([
-                $to, $seq, $type, mb_substr($title, 0, 255),
+                $to ?: null, $seq, $type, mb_substr($title, 0, 255),
                 trim((string)($r['description'] ?? '')) ?: null,
-                $firstCol[$to], $priority, $crewId, $userId ?: null,
+                $to ? $firstCol[$to] : null, $priority, $crewId, $userId ?: null,
             ]);
             $made++;
-            $byProject[$known[$to]['code']] = ($byProject[$known[$to]['code']] ?? 0) + 1;
+            if ($to) {
+                $code = $known[$to]['code'];
+                $byProject[$code] = ($byProject[$code] ?? 0) + 1;
+                $lastProject = $to;
+            } else {
+                $unfiled++;
+            }
         }
 
-        // ⚠ WHAT WAS SKIPPED IS NAMED, not counted. "6 of 8 created" leaves
-        // somebody hunting for the two; naming them is the difference between a
-        // report and a riddle. The ones without a show are still in the session,
-        // so the screen comes back with them to finish.
+        // ⚠ THE SPLIT IS SAID OUT LOUD, including where the unfiled ones went.
+        // "20 cards created" and then only fourteen on the board is the kind of
+        // quiet shortfall this codebase keeps paying for — so the sentence names
+        // the shows, the count with no show, and where to find those.
         $said = [];
         if ($made) {
             $parts = [];
             foreach ($byProject as $code => $n) $parts[] = $n . ' on ' . $code;
+            if ($unfiled) $parts[] = $unfiled . ' with no project yet';
             $said[] = $made . ' card' . ($made === 1 ? '' : 's') . ' created ('
                     . implode(', ', $parts) . '), waiting to be started.';
         }
-        if ($noProject) {
-            $said[] = 'Left for now, with no project chosen: "'
-                    . implode('", "', array_map(fn($t) => mb_substr($t, 0, 60), $noProject)) . '".';
+        if ($unfiled) {
+            $said[] = 'The unfiled ' . ($unfiled === 1 ? 'one is' : 'ones are')
+                    . ' on Studio Tasks — open ' . ($unfiled === 1 ? 'it' : 'each one')
+                    . ' and pick a project when you know which show ' . ($unfiled === 1 ? 'it' : 'they')
+                    . ' belong' . ($unfiled === 1 ? 's' : '') . ' to.';
         }
-        if (!$made && !$noProject) $said[] = 'Nothing was ticked, so nothing was created.';
+        if (!$made) $said[] = 'Nothing was ticked, so nothing was created.';
 
-        // Everything filed and nothing left over: the list has done its job.
-        if ($made && !$noProject) unset($_SESSION['transcript'][$projectId]);
+        // Everything that was ticked is now a card, so the list has done its job.
+        if ($made) unset($_SESSION['transcript'][$projectId]);
 
         flash($made ? 'ok' : 'warn', implode(' ', $said));
-        header('Location: ' . ($made && !$noProject
-            ? 'tasks.php?project=' . array_key_last($byProject ? $known : []) : $selfUrl));
+        // One show and nothing unfiled: its board. Anything else — several shows,
+        // or cards with no show — and only Studio Tasks shows all of them at once.
+        $where = $selfUrl;
+        if ($made) {
+            $where = (count($byProject) === 1 && !$unfiled)
+                ? 'tasks.php?project=' . $lastProject
+                : 'alltasks.php';
+        }
+        header('Location: ' . $where);
         exit;
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
@@ -333,28 +355,36 @@ require __DIR__ . '/includes/header.php';
     </div>
 
     <?php // ⚠ CHOSEN HERE, AFTER READING, not before uploading. Which show a
-          // meeting's actions belong to is usually only clear once the list is
-          // in front of you — which is why the file can be read with no project
-          // at all. They all land on one show; a card that belongs elsewhere is
-          // moved from the card itself, which takes a click. ?>
+          // meeting's actions belong to is usually only clear once the list is in
+          // front of you — which is why the file can be read with no project at
+          // all, and why a row can be created without one. ?>
     <?php // A convenience, not the control: most transcripts are mostly one show,
           // so setting every row at once and then correcting two of them beats
           // picking twenty times. The row is still what decides. ?>
     <p class="muted small file-them">
       Set every row to
       <select id="setAll" aria-label="Set every row's project">
-        <option value="">—</option>
+        <option value="" disabled selected>—</option>
+        <?php // "No project" is a real choice here, not just the absence of one: a
+              // meeting that covered nothing filed yet is twenty rows to clear. ?>
+        <option value="0">no project yet</option>
         <?php foreach ($projects as $pr): ?>
           <option value="<?= (int)$pr['id'] ?>"><?= e($pr['name']) ?> (<?= e($pr['code']) ?>)</option>
         <?php endforeach; ?>
       </select>
-      — each card lands in that board's first column, and one on the wrong show can be
-      moved from the card itself afterwards.
+ — each card lands in that board's first column. A row left on
+      <em>no project yet</em> is still created — it waits on
+      <a href="alltasks.php">Studio Tasks</a> with no board or status until you file it,
+      which takes one click from the card.
     </p>
     <script>
       document.getElementById('setAll').addEventListener('change', function () {
-        if (!this.value) return;
-        document.querySelectorAll('.t-project').forEach(function (s) { s.value = this.value; }, this);
+        if (this.value === '') return;
+        // The helper says "0" for no project; the row selects say "" for it. Mapped
+        // here rather than giving the rows a "0" option, because "" is what an
+        // unchosen select posts and the write path already reads that as unfiled.
+        var v = this.value === '0' ? '' : this.value;
+        document.querySelectorAll('.t-project').forEach(function (s) { s.value = v; });
       });
     </script>
 

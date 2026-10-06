@@ -254,9 +254,13 @@ function notify_mentioned(PDO $pdo, int $ticketId, array $crewIds, string $body,
         else              $noEmail[] = (string)$c['name'];
     }
 
+    // ⚠ LEFT, since migration 041. An INNER JOIN here would have said "that
+    // ticket no longer exists" for every mention on an unfiled card — a card that
+    // does exist, so the mention would be recorded on screen and the email would
+    // report a failure that never happened.
     $q = $pdo->prepare(
         'SELECT t.id, t.seq, t.title, t.type, p.code AS project_code, p.name AS project_name
-           FROM tickets t JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
+           FROM tickets t LEFT JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
     );
     $q->execute([$ticketId]);
     $t = $q->fetch();
@@ -268,8 +272,12 @@ function notify_mentioned(PDO $pdo, int $ticketId, array $crewIds, string $body,
             . ' no email address on file. Add one on the Staffing screen.'];
     }
 
-    $label = ($t['project_code'] ?? '') . '-' . (int)$t['seq'];
-    $subject = sprintf('[%s] %s mentioned you on %s', $t['project_code'], $byWho, $label);
+    // The same fallback ticket_ref() uses: a card with no project has no code to
+    // number against, so it is called by its id.
+    $code  = (string)($t['project_code'] ?? '');
+    $label = $code !== '' ? $code . '-' . (int)$t['seq'] : '#' . (int)$t['id'];
+    $subject = sprintf('[%s] %s mentioned you on %s',
+                       $code !== '' ? $code : 'Anima', $byWho, $label);
     $url = ticket_url((int)$t['id']);
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
@@ -281,7 +289,8 @@ function notify_mentioned(PDO $pdo, int $ticketId, array $crewIds, string $body,
     $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
         . '<p><strong>' . $esc($byWho) . '</strong> mentioned you on <strong>' . $esc($label) . '</strong>.</p>'
         . '<h2 style="font-size:17px;margin:12px 0 6px;">' . $esc($t['title']) . '</h2>'
-        . '<p style="color:#5a6a7a;margin:0 0 12px;">' . $esc($t['project_name']) . '</p>'
+        . '<p style="color:#5a6a7a;margin:0 0 12px;">'
+        . $esc($t['project_name'] ?? 'No project yet') . '</p>'
         . '<div style="background:#f4f6f8;padding:10px 12px;border-radius:6px;white-space:pre-wrap;">'
         . $esc($snippet) . '</div>'
         . '<p style="margin-top:16px;"><a href="' . $esc($url) . '" '
