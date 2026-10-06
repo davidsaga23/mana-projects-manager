@@ -691,6 +691,202 @@ to run once a day — and snapshots are deliberately taken on page load rather t
 **Open:** which percentage of what, and whether a warning on screen is enough before anything is
 emailed.
 
+## Asked for on 2026-10-06
+
+Three things, and they are not the same size. The first two are small and well-supported by what is
+already here. The third is a second product.
+
+### Project kick-off: a planning status, a sign-off, and a frozen original plan
+
+> *"A project should have a planning status until we get a sign off from the CEO and COO, once that
+> happens, everything from that project will have to be stored as a first entry. Things like overall
+> starting/end dates, pipeline steps, asset and shot count, head count, start/end dates per pipeline
+> step/department, original schedule, original staffing, original timeline, etc. The idea is that
+> down the road we can easily compare how the project shifted from the original and approved plan."*
+
+⚠ **HALF OF THIS IS BUILT AND HAS BEEN SINCE AUGUST.** `capture_baseline()`
+(`includes/baseline.php`, migration 013) already freezes, per step: the name, what it applies to,
+days per unit, coverage, **planned headcount**, retake allowance, work units, units estimated, and
+**start date and deadline** — with a reason and a timestamp, append-only, *"and never touches one
+once written"*. It is called today from the setup wizard's review step (`'setup complete'`) and from
+planning. `history_quotas.php` already reads it across shows.
+
+So the mechanism, the append-only discipline and the "original vs today" comparison all exist. What
+David is asking for is **three changes to it**, none of them large:
+
+1. **A `planning` status on `projects`.** The enum is `setup, active, on_hold, wrapped, archived`
+   (migration 027). `setup` already means "the wizard has not finished"; `planning` would mean "the
+   wizard is finished and the plan is not approved yet". Those are genuinely different states, and
+   conflating them would lose the distinction that makes the sign-off meaningful.
+2. **A sign-off that is a record, not a flag.** Two named approvals (CEO, COO) with who and when.
+   ⚠ A boolean would be the wrong shape: the question six months later is *"what exactly did they
+   approve, and when"*, and a `TINYINT(1)` cannot answer either half.
+3. **Widening the snapshot past the steps.** The baseline is per step. David's list is per project:
+   overall dates, shot and asset **counts**, total head count, staffing, the timeline. Some of that
+   is derivable from the step rows; the counts and the staffing are not.
+
+**The real question, and it is a design question rather than a build one:** is the original plan
+*one widened baseline write*, or *a snapshot of several tables*? The first keeps everything in the
+shape `history_quotas.php` already reads, and means deciding now exactly which fields matter. The
+second (a JSON blob of the whole plan at that moment) captures everything, including what nobody
+thought to ask for, and is far harder to compare against — you cannot `GROUP BY` a blob.
+
+**The recommendation is the first**, widened deliberately, because the stated purpose is *comparison*
+and a snapshot you cannot query is a snapshot you will not use. Worth saying plainly: the cost of
+that choice is that a field nobody listed in October 2026 is a field nobody can compare in 2028.
+
+**Open:** which fields go in the project-level baseline, and whether `planning` blocks anything (can
+a project in planning have time logged against it, or cards raised on it?) or is purely a label.
+
+### Project postmortem, before the project is archived
+
+> *"Before archiving, we need to have a postmortem meeting with the team, we will need to create a
+> text input per department/pipeline step and a general one so we can drop all the notes and
+> conclusions"*
+
+**The smallest of the three, and it has no hard parts.** One table: project, step or department or
+NULL for the general note, the text, who wrote it, when. The archive action on `index.php` grows a
+check: archiving a project with no postmortem asks first.
+
+⚠ **PER DEPARTMENT OR PER STEP IS A REAL FORK, NOT A DETAIL.** They are not the same thing here:
+`pipeline_steps.department` exists (migration 015) and several steps share a department. Per step is
+finer and matches how the work is tracked; per department matches how the meeting will actually run,
+because the Comp lead speaks once, not once per Comp step. **Per department reads like the right
+grain for a conversation**, with the steps listed under each heading so nothing is forgotten.
+
+⚠ **AND THE ARCHIVE GATE MUST BE A PROMPT, NOT A WALL.** A show that wrapped two years ago and is
+being tidied up now will never get its postmortem, and a platform that refuses to archive it would
+simply be worked around — or worse, left with a shelf of un-archived dead projects, which is
+exactly the clutter archiving exists to remove.
+
+**Open:** per department or per step; and whether a postmortem is visible to everybody on the show or
+only to production (an honest postmortem and a published one are not always the same document).
+
+### A PM tool for the day-to-day work, to replace Plaky
+
+> *"Similar to Plaky we need a place (it could be a separate URL/subdomain) so we can do essentially
+> everything we do in Plaky. Assign tasks, track them, update status, upload versions, create
+> playlists to review, create filters per task, log working hours, access my assignments, etc. Even
+> if it lives in a different URL all the data should be readable from Anima and vice versa. In fact
+> the assets and shots done in Anima should land directly there along with the pipeline steps so it's
+> just a matter of assigning and adding dates per task."*
+
+**This is the big one, and it is worth being exact about how much already exists, because it is much
+more than it looks.**
+
+⚠ **THE TASK MATRIX IS ALREADY IN THE DATABASE.** `progress` is one row per *step per item*
+(`UNIQUE KEY uniq_step_item (step_id, item_key)`, where `item_key` is `s<shot>` / `a<asset>` /
+`p<project>`). That row already carries: status (resolved **and** the raw external text),
+`is_delivered`, `is_approved`, a primary assignee, **a full assignee list** (`progress_crew`, because
+the live board really does say two names), logged minutes, **a version string**, and notes.
+`schedule` is keyed identically and carries **`start_date`, `end_date` and `crew_id` per step per
+item**, with `is_manual` so hand-planned rows survive the auto-scheduler.
+
+So David's closing sentence — *"it's just a matter of assigning and adding dates per task"* — is
+**already true at the schema level, for both halves**. Shots, assets and pipeline steps do not need
+to "land there"; they are there, and `production.php` already draws the grid.
+
+**What Plaky genuinely has that Anima does not:**
+
+| Wanted | State |
+|---|---|
+| Assign tasks | `progress.crew_id` + `progress_crew`. Exists. |
+| Track them, update status | `progress`, `statuses`, `progress_log`. Exists. |
+| Dates per task | `schedule.start_date` / `end_date`. Exists. |
+| Log working hours | `time_logs` (migration 022). Exists. |
+| My assignments | `mytasks.php`. Exists. |
+| Filters | Column filters exist on the grids; **saved, named, shareable** filters do not. |
+| **Upload versions** | **Does not exist.** `progress.version` is a free-text label, not a file. |
+| **Review playlists** | **Does not exist.** Nothing here holds media. |
+
+⚠ **THE TWO MISSING ITEMS ARE A DIFFERENT KIND OF SOFTWARE FROM EVERYTHING ELSE IN THIS PLATFORM,
+AND THAT IS THE WHOLE COST OF THIS FEATURE.** Anima is a tracker: it stores numbers, dates and names,
+every page is a form and a table, and the largest thing it has ever written is a CSV. Uploading
+versions and reviewing playlists means **storing, serving and playing media**: multi-GB files on
+shared cPanel hosting, upload limits, thumbnails and proxies (nobody reviews a 4K sequence in a
+browser over a shared host), a player with frame-accurate scrubbing, and annotation if the review is
+to be worth having. That is a media application. It is the part to scope honestly, and it is the part
+that decides whether this is three weeks or three months.
+
+**Storage sits above `public_html`**, like FamHealth's — files served through a PHP gate that checks
+the login, never by a public URL, because a shot that leaks before delivery is a client problem, not
+an IT one.
+
+**On the separate subdomain.** Two readings, very far apart in cost:
+
+1. **Same database, same codebase, different entry point** — `pm.davidsaga.com` pointed at the same
+   install, serving an artist-facing view of `progress` and `schedule`. "Readable from Anima and vice
+   versa" is then free, because it is one database. **This is the recommendation**, and it is nearly
+   all of what was asked for.
+2. **A separate application with its own database, synced to Anima.** This is what "a separate URL"
+   sounds like, and it buys almost nothing while costing a sync layer, two sources of truth, and the
+   question of which one wins when they disagree — which is the exact problem the Plaky importer
+   exists to manage today, rebuilt on purpose.
+
+⚠ **AND THE REAL BLOCKER IS NOT ANY OF THE ABOVE.** It is that **Plaky currently owns the statuses**
+(DECISIONS: Plaky as source of truth, for now). Artists updating status in Anima instead of Plaky is
+not a feature — it is the decision that the import stops being the source of truth and becomes a
+one-time migration. Everything in this section is easy to build and impossible to adopt until that
+call is made. It also unlocks version counting on its own, which is blocked for exactly the same
+reason.
+
+**Open:** when Plaky stops being the source of truth — because nothing here matters before that; and
+whether version *upload* is in scope at all, or whether a version *label* plus a link to wherever the
+file already lives (Drive, the server) is enough to start.
+
+## Asked for on 2026-10-06 (urgent) — "what has this show cost us so far?"
+
+FCM went on standby. David's boss needs a number to take to the client: **how much has been spent,
+or committed to be paid, on the current crew to this day.**
+
+⚠ **THAT IS FOUR NUMBERS, NOT ONE, AND THE CLIENT WILL ATTACK WHICHEVER IS SOFTEST.** They are
+listed here in descending order of how defensible they are, because a single blended figure invites
+exactly one question — *"how did you get that?"* — and the answer has to survive it.
+
+1. **Invoiced and paid.** `invoices` with `paid_date IS NOT NULL`. Money that has left the building.
+   Unarguable.
+2. **Invoiced, not yet paid.** `paid_date IS NULL`. Also a hard number: somebody has billed, the
+   document exists. 1 + 2 is *"invoiced to date"* and is the strongest thing to lead with.
+3. **Worked but not yet invoiced.** The exposure nobody has a document for. `time_logs.minutes`
+   — per crew, per project, with the date the work *happened* — divided by `hours_per_day`,
+   times `crew_terms.day_rate`. ⚠ **THIS IS AN ESTIMATE AND MUST BE LABELLED ONE.** DECISIONS,
+   2026-08-18: *"actual cost comes from invoices, not from days times a rate — that product is a
+   second estimate wearing an actual's clothes."* The rule stands. It is still the right number to
+   quote, because the alternative is pretending the work does not exist.
+4. **Committed but not worked** — what is owed anyway if the show never restarts.
+
+### ⚠ Number 4 is not in the platform, and that is the real finding
+
+`crew_terms` holds `day_rate`, `rate_unit`, `rate_currency`, `contract_url` and notes. It holds **no
+contract start or end date, no guaranteed minimum, and no notice period.** So the one figure that
+actually answers *"what do we owe if we stop today"* cannot be computed from Anima at all. It has to
+be read out of the contracts by hand, one at a time.
+
+The nearest available proxy is **booked time beyond today**: `bookings_positions()` already gives
+per person, per step, a start and an end (from `pipeline_steps.start_date` / `deadline` crossed with
+crew lanes). Days still booked after today times the day rate is *planned* remaining cost. It is not
+a contractual obligation and must never be presented as one — but it is the right order of
+magnitude, and it is available now.
+
+### What to build: a stop-cost panel on the project finance screen
+
+One screen, reading what already exists, laid out as the four numbers above with its own arithmetic
+shown beside each. Nothing new is captured for 1, 2 or 3.
+
+**It belongs on `finance_project.php`**, behind `can_see_money()` like everything else that names a
+rate. ⚠ Today that page lists every invoice **with no total row at all**, so even number 1 is a
+hand-addition — which is the immediate reason this question is slow to answer.
+
+**To make number 4 real, `crew_terms` needs three columns:** `contract_start`, `contract_end`, and
+either a notice period or a guaranteed-minimum amount. That is a finance-DB change, so it is a
+`finance_install_07.sql` imported by hand through phpMyAdmin, never `migrate.php`. Worth doing: a
+studio that cannot answer *"what do we owe if this stops"* in under a minute is a studio that answers
+it wrong under pressure.
+
+**Open:** whether the panel reports in one currency (the rates carry their own, and there is no FX
+table anywhere in this platform — mixing them silently would be the worst possible bug on exactly
+this screen), and whether "committed" should mean contractual minimum or booked-and-not-yet-released.
+
 ## Waiting on a decision, or offered and not built (2026-09-18)
 
 Everything here came up in the 2 to 18 September run of work. None of it is urgent, and each
