@@ -15,6 +15,7 @@ require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/finance_nav.php';
 require_once __DIR__ . '/includes/standards.php';
 require_once __DIR__ . '/includes/dashboard.php';
+require_once __DIR__ . '/includes/stopcost.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -195,6 +196,12 @@ foreach ($invoices as $iv) {
 $grandTotal = $proj['grand_total'] ?? $proj['total'];
 $margin = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grandTotal : null;
 
+// WHAT THIS SHOW HAS COST SO FAR, and what the plan still has booked. Worked
+// out here with the rest of the money rather than inside the Overview block,
+// for the reason stated at the tab switch below: the tabs choose what renders,
+// never what is computed.
+$stop = project_stop_cost($pdo, $projectId, $invoices);
+
 // Invoices naming no position still count against the budget, but cannot appear
 // on a projection row. Reported rather than quietly dropped.
 $unattached = 0.0;
@@ -336,6 +343,153 @@ try {
     nothing here converts between currencies, and inventing an exchange rate would be worse than
     saying so.
   </div>
+<?php endif; ?>
+
+<?php // ---- COST TO DATE -------------------------------------------------
+      //
+      // David, 2026-10-06, the day FCM went on standby: his boss needs a figure
+      // for the client. ⚠ FOUR NUMBERS AND NOT ONE BLEND, in descending order
+      // of how defensible each is, because a single figure invites exactly one
+      // question — "how did you get that?" — and a blend cannot survive it.
+      // The arithmetic for each is on the screen beside it for the same reason.
+      ?>
+<h3>Cost to date <span class="muted">— what has been spent, and what is still booked</span></h3>
+
+<div class="dash-strip">
+  <div><span class="muted small">Invoiced and paid</span>
+    <strong><?= e(stop_cost_amounts($stop['paid'])) ?></strong>
+    <span class="muted small">money that has left</span></div>
+  <div><span class="muted small">Invoiced, unpaid</span>
+    <strong><?= e(stop_cost_amounts($stop['unpaid'])) ?></strong>
+    <span class="muted small">billed, document exists</span></div>
+  <div><span class="muted small">Worked, not invoiced</span>
+    <strong><?= e(stop_cost_amounts($stop['worked']['totals'])) ?></strong>
+    <span class="warn-text small">estimate — <?= e(fmt_num($stop['worked']['hours'], 1)) ?> h logged</span></div>
+  <div><span class="muted small">Still booked after today</span>
+    <strong><?= e(stop_cost_amounts($stop['booked']['totals'])) ?></strong>
+    <span class="warn-text small">the plan, not a contract</span></div>
+</div>
+
+<?php if ($stop['mixed']): ?>
+  <div class="flash flash-warn">
+    <strong>This show pays in more than one currency, so these are listed side by side and
+    never added up.</strong> Nothing in this platform converts between currencies, and inventing
+    an exchange rate on the screen that goes to a client would be the worst possible place to
+    do it. Convert them yourself, at a rate you can name and date.
+  </div>
+<?php endif; ?>
+
+<?php // ⚠ THE LIMIT OF THIS SCREEN, said on the screen rather than in a doc
+      // nobody opens. "What do we owe if the show never restarts" needs a
+      // contract start, an end, a notice period or a guaranteed minimum, and
+      // crew_terms holds none of those four. Somebody reading this panel is
+      // about to quote a number to a client; they need to know which question
+      // it answers. ?>
+<div class="flash flash-warn">
+  <p style="margin:0 0 6px;"><strong>What this cannot tell you: what is contractually owed if the
+     show never restarts.</strong></p>
+  <p class="small" style="margin:0;">
+    Rates are on file; contract start and end dates, notice periods and guaranteed minimums are
+    not. <em>Still booked after today</em> is what the <strong>plan</strong> has people down for
+    — the right order of magnitude, and not the same thing as an obligation. The contracts
+    themselves are the only source for that, and the
+    <a href="crew.php?project=<?= (int)$projectId ?>">Staffing screen</a> links each one.
+  </p>
+</div>
+
+<?php if ($stop['why'] !== ''): ?>
+  <div class="flash flash-warn"><?= e($stop['why']) ?></div>
+<?php endif; ?>
+
+<?php // ⚠ PEOPLE WITH HOURS AND NO RATE ARE NAMED, NEVER COUNTED AS ZERO. A
+      // silent nought makes the total look complete while understating what is
+      // owed to a real person — the same failure as a screen that renders
+      // empty, pointed at the one number somebody is about to send a client. ?>
+<?php if ($stop['unpriced']): ?>
+  <div class="flash flash-err">
+    <p style="margin:0 0 6px;"><strong>These people have logged hours and no rate on file, so they
+       are missing from <em>Worked, not invoiced</em> entirely.</strong></p>
+    <p class="small" style="margin:0;">
+      <?php $bits = [];
+            foreach ($stop['unpriced'] as $u) {
+                $bits[] = e($u['name']) . ' (' . e(fmt_num($u['hours'], 1)) . ' h)';
+            }
+            echo implode(', ', $bits); ?>
+      — set a rate on the <a href="crew.php?project=<?= (int)$projectId ?>">Staffing screen</a>
+      and this figure will include them.
+    </p>
+  </div>
+<?php endif; ?>
+
+<?php if ($stop['flat']): ?>
+  <div class="flash flash-warn">
+    <strong>Paid a flat fee, so their hours cannot price the work:</strong>
+    <?php $bits = [];
+          foreach ($stop['flat'] as $f) {
+              $bits[] = e($f['name']) . ' (' . e(fmt_money_plain((float)$f['amount'], $f['currency']))
+                      . ', ' . e(fmt_num($f['hours'], 1)) . ' h logged)';
+          }
+          echo implode(', ', $bits); ?>.
+    Add the fee itself where it belongs rather than reading it off the hours.
+  </div>
+<?php endif; ?>
+
+<?php if ($stop['worked']['rows'] || $stop['booked']['rows']): ?>
+  <details class="stop-detail">
+    <summary>Show the arithmetic, person by person</summary>
+
+    <?php if ($stop['worked']['rows']): ?>
+      <h4>Worked, not yet invoiced</h4>
+      <p class="muted small">
+        Hours from the time log — the day the work <em>happened</em>, not the day it was typed
+        — at each person's own rate. An hourly rate multiplies the hours; a day rate divides
+        them by <?= e(fmt_num(hours_per_day($pdo, $projectId), 1)) ?> hours first.
+        <strong>This is an estimate.</strong> An invoice is the only record of what was really
+        billed, which is why it is kept apart from the two figures above it.
+      </p>
+      <table>
+        <thead><tr><th>Who</th><th class="num">Hours</th><th>Rate</th><th class="num">Estimated</th></tr></thead>
+        <tbody>
+        <?php foreach ($stop['worked']['rows'] as $r): ?>
+          <tr>
+            <td><?= e($r['name']) ?></td>
+            <td class="num"><?= e(fmt_num($r['hours'], 1)) ?></td>
+            <td class="muted small"><?= e(fmt_money_plain($r['rate'], $r['currency'])) ?>
+                / <?= e($r['unit']) ?></td>
+            <td class="num"><?= e(fmt_money_plain($r['cost'], $r['currency'])) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+
+    <?php if ($stop['booked']['rows']): ?>
+      <h4>Still booked after today</h4>
+      <p class="muted small">
+        Working days left in each step's window, from today to its deadline, for every named
+        person holding a lane on it. Weekends and the holiday calendar are already taken out.
+        Placeholders are excluded — an unfilled slot costs nothing yet.
+        <strong>This is the plan, not an obligation.</strong>
+      </p>
+      <table>
+        <thead><tr><th>Who</th><th>Step</th><th>Remaining window</th>
+                   <th class="num">Days</th><th class="num">At their rate</th></tr></thead>
+        <tbody>
+        <?php foreach ($stop['booked']['rows'] as $r): ?>
+          <tr>
+            <td><?= e($r['name']) ?></td>
+            <td class="muted small"><?= e($r['step']) ?></td>
+            <td class="muted small"><?= e($r['from']) ?> → <?= e($r['to']) ?></td>
+            <td class="num"><?= (int)$r['days'] ?></td>
+            <td class="num"><?= $r['cost'] === null
+                  ? '<span class="warn-text small">no day rate</span>'
+                  : e(fmt_money_plain($r['cost'], $r['currency'])) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </details>
 <?php endif; ?>
 
 <?php
@@ -1162,7 +1316,30 @@ if ($retakePct <= 0):
       </tr>
     <?php endforeach; ?>
     </tbody>
+    <?php // ⚠ THE TOTAL ROW THIS TABLE NEVER HAD. Until 2026-10-06 answering
+          // "what have we invoiced on this show" meant adding the column up by
+          // hand, which is slow and, on a long list, wrong. Split paid from
+          // unpaid because those are two different facts, and kept per currency
+          // because nothing here converts between them. ?>
+    <tfoot>
+      <?php foreach (array_unique(array_merge(array_keys($stop['paid']), array_keys($stop['unpaid']))) as $c): ?>
+        <tr>
+          <th colspan="4">Total<?= count($stop['currencies']) > 1 ? ' in ' . e($c) : '' ?></th>
+          <th class="num"><?= e(fmt_money_plain(
+                ($stop['paid'][$c] ?? 0) + ($stop['unpaid'][$c] ?? 0), $c)) ?></th>
+          <th colspan="2"><?= e(fmt_money_plain($stop['paid'][$c] ?? 0, $c)) ?> paid</th>
+          <th colspan="2"><?= ($stop['unpaid'][$c] ?? 0) > 0
+                  ? '<span class="warn-text">' . e(fmt_money_plain($stop['unpaid'][$c], $c)) . ' outstanding</span>'
+                  : 'nothing outstanding' ?></th>
+        </tr>
+      <?php endforeach; ?>
+    </tfoot>
   </table>
+  <?php if ($stop['mixed']): ?>
+    <p class="muted small">
+      One total per currency, never added together — nothing here converts between them.
+    </p>
+  <?php endif; ?>
 <?php else: ?>
   <p class="muted">Nothing recorded yet.</p>
 <?php endif; ?>

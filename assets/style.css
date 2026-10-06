@@ -1937,6 +1937,14 @@ body.lightbox-lock { overflow: hidden; }
 /* Declined and passed candidates, folded under the ones still in play. */
 .closed-cands { margin-top: 6px; }
 .closed-cands > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+
+/* The per-person arithmetic behind the cost-to-date strip. Closed by default:
+   the four figures are the answer, and the working is for whoever is asked
+   "how did you get that?" */
+.stop-detail { margin: 10px 0 18px; }
+.stop-detail > summary { cursor: pointer; font-size: 13px; color: var(--primary); }
+.stop-detail[open] > summary { margin-bottom: 10px; }
+.stop-detail h4 { margin: 14px 0 4px; font-size: 14px; }
 .closed-cands[open] > summary { margin-bottom: 6px; }
 /* --- milestones on the timeline --------------------------------------------
    A dashed line so it never reads as a bar, and a colour of its own so it is
