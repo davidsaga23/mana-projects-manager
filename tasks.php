@@ -277,7 +277,7 @@ require __DIR__ . '/includes/header.php';
               // screen explains itself to anybody who reaches it by address. ?>
         <?php if (function_exists('ai_configured') && ai_configured()): ?>
           <a class="button secondary" href="transcript.php?project=<?= $projectId ?>"
-             title="Read a meeting transcript and turn the action items into cards">Read a transcript</a>
+             title="Read a meeting transcript and turn the action items into cards">Tasks from transcript</a>
         <?php endif; ?>
         <button type="button" class="secondary" onclick="openCreate('task')">+ New task</button>
         <button type="button" onclick="openCreate('ticket')">+ New ticket</button>

@@ -79,7 +79,7 @@ require __DIR__ . '/includes/header.php';
         // them. Which project the cards land on is chosen after reading. ?>
   <?php if (can_edit() && ai_configured()): ?>
     <a class="button secondary" href="transcript.php"
-       title="Read a meeting transcript and turn its action items into cards">Read a transcript</a>
+       title="Read a meeting transcript and turn its action items into cards">Tasks from transcript</a>
   <?php endif; ?>
 </div>
 
