@@ -1334,6 +1334,17 @@ button:hover { background: var(--primary-hover); }
    the mouse can disagree about which row is live and the keyboard is the
    one being acted on. */
 .mention-row.is-active { background: var(--primary-tint); color: var(--primary); }
+
+/* Moving a card between shows. Framed like the danger zone below it because it
+   has consequences - the reference changes - but not in red: it is a thing to
+   do on purpose, not a thing to be warned off. */
+.move-zone {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface-2); padding: 12px 14px; margin-top: 18px; flex-wrap: wrap;
+}
+.move-zone form { margin: 0; flex: none; }
+.move-zone select { width: auto; min-width: 180px; }
 /* An unread mention on My tasks. A left rule rather than a filled row: the
    table already colours an overdue row, and two filled states competing on
    one list is how both stop meaning anything. */

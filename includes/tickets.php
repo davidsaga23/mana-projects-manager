@@ -227,6 +227,122 @@ function ticket_select_sql(): string {
            LEFT JOIN pipeline_steps ps ON ps.id = t.step_id';
 }
 
+/**
+ * MOVE A CARD TO ANOTHER SHOW.
+ *
+ * David, 2026-10-07: "let's add a feature to select project... That way we can
+ * move those around projects." The case that asked for it: work out of a call
+ * transcript lands as a pile of tasks, and which show each one belongs to is
+ * only decided while reading them.
+ *
+ * ⚠ FOUR THINGS CHANGE, and three of them would be silent bugs if they did not.
+ *
+ *   1. THE REFERENCE. `seq` is per project (migration 017), so the card takes the
+ *      next number in its new home and FCM-12 becomes MSD-5. Unavoidable, and
+ *      worth saying out loud: anybody who wrote the old ref in an email now holds
+ *      a reference to a different card. It is written into the thread for that
+ *      reason.
+ *
+ *   2. THE STATUS. Board columns are the PROJECT'S OWN statuses, so the id a card
+ *      carries means nothing in another show. Matched by NAME first — most
+ *      projects call it "Waiting to start" either way — and failing that the
+ *      target's first column, so the card lands somewhere a person can see it.
+ *      Never left pointing at the old project's status: that is a card on a board
+ *      with no column.
+ *
+ *   3. THE SHOT, THE ASSET AND THE STEP. All three are rows belonging to the OLD
+ *      project. Carried across they would point a card at another show's SH050.
+ *      Cleared, and said so, because losing the link is obvious while a wrong one
+ *      is not.
+ *
+ *   4. Nothing else. The assignee stays: `crew` is studio-wide (DECISIONS,
+ *      2026-08-11), so the person is still the person. Comments, attachments and
+ *      mentions hang off the ticket id and travel with it untouched.
+ *
+ * @return array{ok:bool, said:string}
+ */
+function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): array {
+    $q = $pdo->prepare(
+        'SELECT t.*, p.code AS project_code FROM tickets t
+           JOIN projects p ON p.id = t.project_id WHERE t.id = ?'
+    );
+    $q->execute([$ticketId]);
+    $t = $q->fetch();
+    if (!$t) return ['ok' => false, 'said' => 'That card no longer exists.'];
+    if ((int)$t['project_id'] === $toProjectId) {
+        return ['ok' => false, 'said' => 'That card is already on that project.'];
+    }
+
+    $to = $pdo->prepare('SELECT id, code, name FROM projects WHERE id = ?');
+    $to->execute([$toProjectId]);
+    $target = $to->fetch();
+    if (!$target) return ['ok' => false, 'said' => 'That project no longer exists.'];
+
+    $oldRef = ticket_ref($t);
+
+    // The status, by name in the new project.
+    $newStatus = null;
+    $statusNote = '';
+    if ($t['status_id'] !== null) {
+        $was = $pdo->prepare('SELECT name FROM statuses WHERE id = ?');
+        $was->execute([(int)$t['status_id']]);
+        $wasName = (string)$was->fetchColumn();
+        if ($wasName !== '') {
+            $find = $pdo->prepare('SELECT id FROM statuses WHERE project_id = ? AND LOWER(name) = LOWER(?)');
+            $find->execute([$toProjectId, $wasName]);
+            $hit = $find->fetchColumn();
+            if ($hit !== false) $newStatus = (int)$hit;
+        }
+        if ($newStatus === null) {
+            $first = $pdo->prepare(
+                'SELECT id, name FROM statuses WHERE project_id = ? ORDER BY sort_order, name LIMIT 1'
+            );
+            $first->execute([$toProjectId]);
+            $row = $first->fetch();
+            if ($row) {
+                $newStatus = (int)$row['id'];
+                $statusNote = ' ' . $target['code'] . ' has no status called "' . $wasName
+                            . '", so it is now "' . $row['name'] . '".';
+            } else {
+                $statusNote = ' ' . $target['code'] . ' has no statuses set up, so the card has none.';
+            }
+        }
+    }
+
+    $dropped = [];
+    if ($t['shot_id'])  $dropped[] = 'the shot';
+    if ($t['asset_id']) $dropped[] = 'the asset';
+    if ($t['step_id'])  $dropped[] = 'the step';
+
+    $pdo->beginTransaction();
+    try {
+        // The new number is taken inside the transaction, so two moves at once
+        // cannot be handed the same one.
+        $n = $pdo->prepare('SELECT COALESCE(MAX(seq), 0) + 1 FROM tickets WHERE project_id = ?');
+        $n->execute([$toProjectId]);
+        $seq = (int)$n->fetchColumn();
+
+        $pdo->prepare(
+            'UPDATE tickets SET project_id = ?, seq = ?, status_id = ?,
+                    shot_id = NULL, asset_id = NULL, step_id = NULL
+              WHERE id = ?'
+        )->execute([$toProjectId, $seq, $newStatus, $ticketId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        return ['ok' => false, 'said' => 'The card was not moved: ' . $e->getMessage()];
+    }
+
+    $newRef = $target['code'] . '-' . $seq;
+    $said = 'Moved to ' . $target['name'] . '. ' . $oldRef . ' is now ' . $newRef . '.' . $statusNote;
+    if ($dropped) {
+        $said .= ' ' . ucfirst(implode(', ', $dropped))
+               . ' belonged to the old project, so ' . (count($dropped) === 1 ? 'it was' : 'they were')
+               . ' cleared.';
+    }
+    return ['ok' => true, 'said' => $said];
+}
+
 /* ---------------------------------------------------------------------------
  * REPLIES AND MENTIONS (David, 2026-10-06), migration 039.
  * ------------------------------------------------------------------------- */

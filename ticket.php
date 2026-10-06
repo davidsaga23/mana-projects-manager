@@ -111,6 +111,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
     finish_post($selfUrl);
 }
 
+// --- move the card to another show ------------------------------------------
+//
+// ⚠ ITS OWN ACTION, not a field on the Save form. Moving renumbers the card,
+// remaps its status and clears the shot, asset and step — four changes with
+// consequences, where everything else on that form is one field. Folded into
+// Save it would happen as a side effect of pressing a button somebody pressed to
+// fix a typo. A separate control, with its own confirmation, is the honest shape.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_project'])) {
+    $to = (int)($_POST['to_project'] ?? 0);
+    if ($to <= 0) {
+        flash('err', 'No project chosen, so nothing moved.');
+        header('Location: ' . $selfUrl);
+        exit;
+    }
+    $res = move_ticket_to_project($pdo, $id, $to);
+    flash($res['ok'] ? 'ok' : 'err', $res['said']);
+    if ($res['ok']) {
+        // Into the card's own thread, because the reference changing is the kind
+        // of thing somebody reads this history to understand.
+        log_ticket_event($pdo, $id, $userId, $res['said']);
+    }
+    header('Location: ' . $selfUrl);
+    exit;
+}
+
 // --- save the fields --------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     $aboutPair = ticket_about_from_post($_POST['step_id'] ?? '');
@@ -584,6 +609,43 @@ require __DIR__ . '/includes/header.php';
       <div class="actions"><button type="submit">Save changes</button></div>
     <?php endif; ?>
   </form>
+
+  <?php // MOVING IT, between Save and Delete: more consequential than editing a
+        // field, less than destroying the card. The list is every other project,
+        // and the current one is named in the sentence rather than being an
+        // option that would do nothing. ?>
+  <?php if (can_edit()):
+    $others = $pdo->query(
+      "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY
+         FIELD(status, 'active','setup','on_hold','wrapped'), name"
+    )->fetchAll();
+    $others = array_values(array_filter($others, function ($o) use ($projectId) {
+        return (int)$o['id'] !== $projectId;
+    }));
+    if ($others): ?>
+    <div class="move-zone">
+      <div>
+        <strong>Move to another project</strong>
+        <p class="muted small" style="margin:2px 0 0;">
+          Currently on <strong><?= e($t['project_name'] ?? $project['name']) ?></strong>.
+          Moving renumbers it — <?= e($label) ?> becomes the next number on the project it
+          goes to — and any shot, asset or step is cleared, because those belong to this
+          show. Comments, attachments and the assignee go with it.
+        </p>
+      </div>
+      <form method="post" class="inline-form"
+            onsubmit="return confirm('Move <?= e($label) ?> to another project?
+
+Its reference will change and any shot, asset or step will be cleared.');">
+        <select name="to_project" aria-label="Project to move this card to">
+          <?php foreach ($others as $o): ?>
+            <option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option>
+          <?php endforeach; ?>
+        </select>
+        <button type="submit" name="move_project" value="1" class="secondary">Move</button>
+      </form>
+    </div>
+  <?php endif; endif; ?>
 
   <?php if (can_edit() && $canDeleteCard): ?>
     <div class="danger-zone">

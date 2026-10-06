@@ -567,6 +567,36 @@ a different input.
 
 **Open:** which of the two, and the policy answer if it is the second.
 
+### Where the transcript lands, and a general Tasks board (2026-10-07)
+David, asked for alongside the above: *"we need a menu on top that says Tasks (aside of my tasks) so
+we can drop the transcript in that general task and then as we assign them we can put them in a
+project or the other."* The cards arrive in **Waiting to start**, unassigned, and are sorted into
+shows while being read.
+
+**⚠ HALF OF THIS IS ALREADY DONE, and it is the half that was blocking.** David's objection was
+*"If I process the transcript in a project task then I won't be able to move it to another project"*.
+Moving a card between projects was built on 2026-10-07 (`move_ticket_to_project()`), so a transcript
+can be processed on any show and the cards sorted out afterwards. **A general board is now a
+convenience, not a requirement** — worth knowing before anybody scopes it as the hard part.
+
+**The hard part of a general board is statuses.** A board's columns ARE the project's own statuses
+(`statuses.project_id`), and "Waiting to start" is a row belonging to a show. A board with no project
+has no columns. Two ways out, and they are not equal:
+
+1. **A real project, flagged as the inbox.** It gets statuses, a code, a board, a sequence and a
+   place in the switcher for free, and "move between projects" is already built. The cost is one
+   flag and then remembering it everywhere a project list is drawn — the dashboard, finance, the
+   projects page, the switcher — so it does not appear as a show with no delivery date and 0%
+   progress.
+2. **`tickets.project_id` nullable.** Cleaner conceptually, more expensive everywhere: the board,
+   the sequence (`uniq_project_seq` permits many NULLs, so numbering needs its own answer), the
+   status vocabulary, and every query that joins `projects`.
+
+**The recommendation is (1)**, because the thing a general board needs most is to look and behave
+exactly like a board, and that is what a project already is.
+
+**Open:** whether a general board is wanted now that moving works.
+
 ### How many versions a task took
 
 > *"Once we migrate plaky to anima (or a separate platform) we need to count the number of versions
