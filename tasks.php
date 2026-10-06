@@ -28,6 +28,7 @@ require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';
 require_once __DIR__ . '/includes/tickets.php';
+require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcript button
 require_login();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -270,6 +271,14 @@ require __DIR__ . '/includes/header.php';
         <a class="button" href="<?= e($selfUrl) ?>&amp;archived=1">Archive (<?= $archivedCount ?>)</a>
       <?php endif; ?>
       <?php if (can_edit()): ?>
+        <?php // Only offered where it would work. A button that opens a screen
+              // saying "no API key" is a button that teaches people to ignore
+              // buttons; without a key this one simply is not there, and the
+              // screen explains itself to anybody who reaches it by address. ?>
+        <?php if (function_exists('ai_configured') && ai_configured()): ?>
+          <a class="button secondary" href="transcript.php?project=<?= $projectId ?>"
+             title="Read a meeting transcript and turn the action items into cards">Read a transcript</a>
+        <?php endif; ?>
         <button type="button" class="secondary" onclick="openCreate('task')">+ New task</button>
         <button type="button" onclick="openCreate('ticket')">+ New ticket</button>
       <?php endif; ?>

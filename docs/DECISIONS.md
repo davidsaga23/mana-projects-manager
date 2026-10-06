@@ -2124,6 +2124,59 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-07 — A call transcript, read by Claude, into cards
+**Asked by David:** *"we need to process the transcript through an API for Anthropic so you can
+summarize the task and ideally assign a potential user based on the transcript, when you have any
+questions leave the assignee empty and I'll assign everything."* — choosing the second of the two
+options the roadmap had carried since 2026-10-05.
+
+### ⚠ The first thing here that talks to anything outside itself
+Everything else reads this database, or the finance one, or a file somebody uploaded. Three kinds of
+failure arrive with this and none existed before: **it costs money per use**, **it is slow** (tens of
+seconds, and that is a page load sitting there), and **it can be down, rate-limited or time out**.
+Each is reported with what actually happened — never "no tasks found", which is what a failure and an
+empty transcript would otherwise look like. Lesson 11 in a new place.
+
+**The key is a line somebody adds to `config.php` on purpose.** Without it the screen says so, the
+button does not appear on the board, and nothing else is affected. That a transcript LEAVES THE
+BUILDING is a fact about the studio rather than about the code, so it is opt-in by construction.
+
+### ⚠ The reply is data, never instructions
+A transcript is a file somebody uploaded; a model's reading of it is a guess about that file. Both
+are untrusted. Nothing that comes back is executed or written without a person seeing it, and **every
+field is validated**: the title must be non-empty and is cut to the column width, the priority and
+type must be one of the known values or they fall to the default, the count is capped at 40, and
+**the owner is resolved to a crew id by exact name against this project's own people**. A name that
+does not match becomes nobody. The system prompt also tells it that instructions inside the
+transcript are a recording of a meeting, not a request to it.
+
+Checked rather than assumed: a reply naming somebody who is not on the project, an invented priority,
+an invented type, a missing title, an element that is not an object at all, sixty items, a 400-
+character title, and a transcript trying to talk the model into assigning everything — all ten land
+where they should.
+
+### ⚠ An empty owner is the right answer, not a failure
+David's own instruction, and it is worth more than a good guess: **a wrong owner is work sitting on
+the wrong person's list looking assigned; an empty one is visibly waiting for him.** So the prompt
+says to leave it empty whenever there is any doubt, the validator only accepts an exact match against
+the project's crew, and "nobody yet" is the first option and the default in the review table.
+
+### Three screens, and nothing is written until the third
+Upload, read what it found, create. The same shape as the Plaky importer, for a harder version of the
+same reason: these cards were written by a model from a recording of people talking. **The middle
+screen is not a formality** — titles are editable, owners are a dropdown, and anything wrong is
+unticked rather than fixed afterwards on five separate cards.
+
+Cards land in the board's **first column**, on the project the screen was opened from. A card on the
+wrong show is moved from the card itself, which was built the same day and is what makes processing a
+transcript anywhere workable.
+
+**Sonnet rather than Opus:** the work is extraction rather than reasoning, and it is markedly cheaper
+and faster on a transcript that may run to thousands of words.
+
+**Not run in PHP** — there is none on this machine, and no call was made to Anthropic from here. All
+seven checks pass; the validation was replayed in Python over the ten cases above.
+
 ## 2026-10-07 — A Tasks screen across every show, and Projects leaves the top bar
 **Asked by David:** *"I still want the general task menu so we can see all the open tasks with and
 without project to see the progress across multiple projects."*

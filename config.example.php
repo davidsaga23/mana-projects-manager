@@ -30,6 +30,21 @@ return [
     'timezone' => 'America/Mexico_City',
 
     // -------------------------------------------------------------------------
+    // Anthropic API — reading a call transcript into tasks (transcript.php)
+    // -------------------------------------------------------------------------
+    // The ONLY thing in this platform that sends anything outside this server.
+    // Leave it out and the Transcript screen says so and does nothing else; no
+    // other screen is affected.
+    //
+    // ⚠ A TRANSCRIPT LEAVES THE BUILDING when this is set, and it costs a small
+    // amount per use. Both are facts about the studio, not about the code, which
+    // is why this is a line somebody adds on purpose rather than a default.
+    //
+    // Get a key from console.anthropic.com. It is a secret: config.php is out of
+    // git and out of the deploy, so it only ever exists on the server.
+    // 'anthropic_api_key' => 'sk-ant-...',
+
+    // -------------------------------------------------------------------------
     // Email (ticket notifications)
     // -------------------------------------------------------------------------
     // Sent through a real authenticated mailbox. PHP's mail() cannot
