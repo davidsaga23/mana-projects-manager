@@ -115,6 +115,14 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   ⚠ `project_switch_href()` builds the target from the lit TAB, never from the current URL, because
   `step.php`, `ticket.php`, `person.php` and `item.php` draw this bar while holding somebody else's
   id. Both navs call `project_section_nav()`, so production and finance share it.
+- **Tasks** (2026-10-07, `alltasks.php`, no migration): every open card on every show in one list,
+  filterable by project, type and status. **A view, not a container** — same rows the project boards
+  draw, read through the shared `ticket_select_sql()`, and it carries no controls because the board
+  is where a status means something. "Open" is `maps_to <> 'approved'`, the same test the dashboard
+  uses. **Projects left the top bar** the same day; the brand has always linked there.
+- **A card can be moved between projects** (2026-10-07, `move_ticket_to_project()`). It renumbers —
+  `seq` is per project — remaps the status by name, and **clears the shot, asset and step**, which
+  belong to the old show. The assignee stays, because crew is studio-wide.
 - **A viewer gets five project tabs** (2026-09-28): Overview, Brief, Shots, Production tracking,
   Tasks. The other ten are listed in `PROJECT_TABS_HIDDEN_FROM_VIEWERS` in `includes/project_nav.php`,
   applied by `project_nav_items()` and keyed on `can_edit()`, so preview-as-viewer shows the real

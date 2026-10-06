@@ -2124,6 +2124,49 @@ projection prices, so an understated one is money.
 it, and pulling the whole dashboard into it to reach one formatter was the wrong way round. One
 formatter, because two would drift the first time either was corrected.
 
+## 2026-10-07 — A Tasks screen across every show, and Projects leaves the top bar
+**Asked by David:** *"I still want the general task menu so we can see all the open tasks with and
+without project to see the progress across multiple projects."*
+
+**⚠ THAT SENTENCE CHANGED THE BUILD.** The earlier reading of "a general Tasks area" was a place
+cards would LIVE before being sorted into shows — which needs a board with no project, which needs
+statuses with no project, which is a schema argument (ROADMAP). What was actually wanted is to **see
+across** the shows. That needs nothing new: the cards already exist, each on its own project, and
+`alltasks.php` reads them together.
+
+**No migration, nothing stored.** A card on this page is the same row the project's own board draws,
+because `ticket_select_sql()` is the one place either of them asks.
+
+**It carries no controls, deliberately.** A status picker here would be a second way to do a thing
+the board already does, and the board is where the columns mean something. The page reads, and says
+so at the bottom.
+
+**"Open" is a property of the status, not a guess from its name** — the same `maps_to = 'approved'`
+test the dashboard and My tasks use, so a card is open here exactly when it is open there. Matching
+on the word "done" would work until the first show that says "Final". Finished work is one click
+away rather than hidden, because "what did we get through" is a fair question too.
+
+**Project, Type and Status are dropdowns; the rest are boxes.** Each is a short closed list, and
+picking "MSD" is the question the page exists to answer. Built from the values actually present, so a
+show with nothing open is not offered as a filter that finds nothing.
+
+**⚠ "Without project" shows nothing, and the page says why rather than drawing an empty bucket.**
+Every ticket has a project — `tickets.project_id` is NOT NULL since migration 017. What makes the
+sorting workflow possible is **moving** a card between shows, built the same day.
+
+### Projects left the top bar
+David, same day: *"we can delete the projects menu next to my tasks, we can always go back with home
+or changing projects."* He is right, and it was checked before removing: **the brand at the top left
+has always been the link to the project list**, on every screen, and a project's breadcrumb says
+"Projects /" as well. Three ways to one list, one of them a word in a row of four. **Tasks** takes
+its place, beside My tasks and not inside a project, for the reason Artists and Bookings are there:
+a thing about ALL the work does not belong behind a choice of one show.
+
+**Not run in PHP** — there is none on this machine. The table was driven in a browser with the real
+`style.css` and `gridtools.js`, running the page's own script: Project narrowing six cards to the
+three on MSD, Type to the two tickets, priority sorting by urgency rather than the alphabet, dates
+chronological, the Anima Dev chip surviving, and no sideways scroll.
+
 ## 2026-10-06 (later) — Both halves of the notification: a list, and an email on request
 **Asked by David**, when told a mention notified nobody: *"both"* — the list for everyone, email only
 when asked.

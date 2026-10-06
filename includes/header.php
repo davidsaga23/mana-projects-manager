@@ -37,7 +37,21 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       // one way to ALL the shows, and the housekeeping behind a separator.
       ?>
       · <a href="mytasks.php">My tasks</a>
-      · <a href="index.php">Projects</a>
+      <?php // TASKS, next to My tasks and not inside a project, because the
+            // question it answers spans them: "what is open everywhere, and how
+            // are we doing across the shows" (David, 2026-10-07). Same reasoning
+            // as Artists and Bookings — a thing about ALL the work does not
+            // belong behind a choice of one show.
+            //
+            // ⚠ "PROJECTS" WAS HERE AND IS GONE (David, same day: "we can delete
+            // the projects menu next to my tasks, we can always go back with home
+            // or changing projects"). The brand at the top left IS the link to
+            // the project list — it always has been, on every screen — and the
+            // breadcrumb inside a project says "Projects /" as well, so the list
+            // had three ways to reach it and one of them was a word in a row of
+            // four. Check the brand is still a link before adding a fourth item
+            // back here. ?>
+      · <a href="alltasks.php">Tasks</a>
       <?php // ARTISTS is up here, not inside a project, because a freelancer is
             // not the property of the show that first spoke to them — the whole
             // value of writing them down is that the NEXT show can find them.
