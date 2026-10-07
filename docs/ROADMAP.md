@@ -834,6 +834,78 @@ reason.
 whether version *upload* is in scope at all, or whether a version *label* plus a link to wherever the
 file already lives (Drive, the server) is enough to start.
 
+### An assistant that can be asked about production, costs and delays
+
+> *"Add an AI assistant who can access all the Anima information and can reply questions regarding
+> production, costs, or delays."*
+
+**The plumbing exists.** `includes/ai.php` (2026-10-07) is already the one outbound call in this
+platform, and it already carries the three things that come with talking to something outside:
+it costs money per use, it is slow enough to say so on screen, and it can be down — reported with
+what actually happened rather than as an empty result. An assistant reuses that shape entirely.
+
+**And most of the answers are already computed.** "Is anything late" is the dashboard's overdue
+steps and `schedule` against `daily_snapshots`. "What has FCM cost" is `project_stop_cost()`
+(2026-10-06). "How is Compositing going" is `timelog_by_step()` beside the quota. The assistant's
+job is mostly to *find the right existing report and read it out*, which is both the cheap version
+and the reliable one.
+
+So the model is not the hard part. These three are.
+
+#### ⚠ 1. WHO IS ALLOWED TO SEE WHAT, ENFORCED BEFORE THE MODEL, NEVER BY IT
+
+Finance lives in a **separate database**, reached only through `includes/money.php`, behind
+`can_see_money()` — which is `is_admin()`. Artists cannot see rates, and the role work of
+2026-09-28 exists precisely so a viewer gets five tabs and not fifteen.
+
+An assistant that answers *"what is Ana's day rate"* to an artist destroys all of that in one
+sentence, and it would do it **quietly** — there would be no screen to notice it on.
+
+The rule has to be: **the permission check happens before the data reaches the model.** Never
+"here is everything, please be discreet". A system prompt is a request, not a boundary, and the
+transcript reader's own rule already says the model's output is untrusted — its *discretion* has
+to be treated the same way.
+
+#### ⚠ 2. FIXED TOOLS, NOT TEXT-TO-SQL
+
+The obvious build is to let the model write SQL. **Do not.** Two reasons, and the second is worse
+than the first:
+
+- A model one bad query from `DELETE` or a table scan that locks production.
+- Even read-only, a model that can shape its own queries can reach the finance database's rows by
+  asking for them, which puts the entire permission model in the hands of a prompt.
+
+The recommendation is **a small set of named tools** — `project_cost`, `late_steps`,
+`step_progress`, `who_is_booked` — each one a PHP function that already exists and already checks
+`can_see_money()` and the caller's role. The model chooses which to call and with what arguments;
+it never touches the database. That also makes every answer reproducible, which matters for the
+next point.
+
+#### ⚠ 3. A NUMBER IN A CHAT BUBBLE CANNOT BE CHECKED
+
+This is the one that will actually bite. Every figure on the finance screens is shown beside its
+arithmetic on purpose — the Cost to date panel has a "show the working" disclosure for exactly
+this reason, because somebody is about to quote it to a client. A chat answer has none of that, and
+a confidently wrong number that nobody can trace is worse than no assistant at all.
+
+**So every answer cites the screen it came from, with a link**, and the assistant says "I don't
+know" rather than reasoning its way to a figure. If it cannot name the tool that produced a number,
+it should not say the number.
+
+#### The business question, which is not technical
+
+Asking a question sends studio data to Anthropic: names, rates, client budgets, schedules. The
+transcript reader already sends text outside, but somebody chose that file and pressed a button.
+An assistant sends whatever answering requires, by default, every time.
+
+⚠ **Some client contracts restrict where production data may go.** That is David's call and
+possibly his clients', not a thing to decide in code — and it is worth settling before anything
+is built, because the answer "no third-party processing" makes this whole entry moot.
+
+**Open:** who may use it (admins only is the safe start, and answers the finance problem by
+avoiding it); whether it is a box on the dashboard or a page of its own; and the client-data
+question above, which comes first.
+
 ## Asked for on 2026-10-06 (urgent) — "what has this show cost us so far?"
 
 FCM went on standby. David's boss needs a number to take to the client: **how much has been spent,
