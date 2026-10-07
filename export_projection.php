@@ -384,9 +384,11 @@ $put([['v' => 'Projected cost', 's' => XLSX_TEXT],
       ['f' => 'H' . $grandRow, 'v' => round($grandCost, 2), 's' => XLSX_MONEY_CALC]]);
 
 if ($budget && $budget['budget_amount'] !== null) {
-    $budgetRow = $put([['v' => 'Agreed budget', 's' => XLSX_TEXT],
+    $budgetRow = $put([['v' => 'Approved production budget', 's' => XLSX_TEXT],
                        ['v' => round((float)$budget['budget_amount'], 2), 's' => XLSX_MONEY]]);
-    $put([['v' => 'Margin', 's' => XLSX_TEXT],
+    // Same rename as the screen, so a spreadsheet mailed to somebody does not
+    // call it profit when the page it came from does not.
+    $put([['v' => 'Budget variance', 's' => XLSX_TEXT],
           ['f' => 'B' . $budgetRow . '-H' . $grandRow,
            'v' => round((float)$budget['budget_amount'] - $grandCost, 2), 's' => XLSX_MONEY_CALC]]);
 }

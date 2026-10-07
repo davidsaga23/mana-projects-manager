@@ -1,0 +1,38 @@
+-- finance_install_07 — revenue, kept apart from the production budget.
+--
+-- ⚠ IMPORT THIS BY HAND, THROUGH phpMyAdmin, INTO THE FINANCE DATABASE.
+-- migrate.php does not and must not touch this database — it is a separate
+-- MySQL database reached only through includes/money.php, behind
+-- can_see_money(), and that separation is the whole point of it.
+--
+-- David, 2026-10-06: "we need to have three different specific amounts in the
+-- Finance Management overview tab: Revenue (which is what we billed the
+-- client), Approved Production Budget (what we're internally allowed to spend
+-- in operation costs), and Margin (whether we're over or under the Approved
+-- Production Budget)."
+--
+-- ⚠ TWO DIFFERENT NUMBERS THAT WERE ONE COLUMN. `budget_amount` has been doing
+-- double duty since finance_install_02: its own comment on `terms` calls it
+-- "what the client is billed against", while the Overview has always compared
+-- it with the forecast COST, which is an internal spending limit. Those are not
+-- the same figure and on a profitable show they are nowhere near each other.
+-- Keeping one column would mean the screen silently answering one question with
+-- the other — so revenue gets a column of its own and budget_amount keeps the
+-- meaning the comparison already assumed.
+--
+-- WHICH ONE EXISTING DATA IS: budget_amount stays exactly as it is, and is now
+-- named "Approved Production Budget" on screen. Nothing is migrated, nothing is
+-- guessed. ⚠ ANY SHOW WHERE SOMEBODY TYPED THE CLIENT FEE INTO THAT BOX NOW
+-- READS AS A PRODUCTION BUDGET, because the platform cannot tell which was
+-- meant. Worth checking the shows that have a figure in it.
+--
+-- WHAT REVENUE IS NOT: it does not enter the variance. David's own instruction,
+-- in the same message: "This should only compare the production budget against
+-- the current forecast. Do not add client revenue or profit here." Revenue is
+-- displayed beside it and takes no part in the arithmetic.
+--
+-- NULLABLE, with no default. A show nobody has billed yet has no revenue — not
+-- zero, which would read as "billed nothing" and is a different fact.
+
+ALTER TABLE project_budgets
+  ADD COLUMN revenue_amount DECIMAL(12,2) DEFAULT NULL AFTER project_name;

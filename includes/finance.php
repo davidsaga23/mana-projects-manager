@@ -68,26 +68,61 @@ function save_project_budget(int $projectId, array $project, array $in, string $
         if ($amount < 0) throw new RuntimeException('A budget cannot be negative.');
     }
 
+    // Revenue, read the same way and kept entirely separate. ⚠ IT TAKES NO PART
+    // IN THE VARIANCE — David, 2026-10-06: "this should only compare the
+    // production budget against the current forecast. Do not add client revenue
+    // or profit here." It is stored and shown, and nothing computes with it.
+    $revenue = null;
+    $hasRevenue = revenue_available();
+    if ($hasRevenue) {
+        $rawRev = trim((string)($in['revenue_amount'] ?? ''));
+        if ($rawRev !== '') {
+            $cleanRev = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rawRev));
+            if ($cleanRev === '' || !is_numeric($cleanRev)) {
+                throw new RuntimeException('"' . $rawRev . '" is not a number, nothing was saved.');
+            }
+            $revenue = round((float)$cleanRev, 2);
+            if ($revenue < 0) throw new RuntimeException('Revenue cannot be negative.');
+        }
+    }
+
     $cur = strtoupper(trim((string)($in['currency'] ?? 'USD')));
     if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
 
-    $db->prepare(
-        'INSERT INTO project_budgets
-           (project_id, project_code, project_name, budget_amount, currency, terms, notes, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           project_code = VALUES(project_code), project_name = VALUES(project_name),
-           budget_amount = VALUES(budget_amount), currency = VALUES(currency),
-           terms = VALUES(terms), notes = VALUES(notes), updated_by = VALUES(updated_by)'
-    )->execute([
+    // ⚠ TWO STATEMENTS, CHOSEN BY WHAT THE DATABASE ACTUALLY HAS. Naming a
+    // column that is not there is a fatal error on every save, which would take
+    // the whole budget form down for the sake of one optional field.
+    $cols = 'project_id, project_code, project_name, budget_amount, currency, terms, notes, updated_by';
+    $marks = '?, ?, ?, ?, ?, ?, ?, ?';
+    $upd  = 'project_code = VALUES(project_code), project_name = VALUES(project_name), '
+          . 'budget_amount = VALUES(budget_amount), currency = VALUES(currency), '
+          . 'terms = VALUES(terms), notes = VALUES(notes), updated_by = VALUES(updated_by)';
+    $args = [
         $projectId, $project['code'] ?? null, $project['name'] ?? null,
         $amount, $cur,
         trim((string)($in['terms'] ?? '')) ?: null,
         trim((string)($in['notes'] ?? '')) ?: null,
         $who,
-    ]);
+    ];
+    if ($hasRevenue) {
+        $cols .= ', revenue_amount';
+        $marks .= ', ?';
+        $upd  .= ', revenue_amount = VALUES(revenue_amount)';
+        $args[] = $revenue;
+    }
 
-    return $amount === null ? 'Budget cleared.' : 'Budget saved: ' . fmt_money_plain($amount, $cur) . '.';
+    $db->prepare(
+        'INSERT INTO project_budgets (' . $cols . ') VALUES (' . $marks . ')
+         ON DUPLICATE KEY UPDATE ' . $upd
+    )->execute($args);
+
+    $said = $amount === null
+        ? 'Approved production budget cleared.'
+        : 'Approved production budget saved: ' . fmt_money_plain($amount, $cur) . '.';
+    if ($hasRevenue && $revenue !== null) {
+        $said .= ' Revenue: ' . fmt_money_plain($revenue, $cur) . '.';
+    }
+    return $said;
 }
 
 /**
@@ -893,6 +928,20 @@ function delete_invoice(int $id): string {
 function fmt_money_plain(?float $amount, string $currency = 'USD'): string {
     if ($amount === null) return '—';
     return number_format($amount, 2) . ' ' . $currency;
+}
+
+/**
+ * Is `revenue_amount` there yet (finance_install_07)?
+ *
+ * ⚠ PROBED, NOT ASSUMED. The finance schema files are imported BY HAND through
+ * phpMyAdmin — migrate.php cannot reach this database — so there is always a
+ * window where the code is deployed and the column is not. The budget screen has
+ * to keep working through it, minus the one field, rather than failing whole.
+ */
+function revenue_available(): bool {
+    static $known = null;
+    if ($known === null) $known = finance_column_exists('project_budgets', 'revenue_amount');
+    return $known;
 }
 
 /** Has finance_install_03.sql been imported? Invoices cannot name a position without it. */

@@ -192,9 +192,30 @@ foreach ($invoices as $iv) {
 // This used to be budget minus $proj['total'], which is labour alone, and it was
 // read as headroom because that is what a figure called Margin means. On Return
 // to Club it showed 1,720.65 against a 35,000 budget while nothing non-labour
-// could be recorded at all. (2026-08-17.)
+// could be recorded at all. (2026-08-17.) The name itself went on 2026-10-06 —
+// see below — for the same reason the bug was possible: it read as profit.
 $grandTotal = $proj['grand_total'] ?? $proj['total'];
-$margin = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grandTotal : null;
+
+// BUDGET VARIANCE: approved production budget minus what the show is now
+// forecast to cost. Positive is under, negative is over.
+//
+// ⚠ REVENUE IS DELIBERATELY ABSENT FROM THIS LINE. David, 2026-10-06: "this
+// should only compare the production budget against the current forecast. Do
+// not add client revenue or profit here." The two numbers answer different
+// questions — "are we inside what Jorik approved" and "did the show make money"
+// — and one figure that quietly mixed them would answer neither.
+//
+// The arithmetic is unchanged from the old Margin; only its name and how it
+// reads on screen are new. It was renamed because "Margin" means profit to
+// everybody who reads it, and this has never been profit.
+$variance = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grandTotal : null;
+// ⚠ WHY there is no variance, since the two reasons are not the same thing and
+// "no approved budget yet" under a screen that plainly shows one would be a lie.
+$varianceWhy = $budgetAmount === null
+    ? 'no approved budget yet'
+    : ($grandTotal > 0 ? '' : 'nothing is costed yet, so there is nothing to compare');
+$revenueAmount = ($budget && isset($budget['revenue_amount']) && $budget['revenue_amount'] !== null)
+    ? (float)$budget['revenue_amount'] : null;
 
 // WHAT THIS SHOW HAS COST SO FAR, and what the plan still has booked. Worked
 // out here with the rest of the money rather than inside the Overview block,
@@ -308,8 +329,18 @@ try {
 
 <h3>The money</h3>
 <div class="dash-strip">
-  <div><span class="muted small">Budget</span>
-    <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong></div>
+  <?php // THREE FIGURES THAT ARE NOT THE SAME NUMBER, in the order David asked
+        // for them: what the client pays us, what we are allowed to spend, and
+        // whether we are inside it. Revenue sits first and takes no part in any
+        // sum on this screen. ?>
+  <?php if (revenue_available()): ?>
+    <div><span class="muted small">Revenue</span>
+      <strong><?= $revenueAmount === null ? '—' : e(fmt_money_plain($revenueAmount, $cur)) ?></strong>
+      <span class="muted small">billed to the client</span></div>
+  <?php endif; ?>
+  <div><span class="muted small">Approved production budget</span>
+    <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong>
+    <span class="muted small">what we may spend</span></div>
   <?php // RENAMED 2026-10-05 (David): "Projected cost" sounded like a figure
          // agreed once at the start. It is recomputed on every page load from
          // the current pipeline, staffing and rates, so the name now says which
@@ -326,9 +357,22 @@ try {
     <?php if ($proj['unpriced_days'] > 0): ?>
       <span class="warn-text small"><?= e(fmt_num($proj['unpriced_days'], 1)) ?> days unpriced</span>
     <?php endif; ?></div>
-  <div><span class="muted small">Margin</span>
-    <strong class="<?= $margin !== null ? ($margin < 0 ? 'err' : 'ok') : '' ?>">
-      <?= $margin === null ? '—' : e(fmt_money_plain($margin, $cur)) ?></strong></div>
+  <?php // ⚠ THE SIGN IS SPELLED OUT, NOT LEFT TO A MINUS. "-2,000.00 USD"
+        // against a budget is read at a glance as "2,000 left" by anybody not
+        // looking closely, and this is the figure the whole panel exists for.
+        // The absolute amount plus the word is unambiguous either way up. ?>
+  <div><span class="muted small">Budget variance</span>
+    <strong class="<?= $variance !== null ? ($variance < 0 ? 'err' : 'ok') : '' ?>">
+      <?= $variance === null ? '—' : e(fmt_money_plain(abs($variance), $cur)) ?></strong>
+    <?php if ($variance !== null): ?>
+      <?php // Dead level is its own answer. "0.00 UNDER BUDGET" is true and reads
+            // as a near miss; spending the budget exactly is neither under nor
+            // over, and saying so costs one branch. ?>
+      <span class="<?= $variance < 0 ? 'err' : 'ok' ?> small">
+        <?= $variance < 0 ? 'OVER BUDGET' : ($variance > 0 ? 'UNDER BUDGET' : 'ON BUDGET') ?></span>
+    <?php else: ?>
+      <span class="muted small"><?= e($varianceWhy) ?></span>
+    <?php endif; ?></div>
   <div><span class="muted small">Invoiced</span><strong><?= e(fmt_money_plain($billed, $cur)) ?></strong>
     <span class="muted small"><?= count($invoices) ?> invoice(s)</span></div>
   <div><span class="muted small">Unpaid</span>
@@ -559,14 +603,29 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   <?php endif; ?>
 <?php endif; ?>
 
-<h3>Budget</h3>
+<h3>Approved production budget</h3>
+<?php if (!revenue_available()): ?>
+  <p class="muted small">
+    ⚠ <strong>Revenue has nowhere to be stored yet.</strong> Import
+    <code>finance_install_07.sql</code> into the finance database through phpMyAdmin and the
+    field appears here and on the strip above. Everything else on this screen works without it.
+  </p>
+<?php endif; ?>
 <form method="post" class="money-form">
   <input type="hidden" name="save_budget" value="1">
   <div class="row">
-    <label>Agreed amount
+    <?php // Named exactly as the strip names it, because two names for one box
+          // is how the client fee came to be typed into it in the first place. ?>
+    <label>Approved production budget
       <input name="budget_amount" inputmode="decimal" placeholder="e.g. 85000"
              value="<?= e($budgetAmount !== null ? fmt_num($budgetAmount, 2) : '') ?>">
     </label>
+    <?php if (revenue_available()): ?>
+      <label>Revenue <span class="muted small">(billed to the client)</span>
+        <input name="revenue_amount" inputmode="decimal" placeholder="e.g. 120000"
+               value="<?= e($revenueAmount !== null ? fmt_num($revenueAmount, 2) : '') ?>">
+      </label>
+    <?php endif; ?>
     <label style="flex:0 1 90px;">Currency
       <input name="currency" maxlength="3" style="text-transform:uppercase" value="<?= e($cur) ?>">
     </label>
@@ -1101,7 +1160,7 @@ if ($retakePct <= 0):
   Costs with no lane behind them, software seats, render or cloud time, a music licence, stock,
   equipment, travel. The projection above is computed from pipeline steps and can only ever contain
   people; <strong>these are the rest of what a show spends</strong>, and they count toward the
-  Current forecast cost and Margin at the top of this page.
+  Current forecast cost and Budget variance at the top of this page.
   <br>
   <strong>An invoice is a person billing you; an expense is everything that is not somebody's
   time.</strong> Put a freelancer's bill in Invoices below and a vendor's in here, and the two can
@@ -1112,7 +1171,7 @@ if ($retakePct <= 0):
   <div class="flash flash-warn">
     Other expenses need <code>finance_install_05.sql</code>, which hasn't been imported into the
     finance database yet. Until it is, this section cannot record anything, and
-    <strong>Current forecast cost and Margin above are people only</strong>.
+    <strong>Current forecast cost and Budget variance above are people only</strong>.
   </div>
 <?php else: ?>
 
