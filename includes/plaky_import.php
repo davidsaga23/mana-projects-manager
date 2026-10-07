@@ -445,6 +445,17 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
         // things without saying so is the same silent-change problem as one that
         // creates duplicates without saying so.
         'types_normalised' => [],
+        // ⚠ STEPS WHOSE SCOPE DISAGREES WITH THE BOARD. step name => [scope,
+        // kind, n]. The importer decides shot-or-asset from the PARENT'S GROUP in
+        // Plaky and has never consulted the step's own applies_to, so a step set
+        // to cover "Character assets" in Anima happily collects SHOT rows from a
+        // board that keeps that work under Shots. Nothing errors; the rows simply
+        // never count, and the step reads 0 of N for ever.
+        //
+        // Found through David on 2026-10-07, after the same mismatch had been
+        // sitting in MSD unnoticed. Reported here because the import is the only
+        // moment anybody is looking at the two models side by side.
+        'scope_mismatch' => [],
         'notes' => [],
     ];
 
@@ -487,9 +498,12 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             'UPDATE assets SET asset_type = COALESCE(?, asset_type), external_id = COALESCE(?, external_id) WHERE id = ?'
         );
 
-        // Whole-project steps, for groups mapped to 'project_step'.
+        // Whole-project steps, for groups mapped to 'project_step'; and every
+        // step by id, so a subitem can be checked against the scope it claims.
         $projectStepsByName = [];
+        $stepsById = [];
         foreach (pipeline_steps($pdo, $projectId) as $s) {
+            $stepsById[(int)$s['id']] = $s;
             if ($s['applies_to'] === 'project') $projectStepsByName[mb_strtolower($s['name'])] = $s;
         }
         $statusRowsEarly = statuses_by_id($pdo, $projectId);
@@ -679,6 +693,30 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             $primaryCrew = $crewIds[0] ?? null;
             $assigneeRaw = ($s['Assignee'] ?? '') !== '' ? $s['Assignee'] : null;
             $minutes = plaky_time_to_minutes($s['Time spent'] ?? '', $timeUnit);
+
+            // ⚠ DOES THE STEP AGREE WITH WHERE THIS ROW IS GOING? The kind comes
+            // from the board's own shape; applies_to is what Anima was told. When
+            // they differ the row is still written — the board is the source of
+            // truth for status, and refusing it would lose real work — but the
+            // dashboard will not count it, so it is named in the report instead.
+            $stepRow = $stepsById[$stepId] ?? null;
+            if ($stepRow) {
+                $wants = (string)$stepRow['applies_to'];
+                $fits = $wants === 'both'
+                     || ($parent['kind'] === 'shot'  && $wants === 'shot')
+                     || ($parent['kind'] === 'asset' && $wants === 'asset');
+                if (!$fits) {
+                    $name = (string)$stepRow['name'];
+                    if (!isset($report['scope_mismatch'][$name])) {
+                        $report['scope_mismatch'][$name] = [
+                            'scope' => applies_to_phrase($wants, $stepRow['applies_to_asset_type'] ?? null),
+                            'kind'  => $parent['kind'],
+                            'n'     => 0,
+                        ];
+                    }
+                    $report['scope_mismatch'][$name]['n']++;
+                }
+            }
 
             $itemKey = ($parent['kind'] === 'shot' ? 's' : 'a') . $parent['id'];
             $existingId = $progressIds[$stepId . '|' . $itemKey] ?? null;

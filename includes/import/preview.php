@@ -97,6 +97,31 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
   </div>
 <?php endif; ?>
 
+<?php // ⚠ THE MISMATCH THAT COSTS A DASHBOARD. Shown ABOVE the softer notes
+      // because it is the only one here that makes a step read 0 of N for ever
+      // while looking perfectly healthy on this screen. ?>
+<?php if (!empty($report['scope_mismatch'])): ?>
+  <div class="flash flash-err">
+    <p style="margin:0 0 6px;"><strong>Some steps are set to cover something other than what the
+       board files them under.</strong> The rows still import — the board is the source of truth
+       for status — but <strong>the dashboard will not count them</strong>, so those steps will
+       sit at 0 and never move.</p>
+    <ul style="margin:6px 0 0; padding-left:20px;">
+      <?php foreach ($report['scope_mismatch'] as $name => $m): ?>
+        <li><strong><?= e($name) ?></strong> is set to cover <em><?= e($m['scope']) ?></em>,
+            but the board has <?= (int)$m['n'] ?> of its rows under
+            <?= $m['kind'] === 'shot' ? 'shots' : 'assets' ?>.</li>
+      <?php endforeach; ?>
+    </ul>
+    <p class="small" style="margin:6px 0 0;">
+      Fix it in one of two places: change the step's <em>Covers</em> on the
+      <a href="wizard.php?project=<?= $projectId ?>&step=2">Pipeline</a> screen to match the board,
+      or move that work in Plaky. Changing <em>Covers</em> does not move rows that are already
+      here — the old ones stay, uncounted, and the step page says how many.
+    </p>
+  </div>
+<?php endif; ?>
+
 <?php if (!empty($report['types_normalised'])): ?>
   <div class="flash flash-ok">
     Board groups are plural; asset types here aren't. These will be filed under the spelling
