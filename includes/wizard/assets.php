@@ -11,6 +11,12 @@
 // bulk for a batch pasted wrongly. Pasting is easy to get slightly wrong, so
 // correcting it has to be easier than deleting and starting over.
 
+// ⚠ fmt_hours(), for saying how much logged time a bulk delete destroyed.
+// wizard.php does not include this and nothing else in the wizard needed it, so
+// without this line the ONLY path that calls it — deleting assets that have real
+// hours against them — would fatal, which is the worst possible moment for it.
+require_once __DIR__ . '/../timelog.php';
+
 /**
  * Type choices. Shares asset_types() with the pipeline screen deliberately: a
  * step can be scoped to "Character assets", so the two lists must never diverge.
@@ -173,6 +179,75 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 5);
     }
 
+    // ⚠ BULK DELETE, AND IT TAKES MORE THAN THE ASSETS WITH IT. David,
+    // 2026-10-07: "we need an option to do bulk actions in this section, like
+    // for instance delete them all at once."
+    //
+    // Every one of these is ON DELETE CASCADE from `assets`:
+    //   shot_assets  the breakdown — which shots the asset appears in
+    //   progress     one row per step per asset: status, version, notes
+    //   schedule     the planned dates for each of those
+    // and through `progress`, time_logs cascades too — so REAL LOGGED HOURS GO.
+    // `tickets.asset_id` is ON DELETE SET NULL, so cards survive and simply stop
+    // pointing anywhere.
+    //
+    // None of that is obvious from a screen that looks like a list of names, and
+    // on eleven assets at once it is not recoverable. So the damage is COUNTED
+    // FIRST and then reported as fact: not "are you sure", which everybody
+    // clicks through, but "this is what went", which can at least be acted on.
+    if ($action === 'bulk_delete') {
+        $ids = array_values(array_filter(array_map('intval', (array)($_POST['sel'] ?? []))));
+        if (!$ids) throw new RuntimeException('Tick the assets you want to remove first.');
+
+        $in = implode(',', array_fill(0, count($ids), '?'));
+
+        // Each count is optional on purpose: tickets arrive in migration 017 and
+        // time_logs in 022, and an install without them must still be able to
+        // delete an asset rather than fail on a table that was never there.
+        $count = function (string $sql, array $args) use ($pdo): int {
+            try {
+                $q = $pdo->prepare($sql);
+                $q->execute($args);
+                return (int)$q->fetchColumn();
+            } catch (PDOException $e) { return 0; }
+        };
+
+        $nLinks = $count("SELECT COUNT(*) FROM shot_assets WHERE asset_id IN ($in)", $ids);
+        $nProg  = $count("SELECT COUNT(*) FROM progress WHERE project_id = ? AND asset_id IN ($in)",
+                         array_merge([$projectId], $ids));
+        $nSched = $count("SELECT COUNT(*) FROM schedule WHERE project_id = ? AND asset_id IN ($in)",
+                         array_merge([$projectId], $ids));
+        $nTick  = $count("SELECT COUNT(*) FROM tickets WHERE asset_id IN ($in)", $ids);
+        $mins   = $count("SELECT COALESCE(SUM(tl.minutes), 0) FROM time_logs tl
+                            JOIN progress pr ON pr.id = tl.progress_id
+                           WHERE pr.asset_id IN ($in)", $ids);
+
+        $del = $pdo->prepare("DELETE FROM assets WHERE project_id = ? AND id IN ($in)");
+        $del->execute(array_merge([$projectId], $ids));
+        $gone = $del->rowCount();
+
+        $said = 'Removed ' . $gone . ' asset' . ($gone === 1 ? '' : 's') . '.';
+        $also = [];
+        if ($nLinks) $also[] = $nLinks . ' breakdown link' . ($nLinks === 1 ? '' : 's');
+        if ($nProg)  $also[] = $nProg . ' tracked row' . ($nProg === 1 ? '' : 's');
+        if ($nSched) $also[] = $nSched . ' scheduled date' . ($nSched === 1 ? '' : 's');
+        if ($also) $said .= ' That also deleted ' . implode(', ', $also) . '.';
+        if ($nTick) {
+            $said .= ' ' . $nTick . ' task' . ($nTick === 1 ? '' : 's')
+                   . ' kept, but no longer point' . ($nTick === 1 ? 's' : '') . ' at an asset.';
+        }
+
+        // ⚠ LOGGED HOURS ARE SAID LOUDLY AND SEPARATELY. Everything else here
+        // can be typed in again; hours somebody worked cannot.
+        if ($mins > 0) {
+            flash('warn', $said . ' ⚠ ' . fmt_hours($mins)
+                . ' of logged time went with those tracked rows and cannot be recovered.');
+        } else {
+            flash('ok', $said);
+        }
+        return wizard_url($projectId, 5);
+    }
+
     if ($action === 'retype') {
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['sel'] ?? []))));
         if (!$ids) {
@@ -319,7 +394,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
           <tbody id="asset-rows">
           <?php foreach ($assets as $a): $id = (int)$a['id']; ?>
             <tr data-type="<?= e($a['asset_type'] ?? '') ?>">
-              <td><input type="checkbox" name="sel[]" value="<?= $id ?>" title="Select for a bulk type change"></td>
+              <td><input type="checkbox" name="sel[]" value="<?= $id ?>" title="Select for a bulk change"></td>
               <td><input name="name[<?= $id ?>]" value="<?= e($a['name']) ?>"></td>
               <td>
                 <select name="type[<?= $id ?>]">
@@ -354,6 +429,15 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
           <select name="retype_type"><?= wizard_asset_type_options($types) ?></select>
           <input name="retype_new" placeholder="or a new type" size="14">
           <button type="submit" name="action" value="retype" class="secondary">Change type</button>
+          <?php // ⚠ THE COUNT IS IN THE QUESTION, and it is counted at click time
+                // rather than written into the page: with a type filter on, what is
+                // ticked and what is on screen are not the same set. A confirm that
+                // said "these" would be answering about rows nobody can see. ?>
+          <span class="spacer"></span>
+          <button type="submit" name="action" value="bulk_delete" class="danger"
+                  data-confirm-selected="Remove %n ticked asset%s?
+
+This also deletes their breakdown links, tracked rows and scheduled dates, and any logged hours on them. It cannot be undone.">Delete ticked</button>
         </div>
       </form>
     <?php else: ?>

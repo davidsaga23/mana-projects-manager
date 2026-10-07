@@ -564,7 +564,45 @@
       var group = document.getElementById(e.target.getAttribute('data-check-all'));
       if (!group) return;
       var boxes = group.querySelectorAll('input[name="sel[]"]');
-      for (var j = 0; j < boxes.length; j++) boxes[j].checked = e.target.checked;
+      for (var j = 0; j < boxes.length; j++) {
+        // ⚠ VISIBLE ROWS ONLY. The type filter hides rows with display:none
+        // and deliberately leaves their inputs in the form, so a plain "check
+        // everything" would also tick rows nobody can see — harmless when the
+        // bulk action was only a retype, and not harmless at all now that one of
+        // them deletes. What you can see is what you select.
+        var row = boxes[j].closest ? boxes[j].closest('tr') : null;
+        if (row && row.style.display === 'none') continue;
+        boxes[j].checked = e.target.checked;
+      }
+    });
+  }
+})();
+
+// A confirm that counts what is actually ticked, for the destructive bulk
+// actions. %n becomes the number and %s the plural s.
+//
+// Counted when the button is pressed rather than rendered into the page,
+// because the number changes with every tick and with the type filter, and a
+// stale one in a confirm about deleting things is worse than no confirm.
+(function () {
+  'use strict';
+
+  var btns = document.querySelectorAll('[data-confirm-selected]');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function (e) {
+      var form = e.target.form;
+      if (!form) return;
+      var n = form.querySelectorAll('input[name="sel[]"]:checked').length;
+      if (!n) {
+        // Said here as well as on the server: a round trip to be told you ticked
+        // nothing is a round trip wasted.
+        e.preventDefault();
+        alert('Tick the rows you want first.');
+        return;
+      }
+      var msg = e.target.getAttribute('data-confirm-selected')
+                 .replace('%n', n).replace('%s', n === 1 ? '' : 's');
+      if (!window.confirm(msg)) e.preventDefault();
     });
   }
 })();
