@@ -41,9 +41,20 @@ $stepIdOk->execute([$stepId, $projectId]);
 // date. require_login() has already refused a POST from a view-only account.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $stepIdOk->fetchColumn()) {
     try {
-        $raw = ($_POST['action'] ?? '') === 'clear_deadline' ? '' : (string)($_POST['deadline'] ?? '');
-        [$said, $warn] = set_step_deadline($pdo, $project, $stepId, $raw);
-        flash('ok', $said . ' The pace and every figure on this page are worked out from it.');
+        if (($_POST['action'] ?? '') === 'clear_deadline') {
+            // The "use the project's delivery date" link. It is about the deadline
+            // and must not touch the start date, so the start is passed as null.
+            [$said, $warn] = set_step_dates($pdo, $project, $stepId, null, '');
+        } else {
+            // ⚠ BOTH FIELDS ARE ON THE FORM, so both are sent — including an empty
+            // one, which means "clear it". Reading only the filled boxes would make
+            // clearing a date impossible from a screen that shows it.
+            [$said, $warn] = set_step_dates(
+                $pdo, $project, $stepId,
+                (string)($_POST['start_date'] ?? ''), (string)($_POST['deadline'] ?? '')
+            );
+        }
+        flash('ok', $said . ' The pace and every figure on this page are worked out from the deadline.');
         if ($warn) flash('warn', $warn);
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
@@ -209,9 +220,18 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
     $inherited   = !$ownDeadline && $delivery;
 ?>
   <div class="deadline-card">
-    <h3>Deadline</h3>
+    <?php // Not "Deadline" any more: the card holds both ends of the step. ?>
+    <h3>Dates</h3>
     <form method="post" class="inline-form deadline-form">
-      <label class="inline" for="deadlineInput">Change to</label>
+      <?php // ⚠ THE START DATE EARNS ITS PLACE HERE BUT CHANGES NOTHING ON THIS
+            // PAGE. Every figure above is worked from the DEADLINE and today: the
+            // pace, the days left, the quota. The start drives the timeline bar and
+            // the scheduler instead. Said below the fields, because a date that
+            // visibly moves nothing looks broken otherwise. ?>
+      <label class="inline" for="startInput">Starts</label>
+      <input type="date" id="startInput" name="start_date"
+             value="<?= e($step['start_date'] ?? '') ?>">
+      <label class="inline" for="deadlineInput">Due</label>
       <input type="date" id="deadlineInput" name="deadline"
              value="<?= e((string)($ownDeadline ?: $delivery ?: '')) ?>" required>
       <button type="submit" name="action" value="set_deadline">Save</button>
@@ -243,7 +263,10 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
       </form>
     <?php endif; ?>
     <p class="muted small">
-      Changing it recalculates the required pace and every figure on this page straight away.
+      The <strong>deadline</strong> recalculates the required pace and every figure on this page
+      straight away. The <strong>start date</strong> changes nothing here — the pace is measured
+      from today — but it is what the timeline bar and the scheduler are drawn from. Clearing
+      either box empties that date.
       A schedule already saved is not replanned; <a href="schedule.php?project=<?= $projectId ?>">re-run
       it</a> to fit the new date.
     </p>

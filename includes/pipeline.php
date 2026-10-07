@@ -842,36 +842,93 @@ function step_deadline_check(string $stepName, ?string $start, ?string $deadline
  * date is refused or is not a date.
  */
 function set_step_deadline(PDO $pdo, array $project, int $stepId, string $raw): array {
+    // The deadline alone, for the "use the project's delivery date" button. NULL
+    // for the start means LEAVE IT ALONE, which is not the same as '' (clear it).
+    return set_step_dates($pdo, $project, $stepId, null, $raw);
+}
+
+/**
+ * Set a step's start date, its deadline, or both, from one save.
+ *
+ * David, 2026-10-07: "let's also add the start date aside of the deadline so we
+ * can know and adjust it from this view too if needed."
+ *
+ * Each date takes three kinds of value, and the difference matters:
+ *   null  leave it exactly as it is — the field was not on the form
+ *   ''    clear it
+ *   date  set it
+ *
+ * ⚠ THE PAIR IS VALIDATED TOGETHER, AGAINST THE VALUES THAT WILL BE STORED,
+ * not against what is in the row now. Moving a start past an existing deadline
+ * and moving a deadline before an existing start are the same mistake, and
+ * checking each against the old copy of the other would wave one of them
+ * through. Nothing is written unless both survive the check.
+ *
+ * Returns [message, warning-or-null]. Throws, having written nothing, when a
+ * date is refused or is not a date.
+ */
+function set_step_dates(PDO $pdo, array $project, int $stepId,
+                        ?string $startRaw, ?string $deadlineRaw): array {
     $stmt = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
     $stmt->execute([$stepId, (int)$project['id']]);
     $step = $stmt->fetch();
     if (!$step) throw new RuntimeException('That step is not part of this project.');
 
-    $raw = trim($raw);
-    $deadline = null;
-    if ($raw !== '') {
-        // Strict: a date input posts Y-m-d, and anything else is refused rather
-        // than handed to strtotime(), which would read "next friday" as a date.
+    // Strict: a date input posts Y-m-d, and anything else is refused rather than
+    // handed to strtotime(), which would read "next friday" as a date.
+    $parse = function (?string $raw, string $what) use ($step) {
+        if ($raw === null) return ['keep', null];
+        $raw = trim($raw);
+        if ($raw === '') return ['set', null];
         if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $raw, $m)
             || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
-            throw new RuntimeException('"' . $raw . '" is not a date, so the deadline was left unchanged.');
+            throw new RuntimeException('"' . $raw . '" is not a date, so the '
+                                     . $what . ' was left unchanged.');
         }
-        $deadline = $raw;
-    }
+        return ['set', $raw];
+    };
 
-    $check = step_deadline_check((string)$step['name'], $step['start_date'] ?: null, $deadline,
+    [$startMode, $start]       = $parse($startRaw, 'start date');
+    [$deadlineMode, $deadline] = $parse($deadlineRaw, 'deadline');
+
+    // What the row will hold once this save lands — the only pair worth checking.
+    $finalStart    = $startMode    === 'keep' ? ($step['start_date'] ?: null) : $start;
+    $finalDeadline = $deadlineMode === 'keep' ? ($step['deadline'] ?: null)   : $deadline;
+
+    $check = step_deadline_check((string)$step['name'], $finalStart, $finalDeadline,
                                  $project['delivery_date'] ?: null);
     if ($check['refuse']) throw new RuntimeException($check['refuse']);
 
-    $pdo->prepare('UPDATE pipeline_steps SET deadline = ? WHERE id = ? AND project_id = ?')
-        ->execute([$deadline, $stepId, (int)$project['id']]);
+    $sets = [];
+    $args = [];
+    if ($startMode === 'set')    { $sets[] = 'start_date = ?'; $args[] = $finalStart; }
+    if ($deadlineMode === 'set') { $sets[] = 'deadline = ?';   $args[] = $finalDeadline; }
+    if ($sets) {
+        $args[] = $stepId;
+        $args[] = (int)$project['id'];
+        $pdo->prepare('UPDATE pipeline_steps SET ' . implode(', ', $sets)
+                    . ' WHERE id = ? AND project_id = ?')->execute($args);
+    }
 
-    $said = $deadline === null
-        ? ($project['delivery_date']
-            ? $step['name'] . ' now works to the project delivery date, ' . $project['delivery_date'] . '.'
-            : $step['name'] . ' has no deadline now, and the project has no delivery date either.')
-        : $step['name'] . ' is due ' . $deadline
-          . ($step['deadline'] ? ', moved from ' . $step['deadline'] : '') . '.';
+    // Said date by date, and only for what actually moved. "Saved" on a form with
+    // two fields leaves you wondering which of them it meant.
+    $parts = [];
+    if ($startMode === 'set' && ($step['start_date'] ?: null) !== $finalStart) {
+        $parts[] = $finalStart === null
+            ? 'has no start date now'
+            : 'starts ' . $finalStart . ($step['start_date'] ? ', moved from ' . $step['start_date'] : '');
+    }
+    if ($deadlineMode === 'set' && ($step['deadline'] ?: null) !== $finalDeadline) {
+        $parts[] = $finalDeadline === null
+            ? ($project['delivery_date']
+                ? 'now works to the project delivery date, ' . $project['delivery_date']
+                : 'has no deadline now, and the project has no delivery date either')
+            : 'is due ' . $finalDeadline . ($step['deadline'] ? ', moved from ' . $step['deadline'] : '');
+    }
+    $said = $parts
+        ? $step['name'] . ' ' . implode(' and ', $parts) . '.'
+        : $step['name'] . ': nothing changed, those are the dates it already had.';
+
     return [$said, $check['warn']];
 }
 
