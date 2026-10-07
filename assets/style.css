@@ -1951,7 +1951,10 @@ body.lightbox-lock { overflow: hidden; }
    not confused with the solid red "today". Frappe's stylesheet loads from the
    CDN after this file, so these carry the container class to win on
    specificity rather than on order. */
-.tl-chart .tl-ms { stroke: var(--violet); stroke-width: 1.6; stroke-dasharray: 5 4; fill: var(--violet); }
+/* Only the diamond carries this now: the full-height dashed line was removed
+   on 2026-10-06. stroke-dasharray went with it — it was the line's, and on a
+   filled polygon it only ever dotted the outline on hover. */
+.tl-chart .tl-ms { stroke: var(--violet); stroke-width: 1.6; fill: var(--violet); }
 .tl-chart .tl-ms-label {
   font: 600 11px -apple-system, "Segoe UI", Roboto, sans-serif;
   fill: var(--violet);
@@ -1980,10 +1983,12 @@ body.lightbox-lock { overflow: hidden; }
 .tl-chart .tl-ms-hit { fill: transparent; }
 .tl-chart .tl-ms-g.is-draggable { cursor: ew-resize; }
 .tl-chart .tl-ms-g.is-draggable:hover .tl-ms { stroke-width: 2.4; }
+/* With no line to thicken, the marker itself has to answer the hover. */
+.tl-chart .tl-ms-g.is-draggable:hover .tl-ms-label { fill: var(--violet-strong); }
 .tl-chart .tl-ms-g.is-draggable:hover .tl-ms-dia { stroke: var(--violet-strong); stroke-width: 1.5; }
 /* While dragging, the dashes stop and the marker goes solid: it is being
    placed now rather than merely marking a date. */
-.tl-chart .tl-ms-g.is-dragging .tl-ms { stroke-dasharray: none; stroke-width: 2.4; }
+.tl-chart .tl-ms-g.is-dragging .tl-ms { stroke-width: 2.4; }
 .tl-chart .tl-ms-g.is-dragging .tl-ms-label { fill: var(--violet-strong); }
 /* A milestone sitting on the row of the step it reviews. The label is nudged
    clear of the diamond and given a plate, because on a row it lands over the

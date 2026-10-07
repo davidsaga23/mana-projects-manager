@@ -319,12 +319,22 @@
 
   // --- milestones -------------------------------------------------------------
   //
-  // Client reviews, deliveries, locks: dates the plan has to be ready for. Drawn
-  // as a line DOWN the chart rather than a bar on it, because the useful question
-  // about a review date is which bars cross it.
+  // Client reviews, deliveries, locks: dates the plan has to be ready for.
   //
-  // Same geometry as the today line above, on BOTH charts -- a review date is as
-  // relevant to a shot as it is to a department.
+  // DRAWN AS A MARKER ON ITS STEP'S ROW, not as a line down the chart. It began
+  // as a full-height dashed line, on the reasoning that the useful question
+  // about a review date is which bars cross it. Migration 029 then linked a
+  // milestone to the step it reviews, and once each marker sits on its own row
+  // the line stopped earning its keep: a dozen of them turned the chart into a
+  // picket fence, which is what David asked to be rid of on 2026-10-06 ("delete
+  // the dotted vertical lines, I'd like a cleaner version").
+  //
+  // WHAT THAT COSTS, stated so nobody rediscovers it as a bug: you can no longer
+  // read a review date straight down against a row far below it. For a milestone
+  // ON its row that is no loss -- the bar it belongs to is right there. For a
+  // whole-project date stacked at the top it is a real one, mitigated only by
+  // the date axis sitting directly above. If the fence is ever wanted back, it
+  // is the <line> this function no longer appends, and nothing else.
   function addMilestones(g, container) {
     if (!g || !g.gantt_start || !g.options) return;
     if (!window.MILESTONES || !window.MILESTONES.length) return;
@@ -389,7 +399,28 @@
       rowY[String(id)] = parseFloat(el.getAttribute('y'));
       // Kept so a label can tell whether it is about to land ON this bar, where
       // the bar's own name already is.
+      // ⚠ THE BAR'S NAME CAN SIT OUTSIDE THE BAR. Frappe writes a short bar's
+      // label to the RIGHT of it rather than inside, so testing against the
+      // rectangle alone says "clear" while the milestone label lands straight on
+      // top of the step name — which is exactly what the chart looked like on
+      // 2026-10-06. labelRight is where the drawn text actually ends.
+      // $bar_label is Frappe's own handle on it; the query is a fallback in case
+      // a later version renames the property.
+      var lab = b.$bar_label || (b.group ? b.group.querySelector('.bar-label') : null);
+      var labR = 0;
+      if (lab) {
+        try {
+          var lw  = lab.getComputedTextLength();
+          var lxx = parseFloat(lab.getAttribute('x'));
+          // Frappe's update_label_position(): a label too wide for its bar gets
+          // class "big", is anchored START and placed at the bar's right edge;
+          // one that fits is anchored MIDDLE at the bar's centre. So where its
+          // ink ends differs by half its width depending on which it is.
+          labR = lab.classList.contains('big') ? lxx + lw : lxx + lw / 2;
+        } catch (e) { labR = 0; }
+      }
       rowBar[String(id)] = {
+        labelRight: labR,
         x: parseFloat(el.getAttribute('x')),
         y: parseFloat(el.getAttribute('y')),
         w: parseFloat(el.getAttribute('width')),
@@ -415,21 +446,14 @@
       grp.setAttribute('class', 'tl-ms-g');
       grp.setAttribute('data-id', m.id);
 
-      // A WIDE INVISIBLE HANDLE over the whole line, not just the diamond.
-      // The diamond sits near the top and scrolls out of view on a long chart;
-      // the line is what stays on screen, so the line is what you grab.
+      // THE HANDLE IS THE MARKER NOW, and it has to be: a full-height invisible
+      // rect with no line under it would be a 14px column swallowing clicks all
+      // the way down the chart, over every bar it crossed, with nothing on
+      // screen to explain why. Sized once the row is known, at the bottom of
+      // this block.
       var hit = document.createElementNS(ns, 'rect');
       hit.setAttribute('class', 'tl-ms-hit');
-      hit.setAttribute('x', x - 7); hit.setAttribute('y', top);
-      hit.setAttribute('width', 14);
-      hit.setAttribute('height', Math.max(0, h - top));
       grp.appendChild(hit);
-
-      var line = document.createElementNS(ns, 'line');
-      line.setAttribute('class', 'tl-ms');
-      line.setAttribute('x1', x); line.setAttribute('x2', x);
-      line.setAttribute('y1', top); line.setAttribute('y2', h);
-      grp.appendChild(line);
 
       // Bigger than it was: 20px across rather than 10, so it reads as a marker
       // you can take hold of rather than a tick you might have imagined.
@@ -485,7 +509,10 @@
         if (bar) {
           var lx = x + 14, lr = lx + w;
           var key = 'step-' + m.step_id;
-          if (lx < bar.x + bar.w && lr > bar.x) {
+          // The occupied strip is the bar OR its name, whichever reaches further
+          // right — see labelRight above.
+          var taken = Math.max(bar.x + bar.w, bar.labelRight || 0);
+          if (lx < taken && lr > bar.x) {
             // The strip under a bar is one line tall — Frappe's row padding —
             // so a second label cannot simply go below the first. Where two
             // would collide down there, the later one stays beside its diamond
@@ -514,6 +541,16 @@
       ].join(' '));
       text.setAttribute('y', labelY !== undefined ? labelY : ty + 15);
       if (labelY !== undefined) grp.classList.add('label-below');
+
+      // The grab area: the diamond, plus the label wherever it ended up. Tight
+      // enough that it never covers a neighbouring row, generous enough that the
+      // whole marker is draggable rather than only its 20px centre.
+      var hy = Math.min(ty, (labelY !== undefined ? labelY : ty) - 12);
+      var hb = Math.max(ty + 22, (labelY !== undefined ? labelY : ty) + 4);
+      hit.setAttribute('x', x - 11);
+      hit.setAttribute('y', hy);
+      hit.setAttribute('width', Math.max(22, (x + 14 + w) - (x - 11)));
+      hit.setAttribute('height', Math.max(22, hb - hy));
 
       if (!window.TL_CAN_EDIT) return;
       grp.classList.add('is-draggable');
