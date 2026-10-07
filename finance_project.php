@@ -336,11 +336,14 @@ try {
   <?php if (revenue_available()): ?>
     <div><span class="muted small">Revenue</span>
       <strong><?= $revenueAmount === null ? '—' : e(fmt_money_plain($revenueAmount, $cur)) ?></strong>
-      <span class="muted small">billed to the client</span></div>
+      <a class="muted small" href="#budget-form">billed to the client · set it ↓</a></div>
   <?php endif; ?>
   <div><span class="muted small">Approved production budget</span>
     <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong>
-    <span class="muted small">what we may spend</span></div>
+    <?php // Both of these are TYPED IN, and the box is far down the page — further
+          // since the Cost to date panel went in above it. A figure you can set
+          // should say where it is set. ?>
+    <a class="muted small" href="#budget-form">what we may spend · set it ↓</a></div>
   <?php // RENAMED 2026-10-05 (David): "Projected cost" sounded like a figure
          // agreed once at the start. It is recomputed on every page load from
          // the current pipeline, staffing and rates, so the name now says which
@@ -379,6 +382,22 @@ try {
     <strong class="<?= $overdue ? 'err' : '' ?>"><?= e(fmt_money_plain($unpaid, $cur)) ?></strong>
     <?php if ($overdue): ?><span class="err small"><?= $overdue ?> overdue</span><?php endif; ?></div>
 </div>
+
+<?php // ⚠ SAID WHERE THE HOLE IS. This note used to live only down beside the
+      // budget form, which is most of a page below — so the strip simply had no
+      // Revenue on it and nothing nearby explained why. David, 2026-10-06: "I
+      // still don't see the revenue amount and I'd like to know where should I
+      // input that number." An absence has to explain itself at the point it is
+      // noticed, not where the fix happens to live. ?>
+<?php if (!revenue_available()): ?>
+  <div class="flash flash-warn">
+    <strong>Revenue is not here yet because the finance database has nowhere to put it.</strong>
+    Import <code>finance_install_07.sql</code> into the <em>finance</em> database through
+    phpMyAdmin — <code>migrate.php</code> cannot reach that database, so this one is by hand,
+    like every other <code>finance_install_*.sql</code>. The figure and its input box both appear
+    here the moment it lands. Everything else on this page works without it.
+  </div>
+<?php endif; ?>
 
 <?php if ($proj['mixed_currency']): ?>
   <div class="flash flash-warn">
@@ -603,12 +622,18 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   <?php endif; ?>
 <?php endif; ?>
 
-<h3>Approved production budget</h3>
+<h3 id="budget-form">Approved production budget<?= revenue_available() ? ' and revenue' : '' ?></h3>
+<p class="muted small">
+  Both are typed in here and nowhere else. <strong>Approved production budget</strong> is what we
+  are internally allowed to spend<?= revenue_available()
+      ? '; <strong>Revenue</strong> is what the client is billed. Revenue is shown beside the budget and takes no part in the variance.'
+      : '.' ?>
+</p>
 <?php if (!revenue_available()): ?>
-  <p class="muted small">
+  <p class="flash flash-warn">
     ⚠ <strong>Revenue has nowhere to be stored yet.</strong> Import
-    <code>finance_install_07.sql</code> into the finance database through phpMyAdmin and the
-    field appears here and on the strip above. Everything else on this screen works without it.
+    <code>finance_install_07.sql</code> into the <em>finance</em> database through phpMyAdmin
+    and the box appears here, beside the one below. Everything else on this screen works without it.
   </p>
 <?php endif; ?>
 <form method="post" class="money-form">
