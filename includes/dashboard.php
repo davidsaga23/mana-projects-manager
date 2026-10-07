@@ -60,16 +60,48 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
     $assetCount = 0;
     foreach ($stmt as $r) { $typeCounts[$r['t']] = (int)$r['n']; $assetCount += (int)$r['n']; }
 
+    // ⚠ ONLY ROWS THE STEP STILL COVERS. A step's progress rows OUTLIVE a change
+    // to its scope: re-scoping "Color Script" from shots to the whole project
+    // leaves its 21 shot rows in `progress` and adds one project row beside them.
+    //
+    // Counting all of them was a real bug, found by David on 2026-10-07. The
+    // worst of it was the exclusion subtraction in step_applicable_count():
+    // a whole-project step is 1 item, three of the leftover SHOT rows were marked
+    // N/A, and 1 - 3 clamped to a target of ZERO. The card then read
+    // "0.00 of 0.00" with a required pace of 0.00 and "100% under" — a step that
+    // looked finished and weightless while 21 shots sat waiting on it. Lesson 11
+    // again: not an empty screen, a confidently wrong one.
+    //
+    // So every aggregate below is filtered to the CURRENT scope. `pr.id IS NOT
+    // NULL` leads each test because this is a LEFT JOIN: without it a step with
+    // no progress at all matches the 'project' branch on two NULL ids and counts
+    // itself one tracked row.
+    // Every THEN is parenthesised. MySQL accepts a bare boolean expression there,
+    // but AND/OR precedence inside a CASE arm is exactly the kind of thing that
+    // is read wrong once and then quietly returns the wrong rows forever.
+    $typeOk = "(ps.applies_to_asset_type IS NULL OR ps.applies_to_asset_type = ''"
+            . " OR a.asset_type = ps.applies_to_asset_type)";
+    $inScope = "(pr.id IS NOT NULL AND (CASE ps.applies_to
+                   WHEN 'project' THEN (pr.shot_id IS NULL AND pr.asset_id IS NULL)
+                   WHEN 'shot'    THEN (pr.shot_id IS NOT NULL)
+                   WHEN 'asset'   THEN (pr.asset_id IS NOT NULL AND {$typeOk})
+                   WHEN 'both'    THEN (pr.shot_id IS NOT NULL
+                                        OR (pr.asset_id IS NOT NULL AND {$typeOk}))
+                   ELSE 1
+                 END))";
+
     $stmt = $pdo->prepare(
         'SELECT ps.*,
-                COUNT(pr.id) AS tracked,
-                COALESCE(SUM(pr.is_delivered), 0) AS delivered,
-                COALESCE(SUM(pr.is_approved), 0)  AS approved,
-                COALESCE(SUM(st.is_blocked = 1), 0) AS blocked,
-                COALESCE(SUM(st.is_excluded = 1), 0) AS excluded
+                COALESCE(SUM(' . $inScope . '), 0) AS tracked,
+                COALESCE(SUM(' . $inScope . ' AND pr.is_delivered = 1), 0) AS delivered,
+                COALESCE(SUM(' . $inScope . ' AND pr.is_approved = 1), 0)  AS approved,
+                COALESCE(SUM(' . $inScope . ' AND st.is_blocked = 1), 0)   AS blocked,
+                COALESCE(SUM(' . $inScope . ' AND st.is_excluded = 1), 0)  AS excluded,
+                COUNT(pr.id) AS tracked_any
            FROM pipeline_steps ps
            LEFT JOIN progress pr ON pr.step_id = ps.id
            LEFT JOIN statuses st ON st.id = pr.status_id
+           LEFT JOIN assets   a  ON a.id = pr.asset_id
           WHERE ps.project_id = ?
           GROUP BY ps.id
           ORDER BY ps.step_order, ps.id'
@@ -149,6 +181,10 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
             'seconds_missing' => $secondsMissing,
             'applicable' => $applicable,
             'tracked'    => (int)$s['tracked'],
+            // Rows left behind by an earlier scope: tracked against this step but
+            // not covered by it any more. Reported so a screen can say why its
+            // item list is longer than its total, instead of looking broken.
+            'stale_rows' => max(0, (int)$s['tracked_any'] - (int)$s['tracked']),
             'delivered'  => (int)$s['delivered'],
             'approved'   => (int)$s['approved'],
             'blocked'    => (int)$s['blocked'],

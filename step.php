@@ -409,6 +409,22 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
 
 <?php // --- the items themselves ---------------------------------------------- ?>
 <h3>Everything at this step <span class="muted">· <?= count($rows) ?> tracked of <?= (int)$s['applicable'] ?></span></h3>
+
+<?php // ⚠ THE LEFTOVERS, NAMED. Changing a step's scope does not delete the
+      // progress rows the old scope created, so a step re-scoped from shots to
+      // the whole project keeps 21 shot rows it no longer covers. They are listed
+      // below because they are real records — but they count towards nothing, and
+      // a list longer than the total with no explanation reads as a fault. ?>
+<?php if (!empty($s['stale_rows'])): ?>
+  <p class="flash flash-warn">
+    <strong><?= (int)$s['stale_rows'] ?> of these were tracked under a different scope</strong>
+    and are not counted any more. This step now covers
+    <?= e(applies_to_phrase((string)$step['applies_to'], $step['applies_to_asset_type'] ?? null)) ?>, so only
+    <?= (int)$s['tracked'] ?> of the rows below count towards its
+    <?= e(fmt_unit($s['target'], $unit)) ?>. They are kept rather than deleted: they are
+    what really happened, and the scope may change back.
+  </p>
+<?php endif; ?>
 <?php if (!$rows): ?>
   <p class="muted">Nothing has been recorded against this step yet. Progress arrives through
      <a href="import.php?project=<?= $projectId ?>">the importer</a>.</p>
