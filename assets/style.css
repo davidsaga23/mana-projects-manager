@@ -399,9 +399,24 @@ label.inline input { width: auto; }
    label rule adds 4px, which would leave the Save button sitting that much
    lower than the inputs it lines up with. */
 .money-form .row label { margin-bottom: 0; }
+/* display:block is load-bearing, not tidying. A textarea is inline-level by
+   default and sits on the text baseline, which leaves ~4px of descender space
+   underneath it INSIDE its label. The row bottom-aligns (.money-form .row
+   above), so that phantom 4px lifted the Notes box and its caption clear of
+   every other field on the line -- measured at exactly 4px, label bottom 649.1
+   against the textarea's 645.1. Blockifying it removes the baseline, and the
+   box lines up with the inputs beside it.
+
+   And the height is 35px because that is what the inputs on this row actually
+   compute to -- 8px padding twice, a 17px line, 2px of border. It was 39px,
+   which bottom-alignment turned into the Notes box and its caption standing 4px
+   proud of everything beside them. Both numbers were measured in a browser
+   rather than reasoned about; the first guess (that the whole thing was the
+   baseline gap) was only half of it. */
 .money-form textarea {
+  display: block;
   width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
-  font-family: inherit; font-size: 15px; height: 39px; resize: vertical;
+  font-family: inherit; font-size: 15px; height: 35px; resize: vertical;
 }
 .money-form .row-save { flex: 0 0 auto; }
 .money-form .row-save button { margin: 0; }
