@@ -94,13 +94,29 @@ require __DIR__ . '/includes/header.php';
     Until a shot lists what is in it, the scheduler makes it wait for
     <em>every</em> asset on the show before its animation can start, so breaking
     shots down usually pulls the delivery date <strong>in</strong>, not out.
+    <?php // Said HERE because this banner is the only place the problem is
+          // visible, and a producer reading it is holding exactly the shot the
+          // answer applies to. Hidden when migration 042 has not been applied,
+          // rather than advertising a tick that is not there. ?>
+    <?php if (breakdown_na_available($pdo)): ?>
+      If a shot genuinely needs none of something, open that column and tick
+      <strong>N/A</strong> instead of leaving it blank: an empty cell reads as
+      "not decided yet" and keeps the wait, <strong>N/A</strong> clears it.
+    <?php endif; ?>
     <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> afterwards;
     a saved plan is a snapshot and will not improve by itself.
   </div>
 <?php else: ?>
   <p class="muted small">
     All <?= $progress['total'] ?> shots are broken down, <?= $progress['links'] ?>
-    asset<?= $progress['links'] === 1 ? '' : 's' ?> placed.
+    asset<?= $progress['links'] === 1 ? '' : 's' ?> placed<?php
+      // Said rather than folded into the count above: a cell marked N/A is a
+      // decision somebody made, not an asset they placed.
+      $naCount = (int)($progress['na'] ?? 0);
+      if ($naCount > 0) {
+          echo ', ' . $naCount . ' cell' . ($naCount === 1 ? '' : 's') . ' marked N/A';
+      }
+    ?>.
     <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> to use it:
     a saved plan is a snapshot and does not update itself.
   </p>
@@ -184,6 +200,22 @@ $missingNote = $noFrames > 0
                 <?php endif; ?>
               </span>
             <?php endforeach; ?>
+            <?php // ⚠ "NOTHING OF THIS KIND IN THIS SHOT", drawn as a chip so it
+                  // reads as something somebody DECIDED rather than as a cell
+                  // that happens to be empty — which is the whole distinction
+                  // migration 042 exists to make. It takes the same × to remove
+                  // as an asset chip does, so there is no second gesture to
+                  // learn. ?>
+            <?php if (!empty($r['na'][$t])): ?>
+              <span class="chip chip-na" data-na="1">
+                N/A
+                <?php if (can_edit()): ?>
+                  <button type="button" class="chip-x"
+                          title="<?= e($r['shot_code']) ?> does need <?= e($t !== '' ? $t : 'untyped asset') ?> work after all"
+                          aria-label="Clear N/A">×</button>
+                <?php endif; ?>
+              </span>
+            <?php endif; ?>
             <?php if (can_edit()): ?>
               <?php // A BUTTON that opens a list of tick boxes, not a dropdown
                     // (David, 2026-09-22: "have each character with a check box
@@ -238,6 +270,11 @@ $missingNote = $noFrames > 0
 <script>
   window.BD_PROJECT = <?= $projectId ?>;
   window.BD_CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
+  <?php // ⚠ WITHOUT MIGRATION 042 THE PICKER MUST NOT OFFER N/A. Offering a
+        // tick that always fails is worse than not offering it: the producer
+        // believes the cell is settled and the scheduler carries on waiting for
+        // every asset of that type. ?>
+  window.BD_NA_OK = <?= breakdown_na_available($pdo) ? 'true' : 'false' ?>;
   <?php // Every asset this project has, by type, for the picker. Sent once
         // rather than repeated in every cell: the same twenty-five names would
         // otherwise be written into the page two hundred times. ?>

@@ -13,6 +13,9 @@
   var projectId = window.BD_PROJECT;
   var canEdit = window.BD_CAN_EDIT === true;
   var byType = window.BD_ASSETS || {};
+  // False until migration 042 is applied. The N/A row is then never drawn,
+  // rather than drawn and failing on every tick.
+  var naOk = window.BD_NA_OK === true;
   // ⚠ Handed out through a var, because `function closePicker() {}` is a
   // DECLARATION and declarations are block-scoped in strict mode — it is not
   // visible outside the editing block below, and the column filters need it.
@@ -74,6 +77,26 @@
     return chip;
   }
 
+  /**
+   * The "nothing of this kind in this shot" chip, matching what shots.php
+   * renders server-side. Marked with data-na so the removal handler can tell it
+   * from an asset chip ⚠ it has no asset to unlink.
+   */
+  function makeNaChip(type) {
+    var chip = document.createElement('span');
+    chip.className = 'chip chip-na';
+    chip.setAttribute('data-na', '1');
+    chip.appendChild(document.createTextNode('N/A '));
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'chip-x';
+    x.title = 'This shot does need ' + (type || 'untyped asset') + ' work after all';
+    x.setAttribute('aria-label', 'Clear N/A');
+    x.textContent = '\u00d7';
+    chip.appendChild(x);
+    return chip;
+  }
+
   /** Chips stay in the server's order (by name) however they were ticked. */
   function insertChip(cell, chip, name) {
     var at = null;
@@ -100,6 +123,7 @@
   // screen. No Done button to forget, and a failure names the one asset that
   // failed instead of losing the batch.
   var picker = null, pkList = null, pkFilter = null, pkTitle = null, pkCount = null, pkNote = null;
+  var pkNa = null, pkNaBox = null, pkNaWhy = null;
   var pkCell = null, pkButton = null;
 
   function buildPicker() {
@@ -114,11 +138,24 @@
       '</div>' +
       '<input type="search" class="bd-picker-filter" placeholder="Type to narrow the list" ' +
              'aria-label="Filter the list">' +
+      // ⚠ OUTSIDE .bd-picker-list, deliberately. countTicked() counts every
+      // checkbox inside that list and applyFilter() hides every .bd-picker-row
+      // in it, so an N/A box living there would turn "0 of 18 ticked" into
+      // "0 of 19" and vanish whenever somebody typed in the filter. It is a
+      // different kind of answer from the names below it, and it sits apart.
+      '<div class="bd-picker-na" hidden>' +
+        '<label><input type="checkbox" class="bd-na-box"> ' +
+          'Nothing of this kind in this shot</label>' +
+        '<span class="bd-na-why muted small" hidden></span>' +
+      '</div>' +
       '<div class="bd-picker-list"></div>' +
       '<p class="bd-picker-note err small" hidden></p>' +
       '<p class="bd-picker-count muted small"></p>';
     document.body.appendChild(picker);
     pkList   = picker.querySelector('.bd-picker-list');
+    pkNa     = picker.querySelector('.bd-picker-na');
+    pkNaBox  = picker.querySelector('.bd-na-box');
+    pkNaWhy  = picker.querySelector('.bd-na-why');
     pkFilter = picker.querySelector('.bd-picker-filter');
     pkTitle  = picker.querySelector('.bd-picker-title');
     pkCount  = picker.querySelector('.bd-picker-count');
@@ -129,6 +166,42 @@
     picker.addEventListener('change', onTick);
     // Clicks inside must not reach the document handler that closes it.
     picker.addEventListener('mousedown', function (ev) { ev.stopPropagation(); });
+  }
+
+  /**
+   * Set the N/A row from the cell, every time the picker opens.
+   *
+   * ⚠ REFUSED WHILE THE CELL HAS ASSETS IN IT, and shown as a disabled box with
+   * the reason beside it rather than hidden. A control that silently disappears
+   * when it would be useful teaches nobody why. The server refuses the same
+   * case, so this is a courtesy, not the guard.
+   */
+  function naBoxState(cell) {
+    if (!pkNa) return;
+    if (!naOk || !cell) { pkNa.hidden = true; return; }
+    pkNa.hidden = false;
+
+    var hasAssets = !!cell.querySelector('.chip[data-asset]:not([hidden])');
+    pkNaBox.checked = !!cell.querySelector('.chip-na:not([hidden])');
+    pkNaBox.disabled = hasAssets;
+    pkNaWhy.textContent = hasAssets
+      ? 'Take the chips out of this cell first.'
+      : '';
+    pkNaWhy.hidden = !hasAssets;
+  }
+
+  /**
+   * Drop the N/A chip because something was just linked into the cell.
+   *
+   * breakdown_link() deletes the row server-side, so this only keeps the screen
+   * honest ⚠ without it the cell would show "N/A" beside the asset somebody just
+   * added, which is the contradiction the whole design is built to prevent.
+   */
+  function clearNaLocally(cell) {
+    if (!cell) return;
+    var chip = cell.querySelector('.chip-na');
+    if (chip) chip.remove();
+    if (pkCell === cell) naBoxState(cell);
   }
 
   function pickerSay(msg) {
@@ -225,6 +298,7 @@
 
     pkFilter.value = '';
     applyFilter();
+    naBoxState(cell);
     countTicked();
     button.setAttribute('aria-expanded', 'true');
     picker.hidden = false;
@@ -250,6 +324,9 @@
     if (!box.matches || !box.matches('input[type=checkbox]')) return;
     var cell = pkCell;
     if (!cell) return;
+    // The N/A box lives in the same panel and so reaches the same listener, but
+    // it saves a different fact through a different action.
+    if (box.classList && box.classList.contains('bd-na-box')) { onNaTick(box); return; }
 
     var assetId = box.value;
     var name = box.parentNode.textContent.trim();
@@ -279,6 +356,9 @@
     post(body)
       .then(function () {
         if (!adding && existing) existing.remove();
+        // The server cleared this cell's N/A as part of the link, so the grid
+        // has to agree without waiting for a reload.
+        if (adding) clearNaLocally(cell);
         pickerSay('');
         say('');
       })
@@ -291,6 +371,54 @@
         countTicked();
         pickerSay(err.message);
         say(name + ': ' + err.message, true);
+      })
+      .then(function () { box.disabled = false; });
+  }
+
+  /**
+   * Tick = "this shot needs none of these", untick = "it is undecided again".
+   *
+   * Same optimistic-then-roll-back shape as onTick(): the chip is drawn before
+   * the request answers and taken back if it fails, so the panel and the row
+   * underneath can never end up disagreeing.
+   */
+  function onNaTick(box) {
+    var cell = pkCell;
+    if (!cell) return;
+
+    var shotId = shotOf(cell);
+    var type = cell.getAttribute('data-type') || '';
+    var turningOn = box.checked;
+    var existing = cell.querySelector('.chip-na');
+
+    var chip = null;
+    if (turningOn) {
+      if (existing) { existing.hidden = false; return; }
+      chip = makeNaChip(type);
+      cell.insertBefore(chip, cell.querySelector('.bd-add'));
+    } else {
+      if (!existing) return;
+      existing.hidden = true;
+    }
+    box.disabled = true;
+
+    var body = new URLSearchParams();
+    body.append('action', 'na');
+    body.append('shot_id', shotId);
+    body.append('type', type);
+    body.append('on', turningOn ? '1' : '0');
+    post(body)
+      .then(function () {
+        if (!turningOn && existing) existing.remove();
+        pickerSay('');
+        say('');
+      })
+      .catch(function (err) {
+        if (turningOn) { if (chip) chip.remove(); }
+        else if (existing) existing.hidden = false;
+        box.checked = !turningOn;
+        pickerSay(err.message);
+        say(err.message, true);
       })
       .then(function () { box.disabled = false; });
   }
@@ -321,6 +449,27 @@
     if (!x) return;
     var chip = x.closest('.chip');
     var shotId = shotOf(chip);
+
+    // ⚠ THE N/A CHIP IS NOT A LINK, so there is no asset_id to unlink. Sent
+    // through the same action that set it, with on=0.
+    if (chip.hasAttribute('data-na')) {
+      var naCell = chip.closest('.bd-cell');
+      chip.hidden = true;
+      var naBody = new URLSearchParams();
+      naBody.append('action', 'na');
+      naBody.append('shot_id', shotId);
+      naBody.append('type', naCell ? (naCell.getAttribute('data-type') || '') : '');
+      naBody.append('on', '0');
+      post(naBody)
+        .then(function () {
+          chip.remove();
+          if (pkCell === naCell) naBoxState(naCell);
+          say('');
+        })
+        .catch(function (err) { chip.hidden = false; say(err.message, true); });
+      return;
+    }
+
     var assetId = chip.getAttribute('data-asset');
 
     // Hidden rather than removed, so it can come back in place if the delete

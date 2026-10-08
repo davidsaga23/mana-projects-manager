@@ -50,6 +50,25 @@ try {
         exit;
     }
 
+    // "Nothing of this kind in this shot" — the opposite of a link, and saved
+    // the same way: one cell, one request, as it is ticked.
+    //
+    // ⚠ THE TYPE IS A NAME, NOT AN ID, and '' is a real one: it is the "No type
+    // set" column the grid draws for assets nobody has filed yet. So an absent
+    // `type` cannot be told from a deliberate empty one by checking for ''.
+    // isset() on the raw POST is what distinguishes them, and a request with no
+    // type at all is refused rather than quietly marking the untyped column.
+    if ($action === 'na') {
+        if (!isset($_POST['type'])) throw new RuntimeException('No asset type named.');
+        $msg = breakdown_set_na(
+            $pdo, $projectId, $shotId,
+            (string)$_POST['type'],
+            (string)($_POST['on'] ?? '') === '1'
+        );
+        echo json_encode(['ok' => true, 'message' => $msg]);
+        exit;
+    }
+
     if ($action === 'frames') {
         $r = breakdown_set_frames($pdo, $project, $shotId, (string)($_POST['frames'] ?? ''));
         // The derived seconds go back so the row can show what the money will

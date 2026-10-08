@@ -111,7 +111,20 @@ foreach ($rows as $r) {
         // mostly empty.
         $names = [];
         foreach ($r['assets'][$t] ?? [] as $a) $names[] = $a['name'];
-        $cells[] = ['v' => implode(', ', $names), 's' => xlsx_alt(XLSX_TEXT, $shaded)];
+
+        // ⚠ "N/A" IS NOT THE SAME AS BLANK, and the sheet has to say which it
+        // is. Blank means nobody has broken this cell down yet; N/A means
+        // somebody looked and there is nothing of this kind in the shot. The
+        // person reading the export is usually the one who has to chase the
+        // first and must not chase the second.
+        //
+        // Styled as a note rather than as text, so a column of them stays quiet
+        // beside the real asset names — same reasoning as the chip on screen.
+        if (!$names && !empty($r['na'][$t])) {
+            $cells[] = ['v' => 'N/A', 's' => xlsx_alt(XLSX_NOTE, $shaded)];
+        } else {
+            $cells[] = ['v' => implode(', ', $names), 's' => xlsx_alt(XLSX_TEXT, $shaded)];
+        }
     }
     $cells[] = ['v' => $r['notes'], 's' => xlsx_alt(XLSX_NOTE, $shaded)];
     $put($cells);

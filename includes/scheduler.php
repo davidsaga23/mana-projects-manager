@@ -89,6 +89,17 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     $progress   = scheduler_progress_map($pdo, $projectId);
     $manual     = scheduler_manual_rows($pdo, $projectId);
     $shotAssets = scheduler_shot_assets($pdo, $projectId);
+    // Cells a producer has marked "nothing of this kind in this shot", and the
+    // scope of every step, so a dependency on an asset step can be skipped for a
+    // shot that needs none of its assets. See scheduler_item_earliest().
+    $shotNa     = scheduler_shot_na($pdo, $projectId);
+    $stepScope  = [];
+    foreach ($steps as $s) {
+        $stepScope[(int)$s['id']] = [
+            'applies_to' => (string)$s['applies_to'],
+            'type'       => (string)($s['applies_to_asset_type'] ?? ''),
+        ];
+    }
     // Who fills each lane. A placeholder slot ("Animation 02") counts as filled:
     // the whole point is being able to plan before anyone is hired.
     $laneCrew   = scheduler_lane_crew($pdo, $projectId);
@@ -121,7 +132,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
         $stepId  = (int)$step['id'];
         $summary = scheduler_schedule_step(
             $pdo, $project, $step, $axis, $anchor, $projectDeadline,
-            $items, $progress, $manual, $shotAssets, $depsMap,
+            $items, $progress, $manual, $shotAssets, $shotNa, $stepScope, $depsMap,
             $stepEnd, $itemEnd, $estimates, $laneCrew, $retakePct
         );
 
@@ -320,6 +331,55 @@ function scheduler_near_miss_type(PDO $pdo, int $projectId, array $step): ?array
     return null;
 }
 
+/**
+ * shot id => [asset type => true], for the cells marked "nothing of this kind
+ * in this shot" on the breakdown screen.
+ *
+ * Queried here rather than through includes/breakdown.php, exactly as
+ * scheduler_shot_assets() reads shot_assets directly: the scheduler stays
+ * self-contained and does not pull a screen's helper in behind it.
+ *
+ * Empty when migration 042 has not been applied, which lands the scheduler back
+ * on its pre-042 behaviour rather than failing.
+ */
+function scheduler_shot_na(PDO $pdo, int $projectId): array {
+    if (!column_exists($pdo, 'shot_type_na', 'shot_id')) return [];
+    $stmt = $pdo->prepare(
+        'SELECT n.shot_id, n.asset_type
+           FROM shot_type_na n JOIN shots s ON s.id = n.shot_id
+          WHERE s.project_id = ?'
+    );
+    $stmt->execute([$projectId]);
+    $map = [];
+    foreach ($stmt as $r) $map[(int)$r['shot_id']][(string)$r['asset_type']] = true;
+    return $map;
+}
+
+/**
+ * Does this shot's N/A list cover everything the dependency step produces?
+ *
+ * Only true when the step is scoped to ONE NAMED ASSET TYPE and the shot has
+ * been marked as needing none of it.
+ *
+ * ⚠ A STEP WITH NO TYPE FILTER COVERS EVERY ASSET TYPE, so a single N/A mark
+ * proves nothing about it: "no Character" says nothing about whether the shot
+ * still waits for its Environment in a step that builds both. Answering true
+ * there would start shots before the assets they genuinely need were finished,
+ * which is the one direction this scheduler must never be wrong in — a plan
+ * that is pessimistic is annoying, a plan that is optimistic is a missed
+ * delivery.
+ *
+ * 'both' counts alongside 'asset': such a step usually matches the shot itself
+ * under rule 1, and this is only reached when it did not.
+ */
+function scheduler_na_covers(?array $scope, array $na): bool {
+    if (!$scope || !$na) return false;
+    if (!in_array($scope['applies_to'], ['asset', 'both'], true)) return false;
+    $type = trim((string)($scope['type'] ?? ''));
+    if ($type === '') return false;
+    return !empty($na[$type]);
+}
+
 /** shot id => [asset ids], for dependencies that cross from assets to shots. */
 function scheduler_shot_assets(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
@@ -339,7 +399,8 @@ function scheduler_shot_assets(PDO $pdo, int $projectId): array {
  */
 function scheduler_schedule_step(
     PDO $pdo, array $project, array $step, array &$axis, string $anchor, ?string $projectDeadline,
-    array $items, array $progress, array $manual, array $shotAssets, array $depsMap,
+    array $items, array $progress, array $manual, array $shotAssets,
+    array $shotNa, array $stepScope, array $depsMap,
     array $stepEnd, array $itemEnd, array $estimates, array $laneCrew = [],
     float $retakePct = 0.0
 ): array {
@@ -538,7 +599,8 @@ function scheduler_schedule_step(
         $entries[] = [
             'item'     => $item,
             'earliest' => scheduler_item_earliest(
-                $item, $step, $depsMap, $stepEnd, $itemEnd, $shotAssets, $earliestStep
+                $item, $step, $depsMap, $stepEnd, $itemEnd, $shotAssets,
+                $shotNa, $stepScope, $earliestStep
             ),
             'order'    => $i,
         ];
@@ -579,7 +641,8 @@ function scheduler_schedule_step(
             ? min(array_column($entries, 'earliest'))
             : scheduler_item_earliest(
                 ['kind' => 'band', 'id' => null, 'key' => 'band'],
-                $step, $depsMap, $stepEnd, $itemEnd, $shotAssets, $earliestStep
+                $step, $depsMap, $stepEnd, $itemEnd, $shotAssets,
+                $shotNa, $stepScope, $earliestStep
               );
         $span  = $totalWork / max(1, $lanes);
         $scope = applies_to_phrase($step['applies_to'], $step['applies_to_asset_type'] ?? null);
@@ -734,12 +797,15 @@ function scheduler_lane_count(
  *      shot's lighting, not for all lighting;
  *   2. failing that, for a shot waiting on an asset step, the assets that shot
  *      actually uses — assembly waits for ITS characters to be rigged;
+ *  2b. failing that, NOTHING, if the shot has been marked as needing none of
+ *      what that step makes — a shot with no characters in it does not wait for
+ *      the character step at all;
  *   3. failing that, the whole step — which is right for a band, for a
  *      whole-project deliverable, and whenever nothing finer is known.
  */
 function scheduler_item_earliest(
     array $item, array $step, array $depsMap, array $stepEnd, array $itemEnd,
-    array $shotAssets, int $earliestStep
+    array $shotAssets, array $shotNa, array $stepScope, int $earliestStep
 ): float {
     $earliest = (float)$earliestStep;
 
@@ -757,6 +823,25 @@ function scheduler_item_earliest(
                 }
             }
         }
+        // ⚠ 2b. NOTHING OF THAT KIND IN THIS SHOT, so there is nothing to wait
+        // for — and crucially this must be decided BEFORE the fallback below,
+        // because the fallback is what the mark exists to prevent.
+        //
+        // A shot with no characters linked used to land on rule 3 and wait for
+        // the LAST CHARACTER IN THE SHOW to be finished before it could start.
+        // Rule 2 cannot help: it only fires when the shot has assets, and even
+        // then it finds none belonging to this step. The producer had no way to
+        // say "there are none" — an empty cell and an unfilled cell were the
+        // same thing. Migration 042 is what separated them, and this is the line
+        // that spends the difference.
+        //
+        // Deliberately narrow: see scheduler_na_covers(). Only a step scoped to
+        // one named asset type can be skipped this way.
+        if ($end === null && $item['kind'] === 'shot'
+            && scheduler_na_covers($stepScope[$depId] ?? null, $shotNa[$item['id']] ?? [])) {
+            continue;
+        }
+
         if ($end === null && isset($stepEnd[$depId])) {
             $end = $stepEnd[$depId];                                     // 3
         }

@@ -3378,6 +3378,39 @@ fixed blocks; what the figures need is a measurement. The stopwatch is the primi
 chime can sit on top of it later without the stored shape changing — whereas building the
 blocks first would have left every hour rounded to twenty-five minutes nobody worked.
 
+## 2026-10-08 — "Nothing of this kind in this shot" is a fact, not an empty cell
+**Decision:** the shot breakdown gets an N/A mark, stored per shot AND per asset type in a
+new `shot_type_na` table (migration 042). A cell is either a list of assets, or N/A, never
+both: linking an asset clears the mark, and the picker refuses to set it while chips are
+there.
+**Why:** the grid could not tell "nobody has filled this in yet" from "this shot genuinely
+has no character in it", and both readers of the breakdown got it wrong. The warning above
+the grid nagged for ever about shots that were already settled, and — the expensive half —
+`scheduler_item_earliest()` fell through to its last rule and made those shots wait for the
+WHOLE asset step. A shot with no characters in it waited for the last character in the show
+to be finished before its animation could start. Always pessimistic, and pessimism in a
+schedule reads as "we need more people" rather than as missing data, which is how it gets
+believed. David, 2026-10-08: "let's add an N/A option for all the projects because it might
+be that some of them we don't need anything."
+**Consequence:** per cell rather than per shot, because that is the question actually being
+asked — SH160 needing no Character says nothing about its Environment, and only the finer
+fact is usable by the scheduler. The new rule 2b is deliberately narrow: it releases a
+dependency only when the step is scoped to ONE NAMED asset type that the shot has marked
+N/A. A step with no type filter covers every type, so a single mark proves nothing about it
+and the wait stands. That asymmetry is on purpose — a pessimistic plan is annoying, an
+optimistic plan is a missed delivery.
+**Consequence:** `asset_type` is stored as the type NAME, matching the generated-column
+design the breakdown has used since day one. Renaming an asset type therefore orphans its
+N/A rows, and the cells read as unmarked again. That is degradation in the safe direction:
+the warning comes back and the scheduler returns to waiting, so nothing is ever claimed that
+is not true. Keying on an asset-type id would have been the schema change that design was
+bought to avoid.
+**Consequence:** the "broken down" count still treats ONE link or ONE mark as enough, which
+is the same loose rule it has always used. The strict version — every column either filled
+or N/A — is a better number and a bigger change, and doing it here would have moved the
+figure on every project on the day it shipped with no way to tell whether the work or the
+rule had changed.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

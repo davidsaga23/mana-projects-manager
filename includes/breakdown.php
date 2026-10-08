@@ -123,6 +123,48 @@ function breakdown_assets(PDO $pdo, int $projectId): array {
     return $out;
 }
 
+/**
+ * Has migration 042 been applied?
+ *
+ * Probed rather than assumed, like every other optional column in this codebase:
+ * a screen that offers N/A against a database without the table is a save that
+ * fails for no visible reason, and the whole breakdown would go down with it.
+ * Without the table every screen here simply behaves as it did before 042 — the
+ * cells stay empty, the warning keeps counting them, and nothing breaks.
+ *
+ * column_exists() returns false when the TABLE is missing (it catches the
+ * PDOException from SHOW COLUMNS), so asking it about any column is a valid
+ * table probe. Cached for the request, as it is.
+ */
+function breakdown_na_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'shot_type_na', 'shot_id');
+    return $ok;
+}
+
+/**
+ * The cells somebody has marked "there is nothing of this kind in this shot".
+ *
+ * Scoped by PROJECT through the join back to shots, for the same reason
+ * breakdown_rows() does it: shot_type_na carries no project_id of its own, and
+ * the join is the only thing keeping another show's rows out.
+ *
+ * @return array shot id => [asset type => true]
+ */
+function breakdown_na(PDO $pdo, int $projectId): array {
+    if (!breakdown_na_available($pdo)) return [];
+    $stmt = $pdo->prepare(
+        'SELECT n.shot_id, n.asset_type
+           FROM shot_type_na n
+           JOIN shots s ON s.id = n.shot_id
+          WHERE s.project_id = ?'
+    );
+    $stmt->execute([$projectId]);
+    $out = [];
+    foreach ($stmt as $r) $out[(int)$r['shot_id']][(string)$r['asset_type']] = true;
+    return $out;
+}
+
 /** The episodes with shots in them, for the filter. Empty string means none. */
 function breakdown_episodes(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare(
@@ -164,6 +206,10 @@ function breakdown_rows(PDO $pdo, int $projectId, string $episode = ''): array {
             'seconds'   => $r['placeholder_seconds'] !== null ? (float)$r['placeholder_seconds'] : null,
             'notes'     => (string)($r['notes'] ?? ''),
             'assets'    => [],
+            // Asset types this shot has been marked as needing NONE of. Kept
+            // apart from 'assets' because they are the opposite fact, not an
+            // empty version of the same one.
+            'na'        => [],
         ];
     }
     if (!$rows) return [];
@@ -184,6 +230,14 @@ function breakdown_rows(PDO $pdo, int $projectId, string $episode = ''): array {
         $sid = (int)$r['shot_id'];
         if (!isset($rows[$sid])) continue;          // filtered out by episode
         $rows[$sid]['assets'][(string)$r['t']][] = ['id' => (int)$r['id'], 'name' => (string)$r['name']];
+    }
+
+    // One more query rather than a third join, so a shot with no assets and no
+    // N/A marks still comes back — the same reason the assets are fetched
+    // separately above.
+    foreach (breakdown_na($pdo, $projectId) as $sid => $types) {
+        if (!isset($rows[$sid])) continue;       // filtered out by episode
+        $rows[$sid]['na'] = $types;
     }
     return array_values($rows);
 }
@@ -219,6 +273,23 @@ function breakdown_link(PDO $pdo, int $projectId, int $shotId, int $assetId): st
     // the character in the shot, not with an error on somebody's screen.
     $pdo->prepare('INSERT IGNORE INTO shot_assets (shot_id, asset_id) VALUES (?, ?)')
         ->execute([$shotId, $assetId]);
+
+    // ⚠ PUTTING SOMETHING IN THE CELL CLEARS ITS N/A, because the two cannot
+    // both be true: "this shot needs no characters" and "this shot needs Quark"
+    // is a contradiction, and leaving both rows there would let the scheduler
+    // and the grid disagree about the same cell.
+    //
+    // Done here rather than refused, because the producer's intent is not in
+    // doubt — they ticked an asset. The picker disables its N/A row while chips
+    // exist, so the only way to arrive here is from a cell that was marked N/A
+    // and has just been corrected.
+    //
+    // The type is normalised exactly as breakdown_assets() normalises it, or a
+    // cell headed " Character " would never match the row that empties it.
+    if (breakdown_na_available($pdo)) {
+        $pdo->prepare('DELETE FROM shot_type_na WHERE shot_id = ? AND asset_type = ?')
+            ->execute([$shotId, trim((string)($asset['asset_type'] ?? ''))]);
+    }
     return $asset['name'] . ' is in ' . $shot['shot_code'] . '.';
 }
 
@@ -228,6 +299,75 @@ function breakdown_unlink(PDO $pdo, int $projectId, int $shotId, int $assetId): 
     $pdo->prepare('DELETE FROM shot_assets WHERE shot_id = ? AND asset_id = ?')
         ->execute([$shotId, $assetId]);
     return $asset['name'] . ' removed from ' . $shot['shot_code'] . '.';
+}
+
+/**
+ * Mark a cell as "nothing of this kind in this shot", or take the mark off.
+ *
+ * David, 2026-10-08: "let's add an N/A option for all the projects because it
+ * might be that some of them we don't need anything."
+ *
+ * PER CELL — one shot, one asset type. SH160 needing no Character says nothing
+ * about its Environment, and the scheduler can only use the finer fact.
+ *
+ * ⚠ THIS CHANGES THE SCHEDULE, which is the point. A shot with nothing linked
+ * waits for the WHOLE asset step (see scheduler_item_earliest, rule 3), so a
+ * shot with no characters has always waited for the last character in the show.
+ * Marking the cell N/A is what lets the scheduler stop waiting.
+ *
+ * REFUSED WHILE THE CELL HAS ASSETS IN IT, rather than silently emptying it.
+ * Removing somebody's breakdown work to honour a tick is the kind of quiet loss
+ * that is only noticed when the export is already with the client.
+ *
+ * @param string $type '' is the "No type set" column, and is a real value
+ * @throws RuntimeException when the shot is not this project's, or the cell is
+ *                          not empty, or migration 042 has not been applied
+ */
+function breakdown_set_na(PDO $pdo, int $projectId, int $shotId, string $type, bool $on): string {
+    if (!breakdown_na_available($pdo)) {
+        throw new RuntimeException(
+            'This database has not had migration 042 applied yet, so "N/A" cannot be saved. '
+          . 'An administrator can apply it on the migrate.php screen.'
+        );
+    }
+
+    $stmt = $pdo->prepare('SELECT shot_code FROM shots WHERE id = ? AND project_id = ?');
+    $stmt->execute([$shotId, $projectId]);
+    $shot = $stmt->fetch();
+    if (!$shot) throw new RuntimeException('That shot is not on this project.');
+
+    $type  = trim($type);
+    $label = $type !== '' ? $type : 'untyped asset';
+    $code  = (string)$shot['shot_code'];
+
+    if (!$on) {
+        $pdo->prepare('DELETE FROM shot_type_na WHERE shot_id = ? AND asset_type = ?')
+            ->execute([$shotId, $type]);
+        return $code . ' needs ' . $label . ' work decided again.';
+    }
+
+    // Normalised the same way breakdown_assets() groups the columns, so the
+    // count below is of exactly the chips the cell is showing.
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM shot_assets sa
+           JOIN assets a ON a.id = sa.asset_id
+          WHERE sa.shot_id = ? AND COALESCE(NULLIF(TRIM(a.asset_type), ''), '') = ?"
+    );
+    $stmt->execute([$shotId, $type]);
+    $n = (int)$stmt->fetchColumn();
+    if ($n > 0) {
+        throw new RuntimeException(
+            $code . ' already lists ' . $n . ' ' . $label . ($n === 1 ? '' : 's')
+          . ', so it cannot also need none. Take ' . ($n === 1 ? 'it' : 'them')
+          . ' out first if that is wrong.'
+        );
+    }
+
+    // INSERT IGNORE against the (shot_id, asset_type) primary key: two people
+    // marking the same cell is a race that should end with the cell marked.
+    $pdo->prepare('INSERT IGNORE INTO shot_type_na (shot_id, asset_type) VALUES (?, ?)')
+        ->execute([$shotId, $type]);
+    return $code . ' needs no ' . $label . '.';
 }
 
 /**
@@ -312,19 +452,37 @@ function breakdown_set_note(PDO $pdo, array $project, int $shotId, string $raw):
 /**
  * How much of the show has been broken down, for the line above the grid.
  *
- * Counts shots with NO asset against the total. Said plainly because the
- * scheduler's behaviour depends on it: a shot with nothing linked is a shot that
- * still waits for every asset in the show.
+ * Counts shots NOBODY HAS SAID ANYTHING ABOUT against the total. Said plainly
+ * because the scheduler's behaviour depends on it: a shot with nothing linked is
+ * a shot that still waits for every asset in the show.
+ *
+ * ⚠ A SHOT COUNTS AS SPOKEN FOR ON ONE LINK *OR* ONE N/A MARK, not on having
+ * every column filled. That is deliberately the same loose rule the count has
+ * always used — one chip anywhere has always been enough — and 042 only adds
+ * the other way of saying something. A shot marked "no Character" with its
+ * Environment still blank is therefore counted as done, exactly as a shot with
+ * one character and no environment already was.
+ *
+ * The strict version ("every column has either assets or N/A") is a better
+ * number and a bigger change: it would move this figure on every project the day
+ * it shipped, with no way for a producer to tell whether the work or the rule
+ * had changed. Worth doing on purpose, not as a side effect of this.
  */
 function breakdown_progress(PDO $pdo, int $projectId): array {
     $total = (int)$pdo->query(
         'SELECT COUNT(*) FROM shots WHERE project_id = ' . $projectId
     )->fetchColumn();
 
+    // EXISTS rather than COUNT(DISTINCT) now that there are two ways to be
+    // spoken for: counting distinct ids across two tables needs a UNION, while
+    // the shot row itself only has to answer yes or no once.
+    $naClause = breakdown_na_available($pdo)
+        ? ' OR EXISTS (SELECT 1 FROM shot_type_na n WHERE n.shot_id = s.id)'
+        : '';
     $done = (int)$pdo->query(
-        'SELECT COUNT(DISTINCT sa.shot_id)
-           FROM shot_assets sa JOIN shots s ON s.id = sa.shot_id
-          WHERE s.project_id = ' . $projectId
+        'SELECT COUNT(*) FROM shots s
+          WHERE s.project_id = ' . $projectId . '
+            AND (EXISTS (SELECT 1 FROM shot_assets sa WHERE sa.shot_id = s.id)' . $naClause . ')'
     )->fetchColumn();
 
     $links = (int)$pdo->query(
@@ -333,7 +491,16 @@ function breakdown_progress(PDO $pdo, int $projectId): array {
           WHERE s.project_id = ' . $projectId
     )->fetchColumn();
 
-    return ['total' => $total, 'done' => $done, 'empty' => max(0, $total - $done), 'links' => $links];
+    // Counted separately so the line above the grid can say "and 6 cells marked
+    // N/A" rather than quietly folding them into the assets actually placed.
+    $na = breakdown_na_available($pdo) ? (int)$pdo->query(
+        'SELECT COUNT(*)
+           FROM shot_type_na n JOIN shots s ON s.id = n.shot_id
+          WHERE s.project_id = ' . $projectId
+    )->fetchColumn() : 0;
+
+    return ['total' => $total, 'done' => $done, 'empty' => max(0, $total - $done),
+            'links' => $links, 'na' => $na];
 }
 
 /**
