@@ -300,3 +300,193 @@ function time_log_target(array $row): string {
     if ($item === '' && $step === '') return 'General';
     return trim($item . ($step !== '' ? ' · ' . $step : ''));
 }
+
+
+// ---------------------------------------------------------------------------
+// THE RUNNING TIMER
+//
+// David, 2026-10-08: "add a pomodoro or track time option at the end of each
+// task so the user can log time automatically."
+//
+// A STOPWATCH, NOT A POMODORO, and the distinction is worth stating. A pomodoro
+// is a way of ARRANGING attention — twenty-five minutes on, five off, and the
+// count is the point. What this platform needs is a measurement: how long did
+// this actually take, in minutes, against this card. The stopwatch is the
+// primitive; a pomodoro chime can sit on top of it later without the stored
+// shape changing, whereas building the chime first would have left the hours
+// rounded to blocks of twenty-five that nobody worked.
+//
+// ⚠ EVERY FUNCTION HERE DEGRADES TO "NO TIMERS" RATHER THAN FAILING. Migration
+// 043 may not have been applied, exactly as time_logs_available() guards the
+// migration-022 feature above it. The screen then shows the Log box it always
+// showed and no timer column, instead of a fatal on a page people use daily.
+
+/** Is the running-timer table there? Migration 043. */
+function timers_available(PDO $pdo): bool {
+    return column_exists($pdo, 'time_timers', 'crew_id');
+}
+
+/**
+ * The timer this person has running, or null.
+ *
+ * ⚠ THE ELAPSED TIME IS COMPUTED BY MYSQL, not by PHP. started_at is written
+ * with the database's NOW(), so measuring it against PHP's time() would subtract
+ * two different clocks — and on a shared host those drift by seconds to minutes.
+ * The difference would be invisible on a long timer and absurd on a short one.
+ */
+function running_timer(PDO $pdo, int $crewId): ?array {
+    if (!timers_available($pdo) || $crewId <= 0) return null;
+    $q = $pdo->prepare(
+        'SELECT t.*, TIMESTAMPDIFF(SECOND, t.started_at, NOW()) AS elapsed_seconds,
+                p.code AS project_code
+           FROM time_timers t
+           LEFT JOIN projects p ON p.id = t.project_id
+          WHERE t.crew_id = ?'
+    );
+    $q->execute([$crewId]);
+    $row = $q->fetch();
+    if (!$row) return null;
+    // Never negative, however the clocks behave. A timer reading "-3 m" is the
+    // kind of nonsense that makes people stop trusting the whole screen.
+    $row['elapsed_seconds'] = max(0, (int)$row['elapsed_seconds']);
+    return $row;
+}
+
+/** "1:04:09", for the live readout. Hours only once there are some. */
+function fmt_elapsed(int $seconds): string {
+    $seconds = max(0, $seconds);
+    $h = intdiv($seconds, 3600);
+    $m = intdiv($seconds % 3600, 60);
+    $s = $seconds % 60;
+    return $h > 0
+        ? sprintf('%d:%02d:%02d', $h, $m, $s)
+        : sprintf('%d:%02d', $m, $s);
+}
+
+/**
+ * Start timing one card or one tracked row.
+ *
+ * ⚠ STARTING A SECOND TIMER STOPS AND LOGS THE FIRST. crew_id is the primary
+ * key of time_timers, so the schema allows exactly one per person — which is the
+ * honest model, because nobody works on two things in the same minute and two
+ * concurrent timers would bill the same hour to two projects. The alternative,
+ * refusing the second start, makes people leave the first one running while they
+ * move on, which is the single worst outcome: hours attributed to the wrong job.
+ *
+ * What the previous timer did is REPORTED in the returned sentence rather than
+ * done quietly, because it wrote a row to the ledger.
+ *
+ * @throws RuntimeException when the target is not this person's work
+ */
+function start_timer(PDO $pdo, array $in): string {
+    if (!timers_available($pdo)) {
+        throw new RuntimeException('Timers need migration 043, which has not been applied yet.');
+    }
+    $crewId = (int)($in['crew_id'] ?? 0);
+    if ($crewId <= 0) throw new RuntimeException('A timer has to belong to a person.');
+
+    $progressId = !empty($in['progress_id']) ? (int)$in['progress_id'] : null;
+    $ticketId   = !empty($in['ticket_id'])   ? (int)$in['ticket_id']   : null;
+    $projectId  = (int)($in['project_id'] ?? 0);
+
+    // Exactly one target, the same rule log_time() follows. MySQL 5.7 has no
+    // CHECK constraint to enforce it, so it is enforced here, where the error
+    // can say something useful.
+    if (($progressId === null) === ($ticketId === null)) {
+        throw new RuntimeException('A timer runs against one task or one card, not both and not neither.');
+    }
+    if ($projectId <= 0) {
+        throw new RuntimeException('Hours are costed to a show, so a timer needs one.');
+    }
+
+    $said = '';
+    $open = running_timer($pdo, $crewId);
+    if ($open) {
+        // Already timing this very thing: say so and change nothing, rather than
+        // restarting the clock and throwing away the minutes already counted.
+        if ((int)$open['progress_id'] === (int)$progressId
+            && (int)$open['ticket_id'] === (int)$ticketId) {
+            return 'That timer is already running, since '
+                 . date('H:i', strtotime($open['started_at'])) . '.';
+        }
+        $said = stop_timer($pdo, $crewId, (int)($in['entered_by'] ?? 0)) . ' ';
+    }
+
+    // REPLACE rather than INSERT: stop_timer() has just deleted the old row, but
+    // two tabs pressing start at the same moment would otherwise collide on the
+    // primary key and show somebody a duplicate-key error for pressing a button.
+    $pdo->prepare(
+        'REPLACE INTO time_timers (crew_id, project_id, progress_id, ticket_id, started_at)
+         VALUES (?, ?, ?, ?, NOW())'
+    )->execute([$crewId, $projectId, $progressId, $ticketId]);
+
+    return $said . 'Timer started.';
+}
+
+/**
+ * Stop the running timer and write what it measured into the ledger.
+ *
+ * Returns a sentence. Nothing is thrown for "no timer was running" — two tabs,
+ * or a double click, and the second press should be a no-op rather than an error.
+ *
+ * ⚠ THE HOURS ARE LOGGED AGAINST THE DAY THE TIMER STARTED, not today. A timer
+ * started at 23:40 and stopped at 00:10 is work done on the earlier evening, and
+ * filing it under the new date would move it into the wrong week on every report
+ * that groups by day.
+ */
+function stop_timer(PDO $pdo, int $crewId, int $userId = 0, string $notes = ''): string {
+    $open = running_timer($pdo, $crewId);
+    if (!$open) return 'No timer was running.';
+
+    $pdo->prepare('DELETE FROM time_timers WHERE crew_id = ?')->execute([$crewId]);
+
+    $seconds = (int)$open['elapsed_seconds'];
+    $minutes = (int)round($seconds / 60);
+
+    // Under a minute is not work, it is a mis-click. Logging "0 h" would clutter
+    // the ledger with entries that mean nothing and still have to be deleted by
+    // hand.
+    if ($minutes < 1) {
+        return 'That timer ran for ' . $seconds . ' seconds, so nothing was logged.';
+    }
+
+    // ⚠ A TIMER LEFT RUNNING IS REFUSED, NOT TRUNCATED. log_time() already caps
+    // an entry at 24 hours, but hitting that cap here would mean silently
+    // deciding that a timer somebody forgot on Friday represents a 24-hour day.
+    // It does not. The start time is named so the real hours can be typed in.
+    if ($minutes > 24 * 60) {
+        return 'That timer had been running since '
+             . date('j M, H:i', strtotime($open['started_at']))
+             . ' — almost certainly left on by mistake, so nothing was logged. '
+             . 'Enter the hours by hand instead.';
+    }
+
+    // Handed over in minutes, which log_time() accepts as "90m", so the measured
+    // figure is never rounded to the nearest half hour on its way in.
+    return log_time($pdo, [
+        'project_id'  => (int)$open['project_id'],
+        'progress_id' => $open['progress_id'] !== null ? (int)$open['progress_id'] : null,
+        'ticket_id'   => $open['ticket_id'] !== null ? (int)$open['ticket_id'] : null,
+        'crew_id'     => $crewId,
+        'hours'       => $minutes . 'm',
+        'log_date'    => date('Y-m-d', strtotime($open['started_at'])),
+        'notes'       => $notes,
+        'entered_by'  => $userId ?: null,
+    ]);
+}
+
+/**
+ * Throw the running timer away without logging it.
+ *
+ * Needed because the alternative is worse: somebody who started a timer on the
+ * wrong card has to either log hours they did not work and then delete the entry,
+ * or leave it running. Discarding writes nothing to the ledger, so there is
+ * nothing to undo afterwards.
+ */
+function discard_timer(PDO $pdo, int $crewId): string {
+    $open = running_timer($pdo, $crewId);
+    if (!$open) return 'No timer was running.';
+    $pdo->prepare('DELETE FROM time_timers WHERE crew_id = ?')->execute([$crewId]);
+    return 'Timer discarded after ' . fmt_elapsed((int)$open['elapsed_seconds'])
+         . '. Nothing was logged.';
+}

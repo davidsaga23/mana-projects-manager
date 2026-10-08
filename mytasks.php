@@ -24,6 +24,10 @@ require_login();
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $ready  = column_exists($pdo, 'tickets', 'id') && column_exists($pdo, 'users', 'crew_id');
 $canLog = time_logs_available($pdo);
+// Separate from $canLog on purpose: migration 043 can be missing while 022 is
+// applied, and the page should then show exactly the Log box it showed
+// yesterday rather than a column of buttons that cannot work.
+$canTimer = $canLog && timers_available($pdo);
 
 // --- claim a crew row -------------------------------------------------------
 //
@@ -176,6 +180,58 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
         log_ticket_event($pdo, $ticketId, $userId, 'Status: ' . $was . ' → ' . $now);
 
         flash('ok', ticket_ref($tk) . ' set to ' . $now . '.');
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: mytasks.php');
+    exit;
+}
+
+// --- the running timer ------------------------------------------------------
+//
+// David, 2026-10-08: "add a pomodoro or track time option at the end of each
+// task so the user can log time automatically."
+//
+// ⚠ THE SAME OWNERSHIP CHECK AS LOGGING, because starting a timer IS logging,
+// only later. Without it anybody could time somebody else's card and drop hours
+// into a show they have nothing to do with. The check is repeated rather than
+// shared because the two handlers take different inputs; see below.
+if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['timer'])) {
+    try {
+        $what = (string)$_POST['timer'];
+        if ($what === 'stop') {
+            flash('ok', stop_timer($pdo, $myCrewId, $userId));
+        } elseif ($what === 'discard') {
+            flash('ok', discard_timer($pdo, $myCrewId));
+        } else {
+            $progressId = !empty($_POST['progress_id']) ? (int)$_POST['progress_id'] : null;
+            $ticketId   = !empty($_POST['ticket_id'])   ? (int)$_POST['ticket_id']   : null;
+
+            // Yours, or nothing happens. Identical to the rule the log handler
+            // below applies — a timer that could be started on another person's
+            // work would write that person's project into your ledger on stop.
+            if ($progressId) {
+                $q = $pdo->prepare(
+                    'SELECT 1 FROM progress pr WHERE pr.id = ? AND (pr.crew_id = ?
+                        OR EXISTS (SELECT 1 FROM progress_crew pc
+                                    WHERE pc.progress_id = pr.id AND pc.crew_id = ?))'
+                );
+                $q->execute([$progressId, $myCrewId, $myCrewId]);
+                if (!$q->fetchColumn()) throw new RuntimeException('That task is not assigned to you.');
+            } elseif ($ticketId) {
+                $q = $pdo->prepare('SELECT 1 FROM tickets WHERE id = ? AND assigned_crew_id = ?');
+                $q->execute([$ticketId, $myCrewId]);
+                if (!$q->fetchColumn()) throw new RuntimeException('That ticket is not assigned to you.');
+            }
+
+            flash('ok', start_timer($pdo, [
+                'crew_id'     => $myCrewId,
+                'project_id'  => (int)($_POST['project_id'] ?? 0),
+                'progress_id' => $progressId,
+                'ticket_id'   => $ticketId,
+                'entered_by'  => $userId,
+            ]));
+        }
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -336,6 +392,66 @@ if ($ready && $myCrewId) {
 }
 
 $today = date('Y-m-d');
+// Read once for the whole page. Every row asks "is it me?" against this, so a
+// query per row would be forty round trips to answer one question.
+$timer = $canTimer ? running_timer($pdo, $myCrewId) : null;
+
+/**
+ * The Timer cell, drawn the same way in both tables below.
+ *
+ * ⚠ THE STOP BUTTON ONLY EXISTS ON THE ROW BEING TIMED. A stop control on
+ * every row would invite somebody to stop a timer from the wrong line and watch
+ * half an hour land on a card they were not working on — and they would have no
+ * way of knowing, because the hours would simply appear somewhere else.
+ *
+ * Every other row keeps its Start button rather than being disabled while a
+ * timer runs. start_timer() stops and logs the running one first and SAYS so, so
+ * switching tasks is one click; disabling them would make people leave the old
+ * timer going, which is the one outcome that actually corrupts the figures.
+ *
+ * A card with no project gets a dash, matching the Log cell beside it: hours are
+ * costed to a show, so there is nothing to time against yet.
+ */
+function timer_cell(?array $timer, string $kind, int $id, int $projectId): string {
+    if ($projectId <= 0) {
+        return '<span class="muted small" title="Hours are costed to a show, '
+             . 'so the card needs one first">—</span>';
+    }
+    $field  = $kind === 'ticket' ? 'ticket_id' : 'progress_id';
+    $mine   = $timer && (int)($timer[$field] ?? 0) === $id;
+    $off    = can_edit() ? '' : ' disabled';
+
+    if ($mine) {
+        // data-since carries the seconds already elapsed, counted by MySQL at
+        // page load; the script at the foot of the page ticks it from there.
+        // Rendering the final string alone would freeze the moment the page did.
+        // ⚠ BOTH BUTTONS CARRY name="timer", and neither value is in a hidden
+        // field. The first version put <input type="hidden" name="timer" value="stop">
+        // in the form AND name="timer" value="discard" on the drop button, which
+        // works only because PHP keeps the LAST of two same-named fields — so
+        // "drop" throwing the timer away rather than logging it depended on the
+        // order the markup happened to be written in. On a button that decides
+        // whether somebody's hours are kept, that is not a thing to leave to
+        // chance.
+        return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+             . '<button type="submit" name="timer" value="stop" class="timer-btn running"' . $off
+             . ' title="Stop and log what this timer measured">■ Stop '
+             . '<span class="timer-elapsed" data-since="' . (int)$timer['elapsed_seconds'] . '">'
+             . e(fmt_elapsed((int)$timer['elapsed_seconds'])) . '</span></button>'
+             . '<button type="submit" name="timer" value="discard" class="timer-drop"' . $off
+             . ' title="Throw this timer away without logging it">drop</button>'
+             . '</form>';
+    }
+
+    $note = $timer ? ' This stops and logs the one already running.' : '';
+    return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+         . '<input type="hidden" name="timer" value="start">'
+         . '<input type="hidden" name="' . $field . '" value="' . $id . '">'
+         . '<input type="hidden" name="project_id" value="' . $projectId . '">'
+         . '<button type="submit" class="timer-btn"' . $off
+         . ' title="Start timing this, and log the minutes when you stop.' . e($note) . '">'
+         . '▶ Start</button></form>';
+}
 $weekAgo = date('Y-m-d', strtotime('-6 days'));
 $loggedWeek = $myCrewId ? logged_total_for_crew($pdo, $myCrewId, null, $weekAgo, $today) : 0;
 $loggedToday = $myCrewId ? logged_total_for_crew($pdo, $myCrewId, null, $today, $today) : 0;
@@ -449,7 +565,8 @@ require __DIR__ . '/includes/header.php';
     <table class="mywork-table">
       <thead>
         <tr><th>What</th><th>Project</th><th>Status</th><th>Due</th>
-            <?php if ($canLog): ?><th>Logged</th><th>Log time</th><?php endif; ?></tr>
+            <?php if ($canLog): ?><th>Logged</th><th>Log time</th><?php endif; ?>
+            <?php if ($canTimer): ?><th>Timer</th><?php endif; ?></tr>
       </thead>
       <tbody>
       <?php foreach ($tasks as $row):
@@ -505,6 +622,9 @@ require __DIR__ . '/includes/header.php';
               </form>
             </td>
           <?php endif; ?>
+          <?php if ($canTimer): ?>
+            <td><?= timer_cell($timer, 'progress', (int)$row['progress_id'], $pid) ?></td>
+          <?php endif; ?>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -544,7 +664,8 @@ require __DIR__ . '/includes/header.php';
     <table class="mywork-table">
       <thead>
         <tr><th>Ref</th><th>Title</th><th>Project</th><th>Status</th><th>Priority</th><th>Due</th>
-            <?php if ($canLog): ?><th>Log time</th><?php endif; ?></tr>
+            <?php if ($canLog): ?><th>Log time</th><?php endif; ?>
+            <?php if ($canTimer): ?><th>Timer</th><?php endif; ?></tr>
       </thead>
       <tbody>
       <?php foreach ($tickets as $t3):
@@ -610,6 +731,9 @@ require __DIR__ . '/includes/header.php';
               <?php endif; ?>
             </td>
           <?php endif; ?>
+          <?php if ($canTimer): ?>
+            <td><?= timer_cell($timer, 'ticket', (int)$t3['id'], (int)$t3['project_id']) ?></td>
+          <?php endif; ?>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -662,6 +786,42 @@ require __DIR__ . '/includes/header.php';
       // Shots grids use, so clicking a heading behaves identically everywhere. ?>
 <script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
 <script>
+  // The running timer's readout, ticked once a second.
+  //
+  // ⚠ COUNTED FROM THE SERVER'S OWN ELAPSED SECONDS, not from a start time
+  // compared against the browser's clock. data-since is what MySQL measured when
+  // the page was built, so a laptop whose clock is twenty minutes out still
+  // shows the right figure — and the number on screen can never disagree with
+  // the number that gets logged.
+  //
+  // Cosmetic only. If this script never runs, the cell still shows the elapsed
+  // time as it was at page load and Stop still logs the correct minutes, because
+  // the real measurement happens in MySQL on stop.
+  (function () {
+    var spans = document.querySelectorAll('.timer-elapsed[data-since]');
+    if (!spans.length) return;
+
+    var base = [];
+    for (var i = 0; i < spans.length; i++) base.push(parseInt(spans[i].getAttribute('data-since'), 10) || 0);
+    // Measured as a DURATION since the page loaded rather than by incrementing a
+    // counter: a background tab throttles setInterval to once a minute or less,
+    // and a counter would simply lose that time and show the wrong total on the
+    // way back.
+    var t0 = Date.now();
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function fmt(s) {
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      return h > 0 ? h + ':' + pad(m) + ':' + pad(s % 60) : m + ':' + pad(s % 60);
+    }
+    function tick() {
+      var on = Math.floor((Date.now() - t0) / 1000);
+      for (var i = 0; i < spans.length; i++) spans[i].textContent = fmt(base[i] + on);
+    }
+    tick();
+    setInterval(tick, 1000);
+  }());
+
   (function () {
     if (!window.GridTools) return;
     // ⚠ PRIORITY SORTS BY URGENCY, not by the alphabet, which would read
@@ -681,7 +841,10 @@ require __DIR__ . '/includes/header.php';
         sortOnly: true,
         sortKey: sortKey,
         // Nothing to sort a form by.
-        skip: function (th) { return th.textContent.trim() === 'Log time'; }
+        skip: function (th) {
+          var t = th.textContent.trim();
+          return t === 'Log time' || t === 'Timer';
+        }
       });
     });
   }());

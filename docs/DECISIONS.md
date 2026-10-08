@@ -3357,6 +3357,27 @@ of every status query shape with a `'postmortem'` row present.
 
 ---
 
+## 2026-10-08 — Hours are measured by a server-side stopwatch, not remembered
+**Decision:** a timer can be started on any task or card on My tasks. It lives in the
+`time_timers` table, one row per person, and writes to `time_logs` only when it stops.
+**Why:** every hour in the platform was typed from memory into a box, so it arrived rounded
+to halves, generous, and missing the short jobs entirely — and those hours are what the
+expense projection prices and what the stop-cost panel reads. The obvious build, a
+`setInterval` and a number in `localStorage`, loses the afternoon the first time a tab closes
+or a laptop sleeps, silently and unrecoverably. Stored server-side the timer survives the tab,
+and it can be started at the studio and stopped at home.
+**Consequence:** `crew_id` is the primary key, so one running timer per person is enforced by
+the schema rather than by remembering to check — nobody works on two things in the same
+minute, and two concurrent timers would bill the same hour to two projects. Starting a second
+timer stops the first, logs it, and says so, because the alternative (refusing the second)
+makes people leave the first running while they move on, which is the one outcome that
+actually corrupts the figures. A timer running over 24 hours is refused rather than truncated:
+it means somebody forgot it on Friday, not that they worked a 24-hour day.
+**Not built:** the pomodoro rhythm David also mentioned. A pomodoro arranges attention in
+fixed blocks; what the figures need is a measurement. The stopwatch is the primitive, and a
+chime can sit on top of it later without the stored shape changing — whereas building the
+blocks first would have left every hour rounded to twenty-five minutes nobody worked.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
