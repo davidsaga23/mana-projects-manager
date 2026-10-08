@@ -113,8 +113,10 @@ function project_nav_items(int $projectId): array {
  */
 /**
  * Every project, for the switcher. Ordered as index.php orders them — active
- * first, then setup, on hold, wrapped, archived — so the list reads the same way
- * in both places.
+ * first, then setup, on hold, wrapped, postmortem, archived — so the list reads
+ * the same way in both places. ('postmortem' joined the lifecycle with migration
+ * 044; it has to be named in the FIELD list or FIELD() returns 0 for it and a
+ * show waiting on its meeting jumps to the top of the switcher.)
  *
  * Archived shows are included deliberately: looking up how a finished one was
  * set up is a reason to switch, and it is the reason David gave.
@@ -124,7 +126,7 @@ function switchable_projects(PDO $pdo): array {
     if ($cache !== null) return $cache;
     $cache = $pdo->query(
         "SELECT id, name, code, status FROM projects
-          ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','archived'), created_at DESC"
+          ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
     )->fetchAll();
     return $cache;
 }

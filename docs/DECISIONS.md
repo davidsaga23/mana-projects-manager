@@ -3285,6 +3285,78 @@ variation might be problematic."*
 
 ---
 
+## 2026-10-08 — "The work is finished" and "we are finished with the show" are two different facts
+**Asked by David:** *"let's add a project status for 'postmortem' which is a state after finished
+while it waits the postmortem meeting and inputs before the oficial wrap up."*
+
+Migration **044**: `projects.status` gains `'postmortem'`, between `'wrapped'` and `'archived'`.
+
+**Decision:** the lifecycle is now `setup → active → on_hold → wrapped → postmortem → archived`,
+and **archiving is the official wrap-up** rather than the moment production stops.
+
+**Why:** the app had one word for the end and it was doing two jobs. `'wrapped'` means delivered —
+production has stopped. `'archived'`, since migration 027, means out of the way — the front door
+stops showing it. There was nothing between them, so a show waiting on its postmortem meeting had
+to either sit in `'wrapped'` looking identical to a show nobody owes anything on, or be archived
+*before* the meeting that archiving is supposed to follow. Now the state says which it is.
+
+**Nothing was reclassified.** No existing row becomes `'postmortem'`; the migration only widens the
+ENUM. A migration that declared every wrapped show to be "waiting on a postmortem" would be
+inventing an obligation nobody recorded, and the team would have to un-set it show by show.
+
+### ⚠ A postmortem show stays on the front door, and that is the point
+Only archiving takes a show off `index.php`. A show in postmortem is a show somebody still owes
+something on, so it stays where it can be chased. Hiding it would have dropped it off every list in
+the app at once — the quietly-empty screen this codebase keeps paying for.
+
+Set it on the project list, from the same status dropdown as every other status, gated by
+`enum_has_value()` so the option simply does not appear until migration 044 has run.
+
+### What a postmortem show still does, and what it no longer does
+Decided one list at a time rather than by a blanket rule, because the lists are asking different
+questions:
+
+- **On the front door, the project switcher, the finance list and the copy-a-setup picker** — yes,
+  unchanged. These answer "which shows exist", and it does.
+- **On the card pickers** (`ticket.php` move-to-project, `transcript.php`) — yes. Notes that come out
+  of a postmortem meeting are exactly what somebody files as a card, so the state that exists to
+  hold that meeting must not be the state you cannot file against.
+- **Daily snapshots** (`includes/snapshots.php`) — no. A snapshot answers "where did this show stand
+  today" so a chart can show work advancing. A postmortem show reached that state *through*
+  `'wrapped'`, so every further snapshot would rewrite the same numbers and end the chart with a
+  tail of identical days. The snapshots taken while it was active are the history and they stay.
+- **My tasks' production steps** (`mytasks.php`) — no, and this one was genuinely arguable. A show in
+  postmortem may still have cards to close. But postmortem comes strictly *after* `'wrapped'`, and
+  `'wrapped'` already drops production steps off that screen — so including postmortem would make
+  tasks that vanished at wrap-up **reappear a step later**, which is stranger and harder to trust
+  than them staying gone. If unfinished work is the reason a show cannot be called done, the honest
+  move is to leave it `'active'`. The **tickets** half of My tasks is not filtered by project status
+  at all, so a card raised in the meeting still reaches its assignee.
+- **Bookings** (`includes/bookings.php`) — no. The production work is finished, so the dated step
+  positions the show still holds describe days that have already happened; including them would
+  report clashes against a show nobody can be booked onto.
+
+### ⚠ Every FIELD() list had to be edited by hand, and one of them was a real bug waiting
+`FIELD()` returns **0** for a value it does not list, and 0 sorts **first** ascending. So the two
+card pickers — which filter on `status <> 'archived'` and therefore *include* postmortem — would have
+floated every postmortem show above the live ones had the list not been extended. Reproduced in a
+SQLite replay rather than reasoned about.
+
+The position inside the ENUM itself is **for readability, not for correctness**: MySQL orders an ENUM
+positionally, but nothing in the app sorts by it. Checked on 2026-10-08 — every project-status
+ordering is an explicit `FIELD(...)` list, and `includes/standards.php` sorts on
+`p.status = 'archived'` as a boolean (so a postmortem show sorts among the live ones there, which is
+right: a nearly-finished show is good evidence of how to set one up).
+
+**Deliberately not built:** the notes themselves — a text input per department/pipeline step plus a
+general one — and the prompt on archiving a show with no postmortem. This entry is the lifecycle
+state only; the capture is still on `docs/ROADMAP.md`.
+
+**PHP WAS NOT RUN.** Verified by `tools/check_php_blocks.py` (all seven passes) and a SQLite replay
+of every status query shape with a `'postmortem'` row present.
+
+---
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

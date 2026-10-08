@@ -1,0 +1,45 @@
+-- 044 — a POSTMORTEM status for projects, between 'wrapped' and 'archived'.
+--
+-- WHY (David, 2026-10-08): "let's add a project status for 'postmortem' which
+-- is a state after finished while it waits the postmortem meeting and inputs
+-- before the oficial wrap up."
+--
+-- So the distinction this adds is a real one the app could not previously say:
+-- "the work is finished" and "we are finished with the show" are two different
+-- facts. 'wrapped' means delivered — production has stopped. 'archived', since
+-- migration 027, means out of the way — the front door stops showing it. There
+-- was nothing in between, so a show waiting on its postmortem meeting had to
+-- either sit in 'wrapped' looking identical to a show nobody owes anything on,
+-- or be archived before the meeting that archiving is supposed to follow.
+-- Archiving is now the OFFICIAL wrap-up, and it comes after the postmortem,
+-- not before it.
+--
+-- The natural path is therefore: active → wrapped → postmortem → archived.
+--
+-- POSITION IN THE ENUM IS FOR READABILITY, NOT FOR CORRECTNESS. MySQL orders an
+-- ENUM positionally, so a bare `ORDER BY status` would sort by this list — but
+-- nothing in the app sorts that way. Verified against the code on 2026-10-08:
+-- every project-status ordering is an explicit FIELD(...) list (index.php,
+-- includes/project_nav.php, includes/bookings.php, finance.php, ticket.php,
+-- transcript.php) and includes/standards.php orders on `p.status = 'archived'`
+-- as a boolean. 'postmortem' is slotted between 'wrapped' and 'archived' here
+-- so that anybody reading `SHOW COLUMNS` sees the lifecycle in its real order;
+-- the sorts themselves had to be edited by hand, and were.
+--
+-- ⚠ NO EXISTING ROW CHANGES. Nothing becomes 'postmortem' automatically. A
+-- migration that reclassified every wrapped show as "waiting on a postmortem"
+-- would be inventing an obligation nobody recorded, and the team would have to
+-- un-set it one show at a time. The state is reached by choosing it on the
+-- project list.
+--
+-- ADDITIVE, and re-runnable. MODIFY on an ENUM only widens the set of accepted
+-- values; every existing row keeps the value it has. Running this file twice
+-- produces the same column.
+--
+-- STILL OUTSTANDING, deliberately: the notes themselves. The roadmap item asked
+-- for a text input per department/pipeline step plus a general one. This
+-- migration is the lifecycle state only — see docs/ROADMAP.md.
+
+ALTER TABLE projects
+  MODIFY status ENUM('setup','active','on_hold','wrapped','postmortem','archived')
+         NOT NULL DEFAULT 'setup';

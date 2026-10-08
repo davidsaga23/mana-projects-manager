@@ -56,10 +56,17 @@ if ($projectId > 0) {
 $selfUrl  = 'transcript.php' . ($projectId ? '?project=' . $projectId : '');
 $boardUrl = $projectId ? 'tasks.php?project=' . $projectId : 'alltasks.php';
 
-// Every show a card could be filed against.
+// Every show a card could be filed against. Postmortem shows included: notes
+// that come out of a postmortem meeting are exactly the kind of thing somebody
+// files as a card, so the state that exists to hold that meeting must not be
+// the state you cannot file against (migration 044).
+//
+// ⚠ 'postmortem' is named in the FIELD list for the same reason it is on
+// ticket.php: FIELD() returns 0 for an unlisted value and 0 sorts first, so
+// omitting it would put these shows above the active ones.
 $projects = $pdo->query(
     "SELECT id, code, name FROM projects WHERE status <> 'archived'
-      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped'), name"
+      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem'), name"
 )->fetchAll();
 $userId    = (int)($_SESSION['user_id'] ?? 0);
 $ready     = column_exists($pdo, 'tickets', 'id');

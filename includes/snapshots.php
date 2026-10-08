@@ -25,6 +25,18 @@
  * Only 'active' and 'on_hold' projects. A project still in setup has nothing
  * meaningful to record, and a wrapped one has stopped moving — recording either
  * every day would bury the real shows in noise.
+ *
+ * ⚠ 'postmortem' (migration 044) IS DELIBERATELY NOT SNAPSHOTTED, decided
+ * 2026-10-08. A snapshot answers "where did this show stand on this day" so a
+ * chart can show the work advancing. A show in postmortem has, by definition,
+ * finished its production work — it got there THROUGH 'wrapped' — so every
+ * further snapshot would write the same numbers again and flatten the end of
+ * the chart with a tail of identical days. The postmortem is a meeting, not
+ * production, and nothing it produces is a step percentage.
+ *
+ * Nothing is lost by this: the snapshots taken while the show was active are
+ * the history, and they stay. See snapshot_gaps(), which reports missing days
+ * rather than inventing them.
  */
 function projects_needing_snapshot(PDO $pdo, string $today): array {
     $stmt = $pdo->prepare(

@@ -18,7 +18,7 @@ require_admin();
 
 $projects = $pdo->query(
     "SELECT * FROM projects
-      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','archived'), created_at DESC"
+      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
 )->fetchAll();
 
 $ids = array_map(fn($p) => (int)$p['id'], $projects);

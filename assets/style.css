@@ -166,6 +166,12 @@ th {
 .status-active  { background: var(--ok-tint); color: var(--ok); }
 .status-on_hold { background: var(--warn-tint); color: var(--warn); }
 .status-wrapped { background: var(--surface-3); color: var(--text-2); }
+/* Postmortem is the one end-state that still OWES something, so it is the only
+   one of the three with a colour rather than a grey (migration 044, David
+   2026-10-08). Violet is already defined for both themes and is not used by any
+   other status chip, so no new hex was needed. It reads as "done but not
+   closed": louder than wrapped's flat surface, nothing like active's green. */
+.status-postmortem { background: var(--chip-violet-bg); color: var(--chip-violet-ink); }
 /* Archived reads quieter than wrapped: wrapped is delivered, archived is
    merely out of the way, and the list should not celebrate the second. */
 .status-archived { background: var(--chip-grey-bg); color: var(--chip-grey-ink); }

@@ -247,6 +247,20 @@ if ($ready && $myCrewId) {
     // Production tasks: unfinished steps assigned to them, on active projects.
     // Both the primary assignee and the join table, because real work has two
     // names on it and dropping the second is what progress_crew exists to stop.
+    //
+    // ⚠ 'postmortem' (migration 044) IS DELIBERATELY NOT ADDED HERE, decided
+    // 2026-10-08. It is tempting — a show in postmortem may still have cards to
+    // close — but the lifecycle makes it wrong: postmortem comes strictly AFTER
+    // 'wrapped', and 'wrapped' already drops a show's production tasks off this
+    // screen. Adding postmortem would make tasks that vanished at wrap-up
+    // REAPPEAR a step later, which is stranger and harder to trust than them
+    // staying gone. If unfinished work is the reason a show cannot be called
+    // done, the honest move is to leave it 'active'.
+    //
+    // ⚠ And the cards are a separate thing: tickets_for_crew() above is NOT
+    // filtered by project status at all, so a ticket raised out of a postmortem
+    // meeting still lands on the assignee's My tasks. Only the production steps
+    // are gated by the JOIN below.
     $t = $pdo->prepare(
         "SELECT pr.id AS progress_id, pr.project_id, pr.step_id, pr.item_key,
                 pr.status_id, pr.time_spent_minutes,

@@ -744,9 +744,18 @@ a project in planning have time logged against it, or cards raised on it?) or is
 > text input per department/pipeline step and a general one so we can drop all the notes and
 > conclusions"*
 
-**The smallest of the three, and it has no hard parts.** One table: project, step or department or
-NULL for the general note, the text, who wrote it, when. The archive action on `index.php` grows a
-check: archiving a project with no postmortem asks first.
+✅ **HALF BUILT, 2026-10-08 — the lifecycle STATE exists; the notes do not.** Migration **044** adds
+`'postmortem'` to `projects.status`, between `'wrapped'` and `'archived'`, after David asked for
+*"a project status for 'postmortem' which is a state after finished while it waits the postmortem
+meeting and inputs before the oficial wrap up."* So the platform can now say that a show's work is
+finished but the show is not finished with, archiving became the official wrap-up rather than the
+moment production stops, and the state is set from the status dropdown on the project list. See
+`docs/DECISIONS.md`, 2026-10-08, for what a postmortem show still appears on and what it drops off.
+
+⬜ **STILL OUTSTANDING — the capture, which is the part David actually asked for here.** One table:
+project, step or department or NULL for the general note, the text, who wrote it, when. The archive
+action on `index.php` grows a check: archiving a project with no postmortem asks first. Everything
+below still applies to that half, unchanged — the state does not decide any of it.
 
 ⚠ **PER DEPARTMENT OR PER STEP IS A REAL FORK, NOT A DETAIL.** They are not the same thing here:
 `pipeline_steps.department` exists (migration 015) and several steps share a department. Per step is

@@ -24,6 +24,13 @@ require_once __DIR__ . '/pipeline.php';
  * The shows a booking can come from: in setup, active or on hold. Wrapped and
  * archived shows are over, and their positions would only add clashes nobody
  * can do anything about.
+ *
+ * ⚠ 'postmortem' (migration 044) is EXCLUDED for exactly that reason, decided
+ * 2026-10-08: the production work is finished, so the dated step positions it
+ * still holds describe days that have already happened. Including them would
+ * report clashes against a show nobody can be booked onto. Note the FIELD()
+ * list below names only the three statuses the WHERE lets through, so it does
+ * not need 'postmortem' either.
  */
 function bookings_projects(PDO $pdo): array {
     return $pdo->query(

@@ -658,8 +658,12 @@ require __DIR__ . '/includes/header.php';
         // option that would do nothing. ?>
   <?php if (can_edit()):
     $others = $pdo->query(
+      // ⚠ 'postmortem' MUST be named in the FIELD list even though the WHERE
+      // keeps it. FIELD() returns 0 for a value it does not list, and 0 sorts
+      // FIRST ascending — so leaving it out would float every show waiting on
+      // its postmortem to the top of this picker, above the live ones.
       "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY
-         FIELD(status, 'active','setup','on_hold','wrapped'), name"
+         FIELD(status, 'active','setup','on_hold','wrapped','postmortem'), name"
     )->fetchAll();
     $others = array_values(array_filter($others, function ($o) use ($projectId) {
         return (int)$o['id'] !== $projectId;

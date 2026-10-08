@@ -13,13 +13,32 @@ require_login();
 // 'archived' arrives with migration 027 and is offered only once that has run —
 // the screen keeps working on an un-migrated database instead of writing a value
 // the column would refuse.
-$canArchive = enum_has_value($pdo, 'projects', 'status', 'archived');
-$statuses   = ['setup', 'active', 'on_hold', 'wrapped'];
-if ($canArchive) $statuses[] = 'archived';
+//
+// 'postmortem' arrives with migration 044 and is gated the same way, for the
+// same reason (David, 2026-10-08): a dropdown offering it on a database that
+// has not been migrated yet would be a save that fails for no visible reason.
+//
+// ORDER MATTERS IN THIS ARRAY — it is the order of the dropdown, and the
+// dropdown is where the lifecycle is explained to whoever is reading it:
+// setup → active → on hold → wrapped → postmortem → archived. Appending
+// 'postmortem' after 'archived' would put the official wrap-up before the
+// meeting it is supposed to follow.
+$canArchive    = enum_has_value($pdo, 'projects', 'status', 'archived');
+$canPostmortem = enum_has_value($pdo, 'projects', 'status', 'postmortem');
+$statuses      = ['setup', 'active', 'on_hold', 'wrapped'];
+if ($canPostmortem) $statuses[] = 'postmortem';
+if ($canArchive)    $statuses[] = 'archived';
 
 // Archived projects are OUT of the list rather than greyed in it — the point of
 // archiving is that the front door stops showing them. ?archived=1 brings them
 // back, and the count below is always drawn so nothing is hidden silently.
+//
+// ⚠ POSTMORTEM IS NOT HIDDEN, and that is the whole point of it (David,
+// 2026-10-08). A show waiting on its postmortem meeting is a show somebody
+// still owes something on, so it stays on the front door where it can be
+// chased. Only archiving — the official wrap-up — takes a show off this list.
+// Hiding postmortem here would drop it off every list in the app at once,
+// which is exactly the quietly-empty screen this codebase keeps paying for.
 $showArchived = isset($_GET['archived']);
 
 // ---------------------------------------------------------------------------
@@ -146,7 +165,7 @@ $projects = $pdo->query(
               WHERE st.project_id = p.id AND st.setting_key = 'wizard_step') AS wizard_step
      FROM projects p
      {$whereArchived}
-     ORDER BY FIELD(p.status, 'active','setup','on_hold','wrapped','archived'),
+     ORDER BY FIELD(p.status, 'active','setup','on_hold','wrapped','postmortem','archived'),
               p.created_at DESC"
 )->fetchAll();
 
