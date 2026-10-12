@@ -38,6 +38,9 @@
  * the history, and they stay. See snapshot_gaps(), which reports missing days
  * rather than inventing them.
  */
+
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
+
 function projects_needing_snapshot(PDO $pdo, string $today): array {
     $stmt = $pdo->prepare(
         "SELECT p.id
@@ -48,6 +51,9 @@ function projects_needing_snapshot(PDO $pdo, string $today): array {
            ) d ON d.project_id = p.id
           WHERE p.status IN ('active', 'on_hold')
             AND (d.last_date IS NULL OR d.last_date < ?)"
+        // ⚠ The Studio has no shots, assets or steps, so a nightly progress
+        // snapshot of it would record 0 of 0 for ever. See includes/studio.php.
+        . studio_exclude_sql($pdo, 'p')
     );
     $stmt->execute([$today]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);

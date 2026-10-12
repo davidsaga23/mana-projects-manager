@@ -19,6 +19,7 @@
 // Read only. No migration: everything here was already stored.
 
 require_once __DIR__ . '/pipeline.php';
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 /**
  * The shows a booking can come from: in setup, active or on hold. Wrapped and
@@ -34,9 +35,11 @@ require_once __DIR__ . '/pipeline.php';
  */
 function bookings_projects(PDO $pdo): array {
     return $pdo->query(
+        // Nobody is booked onto the Studio. (includes/studio.php)
         "SELECT id, code, name, status, delivery_date FROM projects
-          WHERE status IN ('setup', 'active', 'on_hold')
-          ORDER BY FIELD(status, 'active', 'setup', 'on_hold'), name"
+          WHERE status IN ('setup', 'active', 'on_hold')"
+        . studio_exclude_sql($pdo, '')
+        . " ORDER BY FIELD(status, 'active', 'setup', 'on_hold'), name"
     )->fetchAll();
 }
 

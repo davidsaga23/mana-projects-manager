@@ -4,6 +4,7 @@
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/studio.php';  // the Studio is filtered out below
 require_login();
 
 // The values the `projects.status` ENUM allows. Listed once and used by both the
@@ -153,7 +154,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // A literal built from a boolean, never from input.
-$whereArchived = ($canArchive && !$showArchived) ? "WHERE p.status <> 'archived'" : '';
+// ⚠ TWO CONDITIONS, BUILT AS A LIST. This was a single ternary producing
+// either "WHERE ..." or "", and bolting the Studio filter onto either end would
+// have been a syntax error in one of the two branches - the one nobody opens
+// while testing. Built as a list, neither branch can be the broken one.
+//
+// The Studio is a project row that is not a show (migration 045). It is kept off
+// this page because an entry with no delivery date and 0% progress sitting among
+// the shows is precisely what the 2026-10-07 decision predicted a pseudo-project
+// would do. See includes/studio.php for every screen that filters it.
+$projWhere = [];
+if ($canArchive && !$showArchived) $projWhere[] = "p.status <> 'archived'";
+if (studio_available($pdo))        $projWhere[] = 'p.is_studio = 0';
+$whereArchived = $projWhere ? 'WHERE ' . implode(' AND ', $projWhere) : '';
 
 $projects = $pdo->query(
     "SELECT p.*,
@@ -172,7 +185,8 @@ $projects = $pdo->query(
 // Drawn whether it is zero or not, so "there are none" and "they are hidden" are
 // never the same picture.
 $archivedCount = $canArchive
-    ? (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'archived'")->fetchColumn()
+    ? (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'archived'"
+                     . studio_exclude_sql($pdo, ''))->fetchColumn()
     : 0;
 
 // The progress figure on every row. THREE queries for the whole list, not

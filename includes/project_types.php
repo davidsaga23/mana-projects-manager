@@ -13,13 +13,17 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 /**
  * What is filed under a type: its projects, archived ones included, and the
  * pipeline templates saved for it.
  */
 function project_type_usage(PDO $pdo, string $type): array {
-    $p = $pdo->prepare('SELECT id, name, code, status FROM projects WHERE type = ? ORDER BY name');
+    // The Studio is type 'Other' and would otherwise be counted as a show using
+    // that type, which is what this screen is for. (includes/studio.php)
+    $p = $pdo->prepare('SELECT id, name, code, status FROM projects WHERE type = ?'
+                     . studio_exclude_sql($pdo, '') . ' ORDER BY name');
     $p->execute([$type]);
     $t = $pdo->prepare('SELECT name FROM pipeline_templates WHERE project_type = ? ORDER BY name');
     $t->execute([$type]);
@@ -54,7 +58,8 @@ function unused_project_types(PDO $pdo): array {
     if (!project_types_available($pdo)) return [];
     return $pdo->query(
         'SELECT pt.name FROM project_types pt
-          WHERE NOT EXISTS (SELECT 1 FROM projects p WHERE p.type = pt.name)
+          WHERE NOT EXISTS (SELECT 1 FROM projects p WHERE p.type = pt.name'
+          . studio_exclude_sql($pdo, 'p') . ')
             AND NOT EXISTS (SELECT 1 FROM pipeline_templates t WHERE t.project_type = pt.name)
           ORDER BY pt.sort_order, pt.id'
     )->fetchAll(PDO::FETCH_COLUMN);

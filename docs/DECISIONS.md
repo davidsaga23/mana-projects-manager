@@ -3474,6 +3474,58 @@ yet", "3 positions not invoiced yet", or "waiting on the last payment" — rathe
 withholding the green. The amber is the same `--warn-tint` the pending staffing slots use, so
 "not settled yet" reads identically on both screens.
 
+## 2026-10-12 — The Studio is a project row, reversing 2026-10-07
+**This overturns "A card can exist before anybody says which show it is for" in part.** That
+entry rejected a pseudo-project for unfiled cards and was right at the time. Read it first; it
+is not wrong, it answered a different question.
+**Decision:** migration 045 adds `projects.is_studio` and one row, code `STUDIO`, with its own
+statuses copied from the templates. Its board is `tasks.php`, the same board every show uses.
+**Why the reversal:** the 2026-10-07 entry turned on one observation — *"Studio Tasks is a
+read-only list with filters — it has no columns, so it needs no statuses, so option 1's entire
+advantage bought nothing while its cost stayed."* On 2026-10-12 David asked for the columns:
+"let's mimic the per project task/ticket UI to the Studio Tasks tab. We should be able to create
+new tasks from there". A board needs a status vocabulary, a per-board sequence and a create
+flow. `projects` already has all three and `tasks.php` already draws it. Building a parallel set
+for `project_id IS NULL` would be two implementations of one idea — the mistake this codebase
+names repeatedly (STFC's `shot_characters`/`shot_environments`; the two-vocabulary trap in
+migration 017).
+**The lesson stands, and it is the same one:** that entry said the deciding factor was the shape
+of the requirement, not the strength of the argument. The requirement changed, so the answer
+changed. It was not wrong then.
+
+## 2026-10-12 — The price of the pseudo-project, paid in one place
+**Decision:** `includes/studio.php` holds `studio_exclude_sql()` / `studio_where_sql()` and, in
+its docblock, the enumerated list of every screen that filters the Studio out: the projects
+page and its archived count, finance, the project switcher, the nightly snapshot, bookings,
+historic quotas and fees, workflow standards, and project types twice. Two pickers include it
+deliberately — the ticket page's "move to project" and the transcript's — because those are how
+a card reaches it.
+**Why:** the 2026-10-07 entry predicted the cost exactly: "an inbox appearing as a show with no
+delivery date and 0% progress on the projects page, the dashboard, finance, the switcher and in
+bookings, forever." That prediction was correct and is the reason this is not free. Writing the
+list down in the helper, rather than leaving nine scattered `AND is_studio = 0` clauses to be
+rediscovered one bug at a time, is what makes the cost payable once.
+**Consequence:** every filtered query degrades to its old behaviour when migration 045 has not
+run, because the fragment returns `''`. Both states were parsed before shipping — the splice
+broke `snapshots.php` on the first attempt by opening a string it never closed, which is exactly
+why both are tested.
+
+## 2026-10-12 — Filing unfiled cards is an offer, never automatic
+**Decision:** Studio Tasks shows a button to move every card with no project into the Studio,
+and only when there is at least one. Nothing moves on its own; migration 045 touches no
+existing row.
+**Why:** capture-first is still right, and a NULL project still means what the 2026-10-07 entry
+said it means. The Studio is a destination somebody chooses, not a bucket that unfiled cards
+fall into — if it were automatic, "I have not decided yet" would become indistinguishable from
+"this belongs to no show".
+**Consequence:** the move runs card by card through `move_ticket_to_project()`, not as one
+UPDATE, because that function is what grants a `seq` (so a card stops reading as "#21") and
+drops it into the target's first column (so it is visible on arrival). It deliberately opens no
+transaction of its own: `move_ticket_to_project()` already opens one and MySQL cannot nest them
+— `tools/check_php_blocks.py` caught that before it ran. Nothing is lost, because the operation
+is idempotent and resumable: a card that has moved is no longer unfiled, so a failed batch can
+simply be run again.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

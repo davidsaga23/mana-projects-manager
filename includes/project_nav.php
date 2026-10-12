@@ -43,6 +43,9 @@ const PROJECT_TABS_HIDDEN_FROM_VIEWERS = [
 ];
 
 /** Is this tab, or a link to it, one a viewer should not be shown? */
+
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
+
 function hidden_from_viewers(string $key): bool {
     return !can_edit() && in_array($key, PROJECT_TABS_HIDDEN_FROM_VIEWERS, true);
 }
@@ -125,8 +128,13 @@ function switchable_projects(PDO $pdo): array {
     static $cache = null;
     if ($cache !== null) return $cache;
     $cache = $pdo->query(
-        "SELECT id, name, code, status FROM projects
-          ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
+        // ⚠ The Studio is kept out of the switcher: it is not a show, and an
+        // entry with no delivery date and no progress sitting among the shows is
+        // exactly what the 2026-10-07 decision warned a pseudo-project would do.
+        // Its board is reached from Studio Tasks instead.
+        "SELECT id, name, code, status FROM projects"
+        . studio_where_sql($pdo, '')
+        . " ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
     )->fetchAll();
     return $cache;
 }

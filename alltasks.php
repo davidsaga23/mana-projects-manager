@@ -26,7 +26,29 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcript button
+require_once __DIR__ . '/includes/studio.php';
 require_login();
+
+// --- file every unfiled card into the Studio --------------------------------
+//
+// David, 2026-10-12: "how can I adjust the project of the current tasks without
+// no project to be the global/studio wide task?"
+//
+// ⚠ THIS IS AN OFFER, NEVER AUTOMATIC. A card with no project is still a valid
+// card (migration 041, and the 2026-10-07 decision that argued for it): capturing
+// work before deciding where it goes is the point. What changed is that there is
+// now somewhere deliberate to put the ones that belong to no show — so this is a
+// button somebody presses, not a rule that fires.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_to_studio'])) {
+    try {
+        [$n, $said] = file_unfiled_to_studio($pdo);
+        flash($n > 0 ? 'ok' : 'warn', $said);
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: alltasks.php');
+    exit;
+}
 
 $ready = column_exists($pdo, 'tickets', 'id');
 
@@ -93,6 +115,21 @@ require __DIR__ . '/includes/header.php';
     <a class="button secondary" href="transcript.php"
        title="Read a meeting transcript and turn its action items into cards">Tasks from transcript</a>
   <?php endif; ?>
+  <?php // ⚠ THE BOARD IS tasks.php, NOT A SECOND ONE BUILT HERE. David asked to
+        // "mimic the per project task/ticket UI" on this screen, and the honest
+        // way to do that is to send him to the real one: the Studio is a project
+        // row (migration 045), so its board already has the columns, the filters,
+        // the archive and both create buttons, drawn by the code every other show
+        // uses. A copy of that board living in this file would be the second
+        // implementation this codebase keeps refusing to build — and the one that
+        // would quietly drift.
+        //
+        // This page stays what its own header says it is: a view ACROSS the shows.
+        $studioId = studio_project_id($pdo); ?>
+  <?php if ($studioId): ?>
+    <a class="button" href="tasks.php?project=<?= $studioId ?>"
+       title="The studio's own board, with columns and New task / New ticket">Studio board →</a>
+  <?php endif; ?>
 </div>
 
 <?php if (!$ready): ?>
@@ -126,6 +163,24 @@ require __DIR__ . '/includes/header.php';
     <a href="alltasks.php<?= $showDone ? '' : '?done=1' ?>"><?= $showDone
         ? 'hide finished work' : 'include finished work' ?></a>
   </p>
+
+<?php // ⚠ OFFERED ONLY WHEN THERE IS SOMETHING TO ACCEPT. A button that always
+      // says "move 0 cards" teaches people to stop reading it, and this one
+      // rewrites the project, reference and status of every card it touches.
+      //
+      // It is also NOT a cleanup the system does on its own: an unfiled card is
+      // still a legitimate card, and filing it is a decision about where the
+      // work belongs. The button states what it will do before it does it.
+      if (can_edit() && $unfiled > 0 && $studioId): ?>
+  <form method="post" class="inline-form" style="margin:-6px 0 14px;">
+    <input type="hidden" name="file_to_studio" value="1">
+    <button type="submit" class="secondary" data-confirm-count="<?= (int)$unfiled ?>"
+            onclick="return confirm('Move <?= (int)$unfiled ?> unfiled card<?= $unfiled === 1 ? '' : 's' ?> into the Studio?\n\nEach one gets a STUDIO reference and lands in the first column of the studio board. Cards already on a show are not touched.')">
+      Move <?= (int)$unfiled ?> unfiled card<?= $unfiled === 1 ? '' : 's' ?> into the Studio
+    </button>
+    <span class="muted small">they keep their title, owner, priority and thread — only the project changes</span>
+  </form>
+<?php endif; ?>
 
   <?php // ⚠ CARDS WITH NO PROJECT LIVE HERE, and nowhere else. A project's board
         // filters on project_id, so an unfiled card is on no board at all — this

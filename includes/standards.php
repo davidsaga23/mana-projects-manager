@@ -31,6 +31,7 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 /** Has migration 026 (the per-type sheets) been applied? Only the fallback needs them now. */
 function standards_available(PDO $pdo): bool {
@@ -267,7 +268,9 @@ function project_ideal_copy_sources(PDO $pdo, array $project): array {
         "SELECT p.id, p.name, p.code, p.type, p.status, COUNT(ps.id) AS steps
            FROM projects p
            JOIN pipeline_steps ps ON ps.project_id = p.id
-          WHERE p.id <> ?
+          WHERE p.id <> ?"
+        // The Studio has no pipeline worth copying. (includes/studio.php)
+        . studio_exclude_sql($pdo, 'p') . "
           GROUP BY p.id, p.name, p.code, p.type, p.status
           ORDER BY p.type = ? DESC, p.status = 'archived', p.name"
     );

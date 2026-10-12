@@ -13,12 +13,17 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/pipeline.php';
+require_once __DIR__ . '/includes/studio.php';  // the Studio is filtered out below
 require_once __DIR__ . '/includes/finance.php';
 require_admin();
 
+// ⚠ THE STUDIO IS NOT COSTED. It has no budget, no invoices and no staffing,
+// and a row of dashes among the shows on the money screen would be read as a
+// show nobody had filled in. See includes/studio.php.
 $projects = $pdo->query(
-    "SELECT * FROM projects
-      ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
+    "SELECT * FROM projects"
+    . studio_where_sql($pdo, '')
+    . " ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
 )->fetchAll();
 
 $ids = array_map(fn($p) => (int)$p['id'], $projects);

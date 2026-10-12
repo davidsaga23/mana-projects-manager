@@ -25,6 +25,7 @@
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/crew.php';
 require_once __DIR__ . '/money.php';
+require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 /**
  * True once migration 013 has been applied and there is a baseline table.
@@ -408,7 +409,9 @@ function step_identity_key(array $row): string {
 
 function history_projects(PDO $pdo): array {
     return $pdo->query(
-        'SELECT id, code, name, status, type FROM projects
-          ORDER BY COALESCE(start_date, created_at) DESC, id DESC'
+        // Historic quotas and fees are about shows. (includes/studio.php)
+        'SELECT id, code, name, status, type FROM projects'
+        . studio_where_sql($pdo, '')
+        . ' ORDER BY COALESCE(start_date, created_at) DESC, id DESC'
     )->fetchAll();
 }
