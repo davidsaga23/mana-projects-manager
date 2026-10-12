@@ -68,23 +68,18 @@ function save_project_budget(int $projectId, array $project, array $in, string $
         if ($amount < 0) throw new RuntimeException('A budget cannot be negative.');
     }
 
-    // Revenue, read the same way and kept entirely separate. ⚠ IT TAKES NO PART
-    // IN THE VARIANCE — David, 2026-10-06: "this should only compare the
-    // production budget against the current forecast. Do not add client revenue
-    // or profit here." It is stored and shown, and nothing computes with it.
-    $revenue = null;
-    $hasRevenue = revenue_available();
-    if ($hasRevenue) {
-        $rawRev = trim((string)($in['revenue_amount'] ?? ''));
-        if ($rawRev !== '') {
-            $cleanRev = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rawRev));
-            if ($cleanRev === '' || !is_numeric($cleanRev)) {
-                throw new RuntimeException('"' . $rawRev . '" is not a number, nothing was saved.');
-            }
-            $revenue = round((float)$cleanRev, 2);
-            if ($revenue < 0) throw new RuntimeException('Revenue cannot be negative.');
-        }
-    }
+    // ⚠ REVENUE WAS REMOVED HERE ON 2026-10-12, one week after it went in.
+    // David: "we'll delete the total revenue and only going to keep only these"
+    // — and the list that followed is seven figures about COST, with no client
+    // money among them. The Overview answers "are we inside what Jorik approved
+    // and how much of it have we spent"; what the client is billed is a
+    // different question with a different audience, and a figure sitting on the
+    // panel taking part in no sum was an invitation to read it as profit.
+    //
+    // The `revenue_amount` COLUMN IS LEFT IN PLACE in the finance database, and
+    // nothing reads or writes it any more. Dropping it would need a hand-run
+    // statement in phpMyAdmin and would throw away the figure already typed
+    // there; leaving it costs nothing and keeps that number recoverable.
 
     $cur = strtoupper(trim((string)($in['currency'] ?? 'USD')));
     if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
@@ -104,13 +99,6 @@ function save_project_budget(int $projectId, array $project, array $in, string $
         trim((string)($in['notes'] ?? '')) ?: null,
         $who,
     ];
-    if ($hasRevenue) {
-        $cols .= ', revenue_amount';
-        $marks .= ', ?';
-        $upd  .= ', revenue_amount = VALUES(revenue_amount)';
-        $args[] = $revenue;
-    }
-
     $db->prepare(
         'INSERT INTO project_budgets (' . $cols . ') VALUES (' . $marks . ')
          ON DUPLICATE KEY UPDATE ' . $upd
@@ -119,9 +107,6 @@ function save_project_budget(int $projectId, array $project, array $in, string $
     $said = $amount === null
         ? 'Approved production budget cleared.'
         : 'Approved production budget saved: ' . fmt_money_plain($amount, $cur) . '.';
-    if ($hasRevenue && $revenue !== null) {
-        $said .= ' Revenue: ' . fmt_money_plain($revenue, $cur) . '.';
-    }
     return $said;
 }
 
@@ -928,20 +913,6 @@ function delete_invoice(int $id): string {
 function fmt_money_plain(?float $amount, string $currency = 'USD'): string {
     if ($amount === null) return '—';
     return number_format($amount, 2) . ' ' . $currency;
-}
-
-/**
- * Is `revenue_amount` there yet (finance_install_07)?
- *
- * ⚠ PROBED, NOT ASSUMED. The finance schema files are imported BY HAND through
- * phpMyAdmin — migrate.php cannot reach this database — so there is always a
- * window where the code is deployed and the column is not. The budget screen has
- * to keep working through it, minus the one field, rather than failing whole.
- */
-function revenue_available(): bool {
-    static $known = null;
-    if ($known === null) $known = finance_column_exists('project_budgets', 'revenue_amount');
-    return $known;
 }
 
 /** Has finance_install_03.sql been imported? Invoices cannot name a position without it. */

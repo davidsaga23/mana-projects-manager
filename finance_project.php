@@ -214,8 +214,27 @@ $variance = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grand
 $varianceWhy = $budgetAmount === null
     ? 'no approved budget yet'
     : ($grandTotal > 0 ? '' : 'nothing is costed yet, so there is nothing to compare');
-$revenueAmount = ($budget && isset($budget['revenue_amount']) && $budget['revenue_amount'] !== null)
-    ? (float)$budget['revenue_amount'] : null;
+// LEFT TO SPEND — the current forecast cost minus everything invoiced so far,
+// paid or not. David, 2026-10-12 asked for it as "Balance": "it will compare
+// actual expenses (invoices both paid and unpaid) vs the current forecast cost."
+//
+// ⚠ IT IS NOT CALLED BALANCE, and the reason is on this same strip. `Unpaid`
+// already IS a balance in the sense everybody reads first — money owed to
+// suppliers — and two figures called balance side by side, meaning different
+// things, is a number waiting to be misread in front of a client. The formal
+// name on a film cost report is ESTIMATE TO COMPLETE; "Left to spend" says the
+// same thing without anyone needing the glossary.
+//
+// ⚠ MEASURED AGAINST THE FORECAST, NOT THE APPROVED BUDGET. Those are two
+// different comparisons: Budget variance asks "are we inside what Jorik
+// approved", this asks "how much of what we expect to spend has actually been
+// billed to us yet". Running it off the budget instead would duplicate the
+// variance and hide the fact that invoices can outrun a forecast that was never
+// approved in the first place.
+//
+// Null while nothing is costed: 0 forecast minus 0 invoiced is 0, which would
+// read as "nothing left to spend" on a show that has not been priced at all.
+$leftToSpend = $grandTotal > 0 ? $grandTotal - $billed : null;
 
 // WHAT THIS SHOW HAS COST SO FAR, and what the plan still has booked. Worked
 // out here with the rest of the money rather than inside the Overview block,
@@ -329,15 +348,15 @@ try {
 
 <h3>The money</h3>
 <div class="dash-strip">
-  <?php // THREE FIGURES THAT ARE NOT THE SAME NUMBER, in the order David asked
-        // for them: what the client pays us, what we are allowed to spend, and
-        // whether we are inside it. Revenue sits first and takes no part in any
-        // sum on this screen. ?>
-  <?php if (revenue_available()): ?>
-    <div><span class="muted small">Revenue</span>
-      <strong><?= $revenueAmount === null ? '—' : e(fmt_money_plain($revenueAmount, $cur)) ?></strong>
-      <a class="muted small" href="#budget-form">billed to the client · set it ↓</a></div>
-  <?php endif; ?>
+  <?php // SEVEN FIGURES, IN THE ORDER DAVID LISTED THEM on 2026-10-12, and they
+        // are all about COST. What we may spend, what we now expect to spend,
+        // whether that is inside the approval; then what has actually been
+        // billed to us, how much of that is settled, how much is not, and what
+        // is still to come.
+        //
+        // Revenue was here for a week and was removed with this change. It took
+        // part in no sum, which is exactly why it had to go: a client figure
+        // sitting on a panel of costs gets read as profit by somebody skimming. ?>
   <div><span class="muted small">Approved production budget</span>
     <strong><?= $budgetAmount === null ? '—' : e(fmt_money_plain($budgetAmount, $cur)) ?></strong>
     <?php // Both of these are TYPED IN, and the box is far down the page — further
@@ -378,26 +397,44 @@ try {
     <?php endif; ?></div>
   <div><span class="muted small">Invoiced</span><strong><?= e(fmt_money_plain($billed, $cur)) ?></strong>
     <span class="muted small"><?= count($invoices) ?> invoice(s)</span></div>
+  <?php // Paid and Unpaid add up to Invoiced, deliberately shown as three tiles
+        // rather than one with a split underneath: "how much have we actually
+        // parted with" is its own question, and it was only answerable from the
+        // Cost to date panel further down until now. ?>
+  <div><span class="muted small">Paid</span>
+    <strong><?= e(fmt_money_plain($paid, $cur)) ?></strong>
+    <span class="muted small">money that has left</span></div>
   <div><span class="muted small">Unpaid</span>
     <strong class="<?= $overdue ? 'err' : '' ?>"><?= e(fmt_money_plain($unpaid, $cur)) ?></strong>
     <?php if ($overdue): ?><span class="err small"><?= $overdue ?> overdue</span><?php endif; ?></div>
+  <?php // ⚠ THE SIGN IS SPELLED OUT, exactly as it is on Budget variance and for
+        // the same reason: a bare minus in front of money is read as "less" by
+        // anybody not looking closely, and this figure is the one that says
+        // whether the invoices have overrun the plan. ?>
+  <div><span class="muted small">Left to spend</span>
+    <strong class="<?= $leftToSpend !== null && $leftToSpend < 0 ? 'err' : '' ?>">
+      <?= $leftToSpend === null ? '—' : e(fmt_money_plain(abs($leftToSpend), $cur)) ?></strong>
+    <?php if ($leftToSpend === null): ?>
+      <span class="muted small">nothing is costed yet</span>
+    <?php elseif ($leftToSpend < 0): ?>
+      <span class="err small">OVER FORECAST</span>
+    <?php elseif ($leftToSpend > 0): ?>
+      <span class="muted small">forecast not yet invoiced</span>
+    <?php else: ?>
+      <span class="muted small">fully invoiced</span>
+    <?php endif; ?></div>
 </div>
 
-<?php // ⚠ SAID WHERE THE HOLE IS. This note used to live only down beside the
-      // budget form, which is most of a page below — so the strip simply had no
-      // Revenue on it and nothing nearby explained why. David, 2026-10-06: "I
-      // still don't see the revenue amount and I'd like to know where should I
-      // input that number." An absence has to explain itself at the point it is
-      // noticed, not where the fix happens to live. ?>
-<?php if (!revenue_available()): ?>
-  <div class="flash flash-warn">
-    <strong>Revenue is not here yet because the finance database has nowhere to put it.</strong>
-    Import <code>finance_install_07.sql</code> into the <em>finance</em> database through
-    phpMyAdmin — <code>migrate.php</code> cannot reach that database, so this one is by hand,
-    like every other <code>finance_install_*.sql</code>. The figure and its input box both appear
-    here the moment it lands. Everything else on this page works without it.
-  </div>
-<?php endif; ?>
+<?php // Said once, under the strip, because the figure invites exactly this
+      // question and David asked it himself: it keeps moving until the last
+      // invoice is in, and only then is it what the show really cost. ?>
+<p class="muted small">
+  <strong>Left to spend</strong> is the current forecast cost less everything invoiced so far,
+  paid or not — on a film cost report it is called the <em>estimate to complete</em>. It moves
+  every time an invoice arrives or the forecast changes, and it is only final once the last
+  invoice has been received.
+</p>
+
 
 <?php if ($proj['mixed_currency']): ?>
   <div class="flash flash-warn">
@@ -622,20 +659,12 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   <?php endif; ?>
 <?php endif; ?>
 
-<h3 id="budget-form">Approved production budget<?= revenue_available() ? ' and revenue' : '' ?></h3>
+<h3 id="budget-form">Approved production budget</h3>
 <p class="muted small">
-  Both are typed in here and nowhere else. <strong>Approved production budget</strong> is what we
-  are internally allowed to spend<?= revenue_available()
-      ? '; <strong>Revenue</strong> is what the client is billed. Revenue is shown beside the budget and takes no part in the variance.'
-      : '.' ?>
+  Typed in here and nowhere else — it is the one figure on this screen that does not come out
+  of Anima. Everything beside it on the strip above is computed: the forecast from the pipeline,
+  the staffing and the rates, and the invoice figures from the Invoices tab.
 </p>
-<?php if (!revenue_available()): ?>
-  <p class="flash flash-warn">
-    ⚠ <strong>Revenue has nowhere to be stored yet.</strong> Import
-    <code>finance_install_07.sql</code> into the <em>finance</em> database through phpMyAdmin
-    and the box appears here, beside the one below. Everything else on this screen works without it.
-  </p>
-<?php endif; ?>
 <form method="post" class="money-form">
   <input type="hidden" name="save_budget" value="1">
   <div class="row">
@@ -645,12 +674,6 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
       <input name="budget_amount" inputmode="decimal" placeholder="e.g. 85000"
              value="<?= e($budgetAmount !== null ? fmt_num($budgetAmount, 2) : '') ?>">
     </label>
-    <?php if (revenue_available()): ?>
-      <label>Revenue <span class="muted small">(billed to the client)</span>
-        <input name="revenue_amount" inputmode="decimal" placeholder="e.g. 120000"
-               value="<?= e($revenueAmount !== null ? fmt_num($revenueAmount, 2) : '') ?>">
-      </label>
-    <?php endif; ?>
     <label style="flex:0 1 90px;">Currency
       <input name="currency" maxlength="3" style="text-transform:uppercase" value="<?= e($cur) ?>">
     </label>

@@ -3411,6 +3411,35 @@ or N/A — is a better number and a bigger change, and doing it here would have 
 figure on every project on the day it shipped with no way to tell whether the work or the
 rule had changed.
 
+## 2026-10-12 — The money strip is seven figures about cost, and revenue is not one of them
+**Decision:** the Finance Overview strip shows Approved production budget, Current forecast cost,
+Budget variance, Invoiced, Paid, Unpaid and Left to spend. Revenue, added on 2026-10-06, is
+removed from the screen; `project_budgets.revenue_amount` stays in the finance database, unread
+and unwritten.
+**Why:** David, 2026-10-12, listing the seven he wanted. Revenue took part in no sum on a panel
+where every other figure is a cost, and a client number sitting among costs gets read as profit
+by anybody skimming — which is the same failure that made the old *Margin* label worth renaming.
+The question "did the show make money" has a different audience from "are we inside what Jorik
+approved", and one strip answering both answers neither.
+**Why the column survives:** dropping it needs a hand-run statement in phpMyAdmin (migrate.php
+cannot reach the finance database) and would throw away the figure already typed there. Leaving
+it costs nothing and keeps that number recoverable if the question comes back.
+
+## 2026-10-12 — "Left to spend", not "Balance"
+**Decision:** the seventh figure — current forecast cost minus everything invoiced, paid or not —
+is labelled **Left to spend**, with *estimate to complete* named in the note beneath it.
+**Why:** David asked for it as "Balance" and asked whether there was a better name. There is, and
+the reason is on the same strip: *Unpaid* already is a balance in the sense most people reach for
+first — money owed to suppliers. Two figures called balance, side by side, meaning different
+things, is a number waiting to be misread in front of a client. *Estimate to complete* is the
+formal name on a film cost report and maps onto what a financier expects to see; "Left to spend"
+says the same thing without the glossary.
+**Consequence:** it is measured against the FORECAST, not the approved budget. Those are two
+different comparisons, and running it off the budget would have duplicated Budget variance while
+hiding the case that matters — invoices outrunning a forecast nobody ever approved. It is null,
+not zero, while nothing is costed: 0 minus 0 is 0, which would read as "nothing left to spend" on
+a show that has not been priced at all.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
