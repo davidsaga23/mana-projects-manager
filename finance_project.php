@@ -171,6 +171,9 @@ foreach (project_lanes($pdo, $projectId) as $l) {
         'crew_name' => (string)$l['name'],
         'step_name' => (string)$l['step_name'],
         'label'     => $l['name'] . ', ' . $l['step_name'],
+        // Carried for the Final balance test below: a PLACEHOLDER is a slot
+        // nobody filled, and nobody can invoice for work that was never done.
+        'is_placeholder' => !empty($l['is_placeholder']),
     ];
 }
 $people  = project_people($pdo, $projectId);
@@ -214,27 +217,77 @@ $variance = ($budgetAmount !== null && $grandTotal > 0) ? $budgetAmount - $grand
 $varianceWhy = $budgetAmount === null
     ? 'no approved budget yet'
     : ($grandTotal > 0 ? '' : 'nothing is costed yet, so there is nothing to compare');
-// LEFT TO SPEND — the current forecast cost minus everything invoiced so far,
-// paid or not. David, 2026-10-12 asked for it as "Balance": "it will compare
-// actual expenses (invoices both paid and unpaid) vs the current forecast cost."
+// FINAL BALANCE — the approved production budget against money that has really
+// changed hands. David, 2026-10-12: "let's do it against the approved budget and
+// let's call it final balance", and, asked which side to subtract, "show both".
 //
-// ⚠ IT IS NOT CALLED BALANCE, and the reason is on this same strip. `Unpaid`
-// already IS a balance in the sense everybody reads first — money owed to
-// suppliers — and two figures called balance side by side, meaning different
-// things, is a number waiting to be misread in front of a client. The formal
-// name on a film cost report is ESTIMATE TO COMPLETE; "Left to spend" says the
-// same thing without anyone needing the glossary.
+// So there are two, and they answer the same question at different distances
+// from the bank:
+//   — vs invoiced: approved less everything billed, settled or not. The
+//     conservative one; it counts money committed even before it leaves.
+//   — vs paid:     approved less money that has actually gone. The optimistic
+//     one mid-show, and the true one at the end.
+// They converge the moment the last invoice is settled, which is the point at
+// which the figure stops moving and deserves the word "final".
 //
-// ⚠ MEASURED AGAINST THE FORECAST, NOT THE APPROVED BUDGET. Those are two
-// different comparisons: Budget variance asks "are we inside what Jorik
-// approved", this asks "how much of what we expect to spend has actually been
-// billed to us yet". Running it off the budget instead would duplicate the
-// variance and hide the fact that invoices can outrun a forecast that was never
-// approved in the first place.
+// ⚠ AGAINST THE APPROVED BUDGET, NOT THE FORECAST. This replaces the "Left to
+// spend" tile built earlier the same day, which compared invoices against the
+// current forecast cost. David overruled that, and he is right for the audience:
+// Jorik approved a number, and the question a client takes away is how much of
+// THAT number was spent. Budget variance above still carries the forward-looking
+// comparison (approved against forecast), so nothing was lost — the strip now
+// reads plan-versus-approval at the left and actual-versus-approval at the right.
 //
-// Null while nothing is costed: 0 forecast minus 0 invoiced is 0, which would
-// read as "nothing left to spend" on a show that has not been priced at all.
-$leftToSpend = $grandTotal > 0 ? $grandTotal - $billed : null;
+// Null when no budget has been approved: there is nothing to be a balance of,
+// and 0 would read as "spent exactly to the penny".
+$finalVsInvoiced = $budgetAmount !== null ? $budgetAmount - $billed : null;
+$finalVsPaid     = $budgetAmount !== null ? $budgetAmount - $paid   : null;
+
+// ⚠ WHAT MAKES IT "FINAL", AND WHY IT IS NOT JUST "NOTHING UNPAID". MSD today
+// has no invoices at all, so $unpaid is 0.00 — and a green "final" panel on a
+// show where nobody has billed anything yet would be the most confident kind of
+// wrong this codebase keeps paying for. David's own words carried the answer:
+// "green once the last invoice has been paid (LINKED TO EACH SLOT)".
+//
+// So three conditions, all of which have to hold:
+//   1. something has actually been invoiced;
+//   2. nothing is outstanding;
+//   3. every staffing slot with a REAL PERSON in it has an invoice against it.
+//
+// Placeholder slots are skipped on purpose. An unfilled slot is work nobody did,
+// so no invoice will ever arrive for it, and requiring one would put "final" out
+// of reach for ever on any show that was planned more generously than it was
+// staffed.
+$invoicedSlots = [];
+foreach ($invoices as $iv) {
+    if (!empty($iv['crew_id']) && !empty($iv['step_id'])) {
+        $invoicedSlots[(int)$iv['crew_id'] . '|' . (int)$iv['step_id']] = true;
+    }
+}
+$slotsAwaiting = 0;
+foreach ($positions as $pos) {
+    if ($pos['is_placeholder']) continue;
+    if (!isset($invoicedSlots[$pos['crew_id'] . '|' . $pos['step_id']])) $slotsAwaiting++;
+}
+// Money is rounded to cents everywhere in this codebase, so "nothing left" is a
+// comparison against half a cent rather than against exact zero — a float sum of
+// a dozen invoices does not reliably land on 0.0.
+$isFinal = $billed > 0 && $unpaid < 0.005 && $slotsAwaiting === 0;
+
+// ⚠ AND IT SAYS WHAT IS STILL MISSING. "Not final" with no reason is a dead end
+// on a screen somebody is using to answer a question from the boss; naming the
+// blocker turns it into the next thing to do. Most-blocking first.
+$finalWhy = '';
+if (!$isFinal) {
+    if ($billed <= 0) {
+        $finalWhy = 'nothing invoiced yet';
+    } elseif ($slotsAwaiting > 0) {
+        $finalWhy = $slotsAwaiting . ' position'
+                  . ($slotsAwaiting === 1 ? '' : 's') . ' not invoiced yet';
+    } else {
+        $finalWhy = 'waiting on the last payment';
+    }
+}
 
 // WHAT THIS SHOW HAS COST SO FAR, and what the plan still has booked. Worked
 // out here with the rest of the money rather than inside the Overview block,
@@ -409,30 +462,56 @@ try {
     <?php if ($overdue): ?><span class="err small"><?= $overdue ?> overdue</span><?php endif; ?></div>
   <?php // ⚠ THE SIGN IS SPELLED OUT, exactly as it is on Budget variance and for
         // the same reason: a bare minus in front of money is read as "less" by
-        // anybody not looking closely, and this figure is the one that says
-        // whether the invoices have overrun the plan. ?>
-  <div><span class="muted small">Left to spend</span>
-    <strong class="<?= $leftToSpend !== null && $leftToSpend < 0 ? 'err' : '' ?>">
-      <?= $leftToSpend === null ? '—' : e(fmt_money_plain(abs($leftToSpend), $cur)) ?></strong>
-    <?php if ($leftToSpend === null): ?>
-      <span class="muted small">nothing is costed yet</span>
-    <?php elseif ($leftToSpend < 0): ?>
-      <span class="err small">OVER FORECAST</span>
-    <?php elseif ($leftToSpend > 0): ?>
-      <span class="muted small">forecast not yet invoiced</span>
+        // anybody not looking closely, and these two are the figures somebody
+        // carries into a meeting.
+        //
+        // The TINT is on these two tiles and nowhere else (David, 2026-10-12:
+        // the colour goes on "just the final balance number"). Yellow is the
+        // same --warn-tint the pending staffing slots use, so "not settled yet"
+        // reads identically on both screens; green only once it is really over.
+        //
+        // $finalClass is computed once rather than twice: two tiles that could
+        // disagree about whether the show is finished would be worse than
+        // either answer. ?>
+  <?php $finalClass = $isFinal ? 'tile-final' : 'tile-pending'; ?>
+  <div class="<?= $finalClass ?>"><span class="muted small">Final balance — invoiced</span>
+    <strong class="<?= $finalVsInvoiced !== null && $finalVsInvoiced < 0 ? 'err' : '' ?>">
+      <?= $finalVsInvoiced === null ? '—' : e(fmt_money_plain(abs($finalVsInvoiced), $cur)) ?></strong>
+    <?php if ($finalVsInvoiced === null): ?>
+      <span class="muted small">no approved budget yet</span>
+    <?php elseif ($finalVsInvoiced < 0): ?>
+      <span class="err small">OVER BUDGET</span>
     <?php else: ?>
-      <span class="muted small">fully invoiced</span>
+      <span class="muted small">approved less everything billed</span>
+    <?php endif; ?></div>
+  <div class="<?= $finalClass ?>"><span class="muted small">Final balance — paid</span>
+    <strong class="<?= $finalVsPaid !== null && $finalVsPaid < 0 ? 'err' : '' ?>">
+      <?= $finalVsPaid === null ? '—' : e(fmt_money_plain(abs($finalVsPaid), $cur)) ?></strong>
+    <?php if ($finalVsPaid === null): ?>
+      <span class="muted small">no approved budget yet</span>
+    <?php elseif ($finalVsPaid < 0): ?>
+      <span class="err small">OVER BUDGET</span>
+    <?php else: ?>
+      <span class="<?= $isFinal ? 'ok' : 'muted' ?> small">
+        <?= $isFinal ? 'FINAL' : e($finalWhy) ?></span>
     <?php endif; ?></div>
 </div>
 
-<?php // Said once, under the strip, because the figure invites exactly this
-      // question and David asked it himself: it keeps moving until the last
-      // invoice is in, and only then is it what the show really cost. ?>
+<?php // Said once, under the strip, because the pair invites exactly this
+      // question and David asked it himself: the figure is not final until the
+      // last invoice is in AND settled. ?>
 <p class="muted small">
-  <strong>Left to spend</strong> is the current forecast cost less everything invoiced so far,
-  paid or not — on a film cost report it is called the <em>estimate to complete</em>. It moves
-  every time an invoice arrives or the forecast changes, and it is only final once the last
-  invoice has been received.
+  <strong>Final balance</strong> is the approved production budget less what the show has
+  actually cost — against everything <em>invoiced</em>, and against what has actually been
+  <em>paid</em>. The two meet when the last invoice is settled. Both tiles stay
+  <span class="tile-pending" style="padding:1px 5px;border-radius:3px;">amber</span> until every
+  staffed position has been invoiced and nothing is outstanding, then turn
+  <span class="tile-final" style="padding:1px 5px;border-radius:3px;">green</span>.
+  <?php if (!$isFinal && $billed > 0 && $slotsAwaiting > 0): ?>
+    Right now <?= (int)$slotsAwaiting ?> staffed position<?= $slotsAwaiting === 1 ? ' has' : 's have' ?>
+    no invoice against <?= $slotsAwaiting === 1 ? 'it' : 'them' ?> — the
+    <a href="?project=<?= $projectId ?>&amp;tab=invoices">Invoices tab</a> is where they go.
+  <?php endif; ?>
 </p>
 
 

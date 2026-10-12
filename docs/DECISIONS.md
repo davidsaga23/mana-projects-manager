@@ -3440,6 +3440,40 @@ hiding the case that matters — invoices outrunning a forecast nobody ever appr
 not zero, while nothing is costed: 0 minus 0 is 0, which would read as "nothing left to spend" on
 a show that has not been priced at all.
 
+## 2026-10-12 — Final balance: approved budget against real money, and what "final" means
+**Supersedes** the "Left to spend, not Balance" entry above, the same day. The log is
+append-only, so that entry stands as what was decided and this one as what replaced it.
+**Decision:** the seventh and eighth tiles are **Final balance — invoiced** (approved budget
+less everything billed) and **Final balance — paid** (approved budget less money that has
+actually gone). The forecast-based "Left to spend" is removed.
+**Why:** David overruled the forecast basis: "let's do it against the approved budget and let's
+call it final balance", and, asked which side to subtract, "show both". He is right for the
+audience. Jorik approved a number, and the question a client takes away is how much of *that*
+number was spent — not how it compares to a forecast Anima recalculates on every page load.
+Budget variance still carries the forward-looking comparison, so the strip now reads
+plan-against-approval on the left and actual-against-approval on the right.
+**Why two:** they answer the same question at different distances from the bank. Invoiced is the
+conservative one mid-show, counting money committed before it leaves; paid is the true one at
+the end. They converge when the last invoice is settled, which is the moment the figure stops
+moving.
+
+## 2026-10-12 — "Nothing unpaid" is not the same as "finished paying"
+**Decision:** the Final balance tiles are amber until **all three** hold — something has been
+invoiced, nothing is outstanding, and every staffing slot with a real person in it has an
+invoice against it — and green only then. Placeholder slots are skipped.
+**Why:** MSD today has no invoices at all, so Unpaid is 0.00. A rule that went green on
+"nothing unpaid" would have declared the show finished and the balance final on a project
+nobody has billed a penny against — Lesson 11 in its most expensive form, since this is the
+figure that goes in front of the client. David's own phrasing carried the answer: "green once
+the last invoice has been paid (linked to each slot)".
+**Why placeholders are skipped:** an unfilled slot is work nobody did, so no invoice will ever
+arrive for it. Requiring one would put "final" permanently out of reach on any show planned
+more generously than it was staffed.
+**Consequence:** when it is not final the tile says what is blocking it — "nothing invoiced
+yet", "3 positions not invoiced yet", or "waiting on the last payment" — rather than only
+withholding the green. The amber is the same `--warn-tint` the pending staffing slots use, so
+"not settled yet" reads identically on both screens.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

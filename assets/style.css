@@ -1666,6 +1666,18 @@ svg.trend { margin: 0; }
 }
 .timer-drop:hover:not(:disabled) { color: var(--danger); background: none; }
 
+/* The two Final balance tiles on Finance Overview (David, 2026-10-12).
+   Amber while the show is still being invoiced and settled, green once it is
+   really over. Deliberately the SAME --warn-tint the pending staffing slots use
+   (.slot-inplay), so "not settled yet" reads identically wherever it appears,
+   and subtle enough that the figure stays the loudest thing in the tile. */
+.dash-strip > .tile-pending { background: var(--warn-tint); }
+.dash-strip > .tile-final   { background: var(--ok-tint); }
+/* The strip's own padding sits on the row, so a tinted tile needs its own or the
+   colour runs flush against the number. */
+.dash-strip > .tile-pending,
+.dash-strip > .tile-final { padding: 6px 10px; border-radius: 5px; margin: -6px 0; }
+
 /* Status-change log on the dashboard. */
 .phase-head { margin: 18px 0 6px; font-size: 14px; }
 .activity-table td { vertical-align: middle; }
