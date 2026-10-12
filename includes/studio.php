@@ -64,13 +64,6 @@ function studio_project_id(PDO $pdo): int {
     return $p ? (int)$p['id'] : 0;
 }
 
-/** Is this project the Studio? Takes a row or an id. */
-function is_studio_project($project, ?PDO $pdo = null): bool {
-    if (is_array($project)) return !empty($project['is_studio']);
-    if ($pdo === null) return false;
-    return (int)$project > 0 && (int)$project === studio_project_id($pdo);
-}
-
 /**
  * A SQL fragment that keeps the Studio out of a list of projects.
  *
@@ -120,79 +113,18 @@ function studio_where_sql(PDO $pdo, string $alias = 'p'): string {
     return $frag === '' ? '' : ' WHERE' . substr($frag, 4);
 }
 
-/**
- * How many cards are sitting with no project at all.
- *
- * Drawn on Studio Tasks so the offer to file them is only made when there is
- * something to file — an action that always claims "move 0 cards" teaches people
- * to ignore it.
- */
-function unfiled_ticket_count(PDO $pdo): int {
-    if (!column_exists($pdo, 'tickets', 'id')) return 0;
-    return (int)$pdo->query(
-        'SELECT COUNT(*) FROM tickets WHERE project_id IS NULL AND archived = 0'
-    )->fetchColumn();
-}
-
-/**
- * Move every unfiled card into the Studio.
- *
- * David, 2026-10-12: "how can I adjust the project of the current tasks without
- * no project to be the global/studio wide task?"
- *
- * ⚠ EACH CARD GOES THROUGH move_ticket_to_project(), ONE AT A TIME, rather than
- * one UPDATE over the lot. That function is what gives an unfiled card a `seq`
- * (so it stops reading as "#21" and becomes "STUDIO-4") and drops it into the
- * target's first board column (so it is not invisible on arrival). A bulk UPDATE
- * of project_id alone would move the rows and leave every one of them with
- * seq 0 and no status — on the board, in the wrong column, with the wrong
- * reference, and nothing to say why.
- *
- * ⚠ NO TRANSACTION HERE, and that is deliberate rather than an oversight.
- * move_ticket_to_project() opens its own, and MySQL cannot nest them — the inner
- * beginTransaction() throws, so wrapping the loop would have broken the one
- * action this function exists for. (Caught by tools/check_php_blocks.py, which
- * tests for exactly this, before it ever ran.)
- *
- * Nothing is lost by leaving it out, because the operation is IDEMPOTENT AND
- * RESUMABLE: each card's move is atomic on its own, and a card that has already
- * moved is no longer unfiled, so it is not picked up again. If the batch fails
- * halfway, the cards that moved are correctly filed and the rest are still
- * sitting there waiting, with the button still offering to move them.
- *
- * @return array [moved count, message]
- */
-function file_unfiled_to_studio(PDO $pdo): array {
-    // Required HERE rather than at the top of the file: nine screens include
-    // this file only for studio_exclude_sql(), and none of them should drag the
-    // whole ticket layer in to get a WHERE clause.
-    require_once __DIR__ . '/tickets.php';
-
-    $studioId = studio_project_id($pdo);
-    if ($studioId <= 0) {
-        throw new RuntimeException('There is no Studio yet — migration 045 has not been applied.');
-    }
-
-    $ids = $pdo->query(
-        'SELECT id FROM tickets WHERE project_id IS NULL AND archived = 0 ORDER BY id'
-    )->fetchAll(PDO::FETCH_COLUMN);
-    if (!$ids) return [0, 'There are no unfiled cards to move.'];
-
-    // Counted as they go, so a failure part way through can say how far it got
-    // rather than claiming none of it happened.
-    $n = 0;
-    foreach ($ids as $id) {
-        try {
-            move_ticket_to_project($pdo, (int)$id, $studioId);
-            $n++;
-        } catch (Throwable $e) {
-            throw new RuntimeException(
-                $n . ' card' . ($n === 1 ? '' : 's') . ' moved before this stopped it: '
-                . $e->getMessage() . ' The rest are still unfiled, so you can run it again.'
-            );
-        }
-    }
-
-    return [$n, $n . ' card' . ($n === 1 ? '' : 's') . ' moved to the Studio. '
-             . ($n === 1 ? 'It now has' : 'They now have') . ' a reference and a place on the board.'];
-}
+// ⚠ THE BULK "MOVE THEM ALL TO THE STUDIO" HELPERS WERE REMOVED ON 2026-10-12,
+// hours after they were written. David: "instead of clicking for the ones that
+// don't have a project, make sure a dropdown is always available in this view
+// for the tasks that don't have a project assigned yet."
+//
+// He is right, and his own list is the proof: "Confirm actual FCM/FIFA deadline
+// with Corey" and "Address staffing gaps on FCM project" are FCM's work. One
+// button would have swept both into the Studio, and a card filed against the
+// wrong show is harder to find than one filed against nothing — the wrong one
+// looks handled.
+//
+// So filing is per card, from the dropdown in alltasks.php, which calls
+// move_ticket_to_project() directly. file_unfiled_to_studio() and
+// unfiled_ticket_count() went with the button rather than being left here
+// uncalled.

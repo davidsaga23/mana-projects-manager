@@ -29,24 +29,48 @@ require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcr
 require_once __DIR__ . '/includes/studio.php';
 require_login();
 
-// --- file every unfiled card into the Studio --------------------------------
+// --- file one unfiled card onto a project -----------------------------------
 //
-// David, 2026-10-12: "how can I adjust the project of the current tasks without
-// no project to be the global/studio wide task?"
+// David, 2026-10-12: "instead of clicking for the ones that don't have a project,
+// make sure a dropdown is always available in this view for the tasks that don't
+// have a project assigned yet."
 //
-// ⚠ THIS IS AN OFFER, NEVER AUTOMATIC. A card with no project is still a valid
-// card (migration 041, and the 2026-10-07 decision that argued for it): capturing
-// work before deciding where it goes is the point. What changed is that there is
-// now somewhere deliberate to put the ones that belong to no show — so this is a
-// button somebody presses, not a rule that fires.
-if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_to_studio'])) {
+// ⚠ THIS REPLACED A BULK "MOVE THEM ALL TO THE STUDIO" BUTTON, and David is
+// right that it was the wrong tool. His own list proves it: "Confirm actual
+// FCM/FIFA deadline with Corey" and "Address staffing gaps on FCM project" are
+// FCM's work, not the studio's. A single button would have filed them under the
+// Studio in one press, and a card filed against the wrong show is harder to find
+// than one filed against nothing — the wrong one looks handled. That sentence is
+// from the 2026-10-07 decision and it argues for per-card choice here.
+//
+// ⚠ AND IT IS THE ONE CONTROL THIS SCREEN IS ALLOWED. The header says this page
+// carries no controls on purpose, because a status picker here would duplicate
+// the board. A PROJECT picker on an UNFILED card duplicates nothing: a card with
+// no project is on no board at all, so this list is the only place it can be
+// acted on. Filed rows keep plain text and get no picker — those belong to a
+// board, and the board is where they are changed.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_project'])) {
     try {
-        [$n, $said] = file_unfiled_to_studio($pdo);
-        flash($n > 0 ? 'ok' : 'warn', $said);
+        $tid = (int)($_POST['ticket_id'] ?? 0);
+        $pid = (int)($_POST['project_id'] ?? 0);
+        if ($tid <= 0 || $pid <= 0) throw new RuntimeException('Pick a project to file it on.');
+        // move_ticket_to_project() is what grants the card a seq, so it stops
+        // reading as "#21", and drops it into the target's first column so it is
+        // visible the moment it arrives.
+        // ⚠ IT REPORTS FAILURE, IT DOES NOT THROW. move_ticket_to_project()
+        // catches its own exception and returns ['ok' => false, 'said' => ...].
+        // Reading only the message and flashing 'ok' would have told somebody
+        // their card was filed when it was not — the failure class this codebase
+        // keeps paying for, on the one action this screen exists to perform.
+        $r = move_ticket_to_project($pdo, $tid, $pid);
+        flash(!empty($r['ok']) ? 'ok' : 'err', (string)($r['said'] ?? 'The card was not moved.'));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
-    header('Location: alltasks.php');
+    // Read straight from the query string: $showDone is assigned further down,
+    // AFTER this handler, so using it here would be an undefined variable and
+    // would silently drop the "include finished work" view on every save.
+    header('Location: alltasks.php' . ((($_GET['done'] ?? '') === '1') ? '?done=1' : ''));
     exit;
 }
 
@@ -164,23 +188,21 @@ require __DIR__ . '/includes/header.php';
         ? 'hide finished work' : 'include finished work' ?></a>
   </p>
 
-<?php // ⚠ OFFERED ONLY WHEN THERE IS SOMETHING TO ACCEPT. A button that always
-      // says "move 0 cards" teaches people to stop reading it, and this one
-      // rewrites the project, reference and status of every card it touches.
-      //
-      // It is also NOT a cleanup the system does on its own: an unfiled card is
-      // still a legitimate card, and filing it is a decision about where the
-      // work belongs. The button states what it will do before it does it.
-      if (can_edit() && $unfiled > 0 && $studioId): ?>
-  <form method="post" class="inline-form" style="margin:-6px 0 14px;">
-    <input type="hidden" name="file_to_studio" value="1">
-    <button type="submit" class="secondary" data-confirm-count="<?= (int)$unfiled ?>"
-            onclick="return confirm('Move <?= (int)$unfiled ?> unfiled card<?= $unfiled === 1 ? '' : 's' ?> into the Studio?\n\nEach one gets a STUDIO reference and lands in the first column of the studio board. Cards already on a show are not touched.')">
-      Move <?= (int)$unfiled ?> unfiled card<?= $unfiled === 1 ? '' : 's' ?> into the Studio
-    </button>
-    <span class="muted small">they keep their title, owner, priority and thread — only the project changes</span>
-  </form>
-<?php endif; ?>
+
+
+  <?php
+  // Where an unfiled card can go. Archived shows are left out — filing today's
+  // work onto a finished show is almost always a mis-click — and the Studio is
+  // put FIRST because it is the reason this picker exists: it is the home for the
+  // cards that belong to no show at all. Read once for the whole table.
+  $fileTargets = [];
+  if (can_edit()) {
+      $order = studio_available($pdo) ? 'is_studio DESC, code' : 'code';
+      $fileTargets = $pdo->query(
+          "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY " . $order
+      )->fetchAll();
+  }
+  ?>
 
   <?php // ⚠ CARDS WITH NO PROJECT LIVE HERE, and nowhere else. A project's board
         // filters on project_id, so an unfiled card is on no board at all — this
@@ -212,9 +234,30 @@ require __DIR__ . '/includes/header.php';
               <span class="ctx-chip ctx-platform"><?= e(ticket_about_label(TICKET_ABOUT_PLATFORM)) ?></span>
             <?php endif; ?>
           </td>
-          <td><?= ($r['project_code'] ?? '') !== ''
-                ? e($r['project_code'])
-                : '<span class="warn-text">no project</span>' ?></td>
+          <?php // ⚠ THE SELECTED OPTION READS "no project", which is not cosmetic.
+                // gridtools.js takes a cell's filter and sort value from its
+                // <select>'s chosen option TEXT when there is one (assets/gridtools.js),
+                // so the Project column's filter keeps offering "no project" as a
+                // choice exactly as it did when this cell was a span. Changing that
+                // first option's wording silently drops a filter value. ?>
+          <td><?php if (($r['project_code'] ?? '') !== ''): ?>
+                <?= e($r['project_code']) ?>
+              <?php elseif ($fileTargets): ?>
+                <form method="post" class="inline-form" style="margin:0;">
+                  <input type="hidden" name="set_ticket_project" value="1">
+                  <input type="hidden" name="ticket_id" value="<?= (int)$r['id'] ?>">
+                  <select name="project_id" onchange="this.form.submit()"
+                          class="warn-text proj-pick"
+                          title="File this card on a show, or on the Studio">
+                    <option value="" selected>no project</option>
+                    <?php foreach ($fileTargets as $t): ?>
+                      <option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </form>
+              <?php else: ?>
+                <span class="warn-text">no project</span>
+              <?php endif; ?></td>
           <td class="muted small"><?= $r['type'] === 'ticket' ? 'Ticket' : 'Task' ?></td>
           <td><span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
               <?= e($r['status_name'] ?? 'no status') ?></span></td>
@@ -252,7 +295,13 @@ require __DIR__ . '/includes/header.php';
           if (!PICK[col]) return null;
           var seen = {}, out = [];
           Array.prototype.forEach.call(table.tBodies[0].rows, function (tr) {
-            var v = (tr.cells[col].textContent || '').trim();
+            // ⚠ cellText(), NOT textContent. Since the Project column gained a
+            // <select> on unfiled rows, textContent returns every option run
+            // together, "no projectSTUDIOMSDFCM", which would have filled this
+            // filter with one nonsense entry and quietly LOST "no project" as a
+            // choice, on the very column that exists to find those cards.
+            // GridTools.cellText reads a select's chosen option instead.
+            var v = window.GridTools.cellText(tr.cells[col]);
             if (v === '' || seen[v]) return;
             seen[v] = true;
             out.push({ value: v, label: v });

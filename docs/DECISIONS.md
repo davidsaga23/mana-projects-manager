@@ -3526,6 +3526,28 @@ transaction of its own: `move_ticket_to_project()` already opens one and MySQL c
 is idempotent and resumable: a card that has moved is no longer unfiled, so a failed batch can
 simply be run again.
 
+## 2026-10-12 — Filing is per card, from a dropdown, not one bulk button
+**Supersedes "Filing unfiled cards is an offer, never automatic"** earlier the same day. The
+offer stands; the control was wrong.
+**Decision:** every row on Studio Tasks with no project carries a project `<select>` that files
+that one card. The bulk "move them all to the Studio" button and its two helpers are removed.
+**Why:** David, 2026-10-12: "instead of clicking for the ones that don't have a project, make
+sure a dropdown is always available in this view for the tasks that don't have a project
+assigned yet." His own list is the argument — "Confirm actual FCM/FIFA deadline with Corey" and
+"Address staffing gaps on FCM project" are FCM's work. One button would have swept both into the
+Studio, and *a card filed against the wrong show is harder to find than one filed against
+nothing: the wrong one looks handled.* That sentence is from the 2026-10-07 entry, and it argues
+for per-card choice.
+**Why this screen may carry a control at all,** when its own header says it carries none on
+purpose: that rule exists because a status picker here would duplicate the board. A PROJECT
+picker on an UNFILED card duplicates nothing — a card with no project is on no board, so this
+list is the only place it can be acted on. Filed rows keep plain text and get no picker.
+**Consequence:** the selected option must read "no project". `gridtools.js` takes a cell's
+filter and sort value from a `<select>`'s chosen option text, so that wording is what keeps
+"no project" available in the Project filter — the one filter that finds these cards.
+`alltasks.php` passes its own `options:` callback, which read `textContent` and would have
+returned "no projectSTUDIOMSDFCM"; it now uses `GridTools.cellText`.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

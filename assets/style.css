@@ -1671,6 +1671,15 @@ svg.trend { margin: 0; }
    really over. Deliberately the SAME --warn-tint the pending staffing slots use
    (.slot-inplay), so "not settled yet" reads identically wherever it appears,
    and subtle enough that the figure stays the loudest thing in the tile. */
+/* The project picker on an unfiled card in Studio Tasks (David, 2026-10-12).
+   ⚠ WIDE ENOUGH FOR "no project". A select sizes to its chosen option, and the
+   resting one is the longest text it ever shows, so without a floor it rendered
+   as "no projec" with the rest under the arrow - on the one cell whose job is to
+   say that a card has no home yet. */
+.alltasks-table .proj-pick {
+  min-width: 118px; padding: 2px 4px; font-size: 12.5px; width: auto;
+}
+
 .dash-strip > .tile-pending { background: var(--warn-tint); }
 .dash-strip > .tile-final   { background: var(--ok-tint); }
 /* The strip's own padding sits on the row, so a tinted tile needs its own or the
