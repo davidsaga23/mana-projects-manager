@@ -3548,6 +3548,26 @@ filter and sort value from a `<select>`'s chosen option text, so that wording is
 `alltasks.php` passes its own `options:` callback, which read `textContent` and would have
 returned "no projectSTUDIOMSDFCM"; it now uses `GridTools.cellText`.
 
+## 2026-10-14 — A model's output shape is a preference, not a guarantee
+**Decision:** `ai_task_items()` accepts five shapes of reply — a bare array, a fenced array, an
+object wrapping one under `tasks`/`items`/`action_items`, a single unwrapped item, and one
+object per line — instead of only `[ ... ]`.
+**Why:** David uploaded a real transcript on 2026-10-14 and lost the whole meeting. The reply
+was `{"type":"ticket","title":"Investigate and fix: asset file from Donovan cannot be opened in
+Maya"...}` — a perfectly good action item returned as a bare object because the meeting produced
+only one. The extractor looked for the first `[` and the last `]`, found neither, and refused
+everything. The system prompt *does* ask for an array, and it came back like this anyway.
+**The lesson:** being strict about a model's output FORMAT costs somebody their meeting, while
+being strict about its CONTENT costs nothing. Every field was already validated to death —
+known values only, cut to column widths, an owner that must match somebody really on the show —
+so accepting more shapes adds no risk: an object with no usable title is dropped by the same
+loop that drops a bad one inside an array. The prompt now also states the array rule explicitly
+for the single-item case, as belt and braces rather than as the fix.
+**Also:** "the reply was cut off" and "that is not a list" were one message and are now two.
+Anthropic reports `stop_reason: max_tokens`, so a long meeting is told to be split in half
+rather than sent looking for a fault that is not there. `max_tokens` went from 8,000 to 16,000;
+a cap costs nothing unless it is reached.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
