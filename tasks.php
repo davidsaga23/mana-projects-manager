@@ -51,96 +51,27 @@ $ready = column_exists($pdo, 'tickets', 'id');
 
 // --- create -----------------------------------------------------------------
 if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
-    $title = trim($_POST['title'] ?? '');
-    if ($title === '') {
-        flash('err', 'A card needs a title, nothing was created.');
-        finish_post($selfUrl);
-    }
-
-    $type = ($_POST['type'] ?? 'task') === 'ticket' ? 'ticket' : 'task';
-    // The step select can say "platform" instead of a step id; this splits the
-    // one posted value into the two columns that store it.
-    $aboutReady = ticket_about_available($pdo);
-    $about = ticket_about_from_post($_POST['step_id'] ?? '');
-    $crewId = !empty($_POST['assigned_crew_id']) ? (int)$_POST['assigned_crew_id'] : null;
-
-    // A ticket is a problem somebody owns. Without an assignee it sits unowned
-    // and nobody is told about it — checked here as well as in the form, so a
-    // hand-made POST cannot slip past.
-    if ($type === 'ticket' && !$crewId) {
-        flash('err', 'A ticket needs somebody to own it, nothing was created. Pick who should look at it.');
-        finish_post($selfUrl);
-    }
-
-    $statusId = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
-    $priority = in_array($_POST['priority'] ?? '', ticket_priorities(), true) ? $_POST['priority'] : 'medium';
-
-    $ticketId = null;
+    // ⚠ THE WORK MOVED TO create_ticket() ON 2026-10-16, and this page now asks
+    // for it like anybody else. It was ninety lines inline here; Studio Tasks
+    // needed the same rules, and copying them would have meant two answers to
+    // "what is a new card" that drift apart the first time one is fixed.
     try {
-        $pdo->beginTransaction();
-        // seq is read and written inside the transaction, and the table carries
-        // UNIQUE (project_id, seq) — so two people filing at once collide loudly
-        // rather than quietly sharing a reference number.
-        $seq = next_ticket_seq($pdo, $projectId);
-        $pdo->prepare(
-            'INSERT INTO tickets
-               (project_id, seq, type, title, description, status_id, priority,
-                assigned_crew_id, due_date, shot_id, asset_id, step_id, created_by'
-             . ($aboutReady ? ', about' : '') . ')
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?'
-             . ($aboutReady ? ', ?' : '') . ')'
-        )->execute(array_merge([
-            $projectId, $seq, $type, $title,
-            trim($_POST['description'] ?? '') ?: null,
-            $statusId, $priority, $crewId,
-            !empty($_POST['due_date']) ? $_POST['due_date'] : null,
-            resolve_shot_id($pdo, $projectId, $_POST['shot_label'] ?? ''),
-            resolve_asset_id($pdo, $projectId, $_POST['asset_label'] ?? ''),
-            $about['step_id'],
-            $userId ?: null,
-        ], $aboutReady ? [$about['about']] : []));
-        $ticketId = (int)$pdo->lastInsertId();
-        $pdo->commit();
+        $made = create_ticket(
+            $pdo, $projectId, $_POST,
+            !empty($_FILES['attachments']) ? normalize_files_array($_FILES['attachments']) : [],
+            $userId
+        );
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        flash('err', 'That card could not be saved: ' . $e->getMessage());
+        flash('err', $e->getMessage());
         finish_post($selfUrl);
     }
 
-    $statusRow = $statusId ? (statuses_by_id($pdo, $projectId)[$statusId] ?? null) : null;
-    sync_ticket_completion($pdo, $ticketId, $statusRow);
-
-    // Report what actually happened — including what was typed but not matched.
-    // A shot label nobody recognised silently becoming "no shot" is exactly the
-    // unmatched-name failure the alias layer exists to prevent.
-    $notes = [];
-    $typedShot = trim($_POST['shot_label'] ?? '');
-    $typedAsset = trim($_POST['asset_label'] ?? '');
-    if ($typedShot !== '' && !resolve_shot_id($pdo, $projectId, $typedShot)) {
-        $notes[] = 'No shot called "' . $typedShot . '" in this project, so the card was not linked to one.';
-    }
-    if ($typedAsset !== '' && !resolve_asset_id($pdo, $projectId, $typedAsset)) {
-        $notes[] = 'No asset called "' . $typedAsset . '" in this project, so the card was not linked to one.';
-    }
-
-    if (!empty($_FILES['attachments'])) {
-        $res = save_ticket_attachments(
-            $pdo, normalize_files_array($_FILES['attachments']), $ticketId, null, $userId
-        );
-        if ($res['saved'])  $notes[] = $res['saved'] . ' file(s) attached.';
-        if ($res['errors']) $notes[] = implode(' ', $res['errors']);
-    }
-    if ($crewId) {
-        [, $mailMsg] = notify_assignee($pdo, $ticketId, 'assigned');
-        $notes[] = $mailMsg;
-    }
-
-    $code = $project['code'] . '-' . $seq;
-    flash('ok', ucfirst($type) . ' ' . $code . ' created. ' . trim(implode(' ', $notes)));
+    flash('ok', ucfirst($made['type']) . ' ' . $made['ref'] . ' created. '
+              . trim(implode(' ', $made['notes'])));
     // A new ticket opens its own page — that is where its thread and attachments
     // are, and it is the link people paste to each other. A plain task goes back
     // to the board.
-    finish_post($type === 'ticket' ? 'ticket.php?id=' . $ticketId : $selfUrl);
+    finish_post($made['type'] === 'ticket' ? 'ticket.php?id=' . $made['id'] : $selfUrl);
 }
 
 // --- restore from the archive ----------------------------------------------

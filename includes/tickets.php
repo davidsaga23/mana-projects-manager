@@ -786,3 +786,128 @@ function crew_color_map(array $crew): array {
     }
     return $out;
 }
+
+/**
+ * Create one card, from whichever screen asked.
+ *
+ * David, 2026-10-16: "ok but I still can't create task from this view." The
+ * board has had a create dialog since migration 017; Studio Tasks had only a
+ * button through to it, and a cross-project list is exactly where a card that
+ * belongs to no show gets thought of.
+ *
+ * ⚠ LIFTED OUT OF tasks.php RATHER THAN COPIED. Everything below was inline in
+ * that one page. A second copy in alltasks.php would be two implementations of
+ * "what a new card is" — the seq race, the ticket-needs-an-owner rule, the
+ * platform/step split, the unmatched-name reporting — and they would drift the
+ * first time one of them was fixed. Same reasoning the Studio project itself was
+ * argued from on 2026-10-12.
+ *
+ * ⚠ $projectId IS NULLABLE, and that is the point of calling it from a
+ * cross-project screen. Capture-first (migration 041) says a card may exist
+ * before anybody decides which show it is for, so everything project-shaped here
+ * is skipped rather than faked when there is no project: no shot or asset can be
+ * resolved, no status vocabulary exists to validate against, and next_ticket_seq()
+ * returns 0 so ticket_ref() falls back to "#id".
+ *
+ * Returns ['id', 'seq', 'type', 'ref', 'notes' => string[]]. The notes are things
+ * that happened but were not asked for — a shot name nobody recognised, files
+ * attached, who was emailed — and the caller is expected to say them. A typed
+ * shot label silently becoming "no shot" is the unmatched-name failure the alias
+ * layer exists to prevent.
+ *
+ * @throws RuntimeException with a sentence fit to show, having written nothing
+ */
+function create_ticket(PDO $pdo, ?int $projectId, array $in, array $files = [],
+                       int $userId = 0): array {
+    $projectId = ($projectId !== null && $projectId > 0) ? $projectId : null;
+
+    $title = trim((string)($in['title'] ?? ''));
+    if ($title === '') throw new RuntimeException('A card needs a title, nothing was created.');
+
+    $type = (($in['type'] ?? 'task') === 'ticket') ? 'ticket' : 'task';
+    $aboutReady = ticket_about_available($pdo);
+    $about = ticket_about_from_post($in['step_id'] ?? '');
+    $crewId = !empty($in['assigned_crew_id']) ? (int)$in['assigned_crew_id'] : null;
+
+    // A ticket is a problem somebody owns. Without an assignee it sits unowned
+    // and nobody is told about it — checked here as well as in the form, so a
+    // hand-made POST cannot slip past.
+    if ($type === 'ticket' && !$crewId) {
+        throw new RuntimeException('A ticket needs somebody to own it, nothing was created. '
+                                 . 'Pick who should look at it.');
+    }
+
+    $statusId = !empty($in['status_id']) ? (int)$in['status_id'] : null;
+    $priority = in_array($in['priority'] ?? '', ticket_priorities(), true)
+        ? (string)$in['priority'] : 'medium';
+
+    // Only meaningful within a project: both resolvers look the name up on one
+    // show, and there is no show to look on.
+    $shotId  = $projectId ? resolve_shot_id($pdo, $projectId, $in['shot_label'] ?? '') : null;
+    $assetId = $projectId ? resolve_asset_id($pdo, $projectId, $in['asset_label'] ?? '') : null;
+
+    $ticketId = null;
+    $seq = 0;
+    try {
+        $pdo->beginTransaction();
+        // seq is read and written inside the transaction, and the table carries
+        // UNIQUE (project_id, seq) — so two people filing at once collide loudly
+        // rather than quietly sharing a reference number.
+        $seq = next_ticket_seq($pdo, (int)$projectId);
+        $pdo->prepare(
+            'INSERT INTO tickets
+               (project_id, seq, type, title, description, status_id, priority,
+                assigned_crew_id, due_date, shot_id, asset_id, step_id, created_by'
+             . ($aboutReady ? ', about' : '') . ')
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?'
+             . ($aboutReady ? ', ?' : '') . ')'
+        )->execute(array_merge([
+            $projectId, $seq, $type, $title,
+            trim((string)($in['description'] ?? '')) ?: null,
+            $statusId, $priority, $crewId,
+            !empty($in['due_date']) ? $in['due_date'] : null,
+            $shotId, $assetId, $about['step_id'],
+            $userId ?: null,
+        ], $aboutReady ? [$about['about']] : []));
+        $ticketId = (int)$pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw new RuntimeException('That card could not be saved: ' . $e->getMessage());
+    }
+
+    $statusRow = ($statusId && $projectId)
+        ? (statuses_by_id($pdo, $projectId)[$statusId] ?? null) : null;
+    sync_ticket_completion($pdo, $ticketId, $statusRow);
+
+    $notes = [];
+    $typedShot  = trim((string)($in['shot_label'] ?? ''));
+    $typedAsset = trim((string)($in['asset_label'] ?? ''));
+    if ($projectId && $typedShot !== '' && !$shotId) {
+        $notes[] = 'No shot called "' . $typedShot . '" in this project, so the card was not linked to one.';
+    }
+    if ($projectId && $typedAsset !== '' && !$assetId) {
+        $notes[] = 'No asset called "' . $typedAsset . '" in this project, so the card was not linked to one.';
+    }
+
+    if ($files) {
+        $res = save_ticket_attachments($pdo, $files, $ticketId, null, $userId);
+        if ($res['saved'])  $notes[] = $res['saved'] . ' file(s) attached.';
+        if ($res['errors']) $notes[] = implode(' ', $res['errors']);
+    }
+    if ($crewId) {
+        [, $mailMsg] = notify_assignee($pdo, $ticketId, 'assigned');
+        $notes[] = $mailMsg;
+    }
+
+    // The reference as people will see it, built the one way it is ever built.
+    $code = '';
+    if ($projectId) {
+        $q = $pdo->prepare('SELECT code FROM projects WHERE id = ?');
+        $q->execute([$projectId]);
+        $code = (string)$q->fetchColumn();
+    }
+    $ref = ticket_ref(['project_code' => $code, 'seq' => $seq, 'id' => $ticketId]);
+
+    return ['id' => $ticketId, 'seq' => $seq, 'type' => $type, 'ref' => $ref, 'notes' => $notes];
+}

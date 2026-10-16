@@ -29,6 +29,77 @@ require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcr
 require_once __DIR__ . '/includes/studio.php';
 require_login();
 
+$userId = (int)($_SESSION['user_id'] ?? 0);
+
+// Where a card can go: every live show, plus the Studio. Archived shows are left
+// out — filing today's work onto a finished show is almost always a mis-click —
+// and the Studio is put FIRST because it is the reason this list exists: it is
+// the home for the cards that belong to no show at all.
+//
+// ⚠ READ ONCE, UP HERE, FOR BOTH CONTROLS. The per-row Project picker and the
+// New task dialog are the same choice asked in two places, and a second query
+// for the second one could order them differently or include an archived show in
+// one and not the other. It is also out of the "this page has rows" branch on
+// purpose: the create dialog has to exist on an EMPTY Studio Tasks, which is
+// exactly when somebody wants to add the first card.
+$fileTargets = [];
+if (can_edit()) {
+    $order = studio_available($pdo) ? 'is_studio DESC, code' : 'code';
+    $fileTargets = $pdo->query(
+        "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY " . $order
+    )->fetchAll();
+}
+
+// --- create a card from here ------------------------------------------------
+//
+// David, 2026-10-16: "ok but I still can't create task from this view." The
+// Studio Tasks tab had a button through to the Studio's board and nothing else,
+// which answered a question he had not asked. A cross-project list is where a
+// card that belongs to no show is thought of in the first place.
+//
+// ⚠ TASKS ONLY, DELIBERATELY. A ticket is a problem attached to a shot, an
+// asset or a pipeline step on ONE show, and those pickers cannot be drawn until
+// a project is chosen — a project selector that rebuilt three other selectors
+// under it is the board, and the board already exists. The dialog says so and
+// links there.
+//
+// The card is created through the same create_ticket() the board uses, so the
+// seq race, the status rules and the assignee notification cannot drift between
+// the two screens.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
+    $newProject = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+
+    // ⚠ THE STATUS IS CHOSEN HERE, NOT ON THE FORM. Board columns are a
+    // project's OWN vocabulary, so a status picker would have to be rebuilt
+    // every time the project dropdown changed. A new card starts in its
+    // project's first column, which is what dragging it onto the board would
+    // have done anyway; an unfiled card gets no status because there is no
+    // vocabulary it could belong to.
+    $startStatus = null;
+    if ($newProject) {
+        [$cols] = ticket_board_columns($pdo, $newProject);
+        if ($cols) $startStatus = (int)$cols[0]['id'];
+    }
+
+    try {
+        $made = create_ticket($pdo, $newProject, [
+            'title'             => $_POST['title'] ?? '',
+            'description'       => $_POST['description'] ?? '',
+            'type'              => 'task',
+            'status_id'         => $startStatus,
+            'priority'          => $_POST['priority'] ?? 'medium',
+            'assigned_crew_id'  => $_POST['assigned_crew_id'] ?? null,
+            'due_date'          => $_POST['due_date'] ?? null,
+        ], [], $userId);
+        flash('ok', 'Task ' . $made['ref'] . ' created. ' . trim(implode(' ', $made['notes'])));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: alltasks.php');
+    exit;
+}
+
+
 // --- file one unfiled card onto a project -----------------------------------
 //
 // David, 2026-10-12: "instead of clicking for the ones that don't have a project,
@@ -150,6 +221,9 @@ require __DIR__ . '/includes/header.php';
         //
         // This page stays what its own header says it is: a view ACROSS the shows.
         $studioId = studio_project_id($pdo); ?>
+  <?php if (can_edit()): ?>
+    <button type="button" class="primary" onclick="openStudioCreate()">+ New task</button>
+  <?php endif; ?>
   <?php if ($studioId): ?>
     <a class="button" href="tasks.php?project=<?= $studioId ?>"
        title="The studio's own board, with columns and New task / New ticket">Studio board →</a>
@@ -189,20 +263,6 @@ require __DIR__ . '/includes/header.php';
   </p>
 
 
-
-  <?php
-  // Where an unfiled card can go. Archived shows are left out — filing today's
-  // work onto a finished show is almost always a mis-click — and the Studio is
-  // put FIRST because it is the reason this picker exists: it is the home for the
-  // cards that belong to no show at all. Read once for the whole table.
-  $fileTargets = [];
-  if (can_edit()) {
-      $order = studio_available($pdo) ? 'is_studio DESC, code' : 'code';
-      $fileTargets = $pdo->query(
-          "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY " . $order
-      )->fetchAll();
-  }
-  ?>
 
   <?php // ⚠ CARDS WITH NO PROJECT LIVE HERE, and nowhere else. A project's board
         // filters on project_id, so an unfiled card is on no board at all — this
@@ -272,7 +332,7 @@ require __DIR__ . '/includes/header.php';
 
   <p class="muted small">
     Cards are changed on the card itself, and the columns on a project's board are that
-    project's own statuses. This list only reads.
+    project's own statuses. Apart from creating one and filing it, this list only reads.
   </p>
 
   <?php // The same filter, sort and count the Artists and Shots grids carry.
@@ -322,6 +382,107 @@ require __DIR__ . '/includes/header.php';
     }());
   </script>
 
+<?php endif; ?>
+
+<?php // THE CREATE DIALOG. Outside every branch above, so it exists on an
+      // EMPTY Studio Tasks too — the moment somebody most wants to add a
+      // card is when there are none. It reads the same $fileTargets the
+      // per-row Project pickers do, so the two cannot offer different shows.
+      ?>
+<?php if (can_edit()): ?>
+<div id="studioCreate" class="modal" style="display:none;">
+  <div class="modal-box">
+    <h3>New task</h3>
+    <form method="post">
+      <input type="hidden" name="create" value="1">
+
+      <label>Title
+        <input name="title" id="studioCreateTitle" required placeholder="What needs doing?">
+      </label>
+      <label>Description
+        <textarea name="description" rows="3" placeholder="Details, links, notes…"></textarea>
+      </label>
+
+      <div class="modal-row">
+        <?php // ⚠ THE STUDIO IS FIRST AND SELECTED, because this is the Studio
+              // Tasks screen and a card thought of here usually belongs to the
+              // studio rather than to a show. "No project yet" is kept as a real
+              // choice: capture-first (migration 041) says a card may exist
+              // before anybody decides, and removing the option would quietly
+              // undo that. ?>
+        <label>Project
+          <select name="project_id">
+            <?php foreach ($fileTargets as $t): ?>
+              <option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?> <?= e($t['name']) ?></option>
+            <?php endforeach; ?>
+            <option value="">no project yet</option>
+          </select>
+        </label>
+        <label>Priority
+          <select name="priority">
+            <?php foreach (ticket_priorities() as $p): ?>
+              <option value="<?= $p ?>" <?= $p === 'medium' ? 'selected' : '' ?>><?= ucfirst($p) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-row">
+        <?php // Everybody active, not one show's crew: the project is not chosen
+              // until the dropdown above is, and a card can be handed to somebody
+              // before it has a show at all. Same list ticket.php falls back to
+              // for an unfiled card. ?>
+        <label>Owner
+          <select name="assigned_crew_id">
+            <option value="">nobody</option>
+            <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
+                                          FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label>Due
+          <input type="date" name="due_date">
+        </label>
+      </div>
+
+      <p class="muted small">
+        It starts in the first column of whichever board you picked — no status if you
+        leave it unfiled. Need a <strong>ticket</strong> instead, against a shot, an asset or a
+        pipeline step? Those live on a show's own board
+        <?php if ($studioId): ?>
+          (<a href="tasks.php?project=<?= $studioId ?>">the Studio's is here</a>)<?php endif; ?>,
+        where the pickers for them can exist.
+      </p>
+
+      <div class="modal-actions">
+        <button type="button" class="secondary"
+                onclick="document.getElementById('studioCreate').style.display='none';">Cancel</button>
+        <button type="submit">Create task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Small and local on purpose: assets/board.js owns the board's modals and is
+  // not loaded here, and pulling it in for one dialog would bring the drag and
+  // drop with it.
+  function openStudioCreate() {
+    var m = document.getElementById('studioCreate');
+    m.style.display = 'flex';
+    var t = document.getElementById('studioCreateTitle');
+    if (t) t.focus();
+  }
+  // Escape and a click on the backdrop close it, matching the board's modals so
+  // the two behave the same way.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.getElementById('studioCreate').style.display = 'none';
+  });
+  document.getElementById('studioCreate').addEventListener('mousedown', function (e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+</script>
 <?php endif; ?>
 
 </div>

@@ -3568,6 +3568,36 @@ Anthropic reports `stop_reason: max_tokens`, so a long meeting is told to be spl
 rather than sent looking for a fault that is not there. `max_tokens` went from 8,000 to 16,000;
 a cap costs nothing unless it is reached.
 
+## 2026-10-16 — A card can be created from Studio Tasks, and there is still one create
+**Decision:** Studio Tasks gets a **+ New task** dialog of its own. The ninety lines that
+made a card were lifted out of `tasks.php` into `create_ticket()` in `includes/tickets.php`,
+and both screens call it.
+**Why:** David, 2026-10-16: "ok but I still can't create task from this view." The 2026-10-12
+build gave the tab a button through to the Studio's board, which answered a question he had
+not asked. A cross-project list is where a card belonging to no show is thought of, and
+sending somebody to a board to write it down is the friction that keeps cards in notebooks.
+**Why extracted rather than copied:** a second copy would have been two answers to "what is a
+new card" — the seq race inside the transaction, the ticket-needs-an-owner rule, the
+platform-versus-step split, the unmatched-name reporting — and they would drift the first time
+one of them was fixed. `create_ticket()` takes a NULLABLE project id, which is what lets a
+cross-project screen call it at all: capture-first (migration 041) says a card may exist before
+anybody decides which show it is for, so everything project-shaped is skipped rather than faked.
+
+## 2026-10-16 — Studio Tasks creates tasks, not tickets
+**Decision:** the dialog on Studio Tasks makes plain tasks only. Tickets stay on a project's
+board, and the dialog says so and links there.
+**Why:** a ticket is a problem attached to a shot, an asset or a pipeline step on ONE show, and
+those three pickers cannot be drawn until a project is chosen. A project selector that rebuilt
+three other selectors beneath it IS the board, and the board already exists.
+**Consequence:** the status is chosen by the server, not offered on the form. Board columns are
+a project's own vocabulary, so a status picker would have to be rebuilt every time the project
+dropdown changed. A new card starts in its project's first column — what dragging it onto the
+board would have done anyway — and an unfiled card gets no status, because there is no
+vocabulary it could belong to.
+**Also:** the dialog and the list of destinations sit OUTSIDE the "this page has rows" branch.
+Both were inside it at first, which left the button rendering on an empty Studio Tasks with no
+dialog behind it — and an empty list is exactly when somebody wants to add the first card.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
