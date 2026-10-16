@@ -3373,7 +3373,7 @@ timer stops the first, logs it, and says so, because the alternative (refusing t
 makes people leave the first running while they move on, which is the one outcome that
 actually corrupts the figures. A timer running over 24 hours is refused rather than truncated:
 it means somebody forgot it on Friday, not that they worked a 24-hour day.
-**Not built:** the pomodoro rhythm David also mentioned. A pomodoro arranges attention in
+**Not built (built since, 2026-10-16, see below):** the pomodoro rhythm David also mentioned. A pomodoro arranges attention in
 fixed blocks; what the figures need is a measurement. The stopwatch is the primitive, and a
 chime can sit on top of it later without the stored shape changing — whereas building the
 blocks first would have left every hour rounded to twenty-five minutes nobody worked.
@@ -3648,6 +3648,37 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 **Consequence:** the thresholds are two named constants at the top of `includes/budgetpool.php`,
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
+
+## 2026-10-16 — Start on My tasks runs pomodoro cycles; only focus time is logged
+**Decision:** Start begins a 25-minute focus block instead of an open stopwatch. When it ends
+the 25 minutes are logged to the card and a 5-minute break starts (15 after every fourth
+block). Breaks are never logged. The next focus block waits for a click. Stopping a focus block
+early logs the minutes it actually ran. Migration 048 adds `phase` and `focus_round` to the
+same `time_timers` row, so one timer per person is still enforced by the schema.
+**Why:** David asked for the rhythm ("let's create pomodoro cycles instead of just letting the
+time run"). The 2026-10-08 entry deferred it so the hours would stay measured rather than
+rounded to blocks; that still holds, because a block stopped early logs real minutes, and the
+only figure the cycle caps is an overrun nobody was at the desk for.
+**Consequence:** the server settles a finished block (logs it, starts the break) whenever My
+tasks loads or a timer button is pressed, so a closed tab loses nothing; the browser is only
+the alarm (chime, desktop notification, countdown in the tab title). A block that ends while
+nobody is there logs exactly 25 minutes. Each block is its own `time_logs` row. A timer that
+was already running when 048 was applied stays an open stopwatch until it is stopped.
+**Overruns stay capped, by David's choice:** "if they forget to start the next cycle they can
+log time manually. If done the other way around they might step away or forget but the log
+will be made regardless."
+
+## 2026-10-16 — One clock: MySQL is told PHP's offset, and the studio runs on Pacific time
+**Decision:** `includes/db.php` runs `SET time_zone = '<PHP's current UTC offset>'` on every
+connection, and `config.example.php` names `America/Los_Angeles` (David: "the clock should be
+based in PST and it should allow you to log hours even after 6 pm").
+**Why:** PHP followed config.php while MySQL followed the host clock, six hours apart. In the
+evening MySQL's NOW() was already tomorrow, so `log_time()` refused timer and pomodoro hours as
+"in the future". An offset rather than a zone name because shared hosts rarely load MySQL's
+timezone tables; it is recomputed per request, so daylight saving moves both clocks together.
+**Consequence:** TIMESTAMP columns (created_at etc.) now display in local time. DATETIME values
+written with NOW() before the change keep the host time they were written with. The live zone
+is whatever the server's config.php says; changing it to Pacific is an edit there, not here.
 
 ## 2026-10-16 — Setup to active needs a sign-off, and the kick-off is kept for the postmortem
 **Decision:** choosing *active* for a project in setup (list dropdown, or Finish in the wizard) opens

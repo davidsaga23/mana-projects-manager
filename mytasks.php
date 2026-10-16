@@ -412,6 +412,17 @@ if ($ready && $myCrewId) {
 $today = date('Y-m-d');
 // Read once for the whole page. Every row asks "is it me?" against this, so a
 // query per row would be forty round trips to answer one question.
+// A focus block that ran out while nobody was looking is logged here, before
+// the cell is drawn, so the page always opens on the phase that is really
+// current. The message says what was logged, because it wrote to the ledger.
+if ($canTimer && $myCrewId) {
+    try {
+        $settled = pomodoro_settle($pdo, $myCrewId, $userId);
+        if ($settled !== '') flash('ok', $settled);
+    } catch (Throwable $e) {
+        flash('err', 'The focus block that just ended could not be logged: ' . $e->getMessage());
+    }
+}
 $timer = $canTimer ? running_timer($pdo, $myCrewId) : null;
 
 /**
@@ -439,6 +450,8 @@ function timer_cell(?array $timer, string $kind, int $id, int $projectId): strin
     $mine   = $timer && (int)($timer[$field] ?? 0) === $id;
     $off    = can_edit() ? '' : ' disabled';
 
+    if ($mine && ($timer['phase'] ?? null) !== null) return pomodoro_cell($timer, $field, $id, $projectId, $off);
+
     if ($mine) {
         // data-since carries the seconds already elapsed, counted by MySQL at
         // page load; the script at the foot of the page ticks it from there.
@@ -462,13 +475,69 @@ function timer_cell(?array $timer, string $kind, int $id, int $projectId): strin
     }
 
     $note = $timer ? ' This stops and logs the one already running.' : '';
+    global $pdo;
+    $what = pomodoro_available($pdo)
+          ? 'Start a ' . pomodoro_minutes('focus') . '-minute focus block on this. '
+            . 'Focus time is logged here; breaks are not.'
+          : 'Start timing this, and log the minutes when you stop.';
     return '<form method="post" class="inline-form timer-form" style="margin:0;">'
          . '<input type="hidden" name="timer" value="start">'
          . '<input type="hidden" name="' . $field . '" value="' . $id . '">'
          . '<input type="hidden" name="project_id" value="' . $projectId . '">'
          . '<button type="submit" class="timer-btn"' . $off
-         . ' title="Start timing this, and log the minutes when you stop.' . e($note) . '">'
+         . ' title="' . e($what . $note) . '">'
          . '▶ Start</button></form>';
+}
+
+/**
+ * The Timer cell on the row a pomodoro cycle is running on.
+ *
+ * Three states, and each one says plainly what pressing its button does to the
+ * hours, because that is the thing people will want to know:
+ *   focus       ■ Stop logs the minutes so far; drop throws this block away.
+ *   break       ▶ Focus cuts the break short; end finishes the cycle.
+ *   break over  ▶ Focus n/4 starts the next block; end finishes the cycle.
+ *
+ * data-left is the remaining seconds as MySQL counted them at page load, the
+ * same rule as the stopwatch's data-since: the script below counts down from it
+ * and never compares against the browser's own clock.
+ */
+function pomodoro_cell(array $timer, string $field, int $id, int $projectId, string $off): string {
+    $phase = (string)$timer['phase'];
+    $round = max(1, (int)$timer['focus_round']);
+    $left  = (int)$timer['remaining_seconds'];
+    $of    = ' ' . $round . '/' . POMODORO_ROUNDS;
+
+    $clock = '<span class="timer-countdown" data-left="' . $left . '" data-phase="' . e($phase) . '">'
+           . e(fmt_elapsed($left)) . '</span>';
+
+    if ($phase === 'focus') {
+        // Both buttons carry name="timer" for the reason timer_cell() gives.
+        return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+             . '<span class="pomo-tag pomo-focus" title="Focus block' . $of . '">Focus' . $of . '</span>'
+             . '<button type="submit" name="timer" value="stop" class="timer-btn running"' . $off
+             . ' title="Stop now and log the minutes this block has run">■ ' . $clock . '</button>'
+             . '<button type="submit" name="timer" value="discard" class="timer-drop"' . $off
+             . ' title="Throw this focus block away without logging it">drop</button>'
+             . '</form>';
+    }
+
+    // A break. Start on this same card is "next focus block" (start_timer()),
+    // so the form carries the card exactly as a Start button would.
+    $next  = $phase === 'long_break' ? 1 : $round + 1;
+    $label = $left > 0
+        ? '<span class="pomo-tag pomo-break">' . e(pomodoro_phase_label($phase)) . ' ' . $clock . '</span>'
+        : '<span class="pomo-tag pomo-break pomo-over">Break over</span>';
+    return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+         . '<input type="hidden" name="' . $field . '" value="' . $id . '">'
+         . '<input type="hidden" name="project_id" value="' . $projectId . '">'
+         . $label
+         . '<button type="submit" name="timer" value="start" class="timer-btn' . ($left > 0 ? '' : ' running') . '"' . $off
+         . ' title="Start focus block ' . $next . ' of ' . POMODORO_ROUNDS . ' on this'
+         . ($left > 0 ? ', cutting the break short' : '') . '">▶ Focus ' . $next . '/' . POMODORO_ROUNDS . '</button>'
+         . '<button type="submit" name="timer" value="stop" class="timer-drop"' . $off
+         . ' title="Finish the cycle here. Every focus block in it is already logged.">end</button>'
+         . '</form>';
 }
 $weekAgo = date('Y-m-d', strtotime('-6 days'));
 $loggedWeek = $myCrewId ? logged_total_for_crew($pdo, $myCrewId, null, $weekAgo, $today) : 0;
@@ -848,6 +917,123 @@ require __DIR__ . '/includes/header.php';
     }
     tick();
     setInterval(tick, 1000);
+  }());
+
+  // The pomodoro countdown, and the alarm when a phase runs out.
+  //
+  // ⚠ THE BROWSER IS THE ALARM CLOCK, NOT THE RECORD. When a phase ends this
+  // reloads the page, and the server (pomodoro_settle) logs the focus block and
+  // starts the break. If the tab was closed, nothing is lost: the next time
+  // My tasks opens, the server settles it the same way. So this script can fail
+  // or be throttled and the hours still come out right; only the chime is late.
+  //
+  // Counted down from data-left, the seconds MySQL said were left at page load,
+  // as a duration since the page loaded, for the reason the stopwatch above
+  // gives. The alarm is ONE setTimeout aimed at the end, rather than a check
+  // inside the once-a-second tick, because a background tab may run that tick
+  // only once a minute, and the alarm is exactly what has to fire in the
+  // background.
+  (function () {
+    var el = document.querySelector('.timer-countdown[data-left]');
+    var t0 = Date.now();
+    var baseTitle = document.title;
+    var audio = null;
+
+    // A browser only lets a page make a sound after somebody has clicked or
+    // typed on it, so the audio is switched on at the first interaction and
+    // kept. On a page nobody has touched since it loaded the chime may be
+    // silent; the desktop notification, with the system's own sound, is the
+    // alarm that does not depend on it.
+    function unlock() {
+      try {
+        if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state === 'suspended') audio.resume();
+      } catch (e) { /* no Web Audio: the notification still fires */ }
+    }
+    document.addEventListener('click', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+
+    // Asking for notification permission needs a click, and the Start click
+    // navigates away, so the ask happens on that click before the form is sent.
+    // Whatever the answer, the form is then sent exactly as it would have been.
+    Array.prototype.forEach.call(document.querySelectorAll('.timer-form'), function (f) {
+      f.addEventListener('submit', function (ev) {
+        if (f.getAttribute('data-asked') || !('Notification' in window)
+            || Notification.permission !== 'default') return;
+        var by = ev.submitter;
+        if (by && by.value !== 'start' && !f.querySelector('input[name="timer"][value="start"]')) return;
+        ev.preventDefault();
+        f.setAttribute('data-asked', '1');
+        var send = function () {
+          if (f.requestSubmit) f.requestSubmit(by || undefined);
+          else f.submit();
+        };
+        try { Notification.requestPermission().then(send, send); } catch (e) { send(); }
+      });
+    });
+
+    if (!el) return;
+    var base = parseInt(el.getAttribute('data-left'), 10) || 0;
+    var phase = el.getAttribute('data-phase');
+    var name = phase === 'focus' ? 'Focus' : 'Break';
+    if (base <= 0) return;   // a break that is already over: nothing to count
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function left() { return Math.max(0, base - Math.floor((Date.now() - t0) / 1000)); }
+    function fmt(s) {
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      return h > 0 ? h + ':' + pad(m) + ':' + pad(s % 60) : m + ':' + pad(s % 60);
+    }
+    // The tab title carries the countdown too, so it can be read from any
+    // other tab without coming back here.
+    function tick() {
+      var s = left();
+      el.textContent = fmt(s);
+      document.title = fmt(s) + ' ' + name + ' · ' + baseTitle;
+    }
+    tick();
+    var iv = setInterval(tick, 1000);
+
+    function chime() {
+      try {
+        if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.35, 0.7].forEach(function (at, i) {
+          var o = audio.createOscillator(), g = audio.createGain();
+          o.frequency.value = i === 2 ? 1046 : 784;
+          g.gain.setValueAtTime(0.0001, audio.currentTime + at);
+          g.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + at + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + at + 0.3);
+          o.connect(g); g.connect(audio.destination);
+          o.start(audio.currentTime + at); o.stop(audio.currentTime + at + 0.32);
+        });
+      } catch (e) { /* silent is acceptable; the notification still shows */ }
+    }
+
+    // Reloading under somebody typing hours into a Log box would throw their
+    // typing away, so it waits until nothing on the page has the cursor.
+    function reloadWhenIdle() {
+      var a = document.activeElement;
+      if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) { setTimeout(reloadWhenIdle, 2000); return; }
+      location.reload();
+    }
+
+    setTimeout(function () {
+      clearInterval(iv);
+      tick();
+      chime();
+      var text = phase === 'focus'
+        ? 'Focus block done and logged. Take a break.'
+        : 'Break over. Start the next focus block when you are ready.';
+      document.title = (phase === 'focus' ? 'Break time' : 'Break over') + ' · ' + baseTitle;
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          var n = new Notification('Anima · My tasks', { body: text, tag: 'anima-pomodoro' });
+          n.onclick = function () { window.focus(); n.close(); };
+        }
+      } catch (e) { /* some browsers only notify from a service worker */ }
+      // A beat after the chime, so the sound is not cut off by the reload.
+      setTimeout(reloadWhenIdle, 1500);
+    }, base * 1000);
   }());
 
   (function () {

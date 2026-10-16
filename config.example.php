@@ -26,8 +26,11 @@ return [
     //   28800 = 8 hours   604800 = 7 days (default)   2592000 = 30 days
     'session_lifetime' => 604800,
 
-    // Timezone — affects "today" everywhere (snapshots, quotas, schedules)
-    'timezone' => 'America/Mexico_City',
+    // Timezone — affects "today" everywhere (snapshots, quotas, schedules), for
+    // PHP and MySQL alike (includes/db.php hands MySQL the same offset).
+    // Pacific time, David 2026-10-16. America/Los_Angeles follows US daylight
+    // saving (PST in winter, PDT in summer).
+    'timezone' => 'America/Los_Angeles',
 
     // -------------------------------------------------------------------------
     // Anthropic API — reading a call transcript into tasks (transcript.php)
