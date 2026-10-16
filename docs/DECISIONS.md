@@ -3649,6 +3649,26 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
 
+## 2026-10-16 — Setup to active needs a sign-off, and the kick-off is kept for the postmortem
+**Decision:** choosing *active* for a project in setup (list dropdown, or Finish in the wizard) opens
+`kickoff.php`, which warns, then freezes the setup and emails everyone ticked under *Who signs off*
+(Tim and Jorik). The project stays in setup until all of them approve, then turns active by itself and
+writes the per-step baseline. Either can *Ask for changes* with a note. *Kick-off vs now* compares the
+frozen picture with today, linked from the list once a show is in postmortem. Migration 049,
+finance_install_08.sql. David asked for this in those words the same day.
+**Defaults taken, each open to change:** (1) who signs off is a tick on a login, not a name in code;
+(2) the email link needs a login (a magic link would let a forwarded email approve), and the login now
+returns you to the page you were sent to; (3) the snapshot is taken when it is SENT, so what is
+approved is exactly what was stored; editing afterwards means *send again*, which clears approvals;
+(4) no admin override, or the sign-off means nothing; (5) the money is frozen in the finance database,
+so only an administrator can send a project for sign-off, since only they can read it.
+**Why a snapshot and not copied tables:** the snapshot is built by one function, `kickoff_snapshot()`,
+which the comparison runs again today, so both sides are measured the same way. Copied tables would
+break the first time a column is added. Cost: a figure nobody put in the snapshot in 2026 cannot be
+compared later. **No planning status**, unlike the 6 October plan: David's message keeps it setup
+until signed off. Projects already active (MSD, FCM) have no kick-off and the screen says so, rather
+than recording today's numbers as an original.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

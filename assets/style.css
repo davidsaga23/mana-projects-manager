@@ -260,6 +260,33 @@ button.danger:hover { background: var(--danger-strong); }
 .toggle-form small { flex: 1 1 100%; margin-top: 0; }
 .inline-form button { margin-top: 0; }
 .inline-form small { margin-top: 0; }
+
+/* Kick-off sign-off and Kick-off vs now (kickoff.php, 2026-10-16). A changed
+   figure or row is tinted, so a long comparison is read by colour first. */
+.kickoff-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+.kickoff-tabs .button.is-current { pointer-events: none; }
+.kickoff-warning p { margin: 0 0 8px; }
+.kickoff-signers { margin: 8px 0 12px; }
+.kickoff-send label { display: flex; gap: 8px; align-items: center; }
+.kickoff-send input[type="checkbox"], .kickoff-people input[type="checkbox"] { width: auto; }
+.kickoff-state { font-size: 1.1em; }
+.kickoff-state-approved strong { color: var(--ok); }
+.kickoff-state-changes_requested strong { color: var(--warn); }
+.kickoff-answer, .kickoff-resend { border: 1px solid var(--border); background: var(--surface);
+  border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+.kickoff-section { margin: 28px 0; }
+.kickoff-section > h3 { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.kickoff-figures { width: auto; min-width: 420px; }
+.kickoff-figures th[scope="row"], .kickoff-list th[scope="row"] { text-align: left; font-weight: 500; }
+.kickoff-moved td, .kickoff-row-changed td { background: var(--warn-tint); }
+.kickoff-row-added td { background: var(--ok-tint); }
+.kickoff-row-removed td { background: var(--danger-tint); }
+.kickoff-chg { color: var(--warn-strong); white-space: nowrap; font-size: .9em; }
+.kickoff-list { margin: 12px 0; }
+.kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
+.kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: 6px; }
+.kickoff-text-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .kickoff-text-pair { grid-template-columns: 1fr; } .kickoff-figures { min-width: 0; } }
 label.inline { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-weight: 400; }
 label.inline input { width: auto; }
 .row { display: flex; gap: 14px; flex-wrap: wrap; }

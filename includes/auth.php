@@ -217,6 +217,12 @@ function artist_may_post(): bool {
 
 function require_login(): void {
     if (!is_logged_in()) {
+        // Remember where they were going, so a link in an email (a kick-off
+        // sign-off) lands on its page after the login rather than on the front
+        // door. Same-site paths only; login.php checks it again before use.
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $_SESSION['after_login'] = (string)($_SERVER['REQUEST_URI'] ?? '');
+        }
         header('Location: login.php');
         exit;
     }
