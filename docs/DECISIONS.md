@@ -3664,10 +3664,21 @@ tasks loads or a timer button is pressed, so a closed tab loses nothing; the bro
 the alarm (chime, desktop notification, countdown in the tab title). A block that ends while
 nobody is there logs exactly 25 minutes. Each block is its own `time_logs` row. A timer that
 was already running when 047 was applied stays an open stopwatch until it is stopped.
-**Known interaction:** the open timezone defect (PHP on Mexico City, MySQL on the host clock)
-makes `log_time()` refuse a block as "in the future" in the evening hours when the two dates
-differ. The block is then kept, not lost, and the reason is shown, but it cannot be logged
-until the dates agree again. The same defect already affects the old stopwatch's Stop.
+**Overruns stay capped, by David's choice:** "if they forget to start the next cycle they can
+log time manually. If done the other way around they might step away or forget but the log
+will be made regardless."
+
+## 2026-10-16 — One clock: MySQL is told PHP's offset, and the studio runs on Pacific time
+**Decision:** `includes/db.php` runs `SET time_zone = '<PHP's current UTC offset>'` on every
+connection, and `config.example.php` names `America/Los_Angeles` (David: "the clock should be
+based in PST and it should allow you to log hours even after 6 pm").
+**Why:** PHP followed config.php while MySQL followed the host clock, six hours apart. In the
+evening MySQL's NOW() was already tomorrow, so `log_time()` refused timer and pomodoro hours as
+"in the future". An offset rather than a zone name because shared hosts rarely load MySQL's
+timezone tables; it is recomputed per request, so daylight saving moves both clocks together.
+**Consequence:** TIMESTAMP columns (created_at etc.) now display in local time. DATETIME values
+written with NOW() before the change keep the host time they were written with. The live zone
+is whatever the server's config.php says; changing it to Pacific is an edit there, not here.
 
 ## Still open
 
