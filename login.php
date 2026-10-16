@@ -42,6 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // else's preview — harmless, since a preview only ever reduces what
             // you can do, but baffling.
             unset($_SESSION['preview_role']);
+            // Where require_login() was sent from, if anywhere. Only a path on
+            // this site: one leading slash, not two and not a backslash, which
+            // would otherwise send the browser to another host.
+            $next = (string)($_SESSION['after_login'] ?? '');
+            unset($_SESSION['after_login']);
+            $second = $next[1] ?? '';
+            if ($next === '' || $next[0] !== '/' || $second === '/' || $second === chr(92)) {
+                $next = 'index.php';
+            }
             $_SESSION['user_id']      = $user['id'];
             $_SESSION['username']     = $user['username'];
             $_SESSION['display_name'] = $user['display_name'];
@@ -50,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (PDOException $e) {
                 // Column arrives with migration 005 — not worth failing a login over.
             }
-            header('Location: index.php');
+            header('Location: ' . $next);
             exit;
         }
     } else {

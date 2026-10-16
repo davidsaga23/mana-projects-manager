@@ -698,6 +698,16 @@ already here. The third is a second product.
 
 ### Project kick-off: a planning status, a sign-off, and a frozen original plan
 
+✅ **BUILT 2026-10-16 (migration 049, finance_install_08.sql), in the shape David asked for that day,
+which differs from the plan below in two ways.** No `planning` status: a project stays in `setup`
+until everyone ticked under *Who signs off* (Tim and Jorik) has approved, then turns `active` by
+itself. And the frozen plan is a **snapshot of the screens** (Brief, Staffing, Schedule, Timeline,
+Shots, Setup, Finance management) rather than a widened per-step baseline, because the list asked for
+covers far more than steps; the per-step baseline is still written at approval, so Historic quotas is
+unchanged. The postmortem's **Kick-off vs now** screen recomputes the same snapshot today and compares
+the two. `kickoff.php`, `includes/kickoff.php`; DECISIONS 2026-10-16 says why. The text below is the
+6 October plan, kept for its reasoning.
+
 > *"A project should have a planning status until we get a sign off from the CEO and COO, once that
 > happens, everything from that project will have to be stored as a first entry. Things like overall
 > starting/end dates, pipeline steps, asset and shot count, head count, start/end dates per pipeline
@@ -914,6 +924,24 @@ is built, because the answer "no third-party processing" makes this whole entry 
 **Open:** who may use it (admins only is the safe start, and answers the finance problem by
 avoiding it); whether it is a box on the dashboard or a page of its own; and the client-data
 question above, which comes first.
+
+#### Which AI: Gemini or Claude (asked again 2026-10-16, not decided)
+
+> *"Add to the roadmap to add a kind of gemini AI assistant to ask questions about a project with the
+> data available"*
+
+Both can do this job: answer a question by calling the fixed tools above and quoting the screen a
+number came from. Neither choice changes the three hard parts above, so it can be made late.
+
+- **Claude (Anthropic).** Already wired in: `includes/ai.php` and the `anthropic_api_key` line in
+  `config.php` are what the Transcript reader uses today, so there is one key, one bill and one
+  company receiving studio data instead of two. Strong at tool calling, which is how this would work.
+- **Gemini (Google).** A second outside service, key and bill. Worth it if the studio already lives in
+  Google Workspace and wants the assistant inside Gmail or Drive later, or on price: both charge per
+  use, so compare the current per-question cost on each one's pricing page before choosing.
+
+Either way the client-data question above decides first, because both send the question's data to a
+third party. **Open:** which one, after that.
 
 ## Asked for on 2026-10-06 (urgent) — "what has this show cost us so far?"
 

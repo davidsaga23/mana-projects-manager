@@ -28,6 +28,20 @@ function wizard_save_review(PDO $pdo, ?array $project): string {
     // pressing Finish again must not record a revised estimate as an original.
     $justCommitted = ($project['status'] ?? '') === 'setup';
 
+    // FROM SETUP, FINISH NO LONGER MAKES IT ACTIVE (David, 2026-10-16). It goes
+    // to the kick-off page, which warns, freezes the setup and asks the people
+    // who sign off; the project turns active, and its starting estimate is
+    // recorded, when they have all approved. Before migration 049 the old path
+    // below still runs.
+    require_once __DIR__ . '/../kickoff.php';
+    if ($justCommitted && kickoff_ready($pdo)) {
+        // wizard_step is kept, so "Resume setup" on the list comes back to this
+        // review while the sign-off is open. Approval clears it.
+        flash('ok', 'Setup is finished. One more step before "' . $project['name'] . '" goes active: '
+                  . 'freezing it and getting it signed off.');
+        return 'kickoff.php?project=' . $projectId;
+    }
+
     $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute(['active', $projectId]);
     $pdo->prepare('DELETE FROM project_settings WHERE project_id = ? AND setting_key = ?')
         ->execute([$projectId, 'wizard_step']);

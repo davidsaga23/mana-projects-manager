@@ -5,6 +5,7 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';  // the Studio is filtered out below
+require_once __DIR__ . '/includes/kickoff.php'; // setup -> active goes through a sign-off
 require_login();
 
 // The values the `projects.status` ENUM allows. Listed once and used by both the
@@ -67,11 +68,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($status, $statuses, true)) {
                 throw new RuntimeException('That is not a status this app recognises.');
             }
+            // SETUP TO ACTIVE IS NOT A DROPDOWN CHANGE (David, 2026-10-16). It
+            // goes to the kick-off page, which warns, freezes the setup and asks
+            // the people who sign off. The project turns active when they have
+            // all approved. Before migration 049 the old one-click change stands.
+            if ($project['status'] === 'setup' && $status === 'active' && kickoff_ready($pdo)) {
+                header('Location: kickoff.php?project=' . $id);
+                exit;
+            }
             $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute([$status, $id]);
             flash('ok', sprintf('"%s" is now %s.',
                                 $project['name'], str_replace('_', ' ', $status)));
 
         } elseif ($action === 'rename') {
+            // The name is part of what a kick-off freezes (David, 2026-10-16).
+            if (kickoff_ready($pdo) && ($k = kickoff_current($pdo, $id)) && $k['state'] === 'pending') {
+                throw new RuntimeException('This project is frozen while its kick-off waits for sign-off, '
+                    . 'so it cannot be renamed. Withdraw the request on the Kick-off page first.');
+            }
             $name = trim((string)($_POST['name'] ?? ''));
             if ($name === '') throw new RuntimeException('A project needs a name.');
             if (mb_strlen($name) > 255) {
@@ -200,6 +214,11 @@ $archivedCount = $canArchive
 require_once __DIR__ . '/includes/dashboard.php';
 $progressPct = projects_overall_pct($pdo, $projects);
 
+// Which setup projects are waiting on a kick-off sign-off, for the line under
+// their status. Empty before migration 049.
+$kickoffReady = kickoff_ready($pdo);
+$kickoffOpen  = $kickoffReady ? kickoff_open_states($pdo) : [];
+
 $pageTitle = 'Projects';
 require __DIR__ . '/includes/header.php';
 ?>
@@ -285,6 +304,10 @@ require __DIR__ . '/includes/header.php';
         <?php else: ?>
           <span class="status status-<?= e($p['status']) ?>"><?= e(str_replace('_', ' ', $p['status'])) ?></span>
         <?php endif; ?>
+        <?php if (isset($kickoffOpen[$pid]) && $p['status'] === 'setup'): ?>
+          <a class="muted small" href="kickoff.php?project=<?= $pid ?>"><?=
+            $kickoffOpen[$pid] === 'pending' ? 'waiting for sign-off' : 'changes asked for' ?></a>
+        <?php endif; ?>
       </td>
       <td><?= (int)$p['step_count'] ?></td>
       <td><?= (int)$p['shot_count'] ?></td>
@@ -335,6 +358,11 @@ require __DIR__ . '/includes/header.php';
                 // replace the switcher. ?>
           <?php if (is_admin()): ?>
             <a class="row-btn" href="finance_project.php?project=<?= $pid ?>&tab=overview">Finance</a>
+          <?php endif; ?>
+          <?php // The postmortem's other half: how the show started, beside how
+                // it ended (David, 2026-10-16). ?>
+          <?php if ($p['status'] === 'postmortem' && $kickoffReady): ?>
+            <a class="row-btn" href="kickoff.php?project=<?= $pid ?>&view=compare">Kick-off vs now</a>
           <?php endif; ?>
         <?php endif; ?>
 
