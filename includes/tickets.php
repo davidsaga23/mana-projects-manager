@@ -21,6 +21,8 @@ require_once __DIR__ . '/statuses.php';
 // delete_ticket_with_files() needs upload_dir_path(). Pulled in here rather than
 // left to each caller, so this file works wherever it is required from.
 require_once __DIR__ . '/uploads.php';
+// ticket_file_targets() puts the Studio first, which needs studio_available().
+require_once __DIR__ . '/studio.php';
 
 /**
  * Is this request the board's own uploader rather than a browser navigation?
@@ -369,6 +371,113 @@ function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): arra
                . ' cleared.';
     }
     return ['ok' => true, 'said' => $said];
+}
+
+/* ---------------------------------------------------------------------------
+ * FILING A CARD FROM A LIST (David, 2026-10-16)
+ *
+ * "for the tasks we need to always have a drop down menu available so we can
+ * classify the tasks to any project or studio wise." Every list of cards that
+ * has a Project column draws it with ticket_project_picker() and handles the
+ * post with refile_ticket_from_post(), so the two lists (Studio Tasks and My
+ * tasks) cannot drift into two versions of one control. The card's own page
+ * keeps its "Move to another project" box; that one carries the explanation.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Where a card can go: every live show, plus the Studio.
+ *
+ * Archived shows are left out, because filing today's work onto a finished show
+ * is almost always a mis-click. The Studio is FIRST because it is the home for
+ * the cards that belong to no show at all. Read once per request: a page that
+ * draws forty pickers asks this forty times.
+ */
+function ticket_file_targets(PDO $pdo): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $order = studio_available($pdo) ? 'is_studio DESC, code' : 'code';
+    return $cache = $pdo->query(
+        "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY " . $order
+    )->fetchAll();
+}
+
+/**
+ * The Project cell of a card list: a dropdown that files or moves the card.
+ *
+ * $ticket needs id, project_id and project_code, which ticket_select_sql() and
+ * the My tasks query both provide.
+ *
+ * ⚠ AN UNFILED CARD'S SELECTED OPTION READS "no project", which is not
+ * cosmetic. gridtools.js takes a cell's filter and sort value from a <select>'s
+ * chosen option TEXT, so that wording is what keeps "no project" in the Project
+ * filter on Studio Tasks, the one filter that finds these cards.
+ *
+ * ⚠ THERE IS NO WAY BACK TO "no project" FROM HERE. move_ticket_to_project()
+ * only moves a card onto a show, and un-filing would throw away the reference
+ * number the card was given. A filed card's list therefore has no blank option.
+ *
+ * ⚠ MOVING A FILED CARD ASKS FIRST; FILING AN UNFILED ONE DOES NOT. A move
+ * renumbers the card and clears its shot, asset and step, so a slip of the
+ * mouse on a busy list would cost something. Filing a card that has no project
+ * loses nothing, and asking every time would make the list slower to sort.
+ */
+function ticket_project_picker(array $ticket, array $targets): string {
+    $current = $ticket['project_id'] !== null ? (int)$ticket['project_id'] : 0;
+    $opts = '';
+    $seen = false;
+    foreach ($targets as $t) {
+        $sel = (int)$t['id'] === $current;
+        if ($sel) $seen = true;
+        $opts .= '<option value="' . (int)$t['id'] . '"' . ($sel ? ' selected' : '')
+               . ' title="' . e($t['name']) . '">' . e($t['code']) . '</option>';
+    }
+    if (!$current) {
+        $opts = '<option value="" selected>no project</option>' . $opts;
+    } elseif (!$seen) {
+        // On an archived show, which the targets leave out. Still named, so the
+        // cell says where the card is rather than showing the first show listed.
+        $opts = '<option value="' . $current . '" selected>' . e((string)($ticket['project_code'] ?? '')) . '</option>' . $opts;
+    }
+
+    $confirm = $current
+        ? ticket_ref($ticket) . ': move it to another project? Its reference will change, '
+          . 'and any shot, asset or step it points to will be cleared.'
+        : '';
+    return '<form method="post" class="inline-form" style="margin:0;">'
+         . '<input type="hidden" name="set_ticket_project" value="1">'
+         . '<input type="hidden" name="ticket_id" value="' . (int)$ticket['id'] . '">'
+         . '<select name="project_id" class="proj-pick' . ($current ? '' : ' warn-text') . '"'
+         . ' data-was="' . ($current ?: '') . '" data-confirm="' . e($confirm) . '"'
+         . ' onchange="if (this.dataset.confirm &amp;&amp; !confirm(this.dataset.confirm)) { this.value = this.dataset.was; return; } this.form.submit();"'
+         . ' aria-label="Project for ' . e(ticket_ref($ticket)) . '"'
+         . ' title="' . ($current ? 'Move this card to another show, or to the Studio' : 'File this card on a show, or on the Studio') . '">'
+         . $opts . '</select></form>';
+}
+
+/**
+ * Handle the picker's post. Flashes the outcome and writes it into the card's
+ * own thread, exactly as the card page's Move does, because the reference
+ * changing is the kind of thing somebody reads that history to understand.
+ * The caller checks can_edit() and redirects.
+ *
+ * ⚠ move_ticket_to_project() REPORTS FAILURE, IT DOES NOT THROW. It returns
+ * ['ok' => false, 'said' => ...], so flashing 'ok' on its message alone would
+ * tell somebody their card was filed when it was not.
+ */
+function refile_ticket_from_post(PDO $pdo, int $userId): void {
+    $tid = (int)($_POST['ticket_id'] ?? 0);
+    $pid = (int)($_POST['project_id'] ?? 0);
+    if ($tid <= 0 || $pid <= 0) {
+        flash('err', 'Pick a project to file it on.');
+        return;
+    }
+    try {
+        $r = move_ticket_to_project($pdo, $tid, $pid);
+    } catch (Throwable $e) {
+        $r = ['ok' => false, 'said' => $e->getMessage()];
+    }
+    flash(!empty($r['ok']) ? 'ok' : 'err', (string)($r['said'] ?? 'The card was not moved.'));
+    if (!empty($r['ok'])) log_ticket_event($pdo, $tid, $userId, (string)$r['said']);
 }
 
 /* ---------------------------------------------------------------------------

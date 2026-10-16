@@ -61,7 +61,7 @@ if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
 // on their own rows, which is what every query below already enforces. Written
 // once and read by each control, so the buttons and the guard in
 // require_login() cannot disagree about who is allowed.
-$canSetStatus = can_edit() || is_artist();
+$canSetStatus = can_edit() || is_artist() || is_supervisor();
 
 $me = current_user();
 $myCrewId = 0;
@@ -183,6 +183,24 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
+    header('Location: mytasks.php');
+    exit;
+}
+
+// --- file or move one card ----------------------------------------------------
+//
+// David, 2026-10-16, pointing at "#38 Explore method to quantify team
+// workloads" reading "no project" as plain text on this screen: "for the tasks
+// we need to always have a drop down menu available so we can classify the
+// tasks to any project or studio wise." The same dropdown and handler Studio
+// Tasks uses (includes/tickets.php). Filing is what gives a card its status
+// picker, Log box and timer below, since all three need a show to cost against.
+//
+// ⚠ EDITORS ONLY, the same rule as the card's own Move box. Moving renumbers a
+// card and clears its shot, asset and step, which is more than an artist's
+// "where has my work got to" — artist_may_post() does not list it.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_project'])) {
+    refile_ticket_from_post($pdo, $userId);
     header('Location: mytasks.php');
     exit;
 }
@@ -744,8 +762,13 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $late ? 'row-overdue' : '' ?>">
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>" class="<?= $t3['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($t3)) ?></a></td>
           <td><a href="ticket.php?id=<?= (int)$t3['id'] ?>"><?= e($t3['title']) ?></a></td>
-          <td class="muted small"><?= ($t3['project_code'] ?? '') !== ''
-              ? e($t3['project_code']) : '<span class="warn-text">no project</span>' ?></td>
+          <td class="muted small"><?php if (can_edit()): ?>
+                <?= ticket_project_picker($t3, ticket_file_targets($pdo)) ?>
+              <?php elseif (($t3['project_code'] ?? '') !== ''): ?>
+                <?= e($t3['project_code']) ?>
+              <?php else: ?>
+                <span class="warn-text">no project</span>
+              <?php endif; ?></td>
           <?php // The same control the production tasks above carry, for the same
                 // reason: this is the screen an artist opens to say where their
                 // work has got to, and a ticket is half of what is on it. Still
@@ -756,8 +779,13 @@ require __DIR__ . '/includes/header.php';
                   // unfiled card has none to offer — an empty dropdown would read as
                   // broken. Said in words, with the way out. ?>
             <?php if (!$t3['project_id']): ?>
-              <a class="muted small" href="ticket.php?id=<?= (int)$t3['id'] ?>"
-                 title="Open the card and file it on a show">no project yet</a>
+              <?php if (can_edit()): ?>
+                <span class="muted small"
+                      title="Statuses belong to a show, so they appear once it has one">pick a project first</span>
+              <?php else: ?>
+                <a class="muted small" href="ticket.php?id=<?= (int)$t3['id'] ?>"
+                   title="Open the card and file it on a show">no project yet</a>
+              <?php endif; ?>
             <?php elseif ($canSetStatus): ?>
               <form method="post" class="inline-form" style="margin:0;">
                 <input type="hidden" name="set_ticket_status" value="1">

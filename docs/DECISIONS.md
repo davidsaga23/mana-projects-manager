@@ -3680,6 +3680,23 @@ timezone tables; it is recomputed per request, so daylight saving moves both clo
 written with NOW() before the change keep the host time they were written with. The live zone
 is whatever the server's config.php says; changing it to Pacific is an edit there, not here.
 
+## 2026-10-16 — A Supervisor role: an artist who consults Timeline and Staffing, edits Shots
+**Decision:** a fourth role, `supervisor` (migration 047). Everything an artist can do, plus
+sees a project's Timeline and Staffing tabs (read-only) and edits its Shots. David: "a
+supervisor role who has all the artist permissions but adding the timeline, staffing, shots",
+then "Supervisors can't edit timeline or staffing, it's more for them to consult." Artists
+and Bookings were also asked for; both were already open to every logged-in account to read.
+**Why this shape:** `can_edit()` stays false for a supervisor, so every other screen keeps
+the artist's answer without being touched. Shots asks `can_edit_area()` instead (Timeline and Staffing ask it too, and get no),
+and the write guard in `require_login()` / `require_login_json()` lets a supervisor's POST
+through only for the files named in `SUPERVISOR_SCRIPTS` (includes/auth.php). Same
+allow-list idea as `artist_may_post()`: a screen added later is refused by default.
+**Consequence:** no money for supervisors. Rates and quotes on Staffing go through
+`money.php`, which stays admin-only. Schedule, Dashboard and a crew member's own page stay
+artist-level until somebody asks. Letting supervisors edit an area later is one line in
+`SUPERVISOR_SCRIPTS`, for any screen that already asks `can_edit_area()`. The JSON write guard now also refuses during a preview,
+which it should always have done (the HTML guard already did).
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
@@ -3745,3 +3762,25 @@ is whatever the server's config.php says; changing it to Pacific is an edit ther
 - ~~Platform URL~~ — `mana.davidsaga.com`, served from `public_html/mana`.
 - ~~Plaky as source of truth~~ — yes for now, with the schema built so that changing our
   mind later is additive. See the two paired entries above.
+
+## 2026-10-16 — Every card list has a Project dropdown, filed or not
+**Supersedes the "Filed rows keep plain text and get no picker" part of "Filing is per card,
+from a dropdown, not one bulk button" (2026-10-12).** The per-card choice stands.
+**Decision:** the Project cell on Studio Tasks and on My tasks' Tickets table is a dropdown on
+every row an editor sees, filed or not, with the Studio listed first. Picking a show files an
+unfiled card or moves a filed one. The dropdown, the list of destinations and the handler live
+once in `includes/tickets.php` (`ticket_project_picker()`, `ticket_file_targets()`,
+`refile_ticket_from_post()`), and both screens call them.
+**Why:** David, 2026-10-16, pointing at "#38 Explore method to quantify team workloads" reading
+"no project" as plain text on My tasks: "for the tasks we need to always have a drop down menu
+available so we can classify the tasks to any project or studio wise." My tasks had no way to
+file at all, and an unfiled card there also has no status, Log box or timer, because all three
+need a show. Filing from the row is what makes it usable.
+**Why filed rows get one too:** the 2026-10-12 entry kept them read-only because they belong to
+a board. But a card filed on the wrong show is the mistake that entry warned about, and it
+should be fixable from the same list that filed it, not only from the card.
+**Consequence:** moving a FILED card asks first, because it renumbers the card and clears its
+shot, asset and step; filing an unfiled one does not, because it loses nothing. There is no way
+back to "no project" from the dropdown: `move_ticket_to_project()` only moves onto a show.
+Artists still see plain text, matching the card page's Move box, which is editors-only.
+Every move is written into the card's own thread, as the card page already did.

@@ -66,11 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('err', 'Only an administrator can preview the app as another role.');
         } else {
             $want = (string)($_POST['role'] ?? '');
-            if (!in_array($want, ['editor', 'artist'], true)) {
+            if (!in_array($want, ['editor', 'supervisor', 'artist'], true)) {
                 flash('err', 'That is not a role you can preview.');
             } else {
                 $_SESSION['preview_role'] = $want;
-                flash('ok', 'Previewing as ' . ($want === 'artist' ? 'an artist' : 'an editor')
+                flash('ok', 'Previewing as ' . role_in_words($want)
                           . '. Nothing will save until you leave the preview.');
                 // Straight to the projects list rather than back where they were:
                 // the screen they started from is very often one the borrowed
