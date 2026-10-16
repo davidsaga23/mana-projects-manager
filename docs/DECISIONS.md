@@ -3714,3 +3714,25 @@ David has run a show on it.
 - ~~Platform URL~~ — `mana.davidsaga.com`, served from `public_html/mana`.
 - ~~Plaky as source of truth~~ — yes for now, with the schema built so that changing our
   mind later is additive. See the two paired entries above.
+
+## 2026-10-16 — Every card list has a Project dropdown, filed or not
+**Supersedes the "Filed rows keep plain text and get no picker" part of "Filing is per card,
+from a dropdown, not one bulk button" (2026-10-12).** The per-card choice stands.
+**Decision:** the Project cell on Studio Tasks and on My tasks' Tickets table is a dropdown on
+every row an editor sees, filed or not, with the Studio listed first. Picking a show files an
+unfiled card or moves a filed one. The dropdown, the list of destinations and the handler live
+once in `includes/tickets.php` (`ticket_project_picker()`, `ticket_file_targets()`,
+`refile_ticket_from_post()`), and both screens call them.
+**Why:** David, 2026-10-16, pointing at "#38 Explore method to quantify team workloads" reading
+"no project" as plain text on My tasks: "for the tasks we need to always have a drop down menu
+available so we can classify the tasks to any project or studio wise." My tasks had no way to
+file at all, and an unfiled card there also has no status, Log box or timer, because all three
+need a show. Filing from the row is what makes it usable.
+**Why filed rows get one too:** the 2026-10-12 entry kept them read-only because they belong to
+a board. But a card filed on the wrong show is the mistake that entry warned about, and it
+should be fixable from the same list that filed it, not only from the card.
+**Consequence:** moving a FILED card asks first, because it renumbers the card and clears its
+shot, asset and step; filing an unfiled one does not, because it loses nothing. There is no way
+back to "no project" from the dropdown: `move_ticket_to_project()` only moves onto a show.
+Artists still see plain text, matching the card page's Move box, which is editors-only.
+Every move is written into the card's own thread, as the card page already did.
