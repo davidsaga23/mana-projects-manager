@@ -75,9 +75,17 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 6);
     }
 
-    // Starting this project's ideal quotas from another project's. The same copy
-    // the Ideal quotas tab offers, from the screen where a new project's numbers
-    // are first set (David, 2026-09-17: "We can start copying another one").
+    // Matching days per item to an approved expense projection: upload, preview,
+    // apply. Here since the Ideal quotas tab was removed (David, 2026-10-16), the
+    // tab having edited these same boxes. See includes/ideal_match.php.
+    require_once __DIR__ . '/../ideal_match.php';
+    if (in_array($action, IDEAL_MATCH_ACTIONS, true)) {
+        return ideal_match_post($pdo, $projectId, $action, wizard_url($projectId, 6));
+    }
+
+    // Starting this project's ideal quotas from another project's (David,
+    // 2026-09-17: "We can start copying another one"), from the screen where a
+    // new project's numbers are first set.
     if ($action === 'copy_ideals') {
         require_once __DIR__ . '/../standards.php';
         if (!is_admin()) {
@@ -133,7 +141,8 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
 
         // ⚠ DAYS PER ITEM IS THIS PROJECT'S IDEAL QUOTA (David, 2026-09-17), the
         // number its schedule and its budget run on, and it reaches no other
-        // project. The same number the Ideal quotas tab edits, stored once.
+        // project. Edited here and nowhere else since the Ideal quotas tab, which
+        // edited this same number, was removed (David, 2026-10-16).
         //
         // Only an administrator changes it, as with ideal quotas everywhere since
         // 2026-08-17: the budget is built on it. The box is not drawn for anybody
@@ -238,11 +247,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       <small>A starting point: each stage gets an equal slice, and parallel steps share dates.</small>
     </form>
 
-    <?php // Where a new project's days per item are first set, so where starting
-          // from another project's is offered. The same copy as the Ideal quotas
-          // tab, and the same administrators-only rule as the boxes below. ?>
+    <?php // Where a new project's days per item are set, so where starting from
+          // another project's, or from the approved expense projection, is
+          // offered. The same administrators-only rule as the boxes below. ?>
     <?php if (is_admin() && $perProject): ?>
       <?php project_ideals_copy_form($pdo, $project); ?>
+      <?php require_once __DIR__ . '/../ideal_match.php'; ideal_match_render($pdo, $project, $steps); ?>
     <?php elseif (is_admin()): ?>
       <div class="flash flash-warn">
         <strong>Days per item cannot be changed until database update 034 is applied.</strong> It makes

@@ -322,3 +322,320 @@ function approved_match_apply(PDO $pdo, int $projectId, array $proposal, string 
     }
     return $out;
 }
+
+/* ---------------------------------------------------------------------------
+ * The screen part, drawn on Dates & headcount.
+ *
+ * Until 2026-10-16 this lived on the project's Ideal quotas tab. That tab edited
+ * the same days per item as Dates & headcount, stored once on the step, so David
+ * removed it ("Remove it", 2026-10-16) and the match moved here, beside the
+ * boxes it fills in.
+ * ------------------------------------------------------------------------- */
+
+/** The actions below, so the screen hosting them can tell they are ours. */
+const IDEAL_MATCH_ACTIONS = ['match_preview', 'match_remap', 'match_apply', 'match_cancel'];
+
+/**
+ * Upload, preview again, apply or cancel. $self is the hosting screen's address,
+ * which is returned (with the preview's anchor when one is open) as where to go
+ * next. Throws with a message meant for the person on any refusal.
+ */
+function ideal_match_post(PDO $pdo, int $projectId, string $action, string $self): string {
+    if (!is_admin()) {
+        throw new RuntimeException('Days per item are set on the business side, so only an '
+                                 . 'administrator can match them to an approved sheet.');
+    }
+    $perProject = ideals_per_project($pdo);
+    $to = $self;
+    if ($action === 'match_preview') {
+        // MATCHING AN APPROVED EXPENSE PROJECTION, step one: read the sheet and
+        // hold it for the preview. Nothing is written until match_apply. See
+        // the top of this file.
+        if (!$perProject) {
+            throw new RuntimeException('Matching an approved sheet needs database update 034, which '
+                                     . 'has not been applied yet, so nothing was read.');
+        }
+        $f = $_FILES['approved'] ?? null;
+        if (!$f || (int)($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Choose the approved expense projection, an .xlsx file, to match.');
+        }
+        if (strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION)) !== 'xlsx') {
+            throw new RuntimeException('That is not an .xlsx file. If it is an older .xls, open it in '
+                                     . 'Excel and save it as .xlsx first.');
+        }
+        $sheet = approved_projection_read((string)$f['tmp_name']);
+        // Held in the session rather than re-uploaded: the preview may be
+        // adjusted and previewed again before anything is applied, and the
+        // file is gone the moment this request ends.
+        $_SESSION['ideal_match'][$projectId] = [
+            'file'    => basename((string)$f['name']),
+            'at'      => time(),
+            'title'   => $sheet['title'],
+            'total'   => $sheet['total'],
+            'roles'   => $sheet['roles'],
+            'mapping' => approved_auto_match($sheet['roles'], pipeline_steps($pdo, $projectId)),
+        ];
+        $to = $self . '&match=1#match';
+
+    } elseif ($action === 'match_remap' || $action === 'match_apply') {
+        $held = $_SESSION['ideal_match'][$projectId] ?? null;
+        if (!$held || time() - (int)$held['at'] > 3600) {
+            unset($_SESSION['ideal_match'][$projectId]);
+            throw new RuntimeException('That preview has expired, so nothing was changed. Upload the '
+                                     . 'approved sheet again.');
+        }
+        $mapping = approved_posted_mapping($held['roles'], $_POST['map'] ?? [],
+                                           pipeline_steps($pdo, $projectId));
+        if ($action === 'match_remap') {
+            $_SESSION['ideal_match'][$projectId]['mapping'] = $mapping;
+            $to = $self . '&match=1#match';
+        } else {
+            $proposal = approved_match_proposal($pdo, $projectId, $held['roles'], $mapping);
+            $r = approved_match_apply($pdo, $projectId, $proposal, (string)$held['file'],
+                                      current_user_display());
+            unset($_SESSION['ideal_match'][$projectId]);
+
+            $n = count($r['changed']);
+            if ($n > 0) {
+                flash('ok', sprintf('Matched to %s: %d step%s changed, %s. No other project changed.',
+                                    $held['file'], $n, $n === 1 ? '' : 's', ideal_list($r['changed'], 30)));
+            } else {
+                flash('ok', sprintf('Every matched step already had the days per item %s works out to, '
+                                  . 'so nothing changed.', $held['file']));
+            }
+            if ($r['no_count']) {
+                flash('warn', sprintf('Nothing on this project to count %s by yet (no shots, assets or '
+                                    . 'runtime), so %s left as %s.', ideal_list($r['no_count']),
+                                      count($r['no_count']) === 1 ? 'it was' : 'they were',
+                                      count($r['no_count']) === 1 ? 'it was' : 'they were'));
+            }
+            $skipped = [];
+            foreach ($held['roles'] as $i => $role) {
+                if ($role['rows'] > 0 && (int)($mapping[$i] ?? 0) === 0) $skipped[] = $role['label'];
+            }
+            if ($skipped) {
+                flash('warn', sprintf('Not matched to any step, so not applied: %s.', ideal_list($skipped)));
+            }
+            // The figure somebody will check first, said here rather than left
+            // to be found on another tab.
+            $now = approved_match_rates($pdo, $projectId)['total'];
+            if ($now !== null && $held['total'] !== null) {
+                $gap = $now - (float)$held['total'];
+                if (abs($gap) < 0.005) {
+                    flash('ok', sprintf('The expense projection now totals %s, the same as the approved sheet.',
+                                        number_format($now, 2)));
+                } else {
+                    flash('warn', sprintf('The expense projection now totals %s and the approved sheet %s, '
+                                        . '%s apart. The days per item match the sheet, so the gap is in '
+                                        . 'rates or other expenses.', number_format($now, 2),
+                                          number_format((float)$held['total'], 2),
+                                          number_format(abs($gap), 2)));
+                }
+            }
+        }
+    } else {
+        unset($_SESSION['ideal_match'][$projectId]);
+    }
+    return $to;
+}
+
+/**
+ * The upload form, or the preview of a sheet already uploaded. Administrators
+ * only, once update 034 is applied; draws nothing otherwise.
+ */
+function ideal_match_render(PDO $pdo, array $project, array $steps): void {
+    $projectId = (int)$project['id'];
+    $canEdit = ideals_per_project($pdo) && is_admin();
+    if (!$canEdit || !$steps) return;
+    ?>
+  <?php
+  // An approved expense projection being matched, held from the upload until it
+  // is applied or cancelled. An hour is plenty to read a preview; past that the
+  // project may have moved on under it.
+  $held = $canEdit ? ($_SESSION['ideal_match'][$projectId] ?? null) : null;
+  if ($held && time() - (int)$held['at'] > 3600) {
+      unset($_SESSION['ideal_match'][$projectId]);
+      $held = null;
+  }
+  $showMatch = $held !== null && isset($_GET['match']);
+  ?>
+
+  <?php if ($canEdit): ?>
+    <?php if (!$showMatch): ?>
+      <form method="post" enctype="multipart/form-data" class="inline-form toggle-form ideals-match">
+        <input type="hidden" name="action" value="match_preview">
+        <label class="inline">Match an approved expense projection
+          <input type="file" name="approved" accept=".xlsx" required>
+        </label>
+        <button type="submit" class="secondary">Preview</button>
+        <small>
+          Upload the approved sheet, in the shape <em>Download as Excel</em> produces. Each role's
+          days are worked back into days per item for its step, using this project's own counts and
+          retake allowance, so the projection carries the approved days. Nothing changes until you
+          have seen the result and confirmed it.
+        </small>
+      </form>
+    <?php endif; ?>
+  <?php endif; ?>
+
+  <?php if ($showMatch):
+    $mapping  = $held['mapping'];
+    $proposal = approved_match_proposal($pdo, $projectId, $held['roles'], $mapping);
+    $rates    = approved_match_rates($pdo, $projectId);
+    // Every step offered under the label the platform's own export gives it, which
+    // is what a role in the sheet was written against.
+    $stepOptions = [];
+    foreach ($steps as $st) $stepOptions[(int)$st['id']] = $st['name'] . ' (' . step_scope_tag($st) . ')';
+    $rolesByStep = [];
+    foreach ($held['roles'] as $i => $role) {
+        $sid = (int)($mapping[$i] ?? 0);
+        if ($sid > 0) $rolesByStep[$sid][] = $role['label'];
+    }
+    $factorPct = fmt_num((float)$proposal['retake'], 2);
+  ?>
+    <section class="match-preview" id="match">
+      <h3>Matching <?= e((string)$held['file']) ?></h3>
+      <p class="muted small">
+        <?= $held['title'] !== '' ? '<strong>' . e((string)$held['title']) . '</strong>. ' : '' ?>
+        Days per item are worked back from each role's days with this project's own counts and its
+        retake allowance of <strong><?= e($factorPct) ?>%</strong>. If the sheet was built with a
+        different allowance, change it further down this screen first and preview again.
+        <?php if ($held['total'] !== null): ?>
+          Approved total in the sheet: <strong><?= e(number_format((float)$held['total'], 2)) ?></strong>.
+        <?php endif; ?>
+        <?php if ($rates['total'] !== null): ?>
+          This project's expense projection today: <strong><?= e(number_format($rates['total'], 2)) ?></strong>.
+        <?php endif; ?>
+      </p>
+
+      <form method="post">
+        <?php // Enter previews again rather than applying: the first submit button
+              // is the one a keypress triggers. ?>
+        <button type="submit" name="action" value="match_remap" hidden></button>
+        <table class="grid-table match-table">
+          <colgroup>
+            <col style="width:17%"> <?php // Approved role ?>
+            <col style="width:8%">  <?php // Person-days ?>
+            <col style="width:21%"> <?php // Step on this project ?>
+            <col style="width:12%"> <?php // Counted here ?>
+            <col style="width:9%">  <?php // Days per item now ?>
+            <col style="width:9%">  <?php // Becomes ?>
+            <col style="width:24%"> <?php // Notes ?>
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Approved role</th><th class="num">Person-days</th><th>Step on this project</th>
+              <th class="num">Counted here</th><th class="num">Days per item now</th>
+              <th class="num">Becomes</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach ($held['roles'] as $i => $role):
+            $sid = (int)($mapping[$i] ?? 0);
+            $m = $sid > 0 ? ($proposal['steps'][$sid] ?? null) : null;
+            $notes = [];
+            if ($role['flat']) {
+                $notes[] = 'A flat fee: its cost does not depend on days, so it is left alone.';
+            } elseif ($role['rows'] === 0) {
+                $notes[] = 'No days in the sheet. A fixed cost like this belongs in Other expenses, not in '
+                         . 'days per item.';
+            } elseif ($m === null) {
+                $notes[] = 'No step matched. Pick one, or this role is skipped.';
+            } else {
+                if ($m['new'] === null) {
+                    $notes[] = 'Nothing on this project to count it by yet, so it cannot be worked out.';
+                }
+                if ($m['sheet_units'] !== null && abs($m['sheet_units'] - $m['units']) >= 0.5) {
+                    $notes[] = sprintf('The sheet counts %s, this project %s.', fmt_num($m['sheet_units'], 2),
+                                       fmt_num($m['units'], 2));
+                }
+                if (count($rolesByStep[$sid] ?? []) > 1) {
+                    $notes[] = 'Added together with ' . implode(', ', array_diff($rolesByStep[$sid], [$role['label']]))
+                             . ', which match the same step.';
+                }
+                $here = $rates['by_step'][$sid] ?? null;
+                if ($here !== null && $role['rates']) {
+                    // Either way round: a sheet rate missing here, or a rate here
+                    // the sheet never had, both mean the cost will not come out equal.
+                    if ($here['day'] && (array_diff($role['rates'], $here['day'])
+                                         || array_diff($here['day'], $role['rates']))) {
+                        $notes[] = sprintf('Rate in the sheet %s a day, on this project %s a day.',
+                                           implode(', ', $role['rates']), implode(', ', $here['day']));
+                    }
+                    if ($here['unpriced'] > 0) {
+                        $notes[] = sprintf('%d position%s on this step %s no rate yet.', $here['unpriced'],
+                                           $here['unpriced'] === 1 ? '' : 's', $here['unpriced'] === 1 ? 'has' : 'have');
+                    }
+                }
+            }
+            $problem = $role['rows'] > 0 && ($m === null || $m['new'] === null); ?>
+            <tr class="<?= $problem ? 'has-problem' : '' ?>">
+              <td>
+                <?= e($role['label']) ?>
+                <?php if ($role['rows'] > 1): ?>
+                  <div class="muted small"><?= (int)$role['rows'] ?> artist rows</div>
+                <?php endif; ?>
+              </td>
+              <td class="num"><?= $role['rows'] > 0 ? e(fmt_num($role['days'], 2)) : '<span class="muted">&mdash;</span>' ?></td>
+              <td>
+                <?php if ($role['rows'] > 0): ?>
+                  <select name="map[<?= (int)$i ?>]" aria-label="Step for <?= e($role['label']) ?>">
+                    <option value="0">not matched, skip</option>
+                    <?php foreach ($stepOptions as $optId => $optLabel): ?>
+                      <option value="<?= (int)$optId ?>" <?= $optId === $sid ? 'selected' : '' ?>><?= e($optLabel) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php else: ?>
+                  <span class="muted small">not days per item</span>
+                <?php endif; ?>
+              </td>
+              <td class="num small">
+                <?php if ($m !== null): ?>
+                  <?= e(fmt_num($m['units'], 2)) ?> <span class="muted"><?= e($m['unit_label']) ?></span>
+                <?php else: ?><span class="muted">&mdash;</span><?php endif; ?>
+              </td>
+              <td class="num"><?= $m !== null ? e(fmt_num($m['was'], 3)) : '<span class="muted">&mdash;</span>' ?></td>
+              <td class="num">
+                <?php if ($m !== null && $m['new'] !== null): ?>
+                  <strong class="<?= abs($m['new'] - $m['was']) >= 0.0005 ? 'match-changes' : '' ?>"><?= e(fmt_num($m['new'], 3)) ?></strong>
+                <?php else: ?><span class="muted">&mdash;</span><?php endif; ?>
+              </td>
+              <td class="small"><?= $notes ? e(implode(' ', $notes)) : '<span class="muted">&mdash;</span>' ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+
+        <?php
+        // Steps no role in the sheet reached. Left exactly as they are, and named,
+        // so a step the approved budget never costed is noticed rather than assumed.
+        $untouched = [];
+        foreach ($steps as $st) {
+            if (!isset($proposal['steps'][(int)$st['id']])) $untouched[] = step_display_name($st, $steps);
+        }
+        $changing = count(array_filter($proposal['steps'],
+                                       fn($x) => $x['new'] !== null && abs($x['new'] - $x['was']) >= 0.0005));
+        ?>
+        <?php if ($untouched): ?>
+          <p class="muted small">
+            Not in the approved sheet, so left as they are: <?= e(implode(', ', $untouched)) ?>.
+          </p>
+        <?php endif; ?>
+
+        <div class="actions">
+          <button type="submit" name="action" value="match_apply"
+                  onclick="return confirm(<?= e(json_encode(sprintf("Set days per item on %d step%s of this project?\n\nIt changes this project's schedule and budget, and nothing on any other project.", $changing, $changing === 1 ? '' : 's'))) ?>);">Set these days per item</button>
+          <button type="submit" name="action" value="match_remap" class="secondary">Preview again with these matches</button>
+          <button type="submit" name="action" value="match_cancel" class="secondary" formnovalidate>Cancel</button>
+        </div>
+        <p class="muted small">
+          Only days per item change. Rates, positions and other expenses stay as they are: the notes
+          point out where they differ from the sheet. Changed a match above? The numbers are worked
+          out again from it when you apply, or preview again first to see them.
+        </p>
+      </form>
+    </section>
+  <?php endif; ?>
+
+    <?php
+}

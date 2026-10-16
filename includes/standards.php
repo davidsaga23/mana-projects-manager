@@ -206,56 +206,6 @@ function ideal_list(array $items, int $max = 8): string {
 }
 
 /**
- * Save the Ideal quotas tab: each step's days per item and its note.
- *
- * ⚠ A CHANGED NUMBER WHOSE NOTE WAS LEFT ALONE GETS A NEW NOTE. "Copied from FC
- * Mobile" under a number somebody has since changed would go on claiming a
- * source it no longer has, so it becomes "Set by David on 2026-09-17" unless the
- * note was edited in the same save.
- *
- * @param array $days    step id => typed days per item
- * @param array $sources step id => typed note
- * @return array ['changed' => string[], 'notes' => int, 'errors' => string[]]
- */
-function save_project_ideals(PDO $pdo, int $projectId, array $days, array $sources, string $who = ''): array {
-    if (!ideals_per_project($pdo)) {
-        throw new RuntimeException('Ideal quotas become per project with database update 034, which has '
-                                 . 'not been applied yet, so nothing was saved.');
-    }
-    $steps = pipeline_steps($pdo, $projectId);
-    $upd = $pdo->prepare(
-        'UPDATE pipeline_steps SET days_per_unit = ?, days_source = ? WHERE id = ? AND project_id = ?'
-    );
-    $out = ['changed' => [], 'notes' => 0, 'errors' => []];
-
-    foreach ($steps as $s) {
-        $id = (int)$s['id'];
-        if (!isset($days[$id])) continue;
-        $label = step_display_name($s, $steps);
-        $was = (float)($s['days_per_unit'] ?: 0);
-        $oldNote = ideal_source_note($s);
-        $note = isset($sources[$id]) ? mb_substr(trim((string)$sources[$id]), 0, 120) : $oldNote;
-
-        try {
-            $new = ideal_days_from_input($label, (string)$days[$id], $was);
-        } catch (RuntimeException $e) {
-            $out['errors'][] = $e->getMessage();
-            continue;
-        }
-        if ($new === null && $note === $oldNote) continue;
-
-        if ($new !== null) {
-            if ($note === $oldNote) $note = ideal_set_by($who);
-            $out['changed'][] = sprintf('%s %s → %s', $label, fmt_num($was, 3), fmt_num($new, 3));
-        } else {
-            $out['notes']++;
-        }
-        $upd->execute([$new ?? $was, $note !== '' ? $note : null, $id, $projectId]);
-    }
-    return $out;
-}
-
-/**
  * The projects another project's ideal quotas can be copied from.
  *
  * Every other project that has steps, its own type first: a show of the same kind
@@ -375,9 +325,9 @@ function copy_ideals_flash(array $r): void {
 /**
  * "Start from another project's ideal quotas": a project picker and a button.
  *
- * Drawn on the Ideal quotas tab and on Dates & headcount, which is where a new
- * project's numbers are first set, both posting action=copy_ideals to their own
- * screen. Asks before copying, because it changes this project's budget.
+ * Drawn on Dates & headcount, which is where a project's numbers are set,
+ * posting action=copy_ideals to that screen. (The project's Ideal quotas tab drew
+ * it too, until that tab was removed on 2026-10-16.) Asks before copying, because it changes this project's budget.
  */
 function project_ideals_copy_form(PDO $pdo, array $project): void {
     $sources = project_ideal_copy_sources($pdo, $project);

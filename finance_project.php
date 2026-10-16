@@ -866,7 +866,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
 //            and nobody can edit it — it is arithmetic on the dates and the
 //            progress, and it rises on its own every time either slips.
 //   IDEAL    what this project says that work actually takes, per step, on its
-//            Ideal quotas tab. Typed from experience, or copied from another
+//            Days per item on Dates & headcount. Typed from experience, or copied from another
 //            project and changed from there.
 //
 // A minimum ABOVE the ideal is the finding. It does not mean somebody is lazy;
@@ -950,7 +950,8 @@ try {
   person per day: the step's work spread over the working days from its start to its deadline,
   divided by the people on it, the same figure Dates &amp; headcount shows. It is arithmetic and
   <strong>not editable</strong>. <strong>Ideal</strong> is what this project says that work actually
-  takes, from its <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>.
+  takes, its days per item on
+  <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">Dates &amp; headcount</a>.
 </p>
 
 <?php if (!$quotaRows): ?>
@@ -1056,8 +1057,8 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
 ?>
 <?php if (ideals_per_project($pdo)): ?>
   <p class="muted small ok">
-    Every row below is costed from this project's own
-    <a href="standards.php?project=<?= $projectId ?>">ideal quotas</a>, which no other project shares.
+    Every row below is costed from this project's own days per item, set on
+    <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">Dates &amp; headcount</a>, which no other project shares.
   </p>
 <?php elseif (!($proj['standards_ready'] ?? false)): ?>
   <div class="flash flash-warn">
@@ -1070,7 +1071,7 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
     <strong>no studio standard</strong> for <?= e($proj['project_type'] ?? '') ?> projects, so they
     are costed from what this project was planned at. Those are marked
     <em>est.</em> below.
-    <a href="standards.php?project=<?= $projectId ?>">See the ideal quotas →</a>
+    <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">See the days per item →</a>
   </div>
 <?php elseif ($onIdeal > 0): ?>
   <p class="muted small ok">

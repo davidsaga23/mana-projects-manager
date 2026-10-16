@@ -205,7 +205,8 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
   scheduler fix ROADMAP had flagged: `shot_assets` finally has a writer.
 - **Ideal quotas are PER PROJECT** (2026-09-17, migrations 033/034). A step's own
   `days_per_unit` is the number the schedule, the quotas and the budget run on; it is edited on
-  the project's **Ideal quotas** tab (Finance management) or on Dates & headcount, and it reaches
+  Dates & headcount (the Finance management **Ideal quotas** tab that showed the same number was
+  removed on 2026-10-16), and it reaches
   no other project. Numbers can be **copied from another project**, or **matched to an approved
   expense projection** (.xlsx upload, preview, apply). The per-type sheets of 2026-08-17 are kept
   in `quota_standards`, unread. **Project types** (032) are now labels a person can add.
@@ -223,7 +224,7 @@ screen. `docs/DECISIONS.md` has an entry for every item below; read those before
 
 1. **Push** (GitHub Desktop), then **`migrate.php`** for **035** (timeline versions) and **036**
    (progress on a step), whichever is still pending.
-2. **FCM:** 034 is applied, so: Finance management → Ideal quotas → *Match an approved expense
+2. **FCM:** 034 is applied, so: Dates & headcount → *Match an approved expense
    projection* with `RTC_ExpenseProjection_v01.xlsx`; "Character Sheet" probably has to be pointed
    at the CH sheet step by hand. Then **change the Rough Animation slots' rate from "per second"
    to "per day"** (200 per second is a day rate with the wrong unit: 2,700 per artist instead of

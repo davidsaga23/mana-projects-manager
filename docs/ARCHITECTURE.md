@@ -69,7 +69,8 @@ step_dependencies
 
 **Days per item is the number the schedule, the quotas and the budget all run on, and it is
 read through exactly one function, `effective_days_per_unit()` (`includes/standards.php`).** It
-belongs to the project: edited on the Ideal quotas tab or on Dates & headcount, copied from
+belongs to the project: edited on Dates & headcount (the Ideal quotas tab, removed 2026-10-16, edited the same
+value), copied from
 another project, or matched to an approved expense projection — never shared. The per-type
 sheets that held it from 2026-08-17 to 2026-09-17 are still in `quota_standards`, unread once
 migration 034 is applied; until then the function keeps the old rule.

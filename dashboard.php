@@ -36,8 +36,8 @@ $episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
 
 $steps    = dashboard_steps($pdo, $projectId, $delivery);
 
-// This project's ideal quotas. Set on the business side (Ideal quotas, admin
-// only) and read here — David's split, 2026-08-17: the number is a business
+// This project's ideal quotas. Set on the business side (Days per item on
+// Dates & headcount, admin only) and read here — David's split, 2026-08-17: the number is a business
 // decision and it is useless unless the people running the show can see it.
 // Read-only; nothing on this screen can change one. Per step, per project since
 // 2026-09-17, through effective_days_per_unit() like every other reader.
