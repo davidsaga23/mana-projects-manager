@@ -184,14 +184,18 @@ function is_artist(): bool {
 }
 
 /**
- * An artist who also runs three screens of a project (migration 047).
+ * An artist who also SEES a project's Timeline and Staffing, and EDITS its Shots
+ * (migration 047).
  *
  * David, 2026-10-16: "a supervisor role who has all the artist permissions but
- * adding the timeline, staffing, shots."
+ * adding the timeline, staffing, shots", then the same evening: "Supervisors
+ * can't edit timeline or staffing, it's more for them to consult than anything
+ * else." So Timeline and Staffing are tabs shown to them (project_nav.php) and
+ * read-only like everything else; Shots is the one area they write to.
  *
- * ⚠ can_edit() STAYS FALSE FOR A SUPERVISOR. Everything outside the three areas
- * behaves exactly as it does for an artist, because it asks can_edit() and gets
- * the artist's answer. The three areas ask can_edit_area() instead.
+ * ⚠ can_edit() STAYS FALSE FOR A SUPERVISOR. Everything outside Shots behaves
+ * exactly as it does for an artist, because it asks can_edit() and gets the
+ * artist's answer. Shots asks can_edit_area() instead.
  */
 function is_supervisor(): bool {
     return user_role() === 'supervisor';
@@ -202,19 +206,15 @@ function is_supervisor(): bool {
  * can a supervisor write beyond an artist?" — same reasoning as artist_may_post():
  * a screen added next year is refused by default.
  *
- *   timeline — the page, its drag-and-edit API (schedule_api.php is called by
- *              timeline.js and nothing else), and the .gan import it links to
- *   staffing — the Staffing tab's two views, Crew and Hiring
- *   shots    — the breakdown grid and the API it saves through
+ *   shots — the breakdown grid and the API it saves through
  *
- * NOT here, deliberately: Schedule (its own tab, not asked for), person.php
- * (a crew member's details), and any rate or quote — those go through money.php,
- * which refuses everyone but an admin whatever this list says.
+ * NOT here, deliberately: Timeline and Staffing (David: to consult, not edit),
+ * and any rate or quote — those go through money.php, which refuses everyone
+ * but an admin whatever this list says. Adding an area here is the whole change
+ * to let supervisors edit it, once its screen asks can_edit_area().
  */
 const SUPERVISOR_SCRIPTS = [
-    'timeline' => ['timeline.php', 'schedule_api.php', 'timeline_import.php'],
-    'staffing' => ['crew.php', 'hiring.php'],
-    'shots'    => ['shots.php', 'shots_api.php'],
+    'shots' => ['shots.php', 'shots_api.php'],
 ];
 
 /** May the current account change things in this area ('timeline', 'staffing', 'shots')? */
@@ -325,7 +325,7 @@ function require_login(): void {
             flash('err', in_preview()
                 ? 'Nothing saves while you are previewing as someone else, leave the preview first.'
                 : (is_supervisor()
-                    ? 'Your account can change Timeline, Staffing and Shots, and the status of your own work, but not this.'
+                    ? 'Your account can change Shots and the status of your own work, but not this.'
                     : 'Your account can change the status of your own work, but not this.'));
         }
         // Back to the same screen as a GET, so the reader sees the page and the

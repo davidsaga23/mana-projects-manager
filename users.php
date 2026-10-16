@@ -387,7 +387,7 @@ require __DIR__ . '/includes/header.php';
       <select name="role">
         <option value="artist" selected>Artist, reads everything, sets the status of their own work</option>
         <?php if ($hasSupervisor): ?>
-        <option value="supervisor">Supervisor, an artist who also edits Timeline, Staffing and Shots</option>
+        <option value="supervisor">Supervisor, an artist who also sees Timeline and Staffing, and edits Shots</option>
         <?php endif; ?>
         <option value="editor">Editor, full production access</option>
         <option value="admin">Admin, full access, can manage users</option>

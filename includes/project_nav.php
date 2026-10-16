@@ -43,8 +43,9 @@ const PROJECT_TABS_HIDDEN_FROM_VIEWERS = [
 ];
 
 /**
- * The hidden tabs a SUPERVISOR gets back: Staffing and Timeline, the two of their
- * three areas (Shots is the third) that artists are not shown. Migration 047.
+ * The hidden tabs a SUPERVISOR gets back, to read: Staffing and Timeline (David,
+ * 2026-10-16, "more for them to consult"). They save nothing on either; that is
+ * SUPERVISOR_SCRIPTS in includes/auth.php, which does not list them. Migration 047.
  */
 const PROJECT_TABS_SHOWN_TO_SUPERVISORS = [
     'crew',        // Staffing
