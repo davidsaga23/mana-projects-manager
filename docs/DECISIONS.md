@@ -3649,6 +3649,30 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
 
+## 2026-10-16 — Setup to active needs a sign-off, and the kick-off is kept for the postmortem
+**Decision:** choosing *active* for a project in setup (list dropdown, or Finish in the wizard) opens
+`kickoff.php`, which warns, then freezes the setup and emails everyone ticked under *Who signs off*
+(Tim and Jorik). The project stays in setup until all of them approve, then turns active by itself and
+writes the per-step baseline. Either can *Ask for changes* with a note. *Kick-off vs now* compares the
+frozen picture with today, linked from the list once a show is in postmortem. Migration 049,
+finance_install_08.sql. David asked for this in those words the same day.
+**Settled with David the same day:** (1) who signs off is chosen in a pop-up when sending, pre-ticked
+from *Who signs off* (a tick on a login, admins and editors only); (2) the email link needs a login,
+and the login now returns you to the page you were sent to; (3) the snapshot is taken when it is SENT,
+and **the project is frozen while it waits**: every save on its setup screens is refused
+(`KICKOFF_FROZEN_SCRIPTS`, includes/auth.php), and renaming it on the list too. *Ask for changes*
+unfreezes it; sending again takes a new snapshot, which replaces the old one as the kick-off;
+(4) either signer can ask for changes with a note; (5) an administrator can approve on behalf of
+whoever has not answered, with a reason, and everybody involved is emailed that the original state
+is being set that way; (6) the money is frozen in the finance database, so only an administrator can
+send a project for sign-off, since only they can read it.
+**Why a snapshot and not copied tables:** the snapshot is built by one function, `kickoff_snapshot()`,
+which the comparison runs again today, so both sides are measured the same way. Copied tables would
+break the first time a column is added. Cost: a figure nobody put in the snapshot in 2026 cannot be
+compared later. **No planning status**, unlike the 6 October plan: David's message keeps it setup
+until signed off. Projects already active (MSD, FCM) have no kick-off and the screen says so, rather
+than recording today's numbers as an original.
+
 ## 2026-10-16 — A Supervisor role: an artist who consults Timeline and Staffing, edits Shots
 **Decision:** a fourth role, `supervisor` (migration 047). Everything an artist can do, plus
 sees a project's Timeline and Staffing tabs (read-only) and edits its Shots. David: "a

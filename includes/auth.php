@@ -274,6 +274,12 @@ function artist_may_post(): bool {
 
 function require_login(): void {
     if (!is_logged_in()) {
+        // Remember where they were going, so a link in an email (a kick-off
+        // sign-off) lands on its page after the login rather than on the front
+        // door. Same-site paths only; login.php checks it again before use.
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $_SESSION['after_login'] = (string)($_SERVER['REQUEST_URI'] ?? '');
+        }
         header('Location: login.php');
         exit;
     }
@@ -348,6 +354,54 @@ function require_login(): void {
         header('Location: ' . $back);
         exit;
     }
+
+    // A project waiting on its kick-off sign-off is frozen: see kickoff_frozen().
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($why = kickoff_frozen()) !== null) {
+        if (function_exists('flash')) flash('err', $why);
+        $back   = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $second = $back[1] ?? '';
+        if ($back === '' || $back[0] !== '/' || $second === '/' || $second === chr(92)) {
+            $back = 'index.php';
+        }
+        header('Location: ' . $back);
+        exit;
+    }
+}
+
+/**
+ * The screens that edit what a kick-off freezes, and where each says which
+ * project it is about. While a project's sign-off is WAITING, a save through
+ * any of them is refused (David, 2026-10-16: "the project should be frozen so
+ * no further changes are done until is signed off"). Asking for changes or
+ * withdrawing unfreezes it. Cards, time and statuses are not part of the
+ * kick-off, so My tasks and the boards keep working.
+ */
+const KICKOFF_FROZEN_SCRIPTS = [
+    'brief.php', 'crew.php', 'hiring.php', 'schedule.php', 'schedule_api.php',
+    'timeline.php', 'timeline_import.php', 'shots_api.php', 'wizard.php',
+    'standards.php', 'step.php', 'finance_project.php', 'import.php',
+];
+
+/** Why this POST may not save, when it touches a frozen project; else null. */
+function kickoff_frozen(): ?string {
+    global $pdo;
+    if (!($pdo instanceof PDO)) return null;
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (!in_array($script, KICKOFF_FROZEN_SCRIPTS, true)) return null;
+    $pid = (int)($_GET['project'] ?? $_POST['project'] ?? $_POST['project_id'] ?? 0);
+    if ($pid <= 0 && in_array($script, ['brief.php', 'finance_project.php'], true)) {
+        $pid = (int)($_GET['id'] ?? 0);
+    }
+    if ($pid <= 0) return null;
+    try {
+        $q = $pdo->prepare("SELECT 1 FROM project_kickoffs WHERE project_id = ? AND state = 'pending' LIMIT 1");
+        $q->execute([$pid]);
+        if (!$q->fetchColumn()) return null;
+    } catch (PDOException $e) {
+        return null;   // migration 049 pending
+    }
+    return 'This project is frozen while its kick-off waits for sign-off, so nothing on it can be changed. '
+         . 'To change something, withdraw the request on the Kick-off page, or wait for an answer.';
 }
 
 /** For pages only an admin may open. */
@@ -378,6 +432,12 @@ function require_login_json(): void {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => 'Your account has view-only access.']);
+        exit;
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($why = kickoff_frozen()) !== null) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => $why]);
         exit;
     }
 }
