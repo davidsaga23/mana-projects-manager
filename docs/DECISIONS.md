@@ -3649,6 +3649,23 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
 
+## 2026-10-16 — A Supervisor role: an artist who consults Timeline and Staffing, edits Shots
+**Decision:** a fourth role, `supervisor` (migration 047). Everything an artist can do, plus
+sees a project's Timeline and Staffing tabs (read-only) and edits its Shots. David: "a
+supervisor role who has all the artist permissions but adding the timeline, staffing, shots",
+then "Supervisors can't edit timeline or staffing, it's more for them to consult." Artists
+and Bookings were also asked for; both were already open to every logged-in account to read.
+**Why this shape:** `can_edit()` stays false for a supervisor, so every other screen keeps
+the artist's answer without being touched. Shots asks `can_edit_area()` instead (Timeline and Staffing ask it too, and get no),
+and the write guard in `require_login()` / `require_login_json()` lets a supervisor's POST
+through only for the files named in `SUPERVISOR_SCRIPTS` (includes/auth.php). Same
+allow-list idea as `artist_may_post()`: a screen added later is refused by default.
+**Consequence:** no money for supervisors. Rates and quotes on Staffing go through
+`money.php`, which stays admin-only. Schedule, Dashboard and a crew member's own page stay
+artist-level until somebody asks. Letting supervisors edit an area later is one line in
+`SUPERVISOR_SCRIPTS`, for any screen that already asks `can_edit_area()`. The JSON write guard now also refuses during a preview,
+which it should always have done (the HTML guard already did).
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
