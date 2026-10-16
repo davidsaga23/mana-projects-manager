@@ -1,4 +1,4 @@
--- 047 — the running timer works in pomodoro cycles.
+-- 048 — the running timer works in pomodoro cycles.
 --
 -- David, 2026-10-16: "when you hit start in the My tasks tab let's create
 -- pomodoro cycles instead of just letting the time run".

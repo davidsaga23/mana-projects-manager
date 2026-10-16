@@ -3653,7 +3653,7 @@ David has run a show on it.
 **Decision:** Start begins a 25-minute focus block instead of an open stopwatch. When it ends
 the 25 minutes are logged to the card and a 5-minute break starts (15 after every fourth
 block). Breaks are never logged. The next focus block waits for a click. Stopping a focus block
-early logs the minutes it actually ran. Migration 047 adds `phase` and `focus_round` to the
+early logs the minutes it actually ran. Migration 048 adds `phase` and `focus_round` to the
 same `time_timers` row, so one timer per person is still enforced by the schema.
 **Why:** David asked for the rhythm ("let's create pomodoro cycles instead of just letting the
 time run"). The 2026-10-08 entry deferred it so the hours would stay measured rather than
@@ -3663,7 +3663,7 @@ only figure the cycle caps is an overrun nobody was at the desk for.
 tasks loads or a timer button is pressed, so a closed tab loses nothing; the browser is only
 the alarm (chime, desktop notification, countdown in the tab title). A block that ends while
 nobody is there logs exactly 25 minutes. Each block is its own `time_logs` row. A timer that
-was already running when 047 was applied stays an open stopwatch until it is stopped.
+was already running when 048 was applied stays an open stopwatch until it is stopped.
 **Overruns stay capped, by David's choice:** "if they forget to start the next cycle they can
 log time manually. If done the other way around they might step away or forget but the log
 will be made regardless."

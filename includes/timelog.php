@@ -313,7 +313,7 @@ function time_log_target(array $row): string {
 // is still the primitive: a focus block measures real minutes against a card,
 // and stopping one early logs what it actually ran, never a rounded 25. What
 // the cycle adds is the rhythm — a focus block that ends itself, a break that
-// is never logged, and a long break after every fourth block. Migration 047.
+// is never logged, and a long break after every fourth block. Migration 048.
 //
 // ⚠ NOTHING IS LOGGED THAT NOBODY WORKED. A focus block left running while its
 // owner is away logs its 25 minutes and no more, and the next block waits for a
@@ -329,7 +329,7 @@ function timers_available(PDO $pdo): bool {
     return column_exists($pdo, 'time_timers', 'crew_id');
 }
 
-/** Are pomodoro cycles there? Migration 047. Without it Start is the old stopwatch. */
+/** Are pomodoro cycles there? Migration 048. Without it Start is the old stopwatch. */
 function pomodoro_available(PDO $pdo): bool {
     return column_exists($pdo, 'time_timers', 'phase');
 }
