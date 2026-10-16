@@ -3649,6 +3649,21 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
 
+## 2026-10-16 — A Supervisor role: an artist who also runs Timeline, Staffing and Shots
+**Decision:** a fourth role, `supervisor` (migration 047). Everything an artist can do, plus
+sees and edits a project's Timeline, Staffing (Crew and Hiring) and Shots. David: "a
+supervisor role who has all the artist permissions but adding the timeline, staffing, shots."
+Edit as well as view was the default taken; view-only would have been a smaller change.
+**Why this shape:** `can_edit()` stays false for a supervisor, so every other screen keeps
+the artist's answer without being touched. The three areas ask `can_edit_area()` instead,
+and the write guard in `require_login()` / `require_login_json()` lets a supervisor's POST
+through only for the files named in `SUPERVISOR_SCRIPTS` (includes/auth.php). Same
+allow-list idea as `artist_may_post()`: a screen added later is refused by default.
+**Consequence:** no money for supervisors. Rates and quotes on Staffing go through
+`money.php`, which stays admin-only. Schedule, Dashboard and a crew member's own page stay
+artist-level until somebody asks. The JSON write guard now also refuses during a preview,
+which it should always have done (the HTML guard already did).
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

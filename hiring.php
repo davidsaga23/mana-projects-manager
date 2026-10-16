@@ -315,7 +315,7 @@ if ($fromFinance) {
   <?php endif; ?>
 
   <?php // ---- add several at once ----------------------------------------- ?>
-  <?php if (can_edit()):
+  <?php if (can_edit_area('staffing')):
     $sugg = hire_suggestions($pdo, $projectId);
     $extras = hire_extras_available($pdo);
     // Everybody ever recorded as a candidate, across every project, one row per
@@ -649,7 +649,7 @@ if ($fromFinance) {
                       <div class="muted small"><?= e($h['notes']) ?></div>
                     <?php endif; ?>
 
-                    <?php if (can_edit() && $h['stage'] !== 'hired'): ?>
+                    <?php if (can_edit_area('staffing') && $h['stage'] !== 'hired'): ?>
                       <details class="inline-actions">
                         <summary>Update</summary>
 
@@ -791,7 +791,7 @@ if ($fromFinance) {
             </td>
           <?php endif; ?>
           <td>
-            <?php if (can_edit()): ?>
+            <?php if (can_edit_area('staffing')): ?>
               <details class="inline-actions">
                 <summary>Edit</summary>
                 <form method="post" class="inline-form">

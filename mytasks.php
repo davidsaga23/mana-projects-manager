@@ -61,7 +61,7 @@ if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
 // on their own rows, which is what every query below already enforces. Written
 // once and read by each control, so the buttons and the guard in
 // require_login() cannot disagree about who is allowed.
-$canSetStatus = can_edit() || is_artist();
+$canSetStatus = can_edit() || is_artist() || is_supervisor();
 
 $me = current_user();
 $myCrewId = 0;

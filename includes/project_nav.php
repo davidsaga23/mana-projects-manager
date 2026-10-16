@@ -42,12 +42,23 @@ const PROJECT_TABS_HIDDEN_FROM_VIEWERS = [
     'export',      // Export
 ];
 
+/**
+ * The hidden tabs a SUPERVISOR gets back: Staffing and Timeline, the two of their
+ * three areas (Shots is the third) that artists are not shown. Migration 047.
+ */
+const PROJECT_TABS_SHOWN_TO_SUPERVISORS = [
+    'crew',        // Staffing
+    'timeline',    // Timeline
+];
+
 /** Is this tab, or a link to it, one a viewer should not be shown? */
 
 require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 function hidden_from_viewers(string $key): bool {
-    return !can_edit() && in_array($key, PROJECT_TABS_HIDDEN_FROM_VIEWERS, true);
+    if (can_edit()) return false;
+    if (is_supervisor() && in_array($key, PROJECT_TABS_SHOWN_TO_SUPERVISORS, true)) return false;
+    return in_array($key, PROJECT_TABS_HIDDEN_FROM_VIEWERS, true);
 }
 
 /**

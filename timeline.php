@@ -223,7 +223,7 @@ if ($versionId > 0) {
 // live rows, so a drag there would save into the CURRENT plan, putting today's
 // bar back where it sat last week, while the person dragging believes they are
 // only looking. Nothing is quieter or worse than that.
-$editable = can_edit() && $version === null;
+$editable = can_edit_area('timeline') && $version === null;
 
 // Progress recorded by hand on a step (migration 036). Until it has run the step
 // editor shows its progress box switched off, with the reason, rather than
@@ -315,7 +315,7 @@ require __DIR__ . '/includes/header.php';
 
     <?php if ($version !== null): ?>
       <a class="button" href="timeline.php?project=<?= (int)$projectId ?>">See the current timeline</a>
-    <?php elseif (can_edit()): ?>
+    <?php elseif (can_edit_area('timeline')): ?>
       <?php // The action rides in a hidden field, not on the button: the button
             // is disabled as the form goes, so a double click cannot save two
             // identical versions, and a disabled button is not posted. ?>
@@ -335,7 +335,7 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
     </span>
   </div>
-<?php elseif (can_edit()): ?>
+<?php elseif (can_edit_area('timeline')): ?>
   <p class="muted small">Saving versions of this timeline needs database update <strong>035</strong>.
     <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
 <?php endif; ?>

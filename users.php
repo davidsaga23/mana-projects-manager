@@ -12,7 +12,13 @@ require_once __DIR__ . '/includes/crew.php';
 require_admin();
 
 $currentUserId = (int)$_SESSION['user_id'];
-const USER_ROLES = ['admin', 'editor', 'artist'];
+const USER_ROLES = ['admin', 'editor', 'supervisor', 'artist'];
+
+// The column only accepts 'supervisor' once migration 047 has run. Before that a
+// strict server refuses the save, and a lax one quietly stores an empty role,
+// which locks the person into read-only with no status changes either. So the
+// role is neither offered nor accepted until the column can hold it.
+$hasSupervisor = migration_applied($pdo, '047_role_supervisor.sql');
 
 // Which PERSON a login is. Arrives with the tickets phase (migration 017);
 // hidden rather than breaking the screen if that hasn't run.
@@ -33,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $display  = trim($_POST['display_name'] ?? '');
             $password = $_POST['password'] ?? '';
             $role     = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'artist';
+            if ($role === 'supervisor' && !$hasSupervisor) {
+                throw new RuntimeException('The Supervisor role needs migration 047, run it on the Migrations screen first.');
+            }
 
             if ($username === '')        throw new RuntimeException('A username is required.');
             if (strlen($password) < 8)   throw new RuntimeException('The password must be at least 8 characters.');
@@ -52,6 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'set_role') {
             $id   = (int)($_POST['user_id'] ?? 0);
             $role = in_array($_POST['role'] ?? '', USER_ROLES, true) ? $_POST['role'] : 'artist';
+            if ($role === 'supervisor' && !$hasSupervisor) {
+                throw new RuntimeException('The Supervisor role needs migration 047, run it on the Migrations screen first.');
+            }
 
             // Losing the last admin would leave nobody able to manage accounts,
             // and no way back in short of editing the database by hand.
@@ -257,6 +269,9 @@ require __DIR__ . '/includes/header.php';
           <select name="role" onchange="this.form.submit()">
             <option value="admin"  <?= $u['role']==='admin'  ? 'selected':'' ?>>Admin</option>
             <option value="editor" <?= $u['role']==='editor' ? 'selected':'' ?>>Editor</option>
+            <?php if ($hasSupervisor): ?>
+            <option value="supervisor" <?= $u['role']==='supervisor' ? 'selected':'' ?>>Supervisor</option>
+            <?php endif; ?>
             <option value="artist" <?= $u['role']==='artist' ? 'selected':'' ?>>Artist</option>
           </select>
         </form>
@@ -352,6 +367,7 @@ require __DIR__ . '/includes/header.php';
     See Anima as
     <select name="role">
       <option value="editor">an Editor</option>
+      <option value="supervisor">a Supervisor</option>
       <option value="artist">an Artist</option>
     </select>
   </label>
@@ -370,6 +386,9 @@ require __DIR__ . '/includes/header.php';
     <label>Role
       <select name="role">
         <option value="artist" selected>Artist, reads everything, sets the status of their own work</option>
+        <?php if ($hasSupervisor): ?>
+        <option value="supervisor">Supervisor, an artist who also edits Timeline, Staffing and Shots</option>
+        <?php endif; ?>
         <option value="editor">Editor, full production access</option>
         <option value="admin">Admin, full access, can manage users</option>
       </select>
