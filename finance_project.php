@@ -16,6 +16,7 @@ require_once __DIR__ . '/includes/finance_nav.php';
 require_once __DIR__ . '/includes/standards.php';
 require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/stopcost.php';
+require_once __DIR__ . '/includes/budgetpool.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -1662,6 +1663,248 @@ function invAddRows() {
 
 <?php endif; ?>
 <?php // ---- end INVOICES --------------------------------------------------- ?>
+
+<?php // ---- BUDGET POOL ----------------------------------------------------
+      //
+      // David, 2026-10-16: the show in days rather than money, so a producer can
+      // steer by the pool draining. Everything is computed in budget_pool(); this
+      // block only draws it, which is the same split every other tab here keeps.
+      ?>
+<?php if ($tab === 'pool'): ?>
+<?php $pool = budget_pool($pdo, $project); $pcur = $pool['currency']; ?>
+
+<h3>The pool <span class="muted">— the show in days, not money</span></h3>
+
+<?php if (!$pool['days']['rows'] && !$pool['seconds']['rows']): ?>
+  <?php // ⚠ AN EMPTY SCREEN HAS TO SAY WHY. Three different things produce no
+        // pool at all, and "nothing here" would send somebody hunting through
+        // four screens to find out which. ?>
+  <div class="flash flash-warn">
+    <p><strong>There is no pool to show yet.</strong> It is worked out from each step's
+      headcount and its dates, so it needs both:</p>
+    <ul class="small">
+      <li>somebody standing in each step — set on
+        <a href="crew.php?project=<?= $projectId ?>">Staffing</a>, slots count as well as people;</li>
+      <li>a start date and a deadline on the step — set on
+        <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>.</li>
+    </ul>
+    <p class="small">Nothing is typed in here. Fix those and this screen fills itself in.</p>
+  </div>
+<?php else: ?>
+
+<div class="dash-strip">
+  <div><span class="muted small">Day pool</span>
+    <strong><?= e(fmt_num($pool['days']['pool'], 1)) ?> days</strong>
+    <span class="muted small">headcount &times; each step's window</span></div>
+  <div><span class="muted small">Used</span>
+    <strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days</strong>
+    <?php // ⚠ THE SOURCE IS ON THE FIGURE, not in a footnote. Two very
+          // different numbers can sit here — what the plan says has been
+          // consumed, and what somebody actually recorded — and a reader who
+          // does not know which is looking at is worse off than one who has no
+          // number at all. ?>
+    <span class="<?= $pool['source'] === 'plan' ? 'warn-text' : 'muted' ?> small">
+      <?= $pool['source'] === 'plan' ? 'from the plan, not logged hours' : 'from logged hours' ?></span></div>
+  <div><span class="muted small">Left</span>
+    <strong class="<?= $pool['days']['left'] < 0 ? 'err' : '' ?>">
+      <?= e(fmt_num(abs($pool['days']['left']), 1)) ?> days</strong>
+    <span class="<?= $pool['days']['left'] < 0 ? 'err' : 'muted' ?> small">
+      <?= $pool['days']['left'] < 0 ? 'OVERDRAWN'
+          : e(fmt_num(100 - $pool['days']['pct_used'], 0)) . '% of the pool' ?></span></div>
+  <div><span class="muted small">Work done</span>
+    <strong><?= e(fmt_num($pool['work']['done'], 0)) ?> of <?= e(fmt_num($pool['work']['total'], 0)) ?></strong>
+    <span class="muted small">shots and assets</span></div>
+  <div><span class="muted small">Pace</span>
+    <strong class="<?= e($pool['days']['pace_class']) ?>">
+      <?= e(fmt_num($pool['days']['pct_used'], 0)) ?>% / <?= e(fmt_num($pool['work']['pct'], 0)) ?>%</strong>
+    <span class="<?= e($pool['days']['pace_class']) ?> small"><?= e($pool['days']['pace_text']) ?></span></div>
+</div>
+
+<p class="muted small">
+  Every figure above is in <strong>days</strong>; money appears only inside a step, next to the
+  rate that converts it. The pool is <em>not typed in</em> — it is each step's headcount
+  multiplied by the working days between its start date and its deadline, so a date changed on
+  <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a> moves this screen
+  with it.
+  <?php if ($pool['source'] === 'plan'): ?>
+    Used days come from that same window up to today, because nothing has been logged yet:
+    a slot that started three weeks ago has consumed those person-days whether or not anybody
+    recorded them, which is just as true of the money. The moment hours are logged — by hand or
+    with the timer on <a href="mytasks.php">My tasks</a> — this switches to them and says so.
+  <?php else: ?>
+    Used days are real logged hours divided by this project's
+    <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day.
+  <?php endif; ?>
+</p>
+
+<?php if ($pool['undated']): ?>
+  <?php // ⚠ NAMED, NOT DROPPED. A step with people on it but no dates cannot be
+        // measured, and leaving it out silently makes the show look smaller and
+        // healthier than it is — the exact shape of failure Lesson 11 records. ?>
+  <div class="flash flash-warn">
+    <strong><?= count($pool['undated']) ?>
+      step<?= count($pool['undated']) === 1 ? '' : 's' ?> could not be counted</strong>
+    because <?= count($pool['undated']) === 1 ? 'it has' : 'they have' ?> people assigned but no
+    start date or deadline: <?= e(implode(', ', $pool['undated'])) ?>.
+    The totals above are missing <?= count($pool['undated']) === 1 ? 'it' : 'them' ?>.
+    <a href="production.php?project=<?= $projectId ?>">Set the dates</a> and
+    <?= count($pool['undated']) === 1 ? 'it joins' : 'they join' ?> the pool.
+  </div>
+<?php endif; ?>
+
+<?php if ($pool['days']['rows']): ?>
+<h3>By pipeline step</h3>
+<div class="step-cards">
+  <?php foreach ($pool['days']['rows'] as $r): ?>
+    <?php
+    // The bar carries the step's own colour until the comparison has something
+    // to say, then it carries the verdict — the same rule the production
+    // dashboard's cards follow, so the two read as one family.
+    $bar = $r['pace_class'] === 'ok' ? 'var(--ok)'
+         : ($r['pace_class'] === 'err' ? 'var(--danger)'
+            : ($r['color'] ?: 'var(--step-default)'));
+    ?>
+    <article class="step-card">
+      <div class="step-card-head">
+        <h4><a href="?project=<?= $projectId ?>&amp;tab=pool&amp;step=<?= (int)$r['id'] ?>#step-<?= (int)$r['id'] ?>"><?= e($r['name']) ?></a></h4>
+        <span class="unit-badge"><?= (int)$r['slots'] ?> slot<?= $r['slots'] === 1 ? '' : 's' ?></span>
+      </div>
+      <div class="mini-bar"><span style="width:<?= e(fmt_num(min(100, $r['pct_used']), 1)) ?>%;background:<?= e($bar) ?>"></span></div>
+      <div class="mini-num"><?= e(fmt_num($r['used'], 1)) ?><span class="mini-total">/<?= e(fmt_num($r['pool'], 1)) ?> days</span></div>
+      <div class="muted small">
+        <?= e(fmt_num($r['left'], 1)) ?> days left
+        <?php if ($r['rate_min'] !== null): ?>
+          · <?= $r['rate_same']
+                ? e(fmt_money_plain($r['rate_min'], $pcur)) . ' a day'
+                : e(fmt_money_plain($r['rate_min'], $pcur)) . '—' . e(fmt_money_plain($r['rate_max'], $pcur)) . ' a day' ?>
+        <?php endif; ?>
+      </div>
+      <div class="mini-pace">
+        <div><strong><?= e(fmt_unit($r['done'], $r['unit'])) ?></strong>
+          of <?= e(fmt_unit($r['total'], $r['unit'])) ?> done</div>
+        <div class="<?= e($r['pace_class']) ?> small"><?= e($r['pace_text']) ?></div>
+        <?php // ⚠ UNDERSTAFFING LOOKS LIKE UNDERSPENDING, and this is the line
+              // that stops it reading as good news. The pool counts the slots the
+              // plan plans for; only people who exist burn it. ?>
+        <?php if ($r['filled'] < $r['slots']): ?>
+          <div class="warn-text small"><?= (int)$r['filled'] ?> of <?= (int)$r['slots'] ?> slots filled
+            — the pool assumes <?= (int)$r['slots'] ?></div>
+        <?php endif; ?>
+      </div>
+    </article>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($pool['seconds']['rows']): ?>
+  <h3>Paid by the second <span class="muted">a separate pool, in seconds</span></h3>
+  <p class="muted small">
+    ⚠ These add nothing to the day pool above and take nothing from it — a second is not a day,
+    and the two are never summed. They carry no pace line either: a per-second artist is paid for
+    seconds <em>approved</em>, so what has been spent and what has been delivered are the same
+    measurement, and comparing them would always say "level".
+  </p>
+  <div class="step-cards">
+    <?php foreach ($pool['seconds']['rows'] as $r): ?>
+      <article class="step-card">
+        <div class="step-card-head">
+          <h4><?= e($r['name']) ?></h4>
+          <span class="unit-badge">per second</span>
+        </div>
+        <div class="mini-bar"><span style="width:<?= e(fmt_num(min(100, $r['pct_used']), 1)) ?>%;background:<?= e($r['color'] ?: 'var(--step-default)') ?>"></span></div>
+        <div class="mini-num"><?= e(fmt_num($r['used'], 3)) ?><span class="mini-total">/<?= e(fmt_num($r['pool'], 3)) ?>s approved</span></div>
+        <div class="muted small">
+          <?= e(fmt_num($r['left'], 3)) ?>s to go
+          <?php if ($r['rate'] !== null): ?>
+            · <?= e(fmt_money_plain($r['rate'], $pcur)) ?> a second
+            · <?= e(fmt_money_plain($r['rate'] * $r['pool'], $pcur)) ?> the lot
+          <?php endif; ?>
+        </div>
+        <?php if (!$r['tracks_seconds']): ?>
+          <div class="warn-text small">This step is tracked in items, not seconds, so the figures
+            above are item counts. Set it to track seconds for a real seconds pool.</div>
+        <?php endif; ?>
+      </article>
+    <?php endforeach; ?>
+  </div>
+  <p class="muted small">
+    <?= e(fmt_num($pool['seconds']['used'], 3)) ?>s approved of
+    <?= e(fmt_num($pool['seconds']['pool'], 3)) ?>s across
+    <?= count($pool['seconds']['rows']) ?> step<?= count($pool['seconds']['rows']) === 1 ? '' : 's' ?>.
+  </p>
+<?php endif; ?>
+
+<?php
+// ---- one step in detail ----------------------------------------------------
+// Reached by clicking a card. Rendered underneath rather than on its own page:
+// the comparison that matters is between this step and the pool it came out of,
+// and a separate page would put them a navigation apart.
+$openId = (int)($_GET['step'] ?? 0);
+$open = null;
+foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
+?>
+<?php if ($open): ?>
+  <h3 id="step-<?= (int)$open['id'] ?>"><?= e($open['name']) ?>
+    <span class="muted">— the detail behind the card</span></h3>
+  <div class="dash-strip">
+    <div><span class="muted small">Rate on this step</span>
+      <strong><?= $open['rate_min'] === null ? '—'
+            : e(fmt_money_plain($open['rate_min'], $pcur)) ?></strong>
+      <?php // Which steps already agree on one rate is the map of how far the
+            // studio is from the standard rate card David wants. Said per step,
+            // because that is where it will be set. ?>
+      <?php if ($open['rate_min'] === null): ?>
+        <span class="warn-text small">no rate on file for anybody here</span>
+      <?php elseif ($open['rate_same']): ?>
+        <span class="ok small">every slot agrees — already standard</span>
+      <?php else: ?>
+        <span class="warn-text small">slots differ: <?= e(fmt_money_plain($open['rate_min'], $pcur)) ?>
+          to <?= e(fmt_money_plain($open['rate_max'], $pcur)) ?></span>
+      <?php endif; ?></div>
+    <div><span class="muted small">Pool in days</span>
+      <strong><?= e(fmt_num($open['pool'], 1)) ?> days</strong>
+      <span class="muted small"><?= (int)$open['slots'] ?> slot<?= $open['slots'] === 1 ? '' : 's' ?> across its window</span></div>
+    <div><span class="muted small">Pool in money</span>
+      <strong><?= $open['rate_min'] === null ? '—'
+            : e(fmt_money_plain($open['pool'] * $open['rate_min'], $pcur)) ?></strong>
+      <span class="muted small">at the rate beside it</span></div>
+    <div><span class="muted small">Used</span>
+      <strong><?= e(fmt_num($open['used'], 1)) ?> days</strong>
+      <span class="muted small"><?= $pool['source'] === 'plan' ? 'from the plan' : 'from logged hours' ?></span></div>
+    <div><span class="muted small">Used in money</span>
+      <strong><?= $open['rate_min'] === null ? '—'
+            : e(fmt_money_plain($open['used'] * $open['rate_min'], $pcur)) ?></strong>
+      <span class="muted small">same rate, so it tracks the days</span></div>
+    <div><span class="muted small">Left</span>
+      <strong class="<?= $open['left'] < 0 ? 'err' : '' ?>"><?= e(fmt_num(abs($open['left']), 1)) ?> days</strong>
+      <span class="<?= $open['left'] < 0 ? 'err' : 'muted' ?> small">
+        <?= $open['left'] < 0 ? 'OVERDRAWN' : e(fmt_num(100 - $open['pct_used'], 0)) . '% still to use' ?></span></div>
+  </div>
+
+  <div class="pool-detail">
+    <?= pool_ring_svg($open['pct_used'], 'of days used') ?>
+    <div>
+      <p class="<?= e($open['pace_class']) ?>"><strong><?= e($open['pace_text']) ?></strong></p>
+      <p class="muted small">
+        <?= e(fmt_unit($open['done'], $open['unit'])) ?> of
+        <?= e(fmt_unit($open['total'], $open['unit'])) ?> approved.
+        <?php if ($open['filled'] < $open['slots']): ?>
+          Only <?= (int)$open['filled'] ?> of <?= (int)$open['slots'] ?> slots are filled, so the
+          days are being used more slowly than the plan assumes — this step is not under budget,
+          it is under-staffed.
+        <?php endif; ?>
+      </p>
+      <p class="muted small">
+        <a href="step.php?project=<?= $projectId ?>&amp;step=<?= (int)$open['id'] ?>">Open the step</a>
+        · <a href="?project=<?= $projectId ?>&amp;tab=pool">close this</a>
+      </p>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php endif; ?>
+<?php endif; ?>
+<?php // ---- end BUDGET POOL ------------------------------------------------ ?>
 
 </div>
 </body></html>

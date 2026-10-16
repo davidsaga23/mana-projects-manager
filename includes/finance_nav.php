@@ -24,6 +24,11 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
          'href' => 'finance_project.php' . $p . '&tab=projection'],
         ['key' => 'invoices',   'label' => 'Invoices',
          'href' => 'finance_project.php' . $p . '&tab=invoices'],
+        // THE SAME SHOW IN DAYS (David, 2026-10-16), after the three money tabs
+        // because it is read second: you come here once the money has raised a
+        // question, to find out how many days that question is worth.
+        ['key' => 'pool',       'label' => 'Budget pool',
+         'href' => 'finance_project.php' . $p . '&tab=pool'],
         // The SAME screen the project side links to, not a copy of it. Hiring is
         // one conversation whether it is opened from the plan or from the
         // budget, and two copies of it would drift — the money on it is already
@@ -50,7 +55,7 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
 
 /** The tabs this file knows about, for validating a ?tab= value. */
 function finance_tabs(): array {
-    return ['overview', 'projection', 'invoices'];
+    return ['overview', 'projection', 'invoices', 'pool'];
 }
 
 /** Render the bar. $current is the key of the tab drawing it. */

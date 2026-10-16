@@ -3598,6 +3598,57 @@ vocabulary it could belong to.
 Both were inside it at first, which left the button rendering on an empty Studio Tasks with no
 dialog behind it — and an empty list is exactly when somebody wants to add the first card.
 
+## 2026-10-16 — The budget pool is derived, never typed
+**Decision:** a Budget pool tab under Finance management shows the show in days. The pool is
+each pipeline step's headcount multiplied by the working days between its start date and its
+deadline, computed on every page load in `budget_pool()`. There is no table behind it.
+**Why:** David, 2026-10-16: "Days should come from the headcount & days, this is what the math
+(quota, start/end dates, and headcount) tells us we need in days." A stored copy would be a
+fourth number claiming to describe the same plan, beside the scheduler, the quota and the
+expense projection — and this codebase has already paid for figures that drift apart.
+**Consequence:** fixing a date on Dates & headcount moves this screen, with nothing to re-enter
+and nothing to re-approve. The MVP therefore needed no migration at all.
+
+## 2026-10-16 — Days and seconds are two pools, and the unit belongs to the person
+**Decision:** people paid per approved second get a pool measured in seconds, which neither
+adds to nor subtracts from the day pool. The split is made per LANE, not per step.
+**Why:** David: "for those departments based on a per second the pool will have to be in
+seconds too... I think those pipeline steps won't add or subtract days to the total days pool."
+A second is not a day and summing them makes a number that is not of anything — the rule
+`project_stop_cost()` already follows for currencies.
+**Why per lane:** `crew_terms` is keyed by `crew_id`, so the rate unit belongs to the PERSON.
+MSD's Color (Environment) holds Surendra by the day and Artie by the second at once. "A seconds
+step" is not a thing that exists, so one step can appear in both pools.
+**Consequence:** the seconds cards carry no pace line. A per-second artist is paid for seconds
+*approved*, so spend and progress are the same measurement and comparing them would always read
+"level".
+
+## 2026-10-16 — Spend comes from the plan until somebody logs an hour, and says which
+**Decision:** used days are the same dated window measured up to today, counting only slots with
+a real person in them. If any hours have been logged through `time_logs`, those are used
+instead. The figure always carries its source on screen.
+**Why:** there are no time logs yet, and David asked how spend could possibly be subtracted
+without them. A slot that started three weeks ago has consumed those person-days whether or not
+anybody recorded them — which is exactly as true of the money. What is not acceptable is
+showing the two sources interchangeably without saying which is on screen.
+**Consequence, deliberate and asymmetric:** the pool counts every planned slot, filled or not,
+because the plan is the plan; spend counts only real people, because an empty slot burns
+nothing. An understaffed step therefore looks like it is under budget when it is really heading
+for late, so the card says "1 of 2 slots filled" whenever the two disagree. Without that line
+the screen would quietly reward understaffing.
+
+## 2026-10-16 — A pace badge that cannot mean anything says so instead of going red
+**Decision:** days-against-progress is left uncoloured, with the reason in words, when a step
+has fewer than three items or has used under 15% of its pool.
+**Why:** the mockup exposed both. MSD's Color Script is a whole-project step with ONE item, so
+it reads 0% done for its entire life and 100% on the last day — it would have sat red from
+start to finish and gone green an hour before delivery. And every step consumes setup days
+before its first shot lands, so new steps skew red for a structural reason rather than a real
+one. Five of seven cards came out red in the mockup, and a wall of red carries no signal.
+**Consequence:** the thresholds are two named constants at the top of `includes/budgetpool.php`,
+because they are a judgement about how twitchy the warning should be and will want tuning once
+David has run a show on it.
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart

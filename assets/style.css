@@ -1666,6 +1666,16 @@ svg.trend { margin: 0; }
 }
 .timer-drop:hover:not(:disabled) { color: var(--danger); background: none; }
 
+/* Budget pool: the ring and the words beside it (David, 2026-10-16). Wraps on a
+   narrow window rather than squeezing the ring, which stops being readable well
+   before the text does. */
+.pool-detail {
+  display: flex; gap: 34px; align-items: center; flex-wrap: wrap;
+  margin: 18px 0 26px;
+}
+.pool-detail > div { flex: 1 1 320px; }
+.pool-detail p { margin: 0 0 6px; }
+
 /* The two Final balance tiles on Finance Overview (David, 2026-10-12).
    Amber while the show is still being invoiced and settled, green once it is
    really over. Deliberately the SAME --warn-tint the pending staffing slots use
