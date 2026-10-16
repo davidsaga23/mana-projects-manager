@@ -22,8 +22,14 @@
 --       and writes a new one; nothing is overwritten.
 --
 --   project_kickoff_signoffs
---       One row per person asked, created when it is sent. Who was asked is part
---       of the record, so "Tim approved, Jorik never answered" stays readable.
+--       One row per person asked, created when it is sent. Who was asked is
+--       chosen in a pop-up when sending (pre-ticked from users.signs_off_kickoff)
+--       and is part of the record, so "Tim approved, Jorik never answered" stays
+--       readable.
+--
+-- While a request is pending the project is FROZEN: saves on its setup screens
+-- are refused (KICKOFF_FROZEN_SCRIPTS in includes/auth.php). Asking for changes
+-- unfreezes it; sending again takes a new snapshot, which becomes the kick-off.
 --
 -- ⚠ THE MONEY IS NOT IN HERE. The expense projection, invoices and budget pool
 -- at kick-off go to the FINANCE database (finance_install_08.sql), for the same
@@ -63,6 +69,9 @@ CREATE TABLE IF NOT EXISTS project_kickoff_signoffs (
   decision ENUM('approved','changes') DEFAULT NULL,
   note TEXT DEFAULT NULL,
   decided_at DATETIME DEFAULT NULL,
+  -- Set when an administrator approved in this person's place (David,
+  -- 2026-10-16: possible, but everybody is emailed that it happened).
+  approved_by_override VARCHAR(100) DEFAULT NULL,
   -- What happened to the email, in a sentence, so "did they even get it?" has
   -- an answer on screen.
   email_result VARCHAR(255) DEFAULT NULL,

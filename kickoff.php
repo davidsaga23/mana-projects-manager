@@ -42,7 +42,7 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($_POST['understood'])) {
                 throw new RuntimeException('Tick the box to confirm you have read the warning.');
             }
-            foreach (kickoff_request($pdo, $project) as $m) flash('ok', $m);
+            foreach (kickoff_request($pdo, $project, (array)($_POST['signers'] ?? [])) as $m) flash('ok', $m);
             flash('ok', 'The setup is frozen and waiting for sign-off. The project stays in setup until everybody has approved.');
 
         } elseif ($action === 'approve' || $action === 'changes') {
@@ -52,6 +52,12 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgs = kickoff_decide($pdo, $project, $kick, $action === 'approve' ? 'approved' : 'changes',
                                    (string)($_POST['note'] ?? ''));
             foreach ($msgs as $m) flash('ok', $m);
+
+        } elseif ($action === 'override') {
+            if (!$kick || (int)$kick['id'] !== (int)($_POST['kickoff_id'] ?? 0)) {
+                throw new RuntimeException('This sign-off has been replaced by a newer one. Look at the page again.');
+            }
+            foreach (kickoff_override($pdo, $project, $kick, (string)($_POST['note'] ?? '')) as $m) flash('ok', $m);
 
         } elseif ($action === 'withdraw') {
             if (!$kick) throw new RuntimeException('There is nothing open to withdraw.');
@@ -125,9 +131,8 @@ if ($view === 'people'):
            FROM users u LEFT JOIN crew c ON c.id = u.crew_id
           WHERE u.active = 1 ORDER BY name"
     )->fetchAll(); ?>
-  <p class="lead">The people ticked here are asked to approve every project before it goes from setup to
-    active, and the project only turns active once all of them have. It applies to every project, not just
-    this one.</p>
+  <p class="lead">The people ticked here are pre-ticked in the pop-up that sends a project for sign-off, on every
+    project. Whoever sends it can change the choice there. Each person is emailed at the address below.</p>
   <form method="post">
     <input type="hidden" name="action" value="people">
     <table class="data kickoff-people">
@@ -200,43 +205,56 @@ else:
     $signs = $kick ? kickoff_signoffs($pdo, (int)$kick['id']) : [];
     $mine  = null;
     foreach ($signs as $s) if ((int)$s['user_id'] === (int)($me['id'] ?? 0)) $mine = $s;
-    $signers = kickoff_signers($pdo);
+    $candidates = kickoff_candidates($pdo);
     $isOpen  = $kick && in_array($kick['state'], ['pending', 'changes_requested'], true);
+
+    // THE POP-UP that sends it (David, 2026-10-16: "a pop up window choosing
+    // from the users who should sign off"). Pre-ticked with whoever was asked
+    // last time, else with the defaults under Who signs off.
+    $askedBefore = array_map(fn($s) => (int)$s['user_id'], $signs);
+    $sendDialog = function (string $buttonLabel, string $buttonClass) use ($candidates, $askedBefore, $project) {
+        if ($why = kickoff_finance_problem()) { echo '<p class="err">' . e($why) . '</p>'; return; }
+        if (!can_edit()) return; ?>
+        <button type="button" class="<?= e($buttonClass) ?>"
+                onclick="document.getElementById('kickoff-send-dialog').showModal()"><?= e($buttonLabel) ?></button>
+        <dialog id="kickoff-send-dialog" class="kickoff-dialog">
+          <form method="post" class="kickoff-send" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="action" value="send">
+            <h3>Who should sign off <?= e($project['name']) ?>?</h3>
+            <p class="muted small">The project turns active once everybody ticked here has approved. Each is emailed a
+              link; they log in to Anima to answer.</p>
+            <?php if (!$candidates): ?>
+              <p class="err">There is nobody with an admin or editor login to ask.</p>
+            <?php endif; ?>
+            <?php foreach ($candidates as $c):
+                $on = $askedBefore ? in_array((int)$c['id'], $askedBefore, true) : (int)$c['is_default'] === 1; ?>
+              <label class="kickoff-pick"><input type="checkbox" name="signers[]" value="<?= (int)$c['id'] ?>" <?= $on ? 'checked' : '' ?>>
+                <?= e($c['name']) ?> <span class="muted small"><?= $c['email'] ? e($c['email']) : 'no email on file, will only see it in Anima' ?></span></label>
+            <?php endforeach; ?>
+            <hr>
+            <label class="kickoff-pick"><input type="checkbox" name="understood" value="1" required>
+              I've checked the setup and want to freeze it and send it for sign-off</label>
+            <div class="inline-form">
+              <button type="submit">Freeze and send</button>
+              <button type="button" class="secondary" onclick="this.closest('dialog').close()">Cancel</button>
+            </div>
+          </form>
+        </dialog>
+    <?php };
 ?>
 
   <?php if ($project['status'] === 'setup' && !$isOpen): ?>
     <?php // ---- THE WARNING ------------------------------------------------ ?>
     <div class="flash flash-warn kickoff-warning">
       <p><strong>Going from setup to active is an important change.</strong></p>
-      <p>Sending this freezes how <?= e($project['name']) ?> is set up today and asks
-        <?= $signers ? e(implode(' and ', array_map(fn($s) => $s['name'], $signers))) : 'the people who sign off' ?>
-        to approve it. The project stays in setup until all of them have approved, then turns active by itself.
-        What is frozen is what the postmortem will compare the finished show against, so check it is right first.</p>
+      <p>Sending this freezes how <?= e($project['name']) ?> is set up today and asks the people you choose to
+        approve it. Until they answer, nothing on the project's setup can be changed. It turns active by itself once
+        all of them have approved. What is frozen is what the postmortem will compare the finished show against,
+        so check it is right first.</p>
       <p>Frozen: the Brief, Staffing, Schedule, Timeline, Shots, the Setup (name, type, pipeline, workflow, shots,
         assets, dates and head count) and Finance management (expense projection, invoices, budget pool).</p>
     </div>
-    <?php if (!$signers): ?>
-      <p class="err">Nobody is set to sign off kick-offs yet.
-        <?= is_admin() ? '<a href="' . e($selfUrl) . '&amp;view=people">Choose who signs off →</a>'
-                       : 'Ask an administrator to choose who signs off.' ?></p>
-    <?php else: ?>
-      <ul class="kickoff-signers">
-        <?php foreach ($signers as $s): ?>
-          <li><?= e($s['name']) ?> <span class="muted"><?= $s['email'] ? e($s['email']) : 'no email on file, will see it here only' ?></span></li>
-        <?php endforeach; ?>
-      </ul>
-      <?php if ($why = kickoff_finance_problem()): ?>
-        <p class="err"><?= e($why) ?></p>
-      <?php elseif (can_edit()): ?>
-        <form method="post" class="kickoff-send"
-              onsubmit="this.querySelector('button').disabled = true;">
-          <input type="hidden" name="action" value="send">
-          <label><input type="checkbox" name="understood" value="1" required>
-            I've checked the setup and want to freeze it and send it for sign-off</label>
-          <button type="submit">Freeze and send for sign-off</button>
-        </form>
-      <?php endif; ?>
-    <?php endif; ?>
+    <?php $sendDialog('Choose who signs off and send…', ''); ?>
     <p><a href="index.php">← Back to the projects, leaving it in setup</a></p>
 
   <?php elseif (!$kick): ?>
@@ -253,6 +271,10 @@ else:
     <p class="kickoff-state kickoff-state-<?= e($kick['state']) ?>"><strong><?= e($stateText) ?></strong>
       <span class="muted">· sent by <?= e((string)$kick['requested_by_name']) ?>,
         <?= e(date('j M Y, H:i', strtotime((string)$kick['requested_at']))) ?></span></p>
+    <?php if ($kick['state'] === 'pending'): ?>
+      <div class="flash flash-warn">The project is frozen until this is answered: its setup screens refuse
+        every save. Asking for changes, or withdrawing, unfreezes it.</div>
+    <?php endif; ?>
 
     <table class="data kickoff-signoffs">
       <thead><tr><th>Who</th><th>Answer</th><th>When</th><th>Email</th></tr></thead>
@@ -260,7 +282,8 @@ else:
       <?php foreach ($signs as $s): ?>
         <tr>
           <td><?= e($s['signer_name']) ?></td>
-          <td><?= $s['decision'] === 'approved' ? 'Approved'
+          <td><?= $s['decision'] === 'approved'
+                    ? ($s['approved_by_override'] ? 'Approved by ' . e($s['approved_by_override']) . ' on their behalf' : 'Approved')
                 : ($s['decision'] === 'changes' ? 'Asked for changes' : '<span class="muted">Not yet</span>') ?>
             <?php if ($s['note']): ?><div class="kickoff-prose small"><?= e($s['note']) ?></div><?php endif; ?></td>
           <td><?= $s['decided_at'] ? e(date('j M Y, H:i', strtotime((string)$s['decided_at']))) : '' ?></td>
@@ -272,8 +295,8 @@ else:
 
     <?php if ($kick['state'] === 'pending' && $mine && $mine['decision'] === null): ?>
       <div class="kickoff-answer">
-        <p><strong>You are asked to sign this off.</strong> Below is exactly what was frozen when it was sent.
-          The project's own tabs show it live, which may have moved since.</p>
+        <p><strong>You are asked to sign this off.</strong> Below is exactly what was frozen when it was sent,
+          which is also what the project's own tabs show, since nothing can change until you answer.</p>
         <form method="post" class="inline-form">
           <input type="hidden" name="kickoff_id" value="<?= (int)$kick['id'] ?>">
           <button type="submit" name="action" value="approve"
@@ -292,31 +315,37 @@ else:
       </div>
     <?php endif; ?>
 
+    <?php if ($kick['state'] === 'pending' && is_admin()
+              && array_filter($signs, fn($s) => $s['decision'] === null && (int)$s['user_id'] !== (int)($me['id'] ?? 0))): ?>
+      <details class="kickoff-resend">
+        <summary>Somebody away? Approve on their behalf</summary>
+        <p class="muted small">Approves for everybody who has not answered yet, turns the project active, and emails
+          everybody involved that its original state is being set without their sign-off. The reason goes in the
+          record and the email.</p>
+        <form method="post" onsubmit="return confirm('Approve on behalf of everybody who has not answered?');">
+          <input type="hidden" name="kickoff_id" value="<?= (int)$kick['id'] ?>">
+          <input type="hidden" name="action" value="override">
+          <label>Why it can't wait for them<br><textarea name="note" rows="3" cols="60" required></textarea></label>
+          <button type="submit" class="secondary">Approve on their behalf</button>
+        </form>
+      </details>
+    <?php endif; ?>
+
     <?php if ($isOpen && can_edit() && $project['status'] === 'setup'): ?>
       <div class="kickoff-resend">
         <?php if ($kick['state'] === 'changes_requested'): ?>
-          <p>Make the changes on the project's tabs, then send it again. Sending again freezes the setup as it is
-            then and asks everybody afresh.</p>
-        <?php else: ?>
-          <p class="muted small">Changed the setup since sending? Send it again: that freezes it as it is now and
-            asks everybody afresh, clearing any approvals already given.</p>
-        <?php endif; ?>
-        <?php if ($why = kickoff_finance_problem()): ?>
-          <p class="err"><?= e($why) ?></p>
-        <?php else: ?>
-          <form method="post" class="inline-form" onsubmit="this.querySelector('button').disabled = true;">
-            <input type="hidden" name="action" value="send">
-            <input type="hidden" name="understood" value="1">
-            <button type="submit" class="secondary">Freeze today's setup and send again</button>
-          </form>
+          <p>The project is unfrozen. Make the changes on its tabs, then send it again: that freezes the setup as it
+            is then, replaces this kick-off, and asks everybody afresh.</p>
+          <?php $sendDialog('Freeze the new setup and send again…', ''); ?>
         <?php endif; ?>
         <form method="post" class="inline-form"
-              onsubmit="return confirm('Withdraw the sign-off request? The project stays in setup.');">
+              onsubmit="return confirm('Withdraw the sign-off request? The project stays in setup, unfrozen.');">
           <input type="hidden" name="action" value="withdraw">
           <button type="submit" class="secondary">Withdraw</button>
         </form>
       </div>
     <?php endif; ?>
+
 
     <?php if ($kick['state'] === 'approved'): ?>
       <p><a class="button" href="<?= e($selfUrl) ?>&amp;view=compare">Compare the kick-off with now →</a></p>

@@ -81,6 +81,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $project['name'], str_replace('_', ' ', $status)));
 
         } elseif ($action === 'rename') {
+            // The name is part of what a kick-off freezes (David, 2026-10-16).
+            if (kickoff_ready($pdo) && ($k = kickoff_current($pdo, $id)) && $k['state'] === 'pending') {
+                throw new RuntimeException('This project is frozen while its kick-off waits for sign-off, '
+                    . 'so it cannot be renamed. Withdraw the request on the Kick-off page first.');
+            }
             $name = trim((string)($_POST['name'] ?? ''));
             if ($name === '') throw new RuntimeException('A project needs a name.');
             if (mb_strlen($name) > 255) {

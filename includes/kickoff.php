@@ -83,6 +83,24 @@ function kickoff_signers(PDO $pdo): array {
     return $rows;
 }
 
+/**
+ * Everybody who COULD sign off: active admins and editors (approving is a save,
+ * and an artist's saves are refused). `default` marks the ones ticked under
+ * Who signs off, which the pop-up pre-ticks.
+ */
+function kickoff_candidates(PDO $pdo): array {
+    $rows = $pdo->query(
+        "SELECT u.id, COALESCE(NULLIF(u.display_name, ''), u.username) AS name, u.role,
+                u.signs_off_kickoff AS is_default,
+                COALESCE(NULLIF(TRIM(COALESCE(u.email, '')), ''), NULLIF(TRIM(COALESCE(c.email, '')), '')) AS email
+           FROM users u
+           LEFT JOIN crew c ON c.id = u.crew_id
+          WHERE u.active = 1 AND u.role IN ('admin', 'editor')
+          ORDER BY u.signs_off_kickoff DESC, name"
+    )->fetchAll();
+    return $rows;
+}
+
 /** The latest sign-off request for a project that has not been withdrawn. */
 function kickoff_current(PDO $pdo, int $projectId): ?array {
     $q = $pdo->prepare(
@@ -568,16 +586,19 @@ function kickoff_user_email(PDO $pdo, ?int $userId): ?array {
  *
  * @return string[] sentences for the screen
  */
-function kickoff_request(PDO $pdo, array $project): array {
+function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     $pid = (int)$project['id'];
     if ($project['status'] !== 'setup') {
         throw new RuntimeException('Only a project in setup is sent for sign-off.');
     }
     if ($why = kickoff_finance_problem()) throw new RuntimeException($why);
-    $signers = kickoff_signers($pdo);
+    // Chosen in the pop-up, and checked again here: only people who can save
+    // can approve.
+    $signerIds = array_map('intval', $signerIds);
+    $signers = array_values(array_filter(kickoff_candidates($pdo),
+        fn($u) => in_array((int)$u['id'], $signerIds, true)));
     if (!$signers) {
-        throw new RuntimeException('Nobody is set to sign off kick-offs yet. An administrator ticks them '
-                                 . 'under "Who signs off" on this page.');
+        throw new RuntimeException('Choose at least one person to sign it off. Nothing was sent.');
     }
 
     $snap = kickoff_snapshot($pdo, $project);
@@ -752,6 +773,75 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
             "{$project['name']} has been signed off by everybody and is now active.\n\n{$url}\n");
         $msgs[] = ($kickoff['requested_by_name'] ?: 'Whoever sent it') . ': ' . $res . '.';
     }
+    return $msgs;
+}
+
+/**
+ * An administrator approves in place of everybody who has not answered yet.
+ *
+ * David, 2026-10-16: possible, for when somebody is away, but everybody is
+ * emailed that the original state is being set this way. The reason is kept on
+ * each row it filled in, so the record says it was an override, by whom and why.
+ */
+function kickoff_override(PDO $pdo, array $project, array $kickoff, string $reason): array {
+    if (!is_admin()) throw new RuntimeException('Only an administrator can approve on somebody else\'s behalf.');
+    if ($kickoff['state'] !== 'pending') throw new RuntimeException('This sign-off is no longer waiting for an answer.');
+    $reason = trim($reason);
+    if ($reason === '') throw new RuntimeException('Say why it is being approved without them; everybody is told.');
+
+    $who = current_user_display();
+    $now = date('Y-m-d H:i:s');
+    $kid = (int)$kickoff['id'];
+    $missing = array_values(array_filter(kickoff_signoffs($pdo, $kid), fn($s) => $s['decision'] === null));
+    if (!$missing) throw new RuntimeException('Everybody has already answered.');
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE project_kickoff_signoffs
+                          SET decision = 'approved', decided_at = ?, approved_by_override = ?, note = ?
+                        WHERE kickoff_id = ? AND decision IS NULL")
+            ->execute([$now, mb_substr($who, 0, 100), 'Approved by ' . $who . ' on their behalf: ' . $reason, $kid]);
+        // Same ending as a normal last approval: active, baseline, emails.
+        $pdo->prepare("UPDATE project_kickoffs SET state = 'approved', decided_at = ? WHERE id = ?")->execute([$now, $kid]);
+        $st = $pdo->prepare("UPDATE projects SET status = 'active' WHERE id = ? AND status = 'setup'");
+        $st->execute([(int)$project['id']]);
+        $pdo->prepare('DELETE FROM project_settings WHERE project_id = ? AND setting_key = ?')
+            ->execute([(int)$project['id'], 'wizard_step']);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+
+    $names = implode(' and ', array_map(fn($s) => $s['signer_name'], $missing));
+    $msgs = ['Approved on behalf of ' . $names . '. "' . $project['name'] . '" is '
+           . ($st->rowCount() ? 'now active' : 'signed off') . ', and everybody is being told.'];
+    try {
+        $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
+        if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
+    } catch (Throwable $e) {
+        $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+    }
+
+    // EVERYBODY: every signer asked, and whoever sent it, once each.
+    $to = [];
+    foreach (kickoff_signoffs($pdo, $kid) as $s) {
+        if ($s['signer_email']) $to[strtolower($s['signer_email'])] = ['email' => $s['signer_email'], 'name' => $s['signer_name']];
+    }
+    if ($r = kickoff_user_email($pdo, $kickoff['requested_by'] !== null ? (int)$kickoff['requested_by'] : null)) {
+        $to[strtolower($r['email'])] = $r;
+    }
+    $url  = kickoff_url((int)$project['id']);
+    $line = $who . ' approved the kick-off of ' . $project['name'] . ' on behalf of ' . $names
+          . ', so its original state is being set without their sign-off.';
+    foreach ($to as $t) {
+        [, $res] = kickoff_mail($t,
+            sprintf('[%s] Original state set by override: %s', $project['code'], $project['name']),
+            kickoff_mail_html(htmlspecialchars($line, ENT_QUOTES, 'UTF-8'), [], $url, 'Open the kick-off', 'Reason: ' . $reason),
+            "{$line}\n\nReason: {$reason}\n\n{$url}\n");
+        $msgs[] = $t['name'] . ': ' . $res . '.';
+    }
+    if (!$to) $msgs[] = 'Nobody involved has an email address on file, so nobody was emailed.';
     return $msgs;
 }
 

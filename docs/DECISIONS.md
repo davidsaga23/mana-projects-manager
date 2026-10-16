@@ -3656,12 +3656,16 @@ David has run a show on it.
 writes the per-step baseline. Either can *Ask for changes* with a note. *Kick-off vs now* compares the
 frozen picture with today, linked from the list once a show is in postmortem. Migration 049,
 finance_install_08.sql. David asked for this in those words the same day.
-**Defaults taken, each open to change:** (1) who signs off is a tick on a login, not a name in code;
-(2) the email link needs a login (a magic link would let a forwarded email approve), and the login now
-returns you to the page you were sent to; (3) the snapshot is taken when it is SENT, so what is
-approved is exactly what was stored; editing afterwards means *send again*, which clears approvals;
-(4) no admin override, or the sign-off means nothing; (5) the money is frozen in the finance database,
-so only an administrator can send a project for sign-off, since only they can read it.
+**Settled with David the same day:** (1) who signs off is chosen in a pop-up when sending, pre-ticked
+from *Who signs off* (a tick on a login, admins and editors only); (2) the email link needs a login,
+and the login now returns you to the page you were sent to; (3) the snapshot is taken when it is SENT,
+and **the project is frozen while it waits**: every save on its setup screens is refused
+(`KICKOFF_FROZEN_SCRIPTS`, includes/auth.php), and renaming it on the list too. *Ask for changes*
+unfreezes it; sending again takes a new snapshot, which replaces the old one as the kick-off;
+(4) either signer can ask for changes with a note; (5) an administrator can approve on behalf of
+whoever has not answered, with a reason, and everybody involved is emailed that the original state
+is being set that way; (6) the money is frozen in the finance database, so only an administrator can
+send a project for sign-off, since only they can read it.
 **Why a snapshot and not copied tables:** the snapshot is built by one function, `kickoff_snapshot()`,
 which the comparison runs again today, so both sides are measured the same way. Copied tables would
 break the first time a column is added. Cost: a figure nobody put in the snapshot in 2026 cannot be

@@ -267,6 +267,13 @@ button.danger:hover { background: var(--danger-strong); }
 .kickoff-tabs .button.is-current { pointer-events: none; }
 .kickoff-warning p { margin: 0 0 8px; }
 .kickoff-signers { margin: 8px 0 12px; }
+.kickoff-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 18px 22px; max-width: min(560px, 92vw); }
+.kickoff-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+.kickoff-dialog h3 { margin-top: 0; }
+.kickoff-pick { display: flex; gap: 8px; align-items: baseline; margin: 6px 0; }
+.kickoff-pick input[type="checkbox"] { width: auto; }
+details.kickoff-resend summary { cursor: pointer; }
 .kickoff-send label { display: flex; gap: 8px; align-items: center; }
 .kickoff-send input[type="checkbox"], .kickoff-people input[type="checkbox"] { width: auto; }
 .kickoff-state { font-size: 1.1em; }
