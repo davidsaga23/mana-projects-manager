@@ -169,6 +169,9 @@ foreach ($byDept as $deptName => $deptSteps) {
                 $stage = $stages ? implode(', ', array_unique($stages)) : '';
             } else {
                 $who = (string)$l['name'];
+                // Vendor is said in the sheet as on the screen; Freelance, the
+                // default, is not, so the column stays a list of names.
+                if (collaborator_type_of($l) === 'vendor') $who .= ' (Vendor)';
                 $stage = 'hired';
             }
 
