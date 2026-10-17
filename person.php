@@ -20,6 +20,7 @@ require_once __DIR__ . '/includes/money.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/hiring.php';
+require_once __DIR__ . '/includes/artists.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -72,6 +73,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
         $args[] = $crewId;
         $pdo->prepare($sql)->execute($args);
         flash('ok', 'Details saved.');
+
+        // Freelance or Vendor lives in the ARTIST DATABASE, not on crew, so it
+        // is written there: every record of this person, matched by the crew
+        // link or by the name they had before this save. Only when the form
+        // carried it (a team or empty slot gets no picker).
+        if (isset($_POST['collaborator_type'])) {
+            $said = set_crew_collaborator_type($pdo, $crewId, (string)$person['name'],
+                                               (string)$_POST['collaborator_type']);
+            if ($said !== '') flash('ok', $said);
+        }
 
         // The engagement dates are part of the SAME form and the same save. A
         // separate form per field means a reload per field, which is the habit
@@ -194,6 +205,12 @@ if (column_exists($pdo, 'tickets', 'id')) {
 }
 
 $pageTitle = $person['name'] . ' · ' . $project['name'];
+$collabReady = collaborator_type_available($pdo)
+            && (int)$person['is_placeholder'] !== 1 && (int)$person['is_team'] !== 1;
+$collabType  = $collabReady
+    ? (crew_collaborator_types($pdo, [['id' => $crewId, 'name' => (string)$person['name']]])[$crewId] ?? 'freelance')
+    : 'freelance';
+
 require __DIR__ . '/includes/header.php';
 ?>
 
@@ -373,6 +390,15 @@ require __DIR__ . '/includes/header.php';
     <label>Email <input type="email" name="email" value="<?= e($person['email'] ?? '') ?>"
            placeholder="Needed for ticket notifications"></label>
   </div>
+  <?php // FREELANCE OR VENDOR (David, 2026-10-17), the capsule beside their name
+        // on Staffing. Saved to their artist database entry, which is where the
+        // Artists grid edits it too. Not offered for a team row or an empty
+        // position: neither is somebody to describe. ?>
+  <?php if ($collabReady): ?>
+    <div class="row">
+      <label>Collaborator <?= collaborator_type_select('collaborator_type', $collabType) ?></label>
+    </div>
+  <?php endif; ?>
   <?php if (engagement_dates_available($pdo)): ?>
     <div class="row">
       <label>Starts on this show

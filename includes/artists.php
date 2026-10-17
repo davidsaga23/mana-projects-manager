@@ -22,6 +22,7 @@ require_once __DIR__ . '/hiring.php';
 const ARTIST_FIELDS = [
     'candidate_name', 'email', 'phone', 'portfolio_url', 'portfolio_password', 'source', 'notes',
     'location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
+    'collaborator_type',
 ];
 
 /** What is emphatically NOT person-level, listed so the reason is on the record. */
@@ -238,6 +239,12 @@ function artists_values(array $in, array $extra): array {
         $r = trim((string)($in['rating'] ?? ''));
         $v['rating'] = ($r === '') ? null : max(1, min(5, (int)$r));
     }
+    // ⚠ ONLY WHEN SENT. Every other field above is blanked when missing, which is
+    // right for a text box; this one has a default, and a form or import that
+    // does not carry it must not quietly turn a Vendor back into a Freelancer.
+    if (in_array('collaborator_type', $extra, true) && array_key_exists('collaborator_type', $in)) {
+        $v['collaborator_type'] = collaborator_type_clean((string)$in['collaborator_type']);
+    }
     return $v;
 }
 
@@ -434,7 +441,8 @@ function artists_delete_person(PDO $pdo, string $name, bool $confirmed): array {
 /** Column positions in that sheet, 0-based. Named so the mapping is readable. */
 const FL_NAME = 0, FL_LOCATION = 1, FL_POSITION = 2, FL_SENIORITY = 3,
       FL_TYPE = 4, FL_EMAIL = 5, FL_REEL = 6, FL_PASSWORD = 7,
-      FL_WORKED = 8, FL_NOTES = 9, FL_RATE = 10, FL_RATING = 11;
+      FL_WORKED = 8, FL_NOTES = 9, FL_RATE = 10, FL_RATING = 11,
+      FL_COLLABORATOR = 12;   // Anima's own export only; the studio sheet stops at L
 
 /**
  * Read that spreadsheet into the artist list.
@@ -488,6 +496,10 @@ function artists_import_rows(PDO $pdo, array $rows, array $extra, bool $overwrit
             'worked_with_us' => $get(FL_WORKED) !== '' && $get(FL_WORKED) !== '0' ? 1 : 0,
             'source'         => 'Freelancer spreadsheet',
         ];
+        // Column M, which only Anima's own export writes. Read only when it has
+        // a value, so the studio's original sheet (twelve columns) never turns
+        // a Vendor back into a Freelancer on an overwrite.
+        if ($get(FL_COLLABORATOR) !== '') $in['collaborator_type'] = $get(FL_COLLABORATOR);
 
         if (isset($known[$key])) {
             if (!$overwrite) { $out['skipped']++; continue; }
@@ -512,4 +524,113 @@ function artists_import_rows(PDO $pdo, array $rows, array $extra, bool $overwrit
         if ($rate !== '' && $hireId > 0) $out['rates'][] = ['id' => $hireId, 'name' => $name, 'rate' => $rate];
     }
     return $out;
+}
+
+// --- Freelance or Vendor (migration 051) --------------------------------------
+//
+// A fact about the PERSON, kept in the artist database beside position and
+// seniority (David, 2026-10-17: "the type belongs to the person so we can
+// identify that properly"). Staffing shows it beside whoever holds a position;
+// it is changed on the artist grid or on the person's own page.
+
+const COLLABORATOR_TYPES = ['freelance', 'vendor'];
+
+/** Whether migration 051 has run. Read once per request. */
+function collaborator_type_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = hiring_available($pdo) && column_exists($pdo, 'hires', 'collaborator_type');
+    return $ok;
+}
+
+/** Anything that is not a known type reads as the default. */
+function collaborator_type_clean(string $type): string {
+    $type = strtolower(trim($type));
+    return in_array($type, COLLABORATOR_TYPES, true) ? $type : 'freelance';
+}
+
+function collaborator_type_label(string $type): string {
+    return $type === 'vendor' ? 'Vendor' : 'Freelance';
+}
+
+/** A <select> of the two types, for the artist grid and the person page. */
+function collaborator_type_select(string $name, ?string $value): string {
+    $value = collaborator_type_clean((string)$value);
+    $out = '<select name="' . e($name) . '" aria-label="Freelance or vendor">';
+    foreach (COLLABORATOR_TYPES as $t) {
+        $out .= '<option value="' . e($t) . '"' . ($t === $value ? ' selected' : '') . '>'
+              . e(collaborator_type_label($t)) . '</option>';
+    }
+    return $out . '</select>';
+}
+
+/**
+ * crew id => type, for a list of crew rows (each with id and name).
+ *
+ * A crew member's artist record is found the two ways the book knows them: the
+ * crew id their hire was linked to, or their name. Somebody with no record at
+ * all (put in a slot straight from the crew list) reads as Freelance, the
+ * default, until somebody says otherwise on their page.
+ *
+ * ONE query for the whole page, not one per slot.
+ */
+function crew_collaborator_types(PDO $pdo, array $crew): array {
+    $out = [];
+    if (!$crew || !collaborator_type_available($pdo)) return $out;
+    $ids = []; $names = [];
+    foreach ($crew as $c) {
+        $out[(int)$c['id']] = 'freelance';
+        $ids[] = (int)$c['id'];
+        $names[mb_strtolower(trim((string)$c['name']))] = (int)$c['id'];
+    }
+    $inIds = implode(',', array_fill(0, count($ids), '?'));
+    $inNames = implode(',', array_fill(0, count($names), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT crew_id, candidate_name, collaborator_type FROM hires
+          WHERE crew_id IN ({$inIds}) OR LOWER(candidate_name) IN ({$inNames})
+          ORDER BY id"
+    );
+    $stmt->execute(array_merge($ids, array_keys($names)));
+    // Vendor wins if any record says so: they are all the same person, and an
+    // edit writes every one of them, so a mix only exists where a name and a
+    // crew link disagree about who somebody is.
+    foreach ($stmt as $r) {
+        $cid = isset($out[(int)$r['crew_id']]) ? (int)$r['crew_id']
+             : ($names[mb_strtolower(trim((string)$r['candidate_name']))] ?? 0);
+        if ($cid && $r['collaborator_type'] === 'vendor') $out[$cid] = 'vendor';
+    }
+    return $out;
+}
+
+/**
+ * Set one crew member's type in the artist database. Writes every record that
+ * is theirs (by crew link or by name), the way an edit on the artist grid does.
+ *
+ * Somebody with NO record yet (a studio put in a slot from the crew list) gets
+ * one, with no project, at "lead" — the same kind of entry the Artists screen's
+ * own "add" makes — because otherwise the choice would have nowhere to live.
+ * That entry links back to their crew row, so it is found again next time.
+ *
+ * Returns a sentence for the flash area, or '' when nothing changed.
+ */
+function set_crew_collaborator_type(PDO $pdo, int $crewId, string $name, string $type): string {
+    if (!collaborator_type_available($pdo)) return '';
+    $type = collaborator_type_clean($type);
+    $key  = mb_strtolower(trim($name));
+
+    $have = $pdo->prepare('SELECT COUNT(*) FROM hires WHERE crew_id = ? OR LOWER(candidate_name) = ?');
+    $have->execute([$crewId, $key]);
+    if ((int)$have->fetchColumn() === 0) {
+        if ($type === 'freelance') return '';           // already what no record reads as
+        $pdo->prepare('INSERT INTO hires (project_id, stage, candidate_name, crew_id, collaborator_type)
+                       VALUES (NULL, \'lead\', ?, ?, ?)')
+            ->execute([mb_substr(trim($name), 0, 120), $crewId, $type]);
+        return sprintf('%s is now marked %s, and was added to the artist database to hold it.',
+                       $name, collaborator_type_label($type));
+    }
+    $upd = $pdo->prepare('UPDATE hires SET collaborator_type = ?
+                           WHERE (crew_id = ? OR LOWER(candidate_name) = ?) AND collaborator_type <> ?');
+    $upd->execute([$type, $crewId, $key, $type]);
+    return $upd->rowCount() > 0
+        ? sprintf('%s is now marked %s.', $name, collaborator_type_label($type))
+        : '';
 }

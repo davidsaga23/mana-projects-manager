@@ -67,7 +67,7 @@ if ($name === '') {
 // its migrations saves what it has instead of erroring on what it has not.
 $extra = [];
 foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
-          'portfolio_password'] as $c) {
+          'portfolio_password', 'collaborator_type'] as $c) {
     if (column_exists($pdo, 'hires', $c)) $extra[] = $c;
 }
 
