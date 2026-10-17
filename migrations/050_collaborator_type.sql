@@ -1,0 +1,25 @@
+-- 050 — Collaborator type on a staffing position: Freelance or Vendor.
+--
+-- David, 2026-10-17: "in the staffing section we need to include two types of
+-- collaborators: 1. Freelance: by default 2. Vendor: for whenever we bring
+-- vendors to the projects."
+--
+-- ⚠ ON THE POSITION (crew_lanes), NOT ON THE PERSON (crew). Whether somebody
+-- comes in as a freelancer or through an outside studio is a fact about THIS
+-- engagement on THIS show: the same artist can be booked directly on one show
+-- and arrive through a vendor on the next, and a studio name put in a slot is a
+-- vendor there and nowhere else. One value on the person would have to be wrong
+-- about one of the shows — the same reasoning that put start and end dates on
+-- crew_projects rather than on crew (migration 024).
+--
+-- Nothing in the artist database distinguished studios from people before this
+-- (checked 2026-10-17; MSD-11 asks for that separately). If the book later gets
+-- its own "this entry is a studio" flag, it can PRE-FILL this column when such
+-- an entry is put in a slot; it does not replace it.
+--
+-- An ENUM, on the same grounds hires.stage is one: two values that mean the
+-- same thing on every show, and a third kind of collaborator would be a real
+-- change worth a migration. 'freelance' is the default, so every slot that
+-- already exists reads as Freelance the moment this runs.
+ALTER TABLE crew_lanes
+  ADD COLUMN collaborator_type ENUM('freelance','vendor') NOT NULL DEFAULT 'freelance' AFTER crew_id;

@@ -3846,3 +3846,19 @@ timer). A second, Plaky-fed running total was a second source for one number.
 import neither fills nor clears it, so the screens that read it (dashboard "Time logged",
 person, team, item, My tasks' "imported" note) keep showing those old figures. Dropping the
 column or hiding those figures is a separate choice, not taken here.
+
+## 2026-10-17 — Staffing positions are Freelance or Vendor
+
+**Asked by David:** *"in the staffing section we need to include two types of collaborators:
+Freelance (by default) and Vendor, for whenever we bring vendors to the projects."*
+**Decision:** migration `050` adds `crew_lanes.collaborator_type` (`freelance` default,
+`vendor`). It is shown as a badge beside the name on every filled position, to everyone (it is
+not money), and changed in the **Change assignee** popover, which now has a type picker next
+to the person. Emptying a position resets it to Freelance. The Staffing export writes
+"(Vendor)" after a vendor's name.
+**Why on the position, not the person:** the same artist can be booked directly on one show
+and come through an outside studio on the next; one value on `crew` would be wrong about one
+of them. The artist database had no studio/vendor notion to reuse (MSD-11 asks for one); if
+it gets one, it can pre-fill this value rather than replace it.
+**Not done:** the Hiring screen does not ask for the type, so a freshly hired position starts
+as Freelance and is switched with Change assignee.
