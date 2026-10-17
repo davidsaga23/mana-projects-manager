@@ -3862,3 +3862,14 @@ of them. The artist database had no studio/vendor notion to reuse (MSD-11 asks f
 it gets one, it can pre-fill this value rather than replace it.
 **Not done:** the Hiring screen does not ask for the type, so a freshly hired position starts
 as Freelance and is switched with Change assignee.
+
+## 2026-10-17 (later) — The old Plaky hours are hidden too
+**Follows "The Plaky import no longer reads 'Time spent'" (same date).** David chose to hide the
+figures earlier imports left in `progress.time_spent_minutes` rather than keep showing numbers
+that can never move again. Removed: the Dashboard's "Time logged" section (by step and by
+person), the "Time logged" tile and column on the person and team pages, the "Time" column
+and "· N h logged" on the item page, and My tasks' "N h imported" note.
+**Kept:** the column and its data, and the helpers that read it (`timelog_by_step()`,
+`timelog_by_person()`, `person_step_load()`'s `minutes`), so undoing this is a screen change,
+not a data recovery. Hours logged in Anima (`time_logs`) are untouched and still shown on
+My tasks, the Pomodoro, and the money screens.

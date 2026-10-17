@@ -337,7 +337,7 @@ if ($ready && $myCrewId) {
     // are gated by the JOIN below.
     $t = $pdo->prepare(
         "SELECT pr.id AS progress_id, pr.project_id, pr.step_id, pr.item_key,
-                pr.status_id, pr.time_spent_minutes,
+                pr.status_id,
                 p.name AS project_name, p.code AS project_code,
                 ps.name AS step_name, ps.color AS step_color, ps.deadline,
                 s.episode, s.shot_code, a.name AS asset_name,
@@ -692,9 +692,6 @@ require __DIR__ . '/includes/header.php';
           <?php if ($canLog): ?>
             <td class="num muted">
               <?= $row['logged'] ? e(fmt_hours((int)$row['logged'])) : '—' ?>
-              <?php if (!$row['logged'] && $row['time_spent_minutes']): ?>
-                <small class="muted" title="Imported from Plaky, not logged here"><?= e(fmt_hours((int)$row['time_spent_minutes'])) ?> imported</small>
-              <?php endif; ?>
             </td>
             <td>
               <form method="post" class="log-form">

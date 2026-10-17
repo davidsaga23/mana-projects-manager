@@ -234,8 +234,6 @@ require __DIR__ . '/includes/header.php';
   <div><span class="muted small">Remaining</span><strong><?= $summary['remaining'] ?></strong></div>
   <div><span class="muted small">Blocked</span>
     <strong class="<?= $summary['blocked'] ? 'warn-text' : '' ?>"><?= $summary['blocked'] ?></strong></div>
-  <div><span class="muted small">Time logged</span><strong><?= e(fmt_hours($summary['minutes'])) ?></strong>
-    <span class="muted small"><?= $summary['with_time'] ?> of <?= $summary['assigned'] ?> tasks report any</span></div>
   <div><span class="muted small">Planned until</span>
     <strong><?= e($summary['schedule']['last_end'] ?? '—') ?></strong>
     <span class="muted small"><?= (int)$summary['schedule']['remaining'] ?> task(s) still ahead</span></div>
@@ -309,7 +307,7 @@ require __DIR__ . '/includes/header.php';
   <thead>
     <tr><th>Step</th><th>Scope</th><th class="num">Assigned</th><th class="num">Approved</th>
         <th class="num">Blocked</th><th class="num">Required /day</th><th class="num">Recent /day</th>
-        <th>Deadline</th><th class="num">Time</th></tr>
+        <th>Deadline</th></tr>
   </thead>
   <tbody>
   <?php foreach ($summary['steps'] as $row): $pc = $pace[(int)$row['step_id']] ?? null; ?>
@@ -326,7 +324,6 @@ require __DIR__ . '/includes/header.php';
         <?= $pc ? e(fmt_num($pc['actual'], 2)) : '—' ?>
       </td>
       <td class="muted small"><?= e($row['deadline'] ?: '—') ?></td>
-      <td class="num muted"><?= (int)$row['minutes'] ? e(fmt_hours((int)$row['minutes'])) : '—' ?></td>
     </tr>
   <?php endforeach; ?>
   </tbody>

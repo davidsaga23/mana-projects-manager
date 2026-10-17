@@ -140,11 +140,10 @@ foreach ($rows as $r) {
 }
 
 $applicable = count($rows);
-$approved = 0; $blocked = 0; $minutes = 0;
+$approved = 0; $blocked = 0;
 foreach ($rows as $r) {
     if ($r['done']) $approved++;
     if ($r['status'] && (int)($r['status']['is_blocked'] ?? 0) === 1) $blocked++;
-    $minutes += (int)($r['minutes'] ?? 0);
 }
 $countable = count(array_filter($rows, fn($r) => !$r['excluded']));
 $ready = $countable > 0 && $approved >= $countable;
@@ -196,7 +195,6 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
   · <strong><?= $approved ?></strong> of <?= $countable ?> steps approved
   <?php if ($blocked): ?> · <span class="warn-text"><?= $blocked ?> blocked</span><?php endif; ?>
-  <?php if ($minutes): ?> · <?= e(fmt_hours($minutes)) ?> logged<?php endif; ?>
 </p>
 
 <?php if (!empty($item['notes'])): ?>
@@ -226,7 +224,7 @@ require __DIR__ . '/includes/header.php';
       <tr>
         <th>Step</th><th>Status</th><th>Who</th>
         <?php if ($hasDetail): ?><th>Version</th><?php endif; ?>
-        <th>Due</th><th class="num">Time</th>
+        <th>Due</th>
         <?php if ($hasDetail): ?><th>Notes</th><?php endif; ?>
       </tr>
     </thead>
@@ -276,7 +274,6 @@ require __DIR__ . '/includes/header.php';
           <?= e($r['due'] ?: '—') ?>
           <?php if ($r['manual']): ?><span class="slot-tag" title="Hand-planned; the scheduler leaves it alone">fixed</span><?php endif; ?>
         </td>
-        <td class="num muted"><?= $r['minutes'] ? e(fmt_hours((int)$r['minutes'])) : '—' ?></td>
         <?php if ($hasDetail): ?>
           <td><textarea name="step[<?= $sid ?>][notes]" rows="1" placeholder="—"
                         class="notes-input" <?= can_edit() ? '' : 'disabled' ?>><?= e($r['notes'] ?? '') ?></textarea></td>
