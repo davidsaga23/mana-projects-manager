@@ -271,7 +271,7 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
   </div>
 <?php else: ?>
-  <table>
+  <table class="project-list">
     <tr>
       <th>Code</th><th>Name</th><th>Type</th><th>Status</th>
       <th>Steps</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
@@ -305,7 +305,7 @@ require __DIR__ . '/includes/header.php';
           <span class="status status-<?= e($p['status']) ?>"><?= e(str_replace('_', ' ', $p['status'])) ?></span>
         <?php endif; ?>
         <?php if (isset($kickoffOpen[$pid]) && $p['status'] === 'setup'): ?>
-          <a class="muted small" href="kickoff.php?project=<?= $pid ?>"><?=
+          <a class="muted small status-note" href="kickoff.php?project=<?= $pid ?>"><?=
             $kickoffOpen[$pid] === 'pending' ? 'waiting for sign-off' : 'changes asked for' ?></a>
         <?php endif; ?>
       </td>
@@ -313,7 +313,7 @@ require __DIR__ . '/includes/header.php';
       <td><?= (int)$p['shot_count'] ?></td>
       <td><?= (int)$p['asset_count'] ?></td>
       <td><?= (int)$p['crew_count'] ?></td>
-      <td><?= e($p['delivery_date'] ?? '—') ?></td>
+      <td class="delivery"><?= e($p['delivery_date'] ?? '—') ?></td>
       <td class="row-actions">
         <?php // A FLEX ROW, not three inline links with a space between them.
               // Buttons touching each other read as one segmented control, and
