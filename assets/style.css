@@ -3100,3 +3100,12 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bulk-rates .bulk-apply input { width: 6em; padding: 4px 6px; font-size: 13px; text-align: right; }
 .bulk-tick { display: inline; margin: 0; }
 .bulk-row, .bulk-tick input { width: auto; margin: 0 8px 0 0; vertical-align: middle; }
+
+/* The Status dropdown on Studio Tasks (ticket_status_picker()). Shaped like the
+   chip it replaces so the column reads the same at a glance; width:auto against
+   the global `input, select { width: 100% }`. */
+.status-pick {
+  width: auto; padding: 1px 6px; border-radius: 10px; border: 1px solid;
+  font-size: 11.5px; font-weight: 600;
+}
+.status-pick option { color: var(--text); background: var(--surface-2); }

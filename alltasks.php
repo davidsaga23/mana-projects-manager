@@ -16,9 +16,10 @@
 // page is the same row the project's own board draws. The two cannot disagree,
 // because ticket_select_sql() is the one place either of them asks.
 //
-// Changing a card still happens on the card. This page carries no controls on
-// purpose: a status picker here would be a second way to do a thing the board
-// already does, and the board is where the columns mean something.
+// Most changes still happen on the card. Status is the exception (David,
+// 2026-10-17: "make this status column editable in this context"): each row
+// offers its own project's statuses, saved through set_ticket_status(), the
+// same function the board's drag uses, so the two cannot disagree.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -114,6 +115,26 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tic
     exit;
 }
 
+// The Status dropdown. Same rights as dragging a card on the board.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_status'])) {
+    try {
+        $t = load_ticket($pdo, (int)($_POST['ticket_id'] ?? 0));
+        $sid = (int)($_POST['status_id'] ?? 0);
+        if (!$t || $sid <= 0) throw new RuntimeException('Pick a status for the card.');
+        $st = set_ticket_status($pdo, $t, $sid, $userId);
+        $said = ticket_ref($t) . ' moved to ' . $st['name'] . '.';
+        // A finished card leaves this list (it shows open work), so say where it went.
+        if (ticket_status_is_done($st) && ($_GET['done'] ?? '') !== '1') {
+            $said .= ' It is finished, so it is now under "include finished work".';
+        }
+        flash('ok', $said);
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: alltasks.php' . ((($_GET['done'] ?? '') === '1') ? '?done=1' : ''));
+    exit;
+}
+
 $ready = column_exists($pdo, 'tickets', 'id');
 
 // Finished work is OFF by default and one click away. "Open tasks" is what was
@@ -140,6 +161,16 @@ if ($ready) {
                    FIELD(t.priority, 'urgent','high','medium','low'),
                    p.code, t.seq"
     )->fetchAll();
+}
+
+// Each show's own statuses, read once per project on the page, for the Status
+// dropdowns. Only for people who can change a card; everyone else sees chips.
+$statusesByProject = [];
+if (can_edit()) {
+    foreach ($rows as $r) {
+        $pid = $r['project_id'] !== null ? (int)$r['project_id'] : 0;
+        if ($pid && !isset($statusesByProject[$pid])) $statusesByProject[$pid] = project_statuses($pdo, $pid);
+    }
 }
 
 $open = 0; $overdue = 0; $unowned = 0;
@@ -274,8 +305,12 @@ require __DIR__ . '/includes/header.php';
                 <span class="warn-text">no project</span>
               <?php endif; ?></td>
           <td class="muted small"><?= $r['type'] === 'ticket' ? 'Ticket' : 'Task' ?></td>
-          <td><span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
-              <?= e($r['status_name'] ?? 'no status') ?></span></td>
+          <td><?php if (!empty($statusesByProject[(int)$r['project_id']])): ?>
+                <?= ticket_status_picker($r, $statusesByProject[(int)$r['project_id']]) ?>
+              <?php else: ?>
+                <span class="status-chip" style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
+                <?= e($r['status_name'] ?? 'no status') ?></span>
+              <?php endif; ?></td>
           <td class="muted small"><?= e($r['crew_name'] ?: '—') ?></td>
           <td><span class="prio-dot priority-<?= e($r['priority']) ?>"></span> <?= ucfirst($r['priority']) ?></td>
           <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($r['due_date'] ?: '—') ?></td>
@@ -286,8 +321,9 @@ require __DIR__ . '/includes/header.php';
   </div>
 
   <p class="muted small">
-    Cards are changed on the card itself, and the columns on a project's board are that
-    project's own statuses. Apart from creating one and choosing its project, this list only reads.
+    Cards are changed on the card itself, apart from their project and status, which change
+    here too. Each card's Status offers its own project's columns, because every show names
+    them its own way. A card moved to a finished status leaves this list.
   </p>
 
   <?php // The same filter, sort and count the Artists and Shots grids carry.

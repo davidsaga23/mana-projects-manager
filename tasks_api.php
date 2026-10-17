@@ -54,18 +54,10 @@ try {
         if (!$id || !$statusId) throw new RuntimeException('A card and a status are both required.');
 
         $t = api_load($pdo, $id);
-        $status = api_check_status($pdo, (int)$t['project_id'], $statusId);
-
-        $pdo->prepare('UPDATE tickets SET status_id = ? WHERE id = ?')->execute([$statusId, $id]);
-        sync_ticket_completion($pdo, $id, $status);
-
         // The move goes into the card's own thread, same as an edit made on the
         // detail page — otherwise a card silently changes column overnight and
-        // nobody can say who did it.
-        $before = $t['status_name'] ?? 'none';
-        if ($before !== $status['name']) {
-            log_ticket_event($pdo, $id, $userId, 'Status: ' . $before . ' → ' . $status['name']);
-        }
+        // nobody can say who did it. Shared with the Studio Tasks dropdown.
+        $status = set_ticket_status($pdo, $t, $statusId, $userId);
 
         echo json_encode([
             'ok' => true,
