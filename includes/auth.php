@@ -135,14 +135,20 @@ function preview_role(): string {
     // started. An admin demoted to editor mid-session stops previewing at once
     // rather than keeping a session key that outlives the authority to hold it.
     //
-    // ⚠ AND ONLY EVER DOWNWARD. The whitelist is editor and artist — both
-    // strictly less than admin — so this can take permissions away and has no
+    // ⚠ AND ONLY EVER DOWNWARD. The whitelist is editor, supervisor and artist —
+    // all strictly less than admin — so this can take permissions away and has no
     // path to granting one. A tampered session value is either a lesser role or
     // nothing at all.
     if (real_role() !== 'admin') return '';
     $p = (string)($_SESSION['preview_role'] ?? '');
     if ($p === 'viewer') $p = 'artist';        // a session started before 037
-    return in_array($p, ['editor', 'artist'], true) ? $p : '';
+    return in_array($p, ['editor', 'supervisor', 'artist'], true) ? $p : '';
+}
+
+/** "an artist", "a supervisor", "an editor": a role named in a sentence. */
+function role_in_words(string $role): string {
+    return ['admin' => 'an admin', 'editor' => 'an editor',
+            'supervisor' => 'a supervisor', 'artist' => 'an artist'][$role] ?? $role;
 }
 
 /** Is an admin currently looking at the app as somebody else? */
@@ -178,6 +184,56 @@ function is_artist(): bool {
 }
 
 /**
+ * An artist who also SEES a project's Timeline and Staffing, and EDITS its Shots
+ * (migration 047).
+ *
+ * David, 2026-10-16: "a supervisor role who has all the artist permissions but
+ * adding the timeline, staffing, shots", then the same evening: "Supervisors
+ * can't edit timeline or staffing, it's more for them to consult than anything
+ * else." So Timeline and Staffing are tabs shown to them (project_nav.php) and
+ * read-only like everything else; Shots is the one area they write to.
+ *
+ * ⚠ can_edit() STAYS FALSE FOR A SUPERVISOR. Everything outside Shots behaves
+ * exactly as it does for an artist, because it asks can_edit() and gets the
+ * artist's answer. Shots asks can_edit_area() instead.
+ */
+function is_supervisor(): bool {
+    return user_role() === 'supervisor';
+}
+
+/**
+ * The files a supervisor may SAVE through, by area. The complete answer to "what
+ * can a supervisor write beyond an artist?" — same reasoning as artist_may_post():
+ * a screen added next year is refused by default.
+ *
+ *   shots — the breakdown grid and the API it saves through
+ *
+ * NOT here, deliberately: Timeline and Staffing (David: to consult, not edit),
+ * and any rate or quote — those go through money.php, which refuses everyone
+ * but an admin whatever this list says. Adding an area here is the whole change
+ * to let supervisors edit it, once its screen asks can_edit_area().
+ */
+const SUPERVISOR_SCRIPTS = [
+    'shots' => ['shots.php', 'shots_api.php'],
+];
+
+/** May the current account change things in this area ('timeline', 'staffing', 'shots')? */
+function can_edit_area(string $area): bool {
+    return can_edit() || (is_supervisor() && isset(SUPERVISOR_SCRIPTS[$area]));
+}
+
+/** Is this POST a supervisor saving through one of their three areas? */
+function supervisor_may_post(): bool {
+    if (!is_supervisor()) return false;
+    // SCRIPT_NAME, not REQUEST_URI — see artist_may_post().
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    foreach (SUPERVISOR_SCRIPTS as $scripts) {
+        if (in_array($script, $scripts, true)) return true;
+    }
+    return false;
+}
+
+/**
  * THE ONE HOLE IN READ-ONLY: an artist setting the status of their own work.
  *
  * David, 2026-09-28: "the viewer permission settings should allow... the ability
@@ -201,7 +257,8 @@ function is_artist(): bool {
  *                included. The status-only path lives on My tasks instead.
  */
 function artist_may_post(): bool {
-    if (!is_artist()) return false;
+    // A supervisor has every artist permission, this one included.
+    if (!is_artist() && !is_supervisor()) return false;
 
     $allowed = [
         'mytasks.php' => ['set_status', 'set_ticket_status'],
@@ -217,6 +274,12 @@ function artist_may_post(): bool {
 
 function require_login(): void {
     if (!is_logged_in()) {
+        // Remember where they were going, so a link in an email (a kick-off
+        // sign-off) lands on its page after the login rather than on the front
+        // door. Same-site paths only; login.php checks it again before use.
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $_SESSION['after_login'] = (string)($_SERVER['REQUEST_URI'] ?? '');
+        }
         header('Location: login.php');
         exit;
     }
@@ -263,11 +326,13 @@ function require_login(): void {
     // those are; mytasks.php checks the row is theirs. A preview still saves
     // nothing at all, artist or not — the rule above has no exceptions.
     if ($_SERVER['REQUEST_METHOD'] === 'POST'
-        && ((!can_edit() && !artist_may_post()) || in_preview())) {
+        && ((!can_edit() && !artist_may_post() && !supervisor_may_post()) || in_preview())) {
         if (function_exists('flash')) {
             flash('err', in_preview()
                 ? 'Nothing saves while you are previewing as someone else, leave the preview first.'
-                : 'Your account can change the status of your own work, but not this.');
+                : (is_supervisor()
+                    ? 'Your account can change Shots and the status of your own work, but not this.'
+                    : 'Your account can change the status of your own work, but not this.'));
         }
         // Back to the same screen as a GET, so the reader sees the page and the
         // message rather than a dead POST.
@@ -289,6 +354,54 @@ function require_login(): void {
         header('Location: ' . $back);
         exit;
     }
+
+    // A project waiting on its kick-off sign-off is frozen: see kickoff_frozen().
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($why = kickoff_frozen()) !== null) {
+        if (function_exists('flash')) flash('err', $why);
+        $back   = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $second = $back[1] ?? '';
+        if ($back === '' || $back[0] !== '/' || $second === '/' || $second === chr(92)) {
+            $back = 'index.php';
+        }
+        header('Location: ' . $back);
+        exit;
+    }
+}
+
+/**
+ * The screens that edit what a kick-off freezes, and where each says which
+ * project it is about. While a project's sign-off is WAITING, a save through
+ * any of them is refused (David, 2026-10-16: "the project should be frozen so
+ * no further changes are done until is signed off"). Asking for changes or
+ * withdrawing unfreezes it. Cards, time and statuses are not part of the
+ * kick-off, so My tasks and the boards keep working.
+ */
+const KICKOFF_FROZEN_SCRIPTS = [
+    'brief.php', 'crew.php', 'hiring.php', 'schedule.php', 'schedule_api.php',
+    'timeline.php', 'timeline_import.php', 'shots_api.php', 'wizard.php',
+    'standards.php', 'step.php', 'finance_project.php', 'import.php',
+];
+
+/** Why this POST may not save, when it touches a frozen project; else null. */
+function kickoff_frozen(): ?string {
+    global $pdo;
+    if (!($pdo instanceof PDO)) return null;
+    $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (!in_array($script, KICKOFF_FROZEN_SCRIPTS, true)) return null;
+    $pid = (int)($_GET['project'] ?? $_POST['project'] ?? $_POST['project_id'] ?? 0);
+    if ($pid <= 0 && in_array($script, ['brief.php', 'finance_project.php'], true)) {
+        $pid = (int)($_GET['id'] ?? 0);
+    }
+    if ($pid <= 0) return null;
+    try {
+        $q = $pdo->prepare("SELECT 1 FROM project_kickoffs WHERE project_id = ? AND state = 'pending' LIMIT 1");
+        $q->execute([$pid]);
+        if (!$q->fetchColumn()) return null;
+    } catch (PDOException $e) {
+        return null;   // migration 049 pending
+    }
+    return 'This project is frozen while its kick-off waits for sign-off, so nothing on it can be changed. '
+         . 'To change something, withdraw the request on the Kick-off page, or wait for an answer.';
 }
 
 /** For pages only an admin may open. */
@@ -313,10 +426,18 @@ function require_login_json(): void {
         echo json_encode(['ok' => false, 'error' => 'Your session has expired. Please reload the page and log in again.']);
         exit;
     }
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !can_edit()) {
+    // A preview saves nothing here either, the same rule require_login() keeps.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST'
+        && ((!can_edit() && !supervisor_may_post()) || in_preview())) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => 'Your account has view-only access.']);
+        exit;
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($why = kickoff_frozen()) !== null) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => $why]);
         exit;
     }
 }

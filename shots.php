@@ -178,7 +178,7 @@ $missingNote = $noFrames > 0
         <?php endif; ?>
         <td><strong><?= e($r['shot_code']) ?></strong></td>
         <td class="num bd-frames">
-          <?php if (can_edit()): ?>
+          <?php if (can_edit_area('shots')): ?>
             <input class="bd-frame-input" inputmode="numeric" size="5"
                    value="<?= $r['frames'] !== null ? (int)$r['frames'] : '' ?>"
                    aria-label="Frames in <?= e($r['shot_code']) ?>">
@@ -194,7 +194,7 @@ $missingNote = $noFrames > 0
             <?php foreach ($r['assets'][$t] ?? [] as $a): ?>
               <span class="chip" data-asset="<?= $a['id'] ?>">
                 <?= e($a['name']) ?>
-                <?php if (can_edit()): ?>
+                <?php if (can_edit_area('shots')): ?>
                   <button type="button" class="chip-x" title="Take <?= e($a['name']) ?> out of this shot"
                           aria-label="Remove <?= e($a['name']) ?>">×</button>
                 <?php endif; ?>
@@ -209,14 +209,14 @@ $missingNote = $noFrames > 0
             <?php if (!empty($r['na'][$t])): ?>
               <span class="chip chip-na" data-na="1">
                 N/A
-                <?php if (can_edit()): ?>
+                <?php if (can_edit_area('shots')): ?>
                   <button type="button" class="chip-x"
                           title="<?= e($r['shot_code']) ?> does need <?= e($t !== '' ? $t : 'untyped asset') ?> work after all"
                           aria-label="Clear N/A">×</button>
                 <?php endif; ?>
               </span>
             <?php endif; ?>
-            <?php if (can_edit()): ?>
+            <?php if (can_edit_area('shots')): ?>
               <?php // A BUTTON that opens a list of tick boxes, not a dropdown
                     // (David, 2026-09-22: "have each character with a check box
                     // so I can click and add several assets at the same time").
@@ -236,7 +236,7 @@ $missingNote = $noFrames > 0
         <?php // Typed here since 2026-09-22: it was the one column on this screen
               // that nothing but an importer could fill. ?>
         <td class="bd-notes">
-          <?php if (can_edit()): ?>
+          <?php if (can_edit_area('shots')): ?>
             <textarea class="bd-note-input" rows="1" placeholder="—"
                       aria-label="Note on <?= e($r['shot_code']) ?>"><?= e($r['notes']) ?></textarea>
           <?php else: ?>
@@ -269,7 +269,7 @@ $missingNote = $noFrames > 0
 
 <script>
   window.BD_PROJECT = <?= $projectId ?>;
-  window.BD_CAN_EDIT = <?= can_edit() ? 'true' : 'false' ?>;
+  window.BD_CAN_EDIT = <?= can_edit_area('shots') ? 'true' : 'false' ?>;
   <?php // ⚠ WITHOUT MIGRATION 042 THE PICKER MUST NOT OFFER N/A. Offering a
         // tick that always fails is worse than not offering it: the producer
         // believes the cell is settled and the scheduler carries on waiting for

@@ -31,10 +31,8 @@ require_login();
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 
-// Where a card can go: every live show, plus the Studio. Archived shows are left
-// out — filing today's work onto a finished show is almost always a mis-click —
-// and the Studio is put FIRST because it is the reason this list exists: it is
-// the home for the cards that belong to no show at all.
+// Where a card can go: every live show, the Studio first. ticket_file_targets()
+// is the one list the Project dropdown on every card list reads.
 //
 // ⚠ READ ONCE, UP HERE, FOR BOTH CONTROLS. The per-row Project picker and the
 // New task dialog are the same choice asked in two places, and a second query
@@ -42,13 +40,7 @@ $userId = (int)($_SESSION['user_id'] ?? 0);
 // one and not the other. It is also out of the "this page has rows" branch on
 // purpose: the create dialog has to exist on an EMPTY Studio Tasks, which is
 // exactly when somebody wants to add the first card.
-$fileTargets = [];
-if (can_edit()) {
-    $order = studio_available($pdo) ? 'is_studio DESC, code' : 'code';
-    $fileTargets = $pdo->query(
-        "SELECT id, code, name FROM projects WHERE status <> 'archived' ORDER BY " . $order
-    )->fetchAll();
-}
+$fileTargets = can_edit() ? ticket_file_targets($pdo) : [];
 
 // --- create a card from here ------------------------------------------------
 //
@@ -100,44 +92,21 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'
 }
 
 
-// --- file one unfiled card onto a project -----------------------------------
+// --- file or move one card ----------------------------------------------------
 //
-// David, 2026-10-12: "instead of clicking for the ones that don't have a project,
-// make sure a dropdown is always available in this view for the tasks that don't
-// have a project assigned yet."
+// David, 2026-10-12: "make sure a dropdown is always available in this view for
+// the tasks that don't have a project assigned yet." And 2026-10-16: "for the
+// tasks we need to always have a drop down menu available so we can classify
+// the tasks to any project or studio wise." So every row carries one now, filed
+// or not: a card filed on the wrong show has to be movable from the same list
+// that filed it, or the mistake costs a trip to the card.
 //
-// ⚠ THIS REPLACED A BULK "MOVE THEM ALL TO THE STUDIO" BUTTON, and David is
-// right that it was the wrong tool. His own list proves it: "Confirm actual
-// FCM/FIFA deadline with Corey" and "Address staffing gaps on FCM project" are
-// FCM's work, not the studio's. A single button would have filed them under the
-// Studio in one press, and a card filed against the wrong show is harder to find
-// than one filed against nothing — the wrong one looks handled. That sentence is
-// from the 2026-10-07 decision and it argues for per-card choice here.
-//
-// ⚠ AND IT IS THE ONE CONTROL THIS SCREEN IS ALLOWED. The header says this page
-// carries no controls on purpose, because a status picker here would duplicate
-// the board. A PROJECT picker on an UNFILED card duplicates nothing: a card with
-// no project is on no board at all, so this list is the only place it can be
-// acted on. Filed rows keep plain text and get no picker — those belong to a
-// board, and the board is where they are changed.
+// ⚠ PER CARD, NEVER A BULK BUTTON. "Confirm actual FCM/FIFA deadline with Corey"
+// is FCM's work, not the studio's, and a card filed against the wrong show is
+// harder to find than one filed against nothing — the wrong one looks handled.
+// The handler and the dropdown live in includes/tickets.php, shared with My tasks.
 if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_project'])) {
-    try {
-        $tid = (int)($_POST['ticket_id'] ?? 0);
-        $pid = (int)($_POST['project_id'] ?? 0);
-        if ($tid <= 0 || $pid <= 0) throw new RuntimeException('Pick a project to file it on.');
-        // move_ticket_to_project() is what grants the card a seq, so it stops
-        // reading as "#21", and drops it into the target's first column so it is
-        // visible the moment it arrives.
-        // ⚠ IT REPORTS FAILURE, IT DOES NOT THROW. move_ticket_to_project()
-        // catches its own exception and returns ['ok' => false, 'said' => ...].
-        // Reading only the message and flashing 'ok' would have told somebody
-        // their card was filed when it was not — the failure class this codebase
-        // keeps paying for, on the one action this screen exists to perform.
-        $r = move_ticket_to_project($pdo, $tid, $pid);
-        flash(!empty($r['ok']) ? 'ok' : 'err', (string)($r['said'] ?? 'The card was not moved.'));
-    } catch (Throwable $e) {
-        flash('err', $e->getMessage());
-    }
+    refile_ticket_from_post($pdo, $userId);
     // Read straight from the query string: $showDone is assigned further down,
     // AFTER this handler, so using it here would be an undefined variable and
     // would silently drop the "include finished work" view on every save.
@@ -271,7 +240,7 @@ require __DIR__ . '/includes/header.php';
         // bug, and the Project filter is built from the words in the cells, so an
         // empty one could not be picked. David, 2026-10-07: "we should be able to
         // add them without a project so we can organize them later." Filing one is
-        // a click from the card. ?>
+        // the dropdown in its Project cell. ?>
 
   <div class="grid-scroll">
     <table class="grid-table alltasks-table">
@@ -294,27 +263,13 @@ require __DIR__ . '/includes/header.php';
               <span class="ctx-chip ctx-platform"><?= e(ticket_about_label(TICKET_ABOUT_PLATFORM)) ?></span>
             <?php endif; ?>
           </td>
-          <?php // ⚠ THE SELECTED OPTION READS "no project", which is not cosmetic.
-                // gridtools.js takes a cell's filter and sort value from its
-                // <select>'s chosen option TEXT when there is one (assets/gridtools.js),
-                // so the Project column's filter keeps offering "no project" as a
-                // choice exactly as it did when this cell was a span. Changing that
-                // first option's wording silently drops a filter value. ?>
-          <td><?php if (($r['project_code'] ?? '') !== ''): ?>
+          <?php // The dropdown keeps "no project" as an unfiled card's chosen
+                // option, which is what the Project filter reads (see
+                // ticket_project_picker()). Without edit rights it is plain text. ?>
+          <td><?php if ($fileTargets): ?>
+                <?= ticket_project_picker($r, $fileTargets) ?>
+              <?php elseif (($r['project_code'] ?? '') !== ''): ?>
                 <?= e($r['project_code']) ?>
-              <?php elseif ($fileTargets): ?>
-                <form method="post" class="inline-form" style="margin:0;">
-                  <input type="hidden" name="set_ticket_project" value="1">
-                  <input type="hidden" name="ticket_id" value="<?= (int)$r['id'] ?>">
-                  <select name="project_id" onchange="this.form.submit()"
-                          class="warn-text proj-pick"
-                          title="File this card on a show, or on the Studio">
-                    <option value="" selected>no project</option>
-                    <?php foreach ($fileTargets as $t): ?>
-                      <option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                </form>
               <?php else: ?>
                 <span class="warn-text">no project</span>
               <?php endif; ?></td>
@@ -332,7 +287,7 @@ require __DIR__ . '/includes/header.php';
 
   <p class="muted small">
     Cards are changed on the card itself, and the columns on a project's board are that
-    project's own statuses. Apart from creating one and filing it, this list only reads.
+    project's own statuses. Apart from creating one and choosing its project, this list only reads.
   </p>
 
   <?php // The same filter, sort and count the Artists and Shots grids carry.

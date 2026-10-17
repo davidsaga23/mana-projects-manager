@@ -698,6 +698,16 @@ already here. The third is a second product.
 
 ### Project kick-off: a planning status, a sign-off, and a frozen original plan
 
+✅ **BUILT 2026-10-16 (migration 049, finance_install_08.sql), in the shape David asked for that day,
+which differs from the plan below in two ways.** No `planning` status: a project stays in `setup`
+until everyone ticked under *Who signs off* (Tim and Jorik) has approved, then turns `active` by
+itself. And the frozen plan is a **snapshot of the screens** (Brief, Staffing, Schedule, Timeline,
+Shots, Setup, Finance management) rather than a widened per-step baseline, because the list asked for
+covers far more than steps; the per-step baseline is still written at approval, so Historic quotas is
+unchanged. The postmortem's **Kick-off vs now** screen recomputes the same snapshot today and compares
+the two. `kickoff.php`, `includes/kickoff.php`; DECISIONS 2026-10-16 says why. The text below is the
+6 October plan, kept for its reasoning.
+
 > *"A project should have a planning status until we get a sign off from the CEO and COO, once that
 > happens, everything from that project will have to be stored as a first entry. Things like overall
 > starting/end dates, pipeline steps, asset and shot count, head count, start/end dates per pipeline
@@ -915,6 +925,24 @@ is built, because the answer "no third-party processing" makes this whole entry 
 avoiding it); whether it is a box on the dashboard or a page of its own; and the client-data
 question above, which comes first.
 
+#### Which AI: Gemini or Claude (asked again 2026-10-16, not decided)
+
+> *"Add to the roadmap to add a kind of gemini AI assistant to ask questions about a project with the
+> data available"*
+
+Both can do this job: answer a question by calling the fixed tools above and quoting the screen a
+number came from. Neither choice changes the three hard parts above, so it can be made late.
+
+- **Claude (Anthropic).** Already wired in: `includes/ai.php` and the `anthropic_api_key` line in
+  `config.php` are what the Transcript reader uses today, so there is one key, one bill and one
+  company receiving studio data instead of two. Strong at tool calling, which is how this would work.
+- **Gemini (Google).** A second outside service, key and bill. Worth it if the studio already lives in
+  Google Workspace and wants the assistant inside Gmail or Drive later, or on price: both charge per
+  use, so compare the current per-question cost on each one's pricing page before choosing.
+
+Either way the client-data question above decides first, because both send the question's data to a
+third party. **Open:** which one, after that.
+
 ## Asked for on 2026-10-06 (urgent) — "what has this show cost us so far?"
 
 FCM went on standby. David's boss needs a number to take to the client: **how much has been spent,
@@ -949,7 +977,7 @@ crew lanes). Days still booked after today times the day rate is *planned* remai
 a contractual obligation and must never be presented as one — but it is the right order of
 magnitude, and it is available now.
 
-### What to build: a stop-cost panel on the project finance screen
+### What to build: a stop-cost panel on the project finance screen — BUILT 2026-10-07
 
 One screen, reading what already exists, laid out as the four numbers above with its own arithmetic
 shown beside each. Nothing new is captured for 1, 2 or 3.
@@ -967,6 +995,118 @@ it wrong under pressure.
 **Open:** whether the panel reports in one currency (the rates carry their own, and there is no FX
 table anywhere in this platform — mixing them silently would be the worst possible bug on exactly
 this screen), and whether "committed" should mean contractual minimum or booked-and-not-yet-released.
+
+## Built between 2026-10-07 and 2026-10-16
+
+One run of work, listed so a later conversation can tell what already exists before proposing
+it again. Every commit in it says **PHP WAS NOT RUN** — there is no PHP binary or database on
+the machine this was written on, and nothing here has been executed against real data.
+
+| What | Where | Migration |
+|---|---|---|
+| A card can exist with no project (capture-first) | `ticket.php`, `includes/tickets.php`, `transcript.php` | 041 |
+| Step pages set a start date beside the deadline | `step.php`, `includes/pipeline.php` | — |
+| The dashboard counts only rows a step still covers | `includes/dashboard.php` | — |
+| The importer says when a step's scope disagrees with the board | `includes/plaky_import.php` | — |
+| Bulk delete on the asset wizard, saying what went with it | `includes/wizard/assets.php` | — |
+| Timeline milestones sit on their own step, dotted lines gone | `assets/timeline.js` | — |
+| Stop-cost panel — "what has this show cost us so far?" | `includes/stopcost.php` | — |
+| Finance Overview rebuilt around seven cost figures | `finance_project.php` | finance_install_07 |
+| Final balance, amber until the last invoice is settled | `finance_project.php` | — |
+| Mark a breakdown cell N/A when a shot needs none of something | `includes/breakdown.php`, `shots.php` | 042 |
+| A stopwatch on every row of My tasks | `includes/timelog.php`, `mytasks.php` | 043 |
+| A `postmortem` project status between wrapped and archived | `index.php` and friends | 044 |
+| The Studio: one project row that is not a show | `includes/studio.php` | 045 |
+| A CBB status | — | 046 |
+| Create a card from Studio Tasks, through one shared `create_ticket()` | `alltasks.php`, `includes/tickets.php` | — |
+| Budget pool — the show in days, derived from the plan | `includes/budgetpool.php` | none needed |
+
+### Revenue was added and removed in the same week
+
+`project_budgets.revenue_amount` (finance_install_07) is still in the finance database, **unread
+and unwritten**. David asked for Revenue on 2026-10-06 and removed it on 2026-10-12: it took part
+in no sum on a panel of costs, and a client figure among costs gets read as profit. The column was
+left rather than dropped because dropping it needs a hand-run statement in phpMyAdmin and would
+throw away the figure already typed there. Drop it with a `finance_install_08.sql` if the question
+never comes back.
+
+## ⚠ Open defect: PHP and MySQL disagree about what day it is
+
+**Found 2026-10-09, not fixed.** David: "in the dashboard why is it showing oct 10 when today is
+oct 9th?"
+
+`includes/db.php` sets PHP's timezone from `config.php` (`America/Mexico_City`). It never sets
+MySQL's, so the database runs on the host's — evidently UTC. Mexico City is UTC−6, so **from 6pm
+local onwards the database already thinks it is tomorrow.** An evening Plaky import files its
+`progress_log` rows under the next day, which is how this was noticed.
+
+16 places in the codebase take the date from MySQL (`CURDATE()`, `NOW()`), 45 from PHP. They
+disagree by six hours. It bites near midnight and is silent when it does: the dashboard's daily
+grouping, `tickets.completed_at` and the stale-ticket sweep, hire stage dates, last login — and
+the new timer, which stamps `started_at` with MySQL's `NOW()` and files the hours under that date.
+The timer's *measurement* is unaffected, since both ends of the elapsed calculation are MySQL's
+own clock; only the day it lands on is wrong.
+
+**The fix is one line** in `includes/db.php`, after the connection opens:
+
+```php
+$pdo->exec("SET time_zone = '" . (new DateTime('now', new DateTimeZone($config['timezone'])))->format('P') . "'");
+```
+
+A numeric offset rather than a named zone, because named zones need MySQL's timezone tables
+loaded and shared cPanel hosting usually has not. Computed per connection, so DST follows.
+
+**Two things to know before applying it.** Rows already written do not move — `log_date` is a
+plain DATE and nothing converts it afterwards, so the misfiled days stay misfiled. And **77
+TIMESTAMP columns store UTC and convert on read**, so every "created at" and "updated at" across
+the app will shift back six hours to the correct local time. That is right, but it will look like
+something changed. Not applied because David has not yet said to.
+
+## The budget pool, and what it is missing (2026-10-16)
+
+The MVP exists and needs a show run through it before anything else is built on top. Three things
+were deliberately left out:
+
+1. **Logged hours.** Used days currently come from the plan — each step's dated window measured
+   to today, counting only slots with a real person in them — because nothing has been logged yet.
+   `budget_pool()` already prefers `time_logs` whenever it holds anything, so this turns itself on;
+   what is untested is whether the switchover reads sensibly mid-show.
+2. **A standard rate card per pipeline step.** David, 2026-10-16: "at some point all the day rates
+   can be standardized per pipeline step... so all the slots for CH layout will be 200 each."
+   Today the detail view reports one rate where the slots agree and a spread where they do not,
+   which is the map of how far off that is. The card itself is the next build: one rate per step
+   per year, frozen, with the difference against what people are actually paid landing at company
+   level rather than on the project.
+3. **Earned value.** The natural third step, and the one that answers "will we go over?" before it
+   happens. Construction's Planned Value / Earned Value / Actual Cost maps cleanly onto animation
+   because the deliverables are countable, which they are not in software. Needs real actuals from
+   a finished show to calibrate days-per-shot first.
+
+**The two thresholds are a judgement, not a law.** `POOL_PACE_MIN_ITEMS` (3) and
+`POOL_PACE_MIN_USED` (15%) in `includes/budgetpool.php` decide when the days-against-progress badge
+is allowed to go red. They exist because the mockup turned five of seven cards red — partly from
+steps that had barely started, partly because a whole-project step has ONE item and reads 0% done
+for its entire life. Expect to tune them after a real show.
+
+### The costing conversation behind it (2026-10-07)
+
+Worth keeping, because the build only covers part of it. David asked how to charge two full-time
+staff — Diego at $4,000/month billed by the day, Junior salaried at $3,200 — to projects, and
+spotted the flaw in allocation-percentage costing himself: a project costs more when it is the
+only one. What was agreed in discussion, none of it built:
+
+- **Idle time is the company's, not the surviving project's.** Unabsorbed fixed cost is a period
+  cost. Charging Junior's empty days to MSD punishes a show for a commercial event it did not
+  cause and poisons the next quote.
+- **The capacity figure is the dial.** $38,400/year over 220 days is $175/day; over 180 days it is
+  $213. That choice decides how much idle time projects carry and how much the company eats. 180
+  was the suggestion for a studio with lumpy work.
+- **Two layers.** Project = revenue less attributable cost (contribution). Company = the sum of
+  contributions, less overhead, less unabsorbed capacity. Money is fungible at the second layer;
+  the first exists to stay comparable between shows.
+- **Overhead by markup, not allocation.** Jorik, Tim, David and Renata should be recovered through
+  a markup in quoting rather than spread across projects as a line item.
+- **Same rate for quoting and for actuals**, so the variance is purely about days.
 
 ## Waiting on a decision, or offered and not built (2026-09-18)
 

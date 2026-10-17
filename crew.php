@@ -26,7 +26,7 @@ function staffing_candidate(array $h, bool $canHire): void {
     ?>
     <div class="cand">
       <strong><?= e($h['candidate_name']) ?></strong>
-      <?php if (can_edit()): ?>
+      <?php if (can_edit_area('staffing')): ?>
         <?php // The stage moves in place. "Hired" is NOT in this list:
               // set_hire_stage() would run the real hire from a dropdown with no
               // confirmation, and hiring somebody by mis-clicking a select is not
@@ -89,7 +89,7 @@ function staffing_earlier_candidate(array $h, array $leftDates): void {
       <strong><?= e($h['candidate_name']) ?></strong>
       <span class="cand-was cand-was-<?= $left ? 'left' : e((string)$h['stage']) ?>"><?= e($how) ?><?=
         $stamp ? ', ' . e(date('j M Y', $stamp)) : '' ?></span>
-      <?php if (can_edit()): ?>
+      <?php if (can_edit_area('staffing')): ?>
         <form method="post" class="cand-hire">
           <button type="submit" class="row-btn" name="action"
                   value="reopen:<?= (int)$h['id'] ?>">Line up again</button>
@@ -580,7 +580,7 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php endif; ?>
 
-  <?php if (can_edit()): ?>
+  <?php if (can_edit_area('staffing')): ?>
     <?php
     // Both buttons are always drawn, each disabled when it has nothing to do, so
     // the pair reads as "the slots and the headcount can be brought into line"
@@ -858,7 +858,7 @@ require __DIR__ . '/includes/header.php';
                   </details>
                 <?php endif; ?>
 
-                <?php if (can_edit()): ?>
+                <?php if (can_edit_area('staffing')): ?>
                   <?php // ADDING SOMEBODY HAPPENS HERE, against the position they
                         // are being considered for. Two fields, because that is
                         // all a first conversation has; everything else about
@@ -942,7 +942,7 @@ require __DIR__ . '/includes/header.php';
                   // screens. "Register hire" is what it does (David,
                   // 2026-08-31), and it is the only action an empty slot has
                   // besides removing it. ?>
-            <?php if (can_edit() && $isPh): ?>
+            <?php if (can_edit_area('staffing') && $isPh): ?>
               <?php // ⚠ NOTHING FILLS A POSITION FROM THIS COLUMN ANY MORE.
                     //
                     // "Register hire" went on 2026-09-02 because it made
@@ -985,7 +985,7 @@ require __DIR__ . '/includes/header.php';
                     // into this position. That path re-points the slot rather
                     // than renaming it, so it cannot make a second copy of
                     // anybody. ?>
-            <?php elseif (can_edit()): ?>
+            <?php elseif (can_edit_area('staffing')): ?>
               <?php // BUTTONS, not a line of small print (David, 2026-08-31).
                     // These are the two things done to a filled slot, and they
                     // were previously a disclosure summary and a link — both
@@ -1036,7 +1036,7 @@ require __DIR__ . '/includes/header.php';
                   // says exactly what will go, including how much of it cannot
                   // come back from a Regenerate, which is where that detail is
                   // actually read. ?>
-            <?php if (can_edit()): ?>
+            <?php if (can_edit_area('staffing')): ?>
               <form method="post" class="slot-remove"
                     onsubmit="return confirm('<?= $work['n'] === 0
                         ? 'Remove this slot? The person stays on the studio crew list.'

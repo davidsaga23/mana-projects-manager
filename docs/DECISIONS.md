@@ -3373,7 +3373,7 @@ timer stops the first, logs it, and says so, because the alternative (refusing t
 makes people leave the first running while they move on, which is the one outcome that
 actually corrupts the figures. A timer running over 24 hours is refused rather than truncated:
 it means somebody forgot it on Friday, not that they worked a 24-hour day.
-**Not built:** the pomodoro rhythm David also mentioned. A pomodoro arranges attention in
+**Not built (built since, 2026-10-16, see below):** the pomodoro rhythm David also mentioned. A pomodoro arranges attention in
 fixed blocks; what the figures need is a measurement. The stopwatch is the primitive, and a
 chime can sit on top of it later without the stored shape changing — whereas building the
 blocks first would have left every hour rounded to twenty-five minutes nobody worked.
@@ -3670,6 +3670,78 @@ once there was no estimate left for it to be ideal against.
 shows it under each box and still writes it on its own ("Set by … on …", "Copied from …",
 "Matched to …"); only free-text editing of it went with the tab.
 
+## 2026-10-16 — Start on My tasks runs pomodoro cycles; only focus time is logged
+**Decision:** Start begins a 25-minute focus block instead of an open stopwatch. When it ends
+the 25 minutes are logged to the card and a 5-minute break starts (15 after every fourth
+block). Breaks are never logged. The next focus block waits for a click. Stopping a focus block
+early logs the minutes it actually ran. Migration 048 adds `phase` and `focus_round` to the
+same `time_timers` row, so one timer per person is still enforced by the schema.
+**Why:** David asked for the rhythm ("let's create pomodoro cycles instead of just letting the
+time run"). The 2026-10-08 entry deferred it so the hours would stay measured rather than
+rounded to blocks; that still holds, because a block stopped early logs real minutes, and the
+only figure the cycle caps is an overrun nobody was at the desk for.
+**Consequence:** the server settles a finished block (logs it, starts the break) whenever My
+tasks loads or a timer button is pressed, so a closed tab loses nothing; the browser is only
+the alarm (chime, desktop notification, countdown in the tab title). A block that ends while
+nobody is there logs exactly 25 minutes. Each block is its own `time_logs` row. A timer that
+was already running when 048 was applied stays an open stopwatch until it is stopped.
+**Overruns stay capped, by David's choice:** "if they forget to start the next cycle they can
+log time manually. If done the other way around they might step away or forget but the log
+will be made regardless."
+
+## 2026-10-16 — One clock: MySQL is told PHP's offset, and the studio runs on Pacific time
+**Decision:** `includes/db.php` runs `SET time_zone = '<PHP's current UTC offset>'` on every
+connection, and `config.example.php` names `America/Los_Angeles` (David: "the clock should be
+based in PST and it should allow you to log hours even after 6 pm").
+**Why:** PHP followed config.php while MySQL followed the host clock, six hours apart. In the
+evening MySQL's NOW() was already tomorrow, so `log_time()` refused timer and pomodoro hours as
+"in the future". An offset rather than a zone name because shared hosts rarely load MySQL's
+timezone tables; it is recomputed per request, so daylight saving moves both clocks together.
+**Consequence:** TIMESTAMP columns (created_at etc.) now display in local time. DATETIME values
+written with NOW() before the change keep the host time they were written with. The live zone
+is whatever the server's config.php says; changing it to Pacific is an edit there, not here.
+
+## 2026-10-16 — Setup to active needs a sign-off, and the kick-off is kept for the postmortem
+**Decision:** choosing *active* for a project in setup (list dropdown, or Finish in the wizard) opens
+`kickoff.php`, which warns, then freezes the setup and emails everyone ticked under *Who signs off*
+(Tim and Jorik). The project stays in setup until all of them approve, then turns active by itself and
+writes the per-step baseline. Either can *Ask for changes* with a note. *Kick-off vs now* compares the
+frozen picture with today, linked from the list once a show is in postmortem. Migration 049,
+finance_install_08.sql. David asked for this in those words the same day.
+**Settled with David the same day:** (1) who signs off is chosen in a pop-up when sending, pre-ticked
+from *Who signs off* (a tick on a login, admins and editors only); (2) the email link needs a login,
+and the login now returns you to the page you were sent to; (3) the snapshot is taken when it is SENT,
+and **the project is frozen while it waits**: every save on its setup screens is refused
+(`KICKOFF_FROZEN_SCRIPTS`, includes/auth.php), and renaming it on the list too. *Ask for changes*
+unfreezes it; sending again takes a new snapshot, which replaces the old one as the kick-off;
+(4) either signer can ask for changes with a note; (5) an administrator can approve on behalf of
+whoever has not answered, with a reason, and everybody involved is emailed that the original state
+is being set that way; (6) the money is frozen in the finance database, so only an administrator can
+send a project for sign-off, since only they can read it.
+**Why a snapshot and not copied tables:** the snapshot is built by one function, `kickoff_snapshot()`,
+which the comparison runs again today, so both sides are measured the same way. Copied tables would
+break the first time a column is added. Cost: a figure nobody put in the snapshot in 2026 cannot be
+compared later. **No planning status**, unlike the 6 October plan: David's message keeps it setup
+until signed off. Projects already active (MSD, FCM) have no kick-off and the screen says so, rather
+than recording today's numbers as an original.
+
+## 2026-10-16 — A Supervisor role: an artist who consults Timeline and Staffing, edits Shots
+**Decision:** a fourth role, `supervisor` (migration 047). Everything an artist can do, plus
+sees a project's Timeline and Staffing tabs (read-only) and edits its Shots. David: "a
+supervisor role who has all the artist permissions but adding the timeline, staffing, shots",
+then "Supervisors can't edit timeline or staffing, it's more for them to consult." Artists
+and Bookings were also asked for; both were already open to every logged-in account to read.
+**Why this shape:** `can_edit()` stays false for a supervisor, so every other screen keeps
+the artist's answer without being touched. Shots asks `can_edit_area()` instead (Timeline and Staffing ask it too, and get no),
+and the write guard in `require_login()` / `require_login_json()` lets a supervisor's POST
+through only for the files named in `SUPERVISOR_SCRIPTS` (includes/auth.php). Same
+allow-list idea as `artist_may_post()`: a screen added later is refused by default.
+**Consequence:** no money for supervisors. Rates and quotes on Staffing go through
+`money.php`, which stays admin-only. Schedule, Dashboard and a crew member's own page stay
+artist-level until somebody asks. Letting supervisors edit an area later is one line in
+`SUPERVISOR_SCRIPTS`, for any screen that already asks `can_edit_area()`. The JSON write guard now also refuses during a preview,
+which it should always have done (the HTML guard already did).
+
 ## Still open
 
 - **Whether to put back the people on tasks dragged before 2026-09-18.** A drag on the detailed chart
@@ -3735,3 +3807,25 @@ shows it under each box and still writes it on its own ("Set by … on …", "Co
 - ~~Platform URL~~ — `mana.davidsaga.com`, served from `public_html/mana`.
 - ~~Plaky as source of truth~~ — yes for now, with the schema built so that changing our
   mind later is additive. See the two paired entries above.
+
+## 2026-10-16 — Every card list has a Project dropdown, filed or not
+**Supersedes the "Filed rows keep plain text and get no picker" part of "Filing is per card,
+from a dropdown, not one bulk button" (2026-10-12).** The per-card choice stands.
+**Decision:** the Project cell on Studio Tasks and on My tasks' Tickets table is a dropdown on
+every row an editor sees, filed or not, with the Studio listed first. Picking a show files an
+unfiled card or moves a filed one. The dropdown, the list of destinations and the handler live
+once in `includes/tickets.php` (`ticket_project_picker()`, `ticket_file_targets()`,
+`refile_ticket_from_post()`), and both screens call them.
+**Why:** David, 2026-10-16, pointing at "#38 Explore method to quantify team workloads" reading
+"no project" as plain text on My tasks: "for the tasks we need to always have a drop down menu
+available so we can classify the tasks to any project or studio wise." My tasks had no way to
+file at all, and an unfiled card there also has no status, Log box or timer, because all three
+need a show. Filing from the row is what makes it usable.
+**Why filed rows get one too:** the 2026-10-12 entry kept them read-only because they belong to
+a board. But a card filed on the wrong show is the mistake that entry warned about, and it
+should be fixable from the same list that filed it, not only from the card.
+**Consequence:** moving a FILED card asks first, because it renumbers the card and clears its
+shot, asset and step; filing an unfiled one does not, because it loses nothing. There is no way
+back to "no project" from the dropdown: `move_ticket_to_project()` only moves onto a show.
+Artists still see plain text, matching the card page's Move box, which is editors-only.
+Every move is written into the card's own thread, as the card page already did.

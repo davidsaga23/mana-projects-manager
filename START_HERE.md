@@ -3,6 +3,31 @@
 **Read this first.** It carries everything decided so far so a new conversation can begin
 without re-deriving context.
 
+> ### ⚠ State as of 2026-10-16 — read this before anything below
+>
+> **Migrations 041–046 are all applied**, confirmed by David on 2026-10-16. The older deploy
+> notes further down this file describe September and are kept for their reasoning, not their
+> status. `finance_install_07.sql` is imported too.
+>
+> **Everything is committed through `56c396f`.** David pushes from GitHub Desktop; a commit is
+> not live until he does.
+>
+> **There is one known unfixed defect: PHP and MySQL disagree about the date by six hours.**
+> It silently files evening work under tomorrow. The cause, the one-line fix and the two
+> consequences of applying it are written up under *Open defect* in `docs/ROADMAP.md`. David has
+> seen it and has not yet said to apply it.
+>
+> **What shipped 2026-10-07 to 10-16**, with the files and migrations, is the table under
+> *Built between 2026-10-07 and 2026-10-16* in `docs/ROADMAP.md`. The headlines: unfiled cards,
+> the stop-cost panel, a rebuilt Finance Overview (seven cost figures, Final balance), N/A on
+> the shot breakdown, a stopwatch on My tasks, a `postmortem` project status, **the Studio** (one
+> project row that is not a show, for cards belonging to no project), and the **Budget pool** —
+> the show expressed in days rather than money.
+>
+> **The Budget pool is an MVP awaiting feedback.** It needs a show run through it. What was
+> deliberately left out of it, and the whole costing conversation it came from, is in
+> `docs/ROADMAP.md`.
+
 - **Owner:** David Salinas Garfias (Mana Animation Studio) — *not a developer; explain
   technical trade-offs in plain terms and flag anything destructive before doing it.*
 - **Created:** 2026-08-11

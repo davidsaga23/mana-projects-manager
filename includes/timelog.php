@@ -308,13 +308,16 @@ function time_log_target(array $row): string {
 // David, 2026-10-08: "add a pomodoro or track time option at the end of each
 // task so the user can log time automatically."
 //
-// A STOPWATCH, NOT A POMODORO, and the distinction is worth stating. A pomodoro
-// is a way of ARRANGING attention — twenty-five minutes on, five off, and the
-// count is the point. What this platform needs is a measurement: how long did
-// this actually take, in minutes, against this card. The stopwatch is the
-// primitive; a pomodoro chime can sit on top of it later without the stored
-// shape changing, whereas building the chime first would have left the hours
-// rounded to blocks of twenty-five that nobody worked.
+// A STOPWATCH UNDERNEATH, POMODORO CYCLES ON TOP (David, 2026-10-16: "let's
+// create pomodoro cycles instead of just letting the time run"). The stopwatch
+// is still the primitive: a focus block measures real minutes against a card,
+// and stopping one early logs what it actually ran, never a rounded 25. What
+// the cycle adds is the rhythm — a focus block that ends itself, a break that
+// is never logged, and a long break after every fourth block. Migration 048.
+//
+// ⚠ NOTHING IS LOGGED THAT NOBODY WORKED. A focus block left running while its
+// owner is away logs its 25 minutes and no more, and the next block waits for a
+// click rather than starting itself into an empty chair.
 //
 // ⚠ EVERY FUNCTION HERE DEGRADES TO "NO TIMERS" RATHER THAN FAILING. Migration
 // 043 may not have been applied, exactly as time_logs_available() guards the
@@ -326,6 +329,38 @@ function timers_available(PDO $pdo): bool {
     return column_exists($pdo, 'time_timers', 'crew_id');
 }
 
+/** Are pomodoro cycles there? Migration 048. Without it Start is the old stopwatch. */
+function pomodoro_available(PDO $pdo): bool {
+    return column_exists($pdo, 'time_timers', 'phase');
+}
+
+/**
+ * The cycle, in minutes. The classic pomodoro numbers, and the ones David
+ * agreed to by not asking for others: kept in one place so changing them, or
+ * making them a setting later, is one edit.
+ */
+function pomodoro_minutes(string $phase): int {
+    switch ($phase) {
+        case 'focus':       return 25;
+        case 'short_break': return 5;
+        case 'long_break':  return 15;
+    }
+    return 0;
+}
+
+/** Focus blocks before the long break. */
+const POMODORO_ROUNDS = 4;
+
+/** "Focus", "Short break", "Long break" — for the button and the messages. */
+function pomodoro_phase_label(?string $phase): string {
+    switch ($phase) {
+        case 'focus':       return 'Focus';
+        case 'short_break': return 'Short break';
+        case 'long_break':  return 'Long break';
+    }
+    return 'Timer';
+}
+
 /**
  * The timer this person has running, or null.
  *
@@ -333,6 +368,10 @@ function timers_available(PDO $pdo): bool {
  * with the database's NOW(), so measuring it against PHP's time() would subtract
  * two different clocks — and on a shared host those drift by seconds to minutes.
  * The difference would be invisible on a long timer and absurd on a short one.
+ *
+ * A pomodoro row also carries phase_seconds (how long this phase is) and
+ * remaining_seconds (never below zero). A break whose time is up stays here,
+ * reading 0, until its owner starts the next focus block or ends the cycle.
  */
 function running_timer(PDO $pdo, int $crewId): ?array {
     if (!timers_available($pdo) || $crewId <= 0) return null;
@@ -349,7 +388,76 @@ function running_timer(PDO $pdo, int $crewId): ?array {
     // Never negative, however the clocks behave. A timer reading "-3 m" is the
     // kind of nonsense that makes people stop trusting the whole screen.
     $row['elapsed_seconds'] = max(0, (int)$row['elapsed_seconds']);
+    $row['phase'] = isset($row['phase']) && $row['phase'] !== '' ? (string)$row['phase'] : null;
+    if ($row['phase'] !== null) {
+        $row['phase_seconds']     = pomodoro_minutes($row['phase']) * 60;
+        $row['remaining_seconds'] = max(0, $row['phase_seconds'] - $row['elapsed_seconds']);
+    }
     return $row;
+}
+
+/**
+ * Close a focus block whose 25 minutes are up: log them and begin the break.
+ *
+ * Called when My tasks loads and before any timer action, so a block that ran
+ * out while the tab was closed, or the laptop asleep, is settled the first time
+ * anybody looks — the browser is only the alarm clock, never the record.
+ *
+ * ⚠ EXACTLY THE BLOCK'S LENGTH IS LOGGED, however long ago it ended. Somebody
+ * who walked away at minute 20 and came back two hours later gets 25 minutes,
+ * not two hours and twenty: the cycle told them to stop at 25, and an overrun
+ * nobody was there for is the generous, remembered number the timer exists to
+ * replace.
+ *
+ * ⚠ THE BREAK STARTS WHEN THE FOCUS BLOCK ENDED, not when somebody next looked,
+ * so a break that has also run out reads as over rather than starting afresh.
+ *
+ * ⚠ THE UPDATE GOES FIRST AND ONLY THE CALLER THAT WON IT LOGS. Two tabs
+ * reloading at the same second would otherwise both see an expired block and
+ * log it twice. The WHERE names the exact phase and start time this call read,
+ * so the second UPDATE matches no row and that tab logs nothing.
+ *
+ * Returns a sentence when something was logged, '' when there was nothing to do.
+ */
+function pomodoro_settle(PDO $pdo, int $crewId, int $userId = 0): string {
+    if (!pomodoro_available($pdo)) return '';
+    $open = running_timer($pdo, $crewId);
+    if (!$open || $open['phase'] !== 'focus' || $open['remaining_seconds'] > 0) return '';
+
+    $round = max(1, (int)$open['focus_round']);
+    $next  = $round >= POMODORO_ROUNDS ? 'long_break' : 'short_break';
+    $focus = pomodoro_minutes('focus');
+
+    // One transaction, so the phase only moves on if the minutes were actually
+    // written. If log_time() refuses them, the block stays a finished focus
+    // block, its owner sees why, and Stop or drop is still theirs to choose,
+    // instead of 25 minutes quietly vanishing into a break.
+    $pdo->beginTransaction();
+    try {
+        $u = $pdo->prepare(
+            "UPDATE time_timers
+                SET phase = ?, started_at = DATE_ADD(started_at, INTERVAL {$focus} MINUTE)
+              WHERE crew_id = ? AND phase = 'focus' AND started_at = ?"
+        );
+        $u->execute([$next, $crewId, $open['started_at']]);
+        if ($u->rowCount() !== 1) { $pdo->rollBack(); return ''; }
+
+        $logged = log_time($pdo, [
+            'project_id'  => (int)$open['project_id'],
+            'progress_id' => $open['progress_id'] !== null ? (int)$open['progress_id'] : null,
+            'ticket_id'   => $open['ticket_id'] !== null ? (int)$open['ticket_id'] : null,
+            'crew_id'     => $crewId,
+            'hours'       => $focus . 'm',
+            'log_date'    => date('Y-m-d', strtotime($open['started_at'])),
+            'entered_by'  => $userId ?: null,
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return 'Focus ' . $round . ' of ' . POMODORO_ROUNDS . ' done. ' . $logged . ' '
+         . pomodoro_phase_label($next) . ', ' . pomodoro_minutes($next) . ' minutes.';
 }
 
 /** "1:04:09", for the live readout. Hours only once there are some. */
@@ -399,22 +507,46 @@ function start_timer(PDO $pdo, array $in): string {
         throw new RuntimeException('Hours are costed to a show, so a timer needs one.');
     }
 
-    $said = '';
+    $userId = (int)($in['entered_by'] ?? 0);
+    $pomodoro = pomodoro_available($pdo);
+    // A focus block that has just run out is logged before anything else
+    // happens, so pressing a button never decides what those minutes were.
+    $said = $pomodoro ? pomodoro_settle($pdo, $crewId, $userId) : '';
+    $said = $said !== '' ? $said . ' ' : '';
+    $round = 1;
     $open = running_timer($pdo, $crewId);
     if ($open) {
+        $same = (int)$open['progress_id'] === (int)$progressId
+             && (int)$open['ticket_id'] === (int)$ticketId;
         // Already timing this very thing: say so and change nothing, rather than
         // restarting the clock and throwing away the minutes already counted.
-        if ((int)$open['progress_id'] === (int)$progressId
-            && (int)$open['ticket_id'] === (int)$ticketId) {
-            return 'That timer is already running, since '
+        if ($same && $open['phase'] !== 'short_break' && $open['phase'] !== 'long_break') {
+            return $said . 'That timer is already running, since '
                  . date('H:i', strtotime($open['started_at'])) . '.';
         }
-        $said = stop_timer($pdo, $crewId, (int)($in['entered_by'] ?? 0)) . ' ';
+        if ($same) {
+            // On a break for this card: Start is "next focus block", whether the
+            // break is over or being cut short. The round carries on, and comes
+            // back to 1 after the long break.
+            $round = $open['phase'] === 'long_break' ? 1 : (int)$open['focus_round'] + 1;
+            $pdo->prepare('DELETE FROM time_timers WHERE crew_id = ?')->execute([$crewId]);
+        } else {
+            $said .= stop_timer($pdo, $crewId, $userId) . ' ';
+        }
     }
 
     // REPLACE rather than INSERT: stop_timer() has just deleted the old row, but
     // two tabs pressing start at the same moment would otherwise collide on the
     // primary key and show somebody a duplicate-key error for pressing a button.
+    if ($pomodoro) {
+        $pdo->prepare(
+            "REPLACE INTO time_timers (crew_id, project_id, progress_id, ticket_id,
+                                       phase, focus_round, started_at)
+             VALUES (?, ?, ?, ?, 'focus', ?, NOW())"
+        )->execute([$crewId, $projectId, $progressId, $ticketId, $round]);
+        return $said . 'Focus ' . $round . ' of ' . POMODORO_ROUNDS . ' started, '
+             . pomodoro_minutes('focus') . ' minutes.';
+    }
     $pdo->prepare(
         'REPLACE INTO time_timers (crew_id, project_id, progress_id, ticket_id, started_at)
          VALUES (?, ?, ?, ?, NOW())'
@@ -435,19 +567,31 @@ function start_timer(PDO $pdo, array $in): string {
  * that groups by day.
  */
 function stop_timer(PDO $pdo, int $crewId, int $userId = 0, string $notes = ''): string {
+    // A focus block that ran out before Stop was pressed is logged as its full
+    // 25 minutes by the settle, and what is left to stop is the break after it.
+    $said = pomodoro_settle($pdo, $crewId, $userId);
+    $said = $said !== '' ? $said . ' ' : '';
     $open = running_timer($pdo, $crewId);
-    if (!$open) return 'No timer was running.';
+    if (!$open) return $said . 'No timer was running.';
 
     $pdo->prepare('DELETE FROM time_timers WHERE crew_id = ?')->execute([$crewId]);
 
+    // Breaks are never logged, and the focus block before this one already was.
+    if ($open['phase'] === 'short_break' || $open['phase'] === 'long_break') {
+        return $said . 'Cycle ended on a break. Every focus block in it is already logged.';
+    }
+
     $seconds = (int)$open['elapsed_seconds'];
+    // A focus block stopped early logs what it actually ran. It can never log
+    // more than its length: past that, the settle above has already closed it.
+    if ($open['phase'] === 'focus') $seconds = min($seconds, (int)$open['phase_seconds']);
     $minutes = (int)round($seconds / 60);
 
     // Under a minute is not work, it is a mis-click. Logging "0 h" would clutter
     // the ledger with entries that mean nothing and still have to be deleted by
     // hand.
     if ($minutes < 1) {
-        return 'That timer ran for ' . $seconds . ' seconds, so nothing was logged.';
+        return $said . 'That timer ran for ' . $seconds . ' seconds, so nothing was logged.';
     }
 
     // ⚠ A TIMER LEFT RUNNING IS REFUSED, NOT TRUNCATED. log_time() already caps
@@ -455,7 +599,7 @@ function stop_timer(PDO $pdo, int $crewId, int $userId = 0, string $notes = ''):
     // deciding that a timer somebody forgot on Friday represents a 24-hour day.
     // It does not. The start time is named so the real hours can be typed in.
     if ($minutes > 24 * 60) {
-        return 'That timer had been running since '
+        return $said . 'That timer had been running since '
              . date('j M, H:i', strtotime($open['started_at']))
              . ' — almost certainly left on by mistake, so nothing was logged. '
              . 'Enter the hours by hand instead.';
@@ -463,7 +607,7 @@ function stop_timer(PDO $pdo, int $crewId, int $userId = 0, string $notes = ''):
 
     // Handed over in minutes, which log_time() accepts as "90m", so the measured
     // figure is never rounded to the nearest half hour on its way in.
-    return log_time($pdo, [
+    return $said . log_time($pdo, [
         'project_id'  => (int)$open['project_id'],
         'progress_id' => $open['progress_id'] !== null ? (int)$open['progress_id'] : null,
         'ticket_id'   => $open['ticket_id'] !== null ? (int)$open['ticket_id'] : null,
@@ -487,6 +631,9 @@ function discard_timer(PDO $pdo, int $crewId): string {
     $open = running_timer($pdo, $crewId);
     if (!$open) return 'No timer was running.';
     $pdo->prepare('DELETE FROM time_timers WHERE crew_id = ?')->execute([$crewId]);
-    return 'Timer discarded after ' . fmt_elapsed((int)$open['elapsed_seconds'])
+    if ($open['phase'] === 'short_break' || $open['phase'] === 'long_break') {
+        return 'Cycle ended on a break. Every focus block in it is already logged.';
+    }
+    return ($open['phase'] === 'focus' ? 'Focus block' : 'Timer') . ' discarded after ' . fmt_elapsed((int)$open['elapsed_seconds'])
          . '. Nothing was logged.';
 }

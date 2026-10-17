@@ -47,7 +47,7 @@ $err = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
     try {
-        if (!can_edit()) throw new RuntimeException('Your account has view-only access.');
+        if (!can_edit_area('timeline')) throw new RuntimeException('Your account has view-only access.');
         if ($_FILES['ganfile']['error'] !== UPLOAD_ERR_OK) {
             throw new RuntimeException('Upload failed (code ' . $_FILES['ganfile']['error'] . ').');
         }
@@ -227,6 +227,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
         if (!$dryRun && $changes) {
             $pdo->beginTransaction();
             try {
+                // COALESCE, not overwrite: a file with no resource on a task
+                // means "unspecified", not "nobody". Clearing an assignment
+                // because GanttProject didn't mention it would lose work the
+                // schedule had already done. (Kept out of the SQL: the quote
+                // marks it needs ended the PHP string and broke this page.)
                 $up = $pdo->prepare(
                     "INSERT INTO schedule
                         (project_id, step_id, shot_id, asset_id, item_key,
@@ -235,10 +240,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                      ON DUPLICATE KEY UPDATE
                         start_date = VALUES(start_date),
                         end_date   = VALUES(end_date),
-                        -- COALESCE, not overwrite: a file with no resource on a
-                        -- task means "unspecified", not "nobody". Clearing an
-                        -- assignment because GanttProject didn't mention it would
-                        -- lose work the schedule had already done.
                         crew_id    = COALESCE(VALUES(crew_id), crew_id),
                         is_manual  = 1,
                         source     = 'manual'"
