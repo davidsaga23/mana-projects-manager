@@ -3084,3 +3084,19 @@ button.secondary.danger:hover { background: var(--danger-border); }
    still ends where it ends. The 210px is the chrome above it — nav, tabs, the
    breakdown warning, the totals line. */
 .bd-scroll { overflow: auto; max-height: max(300px, calc(100vh - 210px)); }
+
+/* Bulk rates above the expense projection. Wraps on a narrow screen rather than
+   scrolling, and stays in view while the long table scrolls under it. */
+.bulk-rates {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  margin: 8px 0; padding: 8px 12px; position: sticky; top: 0; z-index: 3;
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: 6px;
+}
+.bulk-rates label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+/* width:auto throughout, or the global `input, select { width: 100% }` stretches
+   each control across the bar and the tick boxes across the Role column. */
+.bulk-rates select { width: auto; padding: 4px 8px; font-size: 13px; }
+.bulk-rates .bulk-apply { display: inline-flex; gap: 6px; align-items: center; }
+.bulk-rates .bulk-apply input { width: 6em; padding: 4px 6px; font-size: 13px; text-align: right; }
+.bulk-tick { display: inline; margin: 0; }
+.bulk-row, .bulk-tick input { width: auto; margin: 0 8px 0 0; vertical-align: middle; }

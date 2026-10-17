@@ -81,6 +81,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $merged = array_merge($existing, ['day_rate' => $_POST['day_rate'] ?? '']);
             flash('ok', save_crew_terms($crewId, $name, $merged, $who));
 
+        } elseif (isset($_POST['bulk_rates'])) {
+            // ONE RATE, MANY ROWS. Ticked in the projection table, applied here
+            // one person at a time through the same merge-and-save the single
+            // box above uses, so contracts, unit and currency survive exactly
+            // as they do there.
+            //
+            // Everybody is checked against this project's lanes, same as the
+            // single box: an id the table did not draw cannot be written to.
+            $onShow = [];
+            foreach (project_lanes($pdo, $projectId) as $l) {
+                $onShow[(int)$l['crew_id']] = [
+                    'name' => (string)$l['name'],
+                    'slot' => (int)($l['is_placeholder'] ?? 0) === 1,
+                ];
+            }
+            $ids = array_unique(array_map('intval', (array)($_POST['crew_ids'] ?? [])));
+            $ids = array_values(array_filter($ids, fn($id) => isset($onShow[$id])));
+            if (!$ids) {
+                throw new RuntimeException('No ticked row is on this project, so no rate was saved.');
+            }
+
+            // A blank here would WIPE every ticked rate, which is never what a
+            // bulk action is for. Clearing stays a one-row-at-a-time job.
+            $rate = trim((string)($_POST['day_rate'] ?? ''));
+            if ($rate === '') {
+                throw new RuntimeException('Type a rate before applying it, nothing was saved.');
+            }
+            $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rate));
+            if ($clean === '' || !is_numeric($clean) || (float)$clean < 0) {
+                throw new RuntimeException('"' . $rate . '" is not a rate, nothing was saved.');
+            }
+
+            // REAL PEOPLE need a second yes. Their rate is theirs on every show,
+            // so a tick here rewrites what other projects are costed at too.
+            // The browser asks; this refuses if it did not, so a page with
+            // scripts off cannot do it silently.
+            $people = [];
+            foreach ($ids as $id) {
+                if (!$onShow[$id]['slot']) $people[] = $onShow[$id]['name'];
+            }
+            if ($people && ($_POST['confirm_people'] ?? '') !== '1') {
+                throw new RuntimeException('The selection includes real people ('
+                    . implode(', ', $people) . '), whose rate changes on every show. '
+                    . 'Nothing was saved; apply again and confirm.');
+            }
+
+            foreach ($ids as $id) {
+                $existing = crew_term($id) ?? [];
+                save_crew_terms($id, $onShow[$id]['name'],
+                    array_merge($existing, ['day_rate' => $rate]), $who);
+            }
+            $n = count($ids);
+            $said = sprintf('Rate %s applied to %d row%s.', $clean, $n, $n === 1 ? '' : 's');
+            if ($people) {
+                $said .= ' Changed on every show for: ' . implode(', ', $people) . '.';
+            }
+            flash('ok', $said);
+
         } elseif (isset($_POST['save_budget'])) {
             flash('ok', save_project_budget($projectId, $project, $_POST, $who));
         } elseif (isset($_POST['save_departments'])) {
@@ -1122,11 +1180,43 @@ if ($retakePct <= 0):
   Rate column and it saves against them everywhere, the other rows they appear on here, and every
   future show they are booked on. A rate set on a <em>slot</em> is the exception: a slot exists only
   on this project, so its rate goes when the slot does.
+  <br><strong>Many at once:</strong> tick rows (or a whole department, or a whole role), type one
+  rate in the bar and apply. If the ticks include real people you are asked first, because of the
+  rule above.
 </p>
 
 <?php if (!$proj['rows']): ?>
   <p class="muted">No pipeline steps yet.</p>
 <?php else: ?>
+  <?php // BULK RATES. Its own form, outside the table, because every row already
+        // carries a single-rate form and forms cannot nest. The tick boxes in
+        // the table join this form through their form="" attribute. Roles are
+        // listed once each, in the order the table draws them.
+        $bulkRoles = [];
+        foreach ($proj['rows'] as $r) {
+            if ($r['crew_id']) $bulkRoles[(string)$r['role']] = true;
+        } ?>
+  <form method="post" id="bulk-rates" class="bulk-rates">
+    <input type="hidden" name="bulk_rates" value="1">
+    <input type="hidden" name="confirm_people" value="0">
+    <strong>Set a rate for many rows</strong>
+    <span class="muted small" id="bulk-count">0 ticked</span>
+    <label class="small">Tick a whole role
+      <select id="bulk-role">
+        <option value="">choose…</option>
+        <?php foreach (array_keys($bulkRoles) as $role): ?>
+          <option value="<?= e($role) ?>"><?= e($role) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <button type="button" class="secondary" id="bulk-clear">Untick all</button>
+    <span class="bulk-apply">
+      <input name="day_rate" inputmode="decimal" size="6" placeholder="rate" aria-label="Rate for the ticked rows">
+      <button type="submit">Apply to ticked</button>
+    </span>
+    <span class="muted small">Each row keeps its own currency and unit (day or second).</span>
+  </form>
+
   <div class="grid-scroll">
   <table class="proj-table">
     <thead>
@@ -1146,6 +1236,9 @@ if ($retakePct <= 0):
     <tbody>
     <?php foreach ($proj['by_department'] as $dept => $group): ?>
       <tr class="track-group"><td colspan="10">
+        <label class="bulk-tick" title="Tick every row in <?= e($dept) ?>">
+          <input type="checkbox" class="bulk-dept-all" data-dept="<?= e($dept) ?>"
+                 aria-label="Tick every row in <?= e($dept) ?>"></label>
         <span class="group-badge"><?= e(strtoupper($dept)) ?></span>
         <span class="muted small"><?= count($group['rows']) ?> people ·
           <?= e(fmt_num($group['days'], 1)) ?> days</span>
@@ -1154,6 +1247,13 @@ if ($retakePct <= 0):
       <?php foreach ($group['rows'] as $r): ?>
         <tr>
           <td class="wf-name">
+            <?php if ($r['crew_id']): ?>
+              <input type="checkbox" class="bulk-row" form="bulk-rates" name="crew_ids[]"
+                     value="<?= (int)$r['crew_id'] ?>" data-dept="<?= e($dept) ?>"
+                     data-role="<?= e((string)$r['role']) ?>" data-slot="<?= $r['is_slot'] ? '1' : '0' ?>"
+                     data-name="<?= e((string)$r['artist']) ?>"
+                     aria-label="Tick <?= e((string)$r['artist']) ?> for a bulk rate">
+            <?php endif; ?>
             <span class="dot" style="background:<?= e($r['step']['color'] ?: '#ccc') ?>"></span><?= e($r['role']) ?>
           </td>
           <td>
@@ -1247,6 +1347,67 @@ if ($retakePct <= 0):
     </tfoot>
   </table>
   </div>
+
+  <script>
+  // Bulk rates: ticking by department or role, the running count, and the
+  // warning before a real person's rate is rewritten on every show. The server
+  // refuses people without confirm_people=1, so this is the ask, not the guard.
+  (function () {
+    var form = document.getElementById('bulk-rates');
+    if (!form) { return; }
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.bulk-row'));
+    var count = document.getElementById('bulk-count');
+    function refresh() {
+      var n = rows.filter(function (b) { return b.checked; }).length;
+      count.textContent = n + ' ticked';
+      document.querySelectorAll('.bulk-dept-all').forEach(function (all) {
+        var mine = rows.filter(function (b) { return b.dataset.dept === all.dataset.dept; });
+        var on = mine.filter(function (b) { return b.checked; }).length;
+        all.checked = mine.length > 0 && on === mine.length;
+        all.indeterminate = on > 0 && on < mine.length;
+      });
+    }
+    rows.forEach(function (b) { b.addEventListener('change', refresh); });
+    document.querySelectorAll('.bulk-dept-all').forEach(function (all) {
+      all.addEventListener('change', function () {
+        rows.forEach(function (b) { if (b.dataset.dept === all.dataset.dept) { b.checked = all.checked; } });
+        refresh();
+      });
+    });
+    document.getElementById('bulk-role').addEventListener('change', function () {
+      var role = this.value;
+      if (role !== '') {
+        rows.forEach(function (b) { if (b.dataset.role === role) { b.checked = true; } });
+      }
+      this.value = '';
+      refresh();
+    });
+    document.getElementById('bulk-clear').addEventListener('click', function () {
+      rows.forEach(function (b) { b.checked = false; });
+      refresh();
+    });
+    form.addEventListener('submit', function (ev) {
+      var picked = rows.filter(function (b) { return b.checked; });
+      if (!picked.length) { ev.preventDefault(); alert('Tick at least one row first.'); return; }
+      if (form.day_rate.value.trim() === '') { ev.preventDefault(); alert('Type the rate to apply.'); return; }
+      var people = [];
+      picked.forEach(function (b) {
+        if (b.dataset.slot !== '1' && people.indexOf(b.dataset.name) < 0) { people.push(b.dataset.name); }
+      });
+      form.confirm_people.value = '0';
+      if (people.length) {
+        if (!confirm('These are real people, not slots:\n\n  ' + people.join('\n  ')
+            + '\n\nA person\'s rate is theirs everywhere, so this changes it on every show '
+            + 'they are booked on, not just this one. Apply anyway?')) {
+          ev.preventDefault();
+          return;
+        }
+        form.confirm_people.value = '1';
+      }
+    });
+    refresh();
+  }());
+  </script>
 
   <p class="muted small">
     <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
