@@ -25,7 +25,11 @@ const PLAKY_REQUIRED_COLUMNS = ['Group', 'Item Parent Id', 'Item/Subitem Id', 'T
 const PLAKY_OPTIONAL_COLUMNS = [
     'Assignee'     => 'nobody will be attached to any of this work',
     'Total frames' => 'no shot will get a frame count from this file',
-    'Time spent'   => 'no logged time will be imported',
+    // 'Time spent' WAS here until 2026-10-17. David: "let's delete the time
+    // spent column from the system, we're not going to use it anymore." Time is
+    // logged in Anima now (the Log box and the Pomodoro timer, into time_logs),
+    // so a file without the column is normal and must not be warned about, and
+    // a file WITH it is simply not read: see plaky_run().
 ];
 
 /**
@@ -230,23 +234,6 @@ function plaky_best_step(array $steps, string $name, string $group): ?array {
 }
 
 /**
- * Convert the file's time value into whole minutes, honouring the declared unit.
- *
- * The platform stores minutes (DECISIONS, 2026-08-12) whatever the file says, so
- * this is the one place the two meet. The `minutes` branch is no longer reachable
- * from the screens — every board logs in hours since 2026-10-05 — but it stays,
- * because the cost of keeping it is a single comparison and the cost of needing
- * it back is rediscovering why the figures are sixty times too small.
- */
-function plaky_time_to_minutes(string $raw, string $unit): ?int {
-    $raw = trim($raw);
-    if ($raw === '' || !is_numeric($raw)) return null;
-    $v = (float)$raw;
-    if ($v <= 0) return null;
-    return $unit === 'hours' ? (int)round($v * 60) : (int)round($v);
-}
-
-/**
  * Everything the mapping screen needs to know about the file, matched against
  * what the project already has.
  */
@@ -412,12 +399,9 @@ function plaky_analyse(PDO $pdo, int $projectId, array $rows): array {
  */
 function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $dryRun): array {
     $split = plaky_split_rows($rows);
-    // ⚠ DEFAULTS TO HOURS, and that default changed on 2026-10-05 when the
-    // upload screen stopped asking. It matters which way round a missing value
-    // falls: every board now logs in hours, so assuming minutes would divide
-    // every imported figure by sixty rather than simply being unhelpful. The
-    // mapping still carries the unit explicitly; this is only the fallback.
-    $timeUnit = ($mapping['time_unit'] ?? 'hours') === 'minutes' ? 'minutes' : 'hours';
+    // Plaky's "Time spent" column is NOT read (2026-10-17). progress.time_spent_minutes
+    // keeps whatever earlier imports wrote, and the importer never touches it
+    // again: it neither fills it nor clears it.
     $groupKinds = $mapping['groups'] ?? [];
     $stepMap = $mapping['steps'] ?? [];        // external title => step_id (0/absent = skip)
     $statusMap = $mapping['statuses'] ?? [];   // external status => status_id (0/absent = unmapped)
@@ -537,7 +521,6 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                     $report['unmapped_statuses'][$statusText] = ($report['unmapped_statuses'][$statusText] ?? 0) + 1;
                 }
                 $flags = status_flags($statusId ? ($statusRowsEarly[$statusId] ?? null) : null);
-                $minutes = plaky_time_to_minutes($p['Time spent'] ?? '', $timeUnit);
                 $assigneeRaw = ($p['Assignee'] ?? '') !== '' ? $p['Assignee'] : null;
                 $crewIds = [];
                 foreach (split_assignees($p['Assignee'] ?? '') as $person) {
@@ -555,21 +538,20 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                 if ($existingId) {
                     $pdo->prepare(
                         'UPDATE progress SET status = ?, status_id = ?, is_delivered = ?, is_approved = ?,
-                            crew_id = COALESCE(?, crew_id), assignee_raw = COALESCE(?, assignee_raw),
-                            time_spent_minutes = COALESCE(?, time_spent_minutes)
+                            crew_id = COALESCE(?, crew_id), assignee_raw = COALESCE(?, assignee_raw)
                           WHERE id = ?'
                     )->execute([$statusText, $statusId, $flags['is_delivered'], $flags['is_approved'],
-                                $crewIds[0] ?? null, $assigneeRaw, $minutes, $existingId]);
+                                $crewIds[0] ?? null, $assigneeRaw, $existingId]);
                     $report['progress_updated']++;
                 } else {
                     $pdo->prepare(
                         'INSERT INTO progress
                             (project_id, step_id, shot_id, asset_id, item_key, status, status_id,
-                             is_delivered, is_approved, crew_id, assignee_raw, time_spent_minutes)
-                         VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)'
+                             is_delivered, is_approved, crew_id, assignee_raw)
+                         VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)'
                     )->execute([$projectId, $stepId, $projectItemKey, $statusText, $statusId,
                                 $flags['is_delivered'], $flags['is_approved'],
-                                $crewIds[0] ?? null, $assigneeRaw, $minutes]);
+                                $crewIds[0] ?? null, $assigneeRaw]);
                     $progressIds[$stepId . '|' . $projectItemKey] = (int)$pdo->lastInsertId();
                     $report['progress_created']++;
                 }
@@ -645,8 +627,8 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
         $insProg = $pdo->prepare(
             'INSERT INTO progress
                 (project_id, step_id, shot_id, asset_id, item_key, status, status_id,
-                 is_delivered, is_approved, crew_id, assignee_raw, time_spent_minutes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                 is_delivered, is_approved, crew_id, assignee_raw)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         // COALESCE on the incoming value: a blank cell must never wipe something
         // already recorded. An import adds knowledge, it doesn't erase it.
@@ -654,8 +636,7 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             'UPDATE progress SET
                 status = ?, status_id = ?, is_delivered = ?, is_approved = ?,
                 crew_id = COALESCE(?, crew_id),
-                assignee_raw = COALESCE(?, assignee_raw),
-                time_spent_minutes = COALESCE(?, time_spent_minutes)
+                assignee_raw = COALESCE(?, assignee_raw)
               WHERE id = ?'
         );
         $delCrew = $pdo->prepare('DELETE FROM progress_crew WHERE progress_id = ?');
@@ -692,7 +673,6 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
             }
             $primaryCrew = $crewIds[0] ?? null;
             $assigneeRaw = ($s['Assignee'] ?? '') !== '' ? $s['Assignee'] : null;
-            $minutes = plaky_time_to_minutes($s['Time spent'] ?? '', $timeUnit);
 
             // ⚠ DOES THE STEP AGREE WITH WHERE THIS ROW IS GOING? The kind comes
             // from the board's own shape; applies_to is what Anima was told. When
@@ -756,7 +736,7 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                 }
                 $updProg->execute([
                     $statusText, $statusId, $flags['is_delivered'], $flags['is_approved'],
-                    $primaryCrew, $assigneeRaw, $minutes, $existingId,
+                    $primaryCrew, $assigneeRaw, $existingId,
                 ]);
                 $report['progress_updated']++;
                 $progressId = $existingId;
@@ -767,7 +747,7 @@ function plaky_run(PDO $pdo, int $projectId, array $rows, array $mapping, bool $
                     $parent['kind'] === 'asset' ? $parent['id'] : null,
                     $itemKey, $statusText, $statusId,
                     $flags['is_delivered'], $flags['is_approved'],
-                    $primaryCrew, $assigneeRaw, $minutes,
+                    $primaryCrew, $assigneeRaw,
                 ]);
                 $progressId = (int)$pdo->lastInsertId();
                 $progressIds[$stepId . '|' . $itemKey] = $progressId;

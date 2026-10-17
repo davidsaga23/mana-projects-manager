@@ -3829,3 +3829,20 @@ shot, asset and step; filing an unfiled one does not, because it loses nothing. 
 back to "no project" from the dropdown: `move_ticket_to_project()` only moves onto a show.
 Artists still see plain text, matching the card page's Move box, which is editors-only.
 Every move is written into the card's own thread, as the card page already did.
+
+## 2026-10-17 — The Plaky import no longer reads "Time spent"
+**Supersedes "The import stops asking what unit time is in" (2026-10-05)** and the "`Time spent`
+is wanted" answer in `PLAKY_EXPORT.md`.
+**Asked by David:** *"let's delete the time spent column from the system, we're not going to use
+it anymore"*, pointing at the import's warning "This file has no Time spent column".
+**Decision:** the importer ignores the column whether or not the file carries it. It is gone
+from `PLAKY_OPTIONAL_COLUMNS` (so a file without it is no longer warned about), from
+`plaky_run()` (which no longer writes `progress.time_spent_minutes` on insert or update), and
+from the upload and mapping screens ("time read as hours", the hours-not-minutes note).
+`plaky_time_to_minutes()` and the `time_unit` session/mapping key went with it.
+**Why:** time is logged in Anima now, per day, into `time_logs` (the Log box and the Pomodoro
+timer). A second, Plaky-fed running total was a second source for one number.
+**What stays:** `progress.time_spent_minutes` and whatever earlier imports wrote into it. The
+import neither fills nor clears it, so the screens that read it (dashboard "Time logged",
+person, team, item, My tasks' "imported" note) keep showing those old figures. Dropping the
+column or hiding those figures is a separate choice, not taken here.

@@ -53,7 +53,7 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
   <tr>
     <td><strong>Progress records</strong>
       <div class="muted small">one per pipeline step on each shot or asset, the status,
-        who's on it and any time logged</div></td>
+        and who's on it</div></td>
     <td><strong><?= (int)$report['progress_created'] + (int)$report['progress_updated'] ?></strong></td>
     <td><?= (int)$report['progress_created'] ?></td>
     <td><?= (int)$report['progress_updated'] ?></td>
