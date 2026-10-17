@@ -54,11 +54,12 @@ require __DIR__ . '/includes/header.php';
       // switching to Finance management. What is genuinely only possible here is
       // the comparison ACROSS projects, so that is what it is for. ?>
 
-<?php // NO "Ideal quotas" button here, deliberately (David, 2026-08-17). The
-      // sheet is reached from INSIDE a project — a project → Finance management
-      // → the Ideal quotas tab — because that is the moment it matters: you are
-      // looking at a budget and want to know, or change, the number that priced
-      // it. ?>
+<?php // NO "Ideal quotas" button here, deliberately (David, 2026-08-17). A
+      // project's days per item are reached from INSIDE it, on Dates & headcount
+      // (the Finance management tab that also showed them was removed on
+      // 2026-10-16, being the same number), and the expense projection links
+      // there: you are looking at a budget and want to know, or change, the
+      // number that priced it. ?>
 
 <p class="lead">
   Every show the studio has taken on, with the dates it runs between, what it was sold for,

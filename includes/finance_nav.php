@@ -42,14 +42,11 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // already shows and nothing in the app sends anybody to it. What it
         // uniquely holds - quoted rates, contract states, bulk add, stage
         // history - is on the roadmap to be moved or retired.
-        // THIS PROJECT'S IDEAL QUOTAS, the numbers its budget is built on.
-        //
-        // Inside Finance management because that is where they are decided
-        // (David, 2026-08-17): the production head sets what the work should
-        // take, and every cost on the projection is computed from it. Per project
-        // since 2026-09-17, so it is a tab like the others, drawing this bar.
-        ['key' => 'standards',  'label' => 'Ideal quotas',
-         'href' => 'standards.php' . $p],
+        // ⚠ NO IDEAL QUOTAS TAB since 2026-10-16 (David chose "Remove it"). It
+        // edited the step's days per item, the very number Dates & headcount
+        // edits, so it was one value on two screens under two names. The
+        // approved-projection match it carried moved to Dates & headcount, and
+        // standards.php now only forwards old bookmarks there.
     ];
 }
 

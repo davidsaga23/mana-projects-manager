@@ -3649,6 +3649,27 @@ one. Five of seven cards came out red in the mockup, and a wall of red carries n
 because they are a judgement about how twitchy the warning should be and will want tuning once
 David has run a show on it.
 
+## 2026-10-16 — The Ideal quotas tab is removed; days per item lives on Dates & headcount
+**Decision, David's** (he asked *"is the Ideal quotas still ideal? I think these ones are the same
+that are in the Headcount & dates right?"*, then chose "Remove it"). They were the same: since
+2026-09-17 both screens read and wrote `pipeline_steps.days_per_unit`, one value per step, so the
+tab was that number under a second name on a second screen. "Ideal" also stopped meaning anything
+once there was no estimate left for it to be ideal against.
+
+**What changed.**
+- **No Ideal quotas tab** in Finance management (`includes/finance_nav.php`).
+- **The approved-expense-projection match moved to Dates & headcount**, above the table it fills
+  in: `ideal_match_post()` and `ideal_match_render()` in `includes/ideal_match.php`, posted to the
+  wizard's step 6. Same preview-then-apply flow, same admin-only rule. "Copy from another project"
+  was already there.
+- **`standards.php` only forwards**, to Dates & headcount with a one-line note, so old bookmarks
+  and links land somewhere. Every link that pointed at it now points at Dates & headcount.
+- `save_project_ideals()` is gone with the only screen that called it.
+
+**Given up:** typing the "where the number came from" note by hand. Dates & headcount still
+shows it under each box and still writes it on its own ("Set by … on …", "Copied from …",
+"Matched to …"); only free-text editing of it went with the tab.
+
 ## 2026-10-16 — Start on My tasks runs pomodoro cycles; only focus time is logged
 **Decision:** Start begins a 25-minute focus block instead of an open stopwatch. When it ends
 the 25 minutes are logged to the card and a 5-minute break starts (15 after every fourth

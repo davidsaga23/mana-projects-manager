@@ -392,7 +392,7 @@ Per step identity, across every project that has run it:
   loop closing — the estimate improves because the tool remembers, not because someone
   remembers. *(Since 2026-09-17 days per item IS each project's ideal quota, so the median is
   offered as a copy into one project, with `days_source` saying where it came from — the same
-  shape as "Copy from another project" on the Ideal quotas tab. Never a shared number: that is
+  shape as "Copy from another project" on Dates & headcount. Never a shared number: that is
   what per-project quotas were for.)*
 
 **Scale caveat worth designing for:** two or three finished projects is not a sample. Show the

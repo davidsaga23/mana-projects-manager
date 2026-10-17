@@ -195,7 +195,7 @@ require __DIR__ . '/includes/header.php';
 <?php
 // This project's IDEAL for the step, beside the pace the deadline demands.
 //
-// Set on the business side (Ideal quotas, admin only) and READ here, which is
+// Set on the business side (Days per item on Dates & headcount, admin only) and READ here, which is
 // the split David asked for: the number is a business decision, and it is
 // useless unless the person running the step can see it. Nothing here can edit
 // it — this screen shows what the ideal says and what the plan asks. Per project
@@ -302,7 +302,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
         <strong><?= e(fmt_unit($idealPerDay, $unit)) ?></strong>
         <span class="muted small">per person per day
           <?php if (is_admin()): ?>
-            · <a href="standards.php?project=<?= (int)$project['id'] ?>">change it</a>
+            · <a href="wizard.php?project=<?= (int)$project['id'] ?>&amp;step=6">change it</a>
           <?php endif; ?></span></div>
     <?php endif; ?>
   </div>
