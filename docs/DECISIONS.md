@@ -3846,3 +3846,14 @@ timer). A second, Plaky-fed running total was a second source for one number.
 import neither fills nor clears it, so the screens that read it (dashboard "Time logged",
 person, team, item, My tasks' "imported" note) keep showing those old figures. Dropping the
 column or hiding those figures is a separate choice, not taken here.
+
+## 2026-10-17 (later) — The old Plaky hours are hidden too
+**Follows "The Plaky import no longer reads 'Time spent'" (same date).** David chose to hide the
+figures earlier imports left in `progress.time_spent_minutes` rather than keep showing numbers
+that can never move again. Removed: the Dashboard's "Time logged" section (by step and by
+person), the "Time logged" tile and column on the person and team pages, the "Time" column
+and "· N h logged" on the item page, and My tasks' "N h imported" note.
+**Kept:** the column and its data, and the helpers that read it (`timelog_by_step()`,
+`timelog_by_person()`, `person_step_load()`'s `minutes`), so undoing this is a screen change,
+not a data recovery. Hours logged in Anima (`time_logs`) are untouched and still shown on
+My tasks, the Pomodoro, and the money screens.

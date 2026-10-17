@@ -29,14 +29,12 @@ if (!$project) {
 }
 
 $team  = team_overview($pdo, $projectId);
-$hours = hours_per_day($pdo, $projectId);
 
-$totAssigned = 0; $totApproved = 0; $totMinutes = 0; $totBlocked = 0;
+$totAssigned = 0; $totApproved = 0; $totBlocked = 0;
 foreach ($team as $p) {
     $totAssigned += $p['summary']['assigned'];
     $totApproved += $p['summary']['approved'];
-    $totMinutes  += $p['summary']['minutes'];
-    $totBlocked  += $p['summary']['blocked'];
+        $totBlocked  += $p['summary']['blocked'];
 }
 $placeholders = count(array_filter($team, fn($p) => (int)($p['is_placeholder'] ?? 0) === 1));
 
@@ -70,7 +68,6 @@ require __DIR__ . '/includes/header.php';
     <span class="muted small">of <?= $totAssigned ?></span></div>
   <div><span class="muted small">Blocked</span>
     <strong class="<?= $totBlocked ? 'warn-text' : '' ?>"><?= $totBlocked ?></strong></div>
-  <div><span class="muted small">Time logged</span><strong><?= e(fmt_hours($totMinutes)) ?></strong></div>
 </div>
 
 <table>
@@ -78,7 +75,7 @@ require __DIR__ . '/includes/header.php';
     <tr>
       <th>Person</th><th>Department</th><th>Role</th>
       <th class="num">Assigned</th><th class="num">Approved</th><th class="num">Remaining</th>
-      <th class="num">Blocked</th><th class="num">Time logged</th><th>Planned to</th>
+      <th class="num">Blocked</th><th>Planned to</th>
     </tr>
   </thead>
   <tbody>
@@ -95,7 +92,6 @@ require __DIR__ . '/includes/header.php';
       <td class="num ok"><?= $s['approved'] ?></td>
       <td class="num"><?= $s['remaining'] ?></td>
       <td class="num <?= $s['blocked'] ? 'warn-text' : 'muted' ?>"><?= $s['blocked'] ?: '—' ?></td>
-      <td class="num muted"><?= $s['minutes'] ? e(fmt_hours($s['minutes'])) : '—' ?></td>
       <td class="muted small"><?= e($s['schedule']['last_end'] ?? '—') ?></td>
     </tr>
   <?php endforeach; ?>
@@ -107,8 +103,6 @@ require __DIR__ . '/includes/header.php';
   with somebody else, a shared task counts for <em>both</em>, which is right for "what is this
   person involved in" and generous for "how much did they deliver". That distinction is still
   open in <code>docs/DECISIONS.md</code> and is surfaced rather than quietly picked.
-  <strong>Time logged</strong> comes from the Plaky import and is nearly empty until time is
-  entered here directly; a day is <?= e(fmt_num($hours, 1)) ?> hours on this project.
 </p>
 <?php endif; ?>
 
