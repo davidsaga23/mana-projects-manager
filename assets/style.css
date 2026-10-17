@@ -1891,10 +1891,19 @@ body.lightbox-lock { overflow: hidden; }
    and so must not be overridden here. */
 .status-form   { margin: 0; display: inline; }
 .status-select {
+  /* width:auto, or the global `input, select { width: 100% }` stretches the
+     pill across the whole column and the table hands the Status column the
+     widest share of the row (David, 2026-10-17). */
+  width: auto;
   padding: 2px 6px; border-radius: 10px; font-size: 12px;
   border: 1px solid rgba(0,0,0,.12); cursor: pointer;
 }
 .status-select:hover { border-color: rgba(0,0,0,.30); }
+/* The kick-off note ("waiting for sign-off") goes UNDER the pill, not beside
+   it: beside it, the note sets the column's width again. */
+.project-list .status-note { display: block; margin-top: 2px; white-space: nowrap; }
+/* A date never breaks at its hyphen on a narrow window. */
+.project-list td.delivery { white-space: nowrap; }
 
 /* --- the actions on a project row -----------------------------------------
    David, 2026-09-02: Open, Finance and Edit as buttons rather than links.
