@@ -167,6 +167,9 @@ crew_id)`, with `progress.crew_id` kept as the primary assignee. See `DECISIONS.
 distinct from "not started": someone has to unblock it. Reported separately from
 remaining work.
 
+> **2026-10-17: the importer no longer reads `Time spent` at all** (DECISIONS, same date). Time is
+> logged in Anima. The paragraphs below are kept as history.
+
 **`Time spent` is wanted — shown in hours, stored in minutes.** It serves two
 jobs David named: checking artist invoices against logged time, and comparing
 planned dates against actual effort. Hours are what everyone reads and types;

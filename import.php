@@ -90,11 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['import'][$projectId] = [
                 'file'      => $dest,
                 'name'      => $orig,
-                // Fixed at hours since 2026-10-05; the upload screen no longer
-                // asks. Kept in the session rather than dropped so the mapping
-                // screen can still state it and plaky_run() still receives it
-                // explicitly — one place to change if a board ever differs again.
-                'time_unit' => 'hours',
                 'rows'      => count($parsed['rows']),
             ];
             flash('ok', 'Read ' . count($parsed['rows']) . ' rows from ' . $orig . '.');
@@ -235,11 +230,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'steps'          => $steps,
                 'statuses'       => $statuses,
                 'people'         => $people,
-                // ?? 'hours' for an import session that was started BEFORE the
-                // upload screen stopped asking: its stored answer still stands,
-                // and a session with no answer at all gets today's rule rather
-                // than a missing key.
-                'time_unit'      => $state['time_unit'] ?? 'hours',
                 'skip_childless' => !empty($_POST['skip_childless']),
             ];
             header('Location: ' . $selfUrl . '&step=preview');
