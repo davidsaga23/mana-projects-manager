@@ -480,6 +480,52 @@ function refile_ticket_from_post(PDO $pdo, int $userId): void {
     if (!empty($r['ok'])) log_ticket_event($pdo, $tid, $userId, (string)$r['said']);
 }
 
+/**
+ * Move a card to another of its own project's statuses, the way dragging it
+ * across the board does: checked against that project's columns, completion
+ * kept in step, and the move written into the card's thread.
+ *
+ * Shared by the board's drag (tasks_api.php) and the Status dropdown on Studio
+ * Tasks, so the two cannot drift. Throws when the status is not this project's.
+ */
+function set_ticket_status(PDO $pdo, array $t, int $statusId, ?int $userId): array {
+    $map = $t['project_id'] !== null ? statuses_by_id($pdo, (int)$t['project_id']) : [];
+    if (!isset($map[$statusId])) {
+        throw new RuntimeException('That status does not belong to this project.');
+    }
+    $status = $map[$statusId];
+    $pdo->prepare('UPDATE tickets SET status_id = ? WHERE id = ?')->execute([$statusId, (int)$t['id']]);
+    sync_ticket_completion($pdo, (int)$t['id'], $status);
+    $before = $t['status_name'] ?? 'none';
+    if ($before !== $status['name']) {
+        log_ticket_event($pdo, (int)$t['id'], $userId, 'Status: ' . $before . ' → ' . $status['name']);
+    }
+    return $status;
+}
+
+/**
+ * The Status dropdown on Studio Tasks (David, 2026-10-17). Offers only the
+ * card's OWN project's statuses, because each show names its columns its own
+ * way. Coloured like the chip it replaces. An unfiled card has no columns to
+ * offer, so it keeps the plain chip.
+ */
+function ticket_status_picker(array $ticket, array $statuses): string {
+    $c = $ticket['status_color'] ?: '#8a97a3';
+    $current = (int)($ticket['status_id'] ?? 0);
+    $opts = $current ? '' : '<option value="" selected>no status</option>';
+    foreach ($statuses as $s) {
+        $opts .= '<option value="' . (int)$s['id'] . '"' . ((int)$s['id'] === $current ? ' selected' : '')
+               . '>' . e($s['name']) . '</option>';
+    }
+    return '<form method="post" class="inline-form" style="margin:0;">'
+         . '<input type="hidden" name="set_ticket_status" value="1">'
+         . '<input type="hidden" name="ticket_id" value="' . (int)$ticket['id'] . '">'
+         . '<select name="status_id" class="status-pick" onchange="this.form.submit()"'
+         . ' style="color:' . e($c) . ';border-color:' . e($c) . '66;background-color:' . e($c) . '1a;"'
+         . ' aria-label="Status for ' . e(ticket_ref($ticket)) . '">'
+         . $opts . '</select></form>';
+}
+
 /* ---------------------------------------------------------------------------
  * REPLIES AND MENTIONS (David, 2026-10-06), migration 039.
  * ------------------------------------------------------------------------- */
