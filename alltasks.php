@@ -79,13 +79,17 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'
         $made = create_ticket($pdo, $newProject, [
             'title'             => $_POST['title'] ?? '',
             'description'       => $_POST['description'] ?? '',
-            'type'              => 'task',
+            // Task or ticket, chosen on the form (David, 2026-10-19). create_ticket()
+            // normalises anything but 'ticket' to 'task', and refuses a ticket with
+            // no owner — the Owner field is made required for a ticket to match.
+            'type'              => (($_POST['type'] ?? 'task') === 'ticket') ? 'ticket' : 'task',
             'status_id'         => $startStatus,
             'priority'          => $_POST['priority'] ?? 'medium',
             'assigned_crew_id'  => $_POST['assigned_crew_id'] ?? null,
             'due_date'          => $_POST['due_date'] ?? null,
         ], [], $userId);
-        flash('ok', 'Task ' . $made['ref'] . ' created. ' . trim(implode(' ', $made['notes'])));
+        flash('ok', ucfirst($made['type']) . ' ' . $made['ref'] . ' created. '
+                  . trim(implode(' ', $made['notes'])));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -223,7 +227,8 @@ require __DIR__ . '/includes/header.php';
         // This page stays what its own header says it is: a view ACROSS the shows.
         $studioId = studio_project_id($pdo); ?>
   <?php if (can_edit()): ?>
-    <button type="button" class="primary" onclick="openStudioCreate()">+ New task</button>
+    <button type="button" class="primary" onclick="openStudioCreate('task')">+ New task</button>
+    <button type="button" class="secondary" onclick="openStudioCreate('ticket')">+ New ticket</button>
   <?php endif; ?>
   <?php if ($studioId): ?>
     <a class="button" href="tasks.php?project=<?= $studioId ?>"
@@ -384,7 +389,7 @@ require __DIR__ . '/includes/header.php';
 <?php if (can_edit()): ?>
 <div id="studioCreate" class="modal" style="display:none;">
   <div class="modal-box">
-    <h3>New task</h3>
+    <h3 id="studioCreateHeading">New task</h3>
     <form method="post">
       <input type="hidden" name="create" value="1">
 
@@ -396,6 +401,17 @@ require __DIR__ . '/includes/header.php';
       </label>
 
       <div class="modal-row">
+        <?php // Task or ticket (David, 2026-10-19). Both saved through the same
+              // create_ticket(); the only difference on this form is that a ticket
+              // must have an owner, enforced below. A ticket's shot/asset/step are
+              // added on the card afterwards — those pickers need a project and
+              // belong to the show's own board. ?>
+        <label>Type
+          <select name="type" id="studioCreateType" onchange="studioSyncType()">
+            <option value="task">Task</option>
+            <option value="ticket">Ticket</option>
+          </select>
+        </label>
         <?php // ⚠ THE STUDIO IS FIRST AND SELECTED, because this is the Studio
               // Tasks screen and a card thought of here usually belongs to the
               // studio rather than to a show. "No project yet" is kept as a real
@@ -410,6 +426,22 @@ require __DIR__ . '/includes/header.php';
             <option value="">no project yet</option>
           </select>
         </label>
+      </div>
+
+      <div class="modal-row">
+        <?php // Everybody active, not one show's crew: the project is not chosen
+              // until the dropdown above is, and a card can be handed to somebody
+              // before it has a show at all. Same list ticket.php falls back to
+              // for an unfiled card. ?>
+        <label>Owner
+          <select name="assigned_crew_id" id="studioCreateOwner">
+            <option value="">nobody</option>
+            <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
+                                          FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
         <label>Priority
           <select name="priority">
             <?php foreach (ticket_priorities() as $p): ?>
@@ -420,37 +452,20 @@ require __DIR__ . '/includes/header.php';
       </div>
 
       <div class="modal-row">
-        <?php // Everybody active, not one show's crew: the project is not chosen
-              // until the dropdown above is, and a card can be handed to somebody
-              // before it has a show at all. Same list ticket.php falls back to
-              // for an unfiled card. ?>
-        <label>Owner
-          <select name="assigned_crew_id">
-            <option value="">nobody</option>
-            <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
-                                          FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
-              <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
         <label>Due
           <input type="date" name="due_date">
         </label>
       </div>
 
-      <p class="muted small">
-        It starts in the first column of whichever board you picked — no status if you
-        leave it unfiled. Need a <strong>ticket</strong> instead, against a shot, an asset or a
-        pipeline step? Those live on a show's own board
-        <?php if ($studioId): ?>
-          (<a href="tasks.php?project=<?= $studioId ?>">the Studio's is here</a>)<?php endif; ?>,
-        where the pickers for them can exist.
+      <p class="muted small" id="studioCreateHint">
+        A task starts in the first column of whichever board you picked, with no status if you
+        leave it unfiled.
       </p>
 
       <div class="modal-actions">
         <button type="button" class="secondary"
                 onclick="document.getElementById('studioCreate').style.display='none';">Cancel</button>
-        <button type="submit">Create task</button>
+        <button type="submit" id="studioCreateSubmit">Create task</button>
       </div>
     </form>
   </div>
@@ -460,8 +475,34 @@ require __DIR__ . '/includes/header.php';
   // Small and local on purpose: assets/board.js owns the board's modals and is
   // not loaded here, and pulling it in for one dialog would bring the drag and
   // drop with it.
-  function openStudioCreate() {
+
+  // Task vs ticket: the one real difference on this form is that a ticket MUST
+  // have an owner (create_ticket() refuses one without). So the Owner is made
+  // required, and the wording and button follow, so the form says what it will
+  // do before it is sent.
+  function studioSyncType() {
+    var type = (document.getElementById('studioCreateType') || {}).value || 'task';
+    var owner = document.getElementById('studioCreateOwner');
+    var head  = document.getElementById('studioCreateHeading');
+    var hint  = document.getElementById('studioCreateHint');
+    var go    = document.getElementById('studioCreateSubmit');
+    var isTicket = type === 'ticket';
+    if (owner) owner.required = isTicket;
+    if (head) head.textContent = isTicket ? 'New ticket' : 'New task';
+    if (go)   go.textContent   = isTicket ? 'Create ticket' : 'Create task';
+    if (hint) hint.textContent = isTicket
+      ? 'A ticket needs an owner. It starts in the first column of whichever show you '
+        + 'picked. To tie it to a specific shot, asset or pipeline step, open the card '
+        + 'after creating it, or raise it on the show’s own board.'
+      : 'A task starts in the first column of whichever board you picked, with no status if '
+        + 'you leave it unfiled.';
+  }
+
+  function openStudioCreate(kind) {
     var m = document.getElementById('studioCreate');
+    var ty = document.getElementById('studioCreateType');
+    if (ty && (kind === 'task' || kind === 'ticket')) ty.value = kind;
+    studioSyncType();
     m.style.display = 'flex';
     var t = document.getElementById('studioCreateTitle');
     if (t) t.focus();

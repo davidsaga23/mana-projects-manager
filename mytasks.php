@@ -252,13 +252,17 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'
         $made = create_ticket($pdo, $newProject, [
             'title'            => $_POST['title'] ?? '',
             'description'      => $_POST['description'] ?? '',
-            'type'             => 'task',
+            // Task or ticket, chosen on the form. create_ticket() normalises
+            // anything but 'ticket' to 'task', and refuses a ticket with no
+            // owner — which is why the Owner field is required for a ticket.
+            'type'             => (($_POST['type'] ?? 'task') === 'ticket') ? 'ticket' : 'task',
             'status_id'        => $startStatus,
             'priority'         => $_POST['priority'] ?? 'medium',
             'assigned_crew_id' => $owner,
             'due_date'         => $_POST['due_date'] ?? null,
         ], [], $userId);
-        flash('ok', 'Task ' . $made['ref'] . ' created. ' . trim(implode(' ', $made['notes'])));
+        flash('ok', ucfirst($made['type']) . ' ' . $made['ref'] . ' created. '
+                  . trim(implode(' ', $made['notes'])));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -701,7 +705,10 @@ require __DIR__ . '/includes/header.php';
         // admins only; it opens the dialog at the foot of the page. A new card is
         // assigned to you by default, so it drops into Tickets below. ?>
   <?php if (can_edit()): ?>
-    <p><button type="button" class="primary" onclick="openMyTaskCreate()">+ New task</button></p>
+    <p class="row-actions">
+      <button type="button" class="primary" onclick="openMyTaskCreate('task')">+ New task</button>
+      <button type="button" class="secondary" onclick="openMyTaskCreate('ticket')">+ New ticket</button>
+    </p>
   <?php endif; ?>
 
   <?php if (!$canLog): ?>
@@ -939,18 +946,21 @@ require __DIR__ . '/includes/header.php';
     <button type="submit" class="secondary">That isn't me, unlink</button>
   </form>
 
-  <?php // THE CREATE DIALOG (David, 2026-10-19: "let's be able to create task
-        // from my tasks context for admins and editors"). The same dialog Studio
-        // Tasks carries, reading the same $fileTargets, saved through the same
-        // create_ticket(). The one change is the Owner, which starts as YOU
-        // because this is the list of your own work. Tasks only, deliberately: a
-        // ticket is a problem attached to a shot, an asset or a step on one show,
-        // and those pickers cannot be drawn until a project is chosen, which is
-        // the board. ?>
+  <?php // THE CREATE DIALOG (David, 2026-10-19). Started as "create task from my
+        // tasks"; he then asked for tickets too, here and on Studio Tasks. So the
+        // Type picker chooses task or ticket, both saved through the same shared
+        // create_ticket(). The Owner starts as YOU, because this is the list of
+        // your own work. A TICKET NEEDS AN OWNER — create_ticket() refuses one
+        // without, so the Owner field is made required when Ticket is picked.
+        //
+        // ⚠ NO SHOT / ASSET / STEP PICKER HERE, on purpose. Those are a show's
+        // own rows and need a project chosen first — that is the board. A ticket
+        // made here can be tied to one afterwards on the card itself; the help
+        // line says so. ?>
   <?php if (can_edit()): ?>
   <div id="myTaskCreate" class="modal" style="display:none;">
     <div class="modal-box">
-      <h3>New task</h3>
+      <h3 id="myTaskCreateHeading">New task</h3>
       <form method="post">
         <input type="hidden" name="create" value="1">
 
@@ -962,6 +972,12 @@ require __DIR__ . '/includes/header.php';
         </label>
 
         <div class="modal-row">
+          <label>Type
+            <select name="type" id="myTaskCreateType" onchange="myTaskSyncType()">
+              <option value="task">Task</option>
+              <option value="ticket">Ticket</option>
+            </select>
+          </label>
           <?php // The same list the per-row Project pickers read. "No project yet"
                 // is a real choice: capture-first (migration 041) lets a card exist
                 // before anybody decides which show it is for. ?>
@@ -971,6 +987,24 @@ require __DIR__ . '/includes/header.php';
                 <option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?> <?= e($t['name']) ?></option>
               <?php endforeach; ?>
               <option value="">no project yet</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="modal-row">
+          <?php // ⚠ OWNER STARTS AS YOU, because this is My tasks: a card made here
+                // should land in the list it was made from. Pick somebody else and
+                // it goes to their list instead. Everybody active, the same list
+                // ticket.php falls back to for an unfiled card. ?>
+          <label>Owner
+            <select name="assigned_crew_id" id="myTaskCreateOwner">
+              <option value="">nobody</option>
+              <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
+                                            FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
+                <option value="<?= (int)$c['id'] ?>" <?= (int)$c['id'] === $myCrewId ? 'selected' : '' ?>>
+                  <?= e(assignee_label($c)) ?>
+                </option>
+              <?php endforeach; ?>
             </select>
           </label>
           <label>Priority
@@ -983,37 +1017,20 @@ require __DIR__ . '/includes/header.php';
         </div>
 
         <div class="modal-row">
-          <?php // ⚠ OWNER STARTS AS YOU, because this is My tasks: a card made here
-                // should land in the list it was made from. Pick somebody else and
-                // it goes to their list instead. Everybody active, the same list
-                // ticket.php falls back to for an unfiled card. ?>
-          <label>Owner
-            <select name="assigned_crew_id">
-              <option value="">nobody</option>
-              <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
-                                            FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
-                <option value="<?= (int)$c['id'] ?>" <?= (int)$c['id'] === $myCrewId ? 'selected' : '' ?>>
-                  <?= e(assignee_label($c)) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </label>
           <label>Due
             <input type="date" name="due_date">
           </label>
         </div>
 
-        <p class="muted small">
-          It starts in the first column of whichever show you picked, assigned to you unless you
-          change the owner, and no status if you leave it unfiled. Need a <strong>ticket</strong>
-          instead, against a shot, an asset or a pipeline step? Those live on a show's own board,
-          where the pickers for them can exist.
+        <p class="muted small" id="myTaskCreateHint">
+          A task starts in the first column of whichever show you picked, assigned to you unless you
+          change the owner, and with no status if you leave it unfiled.
         </p>
 
         <div class="modal-actions">
           <button type="button" class="secondary"
                   onclick="document.getElementById('myTaskCreate').style.display='none';">Cancel</button>
-          <button type="submit">Create task</button>
+          <button type="submit" id="myTaskCreateSubmit">Create task</button>
         </div>
       </form>
     </div>
@@ -1023,9 +1040,35 @@ require __DIR__ . '/includes/header.php';
     // Small and local, like Studio Tasks' own: assets/board.js owns the board's
     // modals and is not loaded here, and pulling it in for one dialog would bring
     // the drag and drop with it.
-    function openMyTaskCreate() {
+
+    // Task vs ticket: the only real difference on this form is that a ticket MUST
+    // have an owner (create_ticket() refuses one without, and would flash an error
+    // after the fact). So the Owner field is made required, and the wording and
+    // button follow, so the form says what it will do before it is sent.
+    function myTaskSyncType() {
+      var type = (document.getElementById('myTaskCreateType') || {}).value || 'task';
+      var owner = document.getElementById('myTaskCreateOwner');
+      var head  = document.getElementById('myTaskCreateHeading');
+      var hint  = document.getElementById('myTaskCreateHint');
+      var go    = document.getElementById('myTaskCreateSubmit');
+      var isTicket = type === 'ticket';
+      if (owner) owner.required = isTicket;
+      if (head) head.textContent = isTicket ? 'New ticket' : 'New task';
+      if (go)   go.textContent   = isTicket ? 'Create ticket' : 'Create task';
+      if (hint) hint.textContent = isTicket
+        ? 'A ticket needs an owner. It starts in the first column of whichever show you '
+          + 'picked. To tie it to a specific shot, asset or pipeline step, open the card '
+          + 'after creating it, or raise it on the show’s own board.'
+        : 'A task starts in the first column of whichever show you picked, assigned to you '
+          + 'unless you change the owner, and with no status if you leave it unfiled.';
+    }
+
+    function openMyTaskCreate(kind) {
       var m = document.getElementById('myTaskCreate');
       if (!m) return;
+      var ty = document.getElementById('myTaskCreateType');
+      if (ty && (kind === 'task' || kind === 'ticket')) ty.value = kind;
+      myTaskSyncType();
       m.style.display = 'flex';
       var t = document.getElementById('myTaskCreateTitle');
       if (t) t.focus();
