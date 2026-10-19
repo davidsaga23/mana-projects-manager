@@ -25,6 +25,7 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
+require_once __DIR__ . '/includes/mailer.php';   // create_ticket() emails the assignee when a card is owned
 require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/ai.php';   // ai_configured(), for the transcript button
 require_once __DIR__ . '/includes/studio.php';
