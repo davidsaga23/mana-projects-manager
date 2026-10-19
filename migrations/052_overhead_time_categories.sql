@@ -1,0 +1,47 @@
+-- 052 — Overhead time categories: the standing buckets leadership logs against.
+--
+-- David, 2026-10-19: "there should be some default tasks for the leadership team
+-- like: Meetings, Desk time... so we can log time in", then the per-role lists:
+--
+--   Admin        Meetings, Desk time, Client & comms, Planning & scheduling,
+--                Recruiting, Business development, Admin, Reviews
+--   Production    Meetings, Desk time, Client & comms, Planning & scheduling
+--   (the role renamed from Editor on 2026-10-19)
+--   Supervisor   Meetings, Desk time, Client & comms, Planning & scheduling,
+--                Recruiting, Reviews
+--   Artist       Meetings, Desk time, Reviews
+--
+-- ⚠ EACH CATEGORY IS A HIDDEN CARD UNDER THE STUDIO, NOT A NEW KIND OF THING.
+-- The running timer (migration 043) and a logged entry (022) both cost their
+-- minutes to exactly one card (a ticket) or one production task (a progress
+-- row) — the schema enforces one or the other, and log_time()/start_timer()
+-- enforce it again. Giving overhead its own third target would mean a new column
+-- on time_timers AND time_logs AND every reader of them, for no gain. So an
+-- overhead category is an ordinary `tickets` row under the Studio project
+-- (migration 045), which is exactly the thing the timer already knows how to
+-- cost hours to. "Where did leadership's week go" is then a plain SUM of
+-- time_logs grouped by ticket and person — one number, built the one way every
+-- other hour in the app is built.
+--
+-- ⚠ overhead_key IS WHAT KEEPS THESE CARDS OFF EVERY BOARD. A normal card has
+-- NULL here; an overhead card carries its category key ('meetings', 'desk_time'
+-- …). The board (tasks.php) and Studio Tasks (alltasks.php) exclude
+-- overhead_key IS NOT NULL, the same shape is_studio keeps the Studio off the
+-- projects list. The list of places that pay this cost is in includes/overhead.php
+-- (overhead_exclude_sql), so it is not rediscovered one bug at a time.
+--
+-- ⚠ THE CATEGORY TITLE AND ITS ROLES LIVE IN CODE, NOT HERE. includes/overhead.php
+-- is the one list of which categories exist and which roles may log against each
+-- — the same way SUPERVISOR_SCRIPTS and pomodoro_minutes() keep a rule-set in one
+-- readable place. The cards themselves are created lazily on first use by
+-- overhead_cards(), so this migration only has to make room for the column: it
+-- does not need the Studio to exist yet, and a category added to the code list
+-- later gets its card with no second migration.
+--
+-- A UNIQUE key on overhead_key (NULLs are never equal in MySQL, so every normal
+-- card is still fine) means the lazy creator can race two page loads and the
+-- loser simply re-reads the card the winner made, instead of a duplicate.
+
+ALTER TABLE tickets
+  ADD COLUMN overhead_key VARCHAR(32) DEFAULT NULL AFTER about,
+  ADD UNIQUE KEY uniq_overhead_key (overhead_key);

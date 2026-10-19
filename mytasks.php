@@ -20,6 +20,7 @@ require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/timelog.php';
 require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/crew.php';
+require_once __DIR__ . '/includes/overhead.php';   // the standing time categories
 require_login();
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
@@ -29,6 +30,10 @@ $canLog = time_logs_available($pdo);
 // applied, and the page should then show exactly the Log box it showed
 // yesterday rather than a column of buttons that cannot work.
 $canTimer = $canLog && timers_available($pdo);
+// The overhead categories (migration 052) need the column, the Studio AND the
+// timer, so a database behind on any one of them shows the page it showed
+// yesterday. The panel only draws for a crew member logging their own time.
+$overheadOn = $canTimer && overhead_available($pdo);
 
 // --- claim a crew row -------------------------------------------------------
 //
@@ -357,6 +362,72 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['log_time
     exit;
 }
 
+// --- overhead time (the standing categories) --------------------------------
+//
+// David, 2026-10-19: standing buckets each role logs against (Meetings, Desk
+// time, Reviews for an artist, up to the eight an admin sees). The same running
+// timer and the same log entry, pointed at a hidden Studio card per category.
+//
+// ⚠ THE CATEGORY IS NAMED BY KEY, NEVER BY TICKET ID. The form sends a key
+// ('meetings'), not the card's id, and this maps it to the card server-side —
+// after checking the key is one THIS role is offered. So an artist can run an
+// overhead timer (artist_may_post() lets the field through), but only on a
+// category their role has, and never on an arbitrary card. The ownership rule
+// the Log box above enforces per task is replaced here by the role rule, because
+// an overhead category belongs to everyone the role list includes.
+if ($myCrewId && overhead_available($pdo) && $_SERVER['REQUEST_METHOD'] === 'POST'
+    && (isset($_POST['overhead_timer']) || isset($_POST['overhead_log']))) {
+    try {
+        $role     = user_role();
+        $studioId = studio_project_id($pdo);
+        $cards    = overhead_cards($pdo);
+
+        // The card for a posted key, or a refusal. One place, so the timer and
+        // the manual log agree on what a valid category is.
+        $cardFor = function (?string $key) use ($cards, $role): array {
+            $key = (string)$key;
+            if ($key === '' || !overhead_key_for_role($key, $role)) {
+                throw new RuntimeException('That is not a time category you can log against.');
+            }
+            if (!isset($cards[$key])) {
+                throw new RuntimeException('That category is not set up yet, reload and try again.');
+            }
+            return $cards[$key];
+        };
+
+        if (isset($_POST['overhead_timer'])) {
+            $what = (string)$_POST['overhead_timer'];
+            if ($what === 'stop') {
+                flash('ok', stop_timer($pdo, $myCrewId, $userId));
+            } elseif ($what === 'discard') {
+                flash('ok', discard_timer($pdo, $myCrewId));
+            } else {
+                $card = $cardFor($_POST['overhead_cat'] ?? '');
+                flash('ok', start_timer($pdo, [
+                    'crew_id'    => $myCrewId,
+                    'project_id' => $studioId,
+                    'ticket_id'  => (int)$card['id'],
+                    'entered_by' => $userId,
+                ]));
+            }
+        } else {
+            $card = $cardFor($_POST['overhead_cat'] ?? '');
+            flash('ok', log_time($pdo, [
+                'project_id' => $studioId,
+                'ticket_id'  => (int)$card['id'],
+                'crew_id'    => $myCrewId,
+                'hours'      => $_POST['hours'] ?? '',
+                'log_date'   => $_POST['log_date'] ?? '',
+                'entered_by' => $userId,
+            ]));
+        }
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: mytasks.php');
+    exit;
+}
+
 if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_log'])) {
     try {
         flash('ok', delete_time_log($pdo, (int)$_POST['delete_log'], $userId, is_admin()));
@@ -371,6 +442,7 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_l
 $tickets = []; $tasks = []; $candidates = []; $entries = []; $statusesByProject = [];
 $mentions = []; $unseenMentions = 0;
 $myCrewName = '';
+$overheadCats = []; $overheadCards = []; $overheadTodayByCard = [];
 
 if ($ready && $myCrewId) {
     $n = $pdo->prepare('SELECT name FROM crew WHERE id = ?');
@@ -438,6 +510,24 @@ if ($ready && $myCrewId) {
     foreach ($tasks as $i => $row) $tasks[$i]['logged'] = $logged[(int)$row['progress_id']] ?? 0;
 
     $entries = time_logs_for_crew($pdo, $myCrewId, null, 15);
+
+    // The overhead categories this role may log against, and the hidden Studio
+    // card behind each. overhead_cards() creates any missing ones on first load.
+    $overheadCats  = $overheadOn ? overhead_categories_for_role(user_role()) : [];
+    $overheadCards = ($overheadOn && $overheadCats) ? overhead_cards($pdo) : [];
+    // How much this person has already put against each category today, so the
+    // panel shows the day filling up rather than a row of bare buttons.
+    $overheadTodayByCard = [];
+    if ($overheadCards) {
+        $ids = implode(',', array_map(fn($c) => (int)$c['id'], $overheadCards));
+        $q = $pdo->prepare(
+            "SELECT ticket_id, COALESCE(SUM(minutes),0) AS m FROM time_logs
+              WHERE crew_id = ? AND log_date = ? AND ticket_id IN ({$ids})
+              GROUP BY ticket_id"
+        );
+        $q->execute([$myCrewId, date('Y-m-d')]);
+        foreach ($q as $r) $overheadTodayByCard[(int)$r['ticket_id']] = (int)$r['m'];
+    }
 
     // Who has named me, newest first, unread at the top. Capped: this is a
     // prompt to go and look, not an archive.
@@ -600,6 +690,84 @@ function pomodoro_cell(array $timer, string $field, int $id, int $projectId, str
          . ' title="Finish the cycle here. Every focus block in it is already logged.">end</button>'
          . '</form>';
 }
+/**
+ * The Start/Stop control for one overhead category, on the Studio time panel.
+ *
+ * ⚠ A SIBLING OF timer_cell()/pomodoro_cell(), NOT A REUSE OF THEM. Those post
+ * name="timer", which require_login() only lets an editor or admin through; the
+ * whole point of the overhead panel is that an artist or a supervisor can log
+ * their own meetings too, so it posts name="overhead_timer" (on
+ * artist_may_post()'s allow-list) and names the category by KEY, never by the
+ * card's id. The markup is otherwise the same — same classes, same data-since /
+ * data-left — so the one clock script at the foot of the page ticks it with no
+ * second copy.
+ *
+ * There is only ever one running timer per person, so at most one category here
+ * shows a countdown; every other shows Start.
+ */
+function overhead_timer_control(?array $timer, array $card, int $studioId, bool $pomodoroOn): string {
+    $cardId = (int)$card['id'];
+    $key    = (string)$card['overhead_key'];
+    $mine   = $timer && (int)($timer['ticket_id'] ?? 0) === $cardId;
+
+    $startForm = function (string $label, string $title, string $extraClass = '') use ($key): string {
+        return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+             . '<input type="hidden" name="overhead_cat" value="' . e($key) . '">'
+             . '<button type="submit" name="overhead_timer" value="start" class="timer-btn' . $extraClass . '"'
+             . ' title="' . e($title) . '">' . $label . '</button></form>';
+    };
+
+    if (!$mine) {
+        $note = $timer ? ' This stops and logs the one already running.' : '';
+        if ($pomodoroOn) {
+            return $startForm('▶ Focus',
+                'Start a ' . pomodoro_minutes('focus') . '-minute focus block on ' . $card['title'] . '.' . $note);
+        }
+        return $startForm('▶ Start', 'Start timing ' . $card['title'] . '.' . $note);
+    }
+
+    // A plain stopwatch (a timer started before pomodoro, or with it off).
+    $phase = ($timer['phase'] ?? null) !== '' ? ($timer['phase'] ?? null) : null;
+    if ($phase === null) {
+        return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+             . '<button type="submit" name="overhead_timer" value="stop" class="timer-btn running"'
+             . ' title="Stop and log what this timer measured">■ Stop '
+             . '<span class="timer-elapsed" data-since="' . (int)$timer['elapsed_seconds'] . '">'
+             . e(fmt_elapsed((int)$timer['elapsed_seconds'])) . '</span></button>'
+             . '<button type="submit" name="overhead_timer" value="discard" class="timer-drop"'
+             . ' title="Throw this timer away without logging it">drop</button></form>';
+    }
+
+    $round = max(1, (int)$timer['focus_round']);
+    $left  = (int)$timer['remaining_seconds'];
+    $of    = ' ' . $round . '/' . POMODORO_ROUNDS;
+    $clock = '<span class="timer-countdown" data-left="' . $left . '" data-phase="' . e($phase) . '">'
+           . e(fmt_elapsed($left)) . '</span>';
+
+    if ($phase === 'focus') {
+        return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+             . '<span class="pomo-tag pomo-focus" title="Focus block' . $of . '">Focus' . $of . '</span>'
+             . '<button type="submit" name="overhead_timer" value="stop" class="timer-btn running"'
+             . ' title="Stop now and log the minutes this block has run">■ ' . $clock . '</button>'
+             . '<button type="submit" name="overhead_timer" value="discard" class="timer-drop"'
+             . ' title="Throw this focus block away without logging it">drop</button></form>';
+    }
+
+    // A break on this category. Start is the next focus block, so it carries the
+    // key exactly as a plain Start would.
+    $next  = $phase === 'long_break' ? 1 : $round + 1;
+    $label = $left > 0
+        ? '<span class="pomo-tag pomo-break">' . e(pomodoro_phase_label($phase)) . ' ' . $clock . '</span>'
+        : '<span class="pomo-tag pomo-break pomo-over">Break over</span>';
+    return '<form method="post" class="inline-form timer-form" style="margin:0;">'
+         . '<input type="hidden" name="overhead_cat" value="' . e($key) . '">'
+         . $label
+         . '<button type="submit" name="overhead_timer" value="start" class="timer-btn' . ($left > 0 ? '' : ' running') . '"'
+         . ' title="Start focus block ' . $next . ' of ' . POMODORO_ROUNDS . ' on this'
+         . ($left > 0 ? ', cutting the break short' : '') . '">▶ Focus ' . $next . '/' . POMODORO_ROUNDS . '</button>'
+         . '<button type="submit" name="overhead_timer" value="stop" class="timer-drop"'
+         . ' title="Finish the cycle here. Every focus block in it is already logged.">end</button></form>';
+}
 $weekAgo = date('Y-m-d', strtotime('-6 days'));
 $loggedWeek = $myCrewId ? logged_total_for_crew($pdo, $myCrewId, null, $weekAgo, $today) : 0;
 $loggedToday = $myCrewId ? logged_total_for_crew($pdo, $myCrewId, null, $today, $today) : 0;
@@ -710,6 +878,53 @@ require __DIR__ . '/includes/header.php';
       else on this page works.
       <?php if (is_admin()): ?><a href="migrate.php">Review and apply it →</a><?php endif; ?>
     </p>
+  <?php endif; ?>
+
+  <?php // --- Studio time: the standing overhead categories (migration 052) ---
+        // David, 2026-10-19. The categories a role may log against are
+        // overhead_categories_for_role(); the hidden Studio card behind each is
+        // in $overheadCards. The timer and the log here cost their hours to the
+        // Studio, so "where did the week go" totals them beside everything else.
+        if ($overheadOn && $overheadCats && $overheadCards): ?>
+    <h3>Studio time <span class="muted">· overhead</span></h3>
+    <p class="muted small">
+      Log time that is not a shot, an asset or a card, meetings, desk time and the rest.
+      Start a timer, or type the hours straight in. It all goes to the Studio, so it adds up
+      beside your show hours.
+    </p>
+    <table class="mywork-table">
+      <thead>
+        <tr><th>Category</th><th>Today</th>
+            <th>Timer</th><th>Log time</th></tr>
+      </thead>
+      <tbody>
+      <?php foreach ($overheadCats as $key => $label):
+        $card = $overheadCards[$key] ?? null;
+        if (!$card) continue;   // not created yet, nothing to log against
+        $cardId   = (int)$card['id'];
+        $todayMin = $overheadTodayByCard[$cardId] ?? 0;
+      ?>
+        <tr>
+          <td><strong><?= e($label) ?></strong></td>
+          <td class="<?= $todayMin > 0 ? '' : 'muted' ?>"><?= e(fmt_hours($todayMin)) ?></td>
+          <td><?= overhead_timer_control($timer, $card, (int)$card['project_id'], pomodoro_available($pdo)) ?></td>
+          <td>
+            <?php // A quick manual entry, for the meeting you forgot to time. The
+                  // date defaults to today; hours accept "1.5", "1,5" or "90m". ?>
+            <form method="post" class="log-form">
+              <input type="hidden" name="overhead_log" value="1">
+              <input type="hidden" name="overhead_cat" value="<?= e($key) ?>">
+              <input type="text" name="hours" size="4" placeholder="e.g. 1.5"
+                     aria-label="Hours on <?= e($label) ?>">
+              <input type="date" name="log_date" value="<?= e(date('Y-m-d')) ?>" max="<?= e(date('Y-m-d')) ?>"
+                     aria-label="Date for <?= e($label) ?>">
+              <button type="submit" class="secondary">Log</button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
   <?php endif; ?>
 
   <h3>Production tasks <span class="muted">· <?= count($tasks) ?></span></h3>

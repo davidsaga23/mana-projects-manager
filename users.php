@@ -268,7 +268,7 @@ require __DIR__ . '/includes/header.php';
           <input type="hidden" name="user_id" value="<?= $id ?>">
           <select name="role" onchange="this.form.submit()">
             <option value="admin"  <?= $u['role']==='admin'  ? 'selected':'' ?>>Admin</option>
-            <option value="editor" <?= $u['role']==='editor' ? 'selected':'' ?>>Editor</option>
+            <option value="editor" <?= $u['role']==='editor' ? 'selected':'' ?>>Production</option>
             <?php if ($hasSupervisor): ?>
             <option value="supervisor" <?= $u['role']==='supervisor' ? 'selected':'' ?>>Supervisor</option>
             <?php endif; ?>
@@ -327,7 +327,7 @@ require __DIR__ . '/includes/header.php';
     <td class="muted">—</td>
   </tr>
   <tr>
-    <td><strong>Editor</strong></td>
+    <td><strong>Production</strong></td>
     <td>Set up projects, import, edit statuses, fix aliases</td>
     <td class="muted">Add or change user accounts</td>
   </tr>
@@ -341,7 +341,7 @@ require __DIR__ . '/includes/header.php';
   View-only is enforced in one place rather than screen by screen, so it also covers
   screens built later. <strong>Money is admin-only</strong>: rates, budgets, invoices and
   contracts live in a separate database with its own login, and the connection to it is
-  never even opened for an editor or a view-only account.
+  never even opened for a Production or a view-only account.
 </p>
 
 <?php // ---- see it for yourself ------------------------------------------------
@@ -366,7 +366,7 @@ require __DIR__ . '/includes/header.php';
   <label class="inline">
     See Anima as
     <select name="role">
-      <option value="editor">an Editor</option>
+      <option value="editor">Production</option>
       <option value="supervisor">a Supervisor</option>
       <option value="artist">an Artist</option>
     </select>
@@ -389,7 +389,7 @@ require __DIR__ . '/includes/header.php';
         <?php if ($hasSupervisor): ?>
         <option value="supervisor">Supervisor, an artist who also sees Timeline and Staffing, and edits Shots</option>
         <?php endif; ?>
-        <option value="editor">Editor, full production access</option>
+        <option value="editor">Production, full access to set up and run shows</option>
         <option value="admin">Admin, full access, can manage users</option>
       </select>
     </label>

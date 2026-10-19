@@ -23,6 +23,8 @@ require_once __DIR__ . '/statuses.php';
 require_once __DIR__ . '/uploads.php';
 // ticket_file_targets() puts the Studio first, which needs studio_available().
 require_once __DIR__ . '/studio.php';
+// board_tickets() keeps overhead cards (migration 052) off the board.
+require_once __DIR__ . '/overhead.php';
 
 /**
  * Is this request the board's own uploader rather than a browser navigation?
@@ -710,9 +712,12 @@ function ticket_step_options(array $steps, $selectedStep, string $about, bool $a
 
 /** Cards for one project's board, grouped by status_id. */
 function board_tickets(PDO $pdo, int $projectId, bool $archived = false): array {
+    // Overhead cards (migration 052) live under the Studio but are never board
+    // cards — they are the standing time buckets, logged against but not worked
+    // through columns. Kept off the Studio's own board here.
     $stmt = $pdo->prepare(
         ticket_select_sql() . '
-          WHERE t.project_id = ? AND t.archived = ?
+          WHERE t.project_id = ? AND t.archived = ?' . overhead_exclude_sql($pdo) . '
           ORDER BY FIELD(t.priority, \'urgent\',\'high\',\'medium\',\'low\'),
                    t.due_date IS NULL, t.due_date ASC, t.created_at ASC'
     );
