@@ -39,7 +39,7 @@ function wizard_save_review(PDO $pdo, ?array $project): string {
         // review while the sign-off is open. Approval clears it.
         flash('ok', 'Setup is finished. One more step before "' . $project['name'] . '" goes active: '
                   . 'freezing it and getting it signed off.');
-        return 'kickoff.php?project=' . $projectId;
+        return 'kickoff.php?project=' . $projectId . '&send=1';
     }
 
     $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute(['active', $projectId]);

@@ -68,12 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($status, $statuses, true)) {
                 throw new RuntimeException('That is not a status this app recognises.');
             }
-            // SETUP TO ACTIVE IS NOT A DROPDOWN CHANGE (David, 2026-10-16). It
-            // goes to the kick-off page, which warns, freezes the setup and asks
-            // the people who sign off. The project turns active when they have
-            // all approved. Before migration 049 the old one-click change stands.
-            if ($project['status'] === 'setup' && $status === 'active' && kickoff_ready($pdo)) {
-                header('Location: kickoff.php?project=' . $id);
+            // MOVING A PROJECT TO ACTIVE IS NOT A PLAIN DROPDOWN CHANGE the first
+            // time (David, 2026-10-16; broadened to any prior status 2026-10-19).
+            // It opens the kick-off sign-off: the project is put in setup if it
+            // was not already, frozen, and the people who sign off are asked; it
+            // turns active once they have all approved. kickoff_should_prompt()
+            // keeps this to the first activation, so a show that is already signed
+            // off and comes back from On hold is a plain change. &send=1 opens the
+            // signer pop-up straight away. Before migration 049 the old one-click
+            // change stands.
+            if (kickoff_should_prompt($pdo, $project, $status)) {
+                if ($project['status'] !== 'setup') {
+                    $pdo->prepare("UPDATE projects SET status = 'setup' WHERE id = ?")->execute([$id]);
+                }
+                header('Location: kickoff.php?project=' . $id . '&send=1');
                 exit;
             }
             $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute([$status, $id]);

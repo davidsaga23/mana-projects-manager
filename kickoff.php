@@ -29,9 +29,12 @@ if (!$project) {
     exit;
 }
 
-$view    = (string)($_GET['view'] ?? '');
-$selfUrl = 'kickoff.php?project=' . $projectId;
-$ready   = kickoff_ready($pdo);
+$view     = (string)($_GET['view'] ?? '');
+$selfUrl  = 'kickoff.php?project=' . $projectId;
+$ready    = kickoff_ready($pdo);
+// Set to active on the list (or Finish in the wizard) lands here with send=1, so
+// the signer pop-up opens on arrival instead of after a second click.
+$autoSend = isset($_GET['send']);
 
 if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
@@ -63,6 +66,10 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$kick) throw new RuntimeException('There is nothing open to withdraw.');
             kickoff_withdraw($pdo, $kick);
             flash('ok', 'Withdrawn. The project stays in setup, and nobody is waiting on it.');
+
+        } elseif ($action === 'reopen') {
+            if (!$kick) throw new RuntimeException('There is nothing open to reopen.');
+            foreach (kickoff_reopen($pdo, $project, $kick) as $m) flash('ok', $m);
 
         } elseif ($action === 'people') {
             if (!is_admin()) throw new RuntimeException('Choosing who signs off is an administrator action.');
@@ -255,6 +262,14 @@ else:
         assets, dates and head count) and Finance management (expense projection, invoices, budget pool).</p>
     </div>
     <?php $sendDialog('Choose who signs off and send…', ''); ?>
+    <?php if ($autoSend): ?>
+      <script>
+        (function () {
+          var d = document.getElementById('kickoff-send-dialog');
+          if (d && typeof d.showModal === 'function' && !d.open) d.showModal();
+        })();
+      </script>
+    <?php endif; ?>
     <p><a href="index.php">← Back to the projects, leaving it in setup</a></p>
 
   <?php elseif (!$kick): ?>
@@ -333,16 +348,25 @@ else:
 
     <?php if ($isOpen && can_edit() && $project['status'] === 'setup'): ?>
       <div class="kickoff-resend">
-        <?php if ($kick['state'] === 'changes_requested'): ?>
+        <?php if ($kick['state'] === 'pending'): ?>
+          <p>Need to change something while this is waiting? Reopen it for editing. That cancels this request,
+            unfreezes the project, and emails the people on the sign-off list that it is open again and to wait for
+            a new request. Make your changes, then send it for sign-off again.</p>
+          <form method="post" class="inline-form"
+                onsubmit="return confirm('Reopen <?= e(addslashes($project['name'])) ?> for editing? This cancels the sign-off request and tells the people on it to wait for a new one.');">
+            <input type="hidden" name="action" value="reopen">
+            <button type="submit">Reopen edits</button>
+          </form>
+        <?php else: // changes_requested — already unfrozen, the normal path is to re-send ?>
           <p>The project is unfrozen. Make the changes on its tabs, then send it again: that freezes the setup as it
             is then, replaces this kick-off, and asks everybody afresh.</p>
           <?php $sendDialog('Freeze the new setup and send again…', ''); ?>
+          <form method="post" class="inline-form"
+                onsubmit="return confirm('Withdraw the sign-off request? The project stays in setup, unfrozen.');">
+            <input type="hidden" name="action" value="withdraw">
+            <button type="submit" class="secondary">Withdraw</button>
+          </form>
         <?php endif; ?>
-        <form method="post" class="inline-form"
-              onsubmit="return confirm('Withdraw the sign-off request? The project stays in setup, unfrozen.');">
-          <input type="hidden" name="action" value="withdraw">
-          <button type="submit" class="secondary">Withdraw</button>
-        </form>
       </div>
     <?php endif; ?>
 
