@@ -51,6 +51,23 @@ if (!$project) $projectId = 0;
 
 $selfUrl  = 'ticket.php?id=' . $id;
 $boardUrl = $projectId ? 'tasks.php?project=' . $projectId : 'alltasks.php';
+
+// Where "← Back" goes. When the card is the viewer's OWN (the owner, i.e. its
+// assigned_crew_id matches their users.crew_id — the same test My tasks uses),
+// send them back to My tasks, which is where they opened it from. Everyone
+// else, and every card that is not theirs, keeps going back to the board the
+// card sits on (or Studio Tasks when it has no show). An unfiled card of their
+// own has no board, so My tasks is the right place for it too.
+$myCrewId = 0;
+if ($userId) {
+    $mc = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
+    $mc->execute([$userId]);
+    $myCrewId = (int)$mc->fetchColumn();
+}
+$isMine    = $myCrewId > 0 && (int)($t['assigned_crew_id'] ?? 0) === $myCrewId;
+$backUrl   = $isMine ? 'mytasks.php' : $boardUrl;
+$backLabel = $isMine ? '← Back to my tasks' : '← Back to the board';
+
 $isTicket = ($t['type'] ?? 'task') === 'ticket';
 $label    = ticket_ref($t);
 $canDeleteCard = is_admin() || (int)$t['created_by'] === $userId;
@@ -396,7 +413,7 @@ require __DIR__ . '/includes/header.php';
   </p>
 <?php endif; ?>
 
-<p class="crumb"><a href="<?= e($boardUrl) ?>">← Back to the board</a></p>
+<p class="crumb"><a href="<?= e($backUrl) ?>"><?= e($backLabel) ?></a></p>
 
 <?php // The same helper the notification emails use, so a pasted link and an
       // emailed one are always the same URL.
