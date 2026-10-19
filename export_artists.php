@@ -48,9 +48,12 @@ foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us',
 }
 
 // The same search the screen was showing, so what downloads is what you were
-// looking at rather than everything regardless.
-$q   = trim((string)($_GET['q'] ?? ''));
-$pos = array_values(array_filter(array_map('strval', (array)($_GET['position'] ?? []))));
+// looking at rather than everything regardless. Read from POST or GET: the
+// screen's download button POSTs the term (a portfolio URL in a download link
+// would be rejected by the live host's firewall), but a plain GET link still
+// works for everything that is not a URL.
+$q   = trim((string)($_REQUEST['q'] ?? ''));
+$pos = array_values(array_filter(array_map('strval', (array)($_REQUEST['position'] ?? []))));
 [$people] = artists_list($pdo, $q, $extra, $pos);
 
 // The "needs finishing" filter is applied in PHP on the screen, for the reason
@@ -58,7 +61,7 @@ $pos = array_values(array_filter(array_map('strval', (array)($_GET['position'] ?
 // query. Without this the button would download everyone while the screen
 // showed the thin ones, and the file's own claim to be what you were looking at
 // would be false.
-if (isset($_GET['thin'])) {
+if (isset($_REQUEST['thin'])) {
     $people = array_values(array_filter($people, fn($r) => (bool)artist_missing($r)));
 }
 if (!$people) {

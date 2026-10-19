@@ -52,8 +52,18 @@ $has = function (string $c) use ($extra) { return in_array($c, $extra, true); };
 
 $selfUrl = 'artists.php';
 
+// THE SEARCH POSTS, it does not GET. A portfolio URL typed into the box —
+// "https://www.artstation.com/nikandr" — is exactly the kind of thing people
+// look an artist up by, but on the live cPanel host the Mod_Security firewall
+// rejects any request whose URL carries a web address (it reads it as a remote
+// include attempt) and returns "Not Acceptable" before PHP ever runs. A GET
+// form puts the term in the URL; a POST form keeps it in the request body,
+// out of the firewall's way. So the search is a POST that is NOT a change to
+// the database: it skips the handler below and simply renders the results.
+$isSearch = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'search');
+
 // ---------------------------------------------------------------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isSearch) {
     $action = $_POST['action'] ?? '';
     try {
         if (!$ready) throw new RuntimeException('The hiring database updates have not been applied yet.');
@@ -195,12 +205,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$q   = trim((string)($_GET['q'] ?? ''));
+// A search POST reads its terms from the body; everything else (the Clear
+// link, a bookmarked list) still reads them from the URL.
+$src = $isSearch ? $_POST : $_GET;
+$q   = trim((string)($src['q'] ?? ''));
 $positions = $ready ? artists_positions($pdo) : [];
 // SEVERAL at once. Anything that is not a position this database actually holds
 // is dropped rather than left filtering against nothing — a stale bookmark
 // should not look like an empty database.
-$pos = (array)($_GET['position'] ?? []);
+$pos = (array)($src['position'] ?? []);
 $pos = array_values(array_intersect(array_map('strval', $pos), $positions));
 
 [$people, $approaches] = $ready ? artists_list($pdo, $q, $extra, $pos) : [[], []];
@@ -217,7 +230,7 @@ $pos = array_values(array_intersect(array_map('strval', $pos), $positions));
 $thin = 0;
 foreach ($people as $pRow) if (artist_missing($pRow)) $thin++;
 
-$onlyThin = isset($_GET['thin']);
+$onlyThin = isset($src['thin']);
 if ($onlyThin) {
     $people = array_values(array_filter($people, fn($pRow) => (bool)artist_missing($pRow)));
 }
@@ -249,9 +262,13 @@ require __DIR__ . '/includes/header.php';
     </div>
   <?php endif; ?>
 
-  <form method="get" class="inline-form">
+  <?php // POSTs rather than GETs so a portfolio URL in the box does not land in
+        // the request URL, where the live host's firewall rejects it. See the
+        // note by $isSearch at the top of this file. ?>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="search">
     <input name="q" value="<?= e($q) ?>" size="30"
-           placeholder="Search name, email, source, notes<?= $extra ? ', location, position' : '' ?>">
+           placeholder="Search name, email, source, notes, portfolio link<?= $extra ? ', location, position' : '' ?>">
     <?php if ($positions): ?>
       <?php // Submits on change, like the role picker on users.php — a filter
             // you have to press a second button to apply is a filter people
@@ -474,12 +491,17 @@ require __DIR__ . '/includes/header.php';
   <?php if ($people): ?>
     <p class="page-actions">
       <?php // Carries the search, so what downloads is what you were looking
-            // at rather than everything regardless. ?>
-      <a class="button secondary"
-         href="export_artists.php<?= ($q !== '' || $pos || $onlyThin)
-              ? '?' . http_build_query(array_filter(
-                    ['q' => $q, 'position' => $pos, 'thin' => $onlyThin ? '1' : '']))
-              : '' ?>">Download as Excel ↓</a>
+            // at rather than everything regardless. POSTs the term for the same
+            // reason the search form does: a portfolio URL in the download link
+            // would be rejected by the live host's firewall. ?>
+      <form method="post" action="export_artists.php" class="inline-form" style="display:inline">
+        <input type="hidden" name="q" value="<?= e($q) ?>">
+        <?php foreach ($pos as $pp): ?>
+          <input type="hidden" name="position[]" value="<?= e($pp) ?>">
+        <?php endforeach; ?>
+        <?php if ($onlyThin): ?><input type="hidden" name="thin" value="1"><?php endif; ?>
+        <button type="submit" class="button secondary">Download as Excel ↓</button>
+      </form>
     </p>
   <?php endif; ?>
 
