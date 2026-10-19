@@ -136,6 +136,21 @@ function ticket_status_is_done(?array $status): bool {
 }
 
 /**
+ * Is this the terminal "Final" status? (David, 2026-10-19.)
+ *
+ * Reaching it sends the card STRAIGHT to the archive, skipping the few-day grace
+ * that archive_stale_done() gives every other finished card. Matched by name
+ * because the status model has no flag that tells "Final" apart from "Completed"
+ * — both only map_to 'approved'. A project that renames its last column loses
+ * the instant archive but still archives on the normal schedule, so nothing
+ * breaks; it just reverts to the old timed behaviour.
+ */
+function ticket_status_is_final(?array $status): bool {
+    return ticket_status_is_done($status)
+        && strcasecmp(trim((string)($status['name'] ?? '')), 'Final') === 0;
+}
+
+/**
  * The next per-project ticket number.
  *
  * Called inside the same transaction as the INSERT, and the table carries
@@ -166,6 +181,14 @@ function sync_ticket_completion(PDO $pdo, int $ticketId, ?array $status): void {
     if (ticket_status_is_done($status)) {
         $pdo->prepare('UPDATE tickets SET completed_at = COALESCE(completed_at, NOW()) WHERE id = ?')
             ->execute([$ticketId]);
+        // "Final" is the terminal state: archive it now rather than leaving it on
+        // the board for archive_stale_done() to sweep a few days later. Fires from
+        // every status-change path, because they all funnel through here — the
+        // board drag, the Studio Tasks / My tasks dropdowns, the ticket detail
+        // page, and card creation.
+        if (ticket_status_is_final($status)) {
+            $pdo->prepare('UPDATE tickets SET archived = 1 WHERE id = ?')->execute([$ticketId]);
+        }
     } else {
         $pdo->prepare('UPDATE tickets SET completed_at = NULL, archived = 0 WHERE id = ?')
             ->execute([$ticketId]);
