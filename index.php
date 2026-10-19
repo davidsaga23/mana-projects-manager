@@ -318,11 +318,12 @@ require __DIR__ . '/includes/header.php';
                     class="status-select status-<?= e($p['status']) ?>"
                     title="Change the status of <?= e($p['name']) ?>">
               <?php foreach ($statuses as $s):
-                  // A signed-off project can't return to setup; don't offer it.
-                  // Its own current status is always kept so the control reads right.
-                  if ($s === 'setup' && $p['status'] !== 'setup' && isset($kickoffSignedOff[$pid])) continue; ?>
-                <option value="<?= e($s) ?>" <?= $p['status'] === $s ? 'selected' : '' ?>>
-                  <?= e(str_replace('_', ' ', $s)) ?>
+                  // A signed-off project can't return to setup: the option is
+                  // shown GREYED OUT rather than removed, so the rule is visible
+                  // (David, 2026-10-19). Its own current status stays selectable.
+                  $lockSetup = $s === 'setup' && $p['status'] !== 'setup' && isset($kickoffSignedOff[$pid]); ?>
+                <option value="<?= e($s) ?>" <?= $p['status'] === $s ? 'selected' : '' ?> <?= $lockSetup ? 'disabled' : '' ?>>
+                  <?= e(str_replace('_', ' ', $s)) ?><?= $lockSetup ? ' (signed off)' : '' ?>
                 </option>
               <?php endforeach; ?>
             </select>
