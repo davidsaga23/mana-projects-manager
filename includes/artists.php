@@ -161,9 +161,12 @@ function artists_list(PDO $pdo, string $q, array $extra, array $positions = [],
         // The fields somebody actually remembers a person by. Bound, never
         // interpolated — the column list above is built from a fixed whitelist,
         // the search term never is.
+        // portfolio_url is in the list so an artist can be found by pasting their
+        // ArtStation / reel link — the whole point of keeping the link on record.
         $like = '%' . $q . '%';
-        $any  = ['h.candidate_name LIKE ?', 'h.email LIKE ?', 'h.source LIKE ?', 'h.notes LIKE ?'];
-        $args = array_merge($args, [$like, $like, $like, $like]);
+        $any  = ['h.candidate_name LIKE ?', 'h.email LIKE ?', 'h.source LIKE ?',
+                 'h.notes LIKE ?', 'h.portfolio_url LIKE ?'];
+        $args = array_merge($args, [$like, $like, $like, $like, $like]);
         foreach (['location', 'position'] as $c) {
             if (in_array($c, $extra, true)) { $any[] = 'h.`' . $c . '` LIKE ?'; $args[] = $like; }
         }
