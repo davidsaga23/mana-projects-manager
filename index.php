@@ -68,6 +68,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($status, $statuses, true)) {
                 throw new RuntimeException('That is not a status this app recognises.');
             }
+            // ONCE SIGNED OFF, NO GOING BACK TO SETUP (David, 2026-10-19). Setup is
+            // where the kick-off data is set; the approved snapshot and the
+            // starting estimate are the record of "how it started". Letting a
+            // signed-off project return to setup would put that original record
+            // back within reach of being changed, so it is refused — pause it with
+            // On hold instead. The dropdown also drops the setup option for these.
+            if ($status === 'setup' && $project['status'] !== 'setup'
+                && kickoff_ready($pdo) && kickoff_approved($pdo, $id) !== null) {
+                throw new RuntimeException('"' . $project['name'] . '" has already been signed off, so it cannot '
+                    . 'go back to setup: that is where its starting data was frozen, and the kick-off is what the '
+                    . 'postmortem compares the finished show against. Put it on hold instead if you need to pause it.');
+            }
             // MOVING A PROJECT TO ACTIVE IS NOT A PLAIN DROPDOWN CHANGE the first
             // time (David, 2026-10-16; broadened to any prior status 2026-10-19).
             // It opens the kick-off sign-off: the project is put in setup if it
@@ -224,8 +236,11 @@ $progressPct = projects_overall_pct($pdo, $projects);
 
 // Which setup projects are waiting on a kick-off sign-off, for the line under
 // their status. Empty before migration 049.
-$kickoffReady = kickoff_ready($pdo);
-$kickoffOpen  = $kickoffReady ? kickoff_open_states($pdo) : [];
+$kickoffReady     = kickoff_ready($pdo);
+$kickoffOpen      = $kickoffReady ? kickoff_open_states($pdo) : [];
+// Signed-off projects can't go back to setup (David, 2026-10-19), so the setup
+// option is dropped from their status dropdown below.
+$kickoffSignedOff = $kickoffReady ? kickoff_approved_ids($pdo) : [];
 
 $pageTitle = 'Projects';
 require __DIR__ . '/includes/header.php';
@@ -302,7 +317,10 @@ require __DIR__ . '/includes/header.php';
             <select name="status" onchange="this.form.submit()"
                     class="status-select status-<?= e($p['status']) ?>"
                     title="Change the status of <?= e($p['name']) ?>">
-              <?php foreach ($statuses as $s): ?>
+              <?php foreach ($statuses as $s):
+                  // A signed-off project can't return to setup; don't offer it.
+                  // Its own current status is always kept so the control reads right.
+                  if ($s === 'setup' && $p['status'] !== 'setup' && isset($kickoffSignedOff[$pid])) continue; ?>
                 <option value="<?= e($s) ?>" <?= $p['status'] === $s ? 'selected' : '' ?>>
                   <?= e(str_replace('_', ' ', $s)) ?>
                 </option>

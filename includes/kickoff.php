@@ -156,6 +156,19 @@ function kickoff_open_states(PDO $pdo): array {
     return $out;
 }
 
+/** project id => true for every project that has a signed-off (approved) kick-off. */
+function kickoff_approved_ids(PDO $pdo): array {
+    $out = [];
+    try {
+        $rows = $pdo->query("SELECT DISTINCT project_id FROM project_kickoffs WHERE state = 'approved'")
+                    ->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        return [];   // migration 049 pending
+    }
+    foreach ($rows as $pid) $out[(int)$pid] = true;
+    return $out;
+}
+
 function kickoff_signoffs(PDO $pdo, int $kickoffId): array {
     $q = $pdo->prepare('SELECT * FROM project_kickoff_signoffs WHERE kickoff_id = ? ORDER BY signer_name');
     $q->execute([$kickoffId]);
