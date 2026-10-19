@@ -15,6 +15,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
+require_once __DIR__ . '/includes/mailer.php';   // create_ticket() emails the assignee
 require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/timelog.php';
 require_once __DIR__ . '/includes/activity.php';
@@ -70,6 +71,12 @@ if ($ready) {
     $mc->execute([$userId]);
     $myCrewId = (int)$mc->fetchColumn();
 }
+
+// Where a new card can be filed: every live show, the Studio first. The one list
+// the create dialog below reads, the same one Studio Tasks and the per-row
+// pickers use, so the shows offered cannot drift between screens. Only built for
+// people who may create — the dialog is editors-and-admins only.
+$fileTargets = can_edit() ? ticket_file_targets($pdo) : [];
 
 // --- change the status of one production task -------------------------------
 if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
@@ -201,6 +208,60 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
 // "where has my work got to" — artist_may_post() does not list it.
 if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_project'])) {
     refile_ticket_from_post($pdo, $userId);
+    header('Location: mytasks.php');
+    exit;
+}
+
+// --- create a card from here ------------------------------------------------
+//
+// David, 2026-10-19: "let's be able to create task from my tasks context for
+// admins and editors." The same dialog Studio Tasks carries (alltasks.php),
+// through the same shared create_ticket() the board uses, so the three screens
+// cannot drift about what a new card is — the seq race, the status rules, the
+// assignee notification all live in one place.
+//
+// ⚠ THE ONE DIFFERENCE FITS THE SCREEN: a card made here is OWNED BY YOU by
+// default, because this is the list of your own work, so it lands in your
+// Tickets below the moment it is saved. A different owner can still be picked,
+// and then the card goes to their list instead.
+//
+// ⚠ EDITORS AND ADMINS ONLY, the same rule as the Move box above. require_login()
+// already refuses the POST for an artist (artist_may_post() lists only the two
+// status fields); this is the second lock, next to the reason.
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
+    $newProject = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+
+    // ⚠ THE STATUS IS CHOSEN HERE, NOT ON THE FORM. Board columns are a project's
+    // own vocabulary, so a status picker would have to be rebuilt every time the
+    // project dropdown changed. A filed card starts in its first column, which is
+    // what dragging it onto the board would have done; an unfiled card gets none.
+    $startStatus = null;
+    if ($newProject) {
+        [$cols] = ticket_board_columns($pdo, $newProject);
+        if ($cols) $startStatus = (int)$cols[0]['id'];
+    }
+
+    // Owner: whoever was picked, falling back to YOU. $myCrewId is 0 for an
+    // editor who has not linked their login to a crew member yet, and a task may
+    // legitimately have no owner, so the fallback is "nobody" rather than a
+    // guess — the dialog only shows once $myCrewId is set, so in practice this is
+    // the current user.
+    $owner = !empty($_POST['assigned_crew_id']) ? (int)$_POST['assigned_crew_id'] : ($myCrewId ?: null);
+
+    try {
+        $made = create_ticket($pdo, $newProject, [
+            'title'            => $_POST['title'] ?? '',
+            'description'      => $_POST['description'] ?? '',
+            'type'             => 'task',
+            'status_id'        => $startStatus,
+            'priority'         => $_POST['priority'] ?? 'medium',
+            'assigned_crew_id' => $owner,
+            'due_date'         => $_POST['due_date'] ?? null,
+        ], [], $userId);
+        flash('ok', 'Task ' . $made['ref'] . ' created. ' . trim(implode(' ', $made['notes'])));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
     header('Location: mytasks.php');
     exit;
 }
@@ -636,6 +697,13 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
   </div>
 
+  <?php // David, 2026-10-19: create a card without leaving My tasks. Editors and
+        // admins only; it opens the dialog at the foot of the page. A new card is
+        // assigned to you by default, so it drops into Tickets below. ?>
+  <?php if (can_edit()): ?>
+    <p><button type="button" class="primary" onclick="openMyTaskCreate()">+ New task</button></p>
+  <?php endif; ?>
+
   <?php if (!$canLog): ?>
     <p class="flash flash-warn">
       Time logging needs migration <code>022</code>, which hasn't been applied yet. Everything
@@ -870,6 +938,107 @@ require __DIR__ . '/includes/header.php';
     <small>Showing work for <strong><?= e($myCrewName) ?></strong>.</small>
     <button type="submit" class="secondary">That isn't me, unlink</button>
   </form>
+
+  <?php // THE CREATE DIALOG (David, 2026-10-19: "let's be able to create task
+        // from my tasks context for admins and editors"). The same dialog Studio
+        // Tasks carries, reading the same $fileTargets, saved through the same
+        // create_ticket(). The one change is the Owner, which starts as YOU
+        // because this is the list of your own work. Tasks only, deliberately: a
+        // ticket is a problem attached to a shot, an asset or a step on one show,
+        // and those pickers cannot be drawn until a project is chosen, which is
+        // the board. ?>
+  <?php if (can_edit()): ?>
+  <div id="myTaskCreate" class="modal" style="display:none;">
+    <div class="modal-box">
+      <h3>New task</h3>
+      <form method="post">
+        <input type="hidden" name="create" value="1">
+
+        <label>Title
+          <input name="title" id="myTaskCreateTitle" required placeholder="What needs doing?">
+        </label>
+        <label>Description
+          <textarea name="description" rows="3" placeholder="Details, links, notes…"></textarea>
+        </label>
+
+        <div class="modal-row">
+          <?php // The same list the per-row Project pickers read. "No project yet"
+                // is a real choice: capture-first (migration 041) lets a card exist
+                // before anybody decides which show it is for. ?>
+          <label>Project
+            <select name="project_id">
+              <?php foreach ($fileTargets as $t): ?>
+                <option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?> <?= e($t['name']) ?></option>
+              <?php endforeach; ?>
+              <option value="">no project yet</option>
+            </select>
+          </label>
+          <label>Priority
+            <select name="priority">
+              <?php foreach (ticket_priorities() as $p): ?>
+                <option value="<?= $p ?>" <?= $p === 'medium' ? 'selected' : '' ?>><?= ucfirst($p) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+        </div>
+
+        <div class="modal-row">
+          <?php // ⚠ OWNER STARTS AS YOU, because this is My tasks: a card made here
+                // should land in the list it was made from. Pick somebody else and
+                // it goes to their list instead. Everybody active, the same list
+                // ticket.php falls back to for an unfiled card. ?>
+          <label>Owner
+            <select name="assigned_crew_id">
+              <option value="">nobody</option>
+              <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
+                                            FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
+                <option value="<?= (int)$c['id'] ?>" <?= (int)$c['id'] === $myCrewId ? 'selected' : '' ?>>
+                  <?= e(assignee_label($c)) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>Due
+            <input type="date" name="due_date">
+          </label>
+        </div>
+
+        <p class="muted small">
+          It starts in the first column of whichever show you picked, assigned to you unless you
+          change the owner, and no status if you leave it unfiled. Need a <strong>ticket</strong>
+          instead, against a shot, an asset or a pipeline step? Those live on a show's own board,
+          where the pickers for them can exist.
+        </p>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary"
+                  onclick="document.getElementById('myTaskCreate').style.display='none';">Cancel</button>
+          <button type="submit">Create task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Small and local, like Studio Tasks' own: assets/board.js owns the board's
+    // modals and is not loaded here, and pulling it in for one dialog would bring
+    // the drag and drop with it.
+    function openMyTaskCreate() {
+      var m = document.getElementById('myTaskCreate');
+      if (!m) return;
+      m.style.display = 'flex';
+      var t = document.getElementById('myTaskCreateTitle');
+      if (t) t.focus();
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { var m = document.getElementById('myTaskCreate'); if (m) m.style.display = 'none'; }
+    });
+    (function () {
+      var m = document.getElementById('myTaskCreate');
+      if (m) m.addEventListener('mousedown', function (e) { if (e.target === this) this.style.display = 'none'; });
+    }());
+  </script>
+  <?php endif; ?>
 <?php endif; ?>
 
 </div>
