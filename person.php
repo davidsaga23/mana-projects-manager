@@ -417,7 +417,7 @@ require __DIR__ . '/includes/header.php';
 
   <?php else: ?>
     <p class="muted small">
-      Visible to administrators only, <?= e(current_user_display()) ?> is one. Editors and
+      Visible to administrators only, <?= e(current_user_display()) ?> is one. Production and
       view-only accounts never see this section and the data never reaches their browser.
       It is stored in a <strong>separate database</strong>, and the contract itself stays in
       Google Drive under Drive's own permissions.

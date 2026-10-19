@@ -158,6 +158,10 @@ if ($ready) {
     // "Final".
     $where = 't.archived = 0';
     if (!$showDone) $where .= " AND (st.maps_to IS NULL OR st.maps_to <> 'approved')";
+    // Overhead cards (migration 052) are the standing time buckets, not work to
+    // get through — they never belong on a task list. overhead_exclude_sql()
+    // names every place that has to say so.
+    $where .= overhead_exclude_sql($pdo);
 
     $rows = $pdo->query(
         ticket_select_sql() . "

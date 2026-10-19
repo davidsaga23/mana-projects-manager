@@ -145,9 +145,15 @@ function preview_role(): string {
     return in_array($p, ['editor', 'supervisor', 'artist'], true) ? $p : '';
 }
 
-/** "an artist", "a supervisor", "an editor": a role named in a sentence. */
+/** "an artist", "a supervisor", "Production": a role named in a sentence. */
 function role_in_words(string $role): string {
-    return ['admin' => 'an admin', 'editor' => 'an editor',
+    // ⚠ 'editor' READS "Production" since 2026-10-19 — the role David renamed. It
+    // is a LABEL change only: the stored value stays 'editor' everywhere, so the
+    // preview whitelist, the finance guard and every role check are untouched and
+    // existing accounts keep working. The one place the old name still appears is
+    // the database value itself. "as Production" is deliberate: a team name, not
+    // "a Production", which does not read.
+    return ['admin' => 'an admin', 'editor' => 'Production',
             'supervisor' => 'a supervisor', 'artist' => 'an artist'][$role] ?? $role;
 }
 
@@ -261,7 +267,17 @@ function artist_may_post(): bool {
     if (!is_artist() && !is_supervisor()) return false;
 
     $allowed = [
-        'mytasks.php' => ['set_status', 'set_ticket_status'],
+        // set_status / set_ticket_status: the status of their own work (2026-09-28).
+        //
+        // overhead_timer / overhead_log: logging their own time against a standing
+        // overhead category (Meetings, Desk time, Reviews for an artist), added
+        // 2026-10-19. ⚠ THIS IS STILL AN ALLOW-LIST BY FIELD, NOT A TICKET THEY
+        // NAME. The field is what is permitted here; mytasks.php maps the posted
+        // category key to the Studio card itself and refuses any key the person's
+        // role is not offered — so this cannot be bent into logging time against
+        // an arbitrary card. An artist logging their own overhead hours is exactly
+        // the writing this was asked to allow, and nothing wider.
+        'mytasks.php' => ['set_status', 'set_ticket_status', 'overhead_timer', 'overhead_log'],
     ];
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.
