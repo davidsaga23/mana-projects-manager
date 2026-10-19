@@ -101,6 +101,25 @@ function kickoff_candidates(PDO $pdo): array {
     return $rows;
 }
 
+/**
+ * Should changing a project to this status open the kick-off sign-off, instead
+ * of just saving the new status?
+ *
+ * David, 2026-10-19: the sign-off fires on the move INTO active. True only the
+ * FIRST time a project is activated — once it has a signed-off kick-off, going
+ * active again (for example back from On hold) is a plain status change, so
+ * "how it started" stays one record. Only the pre-launch statuses count:
+ * reactivating a wrapped, postmortem or archived show is not a fresh kick-off.
+ * Before migration 049 this is always false, so the old one-click change stands.
+ */
+function kickoff_should_prompt(PDO $pdo, array $project, string $newStatus): bool {
+    if ($newStatus !== 'active') return false;
+    $was = (string)($project['status'] ?? '');
+    if (!in_array($was, ['setup', 'on_hold'], true)) return false;
+    if (!kickoff_ready($pdo)) return false;
+    return kickoff_approved($pdo, (int)$project['id']) === null;
+}
+
 /** The latest sign-off request for a project that has not been withdrawn. */
 function kickoff_current(PDO $pdo, int $projectId): ?array {
     $q = $pdo->prepare(
@@ -134,6 +153,19 @@ function kickoff_open_states(PDO $pdo): array {
         return [];
     }
     foreach ($rows as $r) $out[(int)$r['project_id']] = $r['state'];
+    return $out;
+}
+
+/** project id => true for every project that has a signed-off (approved) kick-off. */
+function kickoff_approved_ids(PDO $pdo): array {
+    $out = [];
+    try {
+        $rows = $pdo->query("SELECT DISTINCT project_id FROM project_kickoffs WHERE state = 'approved'")
+                    ->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        return [];   // migration 049 pending
+    }
+    foreach ($rows as $pid) $out[(int)$pid] = true;
     return $out;
 }
 
@@ -852,6 +884,51 @@ function kickoff_withdraw(PDO $pdo, array $kickoff): void {
     }
     $pdo->prepare("UPDATE project_kickoffs SET state = 'withdrawn', decided_at = ? WHERE id = ?")
         ->execute([date('Y-m-d H:i:s'), (int)$kickoff['id']]);
+}
+
+/**
+ * Reopen a frozen project for editing AND tell the people signing off.
+ *
+ * David, 2026-10-19: an admin needs a way to restart edits on a project that is
+ * waiting for sign-off, and the people asked to sign it off should be told it is
+ * open again and to wait for a NEW request. This is a withdraw (which voids the
+ * request and unfreezes the project) PLUS that email — a bare withdraw told
+ * nobody, which is the gap this closes. The old row is kept as 'withdrawn' so the
+ * history still reads "asked, then reopened"; re-sending writes a fresh one.
+ *
+ * @return string[] sentences for the screen
+ */
+function kickoff_reopen(PDO $pdo, array $project, array $kickoff): array {
+    if (!in_array($kickoff['state'], ['pending', 'changes_requested'], true)) {
+        throw new RuntimeException('There is nothing open to reopen.');
+    }
+    $kid     = (int)$kickoff['id'];
+    $signers = kickoff_signoffs($pdo, $kid);   // read the list before voiding it
+    $pdo->prepare("UPDATE project_kickoffs SET state = 'withdrawn', decided_at = ? WHERE id = ?")
+        ->execute([date('Y-m-d H:i:s'), $kid]);
+
+    $who  = current_user_display();
+    $url  = kickoff_url((int)$project['id']);
+    $msgs = ['Editing is open again and the sign-off request is cancelled. The people who were asked to sign '
+           . 'off are being told to wait for a new request.'];
+
+    // One email per person asked, deduplicated by address.
+    $to = [];
+    foreach ($signers as $s) {
+        if (empty($s['signer_email'])) continue;
+        $to[strtolower($s['signer_email'])] = ['email' => $s['signer_email'], 'name' => $s['signer_name']];
+    }
+    $line = $who . ' has reopened ' . $project['name'] . ' for editing, so the sign-off you were asked for is '
+          . 'cancelled. There is nothing to do right now — please wait for a fresh sign-off request.';
+    foreach ($to as $t) {
+        [, $res] = kickoff_mail($t,
+            sprintf('[%s] Sign-off paused, please wait: %s', $project['code'], $project['name']),
+            kickoff_mail_html(htmlspecialchars($line, ENT_QUOTES, 'UTF-8'), [], $url, 'Open the project'),
+            "{$line}\n\n{$url}\n");
+        $msgs[] = $t['name'] . ': ' . $res . '.';
+    }
+    if (!$to) $msgs[] = 'Nobody on the sign-off list has an email address on file, so nobody was emailed.';
+    return $msgs;
 }
 
 // ---------------------------------------------------------------------------

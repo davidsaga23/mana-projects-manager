@@ -68,12 +68,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($status, $statuses, true)) {
                 throw new RuntimeException('That is not a status this app recognises.');
             }
-            // SETUP TO ACTIVE IS NOT A DROPDOWN CHANGE (David, 2026-10-16). It
-            // goes to the kick-off page, which warns, freezes the setup and asks
-            // the people who sign off. The project turns active when they have
-            // all approved. Before migration 049 the old one-click change stands.
-            if ($project['status'] === 'setup' && $status === 'active' && kickoff_ready($pdo)) {
-                header('Location: kickoff.php?project=' . $id);
+            // ONCE SIGNED OFF, NO GOING BACK TO SETUP (David, 2026-10-19). Setup is
+            // where the kick-off data is set; the approved snapshot and the
+            // starting estimate are the record of "how it started". Letting a
+            // signed-off project return to setup would put that original record
+            // back within reach of being changed, so it is refused — pause it with
+            // On hold instead. The dropdown also drops the setup option for these.
+            if ($status === 'setup' && $project['status'] !== 'setup'
+                && kickoff_ready($pdo) && kickoff_approved($pdo, $id) !== null) {
+                throw new RuntimeException('"' . $project['name'] . '" has already been signed off, so it cannot '
+                    . 'go back to setup: that is where its starting data was frozen, and the kick-off is what the '
+                    . 'postmortem compares the finished show against. Put it on hold instead if you need to pause it.');
+            }
+            // MOVING A PROJECT TO ACTIVE IS NOT A PLAIN DROPDOWN CHANGE the first
+            // time (David, 2026-10-16; broadened to any prior status 2026-10-19).
+            // It opens the kick-off sign-off: the project is put in setup if it
+            // was not already, frozen, and the people who sign off are asked; it
+            // turns active once they have all approved. kickoff_should_prompt()
+            // keeps this to the first activation, so a show that is already signed
+            // off and comes back from On hold is a plain change. &send=1 opens the
+            // signer pop-up straight away. Before migration 049 the old one-click
+            // change stands.
+            if (kickoff_should_prompt($pdo, $project, $status)) {
+                if ($project['status'] !== 'setup') {
+                    $pdo->prepare("UPDATE projects SET status = 'setup' WHERE id = ?")->execute([$id]);
+                }
+                header('Location: kickoff.php?project=' . $id . '&send=1');
                 exit;
             }
             $pdo->prepare('UPDATE projects SET status = ? WHERE id = ?')->execute([$status, $id]);
@@ -216,8 +236,11 @@ $progressPct = projects_overall_pct($pdo, $projects);
 
 // Which setup projects are waiting on a kick-off sign-off, for the line under
 // their status. Empty before migration 049.
-$kickoffReady = kickoff_ready($pdo);
-$kickoffOpen  = $kickoffReady ? kickoff_open_states($pdo) : [];
+$kickoffReady     = kickoff_ready($pdo);
+$kickoffOpen      = $kickoffReady ? kickoff_open_states($pdo) : [];
+// Signed-off projects can't go back to setup (David, 2026-10-19), so the setup
+// option is dropped from their status dropdown below.
+$kickoffSignedOff = $kickoffReady ? kickoff_approved_ids($pdo) : [];
 
 $pageTitle = 'Projects';
 require __DIR__ . '/includes/header.php';
@@ -294,9 +317,13 @@ require __DIR__ . '/includes/header.php';
             <select name="status" onchange="this.form.submit()"
                     class="status-select status-<?= e($p['status']) ?>"
                     title="Change the status of <?= e($p['name']) ?>">
-              <?php foreach ($statuses as $s): ?>
-                <option value="<?= e($s) ?>" <?= $p['status'] === $s ? 'selected' : '' ?>>
-                  <?= e(str_replace('_', ' ', $s)) ?>
+              <?php foreach ($statuses as $s):
+                  // A signed-off project can't return to setup: the option is
+                  // shown GREYED OUT rather than removed, so the rule is visible
+                  // (David, 2026-10-19). Its own current status stays selectable.
+                  $lockSetup = $s === 'setup' && $p['status'] !== 'setup' && isset($kickoffSignedOff[$pid]); ?>
+                <option value="<?= e($s) ?>" <?= $p['status'] === $s ? 'selected' : '' ?> <?= $lockSetup ? 'disabled' : '' ?>>
+                  <?= e(str_replace('_', ' ', $s)) ?><?= $lockSetup ? ' (signed off)' : '' ?>
                 </option>
               <?php endforeach; ?>
             </select>
