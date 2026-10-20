@@ -167,6 +167,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_project'])) {
     exit;
 }
 
+// --- snooze / un-snooze -----------------------------------------------------
+// A wake-up date (migration 053). Production + admins only, its own button so it
+// never rides along with a field save. Un-snooze clears it. The card stays
+// visible on its own detail page so this control is always reachable.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['snooze']) && can_edit()) {
+    $date = trim($_POST['snoozed_until'] ?? '');
+    $clear = ($_POST['snooze'] === 'clear') || $date === '';
+    if (!$clear && $date <= date('Y-m-d')) {
+        flash('err', 'Pick a date in the future to snooze to, nothing changed.');
+        header('Location: ' . $selfUrl);
+        exit;
+    }
+    $said = snooze_ticket($pdo, $id, $clear ? null : $date, $userId);
+    flash('ok', $said);
+    header('Location: ' . $selfUrl);
+    exit;
+}
+
 // --- save the fields --------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
     $aboutPair = ticket_about_from_post($_POST['step_id'] ?? '');
@@ -443,6 +461,9 @@ require __DIR__ . '/includes/header.php';
     <?php if ($t['crew_name']): ?> · owned by <strong><?= e($t['crew_name']) ?></strong><?php endif; ?>
     <?php if ($t['due_date']): ?> · due <strong><?= date('M j, Y', strtotime($t['due_date'])) ?></strong><?php endif; ?>
     <?php if ((int)$t['archived'] === 1): ?> · <em>archived</em><?php endif; ?>
+    <?php if (($t['snoozed_until'] ?? null) && $t['snoozed_until'] > date('Y-m-d')): ?>
+      · <em>snoozed until <?= date('M j, Y', strtotime($t['snoozed_until'])) ?></em>
+    <?php endif; ?>
   </p>
 
   <?php if ((int)($t['is_placeholder'] ?? 0) === 1): ?>
@@ -668,6 +689,37 @@ require __DIR__ . '/includes/header.php';
       <div class="actions"><button type="submit">Save changes</button></div>
     <?php endif; ?>
   </form>
+
+  <?php // SNOOZE — a wake-up date (migration 053). Its own form, between Save and
+        // Move: it hides the card from the active lists until the date, then the
+        // card returns on its own. Separate from the due date on purpose. ?>
+  <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')):
+    $snoozedUntil = $t['snoozed_until'] ?? null;
+    $isSnoozed = $snoozedUntil !== null && $snoozedUntil > date('Y-m-d');
+  ?>
+    <div class="move-zone">
+      <div>
+        <strong>Snooze</strong>
+        <p class="muted small" style="margin:2px 0 0;">
+          <?php if ($isSnoozed): ?>
+            Hidden from My tasks, the board and Studio Tasks until
+            <strong><?= date('M j, Y', strtotime($snoozedUntil)) ?></strong>, when it comes back on its own.
+          <?php else: ?>
+            Hide this <?= $isTicket ? 'ticket' : 'task' ?> until a future date — it drops off My tasks,
+            the board and Studio Tasks and returns on its own that day. The due date is not changed.
+          <?php endif; ?>
+        </p>
+      </div>
+      <form method="post" class="inline-form">
+        <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+               value="<?= e($isSnoozed ? $snoozedUntil : '') ?>" aria-label="Snooze until">
+        <button type="submit" name="snooze" value="set" class="secondary"><?= $isSnoozed ? 'Change date' : 'Snooze' ?></button>
+        <?php if ($isSnoozed): ?>
+          <button type="submit" name="snooze" value="clear">Un-snooze</button>
+        <?php endif; ?>
+      </form>
+    </div>
+  <?php endif; ?>
 
   <?php // MOVING IT, between Save and Delete: more consequential than editing a
         // field, less than destroying the card. The list is every other project,
