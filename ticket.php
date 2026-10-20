@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['move_project'])) {
 }
 
 // --- snooze / un-snooze -----------------------------------------------------
-// A wake-up date (migration 053). Production + admins only, its own button so it
+// A wake-up date (migration 054). Production + admins only, its own button so it
 // never rides along with a field save. Un-snooze clears it. The card stays
 // visible on its own detail page so this control is always reachable.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['snooze']) && can_edit()) {
@@ -690,7 +690,7 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
   </form>
 
-  <?php // SNOOZE — a wake-up date (migration 053). Its own form, between Save and
+  <?php // SNOOZE — a wake-up date (migration 054). Its own form, between Save and
         // Move: it hides the card from the active lists until the date, then the
         // card returns on its own. Separate from the due date on purpose. ?>
   <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')):

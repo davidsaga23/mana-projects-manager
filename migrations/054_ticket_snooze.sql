@@ -1,4 +1,4 @@
--- 053 — Snooze a card to a future date.
+-- 054 — Snooze a card to a future date.
 --
 -- David, 2026-10-20: "let's also add a snooze button for tasks with a new date
 -- for editors and admins so they can reschedule/disappear the task that needs to

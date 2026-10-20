@@ -77,7 +77,7 @@ if ($ready) {
     $myCrewId = (int)$mc->fetchColumn();
 }
 
-// ⚠ "SOMEBODY LOOKED", stamped on opening the list (migration 053). This is what
+// ⚠ "SOMEBODY LOOKED", stamped on opening the list (migration 054). This is what
 // clears the NEW colour on the top-bar badge: a task counts as new until the
 // owner has actually opened My tasks, at which point there is nothing left to
 // flag. Written on a GET, like the mention seen_at (migration 040) and the daily
@@ -1178,7 +1178,7 @@ require __DIR__ . '/includes/header.php';
     </table>
   <?php endif; ?>
 
-  <?php // SNOOZED — the cards you hid to a future date (migration 053). Listed so
+  <?php // SNOOZED — the cards you hid to a future date (migration 054). Listed so
         // they are never lost: each shows when it comes back and can be woken now. ?>
   <?php if (can_edit() && $snoozedTickets): ?>
     <h3>Snoozed <span class="muted">· <?= count($snoozedTickets) ?></span></h3>

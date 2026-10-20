@@ -264,7 +264,7 @@ function ticket_select_sql(): string {
 }
 
 /**
- * A SQL fragment that keeps SNOOZED cards (migration 053) out of a list.
+ * A SQL fragment that keeps SNOOZED cards (migration 054) out of a list.
  *
  * A card snoozed to a future date is hidden until that day comes; one snoozed to
  * today or any past date is shown, because its wake-up day has arrived. NULL —
@@ -284,7 +284,7 @@ function ticket_select_sql(): string {
  *
  * @param string $alias table alias used in the query, '' for none
  * @return string ' AND (<a>snoozed_until IS NULL OR <a>snoozed_until <= CURDATE())',
- *                or '' when the column is absent (before migration 053 is run)
+ *                or '' when the column is absent (before migration 054 is run)
  */
 function snooze_exclude_sql(PDO $pdo, string $alias = 't'): string {
     if (!column_exists($pdo, 'tickets', 'snoozed_until')) return '';
