@@ -264,6 +264,63 @@ function ticket_select_sql(): string {
 }
 
 /**
+ * A SQL fragment that keeps SNOOZED cards (migration 053) out of a list.
+ *
+ * A card snoozed to a future date is hidden until that day comes; one snoozed to
+ * today or any past date is shown, because its wake-up day has arrived. NULL —
+ * never snoozed — is always shown.
+ *
+ * ⚠ THE PLACES THAT MUST APPLY IT, written here so they are not rediscovered one
+ * bug at a time (the same discipline overhead_exclude_sql() keeps):
+ *
+ *   includes/tickets.php  board_tickets()       — the board's own columns
+ *   includes/tickets.php  tickets_for_crew()    — My tasks' card list
+ *   includes/tickets.php  tickets_for_step()    — the step detail page
+ *   alltasks.php          the cross-project Studio Tasks list
+ *
+ * A single-ticket load by id (load_ticket) deliberately does NOT apply it: once
+ * you are looking at a card you must still see it to un-snooze it, and the board
+ * and My tasks each keep a "Snoozed" view that lists the hidden ones on purpose.
+ *
+ * @param string $alias table alias used in the query, '' for none
+ * @return string ' AND (<a>snoozed_until IS NULL OR <a>snoozed_until <= CURDATE())',
+ *                or '' when the column is absent (before migration 053 is run)
+ */
+function snooze_exclude_sql(PDO $pdo, string $alias = 't'): string {
+    if (!column_exists($pdo, 'tickets', 'snoozed_until')) return '';
+    $a = $alias !== '' ? preg_replace('/[^A-Za-z0-9_]/', '', $alias) . '.' : '';
+    return ' AND (' . $a . 'snoozed_until IS NULL OR ' . $a . 'snoozed_until <= CURDATE())';
+}
+
+/**
+ * Put a card to sleep until a date, or wake it now.
+ *
+ * $date is 'YYYY-MM-DD' to snooze, or null to clear the snooze. Both write a line
+ * into the card's own thread so its history explains why it dropped off the
+ * lists and when it is due back. Returns a short sentence for the flash message.
+ */
+function snooze_ticket(PDO $pdo, int $ticketId, ?string $date, ?int $userId): string {
+    if (!column_exists($pdo, 'tickets', 'snoozed_until')) {
+        return 'Snooze is not set up yet — run the pending database update first.';
+    }
+    $pdo->prepare('UPDATE tickets SET snoozed_until = ? WHERE id = ?')
+        ->execute([$date ?: null, $ticketId]);
+    if ($date) {
+        $when = date('M j, Y', strtotime($date));
+        log_ticket_event($pdo, $ticketId, $userId, 'Snoozed until ' . $when . '.');
+        return 'Snoozed until ' . $when . '. It will come back on its own that day.';
+    }
+    log_ticket_event($pdo, $ticketId, $userId, 'Un-snoozed — back on the active lists.');
+    return 'Un-snoozed — it is back on the active lists.';
+}
+
+/** Is this card snoozed to a day still in the future? */
+function ticket_is_snoozed(array $t): bool {
+    $d = $t['snoozed_until'] ?? null;
+    return $d !== null && $d > date('Y-m-d');
+}
+
+/**
  * MOVE A CARD TO ANOTHER SHOW.
  *
  * David, 2026-10-07: "let's add a feature to select project... That way we can
@@ -740,7 +797,8 @@ function board_tickets(PDO $pdo, int $projectId, bool $archived = false): array 
     // through columns. Kept off the Studio's own board here.
     $stmt = $pdo->prepare(
         ticket_select_sql() . '
-          WHERE t.project_id = ? AND t.archived = ?' . overhead_exclude_sql($pdo) . '
+          WHERE t.project_id = ? AND t.archived = ?'
+          . overhead_exclude_sql($pdo) . snooze_exclude_sql($pdo) . '
           ORDER BY FIELD(t.priority, \'urgent\',\'high\',\'medium\',\'low\'),
                    t.due_date IS NULL, t.due_date ASC, t.created_at ASC'
     );
@@ -902,12 +960,54 @@ function tickets_for_crew(PDO $pdo, int $crewId): array {
         ticket_select_sql() . "
           WHERE t.assigned_crew_id = ?
             AND t.archived = 0
-            AND (st.maps_to IS NULL OR st.maps_to <> 'approved')
+            AND (st.maps_to IS NULL OR st.maps_to <> 'approved')"
+          . snooze_exclude_sql($pdo) . "
           ORDER BY t.due_date IS NULL, t.due_date ASC,
                    FIELD(t.priority, 'urgent','high','medium','low'),
                    p.code, t.seq"
     );
     $stmt->execute([$crewId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * The cards one person has snoozed to a future date, across every project.
+ *
+ * The counterpart to tickets_for_crew(): what fell off My tasks because it was
+ * snoozed, so the owner can find it again and wake it early if they change their
+ * mind. Soonest to return first.
+ */
+function snoozed_tickets_for_crew(PDO $pdo, int $crewId): array {
+    if (!column_exists($pdo, 'tickets', 'snoozed_until')) return [];
+    $stmt = $pdo->prepare(
+        ticket_select_sql() . "
+          WHERE t.assigned_crew_id = ?
+            AND t.archived = 0
+            AND t.snoozed_until IS NOT NULL
+            AND t.snoozed_until > CURDATE()
+          ORDER BY t.snoozed_until ASC, p.code, t.seq"
+    );
+    $stmt->execute([$crewId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * The cards snoozed to a future date on one project, for the board's Snoozed
+ * view. Soonest to return first.
+ */
+function snoozed_tickets_for_project(PDO $pdo, int $projectId): array {
+    if (!column_exists($pdo, 'tickets', 'snoozed_until')) return [];
+    $stmt = $pdo->prepare(
+        ticket_select_sql() . "
+          WHERE t.project_id = ?
+            AND t.archived = 0
+            AND t.snoozed_until IS NOT NULL
+            AND t.snoozed_until > CURDATE()"
+          . overhead_exclude_sql($pdo) . "
+          ORDER BY t.snoozed_until ASC,
+                   FIELD(t.priority, 'urgent','high','medium','low'), t.seq"
+    );
+    $stmt->execute([$projectId]);
     return $stmt->fetchAll();
 }
 
@@ -922,7 +1022,8 @@ function tickets_for_step(PDO $pdo, int $stepId): array {
         ticket_select_sql() . "
           WHERE t.step_id = ?
             AND t.archived = 0
-            AND (st.maps_to IS NULL OR st.maps_to <> 'approved')
+            AND (st.maps_to IS NULL OR st.maps_to <> 'approved')"
+          . snooze_exclude_sql($pdo) . "
           ORDER BY FIELD(t.priority, 'urgent','high','medium','low'), t.due_date IS NULL, t.due_date"
     );
     $stmt->execute([$stepId]);

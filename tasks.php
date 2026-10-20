@@ -86,6 +86,21 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore']))
     exit;
 }
 
+// --- un-snooze (migration 053) ----------------------------------------------
+// Wakes a snoozed card early, from the board's Snoozed view. Editors only, and
+// scoped to this project. Snoozing itself is done from the card (ticket.php) and
+// from My tasks; the board just needs a way to reach a hidden card and wake it.
+if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unsnooze'])) {
+    $sid = (int)$_POST['unsnooze'];
+    $own = $pdo->prepare('SELECT 1 FROM tickets WHERE id = ? AND project_id = ?');
+    $own->execute([$sid, $projectId]);
+    if ($own->fetchColumn()) {
+        flash('ok', snooze_ticket($pdo, $sid, null, $userId));
+    }
+    header('Location: ' . $selfUrl . '&snoozed=1');
+    exit;
+}
+
 // --- delete -----------------------------------------------------------------
 if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) {
     $delId = (int)$_POST['delete'];
@@ -108,6 +123,7 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) 
 // --- load -------------------------------------------------------------------
 $columns = []; $usedFallback = false; $cards = []; $justArchived = 0;
 $archivedCount = 0; $archiveDays = 3; $showArchived = false;
+$snoozedCount = 0; $showSnoozed = false;
 $assignees = []; $steps = []; $shotOptions = []; $assetOptions = [];
 $episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
 
@@ -121,7 +137,27 @@ if ($ready) {
     $ac->execute([$projectId]);
     $archivedCount = (int)$ac->fetchColumn();
 
-    $cards     = board_tickets($pdo, $projectId, $showArchived);
+    // Snoozed cards (migration 053): a count for the toggle, and a view that lists
+    // them so a hidden card can be found and woken. Archive takes precedence if
+    // both are asked for in the URL — they are separate shelves, never both.
+    if (column_exists($pdo, 'tickets', 'snoozed_until')) {
+        $showSnoozed = !$showArchived && !empty($_GET['snoozed']);
+        $sc = $pdo->prepare('SELECT COUNT(*) FROM tickets WHERE project_id = ? AND archived = 0
+                               AND snoozed_until IS NOT NULL AND snoozed_until > CURDATE()');
+        $sc->execute([$projectId]);
+        $snoozedCount = (int)$sc->fetchColumn();
+    }
+
+    if ($showSnoozed) {
+        // Same column grouping board_tickets() builds, so the Snoozed view reads
+        // like the board it came from.
+        $cards = [];
+        foreach (snoozed_tickets_for_project($pdo, $projectId) as $r) {
+            $cards[(int)($r['status_id'] ?? 0)][] = $r;
+        }
+    } else {
+        $cards = board_tickets($pdo, $projectId, $showArchived);
+    }
     $assignees = ticket_assignees($pdo, $projectId);
 
     $stepsQ = $pdo->prepare('SELECT id, name FROM pipeline_steps WHERE project_id = ? ORDER BY step_order, name');
@@ -167,7 +203,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="board-head">
   <h2 class="wizard-title" style="margin:0;">
-    <?= $showArchived ? 'Archive' : 'Tasks' ?> <span class="muted">· <?= e($project['name']) ?></span>
+    <?= $showArchived ? 'Archive' : ($showSnoozed ? 'Snoozed' : 'Tasks') ?> <span class="muted">· <?= e($project['name']) ?></span>
   </h2>
   <div class="board-tools">
     <label class="inline muted small">Show
@@ -195,9 +231,12 @@ require __DIR__ . '/includes/header.php';
         <option value="nodate">No due date</option>
       </select>
     </label>
-    <?php if ($showArchived): ?>
+    <?php if ($showArchived || $showSnoozed): ?>
       <a class="button" href="<?= e($selfUrl) ?>">← Back to the board</a>
     <?php else: ?>
+      <?php if ($snoozedCount > 0): ?>
+        <a class="button" href="<?= e($selfUrl) ?>&amp;snoozed=1">Snoozed (<?= $snoozedCount ?>)</a>
+      <?php endif; ?>
       <?php if ($archivedCount > 0): ?>
         <a class="button" href="<?= e($selfUrl) ?>&amp;archived=1">Archive (<?= $archivedCount ?>)</a>
       <?php endif; ?>
@@ -217,7 +256,13 @@ require __DIR__ . '/includes/header.php';
   </div>
 </div>
 
-<?php if ($showArchived): ?>
+<?php if ($showSnoozed): ?>
+  <p class="muted small">
+    <strong><?= $snoozedCount ?></strong> snoozed card(s), hidden from the board until the date each
+    shows. <strong>Nothing is deleted</strong> — a card returns on its own that day, or use Un-snooze
+    to bring one back now.
+  </p>
+<?php elseif ($showArchived): ?>
   <p class="muted small">
     <strong><?= $archivedCount ?></strong> archived card(s). Finished work lands here
     <?= $archiveDays ?> day<?= $archiveDays === 1 ? '' : 's' ?> after it reaches a status that counts
@@ -362,6 +407,17 @@ foreach ($cards as $sid => $list) {
                   </form>
                   <?php endif; ?>
                 </span>
+              </div>
+            <?php elseif ($showSnoozed): ?>
+              <div class="card-archive-row" onclick="event.stopPropagation();">
+                <span class="muted small">Back <?= ($t['snoozed_until'] ?? null) ? date('M j, Y', strtotime($t['snoozed_until'])) : '—' ?></span>
+                <?php if (can_edit()): ?>
+                <span>
+                  <form method="post" style="display:inline;">
+                    <button type="submit" name="unsnooze" value="<?= (int)$t['id'] ?>" class="secondary">Un-snooze</button>
+                  </form>
+                </span>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
           </div>

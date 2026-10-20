@@ -140,6 +140,27 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tic
     exit;
 }
 
+// --- snooze / un-snooze (migration 053) -------------------------------------
+// A wake-up date from the cross-project list. Editors + admins only, the same
+// gate the status change above carries. Snooze hides the card from every active
+// list; un-snooze brings it back. The hiding lives in snooze_exclude_sql().
+if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['snooze'])) {
+    try {
+        $ticketId = (int)($_POST['ticket_id'] ?? 0);
+        if (!load_ticket($pdo, $ticketId)) throw new RuntimeException('That card no longer exists.');
+        $date  = trim($_POST['snoozed_until'] ?? '');
+        $clear = ($_POST['snooze'] === 'clear') || $date === '';
+        if (!$clear && $date <= date('Y-m-d')) {
+            throw new RuntimeException('Pick a date in the future to snooze to.');
+        }
+        flash('ok', snooze_ticket($pdo, $ticketId, $clear ? null : $date, $userId));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: alltasks.php' . (!empty($_POST['from_snoozed']) ? '?snoozed=1' : ''));
+    exit;
+}
+
 $ready = column_exists($pdo, 'tickets', 'id');
 
 // Finished work is OFF by default and one click away. "Open tasks" is what was
@@ -147,6 +168,13 @@ $ready = column_exists($pdo, 'tickets', 'id');
 // answer a different question — but "what did we get through" is a fair question
 // too, and hiding it entirely would be answering only half.
 $showDone = ($_GET['done'] ?? '') === '1';
+
+// Snoozed cards (migration 053) are hidden here the same way they are hidden
+// from the board and My tasks, with their own one-click view so they can be
+// found and woken early. "Snoozed" and "Finished" are separate questions, so the
+// Snoozed view shows snoozed cards whatever their status.
+$showSnoozed = ($_GET['snoozed'] ?? '') === '1';
+$hasSnooze   = column_exists($pdo, 'tickets', 'snoozed_until');
 
 $rows = [];
 if ($ready) {
@@ -157,7 +185,13 @@ if ($ready) {
     // matching on the word "done" would work until the first show that says
     // "Final".
     $where = 't.archived = 0';
-    if (!$showDone) $where .= " AND (st.maps_to IS NULL OR st.maps_to <> 'approved')";
+    if ($showSnoozed && $hasSnooze) {
+        // The Snoozed view: only cards asleep until a future day, any status.
+        $where .= ' AND t.snoozed_until IS NOT NULL AND t.snoozed_until > CURDATE()';
+    } else {
+        if (!$showDone) $where .= " AND (st.maps_to IS NULL OR st.maps_to <> 'approved')";
+        $where .= snooze_exclude_sql($pdo);
+    }
     // Overhead cards (migration 052) are the standing time buckets, not work to
     // get through — they never belong on a task list. overhead_exclude_sql()
     // names every place that has to say so.
@@ -170,6 +204,16 @@ if ($ready) {
                    FIELD(t.priority, 'urgent','high','medium','low'),
                    p.code, t.seq"
     )->fetchAll();
+}
+
+// How many cards are asleep, for the toggle. Overhead cards never count.
+$snoozedCount = 0;
+if ($ready && $hasSnooze) {
+    $snoozedCount = (int)$pdo->query(
+        "SELECT COUNT(*) FROM tickets t WHERE t.archived = 0
+           AND t.snoozed_until IS NOT NULL AND t.snoozed_until > CURDATE()"
+         . overhead_exclude_sql($pdo)
+    )->fetchColumn();
 }
 
 // Each show's own statuses, read once per project on the page, for the Status
@@ -249,12 +293,18 @@ require __DIR__ . '/includes/header.php';
 
 <?php elseif (!$rows): ?>
   <div class="empty-state">
-    <h2><?= $showDone ? 'No cards at all yet' : 'Nothing open' ?></h2>
-    <p class="muted"><?= $showDone
-        ? 'Tasks and tickets are raised on a project\'s Tasks board.'
-        : 'Every card on every show is finished or archived.' ?></p>
-    <?php if (!$showDone): ?>
-      <p><a class="button secondary" href="alltasks.php?done=1">Include finished work</a></p>
+    <?php if ($showSnoozed): ?>
+      <h2>Nothing snoozed</h2>
+      <p class="muted">A card snoozed from its detail page or My tasks lands here until its date.</p>
+      <p><a class="button secondary" href="alltasks.php">← Back to open work</a></p>
+    <?php else: ?>
+      <h2><?= $showDone ? 'No cards at all yet' : 'Nothing open' ?></h2>
+      <p class="muted"><?= $showDone
+          ? 'Tasks and tickets are raised on a project\'s Tasks board.'
+          : 'Every card on every show is finished or archived.' ?></p>
+      <?php if (!$showDone): ?>
+        <p><a class="button secondary" href="alltasks.php?done=1">Include finished work</a></p>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 
@@ -268,8 +318,15 @@ require __DIR__ . '/includes/header.php';
       if ($overdue): ?> · <span class="err"><?= $overdue ?> past its date</span><?php endif; ?><?php
       if ($unowned): ?> · <span class="warn-text"><?= $unowned ?> with nobody on <?= $unowned === 1 ? 'it' : 'them' ?></span><?php endif; ?>
     ·
-    <a href="alltasks.php<?= $showDone ? '' : '?done=1' ?>"><?= $showDone
-        ? 'hide finished work' : 'include finished work' ?></a>
+    <?php if ($showSnoozed): ?>
+      <a href="alltasks.php">← back to open work</a>
+    <?php else: ?>
+      <a href="alltasks.php<?= $showDone ? '' : '?done=1' ?>"><?= $showDone
+          ? 'hide finished work' : 'include finished work' ?></a>
+      <?php if ($hasSnooze && $snoozedCount > 0): ?>
+        · <a href="alltasks.php?snoozed=1">snoozed (<?= $snoozedCount ?>)</a>
+      <?php endif; ?>
+    <?php endif; ?>
   </p>
 
 
@@ -323,7 +380,31 @@ require __DIR__ . '/includes/header.php';
               <?php endif; ?></td>
           <td class="muted small"><?= e($r['crew_name'] ?: '—') ?></td>
           <td><span class="prio-dot priority-<?= e($r['priority']) ?>"></span> <?= ucfirst($r['priority']) ?></td>
-          <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($r['due_date'] ?: '—') ?></td>
+          <td class="muted small <?= $late ? 'err' : '' ?>">
+            <?php if ($showSnoozed): ?>
+              back <?= ($r['snoozed_until'] ?? null) ? date('M j, Y', strtotime($r['snoozed_until'])) : '—' ?>
+              <?php if (can_edit()): ?>
+                <form method="post" class="inline-form" style="margin:3px 0 0;">
+                  <input type="hidden" name="snooze" value="clear">
+                  <input type="hidden" name="ticket_id" value="<?= (int)$r['id'] ?>">
+                  <input type="hidden" name="from_snoozed" value="1">
+                  <button type="submit" class="secondary">Un-snooze</button>
+                </form>
+              <?php endif; ?>
+            <?php else: ?>
+              <?= e($r['due_date'] ?: '—') ?>
+              <?php if (can_edit() && $hasSnooze): ?>
+                <form method="post" class="inline-form snooze-form" style="margin:3px 0 0;"
+                      title="Hide until a date; comes back on its own. Due date unchanged.">
+                  <input type="hidden" name="snooze" value="set">
+                  <input type="hidden" name="ticket_id" value="<?= (int)$r['id'] ?>">
+                  <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                         class="day-input" aria-label="Snooze until" required>
+                  <button type="submit" class="secondary" title="Snooze">💤</button>
+                </form>
+              <?php endif; ?>
+            <?php endif; ?>
+          </td>
         </tr>
       <?php endforeach; ?>
       </tbody>

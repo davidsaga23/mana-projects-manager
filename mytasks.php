@@ -210,6 +210,33 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
     exit;
 }
 
+// --- snooze / un-snooze one of my cards -------------------------------------
+//
+// David, 2026-10-20: a snooze button so a card that only needs attention later
+// drops off this list now and comes back on its own. Production + admins only,
+// and only cards assigned to the person asking — the same ownership test
+// set_ticket_status uses just above, so the hidden id cannot reach anybody
+// else's work. The hiding itself lives in tickets_for_crew() (snooze_exclude_sql).
+if ($myCrewId && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['snooze'])) {
+    try {
+        $ticketId = (int)($_POST['ticket_id'] ?? 0);
+        $q = $pdo->prepare('SELECT 1 FROM tickets WHERE id = ? AND assigned_crew_id = ?');
+        $q->execute([$ticketId, $myCrewId]);
+        if (!$q->fetchColumn()) throw new RuntimeException('That card is not assigned to you.');
+
+        $date  = trim($_POST['snoozed_until'] ?? '');
+        $clear = ($_POST['snooze'] === 'clear') || $date === '';
+        if (!$clear && $date <= date('Y-m-d')) {
+            throw new RuntimeException('Pick a date in the future to snooze to.');
+        }
+        flash('ok', snooze_ticket($pdo, $ticketId, $clear ? null : $date, $userId));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: mytasks.php' . (!empty($_POST['from_snoozed']) ? '?snoozed=1' : ''));
+    exit;
+}
+
 // --- file or move one card ----------------------------------------------------
 //
 // David, 2026-10-16, pointing at "#38 Explore method to quantify team
@@ -458,6 +485,7 @@ $tickets = []; $tasks = []; $candidates = []; $entries = []; $statusesByProject 
 $mentions = []; $unseenMentions = 0;
 $myCrewName = '';
 $overheadCats = []; $overheadCards = []; $overheadTodayByCard = [];
+$snoozedTickets = [];
 
 if ($ready && $myCrewId) {
     $n = $pdo->prepare('SELECT name FROM crew WHERE id = ?');
@@ -465,6 +493,9 @@ if ($ready && $myCrewId) {
     $myCrewName = (string)$n->fetchColumn();
 
     $tickets = tickets_for_crew($pdo, $myCrewId);
+    // The cards you snoozed, so they can be found and woken early. Editors only,
+    // the same gate the snooze button carries.
+    if (can_edit()) $snoozedTickets = snoozed_tickets_for_crew($pdo, $myCrewId);
 
     // Production tasks: unfinished steps assigned to them, on active projects.
     // Both the primary assignee and the join table, because real work has two
@@ -1105,7 +1136,19 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
           </td>
           <td><span class="prio-dot priority-<?= e($t3['priority']) ?>"></span> <?= ucfirst($t3['priority']) ?></td>
-          <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($t3['due_date'] ?: '—') ?></td>
+          <td class="muted small <?= $late ? 'err' : '' ?>">
+            <?= e($t3['due_date'] ?: '—') ?>
+            <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')): ?>
+              <form method="post" class="inline-form snooze-form" style="margin:3px 0 0;"
+                    title="Hide until a date; comes back on its own. Due date unchanged.">
+                <input type="hidden" name="snooze" value="set">
+                <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
+                <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                       class="day-input" aria-label="Snooze until" required>
+                <button type="submit" class="secondary" title="Snooze">💤</button>
+              </form>
+            <?php endif; ?>
+          </td>
           <?php if ($canLog): ?>
             <td>
               <?php // ⚠ NO TIME AGAINST AN UNFILED CARD. Hours are costed to a show
@@ -1129,6 +1172,32 @@ require __DIR__ . '/includes/header.php';
           <?php if ($canTimer): ?>
             <td><?= timer_cell($timer, 'ticket', (int)$t3['id'], (int)$t3['project_id']) ?></td>
           <?php endif; ?>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+
+  <?php // SNOOZED — the cards you hid to a future date (migration 053). Listed so
+        // they are never lost: each shows when it comes back and can be woken now. ?>
+  <?php if (can_edit() && $snoozedTickets): ?>
+    <h3>Snoozed <span class="muted">· <?= count($snoozedTickets) ?></span></h3>
+    <table class="mywork-table">
+      <thead><tr><th>Ref</th><th>Title</th><th>Project</th><th>Comes back</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($snoozedTickets as $sz): ?>
+        <tr>
+          <td><a href="ticket.php?id=<?= (int)$sz['id'] ?>" class="<?= $sz['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($sz)) ?></a></td>
+          <td><a href="ticket.php?id=<?= (int)$sz['id'] ?>"><?= e($sz['title']) ?></a></td>
+          <td class="muted small"><?= e($sz['project_code'] ?? '—') ?></td>
+          <td class="muted small"><?= date('M j, Y', strtotime($sz['snoozed_until'])) ?></td>
+          <td>
+            <form method="post" class="inline-form" style="margin:0;">
+              <input type="hidden" name="snooze" value="clear">
+              <input type="hidden" name="ticket_id" value="<?= (int)$sz['id'] ?>">
+              <button type="submit" class="secondary">Un-snooze</button>
+            </form>
+          </td>
         </tr>
       <?php endforeach; ?>
       </tbody>
