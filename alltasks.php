@@ -140,7 +140,7 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tic
     exit;
 }
 
-// --- snooze / un-snooze (migration 053) -------------------------------------
+// --- snooze / un-snooze (migration 054) -------------------------------------
 // A wake-up date from the cross-project list. Editors + admins only, the same
 // gate the status change above carries. Snooze hides the card from every active
 // list; un-snooze brings it back. The hiding lives in snooze_exclude_sql().
@@ -169,7 +169,7 @@ $ready = column_exists($pdo, 'tickets', 'id');
 // too, and hiding it entirely would be answering only half.
 $showDone = ($_GET['done'] ?? '') === '1';
 
-// Snoozed cards (migration 053) are hidden here the same way they are hidden
+// Snoozed cards (migration 054) are hidden here the same way they are hidden
 // from the board and My tasks, with their own one-click view so they can be
 // found and woken early. "Snoozed" and "Finished" are separate questions, so the
 // Snoozed view shows snoozed cards whatever their status.

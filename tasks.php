@@ -86,7 +86,7 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore']))
     exit;
 }
 
-// --- un-snooze (migration 053) ----------------------------------------------
+// --- un-snooze (migration 054) ----------------------------------------------
 // Wakes a snoozed card early, from the board's Snoozed view. Editors only, and
 // scoped to this project. Snoozing itself is done from the card (ticket.php) and
 // from My tasks; the board just needs a way to reach a hidden card and wake it.
@@ -137,7 +137,7 @@ if ($ready) {
     $ac->execute([$projectId]);
     $archivedCount = (int)$ac->fetchColumn();
 
-    // Snoozed cards (migration 053): a count for the toggle, and a view that lists
+    // Snoozed cards (migration 054): a count for the toggle, and a view that lists
     // them so a hidden card can be found and woken. Archive takes precedence if
     // both are asked for in the URL — they are separate shelves, never both.
     if (column_exists($pdo, 'tickets', 'snoozed_until')) {
