@@ -4,6 +4,12 @@ $pageTitle = $pageTitle ?? 'Anima | Project manager';
 // $pdo is in scope here because every page requires db.php before this file.
 $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     ? pending_migration_count($pdo) : 0;
+// The My tasks nav badge — how many active cards are mine, and whether any is
+// new since I last looked. Drawn for whoever is signed in; cheap enough to run
+// on every page (see mytasks_badge()).
+$myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
+    ? mytasks_badge($pdo, (int)($_SESSION['user_id'] ?? 0))
+    : ['count' => 0, 'new' => false];
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
@@ -36,7 +42,10 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
       // finance_nav() both draw. So the top bar carries what is on MY desk, the
       // one way to ALL the shows, and the housekeeping behind a separator.
       ?>
-      · <a href="mytasks.php">My tasks</a>
+      · <a href="mytasks.php">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
+          class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
+          title="<?= $myTasksBadge['new']
+              ? 'You have a new task' : 'Your active tasks' ?>"><?= (int)$myTasksBadge['count'] ?></span><?php endif; ?></a>
       <?php // TASKS, next to My tasks and not inside a project, because the
             // question it answers spans them: "what is open everywhere, and how
             // are we doing across the shows" (David, 2026-10-07). Same reasoning

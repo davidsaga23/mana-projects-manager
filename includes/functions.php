@@ -371,3 +371,58 @@ function working_days_between(string $from, string $to): int {
     }
     return $count;
 }
+
+/**
+ * The My tasks nav badge: how many active cards this login owns, and whether any
+ * of them is NEW since they last opened the list.
+ *
+ * David, 2026-10-20: a number under "My tasks", and a different COLOUR when
+ * there is something new. Drawn in the top bar on EVERY page, so it has to be
+ * cheap — one indexed query (idx_assignee covers assigned_crew_id + archived),
+ * no per-card work.
+ *
+ * "Active" is counted exactly as the My tasks Tickets list counts it
+ * (tickets_for_crew): the login's own cards, not archived, status not approved.
+ * "New" means created after users.mytasks_seen_at, which opening My tasks stamps
+ * to NOW() — so the colour clears the moment they look.
+ *
+ * Degrades safely before migration 053: with no mytasks_seen_at column the count
+ * still shows and 'new' is simply always false. With no tickets table, or no
+ * crew link, it returns zero and the caller draws nothing.
+ *
+ * @return array{count:int, new:bool}
+ */
+function mytasks_badge(PDO $pdo, int $userId): array {
+    $none = ['count' => 0, 'new' => false];
+    if ($userId <= 0) return $none;
+    if (!column_exists($pdo, 'tickets', 'id') || !column_exists($pdo, 'users', 'crew_id')) {
+        return $none;
+    }
+    $hasSeen = column_exists($pdo, 'users', 'mytasks_seen_at');
+
+    // A ticket is new when it was created after the login last opened My tasks.
+    // COALESCE to an old date so a never-looked login (NULL) treats what it has
+    // as new — correct for someone opening the screen for the first time.
+    $newExpr = $hasSeen
+        ? "SUM(CASE WHEN t.created_at > COALESCE(u.mytasks_seen_at, '1970-01-01') THEN 1 ELSE 0 END)"
+        : '0';
+
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) AS n, {$newExpr} AS new_n
+               FROM users u
+               JOIN tickets t         ON t.assigned_crew_id = u.crew_id
+               LEFT JOIN statuses st  ON st.id = t.status_id
+              WHERE u.id = ? AND u.crew_id IS NOT NULL
+                AND t.archived = 0
+                AND (st.maps_to IS NULL OR st.maps_to <> 'approved')"
+        );
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        if (!$row) return $none;
+        return ['count' => (int)$row['n'], 'new' => ((int)$row['new_n']) > 0];
+    } catch (Throwable $e) {
+        // A missing statuses table or similar should never break the chrome.
+        return $none;
+    }
+}

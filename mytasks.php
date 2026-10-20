@@ -77,6 +77,17 @@ if ($ready) {
     $myCrewId = (int)$mc->fetchColumn();
 }
 
+// ⚠ "SOMEBODY LOOKED", stamped on opening the list (migration 053). This is what
+// clears the NEW colour on the top-bar badge: a task counts as new until the
+// owner has actually opened My tasks, at which point there is nothing left to
+// flag. Written on a GET, like the mention seen_at (migration 040) and the daily
+// snapshot before it — a fact with no form to submit. Only on a plain view, not
+// on the POST handlers above, which have already redirected back here as a GET.
+if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'GET'
+    && column_exists($pdo, 'users', 'mytasks_seen_at')) {
+    $pdo->prepare('UPDATE users SET mytasks_seen_at = NOW() WHERE id = ?')->execute([$userId]);
+}
+
 // Where a new card can be filed: every live show, the Studio first. The one list
 // the create dialog below reads, the same one Studio Tasks and the per-row
 // pickers use, so the shows offered cannot drift between screens. Only built for

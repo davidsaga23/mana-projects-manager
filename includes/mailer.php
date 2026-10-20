@@ -426,3 +426,96 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
         return [false, 'The notification email failed: ' . $e->getMessage()];
     }
 }
+
+/**
+ * ONE summary email per person for a batch of tasks just created from a
+ * transcript (David, 2026-10-20).
+ *
+ * ⚠ ONE EMAIL, NOT ONE PER CARD. A meeting can turn into a dozen action items
+ * for the same person; notify_assignee() would fire a dozen separate emails for
+ * them. This gathers every card that landed on a person in this one read and
+ * sends them a single list — the difference between a useful "here is your share
+ * of that meeting" and an inbox full of near-identical notifications.
+ *
+ * Fans out only to the people cards were ASSIGNED to. Unfiled/unassigned cards
+ * ("nobody yet" — the expected answer when the transcript was vague) email no
+ * one; there is nobody to tell yet.
+ *
+ * Reports in the same shape the other notifiers use, and NAMES anyone it could
+ * not reach — a crew slot or a team has no personal inbox, and silently dropping
+ * them would read on screen as "everyone was emailed".
+ *
+ * @param array<int, array<int, array{title:string, project:string,
+ *        priority:string, due:?string, url:string}>> $byCrew  crew id => their cards
+ * @return array{0:bool, 1:string}  [any sent, a sentence for the flash]
+ */
+function notify_transcript_tasks(PDO $pdo, array $byCrew): array {
+    global $config;
+    if (!$byCrew) return [false, ''];
+
+    if (!SmtpMailer::isConfigured($config)) {
+        return [false, 'Email is not set up on this server, so nobody was emailed about their new tasks.'];
+    }
+
+    $ids = implode(',', array_map('intval', array_keys($byCrew)));
+    $people = $pdo->query("SELECT id, name, email FROM crew WHERE id IN ({$ids})")->fetchAll();
+    $byId = [];
+    foreach ($people as $c) $byId[(int)$c['id']] = $c;
+
+    $emailed = [];   // names reached
+    $noEmail = [];   // names with no address on file
+    $failed  = [];   // names where SMTP threw
+
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+    foreach ($byCrew as $crewId => $items) {
+        $c = $byId[(int)$crewId] ?? null;
+        if (!$c || !$items) continue;
+        $addr = trim((string)($c['email'] ?? ''));
+        if ($addr === '') { $noEmail[] = (string)$c['name']; continue; }
+
+        $n = count($items);
+        $subject = sprintf('[Anima] %d new task%s from a meeting', $n, $n === 1 ? '' : 's');
+
+        $rowsHtml = '';
+        $rowsText = '';
+        foreach ($items as $it) {
+            $meta = [$it['project'] ?: 'No project yet', 'Priority: ' . ucfirst($it['priority'])];
+            if (!empty($it['due'])) $meta[] = 'Due: ' . date('M j, Y', strtotime($it['due']));
+            $rowsHtml .= '<li style="margin:0 0 12px;">'
+                . '<a href="' . $esc($it['url']) . '" style="color:#2f6fb2;font-weight:600;">'
+                . $esc($it['title']) . '</a>'
+                . '<div style="color:#5a6a7a;font-size:13px;">' . implode(' &middot; ', array_map($esc, $meta)) . '</div>'
+                . '</li>';
+            $rowsText .= "- {$it['title']} (" . implode(' | ', $meta) . ")\n  {$it['url']}\n";
+        }
+
+        $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
+            . '<p>Hi ' . $esc($c['name']) . ',</p>'
+            . '<p>' . $n . ' new task' . ($n === 1 ? ' was' : 's were')
+            . ' assigned to you from a meeting transcript:</p>'
+            . '<ul style="padding-left:18px;">' . $rowsHtml . '</ul>'
+            . '<p style="color:#8a97a3;font-size:12px;margin-top:18px;">Anima | Project manager</p>'
+            . '</div>';
+
+        $text = "Hi {$c['name']},\n\n{$n} new task" . ($n === 1 ? ' was' : 's were')
+            . " assigned to you from a meeting transcript:\n\n" . $rowsText . "\nAnima | Project manager\n";
+
+        try {
+            (new SmtpMailer($config))->send([['email' => $addr, 'name' => $c['name']]], $subject, $html, $text);
+            $emailed[] = (string)$c['name'];
+        } catch (Throwable $e) {
+            error_log('[Anima transcript mail] ' . $e->getMessage());
+            $failed[] = (string)$c['name'];
+        }
+    }
+
+    $parts = [];
+    if ($emailed) $parts[] = 'Emailed ' . implode(', ', $emailed) . ' their new tasks.';
+    if ($noEmail) $parts[] = implode(', ', $noEmail) . ' ' . (count($noEmail) === 1 ? 'has' : 'have')
+                           . ' no email address on file, so ' . (count($noEmail) === 1 ? 'was' : 'were')
+                           . ' not reached — add one on the Staffing screen.';
+    if ($failed)  $parts[] = 'The email to ' . implode(', ', $failed) . ' failed to send.';
+
+    return [!empty($emailed), implode(' ', $parts)];
+}
