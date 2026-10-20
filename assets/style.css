@@ -807,6 +807,18 @@ p.crumb a { white-space: normal; }
   background: var(--warn-tint); color: var(--warn); border-radius: 3px;
   padding: 1px 6px; font-size: 11.5px; margin-left: 4px;
 }
+
+/* My tasks count badge. Quiet by default (just a tally); lit a different colour
+   when there is a NEW task since the list was last opened (David, 2026-10-20). */
+.mytasks-badge {
+  display: inline-block; min-width: 16px; padding: 0 5px; margin-left: 5px;
+  background: var(--surface-3); color: var(--muted);
+  border: 1px solid var(--border-strong); border-radius: 9px;
+  font-size: 11px; line-height: 15px; text-align: center; font-weight: 700;
+}
+.mytasks-badge.is-new {
+  background: var(--primary); color: var(--on-primary); border-color: var(--primary);
+}
 .row-inactive td { background: var(--surface-2); color: var(--faint); }
 .row-inactive td strong { font-weight: 400; }
 .role-table td { vertical-align: top; }
