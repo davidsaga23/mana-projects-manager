@@ -129,6 +129,65 @@ function real_role(): string {
     return $role === 'viewer' ? 'artist' : $role;
 }
 
+/**
+ * The specific PERSON being previewed, or null when not previewing a person.
+ *
+ * David, 2026-10-21: "can we admins see anima as specific users instead of
+ * generic ones?" The role preview below answers "what does an artist see"; this
+ * answers "what does THIS artist see" — it borrows a named account's role AND
+ * its crew link (effective_crew_id() reads it) so My tasks and the scoped
+ * projects list show exactly that person's world.
+ *
+ * ⚠ SAME TWO SAFEGUARDS AS preview_role(), re-checked on every call:
+ *   - only an admin can be previewing anyone (real_role() must still be admin);
+ *   - only ever DOWNWARD — the viewed account must be active and hold a role
+ *     strictly below admin (editor / supervisor / artist). Viewing as another
+ *     admin is refused, so this can never be a path to lateral snooping between
+ *     administrators, and a tampered session id pointing at an admin resolves to
+ *     "no preview" rather than borrowing those powers.
+ *
+ * Read fresh once per request, like current_user(), so demoting or deactivating
+ * the viewed account ends the preview on the admin's very next page view.
+ * Returns a row with id, username, display_name, role (normalised), crew_id.
+ */
+function preview_user(): ?array {
+    static $loaded = false;
+    static $u = null;
+    if ($loaded) return $u;
+    $loaded = true;
+
+    if (real_role() !== 'admin') return $u = null;
+    $id = (int)($_SESSION['preview_user_id'] ?? 0);
+    if ($id <= 0) return $u = null;
+
+    global $pdo;
+    if (!($pdo instanceof PDO)) return $u = null;
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT id, username, display_name, role, active, crew_id FROM users WHERE id = ?'
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch() ?: null;
+    } catch (PDOException $e) {
+        // Roles (005) or the crew link (017) may be missing on this install;
+        // without them there is nothing to preview, so fall back to no preview
+        // rather than locking the admin into a broken state.
+        return $u = null;
+    }
+    if (!$row || (int)($row['active'] ?? 0) !== 1) return $u = null;
+
+    $role = ((string)($row['role'] ?? '')) === 'viewer' ? 'artist' : (string)($row['role'] ?? '');
+    if (!in_array($role, ['editor', 'supervisor', 'artist'], true)) return $u = null;
+    $row['role'] = $role;
+    return $u = $row;
+}
+
+/** The id of the person being previewed, or 0 when not previewing a person. */
+function preview_user_id(): int {
+    $p = preview_user();
+    return $p ? (int)$p['id'] : 0;
+}
+
 /** The role being previewed, or '' when not previewing. */
 function preview_role(): string {
     // ⚠ CHECKED AGAINST THE REAL ROLE ON EVERY CALL, not just when the preview
@@ -140,6 +199,10 @@ function preview_role(): string {
     // path to granting one. A tampered session value is either a lesser role or
     // nothing at all.
     if (real_role() !== 'admin') return '';
+    // Previewing a specific person wears THAT person's role; preview_user() has
+    // already proved it is a lesser, active account.
+    $pu = preview_user();
+    if ($pu) return (string)$pu['role'];
     $p = (string)($_SESSION['preview_role'] ?? '');
     if ($p === 'viewer') $p = 'artist';        // a session started before 037
     return in_array($p, ['editor', 'supervisor', 'artist'], true) ? $p : '';
@@ -160,6 +223,55 @@ function role_in_words(string $role): string {
 /** Is an admin currently looking at the app as somebody else? */
 function in_preview(): bool {
     return preview_role() !== '';
+}
+
+/** Is the current preview a specific PERSON (not merely a role)? */
+function in_user_preview(): bool {
+    return preview_user_id() > 0;
+}
+
+/**
+ * The id of the account the app should behave AS — the previewed person when
+ * one is being previewed, otherwise the logged-in account.
+ *
+ * The companion to user_role(): where that answers "which role am I behaving
+ * as", this answers "whose world am I looking at". My tasks and the projects
+ * scope read through here, so viewing as a person reuses every per-person path
+ * that already existed without being taught about the preview separately.
+ */
+function effective_user_id(): int {
+    $pu = preview_user_id();
+    return $pu > 0 ? $pu : (int)($_SESSION['user_id'] ?? 0);
+}
+
+/**
+ * The crew member the effective account is linked to, or null when it is linked
+ * to nobody (or the crew link column is missing — migration 017). This is the
+ * key that turns "who am I" into "which projects / tasks are mine".
+ *
+ * Read once per request. A login with no crew link resolves to null, which the
+ * callers read as "sees nothing of their own" — the same answer the app already
+ * gives such an account on My tasks.
+ */
+function effective_crew_id(PDO $pdo): ?int {
+    static $cache = [];
+    $uid = effective_user_id();
+    if (array_key_exists($uid, $cache)) return $cache[$uid];
+    if ($uid <= 0) return $cache[$uid] = null;
+    // The previewed person's row already carries crew_id; use it and save a query.
+    $pu = preview_user();
+    if ($pu && (int)$pu['id'] === $uid) {
+        $c = $pu['crew_id'] !== null ? (int)$pu['crew_id'] : null;
+        return $cache[$uid] = ($c ?: null);
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
+        $stmt->execute([$uid]);
+        $c = $stmt->fetchColumn();
+    } catch (PDOException $e) {
+        return $cache[$uid] = null;   // migration 017 pending
+    }
+    return $cache[$uid] = ($c ? (int)$c : null);
 }
 
 /**
@@ -430,6 +542,107 @@ function require_admin(): void {
         header('Location: index.php');
         exit;
     }
+}
+
+// --- PER-USER PROJECT VISIBILITY -------------------------------------------
+//
+// David, 2026-10-21: "how can we assign a project to a user so they can only
+// see the ones they're subscribed/linked to?" The answer the app already half
+// had: a person is "on" a show when they are staffed onto it (crew_projects,
+// written by includes/crew.php), and a login is tied to a person by its crew
+// link (users.crew_id). So "linked" means "staffed", and no new table is
+// needed — this is a filter over data the app already keeps.
+//
+// KEYED ON user_role() AND effective_crew_id(), both of which follow a preview.
+// So an admin viewing AS a specific artist sees exactly that artist's projects,
+// which is the whole point of feature 2 — the two features share this code
+// rather than each carrying its own idea of "whose projects".
+
+/**
+ * The roles that see EVERY project, regardless of staffing. Admin and Production
+ * (stored 'editor') run the studio, so they are never scoped. Overridable in
+ * config.php via $config['project_visibility_see_all'] if David later decides
+ * supervisors should also see the whole slate — admin is forced in whatever the
+ * config says, because an admin who could not see a project could not fix it.
+ */
+function roles_see_all_projects(): array {
+    global $config;
+    $r = $config['project_visibility_see_all'] ?? ['admin', 'editor'];
+    if (!is_array($r)) $r = ['admin', 'editor'];
+    if (!in_array('admin', $r, true)) $r[] = 'admin';
+    return $r;
+}
+
+/** Does the effective role see every project (so no scoping applies)? */
+function sees_all_projects(): bool {
+    return in_array(user_role(), roles_see_all_projects(), true);
+}
+
+/**
+ * The project ids the effective user may see, or NULL meaning "all of them".
+ *
+ * null  — a see-all role (admin / Production), or the crew_projects table is
+ *         missing on this install: do not scope, because locking people out of
+ *         a working app over a half-applied database is worse than the feature.
+ * []    — a scoped role with no crew link, or linked but staffed on nothing:
+ *         they see no shows, which is the honest answer for such an account.
+ * [ids] — a scoped role: exactly the shows they are staffed on.
+ */
+function visible_project_ids(PDO $pdo): ?array {
+    static $cache = null;
+    static $done = false;
+    if ($done) return $cache;
+    $done = true;
+
+    if (sees_all_projects()) return $cache = null;
+
+    $crewId = effective_crew_id($pdo);
+    if (!$crewId) return $cache = [];
+
+    try {
+        $stmt = $pdo->prepare('SELECT project_id FROM crew_projects WHERE crew_id = ?');
+        $stmt->execute([$crewId]);
+        return $cache = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    } catch (PDOException $e) {
+        return $cache = null;   // crew_projects absent — don't scope a broken DB
+    }
+}
+
+/**
+ * A SQL fragment that limits a projects query to what the effective user may
+ * see, for splicing into a WHERE. Returns '' for a see-all role (no limit), or
+ * "<col> IN (1,2,3)" / "<col> IN (0)" for a scoped one. The ids are cast to int
+ * before being inlined, so there is nothing to bind and nothing to inject.
+ *
+ *   $alias — the projects table's id column, e.g. 'p.id' or 'id'.
+ */
+function visible_projects_sql(PDO $pdo, string $col): string {
+    $ids = visible_project_ids($pdo);
+    if ($ids === null) return '';
+    if (!$ids) return $col . ' IN (0)';     // nothing — 0 is never a real id
+    $safe = implode(',', array_map('intval', $ids));
+    return $col . ' IN (' . $safe . ')';
+}
+
+/** May the effective user open this one project? See-all roles always may. */
+function may_see_project(PDO $pdo, int $projectId): bool {
+    $ids = visible_project_ids($pdo);
+    if ($ids === null) return true;
+    return in_array($projectId, $ids, true);
+}
+
+/**
+ * Bounce a scoped user who reached a project they are not staffed on — the
+ * "close the door" half that project_nav.php's tab-hiding deliberately leaves to
+ * a guard. Called by the project hub; a see-all role sails straight through.
+ */
+function require_project_access(PDO $pdo, int $projectId): void {
+    if (may_see_project($pdo, $projectId)) return;
+    if (function_exists('flash')) {
+        flash('err', 'That project is not one of yours. You only see the shows you are staffed on.');
+    }
+    header('Location: index.php');
+    exit;
 }
 
 // For AJAX/API endpoints: never redirect to an HTML page, always respond

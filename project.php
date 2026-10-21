@@ -20,6 +20,11 @@ if (!$project) {
     header('Location: index.php');
     exit;
 }
+// PER-USER VISIBILITY (David, 2026-10-21): the hub is the one door every project
+// screen hangs off, so a scoped user who followed a stale link to a show they
+// are not staffed on is turned back here rather than shown its insides. See-all
+// roles (admin / Production) pass straight through.
+require_project_access($pdo, $projectId);
 
 $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 $assetCount = (int)$pdo->query("SELECT COUNT(*) FROM assets WHERE project_id = $projectId")->fetchColumn();

@@ -54,8 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['stop'])) {
         // Unconditional. If the key is set on an account that may not preview it
         // does nothing anyway, and refusing to clear it could only ever strand
-        // somebody.
-        unset($_SESSION['preview_role']);
+        // somebody. Both kinds of preview are cleared together — a role one and a
+        // person one are never meant to stack, and leaving either would strand.
+        unset($_SESSION['preview_role'], $_SESSION['preview_user_id']);
         flash('ok', 'Back to your own account.');
 
     } elseif (isset($_POST['start'])) {
@@ -69,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($want, ['editor', 'supervisor', 'artist'], true)) {
                 flash('err', 'That is not a role you can preview.');
             } else {
+                // A role preview is generic, so it clears any person preview.
+                unset($_SESSION['preview_user_id']);
                 $_SESSION['preview_role'] = $want;
                 flash('ok', 'Previewing as ' . role_in_words($want)
                           . '. Nothing will save until you leave the preview.');
@@ -76,6 +79,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // the screen they started from is very often one the borrowed
                 // role cannot open, and landing on "that screen is for
                 // administrators only" reads as a fault rather than the answer.
+                $back = 'index.php';
+            }
+        }
+
+    } elseif (isset($_POST['start_user'])) {
+        // VIEW AS A SPECIFIC PERSON (David, 2026-10-21). Same two safeguards as a
+        // role preview, enforced by preview_user() itself the moment the session
+        // key is read: admin only, and only ever a lesser, active account. We
+        // validate here as well so the admin gets a clear message rather than a
+        // preview that silently refuses to take.
+        if (real_role() !== 'admin') {
+            flash('err', 'Only an administrator can view the app as someone else.');
+        } else {
+            $wantId = (int)($_POST['user_id'] ?? 0);
+            $target = null;
+            if ($wantId > 0) {
+                try {
+                    $stmt = $pdo->prepare(
+                        'SELECT id, username, display_name, role, active FROM users WHERE id = ?'
+                    );
+                    $stmt->execute([$wantId]);
+                    $target = $stmt->fetch() ?: null;
+                } catch (PDOException $e) {
+                    $target = null;   // roles (005) missing — nothing to view as
+                }
+            }
+            $role = $target ? (($target['role'] ?? '') === 'viewer' ? 'artist' : (string)$target['role']) : '';
+            if (!$target || (int)($target['active'] ?? 0) !== 1
+                || !in_array($role, ['editor', 'supervisor', 'artist'], true)
+                || (int)$target['id'] === (int)$me['id']) {
+                // An admin, an inactive account, yourself, or an unknown id: none
+                // of these is a person you can borrow.
+                flash('err', 'That is not an account you can view the app as.');
+            } else {
+                unset($_SESSION['preview_role']);           // role is taken from the person
+                $_SESSION['preview_user_id'] = (int)$target['id'];
+                // The audit row — "who looked as whom, and when" (migration 055).
+                // Best-effort: a missing table must never block the preview, which
+                // works whether or not 055 has been applied.
+                try {
+                    $log = $pdo->prepare(
+                        'INSERT INTO preview_audit (admin_user_id, viewed_user_id, started_at) VALUES (?, ?, ?)'
+                    );
+                    $log->execute([(int)$me['id'], (int)$target['id'], date('Y-m-d H:i:s')]);
+                } catch (PDOException $e) {
+                    // migration 055 pending — recorded nowhere, but the view still works.
+                }
+                flash('ok', 'Viewing as ' . ($target['display_name'] ?: $target['username'])
+                          . '. Nothing will save until you leave the preview.');
                 $back = 'index.php';
             }
         }

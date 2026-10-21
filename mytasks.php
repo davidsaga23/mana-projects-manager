@@ -70,11 +70,14 @@ if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POS
 $canSetStatus = can_edit() || is_artist() || is_supervisor();
 
 $me = current_user();
+// WHOSE tasks this list shows. Normally the logged-in account; when an admin is
+// previewing AS a specific person (David, 2026-10-21) it is that person's crew
+// link, so the admin sees exactly the cards that person sees. The POST handlers
+// above and below still act as the REAL account — but a preview saves nothing
+// anyway (require_login() refuses the POST), so they never run while viewing.
 $myCrewId = 0;
 if ($ready) {
-    $mc = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
-    $mc->execute([$userId]);
-    $myCrewId = (int)$mc->fetchColumn();
+    $myCrewId = (int)(effective_crew_id($pdo) ?? 0);
 }
 
 // ⚠ "SOMEBODY LOOKED", stamped on opening the list (migration 054). This is what
@@ -83,7 +86,12 @@ if ($ready) {
 // flag. Written on a GET, like the mention seen_at (migration 040) and the daily
 // snapshot before it — a fact with no form to submit. Only on a plain view, not
 // on the POST handlers above, which have already redirected back here as a GET.
-if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'GET'
+//
+// NOT while previewing as someone (David, 2026-10-21): the admin is looking at
+// that person's list, not clearing their own badge, and we must not clear the
+// previewed person's "new" flag on their behalf either — so the stamp is skipped
+// entirely during a preview and nobody's badge moves because an admin peeked.
+if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'GET' && !in_preview()
     && column_exists($pdo, 'users', 'mytasks_seen_at')) {
     $pdo->prepare('UPDATE users SET mytasks_seen_at = NOW() WHERE id = ?')->execute([$userId]);
 }

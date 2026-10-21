@@ -7,8 +7,11 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
 // The My tasks nav badge — how many active cards are mine, and whether any is
 // new since I last looked. Drawn for whoever is signed in; cheap enough to run
 // on every page (see mytasks_badge()).
+// effective_user_id(), not the session id: while an admin is viewing AS a
+// specific person (David, 2026-10-21) the badge counts THAT person's cards, so
+// the whole top bar agrees about whose desk is on show.
 $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
-    ? mytasks_badge($pdo, (int)($_SESSION['user_id'] ?? 0))
+    ? mytasks_badge($pdo, effective_user_id())
     : ['count' => 0, 'new' => false];
 ?>
 <!doctype html>
@@ -25,7 +28,9 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
       <span><?= e(current_user_display()) ?></span>
       <?php // Names the role being WORN, so the top bar and the app agree about
             // who you are while a preview is running. ?>
-      <?php if (in_preview()): ?>
+      <?php if (in_user_preview()): $pu = preview_user(); ?>
+        <span class="role-badge role-badge-preview">as <?= e((string)($pu['display_name'] ?: $pu['username'])) ?> · <?= e(role_in_words(preview_role())) ?></span>
+      <?php elseif (in_preview()): ?>
         <span class="role-badge role-badge-preview">as <?= e(role_in_words(preview_role())) ?></span>
       <?php elseif (!can_edit()): ?>
         <span class="role-badge"><?= is_supervisor() ? 'supervisor' : 'artist' ?></span>
@@ -129,9 +134,15 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
           // mid-clause after every <strong>. Two items: what is happening, and
           // the way out. ?>
     <div class="preview-msg">
+      <?php if (in_user_preview()): $pvu = preview_user(); ?>
+      <strong>Viewing as <?= e((string)($pvu['display_name'] ?: $pvu['username'])) ?> (<?= e(role_in_words(preview_role())) ?>).</strong>
+      This is their view: their My tasks, the shows they are on, and the screens and buttons they get.
+      <strong>Nothing saves</strong> while you are in here.
+      <?php else: ?>
       <strong>Previewing as <?= e(role_in_words(preview_role())) ?>.</strong>
       This is what they see: the menu, the screens they can open, the buttons they get.
       <strong>Nothing saves</strong> while you are in here, whichever role you are wearing.
+      <?php endif; ?>
     </div>
     <form method="post" action="preview.php" class="preview-exit">
       <input type="hidden" name="stop" value="1">

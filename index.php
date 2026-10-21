@@ -200,6 +200,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $projWhere = [];
 if ($canArchive && !$showArchived) $projWhere[] = "p.status <> 'archived'";
 if (studio_available($pdo))        $projWhere[] = 'p.is_studio = 0';
+// PER-USER VISIBILITY (David, 2026-10-21): a scoped role (artist / supervisor)
+// sees only the shows it is staffed on; admin and Production see everything and
+// this adds nothing. Empty for a see-all role, so the list is unchanged for them.
+$visSql = visible_projects_sql($pdo, 'p.id');
+if ($visSql !== '') $projWhere[] = $visSql;
 $whereArchived = $projWhere ? 'WHERE ' . implode(' AND ', $projWhere) : '';
 
 $projects = $pdo->query(
@@ -218,9 +223,13 @@ $projects = $pdo->query(
 
 // Drawn whether it is zero or not, so "there are none" and "they are hidden" are
 // never the same picture.
+// The count respects the same per-user scope as the list, so a scoped user is
+// not told "Show archived (7)" about shows they could never open.
+$visArchived = visible_projects_sql($pdo, 'id');
 $archivedCount = $canArchive
     ? (int)$pdo->query("SELECT COUNT(*) FROM projects WHERE status = 'archived'"
-                     . studio_exclude_sql($pdo, ''))->fetchColumn()
+                     . studio_exclude_sql($pdo, '')
+                     . ($visArchived !== '' ? ' AND ' . $visArchived : ''))->fetchColumn()
     : 0;
 
 // The progress figure on every row. THREE queries for the whole list, not
