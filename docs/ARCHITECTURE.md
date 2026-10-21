@@ -1,8 +1,12 @@
 # Anima — Architecture
 
-Draft v1 · 2026-08-11 · **proposal, not yet built**
+Draft v1 · 2026-08-11 · **built and live** (the "not yet built" caveats below are historical; the
+schema described here is the implemented baseline).
 
-Read `../START_HERE.md` first for context and decisions.
+Read `../START_HERE.md` first for context and decisions. **This file documents the v1 schema and
+the design thinking; it is not kept in lockstep with every later migration.** For tables and
+columns added after the v1 baseline — and especially for which changes are live vs pending — read
+`MIGRATIONS.md`, which is the authoritative ledger.
 
 ---
 
@@ -25,7 +29,9 @@ Read `../START_HERE.md` first for context and decisions.
 projects
   id, code (unique), name,
   type VARCHAR(20),          -- a name from project_types (migration 032); was ENUM('2D','3D','Mixed','Other')
-  status ENUM('setup','active','on_hold','wrapped'),
+  status ENUM('setup','active','on_hold','wrapped','postmortem','archived'),
+                             -- 'archived' added migration 027, 'postmortem' added migration 044
+                             -- (sits between 'wrapped' and 'archived')
   fps INT DEFAULT 24,
   start_date DATE, delivery_date DATE,
   created_at

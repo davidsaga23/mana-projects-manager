@@ -1,0 +1,141 @@
+# Anima — Feature changelog
+
+Plain-language record of what shipped, newest first, so a new account can see what already exists
+before proposing it again. Each entry notes whether it needed a database migration (see
+`docs/MIGRATIONS.md` for which migrations are still pending — a few of the newest features are
+**merged and live in code but dormant until David runs their migration**).
+
+For the deeper reasoning behind any of these, see `docs/DECISIONS.md` (append-only, dated) and the
+build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
+
+> **PR numbers** are the GitHub pull-request numbers as merged to `master`. A handful of the
+> commit-message `(#NN)` tags differ from their merge-PR number because branches were merged out of
+> order; where that happens the date and description are the reliable part.
+
+---
+
+## 2026-10-21 — the latest batch (all merged to `master`, live)
+
+- **PR #26 — Per-user project visibility + "view the app as a specific person".** *(needs migration
+  056, for the audit trail only — the feature works without it.)*
+  Two linked things. (1) Non-admin users now see only the shows they are **staffed on**; admins and
+  Production still see everything; supervisors and artists are scoped. Reuses existing staffing data
+  (`crew_projects` + `users.crew_id`) — no new "who sees what" table. (2) An admin can **preview the
+  app as a specific named person** (read-only) from the Users page — their My tasks, their nav
+  badge, their scoped project list — a step beyond the existing "preview as a role".
+  **Known boundary:** this scopes the project *list* and the project-*hub* door only; direct
+  deep-links to sub-pages are still reachable (matches the app's "hide the tab, don't lock the
+  door" posture). **Prerequisite:** every real login needs `users.crew_id` set on the Users page, or
+  a scoped user sees nothing.
+- **PR #12 — Freelance/Vendor collaborator type lives on the person.** *(needs migrations 050 + 051.)*
+  Each collaborator is Freelance (default) or Vendor. The type belongs to the **person** (in the
+  artist database), edited on the Artists grid and the person page, and shown as a capsule inline in
+  Staffing. (An earlier cut, migration 050, stored it per position and was superseded.)
+- **PR #25 — "Last seen" shows real activity, not stale login.** *(needs migration 055.)*
+  The Users-page "Last seen" column used to show each person's last *login*, which only refreshes on
+  a fresh sign-in (a session lasts a week), so it read as stale. Now the app stamps a real last-seen
+  on every authenticated page load, throttled to once per ~5 minutes per person. Old values
+  self-heal the next time each person opens a page.
+- **PR #24 — Artists & supervisors can log their own time on their own cards.** *(no migration.)*
+  On My tasks, artists and supervisors can now start the timer, log hours by hand, and delete their
+  own log entry on their own task cards — the same controls editors already had. Ownership is
+  unchanged (still only your own rows; only admins can delete across people). A user needs a crew
+  link to see these controls.
+- **PR #23 — My tasks "Tasks/Tickets" UI polish.** *(no migration.)*
+  Renamed the section heading to "Tasks/Tickets", added a Type column (Task vs Ticket), and moved
+  the per-row Snooze control inline to match the Log button. Same inline styling applied to Studio
+  Tasks for consistency.
+
+## 2026-10-20
+
+- **PR #21 — Snooze a card to a future date.** *(needs migration 054.)*
+  Production (editor) and admins can snooze a task/ticket to a wake-up **date**. While that date is
+  in the future the card drops off every active list (My tasks, board, Studio Tasks, step page) and
+  returns on its own that day. Snooze is **separate from the due date** and does not move it.
+- **PR #20 — New-task email + My-tasks nav badge.** *(the count works without a migration; the "new"
+  colour needs migration 053.)*
+  (a) Creating cards from the transcript / tasks flow now sends **one summary email per assigned
+  person** (not one per card), and the screen reports who was emailed and who had no address.
+  (b) The top-bar "My tasks" shows a count of your active cards, and the badge changes colour when a
+  card is **new since you last opened My tasks**, clearing when you open it.
+
+## 2026-10-19
+
+- **PR #18 — Studio-time overhead panel on My tasks.** *(needs migration 052.)*
+  A "Studio time" panel at the top of My tasks. Each person sees only their role's overhead
+  categories, each with a Pomodoro Start button and a quick "log Xh" box, so leadership can log
+  meetings/desk/reviews. **This batch also renames the "Editor" role to display as "Production"
+  everywhere** (role unchanged underneath, no access change). Artists & supervisors can log their
+  own overhead here.
+- **PR #19 — Artist database search fix.** *(no migration.)*
+  Artist search now **POSTs** the term (a GET with a URL in it tripped the host's firewall as "Not
+  Acceptable"), and search now actually checks stored portfolio URLs, so pasting an ArtStation/reel
+  link finds the artist. Same POST fix applied to the "Download as Excel" button. **Confirm on the
+  live site** — the WAF isn't reproducible from the cloud dev environment.
+- **PR #17 — Kick-off sign-off behaviour.** *(no migration — reuses the 049 tables.)*
+  (a) Setting a project to Active opens the signer pop-up straight away, but only on the **first**
+  activation. (b) A "Reopen edits" button withdraws a pending sign-off request and unfreezes the
+  project, emailing each signer to wait for a new request. (c) A signed-off project can't go back to
+  Setup (use On hold); the dropdown shows Setup greyed as "(signed off)".
+- **PR #16 — Auto-archive at "Final".** *(no migration.)*
+  Setting a task's status to "Final" archives it instantly (findable under the project's Archive /
+  "Show archived"; revert the status to un-archive). Only "Final" is instant; other statuses still
+  archive on the usual timer.
+- **PR #15 — "+ New ticket" on both My tasks and Studio Tasks.** *(no migration.)*
+  A Type dropdown (task vs ticket). A ticket must have an owner (My tasks defaults to you; Studio
+  Tasks you pick). Shot/asset/pipeline pickers stay on the board.
+- **PR #14 — Task detail "← Back" returns to My tasks for your own cards.** *(no migration.)*
+  When the card is the viewer's own, the back link reads "← Back to my tasks"; others keep going to
+  the board.
+- **PR #13 — "+ New task" on My tasks (editors/admins).** *(no migration.)*
+  Create a task without leaving the screen, via the shared `create_ticket()`; owner defaults to you;
+  project optional/unfiled. Also fixed a latent bug: the create path now always loads the mailer.
+
+## 2026-10-17 (and the first batch of this run)
+
+- **PR #2 — Supervisor role.** *(needs migration 047.)* Artist permissions plus view-only Timeline
+  and Staffing, and editable Shots. Artists/Bookings readable by all (rates stay admin-only).
+- **PR #3 — Pomodoro timer + clock fix.** *(needs migration 048.)* The My-tasks running timer works
+  in Pomodoro cycles; overruns cap at the block length and extra time is logged manually.
+- **PR #4 / #17 — Kick-off sign-off.** *(needs migration 049 + `finance_install_08.sql` by hand.)*
+  A project in `setup` becomes `active` only once the named signers (Tim and Jorik, pre-ticked)
+  approve; what they approved is kept as a snapshot. The postmortem's "Kick-off vs now" screen
+  compares that snapshot with today. (Behaviour refinements shipped as PR #17, above.)
+- **PR #1 — Project switcher dropdown.** The project name in the top bar switches you to the same
+  screen on another show.
+- **PR #5 — Ideal quotas tab removed.** Days-per-item now lives only on Dates & headcount (the
+  Finance "Ideal quotas" tab showed the same number and was dropped).
+- **PR #6 — Plaky import stops reading "Time spent".** Time is logged in Anima now, so the importer
+  ignores that column whether or not the file carries it. Old figures already imported are left
+  untouched.
+- **PR #7 — Bulk rates on the expense projection.** Set one rate on many rows at once.
+- **PR #8 — Editable status dropdown on Studio Tasks.** Change a card's status straight from the
+  list.
+- **PR #9 — Freelance/Vendor type (position-based).** *(Superseded by PR #12, which moved the type to
+  the person.)*
+- **PR #10 — Removed the old Plaky "time logged" display screens** from dashboard, person, team, item
+  and My tasks.
+- **PR #11 — Narrowed the Status column** on the projects list to fit its content.
+
+---
+
+## Earlier milestones (before this run)
+
+These were built and deployed earlier; the detail and reasoning live in `docs/ROADMAP.md` and
+`docs/DECISIONS.md`. Headlines:
+
+- **2026-10-07 → 10-16:** unfiled cards (capture before filing), the stop-cost panel
+  ("what has this show cost us so far?"), a rebuilt Finance Overview with seven cost figures and a
+  Final balance, N/A on the shot breakdown, a stopwatch on My tasks, the `postmortem` project state,
+  "The Studio" (a project row that is not a show), and the **Budget pool** (the show in days). An
+  AI transcript-to-tasks reader (`includes/ai.php`, the app's one external call).
+- **2026-09:** the app went dark in Mana's colours (tokenised CSS), per-project ideal quotas,
+  Bookings (cross-show clashes), Staffing merging Crew + Hiring, the artist database grid, the
+  read-only artist role, timeline versions, step-progress editing, the Studio Tasks view.
+- **2026-08:** the core was built phase by phase — schema + migrations, the setup wizard, Plaky
+  import + the status model, the forward/reverse scheduler, the timeline UI (ported from STFC),
+  reporting, tickets/tasks with attachments and email, the tracking grid, people/performance, the
+  whole money side in its separate database, and hiring/contracts.
+
+For the full origin story, the build order, and the ~20 hard-won engineering lessons, read
+`START_HERE.md`.

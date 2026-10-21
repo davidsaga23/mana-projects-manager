@@ -1156,3 +1156,59 @@ any template for the new type, then remove the old type from the Basics panel.
 Offered 2026-09-03, not built: a clean-up for `crew` rows left behind by the old
 rename-the-slot hiring, which no position, task, ticket or login refers to any more. The merge
 tool (`people_merge.php`) handles the duplicates that ARE referred to.
+
+## Built between 2026-10-17 and 2026-10-21
+
+One run of work, merged to `master` as PRs #1–#26 and #12 (all live). The plain-language, per-PR
+list is in **`docs/CHANGELOG.md`**, and which database change each needs is in
+**`docs/MIGRATIONS.md`** — several of these are live in code but **dormant until David runs
+migrations 047–056** (and imports `finance_install_08.sql` by hand). Headlines, so a later
+conversation doesn't propose them again:
+
+| What | Where | Migration |
+|---|---|---|
+| Supervisor role (artist perms + view-only Timeline/Staffing + editable Shots) | `includes/auth.php` and friends | 047 |
+| Pomodoro cycles on the My-tasks timer | `includes/timelog.php`, `mytasks.php` | 048 |
+| Kick-off sign-off: `setup` → `active` only once named signers approve; snapshot kept; reopen-edits; lock setup after sign-off | `kickoff.php`, `includes/kickoff.php` | 049 + `finance_install_08` |
+| Project switcher dropdown in the top bar | `includes/project_nav.php` | — |
+| Ideal quotas tab removed (days-per-item lives only on Dates & headcount) | finance management | — |
+| Plaky import stops reading "Time spent" | `includes/plaky_import.php` | — |
+| Bulk rate on the expense projection | `finance_project.php` | — |
+| Editable status dropdown on Studio Tasks | `alltasks.php` | — |
+| Freelance/Vendor collaborator type, on the **person** | `includes/artists.php`, Artists grid, person page, Staffing capsule | 050 → 051 |
+| Removed old Plaky "time logged" display screens | dashboard/person/team/item/My tasks | — |
+| Narrowed the projects-list Status column | `index.php` | — |
+| "+ New task" / "+ New ticket" on My tasks and Studio Tasks | `mytasks.php`, `alltasks.php`, `includes/tickets.php` | — |
+| Task detail "← Back" returns to My tasks for your own cards | `ticket.php` | — |
+| Auto-archive a card the instant it reaches "Final" | wherever status is set | — |
+| Artist DB search POSTs (dodges the host WAF) and checks portfolio URLs | `artists.php` | — |
+| Studio-time overhead panel + Editor→"Production" display rename | `mytasks.php`, `includes/studio*` | 052 |
+| New-task email (one per person) + My-tasks nav count/new badge | transcript flow, `header.php`, `mytasks.php` | 053 (colour only) |
+| Snooze a card to a future wake-up date | `ticket.php`, `mytasks.php`, `tasks.php`, `alltasks.php`, `includes/tickets.php` | 054 |
+| My-tasks "Tasks/Tickets" header, Type column, inline Snooze | `mytasks.php`, `alltasks.php` | — |
+| Artists & supervisors log their own time on their own cards | `includes/auth.php` (`can_log_own_time()`), `mytasks.php` | — |
+| "Last seen" tracks real last-activity, not stale last-login | `includes/auth.php` (`touch_last_seen()`), `users.php` | 055 |
+| Per-user project visibility (see only shows you're staffed on) | `includes/auth.php`, `index.php`, `project.php` | — |
+| "View the app as a specific person" (admin, read-only) | `preview.php`, `users.php`, `header.php`, `mytasks.php` | 056 (audit only) |
+
+### Still open out of this run
+- **Project visibility only scopes the list + the project-hub door.** Deep-links to sub-pages
+  (`shots.php?project=X` etc.) are still reachable, matching the app's "hide the tab, don't lock
+  the door" posture. Locking every sub-page for scoped users was offered and not built.
+  Prerequisite for the whole feature: every real login needs `users.crew_id` set on the Users page.
+- **Snooze does not move the due date** (David's default); the open alternative is making it move
+  the due date instead, if he asks.
+- **The My-tasks "new" badge keys off card creation**, not reassignment of an old card — can extend
+  if David asks.
+
+## The "sell the app to customers" exploration (not part of the internal app)
+
+A separate, **planning-only** workstream (its chat thread since deleted) explored turning the
+tracker into a product sold to outside customers: an admin invite link → the customer creates their
+own workspace → a ~20-day free trial with no card → blocked → pay a full year via Stripe → data
+kept ~2 months after a lapse, with customer emails and trial/payment records in a separate database.
+The strong recommendation was **one database per customer** (mirroring the existing "one studio =
+one DB" + separate finance DB), a single shared app install, rather than a shared multi-tenant
+rewrite. A plan document may exist at `/mnt/project-files/selling/selling-the-app-plan.md` (outside
+this repo). **This is a different product, not the internal studio tool — don't expand it unless
+David revives it, and if he does, start a fresh thread.**

@@ -3,19 +3,45 @@
 **Read this first.** It carries everything decided so far so a new conversation can begin
 without re-deriving context.
 
-> ### ⚠ State as of 2026-10-16 — read this before anything below
+> ### ⚠ NEW ACCOUNT / FRESH CONVERSATION? Start with the handoff pack
+>
+> For the current state of the project in one place, read these first — they are kept up to date
+> and are the source of truth for "what is live":
+>
+> - **`docs/HANDOFF.md`** — what the app is, how it's built and deployed, current state, known
+>   boundaries, and the open backlog. The cold-start doc.
+> - **`docs/MIGRATIONS.md`** — the authoritative ledger of every database change, what each
+>   unlocks, and **which are still pending** (code ships ahead of the database).
+> - **`docs/CHANGELOG.md`** — every shipped feature in plain language, newest first, PR by PR.
+> - **`docs/DECISIONS.md`** — append-only log of every decision and *why* (don't reopen settled
+>   ground).
+>
+> The rest of *this* file, and the long build logs in `docs/ROADMAP.md`, are kept for their
+> **reasoning**, not their status — their dated banners below are historical.
+>
+> ### State as of 2026-10-21 (summary; full detail in the handoff pack above)
+>
+> **Everything built through PR #26 and PR #12 is merged to `master` and live.** The latest run
+> (2026-10-17 → 10-21) added the Supervisor role, a Pomodoro timer, the kick-off sign-off, the
+> Studio-time panel (and the Editor→Production rename), Freelance/Vendor on the person, snooze, the
+> new-task email + My-tasks badge, the My-tasks Tasks/Tickets UI, artists logging their own time,
+> the real "Last seen" fix, per-user project visibility, and "view the app as a specific person".
+>
+> **⚠ Migrations `047`–`056` are PENDING** (plus `finance_install_08.sql` by hand), waiting for
+> David to open `migrate.php`. Features needing them are dormant until then. See `docs/MIGRATIONS.md`.
+>
+> **The default branch is `master`.** Merging to `master` auto-deploys to the live site in ~30s.
+>
+> **One known unfixed defect: PHP and MySQL disagree about the date by six hours** — see *Open
+> defect* in `docs/ROADMAP.md`. David has seen it and not yet said to apply the one-line fix.
+>
+> ---
+>
+> ### ⚠ State as of 2026-10-16 (historical — kept for reasoning)
 >
 > **Migrations 041–046 are all applied**, confirmed by David on 2026-10-16. The older deploy
 > notes further down this file describe September and are kept for their reasoning, not their
 > status. `finance_install_07.sql` is imported too.
->
-> **Everything is committed through `56c396f`.** David pushes from GitHub Desktop; a commit is
-> not live until he does.
->
-> **There is one known unfixed defect: PHP and MySQL disagree about the date by six hours.**
-> It silently files evening work under tomorrow. The cause, the one-line fix and the two
-> consequences of applying it are written up under *Open defect* in `docs/ROADMAP.md`. David has
-> seen it and has not yet said to apply it.
 >
 > **What shipped 2026-10-07 to 10-16**, with the files and migrations, is the table under
 > *Built between 2026-10-07 and 2026-10-16* in `docs/ROADMAP.md`. The headlines: unfiled cards,
@@ -863,7 +889,8 @@ schema built as though the platform owned the data. See "Settled earlier" at the
 
 ## 6. How to work in the new chat
 
-- Start by reading this file and `docs/ARCHITECTURE.md`.
+- Start by reading the handoff pack (`docs/HANDOFF.md`, `docs/MIGRATIONS.md`, `docs/CHANGELOG.md`),
+  then this file and `docs/ARCHITECTURE.md` for depth.
 - **Run `python tools/check_php_blocks.py` before handing anything over.** There is no PHP
   binary on the dev machine, so no `php -l`; this is the only gate. It makes seven passes,
   each earned by a bug that actually shipped: unbalanced `endif;`/`endforeach;`, unterminated
