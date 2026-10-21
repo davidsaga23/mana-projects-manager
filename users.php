@@ -381,7 +381,7 @@ require __DIR__ . '/includes/header.php';
       // does an artist see"; this answers "what does THIS person see" — it wears
       // their role AND their crew link, so My tasks and the projects list show
       // exactly their world. Read-only like the role preview, and every start is
-      // written to the preview_audit table (migration 055).
+      // written to the preview_audit table (migration 056).
       //
       // Eligible = active, a lesser role (never another admin), and not yourself.
       $meId = (int)(current_user()['id'] ?? 0);

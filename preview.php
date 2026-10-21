@@ -115,16 +115,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 unset($_SESSION['preview_role']);           // role is taken from the person
                 $_SESSION['preview_user_id'] = (int)$target['id'];
-                // The audit row — "who looked as whom, and when" (migration 055).
+                // The audit row — "who looked as whom, and when" (migration 056).
                 // Best-effort: a missing table must never block the preview, which
-                // works whether or not 055 has been applied.
+                // works whether or not 056 has been applied.
                 try {
                     $log = $pdo->prepare(
                         'INSERT INTO preview_audit (admin_user_id, viewed_user_id, started_at) VALUES (?, ?, ?)'
                     );
                     $log->execute([(int)$me['id'], (int)$target['id'], date('Y-m-d H:i:s')]);
                 } catch (PDOException $e) {
-                    // migration 055 pending — recorded nowhere, but the view still works.
+                    // migration 056 pending — recorded nowhere, but the view still works.
                 }
                 flash('ok', 'Viewing as ' . ($target['display_name'] ?: $target['username'])
                           . '. Nothing will save until you leave the preview.');
