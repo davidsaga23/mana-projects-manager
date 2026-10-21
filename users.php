@@ -30,6 +30,14 @@ $hasSupervisor = migration_applied($pdo, '047_role_supervisor.sql');
 // Renata were in.
 $hasCrewLink = column_exists($pdo, 'users', 'crew_id');
 
+// "Last seen" is a last-ACTIVITY time written on each authenticated page view
+// (migration 055, stamped by includes/auth.php). Until that migration runs the
+// column isn't there, so fall back to last_login — which is all this screen used
+// to show, and the reason the dates looked stale: a login lasts a week, so it
+// only moved when someone signed in afresh. COALESCE shows the truer value and
+// keeps the login date as a fallback until the first activity touch upgrades it.
+$hasLastSeen = column_exists($pdo, 'users', 'last_seen');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? '';
@@ -178,7 +186,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query(
-    'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, u.last_login'
+    'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, '
+    . ($hasLastSeen ? 'COALESCE(u.last_seen, u.last_login)' : 'u.last_login') . ' AS last_seen'
     . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name, c.email AS crew_email' : '')
     . ' FROM users u'
     . ($hasCrewLink ? ' LEFT JOIN crew c ON c.id = u.crew_id' : '')
@@ -288,7 +297,7 @@ require __DIR__ . '/includes/header.php';
           </form>
         <?php endif; ?>
       </td>
-      <td class="muted small"><?= e($u['last_login'] ? substr($u['last_login'], 0, 16) : 'never') ?></td>
+      <td class="muted small"><?= e($u['last_seen'] ? substr($u['last_seen'], 0, 16) : 'never') ?></td>
       <td class="row-actions">
         <?php // The same flex row the project list uses, and the same
               // <summary>-as-a-button: two controls on one line, and the panel

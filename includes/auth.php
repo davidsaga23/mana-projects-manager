@@ -317,6 +317,45 @@ function artist_may_post(): bool {
     return false;
 }
 
+/**
+ * Stamp "last seen" for the logged-in account, so the Users page can show when
+ * someone was last ACTIVE rather than only when they last logged in.
+ *
+ * Called from the auth gates below, so every authenticated page view and API
+ * call counts — which is the whole point: a login lasts a week as a rolling
+ * window, so without this the time only ever moves when somebody signs in
+ * afresh, and an everyday user's "last seen" drifts days behind reality (David's
+ * own read three weeks stale on a day he'd used the app).
+ *
+ * THROTTLED to at most once every five minutes per session. The marker lives in
+ * the session, so deciding whether to write needs no extra read: an active user
+ * costs one small UPDATE now and then, not one on every single request. The
+ * marker is set even when the write can't happen (column not there yet) so a
+ * pending migration can't turn into a failing UPDATE on every page.
+ */
+function touch_last_seen(): void {
+    if (empty($_SESSION['user_id'])) return;
+
+    $throttle = 300;                       // 5 minutes
+    $now  = time();
+    $last = (int)($_SESSION['last_seen_touch'] ?? 0);
+    if ($last !== 0 && ($now - $last) < $throttle) return;
+
+    // Mark it tried straight away, whatever happens below — so a column that
+    // isn't there yet (migration 055 pending) doesn't mean one failing UPDATE
+    // per request until it's run.
+    $_SESSION['last_seen_touch'] = $now;
+
+    global $pdo;
+    if (!($pdo instanceof PDO)) return;
+    try {
+        $pdo->prepare('UPDATE users SET last_seen = NOW() WHERE id = ?')
+            ->execute([(int)$_SESSION['user_id']]);
+    } catch (PDOException $e) {
+        // Column arrives with migration 055; never fail a page over it.
+    }
+}
+
 function require_login(): void {
     if (!is_logged_in()) {
         // Remember where they were going, so a link in an email (a kick-off
@@ -337,6 +376,9 @@ function require_login(): void {
         header('Location: login.php?disabled=1');
         exit;
     }
+
+    // Record that this account is active right now (throttled — see the helper).
+    touch_last_seen();
 
     // The daily progress snapshot, taken by whoever opens the app first that
     // day. Here because it is the one place every page already passes through —
@@ -471,6 +513,8 @@ function require_login_json(): void {
         echo json_encode(['ok' => false, 'error' => 'Your session has expired. Please reload the page and log in again.']);
         exit;
     }
+    // API calls are activity too — count them for "last seen" (throttled).
+    touch_last_seen();
     // A preview saves nothing here either, the same rule require_login() keeps.
     if ($_SERVER['REQUEST_METHOD'] === 'POST'
         && ((!can_edit() && !supervisor_may_post()) || in_preview())) {
