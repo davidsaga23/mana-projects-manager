@@ -462,37 +462,3 @@ function link_login_to_crew(PDO $pdo, int $userId, string $personName): array {
                    . 'be assigned to them on any project. Add an email address on a project Crew '
                    . 'screen if they should be notified.'];
 }
-
-// --- collaborator type: Freelance or Vendor (migration 050) -------------------
-//
-// Stored on the POSITION, not the person: the same artist can be booked
-// directly on one show and come through an outside studio on the next. See
-// migrations/050_collaborator_type.sql.
-
-const COLLABORATOR_TYPES = ['freelance', 'vendor'];
-
-/** Whether migration 050 has run. Read once per request. */
-function collaborator_type_available(PDO $pdo): bool {
-    static $ok = null;
-    if ($ok === null) $ok = column_exists($pdo, 'crew_lanes', 'collaborator_type');
-    return $ok;
-}
-
-/** A lane row's type, falling back to the default for anything unexpected. */
-function collaborator_type_of(array $lane): string {
-    $t = (string)($lane['collaborator_type'] ?? '');
-    return in_array($t, COLLABORATOR_TYPES, true) ? $t : 'freelance';
-}
-
-function collaborator_type_label(string $type): string {
-    return $type === 'vendor' ? 'Vendor' : 'Freelance';
-}
-
-/** Mark one position Freelance or Vendor. The lane must belong to $projectId. */
-function set_lane_collaborator_type(PDO $pdo, int $projectId, int $laneId, string $type): void {
-    if (!in_array($type, COLLABORATOR_TYPES, true)) {
-        throw new RuntimeException('A collaborator is either Freelance or Vendor.');
-    }
-    $pdo->prepare('UPDATE crew_lanes SET collaborator_type = ? WHERE id = ? AND project_id = ?')
-        ->execute([$type, $laneId, $projectId]);
-}

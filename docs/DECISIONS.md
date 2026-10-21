@@ -3847,29 +3847,23 @@ import neither fills nor clears it, so the screens that read it (dashboard "Time
 person, team, item, My tasks' "imported" note) keep showing those old figures. Dropping the
 column or hiding those figures is a separate choice, not taken here.
 
-## 2026-10-17 — Staffing positions are Freelance or Vendor
+## 2026-10-17 — Freelance or Vendor is a fact about the person, kept in the artist database
 
 **Asked by David:** *"in the staffing section we need to include two types of collaborators:
-Freelance (by default) and Vendor, for whenever we bring vendors to the projects."*
-**Decision:** migration `050` adds `crew_lanes.collaborator_type` (`freelance` default,
-`vendor`). It is shown as a badge beside the name on every filled position, to everyone (it is
-not money), and changed in the **Change assignee** popover, which now has a type picker next
-to the person. Emptying a position resets it to Freelance. The Staffing export writes
-"(Vendor)" after a vendor's name.
-**Why on the position, not the person:** the same artist can be booked directly on one show
-and come through an outside studio on the next; one value on `crew` would be wrong about one
-of them. The artist database had no studio/vendor notion to reuse (MSD-11 asks for one); if
-it gets one, it can pre-fill this value rather than replace it.
-**Not done:** the Hiring screen does not ask for the type, so a freshly hired position starts
-as Freelance and is switched with Change assignee.
-
-## 2026-10-17 (later) — The old Plaky hours are hidden too
-**Follows "The Plaky import no longer reads 'Time spent'" (same date).** David chose to hide the
-figures earlier imports left in `progress.time_spent_minutes` rather than keep showing numbers
-that can never move again. Removed: the Dashboard's "Time logged" section (by step and by
-person), the "Time logged" tile and column on the person and team pages, the "Time" column
-and "· N h logged" on the item page, and My tasks' "N h imported" note.
-**Kept:** the column and its data, and the helpers that read it (`timelog_by_step()`,
-`timelog_by_person()`, `person_step_load()`'s `minutes`), so undoing this is a screen change,
-not a data recovery. Hours logged in Anima (`time_logs`) are untouched and still shown on
-My tasks, the Pomodoro, and the money screens.
+Freelance (by default) and Vendor, for whenever we bring vendors to the projects."* Then, after a
+first cut stored it per position (migration 050): *"I think the type belongs to the person so we
+can identify that properly... include the column for freelance and vendor in the artist database
+and add freelance to all the current registries. The type in staffing should appear as a capsule
+inline same as the contract and you can edit it in the detailed view."*
+**Decision:** migration `051` adds `hires.collaborator_type` (`freelance` default, so every
+existing record reads Freelance), carries over anyone marked Vendor under 050, and drops
+`crew_lanes.collaborator_type`. Edited on the **Artists** grid (a Collaborator column, saved
+across every record of the person like the other fields) and on the **person page** (Details →
+Collaborator). Staffing shows it as the first capsule on the contract line of a filled position,
+to everyone, since it is not money. The Staffing export writes "(Vendor)" after the name; the
+Artists export adds a 13th column, Collaborator, which the importer reads when present.
+**Matching a crew member to their artist record:** by `hires.crew_id`, or by name. Somebody with
+no record (a studio put in a slot from the crew list) reads as Freelance; choosing Vendor on their
+page creates a project-less "lead" entry for them in the artist database to hold it.
+**Given up:** a vendor on one show is a vendor on every show; an artist booked through a vendor
+once and directly later is switched by hand.

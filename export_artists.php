@@ -43,7 +43,7 @@ if (!hiring_available($pdo)) {
 
 $extra = [];
 foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
-          'portfolio_password'] as $c) {
+          'portfolio_password', 'collaborator_type'] as $c) {
     if (column_exists($pdo, 'hires', $c)) $extra[] = $c;
 }
 
@@ -77,16 +77,18 @@ $quotes = (can_see_money() && hire_quotes_available())
 
 $rows = [];
 
-// Row 1: the title bar, run across all twelve columns so the fill does not stop
+// Row 1: the title bar, run across all thirteen columns so the fill does not stop
 // halfway — the original does the same.
 $title = [['v' => 'Freelancers database', 's' => XLSX_FL_TITLE]];
-for ($i = 1; $i < 12; $i++) $title[] = ['v' => '', 's' => XLSX_FL_TITLE];
+for ($i = 1; $i < 13; $i++) $title[] = ['v' => '', 's' => XLSX_FL_TITLE];
 $rows[] = $title;
 
 // Row 2: its headers, in its order.
 $rows[] = array_map(function ($h) { return ['v' => $h, 's' => XLSX_FL_HEAD]; }, [
     'Artist', 'Location', 'Position', 'Seniority', 'Project type', 'Email',
     'Demo / portfolio link', 'Password', 'Worked with us?', 'Notes', 'Rate (USD)', 'Rating',
+    // Last, so every column the studio's own sheet has keeps its letter.
+    'Collaborator',
 ]);
 
 $val = function ($p, string $k) { return (string)($p[$k] ?? ''); };
@@ -114,10 +116,12 @@ foreach ($people as $p) {
         ['v' => $val($p, 'notes'),  's' => XLSX_FL_TEXT],
         ['v' => $rate,              's' => $rate === '' ? XLSX_FL_TEXT : XLSX_FL_NUM],
         ['v' => $val($p, 'rating'), 's' => XLSX_FL_TEXT],
+        ['v' => isset($p['collaborator_type']) ? collaborator_type_label((string)$p['collaborator_type']) : '',
+         's' => XLSX_FL_TEXT],
     ];
 }
 
-$widths = [26, 14, 20, 12, 12, 30, 38, 10, 14, 34, 12, 8];
+$widths = [26, 14, 20, 12, 12, 30, 38, 10, 14, 34, 12, 8, 12];
 
 try {
     $bytes = xlsx_build('Freelancers', $rows, $widths);

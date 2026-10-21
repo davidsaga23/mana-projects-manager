@@ -112,10 +112,6 @@ if (!$project) {
 
 $selfUrl = 'crew.php?project=' . $projectId;
 $schemaReady = column_exists($pdo, 'crew', 'is_placeholder');
-// Freelance or Vendor on each position (migration 050). Until it is applied the
-// badge and the picker are simply absent rather than offering a choice that
-// cannot be saved.
-$typeReady = $schemaReady && collaborator_type_available($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -246,29 +242,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $crewId = (int)($_POST['assign_crew'][$m[1]] ?? 0);
             if ($crewId <= 0) throw new RuntimeException('Pick somebody to put in that slot.');
             $was = lane_crew_id($pdo, $projectId, (int)$m[1]);
-            // The same Save carries the collaborator type, so switching somebody
-            // from Freelance to Vendor is "Change assignee", keep the same name,
-            // pick Vendor, Save. Nothing moves when the person is unchanged.
-            $type = (string)($_POST['collab_type'][$m[1]] ?? '');
-            if ($was !== $crewId) {
-                assign_crew_to_lane($pdo, $projectId, (int)$m[1], $crewId);
-                // Whoever was hired into it has now left it, and their history says when.
-                note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
-            }
-            if ($typeReady && $type !== '') set_lane_collaborator_type($pdo, $projectId, (int)$m[1], $type);
-            flash('ok', $was !== $crewId
-                ? 'Slot filled. Any work already scheduled on that track moved with it.'
-                : 'Saved.' . ($typeReady && $type !== ''
-                    ? ' This position is now marked ' . collaborator_type_label($type) . '.' : ''));
+            assign_crew_to_lane($pdo, $projectId, (int)$m[1], $crewId);
+            // Whoever was hired into it has now left it, and their history says when.
+            if ($was !== $crewId) note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
+            flash('ok', 'Slot filled. Any work already scheduled on that track moved with it.');
 
         } elseif (preg_match('/^unassign:(\d+)$/', $action, $m)) {
             // Empties the slot without removing it — see unassign_lane() for why
             // that is a placeholder going back in rather than a NULL.
             $was = lane_crew_id($pdo, $projectId, (int)$m[1]);
             flash('ok', unassign_lane($pdo, $projectId, (int)$m[1]));
-            // An empty position goes back to the default, so whoever fills it
-            // next does not inherit the last occupant's Vendor.
-            if ($typeReady) set_lane_collaborator_type($pdo, $projectId, (int)$m[1], 'freelance');
             // The person hired into it has left it: said in their history, and
             // shown with everybody else talked to for this position.
             note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
@@ -458,6 +441,16 @@ if ($schemaReady && can_see_money()) {
 }
 
 $people   = $schemaReady ? assignable_crew($pdo) : [];
+
+// Freelance or Vendor for everybody holding a position, in one query (migration
+// 051). Empty until it is applied, and then the capsule is simply not drawn.
+$filledCrew = [];
+foreach ($lanes as $l) {
+    if ((int)($l['is_placeholder'] ?? 0) !== 1) {
+        $filledCrew[(int)$l['crew_id']] = ['id' => (int)$l['crew_id'], 'name' => (string)$l['name']];
+    }
+}
+$collabTypes = $schemaReady ? crew_collaborator_types($pdo, array_values($filledCrew)) : [];
 $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 
 // Who is lined up for the empty slots. An unfilled slot with three candidates in
@@ -763,14 +756,6 @@ require __DIR__ . '/includes/header.php';
                   // "what is Rough 02 carrying?" is a fair question before
                   // anyone is hired into it. ?>
             <strong><a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$l['crew_id'] ?>"><?= e($l['name']) ?></a></strong>
-            <?php // FREELANCE OR VENDOR (David, 2026-10-17), beside the name and
-                  // visible to everyone: unlike the contract it is not money.
-                  // Only on a filled position, because an empty one has nobody
-                  // to be either. Changed under "Change assignee". ?>
-            <?php if ($typeReady && !$isPh):
-              $cType = collaborator_type_of($l); ?>
-              <span class="collab-chip collab-<?= e($cType) ?>"><?= e(collaborator_type_label($cType)) ?></span>
-            <?php endif; ?>
             <?php // THE CONTRACT, READ ONLY (David, 2026-10-05). Changing one is
                   // still the Hiring screen's job — it has the dates, the log and
                   // the rate beside it, and a state picker on a row whose other
@@ -789,17 +774,28 @@ require __DIR__ . '/includes/header.php';
                   // shipped. "Nobody has started the contract" is the single most
                   // actionable thing this line can say, so it is the one state it
                   // must not stay silent about. ?>
-            <?php if (!$isPh && can_see_money()):
-              $ct = $laneTerms[(int)$l['crew_id']] ?? [];
+            <?php if (!$isPh):
+              $money = can_see_money();
+              $ct = $money ? ($laneTerms[(int)$l['crew_id']] ?? []) : [];
               $cUrl = trim((string)($ct['contract_url'] ?? ''));
               // No state while $contractsOff explains why on the line at the top
               // of the page — but a LINK still shows, because contract_url lives
               // on crew_terms whether or not finance_install_04 has been run.
-              $showState = ($contractsOff === null);
+              $showState = $money && ($contractsOff === null);
               $cStatus = $showState ? ((string)($ct['contract_status'] ?? '') ?: 'none') : '';
               $waiting = ($showState && $ct) ? contract_days_waiting($ct) : null;
-              if ($showState || $cUrl !== ''): ?>
+              // FREELANCE OR VENDOR, first on the same line (David, 2026-10-17:
+              // "a capsule inline, same as the contract"). It is the person's,
+              // from the artist database, and it is not money, so everybody sees
+              // it even where the contract half of this line is admin-only.
+              $cType = $collabTypes[(int)$l['crew_id']] ?? null;
+              if ($cType !== null || $showState || $cUrl !== ''): ?>
               <div class="slot-contract">
+                <?php if ($cType !== null): ?>
+                  <span class="collab-chip collab-<?= e($cType) ?>"
+                        title="From their artist database entry. Change it on their page."><?=
+                    e(collaborator_type_label($cType)) ?></span>
+                <?php endif; ?>
                 <?php if ($cStatus !== ''): ?>
                   <span class="ct-chip ct-<?= e($cStatus) ?>"
                         title="<?= e(contract_state_phrase($cStatus, $ct['contract_sent_date'] ?? null,
@@ -1033,13 +1029,6 @@ require __DIR__ . '/includes/header.php';
                       </option>
                     <?php endforeach; ?>
                   </select>
-                  <?php if ($typeReady): ?>
-                    <select name="collab_type[<?= (int)$l['id'] ?>]" aria-label="Collaborator type">
-                      <?php foreach (COLLABORATOR_TYPES as $t): ?>
-                        <option value="<?= e($t) ?>" <?= $t === collaborator_type_of($l) ? 'selected' : '' ?>><?= e(collaborator_type_label($t)) ?></option>
-                      <?php endforeach; ?>
-                    </select>
-                  <?php endif; ?>
                   <button type="submit" class="secondary" name="action" value="assign:<?= (int)$l['id'] ?>">Save</button>
                   <?php // type=button, so it dismisses rather than submitting the
                         // form it happens to sit inside. ?>

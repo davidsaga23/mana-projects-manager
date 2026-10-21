@@ -21,6 +21,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/hiring.php';
+require_once __DIR__ . '/includes/artists.php';
 require_once __DIR__ . '/includes/xlsx.php';
 require_login();
 
@@ -51,6 +52,12 @@ if (!$lanes) {
 
 $hiringReady = hiring_available($pdo);
 $byLane = $hiringReady ? hires_by_lane($pdo, $projectId) : [];
+// Freelance or Vendor per person, from the artist database (migration 051).
+$filledCrew = [];
+foreach ($lanes as $l) {
+    if ((int)$l['is_placeholder'] !== 1) $filledCrew[(int)$l['crew_id']] = ['id' => (int)$l['crew_id'], 'name' => (string)$l['name']];
+}
+$collabTypes = crew_collaborator_types($pdo, array_values($filledCrew));
 
 // How much work is already planned on each track, which is what turns an empty
 // position from untidy into urgent.
@@ -171,7 +178,7 @@ foreach ($byDept as $deptName => $deptSteps) {
                 $who = (string)$l['name'];
                 // Vendor is said in the sheet as on the screen; Freelance, the
                 // default, is not, so the column stays a list of names.
-                if (collaborator_type_of($l) === 'vendor') $who .= ' (Vendor)';
+                if (($collabTypes[(int)$l['crew_id']] ?? '') === 'vendor') $who .= ' (Vendor)';
                 $stage = 'hired';
             }
 

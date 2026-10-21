@@ -44,7 +44,7 @@ $ready = hiring_available($pdo);
 // feature at a time instead of failing whole.
 $extra = [];
 foreach (['location', 'position', 'seniority', 'project_type', 'worked_with_us', 'rating',
-          'portfolio_password'] as $c) {
+          'portfolio_password', 'collaborator_type'] as $c) {
     if (column_exists($pdo, 'hires', $c)) $extra[] = $c;
 }
 $canAddFree = $ready && column_is_nullable($pdo, 'hires', 'project_id');
@@ -338,6 +338,7 @@ require __DIR__ . '/includes/header.php';
               <th>Name</th>
               <?php if ($has('position')):  ?><th>Position</th><?php endif; ?>
               <?php if ($has('seniority')): ?><th>Seniority</th><?php endif; ?>
+              <?php if ($has('collaborator_type')): ?><th>Collaborator</th><?php endif; ?>
               <?php if ($has('location')):  ?><th>Location</th><?php endif; ?>
               <?php // Between Location and Type, where David asked for it. Admin
                     // only: it is the finance database's number, and no other
@@ -377,6 +378,12 @@ require __DIR__ . '/includes/header.php';
               <?php endif; ?>
               <?php if ($has('seniority')): ?>
                 <td><?= artists_seniority_select($n . '[seniority]', $p['seniority'] ?? null) ?></td>
+              <?php endif; ?>
+              <?php // FREELANCE OR VENDOR (David, 2026-10-17). A person-level fact,
+                    // so it saves across every record of theirs like the rest of
+                    // the row, and Staffing shows it beside them. ?>
+              <?php if ($has('collaborator_type')): ?>
+                <td><?= collaborator_type_select($n . '[collaborator_type]', $p['collaborator_type'] ?? null) ?></td>
               <?php endif; ?>
               <?php if ($has('location')): ?>
                 <td><input name="<?= $n ?>[location]" value="<?= e($p['location'] ?? '') ?>"
@@ -534,6 +541,7 @@ require __DIR__ . '/includes/header.php';
                 <th>Name</th>
                 <?php if ($has('position')):  ?><th>Position</th><?php endif; ?>
                 <?php if ($has('seniority')): ?><th>Seniority</th><?php endif; ?>
+                <?php if ($has('collaborator_type')): ?><th>Collaborator</th><?php endif; ?>
                 <?php if ($has('location')):  ?><th>Location</th><?php endif; ?>
                 <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
                 <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
@@ -558,6 +566,8 @@ require __DIR__ . '/includes/header.php';
                   <td><input name="<?= $n ?>[position]" size="14" maxlength="80"></td><?php endif; ?>
                 <?php if ($has('seniority')): ?>
                   <td><?= artists_seniority_select($n . '[seniority]', '') ?></td><?php endif; ?>
+                <?php if ($has('collaborator_type')): ?>
+                  <td><?= collaborator_type_select($n . '[collaborator_type]', 'freelance') ?></td><?php endif; ?>
                 <?php if ($has('location')): ?>
                   <td><input name="<?= $n ?>[location]" size="10" maxlength="80"></td><?php endif; ?>
                 <?php if ($has('project_type')): ?>

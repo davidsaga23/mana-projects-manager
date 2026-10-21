@@ -3131,12 +3131,12 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .status-pick option { color: var(--text); background: var(--surface-2); }
 
-/* FREELANCE OR VENDOR beside a filled staffing slot's name (David, 2026-10-17).
-   Freelance is the default and stays quiet; Vendor is the one worth spotting. */
+/* FREELANCE OR VENDOR, first on a filled staffing slot's contract line (David,
+   2026-10-17). The same capsule as the contract state. Freelance is the default
+   and stays quiet; Vendor is the one worth spotting. */
 .collab-chip {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
-  padding: 1px 6px; border-radius: 10px; border: 1px solid; margin-left: 6px;
-  vertical-align: 1px;
+  padding: 1px 6px; border-radius: 10px; border: 1px solid;
 }
 .collab-freelance { color: var(--faint);  border-color: var(--border-strong); background: none; }
 .collab-vendor    { color: var(--violet); border-color: var(--violet);        background: var(--violet-tint); }
