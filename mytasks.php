@@ -1144,19 +1144,21 @@ require __DIR__ . '/includes/header.php';
                 <?= e($t3['status_name'] ?? 'no status') ?></span>
             <?php endif; ?>
           </td>
-          <td><span class="prio-dot priority-<?= e($t3['priority']) ?>"></span> <?= ucfirst($t3['priority']) ?></td>
+          <td style="white-space:nowrap;"><span class="prio-dot priority-<?= e($t3['priority']) ?>"></span> <?= ucfirst($t3['priority']) ?></td>
           <td class="muted small <?= $late ? 'err' : '' ?>">
-            <?= e($t3['due_date'] ?: '—') ?>
-            <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')): ?>
-              <form method="post" class="snooze-form" style="margin:5px 0 0;"
-                    title="Hide until a date; comes back on its own. Due date unchanged.">
-                <input type="hidden" name="snooze" value="set">
-                <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
-                <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
-                       class="day-input" aria-label="Snooze until" required>
-                <button type="submit" class="secondary">Snooze</button>
-              </form>
-            <?php endif; ?>
+            <span class="due-cell">
+              <span class="due-date"><?= e($t3['due_date'] ?: '—') ?></span>
+              <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')): ?>
+                <form method="post" class="snooze-form"
+                      title="Hide until a date; comes back on its own. Due date unchanged.">
+                  <input type="hidden" name="snooze" value="set">
+                  <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
+                  <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                         class="day-input" aria-label="Snooze until" required>
+                  <button type="submit" class="secondary">Snooze</button>
+                </form>
+              <?php endif; ?>
+            </span>
           </td>
           <?php if ($canLog): ?>
             <td>

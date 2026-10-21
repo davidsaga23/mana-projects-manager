@@ -1682,6 +1682,11 @@ svg.trend { margin: 0; }
 .mywork-table small { display: block; margin-top: 2px; }
 .mywork-table select { width: auto; min-width: 140px; padding: 4px 6px; font-size: 13px; }
 .mywork-table form { margin: 0; }
+/* Due cell: the due date and the Snooze control on one line, so the Snooze row
+   lines up with the Log and Timer controls beside it. The date keeps a fixed
+   width so every row's Snooze field starts at the same place. */
+.mywork-table .due-cell { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.mywork-table .due-cell .due-date { min-width: 78px; white-space: nowrap; }
 .log-form, .snooze-form { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
 .log-form .hrs-input { width: 62px; padding: 4px 6px; font-size: 13px; }
 .log-form .day-input, .snooze-form .day-input { width: 138px; padding: 4px 6px; font-size: 13px; }
