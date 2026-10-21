@@ -208,6 +208,25 @@ function is_supervisor(): bool {
 }
 
 /**
+ * May the current account log its OWN hours on My tasks — start a timer, type
+ * hours in by hand, and remove a log entry it entered?
+ *
+ * David, 2026-10-21: "let's [make] that available for artists then, they should
+ * be able to start timers, log manually their time and delete a log entry (same
+ * for editors and supervisors)." So every working role may, which is what this
+ * returns. It is deliberately a role list, NOT "anyone logged in": a read-only
+ * role added later does not inherit time-logging by accident.
+ *
+ * ⚠ THIS SAYS WHO, NOT WHOSE. Every timer / log / delete handler in mytasks.php
+ * already restricts the row to the viewer's own crew ($myCrewId and the assigned
+ * checks; delete_time_log() refuses an entry the person did not enter unless they
+ * are an admin). This gate only decides whether the controls are live at all.
+ */
+function can_log_own_time(): bool {
+    return can_edit() || is_artist() || is_supervisor();
+}
+
+/**
  * The files a supervisor may SAVE through, by area. The complete answer to "what
  * can a supervisor write beyond an artist?" — same reasoning as artist_may_post():
  * a screen added next year is refused by default.
@@ -258,7 +277,6 @@ function supervisor_may_post(): bool {
  *                a way to claim to be somebody else and then change their work.
  *                An admin links the account on the Users screen, which checks
  *                the choice. See migration 037.
- *   log_time   — not asked for. Status was.
  *   ticket.php — its `update` rewrites the whole card, assignee and title
  *                included. The status-only path lives on My tasks instead.
  */
@@ -277,7 +295,18 @@ function artist_may_post(): bool {
         // role is not offered — so this cannot be bent into logging time against
         // an arbitrary card. An artist logging their own overhead hours is exactly
         // the writing this was asked to allow, and nothing wider.
-        'mytasks.php' => ['set_status', 'set_ticket_status', 'overhead_timer', 'overhead_log'],
+        //
+        // log_time / timer / delete_log: logging their own hours against their own
+        // task cards, and removing an entry they made, added 2026-10-21 (David:
+        // artists/supervisors "should be able to start timers, log manually their
+        // time and delete a log entry"). ⚠ SAME SHAPE AS ABOVE — the FIELD is
+        // permitted here; WHOSE row it may touch is a second lock in mytasks.php:
+        // every one of those handlers checks the task/ticket is assigned to the
+        // viewer's own crew ($myCrewId), and delete_time_log() refuses an entry the
+        // person did not enter unless they are an admin. So this cannot log or
+        // delete against somebody else's work. See can_log_own_time().
+        'mytasks.php' => ['set_status', 'set_ticket_status', 'overhead_timer', 'overhead_log',
+                          'log_time', 'timer', 'delete_log'],
     ];
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.

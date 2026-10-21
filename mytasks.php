@@ -645,7 +645,7 @@ function timer_cell(?array $timer, string $kind, int $id, int $projectId): strin
     }
     $field  = $kind === 'ticket' ? 'ticket_id' : 'progress_id';
     $mine   = $timer && (int)($timer[$field] ?? 0) === $id;
-    $off    = can_edit() ? '' : ' disabled';
+    $off    = can_log_own_time() ? '' : ' disabled';
 
     if ($mine && ($timer['phase'] ?? null) !== null) return pomodoro_cell($timer, $field, $id, $projectId, $off);
 
@@ -1031,10 +1031,10 @@ require __DIR__ . '/includes/header.php';
                 <input type="hidden" name="progress_id" value="<?= (int)$row['progress_id'] ?>">
                 <input type="hidden" name="project_id" value="<?= $pid ?>">
                 <input name="hours" placeholder="1.5" class="hrs-input" inputmode="decimal"
-                       title="Hours. 90m works too." <?= can_edit() ? '' : 'disabled' ?>>
+                       title="Hours. 90m works too." <?= can_log_own_time() ? '' : 'disabled' ?>>
                 <input type="date" name="log_date" value="<?= $today ?>" max="<?= $today ?>"
-                       class="day-input" <?= can_edit() ? '' : 'disabled' ?>>
-                <button type="submit" class="secondary" <?= can_edit() ? '' : 'disabled' ?>>Log</button>
+                       class="day-input" <?= can_log_own_time() ? '' : 'disabled' ?>>
+                <button type="submit" class="secondary" <?= can_log_own_time() ? '' : 'disabled' ?>>Log</button>
               </form>
             </td>
           <?php endif; ?>
@@ -1162,10 +1162,10 @@ require __DIR__ . '/includes/header.php';
                 <input type="hidden" name="log_time" value="1">
                 <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
                 <input type="hidden" name="project_id" value="<?= (int)$t3['project_id'] ?>">
-                <input name="hours" placeholder="1.5" class="hrs-input" inputmode="decimal" <?= can_edit() ? '' : 'disabled' ?>>
+                <input name="hours" placeholder="1.5" class="hrs-input" inputmode="decimal" <?= can_log_own_time() ? '' : 'disabled' ?>>
                 <input type="date" name="log_date" value="<?= $today ?>" max="<?= $today ?>"
-                       class="day-input" <?= can_edit() ? '' : 'disabled' ?>>
-                <button type="submit" class="secondary" <?= can_edit() ? '' : 'disabled' ?>>Log</button>
+                       class="day-input" <?= can_log_own_time() ? '' : 'disabled' ?>>
+                <button type="submit" class="secondary" <?= can_log_own_time() ? '' : 'disabled' ?>>Log</button>
               </form>
               <?php endif; ?>
             </td>
@@ -1217,7 +1217,7 @@ require __DIR__ . '/includes/header.php';
           <td class="num"><?= e(fmt_hours((int)$en['minutes'])) ?></td>
           <td class="muted small"><?= e($en['notes'] ?: '') ?></td>
           <td class="row-actions">
-            <?php if (can_edit() && (is_admin() || (int)$en['entered_by'] === $userId)): ?>
+            <?php if (can_log_own_time() && (is_admin() || (int)$en['entered_by'] === $userId)): ?>
               <form method="post" onsubmit="return confirm('Remove this entry?');">
                 <button type="submit" name="delete_log" value="<?= (int)$en['id'] ?>" class="link-danger">remove</button>
               </form>
