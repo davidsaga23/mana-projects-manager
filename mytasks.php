@@ -1073,13 +1073,13 @@ require __DIR__ . '/includes/header.php';
     </table>
   <?php endif; ?>
 
-  <h3>Tickets <span class="muted">· <?= count($tickets) ?></span></h3>
+  <h3>Tasks/Tickets <span class="muted">· <?= count($tickets) ?></span></h3>
   <?php if (!$tickets): ?>
-    <p class="muted">No open tickets are assigned to you.</p>
+    <p class="muted">No open tasks or tickets are assigned to you.</p>
   <?php else: ?>
     <table class="mywork-table">
       <thead>
-        <tr><th>Ref</th><th>Title</th><th>Project</th><th>Status</th><th>Priority</th><th>Due</th>
+        <tr><th>Ref</th><th>Title</th><th>Project</th><th>Type</th><th>Status</th><th>Priority</th><th>Due</th>
             <?php if ($canLog): ?><th>Log time</th><?php endif; ?>
             <?php if ($canTimer): ?><th>Timer</th><?php endif; ?></tr>
       </thead>
@@ -1098,6 +1098,7 @@ require __DIR__ . '/includes/header.php';
               <?php else: ?>
                 <span class="warn-text">no project</span>
               <?php endif; ?></td>
+          <td class="muted small"><?= $t3['type'] === 'ticket' ? 'Ticket' : 'Task' ?></td>
           <?php // The same control the production tasks above carry, for the same
                 // reason: this is the screen an artist opens to say where their
                 // work has got to, and a ticket is half of what is on it. Still
@@ -1139,13 +1140,13 @@ require __DIR__ . '/includes/header.php';
           <td class="muted small <?= $late ? 'err' : '' ?>">
             <?= e($t3['due_date'] ?: '—') ?>
             <?php if (can_edit() && column_exists($pdo, 'tickets', 'snoozed_until')): ?>
-              <form method="post" class="inline-form snooze-form" style="margin:3px 0 0;"
+              <form method="post" class="snooze-form" style="margin:5px 0 0;"
                     title="Hide until a date; comes back on its own. Due date unchanged.">
                 <input type="hidden" name="snooze" value="set">
                 <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
                 <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
                        class="day-input" aria-label="Snooze until" required>
-                <button type="submit" class="secondary" title="Snooze">💤</button>
+                <button type="submit" class="secondary">Snooze</button>
               </form>
             <?php endif; ?>
           </td>
