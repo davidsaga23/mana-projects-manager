@@ -3867,3 +3867,95 @@ no record (a studio put in a slot from the crew list) reads as Freelance; choosi
 page creates a project-less "lead" entry for them in the artist database to hold it.
 **Given up:** a vendor on one show is a vendor on every show; an artist booked through a vendor
 once and directly later is switched by hand.
+
+## 2026-10-19 — The Editor role is displayed everywhere as "Production"
+**Decision:** the role stored as `editor` now reads "Production" in every UI label. The stored
+name, the permission checks and the access are unchanged — this is a display rename only.
+**Why:** David's team calls that function Production, not Editor. Renaming the stored role would
+have touched every `can_edit()`-shaped check for no benefit and real risk.
+**Consequence:** code and migrations still say `editor`; anyone reading the database sees `editor`;
+only on-screen text says Production. (Shipped with migration 052.)
+
+## 2026-10-19 — Artists & supervisors may log overhead (studio) time
+**Decision:** the Studio-time panel lets artists and supervisors log their own overhead hours
+(meetings, desk, reviews) against their role's categories, a deliberate narrow opening of otherwise
+view-only access.
+**Why:** David wanted the leadership and the crew to be able to record where non-task time goes,
+per role, without making artists editors.
+**Consequence:** each role sees only its own buckets; supervisors' "Planning" merges into the shared
+"Planning & scheduling" bucket (David confirmed). Needs migration 052; dormant until run.
+
+## 2026-10-19 — A task set to "Final" archives instantly
+**Decision:** setting a card's status to a status literally named "Final" archives it immediately;
+other statuses keep the existing timed archive.
+**Why:** David wanted finished work off the active boards at once, not after a delay.
+**Consequence:** keyed on the status *name* "Final"; reverting the status un-archives. Fires
+everywhere status is set. No migration.
+
+## 2026-10-20 — Snooze is a separate wake-up date, not a change to the due date
+**Decision:** snoozing a card sets `tickets.snoozed_until`, a wake-up DATE that hides the card from
+every active list until that day. It does **not** move the due date.
+**Why:** David's stated default — a snooze is "deal with this later", not "it's due later". The two
+are different facts and conflating them would quietly rewrite deadlines.
+**Consequence:** Production (editor) + admins only. A card snoozed to today/past is shown; only a
+future date hides it. The one place that lists which active lists hide snoozed cards is
+`snooze_exclude_sql()` in `includes/tickets.php` (mirrors `overhead_exclude_sql()`). Needs migration
+054. **Open alternative:** make snooze move the due date instead, if David asks. Originally numbered
+053, renumbered to 054 after colliding with `053_mytasks_seen.sql`.
+
+## 2026-10-20 — The My-tasks badge counts active cards; "new" means created since last view
+**Decision:** the top-bar "My tasks" shows a count of the viewer's active (owned, not finished, not
+archived) cards, and the badge changes colour when a card is new **since they last opened My
+tasks**, clearing when they open it. Transcript/task creation emails **one summary per assigned
+person**, not one per card.
+**Why:** David wanted a nudge when something new lands, and one tidy email rather than a flood.
+**Consequence:** "new" keys off card *creation*, so reassigning an old card does not light the
+badge (can extend if asked). The count works without a migration; only the "new" colour needs
+`053_mytasks_seen`. Emails can't be verified from the cloud env — confirm on the live site.
+
+## 2026-10-21 — Project visibility reuses staffing; it scopes the list and the hub, not sub-pages
+**Decision:** a non-admin sees only the shows they are **staffed on** (`crew_projects` +
+`users.crew_id`); admins and Production see all; supervisors and artists are scoped. "See-all" is
+overridable via `config.php` (`project_visibility_see_all`), with admins always forced in. The guard
+is applied to the project **list** and the project-**hub** door only.
+**Why:** David asked that people only see their own shows. Reusing staffing means no new "who sees
+what" table and no data to keep in sync.
+**Consequence — a deliberate known boundary:** direct deep-links to sub-pages (`shots.php?project=X`
+etc.) remain reachable, matching the app's existing "hide the tab, don't lock the door" posture for
+viewers. Locking every sub-page was offered and not built. **Prerequisite:** every real login needs
+`users.crew_id` set on the Users page, or a scoped user sees nothing. No migration for the feature
+itself.
+
+## 2026-10-21 — "View the app as a specific person" extends preview; read-only; audit best-effort
+**Decision:** an admin can borrow a named person's role + crew link for the session and see their
+world — My tasks, nav badge, scoped project list — a step beyond the existing "preview as a role".
+It is **read-only** (the POST guard is unchanged, `in_preview()` stays true), **admin-only**, and
+never another admin / an inactive user / oneself. Each start writes a `preview_audit` row.
+**Why:** David: "can we admins see Anima as specific users instead of" just a generic role — to
+check exactly what one person sees.
+**Consequence:** the seen-at stamp is skipped during a preview, so an admin peek never clears
+anyone's "new" badge or last-seen. The audit insert is **best-effort** — the feature works whether
+or not migration 056 (the audit table) has run. Originally numbered 055, renumbered to 056 after
+colliding with `055_last_seen.sql`.
+
+## 2026-10-21 — "Last seen" tracks real activity, not last login
+**Decision:** add `users.last_seen`, stamped on every authenticated page load and API call via the
+shared auth gates (`touch_last_seen()`), throttled to once per ~5 minutes per session. The Users
+page shows `COALESCE(last_seen, last_login)`.
+**Why:** the column had shown `last_login`, which only refreshes on a fresh sign-in; a session lasts
+a week, so an active user's date sat stale for days.
+**Consequence:** old values self-heal the next time each person opens a page after migration 055
+runs; until then a logged-in user falls back to their login date (so nobody active reads "never").
+Needs migration 055; dormant and harmless until run.
+
+## 2026-10-21 — Repo documentation is the single source of truth for handoff
+**Decision:** the repository's Markdown docs are kept current enough that a fresh Claude account
+with no chat memory can pick the project up from the repo alone. A handoff pack was added —
+`docs/HANDOFF.md` (current state), `docs/MIGRATIONS.md` (the migration ledger + what's pending), and
+`docs/CHANGELOG.md` (features, PR by PR) — linked from the top of `START_HERE.md`.
+**Why:** David is moving development to a different Claude premium account and needs all relevant
+context in the repo, not in a conversation's memory.
+**Consequence:** when a status banner in `START_HERE.md` or a build log in `docs/ROADMAP.md`
+disagrees with `docs/HANDOFF.md`/`docs/MIGRATIONS.md` about what is live, the handoff pack wins; the
+older files are kept for their reasoning. Keep `docs/DECISIONS.md`, `docs/HANDOFF.md` and
+`docs/MIGRATIONS.md` current as state changes.
