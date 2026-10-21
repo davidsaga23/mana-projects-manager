@@ -383,6 +383,47 @@ require __DIR__ . '/includes/header.php';
   <button class="button secondary" type="submit">Start preview</button>
 </form>
 
+<?php // ---- see it as a specific person -----------------------------------------
+      // David, 2026-10-21: "can we admins see anima as specific users instead of
+      // generic ones? that will help us see their assigned tasks and what's
+      // available to them specifically." The role preview above answers "what
+      // does an artist see"; this answers "what does THIS person see" — it wears
+      // their role AND their crew link, so My tasks and the projects list show
+      // exactly their world. Read-only like the role preview, and every start is
+      // written to the preview_audit table (migration 056).
+      //
+      // Eligible = active, a lesser role (never another admin), and not yourself.
+      $meId = (int)(current_user()['id'] ?? 0);
+      $previewable = array_values(array_filter($users, function ($u) use ($meId) {
+          $role = ($u['role'] ?? '') === 'viewer' ? 'artist' : (string)($u['role'] ?? '');
+          return (int)$u['active'] === 1
+              && in_array($role, ['editor', 'supervisor', 'artist'], true)
+              && (int)$u['id'] !== $meId;
+      }));
+?>
+<?php if ($previewable): ?>
+<h3>See the app as a specific person</h3>
+<p class="muted small">
+  Pick someone and the app becomes theirs — their My tasks, the shows they are staffed on, the
+  screens and buttons they get. <strong>Nothing saves while you are in there</strong>, and a banner
+  across the top brings you back. Each time you do this is recorded. If someone isn't linked to a
+  crew member yet (set that above), their tasks and projects will show empty.
+</p>
+<form method="post" action="preview.php" class="inline-form filter-bar">
+  <input type="hidden" name="start_user" value="1">
+  <input type="hidden" name="back" value="/users.php">
+  <label class="inline">
+    See Anima as
+    <select name="user_id">
+      <?php foreach ($previewable as $u): ?>
+      <option value="<?= (int)$u['id'] ?>"><?= e((string)($u['display_name'] ?: $u['username'])) ?> — <?= e(role_in_words(($u['role'] ?? '') === 'viewer' ? 'artist' : (string)$u['role'])) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
+  <button class="button secondary" type="submit">View as this person</button>
+</form>
+<?php endif; ?>
+
 <h3>Add someone</h3>
 <form method="post" class="stack">
   <input type="hidden" name="action" value="add">
