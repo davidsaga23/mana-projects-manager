@@ -394,13 +394,13 @@ require __DIR__ . '/includes/header.php';
             <?php else: ?>
               <?= e($r['due_date'] ?: '—') ?>
               <?php if (can_edit() && $hasSnooze): ?>
-                <form method="post" class="inline-form snooze-form" style="margin:3px 0 0;"
+                <form method="post" class="snooze-form" style="margin:5px 0 0;"
                       title="Hide until a date; comes back on its own. Due date unchanged.">
                   <input type="hidden" name="snooze" value="set">
                   <input type="hidden" name="ticket_id" value="<?= (int)$r['id'] ?>">
                   <input type="date" name="snoozed_until" min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
                          class="day-input" aria-label="Snooze until" required>
-                  <button type="submit" class="secondary" title="Snooze">💤</button>
+                  <button type="submit" class="secondary">Snooze</button>
                 </form>
               <?php endif; ?>
             <?php endif; ?>
