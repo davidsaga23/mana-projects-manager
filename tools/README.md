@@ -49,6 +49,14 @@ that is both easy to make in this codebase and invisible until a page is blank.
    which pass 2 cannot see because the quotes re-pair further down (2026-08-31).
 7. **Nested transactions** — a function that opens a transaction and calls another that opens
    one, unguarded. MySQL has none, so the second `beginTransaction()` throws (2026-09-03).
+8. **A variable nothing assigns** — read once in a file and never written, which reads null at
+   runtime while the file parses perfectly (2026-10-22). The Board shipped a white page that way:
+   a scripted edit failed partway, and the edit after it added the code that depended on the part
+   that never landed. Deliberately narrow — only a name mentioned exactly once — because a first
+   cut that reported every unassigned variable found 63 across the codebase, nearly all of them
+   `preg_match`'s `$m` and friends, and a gate that cries wolf is the one people learn to ignore.
+   It knows about destructuring, by-reference out-parameters, and the partials under
+   `includes/import/` and `includes/wizard/` that read their parent page's scope.
 
 A clean run proves the files compile. It does not prove a screen works: that still needs the
 browser, which is why `START_HERE.md` §6 describes testing with static HTML harnesses.
