@@ -3554,3 +3554,15 @@ button.secondary.danger:hover { background: var(--danger-border); }
 @media (max-width: 700px) {
   .board-panel { width: 100vw; border-left: none; }
 }
+
+/* The Due filter's extra date boxes, shown only for "a specific date" or "a
+   range". They drop under the dropdown rather than beside it: the column is
+   118px wide and two date inputs are not. */
+.board-due-filter { display: flex; flex-direction: column; gap: 5px; }
+.board-due-dates { display: flex; flex-direction: column; gap: 4px; }
+.board-due-dates[hidden] { display: none; }
+.board-due-dates input {
+  width: 100%; min-height: 28px; padding: 3px 7px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-size: 12px;
+}

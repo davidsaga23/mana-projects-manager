@@ -388,6 +388,11 @@
   var fStatus = document.getElementById('fStatus');
   var fCrew = document.getElementById('fCrew');
   var fDue = document.getElementById('fDue');
+  var fDueOn = document.getElementById('fDueOn');
+  var fDueOnDate = document.getElementById('fDueOnDate');
+  var fDueRange = document.getElementById('fDueRange');
+  var fDueFrom = document.getElementById('fDueFrom');
+  var fDueTo = document.getElementById('fDueTo');
   var clearBtn = document.getElementById('boardClear');
   var countEl = document.getElementById('boardCount');
   var wasOpen = null;                 // what was expanded before filtering began
@@ -410,13 +415,55 @@
     return d.toISOString().slice(0, 10);
   }
 
+  /**
+   * Monday to Friday of the week we are in.
+   *
+   * ⚠ BUILT FROM LOCAL DATE PARTS, never by parsing or formatting through UTC.
+   * This platform has been bitten by that before (the timeline's rule 2): a
+   * 'YYYY-MM-DD' string handed to new Date() is read as UTC and comes back a
+   * day early west of Greenwich, which here would quietly shift the whole week.
+   */
+  function weekMonFri() {
+    var d = new Date();
+    var dow = d.getDay();                         // 0 Sunday … 6 Saturday
+    // Sunday belongs to the week that has just ended, which is how a studio
+    // reads "this week" on a Sunday evening.
+    var backToMonday = dow === 0 ? 6 : dow - 1;
+    var mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - backToMonday);
+    var fri = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 4);
+    return { from: ymd(mon), to: ymd(fri) };
+  }
+
+  function ymd(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
   function dueMatches(want, due) {
     if (want === '') return true;
     if (want === '__none') return due === '';
-    if (due === '') return false;
+    if (due === '') return false;                 // every answer below needs a date
     if (want === 'set') return true;
     if (want === 'late') return due < today();
     if (want === 'soon') return due >= today() && due <= inDays(7);
+    if (want === 'today') return due === today();
+    if (want === 'yesterday') return due === inDays(-1);
+    if (want === 'week') {
+      var w = weekMonFri();
+      return due >= w.from && due <= w.to;
+    }
+    if (want === 'on') {
+      var on = fDueOnDate ? fDueOnDate.value : '';
+      // Nothing picked yet filters nothing, rather than hiding the whole board.
+      return on === '' ? true : due === on;
+    }
+    if (want === 'range') {
+      var from = fDueFrom ? fDueFrom.value : '';
+      var to = fDueTo ? fDueTo.value : '';
+      if (from !== '' && due < from) return false;
+      if (to !== '' && due > to) return false;
+      return true;
+    }
     return true;
   }
 
@@ -425,6 +472,11 @@
     var st = fStatus ? fStatus.value : '';
     var cr = fCrew ? fCrew.value : '';
     var du = fDue ? fDue.value : '';
+
+    // The extra boxes belong to their own choice and nothing else.
+    if (fDueOn) fDueOn.hidden = du !== 'on';
+    if (fDueRange) fDueRange.hidden = du !== 'range';
+
     var on = q !== '' || st !== '' || cr !== '' || du !== '';
 
     // Remember the board as the person left it, once, so Clear can restore it.
@@ -473,13 +525,15 @@
   }
 
   if (search) search.addEventListener('input', applyFilters);
-  [fStatus, fCrew, fDue].forEach(function (el) {
+  [fStatus, fCrew, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
     if (el) el.addEventListener('change', applyFilters);
   });
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
       if (search) search.value = '';
-      [fStatus, fCrew, fDue].forEach(function (el) { if (el) el.value = ''; });
+      [fStatus, fCrew, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
+        if (el) el.value = '';
+      });
       applyFilters();
     });
   }

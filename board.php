@@ -154,14 +154,29 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
       </select>
     </div>
-    <div>
+    <div class="board-due-filter">
       <select id="fDue" aria-label="Filter by due date">
         <option value="">Any date</option>
         <option value="late">Overdue</option>
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="week">This week, Mon to Fri</option>
         <option value="soon">Due in the next 7 days</option>
+        <option value="on">A specific date…</option>
+        <option value="range">A range…</option>
         <option value="set">Has a date</option>
         <option value="__none">No date</option>
       </select>
+      <?php // ⚠ ONLY SHOWN ONCE THEY ARE ASKED FOR. Two date boxes sitting
+            // empty in the filter bar read as something you have to fill in
+            // before the board will answer. ?>
+      <span class="board-due-dates" id="fDueOn" hidden>
+        <input type="date" id="fDueOnDate" aria-label="Due on this date">
+      </span>
+      <span class="board-due-dates" id="fDueRange" hidden>
+        <input type="date" id="fDueFrom" aria-label="Due from">
+        <input type="date" id="fDueTo" aria-label="Due until">
+      </span>
     </div>
     <div></div>
     <div></div>

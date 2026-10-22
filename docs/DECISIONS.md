@@ -4271,3 +4271,15 @@ is what actually identifies it. **A class string is a set, not an identity.**
 gives way first and the count and chip never wrap, which is what pushed "26 items" onto two lines
 and shoved that group's bar right. The other columns were trimmed to what their contents need so
 the whole board still fits a 1280 laptop without scrolling sideways.
+
+## 2026-10-22 — The Board's Due filter answers the questions a producer actually asks
+**Decision:** Overdue, Today, Yesterday, This week (Mon to Fri), Due in the next 7 days, a specific
+date, a range, Has a date, No date. David's list.
+**Consequence:** the two date boxes appear ONLY when their own choice is picked — two empty boxes
+sitting in the filter bar read as something you must fill in before the board will answer. A
+specific date with nothing picked filters nothing rather than hiding the whole board, and a range
+with only one end set is open at the other.
+⚠ **The week is built from local date parts, never through UTC.** A 'YYYY-MM-DD' handed to
+new Date() is read as UTC and comes back a day early west of Greenwich (the timeline's rule 2),
+which here would quietly shift the whole week. Sunday belongs to the week that has just ended,
+which is how a studio reads "this week" on a Sunday evening.
