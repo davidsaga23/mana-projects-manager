@@ -149,6 +149,71 @@ function board_item_status(array $tasks): array {
 }
 
 /**
+ * How far along one shot or asset is, as a stacked bar of its tasks' own
+ * status colours (David, 2026-10-22: "the more complete/approved the more the
+ * bar is going to be filled with that color").
+ *
+ * ⚠ IT FILLS FROM THE LEFT, most finished first, so it reads as a progress bar
+ * rather than as a chart somebody has to decode: Final, then delivered, then
+ * blocked, then merely started, then nothing yet. The order is the STRUCTURE of
+ * each status (`maps_to`, `is_blocked`), never its name — every show spells
+ * these its own way, which is the whole reason `statuses` is per project.
+ *
+ * N/A leaves the bar entirely: a step this item does not pass through is not
+ * work waiting to be done, so counting it would make the shot look unfinished
+ * for ever.
+ *
+ * @return array{segments: array, done: int, total: int}
+ */
+function board_item_bar(array $tasks, array $statusMap): array {
+    $live = array_values(array_filter($tasks, fn($t) => !$t['is_excluded']));
+    $total = count($live);
+    if ($total === 0) return ['segments' => [], 'done' => 0, 'total' => 0];
+
+    // Gather by status, keeping "nothing recorded" as its own bucket.
+    $buckets = [];
+    foreach ($live as $t) {
+        $key = $t['status_id'] === null ? 'none' : (string)$t['status_id'];
+        if (!isset($buckets[$key])) {
+            $s = $t['status_id'] !== null ? ($statusMap[$t['status_id']] ?? null) : null;
+            $buckets[$key] = [
+                'name'  => $s['name'] ?? 'Not started',
+                'color' => $s ? ($s['color'] ?: 'var(--border-strong)') : 'var(--border-strong)',
+                'n'     => 0,
+                'rank'  => board_status_rank($s),
+                'order' => $s ? (int)($s['sort_order'] ?? 0) : 9999,
+            ];
+        }
+        $buckets[$key]['n']++;
+    }
+
+    $segments = array_values($buckets);
+    usort($segments, fn($a, $b) => [$a['rank'], $a['order']] <=> [$b['rank'], $b['order']]);
+
+    $done = 0;
+    foreach ($live as $t) if ($t['is_approved']) $done++;
+
+    foreach ($segments as &$seg) $seg['pct'] = $seg['n'] / $total * 100;
+    unset($seg);
+
+    return ['segments' => $segments, 'done' => $done, 'total' => $total];
+}
+
+/**
+ * How far along a status is, 0 being finished. Read from what it MEANS, so a
+ * show that calls its finished state "Delivered" or "Aprobado" still sorts
+ * right. assets/board-screen.js mirrors this, from the same facts carried on
+ * each option — the two must move together.
+ */
+function board_status_rank(?array $status): int {
+    if (!$status) return 4;                                     // nothing recorded
+    if (($status['maps_to'] ?? '') === 'approved') return 0;
+    if (($status['maps_to'] ?? '') === 'delivered') return 1;
+    if ((int)($status['is_blocked'] ?? 0) === 1) return 2;      // stuck, but real work
+    return 3;
+}
+
+/**
  * Everything the board draws for one show: groups, their items, and each
  * item's tasks.
  *
@@ -329,6 +394,7 @@ function board_data(PDO $pdo, int $projectId): array {
             'tasks'    => $tasks,
             'self'     => null,
             'status'   => board_item_status($tasks),
+            'bar'      => board_item_bar($tasks, $statusMap),
         ]);
     }
 
@@ -348,6 +414,7 @@ function board_data(PDO $pdo, int $projectId): array {
             'tasks'    => $tasks,
             'self'     => null,
             'status'   => board_item_status($tasks),
+            'bar'      => board_item_bar($tasks, $statusMap),
         ]);
     }
 
@@ -422,6 +489,8 @@ function board_status_cell(array $t, array $statuses, int $projectId,
         $out .= '<option value="' . $id . '"'
               . ' data-color="' . e($s['color'] ?: '') . '"'
               . (($s['maps_to'] ?? '') === 'approved' ? ' data-approved="1"' : '')
+              . (($s['maps_to'] ?? '') === 'delivered' ? ' data-delivered="1"' : '')
+              . ((int)($s['is_blocked'] ?? 0) === 1 ? ' data-blocked="1"' : '')
               . ((int)($s['is_excluded'] ?? 0) === 1 ? ' data-excluded="1"' : '')
               . ((($s['maps_to'] ?? 'none') === 'none' && (int)($s['is_blocked'] ?? 0) === 0)
                   ? ' data-blank="1"' : '')

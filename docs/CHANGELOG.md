@@ -31,6 +31,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   Pending review, the same limit My tasks keeps. The other statuses are listed but greyed.
 - Search, expand-all and collapse-all across the board, plus a menu on each group for that
   group alone. Shots and assets start collapsed.
+- **Each shot carries a progress bar** made of its tasks' own status colours, filling from the
+  left as work finishes.
+- **The headings stick to the top**, with filters on Status, Assignee and Due, a count of what
+  matches, and a Clear button.
 - Groups are named for the studio's phases — Pre-production, Production, Post-production —
   with the episode or asset type beside the name.
 

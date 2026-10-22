@@ -4164,3 +4164,30 @@ actually wanted.
 collapsed group changes nothing visible and reads as a broken button. Every task row is still
 rendered and hidden by class, so expanding fetches nothing; that is where a 188-shot show would
 start to want its tasks loaded on demand.
+
+## 2026-10-22 — A shot carries a bar of its tasks' status colours
+**Decision:** each shot and asset row on the Board shows a stacked bar made of its own tasks'
+status colours, in the space its name leaves. David: "the more complete/approved the more the bar
+is going to be filled with that color."
+**It fills from the LEFT, most finished first** — approved, then delivered, then blocked, then
+merely started, then nothing recorded — so it reads as a progress bar rather than a chart to
+decode. The order comes from each status's STRUCTURE (`maps_to`, `is_blocked`), never its name.
+N/A leaves the bar entirely: a step an item does not pass through is not work waiting to be done,
+and counting it would leave the shot looking unfinished for ever. `board_item_bar()` builds it and
+`redrawBar()` in board-screen.js rebuilds it from the same facts when a status changes — the two
+must move together or a bar would re-sort itself the moment somebody touched a status.
+
+## 2026-10-22 — The Board's headings stick, and three columns filter
+**Decision:** the column headings and a filter row ride at the top of the page, and Status,
+Assignee and Due each carry a dropdown. Frames belongs to the shot, and Link and Notes are filled
+on 6 and 2 rows of MSD's 147, so a dropdown on either would be furniture. A count says how many
+tasks match, and Clear appears only while something is filtering.
+**Why:** 21 shots expanded is 170 rows; by the time you have scrolled to SH150 the column you are
+reading has no heading on it and the filter that got you there has gone too.
+**Consequence:** the filters read DATA ATTRIBUTES ON THE ROW, not the controls inside it, so a row
+filters the same whether its cells are editable selects or plain text for an artist — and every
+save updates them, or a task moved to Final would sit on under a filter for In progress. A shot
+whose tasks match is opened, and **the board's own expand state is restored when the filters are
+cleared**, including any shot somebody opened or collapsed by hand while filtering: without that,
+filtering, pressing Collapse all and then Clear re-opened everything, undoing a choice the person
+had just made.
