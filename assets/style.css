@@ -3145,9 +3145,23 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bulk-rates label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
 /* width:auto throughout, or the global `input, select { width: 100% }` stretches
    each control across the bar and the tick boxes across the Role column. */
-.bulk-rates select { width: auto; padding: 4px 8px; font-size: 13px; }
+.bulk-rates select { width: auto; }
 .bulk-rates .bulk-apply { display: inline-flex; gap: 6px; align-items: center; }
-.bulk-rates .bulk-apply input { width: 6em; padding: 4px 6px; font-size: 13px; text-align: right; }
+.bulk-rates .bulk-apply input { width: 7em; text-align: right; }
+
+/* ⚠ ONE HEIGHT FOR EVERYTHING ON THIS BAR (David, 2026-10-22: "they buttons and
+   fields are not the same size"). The select, the rate box and the two buttons
+   were each inheriting a different padding and font size from three different
+   rules, so the row read as four controls of four sizes. Set here, together,
+   rather than tuned one at a time — which is how they drifted apart. */
+.bulk-rates select,
+.bulk-rates input[type="text"],
+.bulk-rates .bulk-apply input,
+.bulk-rates button {
+  min-height: 34px; padding: 6px 12px; font-size: 13px; line-height: 1.2;
+  border-radius: 7px; box-sizing: border-box;
+}
+.bulk-rates button { cursor: pointer; }
 .bulk-tick { display: inline; margin: 0; }
 .bulk-row, .bulk-tick input { width: auto; margin: 0 8px 0 0; vertical-align: middle; }
 
