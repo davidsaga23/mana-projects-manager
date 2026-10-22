@@ -457,6 +457,14 @@ function artist_may_post(): bool {
         // delete against somebody else's work. See can_log_own_time().
         'mytasks.php' => ['set_status', 'set_ticket_status', 'overhead_timer', 'overhead_log',
                           'log_time', 'timer', 'delete_log'],
+        // set_status: the status of their own work on the Board (2026-10-22),
+        // which is the same hole as My tasks wearing a different screen. ⚠ SAME
+        // SHAPE AGAIN — the FIELD is permitted here; WHOSE row it may touch is a
+        // second lock inside board_api.php, which refuses a task the asker is
+        // not named on, and the two-status limit is a third in
+        // status_self_serve(). Nothing else on that screen is in this list, so
+        // an artist cannot assign work, move a date or type a link.
+        'board_api.php' => ['set_status'],
     ];
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.
@@ -767,8 +775,13 @@ function require_login_json(): void {
     // API calls are activity too — count them for "last seen" (throttled).
     touch_last_seen();
     // A role preview saves nothing here either, the same rule require_login() keeps.
+    //
+    // ⚠ artist_may_post() IS CONSULTED HERE TOO, since 2026-10-22. It was left
+    // out while no API an artist could reach existed; the Board's one does, and
+    // a gate that disagreed with require_login() about who may write would mean
+    // the same person being allowed through a form and refused through fetch().
     if ($_SERVER['REQUEST_METHOD'] === 'POST'
-        && ((!can_edit() && !supervisor_may_post()) || preview_blocks_saving())) {
+        && ((!can_edit() && !artist_may_post() && !supervisor_may_post()) || preview_blocks_saving())) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => 'Your account has view-only access.']);

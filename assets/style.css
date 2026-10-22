@@ -3169,3 +3169,148 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .collab-freelance { color: var(--faint);  border-color: var(--border-strong); background: none; }
 .collab-vendor    { color: var(--violet); border-color: var(--violet);        background: var(--violet-tint); }
+
+/* ---------------------------------------------------------------------------
+   THE BOARD (board.php, 2026-10-22) — the screen that replaces Plaky.
+
+   Quieter than the rest of the app on purpose (David: "a more Apple like style
+   ... more elegant"): a soft panel per group, hairline rules inside it, and
+   colour only where it carries meaning. Every colour here is a ROLE from :root
+   except a status's own hex, which is data a person chose per project and is
+   mixed into a tint by board_tint() in PHP (lesson 21 is about colours written
+   into rules, which these are not).
+   ------------------------------------------------------------------------ */
+
+.board-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 18px; }
+.board-shows { display: flex; flex-wrap: wrap; gap: 6px; }
+.board-chip {
+  min-height: 32px; padding: 6px 14px; border-radius: 16px; text-decoration: none;
+  font-size: 13.5px; color: var(--muted); background: transparent;
+}
+.board-chip:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.board-chip.is-on { background: var(--primary-tint); color: var(--primary); font-weight: 600; }
+
+.board-title { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-bottom: 16px; }
+.board-title > div:first-child { flex-grow: 1; min-width: 0; }
+.board-title h2 { margin: 0; letter-spacing: -.02em; }
+.board-title p { margin: 4px 0 0; }
+.board-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.board-search input {
+  min-width: 220px; min-height: 36px; padding: 7px 12px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+}
+
+/* The seven columns, declared once and reused by the head and every row so
+   they cannot drift apart. */
+.board-grid-head, .board-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 160px 180px 132px 76px 110px minmax(110px, .9fr);
+  align-items: center;
+}
+.board-grid-head {
+  padding: 0 14px 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--faint);
+}
+.board-grid-head .num { text-align: right; }
+
+.board-group { margin-bottom: 22px; }
+.board-group-head { display: flex; align-items: center; gap: 9px; padding: 0 14px 8px; }
+.board-group-head strong { letter-spacing: -.012em; }
+.board-group.is-shut .board-rows { display: none; }
+
+.board-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.board-dot-step { width: 5px; height: 5px; }
+
+.board-caret {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; flex-shrink: 0;
+  background: transparent; border: none; cursor: pointer; color: var(--faint);
+  transition: transform .18s ease;
+}
+.board-caret.is-open, .board-item.is-open > .board-row .board-caret { transform: rotate(90deg); }
+.board-caret-blank { cursor: default; }
+
+.board-rows {
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 14px; overflow: hidden;
+}
+.board-item + .board-item { border-top: 1px solid var(--border-soft); }
+.board-row { min-height: 50px; }
+.board-row:hover { background: var(--surface-2); }
+.board-row-task { min-height: 46px; border-top: 1px solid var(--border-soft); }
+.board-item:not(.is-open) .board-row-task { display: none; }
+/* ⚠ `display: grid` above BEATS the browser's own [hidden] rule, because an
+   author stylesheet outranks the user agent's. Without this line the search
+   sets hidden on a row and the row stays on screen — which it did, on the
+   first run of assets/board.js. Anything given a display here needs its own
+   [hidden]. */
+.board-row[hidden], .board-item[hidden] { display: none; }
+
+.board-cell, .board-cell-name { padding: 7px 14px; min-width: 0; }
+.board-cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+.board-cell-name { display: flex; align-items: center; gap: 9px; }
+.board-task-name { padding-left: 43px; color: var(--text-2); }
+.board-name { font-weight: 600; letter-spacing: -.015em; }
+
+.board-derived { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.board-pill {
+  display: inline-block; padding: 5px 11px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; background: var(--surface-3); color: var(--muted);
+}
+.board-who { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.board-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  font-size: 10px; font-weight: 600; background: var(--surface-3); color: var(--text-2);
+}
+.board-note { font-size: 13.5px; color: var(--muted); }
+
+/* The controls sit flat in the row until they are used, so a board of 150 of
+   them does not read as 150 boxes. */
+.board-status, .board-crew, .board-due, .board-text {
+  width: 100%; min-height: 32px; padding: 5px 9px; border-radius: 8px;
+  border: 1px solid transparent; background: var(--surface-2); color: var(--text);
+  font-size: 13px;
+}
+.board-status { font-weight: 600; }
+.board-crew:hover, .board-due:hover, .board-text:hover { border-color: var(--border-strong); }
+.board-text::placeholder, .board-crew option[value=""] { color: var(--faint); }
+.board-due.is-late { color: var(--danger); }
+.board-status:disabled, .board-crew:disabled, .board-due:disabled, .board-text:disabled {
+  opacity: .55; cursor: progress;
+}
+.is-saving { opacity: .55; }
+.is-saved { box-shadow: 0 0 0 2px var(--ok-border); }
+
+.board-foot { max-width: 680px; margin-top: 18px; }
+
+/* What a save did, bottom right, out of the way of the rows. */
+.board-note-bar {
+  position: fixed; right: 18px; bottom: 18px; z-index: 60; max-width: 420px;
+  padding: 11px 15px; border-radius: 10px;
+  background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--border-strong); box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  font-size: 13.5px;
+}
+.board-note-bar.is-bad { background: var(--danger-tint-2); border-color: var(--danger-border); }
+
+@media (max-width: 900px) {
+  /* Below this the seven columns stop being a table and become stacked rows,
+     each cell labelled by its own aria-label. A board nobody can read on a
+     phone is a board a freelancer will not open. */
+  .board-grid-head { display: none; }
+  .board-row { grid-template-columns: 1fr 1fr; }
+  .board-cell-name { grid-column: 1 / -1; }
+}
+
+/* The Board's own entry in the top bar: the one button up there, because it is
+   the screen the studio lives in (2026-10-22). */
+.nav-board {
+  display: inline-flex; align-items: center; min-height: 30px;
+  padding: 5px 13px; margin-right: 2px; border-radius: 8px;
+  background: var(--primary-tint); color: var(--primary);
+  font-weight: 600; text-decoration: none;
+}
+.nav-board:hover { background: var(--primary-fill); color: var(--on-primary); text-decoration: none; }
+.nav-board.is-on { background: var(--primary); color: var(--on-primary); }

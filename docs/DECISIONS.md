@@ -4090,3 +4090,50 @@ a glance".
 to today), which can never pass their budget. So "over budget" only appears once hours are logged,
 and the note under the table says which source is in use. Per-second people are left out, because
 they have no day budget. Two slots held by one person are one row.
+
+## 2026-10-22 — The Board: one studio-wide screen, built as a view over rows that already exist
+**Decision:** `board.php` is a new top-level screen (a button in the top bar, before My tasks) with
+its own show picker, not a tab inside a project. David: "a big button at the top will give you
+access to the board where you can switch between projects so you don't have one per project and
+just one place to take a look at the whole thing."
+
+It draws Plaky's shape onto what this schema has held since v1: a Plaky **group** is an episode, an
+asset type, or a department of whole-show steps; an **item** is a `shots`/`assets` row; a
+**subitem** is a `progress` row (`UNIQUE KEY uniq_step_item`); **status** is the project's own
+`statuses`; **assignee** is `progress.crew_id`; **due date** is `schedule.end_date`; **frames** are
+`shots.frames`; **link** is new (migration 057). So nothing migrates on the day Plaky is switched
+off — the importer stops and people set these statuses by hand, which is exactly what the
+2026-08-11 status-model decision was bought for.
+
+**Settled with it:**
+- **One due date, not two** (David: "let's use the built in one"). Typing a date on the board
+  writes `schedule.end_date` and sets `is_manual = 1`, the same thing dragging its bar does, so the
+  board and the timeline cannot disagree and Regenerate will not overwrite it. Plaky's due date
+  agrees with nothing.
+- **A shot's own status is DERIVED** (`board_item_status()`), never stored: finished when every
+  applicable task is approved, in progress when any has started, otherwise not started. N/A rows
+  leave the reckoning. Plaky makes somebody maintain that cell by hand.
+- **Frames are read-only here**, edited on the breakdown. One writer per number.
+- **Artists get the same two statuses as My tasks**, through the same `status_self_serve()`, with
+  the rest listed and disabled so the show's vocabulary stays visible. Enforced three times: the
+  option is disabled, `artist_may_post()` allows only `set_status` on `board_api.php`, and the API
+  refuses a row the asker is not named on.
+- **`require_login_json()` now consults `artist_may_post()`**, which it never had to before: no API
+  an artist could reach existed. A JSON gate that disagreed with `require_login()` would allow
+  somebody through a form and refuse them through fetch().
+- **The whole show renders, collapsed above 40 items.** Every task row is in the page and hidden by
+  class, so expanding fetches nothing; a 188-shot show is ~1,500 rows, which is where lazy loading
+  starts to earn its keep.
+**Consequence:** `assets/board.js` was already taken by the tasks kanban, so this screen's script is
+`assets/board-screen.js`. The readiness view that folds in the Production tracking grid, the task
+detail panel and comments on a task are **not** in this first cut.
+
+## 2026-10-22 — Two bugs the board harness caught, worth keeping
+**`display: grid` beats `[hidden]`.** The search set `hidden` on a row and the row stayed on screen,
+because an author rule (`.board-row { display: grid }`) outranks the user agent's
+`[hidden] { display: none }`. Anything given a `display` needs its own `[hidden]` rule beside it.
+**A rollback must capture the old value before the request, not after.** The first cut re-remembered
+each cell immediately after calling save(), which ran before the answer came back — so a refused
+status "rolled back" to the value that had just been refused, leaving the board showing something
+the database did not hold. `save()` now takes the previous value as the request leaves and only
+overwrites it once the server has agreed.
