@@ -597,6 +597,7 @@
         // Into the panel, so the keyboard is where the eye is.
         var first = panelInner.querySelector('select, input, button, a');
         if (first) first.focus();
+        commentsReady();
       })
       .catch(function () {
         panelInner.innerHTML = '<p class="err">That did not open. Check your connection and try again.</p>';
@@ -628,6 +629,154 @@
       });
     }
   });
+
+
+  // --- the Comments tab -----------------------------------------------------
+  //
+  // David, 2026-10-22: "let's also add a comments section tab between details
+  // and activity", then "those comments are the ones that currently live under
+  // my tasks, they're the exact same just displayed in this context too", and
+  // "remember to have the option to create threads".
+  //
+  // ⚠ THE SERVER RENDERS THE PANE, BEFORE AND AFTER. board_comment.php answers
+  // a post with the whole comments pane, drawn by the same PHP function that
+  // drew it when the panel opened — so nothing about a comment's shape, its
+  // indent or its highlighted mentions is written a second time here. This is
+  // only the three things a page reload would otherwise have done: send the
+  // form, swap the pane, put the picker back on the new box.
+
+  /** Re-arm a freshly rendered comments pane: the @ picker, and the count. */
+  function commentsReady() {
+    var pane = panelInner ? panelInner.querySelector('[data-pane="comments"]') : null;
+    if (!pane) return;
+
+    var box = pane.querySelector('.board-comment-box');
+    var json = pane.querySelector('.board-comment-people');
+    if (box && json && window.animaMentions) {
+      var people = [];
+      try { people = JSON.parse(json.textContent || '[]'); } catch (err) { people = []; }
+      // The same picker the ticket screen uses, attached to a box that did not
+      // exist when the page loaded. See assets/mentions.js.
+      window.animaMentions.attach(box, people);
+    }
+
+    // "Comments · 4" on the tab, kept honest after a post without reloading
+    // anything: the pane in front of us IS the count.
+    var tab = panelInner.querySelector('.panel-tab[data-tab="comments"]');
+    if (!tab) return;
+    var n = pane.querySelectorAll('.comment').length;
+    var badge = tab.querySelector('.muted');
+    if (n === 0) { if (badge) badge.remove(); return; }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'muted';
+      tab.appendChild(document.createTextNode(' '));
+      tab.appendChild(badge);
+    }
+    badge.textContent = '· ' + n;
+  }
+
+  /** The hidden parent_id is what makes a comment a reply (migration 039). */
+  function replyTo(form, id, who) {
+    var field = form.querySelector('input[name="parent_id"]');
+    var banner = form.querySelector('.reply-banner');
+    var box = form.querySelector('.board-comment-box');
+    if (field) field.value = id || '';
+    if (banner) {
+      banner.hidden = !id;
+      var name = banner.querySelector('strong');
+      if (name) name.textContent = who || 'that comment';
+    }
+    if (box) box.focus();
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    var form = e.target.closest('.board-comment-form');
+
+    var reply = e.target.closest('.comment-reply-btn');
+    if (reply && panelInner && panelInner.contains(reply)) {
+      // The button sits above the form, not inside it — one box per pane, the
+      // same shape the ticket screen settled on.
+      form = panelInner.querySelector('.board-comment-form');
+      if (form) {
+        replyTo(form, reply.getAttribute('data-reply-to'), reply.getAttribute('data-reply-name'));
+        form.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+
+    if (form && e.target.closest('[data-reply-cancel]')) replyTo(form, '', '');
+  });
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest ? e.target.closest('.board-comment-form') : null;
+    if (!form) return;
+    e.preventDefault();
+
+    var pane = form.closest('[data-pane="comments"]');
+    var btn = form.querySelector('button[type="submit"]');
+    var box = form.querySelector('.board-comment-box');
+    if (!pane || !box) return;
+    if (!box.value.trim()) { box.focus(); return; }
+
+    // ⚠ LOCKED WHILE IT IS IN FLIGHT. Naming somebody opens SMTP inline, so a
+    // comment with an @ in it can take a second or two — long enough for an
+    // impatient second click to post the same paragraph twice.
+    if (btn) { btn.disabled = true; btn.textContent = 'Posting…'; }
+
+    var data = new FormData(form);
+    data.append('project_id', form.getAttribute('data-project'));
+    data.append('step_id', form.getAttribute('data-step'));
+    data.append('item_key', form.getAttribute('data-item'));
+
+    fetch('board_comment.php', { method: 'POST', body: data, credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        pane.innerHTML = html;
+        commentsReady();
+        var fresh = pane.querySelector('.board-comment-box');
+        if (fresh) fresh.focus();
+      })
+      .catch(function () {
+        if (btn) { btn.disabled = false; btn.textContent = 'Post'; }
+        var warn = document.createElement('p');
+        warn.className = 'err';
+        warn.textContent = 'That did not post. Check your connection and try again — your '
+                         + 'words are still in the box.';
+        form.insertBefore(warn, form.firstChild);
+      });
+  });
+
+  // --- ?open=<step>:<item> --------------------------------------------------
+  //
+  // What a mention email links to (notify_mentioned_task()): the task itself,
+  // not a screen of four hundred rows with "somewhere in here" as the
+  // instruction. The group it sits in has to be opened first, because the board
+  // starts with every item collapsed.
+  (function openFromUrl() {
+    var want = new URLSearchParams(window.location.search).get('open');
+    if (!want) return;
+    var bits = want.split(':');
+    if (bits.length < 2) return;
+    var btn = document.querySelector('.board-open-task[data-step="' + CSS.escape(bits[0])
+            + '"][data-item="' + CSS.escape(bits.slice(1).join(':')) + '"]');
+    if (!btn) return;
+    // Both wrappers, in the board's own vocabulary: a group is shut with
+    // `is-shut`, a shot is opened with `is-open`. Un-shutting the group first,
+    // for the reason setAll() gives — opening a row inside a collapsed group
+    // changes nothing anybody can see.
+    var group = btn.closest('.board-group');
+    if (group) unshutGroup(group);
+    var item = btn.closest('.board-item');
+    if (item) {
+      item.classList.add('is-open');
+      var c = item.querySelector('.board-row-item .board-caret');
+      if (c) c.setAttribute('aria-expanded', 'true');
+    }
+    btn.scrollIntoView({ block: 'center' });
+    panelOpen(btn);
+  }());
 
   if (panelClose) panelClose.addEventListener('click', panelShut);
   document.addEventListener('keydown', function (e) {

@@ -49,6 +49,32 @@ $mayEdit   = can_edit();
 $myCrewId  = (int)(effective_crew_id($pdo) ?? 0);
 $mine      = $t['crew_id'] !== null && $t['crew_id'] === $myCrewId;
 $linkReady = column_exists($pdo, 'progress', 'link');
+
+// ⚠ ANYBODY WHO CAN LOG IN MAY COMMENT, which is wider than every other control
+// on this panel and is the point. Setting a status, moving a date or assigning
+// work is Production's; SAYING SOMETHING is how a freelancer tells Production
+// that the brief is wrong, and a board where only Production can talk would
+// push that conversation straight back into WhatsApp. A preview still writes
+// nothing, the rule require_login() keeps everywhere.
+$mayComment = !preview_blocks_saving();
+$progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+$commentCount = $progressId
+    ? count(board_task_comments($pdo, $progressId)['comments']) : 0;
+
+// A mention stops being new when the person OPENS the task it is on, which is
+// this request — not when they glance at the list on My tasks, which is a
+// pointer rather than the thing itself (migration 040 says why). The twin of
+// the stamp in ticket.php, and written on a GET for the same reason: it is a
+// fact about somebody having looked, and there is no form to submit.
+if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
+    && column_exists($pdo, 'ticket_mentions', 'seen_at')) {
+    $pdo->prepare(
+        'UPDATE ticket_mentions m
+           JOIN ticket_comments c ON c.id = m.comment_id
+            SET m.seen_at = NOW()
+          WHERE c.progress_id = ? AND m.crew_id = ? AND m.seen_at IS NULL'
+    )->execute([$progressId, $myCrewId]);
+}
 ?>
 <div class="panel-head">
   <p class="panel-crumbs">
@@ -67,6 +93,10 @@ $linkReady = column_exists($pdo, 'progress', 'link');
 
 <div class="panel-tabs" role="tablist">
   <button type="button" class="panel-tab is-on" role="tab" aria-selected="true" data-tab="details">Details</button>
+  <?php // Between Details and Activity, where David asked for it: what the task
+        // IS, then what people SAID about it, then what HAPPENED to it. ?>
+  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="comments">Comments<?php
+    if ($commentCount): ?> <span class="muted">· <?= $commentCount ?></span><?php endif; ?></button>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="activity">Activity<?php
     if ($detail['activity']): ?> <span class="muted">· <?= count($detail['activity']) ?></span><?php endif; ?></button>
 </div>
@@ -112,6 +142,16 @@ $linkReady = column_exists($pdo, 'progress', 'link');
       Edited here and on the board, the same row either way
     <?php endif; ?>
   </p>
+</div>
+
+<?php // ⚠ THE SAME ROWS THE TICKET SCREEN SHOWS (migration 059). David,
+      // 2026-10-22: "those comments are the ones that currently live under my
+      // tasks, they're the exact same just displayed in this context too." So
+      // this is one conversation seen from a second place, not a second
+      // conversation — and board_comment.php re-renders this very pane through
+      // the same function after a post. ?>
+<div class="panel-body" data-pane="comments" hidden>
+  <?= board_comments_html($pdo, $projectId, $stepId, $itemKey, $mayComment, $crew) ?>
 </div>
 
 <div class="panel-body" data-pane="activity" hidden>

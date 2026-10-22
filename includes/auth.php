@@ -465,6 +465,16 @@ function artist_may_post(): bool {
         // status_self_serve(). Nothing else on that screen is in this list, so
         // an artist cannot assign work, move a date or type a link.
         'board_api.php' => ['set_status'],
+        // add_comment: saying something about a task on the Board (2026-10-22).
+        // ⚠ WIDER THAN THE REST OF THIS LIST ON PURPOSE, and the only entry
+        // here that is not about the asker's OWN row. An artist may comment on
+        // any task of a show they can see, because that is how they tell
+        // Production the brief is wrong — a board where only Production can
+        // talk pushes that conversation back into WhatsApp, which is the thing
+        // this screen exists to end. The scope that remains is real and checked
+        // in board_comment.php: the show must be one board_projects() returns
+        // for this account, and the step and item must be that show's.
+        'board_comment.php' => ['add_comment'],
     ];
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.

@@ -604,3 +604,106 @@ function notify_transcript_tasks(PDO $pdo, array $byCrew): array {
 
     return [!empty($emailed), implode(' ', $parts)];
 }
+
+/**
+ * The address that opens one task's panel on the Board.
+ *
+ * board.php reads `open` and clicks that task's button for you, so a mention
+ * email lands on the conversation rather than on a screen of four hundred rows
+ * with "somewhere in here" as the instruction.
+ */
+function board_task_url(int $projectId, int $stepId, string $itemKey): string {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
+    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    return "{$scheme}://{$host}{$dir}/board.php?project={$projectId}"
+         . '&open=' . rawurlencode($stepId . ':' . $itemKey);
+}
+
+/**
+ * Tell the people a comment on a BOARD TASK named.
+ *
+ * The twin of notify_mentioned(), and deliberately a separate function rather
+ * than a flag on it: that one starts by looking the ticket up to build "RTC-12",
+ * and a board task has no ticket and no reference number — it is a step against
+ * a shot. Everything else is the same promise, including the important half:
+ * IT NAMES ANYBODY IT COULD NOT REACH, because a mention that silently goes
+ * nowhere is worse than none at all.
+ *
+ * @param int[] $crewIds the people named, from ticket_parse_mentions()
+ * @param array $ctx project_id, step_id, item_key, and the names to show
+ * @return array{0:bool, 1:string} [sent, a sentence for the author]
+ */
+function notify_mentioned_task(PDO $pdo, array $crewIds, string $body,
+                               string $byWho, array $ctx): array {
+    global $config;
+    if (!$crewIds) return [false, ''];
+
+    if (!SmtpMailer::isConfigured($config)) {
+        return [false, 'Email is not set up on this server, so nobody was emailed.'];
+    }
+
+    $ids = implode(',', array_map('intval', $crewIds));
+    $people = $pdo->query("SELECT id, name, email FROM crew WHERE id IN ({$ids})")->fetchAll();
+
+    $recipients = [];
+    $noEmail = [];
+    foreach ($people as $c) {
+        $addr = trim((string)($c['email'] ?? ''));
+        if ($addr !== '') $recipients[] = ['email' => $addr, 'name' => $c['name']];
+        else              $noEmail[] = (string)$c['name'];
+    }
+    if (!$recipients) {
+        return [false, 'Nobody was emailed: ' . implode(', ', $noEmail)
+            . ' ' . (count($noEmail) === 1 ? 'has' : 'have')
+            . ' no email address on file. Add one on the Staffing screen.'];
+    }
+
+    $projectId = (int)($ctx['project_id'] ?? 0);
+    $stepId    = (int)($ctx['step_id'] ?? 0);
+    $itemKey   = (string)($ctx['item_key'] ?? '');
+    $stepName  = trim((string)($ctx['step_name'] ?? '')) ?: 'a task';
+    $itemName  = trim((string)($ctx['item_name'] ?? ''));
+    $code      = trim((string)($ctx['project_code'] ?? ''));
+
+    // "BG Layout on SH160" — what the task is, in the words on the board.
+    $label = $itemName !== '' ? ($stepName . ' on ' . $itemName) : $stepName;
+    $subject = sprintf('[%s] %s mentioned you on %s',
+                       $code !== '' ? $code : 'Anima', $byWho, $label);
+    $url = board_task_url($projectId, $stepId, $itemKey);
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+    // Enough to know whether it needs answering now, without turning the mail
+    // into a copy of the conversation.
+    $snippet = mb_substr(trim($body), 0, 600);
+    if (mb_strlen(trim($body)) > 600) $snippet .= '…';
+
+    $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
+        . '<p><strong>' . $esc($byWho) . '</strong> mentioned you on the board.</p>'
+        . '<h2 style="font-size:17px;margin:12px 0 6px;">' . $esc($label) . '</h2>'
+        . '<p style="color:#5a6a7a;margin:0 0 12px;">'
+        . $esc(trim((string)($ctx['project_name'] ?? '')) ?: 'Anima') . '</p>'
+        . '<div style="background:#f4f6f8;padding:10px 12px;border-radius:6px;white-space:pre-wrap;">'
+        . $esc($snippet) . '</div>'
+        . '<p style="margin-top:16px;"><a href="' . $esc($url) . '" '
+        . 'style="background:#2f6fb2;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;display:inline-block;">'
+        . 'Open the task</a></p>'
+        . '<p style="color:#8a97a3;font-size:12px;margin-top:18px;">Anima | Project manager</p>'
+        . '</div>';
+
+    $text = "{$byWho} mentioned you on {$label}.\n\n" . $snippet . "\n\nOpen: {$url}\n";
+
+    try {
+        (new SmtpMailer($config))->send($recipients, $subject, $html, $text);
+        $said = 'Emailed ' . implode(', ', array_column($recipients, 'name')) . '.';
+        if ($noEmail) {
+            $said .= ' ' . implode(', ', $noEmail) . ' ' . (count($noEmail) === 1 ? 'has' : 'have')
+                   . ' no email address on file and ' . (count($noEmail) === 1 ? 'was' : 'were')
+                   . ' not reached.';
+        }
+        return [true, $said];
+    } catch (Throwable $e) {
+        error_log('[Anima board mention mail] ' . $e->getMessage());
+        return [false, 'The mention email failed: ' . $e->getMessage()];
+    }
+}

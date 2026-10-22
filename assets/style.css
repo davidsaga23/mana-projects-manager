@@ -3610,3 +3610,20 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-open-task:hover { text-decoration: underline; }
 .board-open-task:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* --- the Comments tab in the Board's task panel --------------------------- */
+/* The ticket screen's comment styles already do the work (.comment,
+   .comment-reply, .reply-banner, .mention); these are only the differences a
+   panel 420px wide makes, plus the one global this codebase keeps tripping
+   over — `button { margin-top: 16px }`, which pushed the Post button out of
+   line with the box above it exactly as it did the bulk rate bar. */
+.board-comment-form { margin-top: 20px; }
+.board-comment-form .board-comment-box {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+.board-comment-form .board-comment-post { margin-top: 10px; }
+.board-comment-form .reply-banner { margin-bottom: 10px; }
+.panel-body[data-pane="comments"] .comment { margin-bottom: 15px; }
+.panel-body[data-pane="comments"] .comment-head { gap: 6px; }

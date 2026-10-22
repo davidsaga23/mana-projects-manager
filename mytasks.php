@@ -593,19 +593,39 @@ if ($ready && $myCrewId) {
     // Who has named me, newest first, unread at the top. Capped: this is a
     // prompt to go and look, not an archive.
     if (ticket_mentions_available($pdo) && column_exists($pdo, 'ticket_mentions', 'seen_at')) {
+        // ⚠ EVERY JOIN TO `tickets` HERE IS LEFT, AND BOTH TIMES FOR THE SAME
+        // REASON. Migration 041 let a card have no project, so joining
+        // `projects` had to become LEFT or a mention on an unfiled card was
+        // named, emailed, and then missing from the screen the email pointed
+        // at. Migration 059 does the same thing one level up: a comment can now
+        // hang off a BOARD TASK instead of a ticket, so joining `tickets` has
+        // to become LEFT or every mention typed on the board vanishes exactly
+        // the same way. This is the one query in the codebase that joins
+        // through ticket_comments; a new one has to make the same choice.
+        $onBoard = column_exists($pdo, 'ticket_comments', 'progress_id');
         $mq = $pdo->prepare(
             'SELECT m.comment_id, m.seen_at, c.body, c.created_at, c.ticket_id,
-                    t.seq, t.title, t.type, p.code AS project_code,
-                    u.display_name AS said_by
+                    t.seq, t.title, t.type,
+                    u.display_name AS said_by, '
+             . ($onBoard
+                 ? 'COALESCE(p.code, bp.code) AS project_code,
+                    pr.project_id AS board_project, pr.step_id AS board_step,
+                    pr.item_key AS board_item, ps.name AS board_step_name,
+                    COALESCE(sh.shot_code, ba.name, bp.name) AS board_item_name'
+                 : 'p.code AS project_code') . '
                FROM ticket_mentions m
                JOIN ticket_comments c ON c.id = m.comment_id
-               JOIN tickets t         ON t.id = c.ticket_id
-               -- ⚠ LEFT, since migration 041. An INNER JOIN here would drop a
-               -- mention on an unfiled card: named, notified by email, and then
-               -- nothing on the screen the email points at.
+               LEFT JOIN tickets t    ON t.id = c.ticket_id
                LEFT JOIN projects p   ON p.id = t.project_id
-               LEFT JOIN users u      ON u.id = c.user_id
-              WHERE m.crew_id = ? AND t.archived = 0
+               LEFT JOIN users u      ON u.id = c.user_id'
+             . ($onBoard
+                 ? ' LEFT JOIN progress pr       ON pr.id = c.progress_id
+                     LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+                     LEFT JOIN shots sh          ON sh.id = pr.shot_id
+                     LEFT JOIN assets ba         ON ba.id = pr.asset_id
+                     LEFT JOIN projects bp       ON bp.id = pr.project_id'
+                 : '') . '
+              WHERE m.crew_id = ? AND COALESCE(t.archived, 0) = 0
               ORDER BY m.seen_at IS NULL DESC, c.created_at DESC
               LIMIT 15'
         );
@@ -1078,13 +1098,27 @@ require __DIR__ . '/includes/header.php';
     <h3>Mentioned <span class="muted">· <?= count($mentions) ?><?php
       if ($unseenMentions): ?>, <strong class="warn-text"><?= $unseenMentions ?> new</strong><?php endif; ?></span></h3>
     <table class="mywork-table">
-      <thead><tr><th>Ref</th><th>Ticket</th><th>Project</th><th>Said by</th><th>What</th><th>When</th></tr></thead>
+      <thead><tr><th>Ref</th><th>What</th><th>Project</th><th>Said by</th><th>What</th><th>When</th></tr></thead>
       <tbody>
       <?php foreach ($mentions as $m): ?>
+        <?php
+        // Where this was said, and so where the link goes. A mention lives on a
+        // ticket or on a board task (migration 059); the row is otherwise
+        // identical, because to the person reading it the two are one list.
+        $onTask = empty($m['ticket_id']) && !empty($m['board_step']);
+        $where = $onTask
+            ? 'board.php?project=' . (int)$m['board_project']
+              . '&open=' . rawurlencode($m['board_step'] . ':' . $m['board_item'])
+            : 'ticket.php?id=' . (int)$m['ticket_id'] . '#c' . (int)$m['comment_id'];
+        $what = $onTask
+            ? trim((string)$m['board_step_name']) . ' · ' . trim((string)$m['board_item_name'])
+            : (string)$m['title'];
+        ?>
         <tr class="<?= $m['seen_at'] === null ? 'mention-new' : '' ?>">
-          <td><a href="ticket.php?id=<?= (int)$m['ticket_id'] ?>#c<?= (int)$m['comment_id'] ?>"
-                 class="<?= $m['type'] === 'ticket' ? 'ref-ticket' : 'ref-task' ?>"><?= e(ticket_ref($m)) ?></a></td>
-          <td><a href="ticket.php?id=<?= (int)$m['ticket_id'] ?>#c<?= (int)$m['comment_id'] ?>"><?= e($m['title']) ?></a></td>
+          <td><a href="<?= e($where) ?>"
+                 class="<?= $onTask ? 'ref-task' : ($m['type'] === 'ticket' ? 'ref-ticket' : 'ref-task') ?>"><?=
+                 e($onTask ? 'Board' : ticket_ref($m)) ?></a></td>
+          <td><a href="<?= e($where) ?>"><?= e($what) ?></a></td>
           <td class="muted small"><?= e($m['project_code']) ?></td>
           <td class="muted small"><?= e($m['said_by'] ?: 'Someone') ?></td>
           <td class="muted small"><?= e(mb_substr(trim((string)$m['body']), 0, 90))

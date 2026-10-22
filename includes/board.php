@@ -37,6 +37,14 @@ require_once __DIR__ . '/statuses.php';
 require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/studio.php';      // studio_exclude_sql(): nobody works on the Studio
 require_once __DIR__ . '/grid.php';        // step_covers_item(), the one scope rule
+// ⚠ THE COMMENTS ON A BOARD TASK ARE TICKET COMMENTS (migration 059). Not a
+// copy of them — the same rows, the same mentions table, the same threading.
+// David, 2026-10-22: "those comments are the ones that currently live under my
+// tasks, they're the exact same just displayed in this context too." So this
+// file borrows ticket_parse_mentions(), ticket_render_body() and
+// ticket_thread() rather than growing its own, and a mention typed on the board
+// lands in the same My tasks list as one typed on a ticket.
+require_once __DIR__ . '/tickets.php';
 
 /* ---------------------------------------------------------------------------
  * The three phases, named as the studio names them.
@@ -792,4 +800,237 @@ function board_assignees(PDO $pdo, int $projectId): array {
     );
     $q->execute([$projectId, $projectId]);
     return $q->fetchAll();
+}
+
+/* ---------------------------------------------------------------------------
+ * TALKING ABOUT A TASK (David, 2026-10-22), migration 059.
+ *
+ * "let's also add a comments section tab between details and activity", then —
+ * when the first design was about to grow a second comment table — "those
+ * comments are the ones that currently live under my tasks, they're the exact
+ * same just displayed in this context too", and "remember to have the option to
+ * create threads".
+ *
+ * So everything below is plumbing, not a feature: it finds the progress row a
+ * board task IS, hangs `ticket_comments` off it, and hands the result to the
+ * renderers ticket.php already uses. Threads, mentions, the seen_at stamp and
+ * the My tasks list all arrive working because none of them is new.
+ * ------------------------------------------------------------------------ */
+
+/** Has migration 059 run? Until it has, the tab says so instead of failing. */
+function board_comments_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'ticket_comments', 'progress_id');
+    return $ok;
+}
+
+/**
+ * The `progress` row a board task is, created if the importer never made one.
+ *
+ * ⚠ CREATING IT IS HARMLESS AND DELIBERATE. A task with no status set has no
+ * row yet, and board_api.php's $upsert has always conjured one on the first
+ * save; a comment is the same kind of first touch. The row it makes carries no
+ * status, so nothing on any screen moves — unlike the alternative considered
+ * and rejected in migration 059, which would have invented a TICKET and put a
+ * duplicate card in front of the assignee for the crime of someone commenting.
+ *
+ * The caller must already have checked the step and item are this project's;
+ * board_task_detail() and board_comment.php both do, and the project_id test
+ * here is the belt to that braces.
+ *
+ * @return int|null null when there is no row and none was asked for
+ */
+function board_task_progress_id(PDO $pdo, int $projectId, int $stepId,
+                                string $itemKey, bool $create = false): ?int {
+    $q = $pdo->prepare('SELECT id FROM progress WHERE step_id = ? AND item_key = ? AND project_id = ?');
+    $q->execute([$stepId, $itemKey, $projectId]);
+    $id = $q->fetchColumn();
+    if ($id) return (int)$id;
+    if (!$create) return null;
+
+    $kind   = substr($itemKey, 0, 1);
+    $itemId = (int)substr($itemKey, 1);
+    $pdo->prepare(
+        'INSERT INTO progress (project_id, step_id, shot_id, asset_id, item_key)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
+    )->execute([
+        $projectId, $stepId,
+        $kind === 's' ? $itemId : null,
+        $kind === 'a' ? $itemId : null,
+        $itemKey,
+    ]);
+    return (int)$pdo->lastInsertId();
+}
+
+/**
+ * Everything said about one task, oldest first, with who said it.
+ *
+ * Oldest first because a conversation is read down the page; the ticket screen
+ * does the same. Mentions come back keyed by comment so one query covers the
+ * lot rather than one per line.
+ *
+ * @return array{comments: array, mentions: array<int, string[]>}
+ */
+function board_task_comments(PDO $pdo, int $progressId): array {
+    if (!board_comments_available($pdo) || $progressId <= 0) {
+        return ['comments' => [], 'mentions' => []];
+    }
+    $q = $pdo->prepare(
+        'SELECT c.id, c.parent_id, c.user_id, c.kind, c.body, c.created_at,
+                u.display_name
+           FROM ticket_comments c
+           LEFT JOIN users u ON u.id = c.user_id
+          WHERE c.progress_id = ?
+          ORDER BY c.created_at, c.id'
+    );
+    $q->execute([$progressId]);
+    $comments = $q->fetchAll();
+
+    $mentions = [];
+    if ($comments && ticket_mentions_available($pdo)) {
+        $ids = implode(',', array_map(fn($c) => (int)$c['id'], $comments));
+        foreach ($pdo->query(
+            'SELECT comment_id, named_as FROM ticket_mentions WHERE comment_id IN (' . $ids . ')'
+        ) as $m) {
+            $mentions[(int)$m['comment_id']][] = (string)$m['named_as'];
+        }
+    }
+    return ['comments' => $comments, 'mentions' => $mentions];
+}
+
+/**
+ * Say something about a task, and tell anybody it named.
+ *
+ * Returns [commentId, a sentence for the author]. Throws on anything it will
+ * not do, which the caller turns into a line of red in the panel.
+ *
+ * @param array $ctx the task's names, for the email's subject and link
+ */
+function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKey,
+                           string $body, ?int $parentId, int $userId, array $ctx = []): array {
+    if (!board_comments_available($pdo)) {
+        throw new RuntimeException('Comments need database update 059, which has not been applied yet.');
+    }
+    $body = trim($body);
+    if ($body === '') throw new RuntimeException('Nothing to post — the box was empty.');
+    if (mb_strlen($body) > 5000) {
+        throw new RuntimeException('That is longer than a comment holds (5000 characters).');
+    }
+
+    $progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey, true);
+    if (!$progressId) throw new RuntimeException('That task could not be found to comment on.');
+
+    // ⚠ A REPLY'S PARENT MUST BE ON THIS TASK. Without the check, a posted id is
+    // a way to hang a reply on another show's conversation — the same guard
+    // ticket.php keeps, for the same reason.
+    $parent = null;
+    if ($parentId && ticket_threads_available($pdo)) {
+        $q = $pdo->prepare('SELECT id FROM ticket_comments WHERE id = ? AND progress_id = ?');
+        $q->execute([$parentId, $progressId]);
+        $parent = $q->fetchColumn() ?: null;
+    }
+
+    $cols  = 'progress_id, user_id, kind, body';
+    $marks = "?, ?, 'user', ?";
+    $args  = [$progressId, $userId ?: null, $body];
+    if (ticket_threads_available($pdo)) { $cols .= ', parent_id'; $marks .= ', ?'; $args[] = $parent; }
+    $pdo->prepare('INSERT INTO ticket_comments (' . $cols . ') VALUES (' . $marks . ')')->execute($args);
+    $commentId = (int)$pdo->lastInsertId();
+
+    // Resolved against this show's people and stored as ids, never left in the
+    // text: the rule migration 039 wrote down.
+    $mentions = ticket_parse_mentions($body, board_assignees($pdo, $projectId));
+    ticket_save_mentions($pdo, $commentId, $mentions);
+
+    $said = $parent ? 'Reply posted.' : 'Comment posted.';
+    if ($mentions && function_exists('notify_mentioned_task')) {
+        // Naming somebody tells them, here as on a ticket — David settled that
+        // on 2026-10-06 ("not an option but something already built in by
+        // default"). The mailer opens SMTP inline, which is also why posting a
+        // comment with an @ in it takes a moment; see the note in ticket.php.
+        [, $more] = notify_mentioned_task($pdo, array_keys($mentions), $body,
+            current_user_display(), $ctx + ['project_id' => $projectId,
+                                            'step_id' => $stepId, 'item_key' => $itemKey]);
+        if ($more !== '') $said .= ' ' . $more;
+    }
+    return [$commentId, $said];
+}
+
+/**
+ * The Comments tab's contents.
+ *
+ * ⚠ MARKUP, NOT JSON, for the reason board_task.php gives: posting a comment
+ * re-renders this pane through the same function that drew it, so a reply, a
+ * highlighted mention and a thread indent are written once. It is also why
+ * board_comment.php answers with HTML.
+ */
+function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $itemKey,
+                             bool $mayPost, array $people): string {
+    if (!board_comments_available($pdo)) {
+        return '<p class="warn-text small">Comments need database update 059. '
+             . 'Everything else on this task works meanwhile.</p>';
+    }
+
+    $progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+    $found = board_task_comments($pdo, (int)$progressId);
+    $threaded = ticket_thread($found['comments']);
+
+    // ONE RENDERER for a comment and for a reply, so the two cannot drift apart
+    // in anything but their indent. Depth is 0 or 1 and nothing else — see
+    // migration 039 for why a task is not a forum.
+    $one = function (array $c, int $depth) use ($found, $mayPost, $pdo): string {
+        $cid = (int)$c['id'];
+        $named = $found['mentions'][$cid] ?? [];
+        $h = '<div class="comment' . ($depth > 0 ? ' comment-reply' : '')
+           . '" id="bc' . $cid . '">'
+           . '<div class="comment-head"><strong>'
+           . e($c['display_name'] ?? 'Someone') . '</strong>'
+           . '<span class="muted small">'
+           . e(date('j M Y · g:i A', strtotime((string)$c['created_at']))) . '</span>';
+        if ($mayPost && $depth === 0 && ticket_threads_available($pdo)) {
+            $h .= '<button type="button" class="comment-reply-btn linkish" data-reply-to="' . $cid
+                . '" data-reply-name="' . e($c['display_name'] ?? '') . '">Reply</button>';
+        }
+        $h .= '</div><div class="comment-body">'
+            . ticket_render_body((string)$c['body'], $named) . '</div></div>';
+        return $h;
+    };
+
+    $out = '';
+    foreach ($threaded as $c) {
+        $out .= $one($c, 0);
+        foreach (($c['replies'] ?? []) as $r) $out .= $one($r, 1);
+    }
+    if ($out === '') {
+        $out = '<p class="muted small">Nothing said about this task yet. Anything written here is the '
+             . 'same conversation that shows on My tasks, so naming somebody reaches them there too.</p>';
+    }
+
+    if ($mayPost) {
+        $out .= '<form class="comment-form board-comment-form" method="post"'
+              . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
+              . ' data-item="' . e($itemKey) . '">'
+              . '<div class="reply-banner" hidden>Replying to <strong></strong> '
+              . '<button type="button" class="linkish" data-reply-cancel>post as a new comment instead</button></div>'
+              // add_comment is the FIELD artist_may_post() allows, not a value:
+              // the allow-list in includes/auth.php is read that way, so this
+              // name is what lets an artist speak here at all.
+              . '<input type="hidden" name="add_comment" value="1">'
+              . '<input type="hidden" name="parent_id" value="">'
+              . '<label>Add a comment'
+              . '<textarea name="body" rows="3" class="board-comment-box"'
+              . ' placeholder="What is going on with this one… type @ to name somebody"></textarea>'
+              . '</label>'
+              . '<p class="muted small">Naming somebody emails them and puts it in their My tasks.</p>'
+              . '<button type="submit" class="primary board-comment-post">Post</button>'
+              . '</form>'
+              // The picker reads this, exactly as ticket.php feeds assets/mentions.js:
+              // the names offered are the names the parser can resolve, never more.
+              . '<script type="application/json" class="board-comment-people">'
+              . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
+                            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
+              . '</script>';
+    }
+    return $out;
 }
