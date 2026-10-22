@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Days off, and the schedule plans around them *(needs migration 060)*
+
+- **A Days off section on every person page**: a first and last day and a reason. It counts on
+  every show the person is on.
+- **The scheduler now plans around each person's days off and their start and finish dates on the
+  show.** Their tasks skip those days, and work goes to whoever on the step can finish it first.
+  Re-run the schedule to see it; saved plans and hand-placed bars do not move by themselves.
+
 ## 2026-10-22 — Timeline: a dragged bar moves alone *(no migration)*
 
 - **Dragging a step on the general timeline moves only that step.** The steps that wait for it no
