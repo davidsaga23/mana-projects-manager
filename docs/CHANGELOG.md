@@ -43,7 +43,8 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   filling from the left as work finishes. Hovering one lists how many tasks are in each status.
   The bars line up down the column whatever the shots are called.
 - **The headings stick to the top**, with filters on Status, Assignee and Due, a count of what
-  matches, and a Clear button.
+  matches, and a Clear button. Due filters by overdue, today, yesterday, this week (Mon to Fri),
+  the next 7 days, a specific date, a range, has a date, or no date.
 - **A shot reads In progress as soon as one of its tasks has been picked up**, rather than waiting
   for something to be finished. Which statuses mean that is now a tick on the Statuses screen
   *(migration 058 — the board is already right without it)*.
