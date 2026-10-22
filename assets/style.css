@@ -3350,11 +3350,38 @@ button.secondary.danger:hover { background: var(--danger-border); }
 /* How far along a shot is, in its own tasks' status colours (2026-10-22).
    Sits in the space the shot's name leaves and fills from the left. */
 .board-bar {
-  display: flex; flex: 1 1 auto; max-width: 320px; min-width: 60px;
-  height: 7px; border-radius: 4px; overflow: hidden;
-  background: var(--surface-3);
+  position: relative; display: inline-flex; align-items: center;
+  flex: 1 1 auto; max-width: 320px; min-width: 60px;
+  padding: 6px 0;                      /* a bigger target than 7px of bar */
+  cursor: default;
 }
+.board-bar-track {
+  display: flex; width: 100%; height: 7px;
+  border-radius: 4px; overflow: hidden; background: var(--surface-3);
+  transition: height .12s ease;
+}
+.board-bar:hover .board-bar-track, .board-bar:focus-visible .board-bar-track { height: 11px; }
+.board-bar:focus { outline: none; }
+.board-bar:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
 .board-bar-seg { display: block; height: 100%; }
+
+/* How many of each colour, on hover or keyboard focus. The segments carry their
+   own titles too, for touch, where nothing hovers. */
+.board-bar-pop {
+  position: absolute; z-index: 40; top: 100%; left: 0; min-width: 190px;
+  display: none; flex-direction: column; gap: 3px; padding: 9px 11px;
+  background: var(--surface-3); border: 1px solid var(--border-strong);
+  border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, .55);
+  font-size: 12.5px; color: var(--text); white-space: nowrap;
+}
+.board-bar:hover .board-bar-pop, .board-bar:focus-within .board-bar-pop { display: flex; }
+.board-bar-key { display: flex; align-items: center; gap: 8px; }
+.board-bar-key i { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.board-bar-key b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
+.board-bar-sum {
+  margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border);
+  color: var(--muted);
+}
 
 /* The headings and the filters ride at the top of a long board. */
 .board-sticky {
@@ -3389,4 +3416,24 @@ button.secondary.danger:hover { background: var(--danger-border); }
   /* Stacked, the seven-column filter row has nothing to line up with. */
   .board-sticky { position: static; }
   .board-filters { grid-template-columns: 1fr 1fr; }
+}
+
+/* The same bar on a group header, a little wider: it is summarising a phase. */
+.board-bar-group { max-width: 420px; margin-left: 4px; }
+
+/* ⚠ THE BARS LINE UP BECAUSE THE LABEL BESIDE THEM IS A FIXED WIDTH. Left to
+   itself the bar starts wherever the name ends, so a column of shots called
+   FutsalInt01 and MadridStreetExt03 had its bars stepping in and out
+   (2026-10-22). A longer name is clipped and keeps its full text in a tooltip. */
+.board-item-label {
+  flex: 0 0 220px; min-width: 0; display: flex; align-items: baseline; gap: 8px;
+}
+.board-item-label .board-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-item-scope { flex-shrink: 0; }
+.board-group-label { flex: 0 0 250px; min-width: 0; display: flex; align-items: center; gap: 9px; }
+.board-group-label strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 900px) {
+  /* Stacked, there is no column for them to line up down. */
+  .board-item-label, .board-group-label { flex: 1 1 auto; }
 }

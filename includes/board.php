@@ -203,6 +203,39 @@ function board_item_bar(array $tasks, array $statusMap): array {
 }
 
 /**
+ * One progress bar, with the panel that answers "how many of each colour?"
+ * (David, 2026-10-22).
+ *
+ * ⚠ A SEGMENT'S OWN TOOLTIP IS NOT ENOUGH. These bars are 7px tall, and a
+ * slice holding one task of eight is a few pixels wide — hovering it exactly is
+ * a game, and the native tooltip waits a second before saying anything. So the
+ * whole bar carries one panel listing every status in it with its count, shown
+ * on hover and on keyboard focus, and the bar is focusable so it is reachable
+ * without a mouse. The per-segment titles stay for touch, where nothing hovers.
+ */
+function board_bar_html(array $bar, string $extraClass = ''): string {
+    if (($bar['total'] ?? 0) <= 0) return '';
+    $sum = $bar['done'] . ' of ' . $bar['total'] . ' tasks finished';
+
+    $track = '';
+    $keys  = '';
+    foreach ($bar['segments'] as $seg) {
+        $track .= '<span class="board-bar-seg" style="width:' . e(fmt_num($seg['pct'], 3))
+                . '%;background:' . e($seg['color']) . '" title="' . e($seg['name'] . ', '
+                . $seg['n'] . ' of ' . $bar['total']) . '"></span>';
+        $keys  .= '<span class="board-bar-key"><i style="background:' . e($seg['color'])
+                . '"></i>' . e($seg['name']) . '<b>' . (int)$seg['n'] . '</b></span>';
+    }
+
+    return '<span class="board-bar ' . e($extraClass) . '" tabindex="0" role="img"'
+         . ' aria-label="' . e($sum) . '">'
+         . '<span class="board-bar-track">' . $track . '</span>'
+         . '<span class="board-bar-pop">' . $keys
+         . '<span class="board-bar-sum">' . e($sum) . '</span></span>'
+         . '</span>';
+}
+
+/**
  * How far along a status is, 0 being finished. Read from what it MEANS, so a
  * show that calls its finished state "Delivered" or "Aprobado" still sorts
  * right. assets/board-screen.js mirrors this, from the same facts carried on
@@ -327,10 +360,17 @@ function board_data(PDO $pdo, int $projectId): array {
                 'color'  => board_dept_color($dept),
                 'rank'   => board_dept_rank($dept),
                 'items'  => [],
+                '_tasks' => [],      // gathered for the group's own bar, below
             ];
         }
         $groups[$key]['items'][] = $item;
         $counts['items']++;
+        // A whole-show deliverable IS one task, so it contributes itself; a shot
+        // contributes the tasks under it. Either way the group's bar is made of
+        // exactly the work the group holds.
+        foreach ($item['tasks'] ?: array_filter([$item['self']]) as $t) {
+            $groups[$key]['_tasks'][] = $t;
+        }
         foreach ($item['tasks'] as $t) {
             if ($t['is_excluded']) continue;
             $counts['tasks']++;
@@ -423,6 +463,16 @@ function board_data(PDO $pdo, int $projectId): array {
     // Pre-production, Production, Post-production, then anything a step named
     // itself — the order a crew list, a call sheet and the expense projection
     // are all already read in.
+    // ⚠ THE GROUP'S BAR IS BUILT FROM EVERY TASK IN IT, not from its shots'
+    // bars averaged. Averaging percentages weights a 2-task deliverable the
+    // same as an 8-task shot, which is how a phase ends up reading finished
+    // while half its work is outstanding (David, 2026-10-22).
+    foreach ($groups as &$g) {
+        $g['bar'] = board_item_bar($g['_tasks'], $statusMap);
+        unset($g['_tasks']);
+    }
+    unset($g);
+
     $groups = array_values($groups);
     usort($groups, function ($a, $b) {
         return [$a['rank'], $a['detail']] <=> [$b['rank'], $b['detail']];

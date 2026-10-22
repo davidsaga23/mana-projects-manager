@@ -177,14 +177,21 @@ require __DIR__ . '/includes/header.php';
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </button>
-      <span class="board-dot" style="background:<?= e($g['color']) ?>"></span>
-      <strong><?= e($g['name']) ?></strong>
-      <?php // The episode, or the asset type: what divides this phase, beside
-            // the phase rather than instead of it. ?>
-      <?php if (($g['detail'] ?? '') !== ''): ?>
-        <span class="board-group-detail"><?= e($g['detail']) ?></span>
-      <?php endif; ?>
-      <span class="muted small"><?= count($g['items']) ?> item<?= count($g['items']) === 1 ? '' : 's' ?></span>
+      <span class="board-group-label">
+        <span class="board-dot" style="background:<?= e($g['color']) ?>"></span>
+        <strong><?= e($g['name']) ?></strong>
+        <?php // The episode, or the asset type: what divides this phase, beside
+              // the phase rather than instead of it. ?>
+        <?php if (($g['detail'] ?? '') !== ''): ?>
+          <span class="board-group-detail"><?= e($g['detail']) ?></span>
+        <?php endif; ?>
+        <span class="muted small"><?= count($g['items']) ?> item<?= count($g['items']) === 1 ? '' : 's' ?></span>
+      </span>
+
+      <?php // The whole phase at a glance, in the same colours and the same
+            // order as the shots underneath it, built from every task in the
+            // group rather than its shots' bars averaged.
+            echo board_bar_html($g['bar'] ?? [], 'board-bar-group'); ?>
 
       <?php // ⚠ PER GROUP, BESIDE THE WHOLE-BOARD BUTTONS (David's choice,
             // 2026-10-22). The arrow to the left hides the group; it cannot
@@ -224,27 +231,28 @@ require __DIR__ . '/includes/header.php';
               <?php else: ?>
                 <span class="board-caret board-caret-blank" aria-hidden="true"></span>
               <?php endif; ?>
-              <?php if ($item['kind'] === 'project'): ?>
-                <span class="board-name"><?= e($item['name']) ?></span>
-              <?php else: ?>
-                <a class="board-name" href="item.php?project=<?= $projectId ?>&amp;item=<?= e(urlencode($item['item_key'])) ?>"><?= e($item['name']) ?></a>
-              <?php endif; ?>
-              <span class="muted small"><?= e($item['scope']) ?></span>
+              <?php // ⚠ ONE FIXED-WIDTH BLOCK FOR THE NAME AND ITS COUNT, so the
+                    // bars line up down the column however long the names are
+                    // (David, 2026-10-22: MadridStreetExt03 pushed its bar half
+                    // an inch right of FutsalInt01's). A name longer than the
+                    // block is clipped with an ellipsis and keeps its full text
+                    // in the title. ?>
+              <span class="board-item-label">
+                <?php if ($item['kind'] === 'project'): ?>
+                  <span class="board-name" title="<?= e($item['name']) ?>"><?= e($item['name']) ?></span>
+                <?php else: ?>
+                  <a class="board-name" title="<?= e($item['name']) ?>"
+                     href="item.php?project=<?= $projectId ?>&amp;item=<?= e(urlencode($item['item_key'])) ?>"><?= e($item['name']) ?></a>
+                <?php endif; ?>
+                <span class="muted small board-item-scope"><?= e($item['scope']) ?></span>
+              </span>
 
               <?php // HOW FAR ALONG, in the colours of its own tasks' statuses
                     // (David, 2026-10-22). Sits in the space the shot's name
-                    // leaves, which is where he pointed, and fills from the left
-                    // as work finishes. A deliverable has no bar: it is one task,
-                    // and a bar of one segment says nothing a status does not. ?>
-              <?php $bar = $item['bar'] ?? null; if ($bar && $bar['total'] > 0): ?>
-                <span class="board-bar"
-                      title="<?= (int)$bar['done'] ?> of <?= (int)$bar['total'] ?> tasks finished">
-                  <?php foreach ($bar['segments'] as $seg): ?>
-                    <span class="board-bar-seg" style="width:<?= e(fmt_num($seg['pct'], 3)) ?>%;background:<?= e($seg['color']) ?>"
-                          title="<?= e($seg['name']) ?>, <?= (int)$seg['n'] ?> of <?= (int)$bar['total'] ?>"></span>
-                  <?php endforeach; ?>
-                </span>
-              <?php endif; ?>
+                    // leaves, fills from the left as work finishes, and says how
+                    // many of each on hover. A deliverable has no bar: it is one
+                    // task, and a bar of one segment says nothing a status does not.
+                    echo board_bar_html($item['bar'] ?? []); ?>
             </div>
 
             <?php if ($self): ?>

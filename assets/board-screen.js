@@ -118,6 +118,7 @@
         el.style.color = data.color || '';
         var item = el.closest('.board-item');
         if (item) { redrawDerived(item); redrawBar(item); }
+        redrawGroupBar(el.closest('.board-group'));
       });
       return;
     }
@@ -290,10 +291,29 @@
   }
 
   function redrawBar(item) {
-    var bar = item.querySelector('.board-row-item .board-bar');
-    if (!bar) return;
-    var picks = item.querySelectorAll('.board-row-task .board-status');
-    if (!picks.length) return;
+    drawBar(item.querySelector('.board-row-item .board-bar'),
+            item.querySelectorAll('.board-row-task .board-status'));
+  }
+
+  /**
+   * The group's own bar, over every task in it.
+   *
+   * ⚠ EVERY TASK, not its shots' bars averaged — averaging percentages weights
+   * a 2-task deliverable the same as an 8-task shot, and a phase would read
+   * finished with half its work outstanding. board_item_bar() in PHP builds it
+   * the same way.
+   */
+  function redrawGroupBar(section) {
+    if (!section) return;
+    drawBar(section.querySelector('.board-group-head .board-bar'),
+            section.querySelectorAll('.board-status'));
+  }
+
+  function drawBar(bar, picks) {
+    if (!bar || !picks || !picks.length) return;
+    var track = bar.querySelector('.board-bar-track');
+    var pop = bar.querySelector('.board-bar-pop');
+    if (!track) return;
 
     var buckets = {}, total = 0, done = 0;
     Array.prototype.forEach.call(picks, function (sel) {
@@ -305,7 +325,7 @@
       if (!buckets[key]) {
         buckets[key] = {
           name: opt.value === '' ? 'Not started' : (opt.textContent || '').trim(),
-          color: opt.getAttribute('data-color') || '',
+          color: opt.getAttribute('data-color') || 'var(--border-strong)',
           rank: rankOf(opt),
           order: opt.index,
           n: 0
@@ -313,21 +333,45 @@
       }
       buckets[key].n++;
     });
-    if (!total) { bar.innerHTML = ''; return; }
+    if (!total) { track.innerHTML = ''; if (pop) pop.innerHTML = ''; return; }
 
     var segs = Object.keys(buckets).map(function (k) { return buckets[k]; });
     segs.sort(function (a, b) { return (a.rank - b.rank) || (a.order - b.order); });
 
-    bar.innerHTML = '';
+    var sum = done + ' of ' + total + ' tasks finished';
+    track.innerHTML = '';
+    if (pop) pop.innerHTML = '';
+
     segs.forEach(function (seg) {
       var span = document.createElement('span');
       span.className = 'board-bar-seg';
       span.style.width = (seg.n / total * 100) + '%';
-      span.style.background = seg.color || 'var(--border-strong)';
+      span.style.background = seg.color;
       span.title = seg.name + ', ' + seg.n + ' of ' + total;
-      bar.appendChild(span);
+      track.appendChild(span);
+
+      if (!pop) return;
+      // Built as nodes, never as a string of HTML: a status is named by a
+      // person, and this one is dropped straight into the page.
+      var key = document.createElement('span');
+      key.className = 'board-bar-key';
+      var dot = document.createElement('i');
+      dot.style.background = seg.color;
+      key.appendChild(dot);
+      key.appendChild(document.createTextNode(seg.name));
+      var n = document.createElement('b');
+      n.textContent = seg.n;
+      key.appendChild(n);
+      pop.appendChild(key);
     });
-    bar.title = done + ' of ' + total + ' tasks finished';
+
+    if (pop) {
+      var foot = document.createElement('span');
+      foot.className = 'board-bar-sum';
+      foot.textContent = sum;
+      pop.appendChild(foot);
+    }
+    bar.setAttribute('aria-label', sum);
   }
 
   // --- searching and filtering ----------------------------------------------
