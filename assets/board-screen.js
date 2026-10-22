@@ -707,6 +707,29 @@
     }
 
     if (form && e.target.closest('[data-reply-cancel]')) replyTo(form, '', '');
+
+    // Taking a file back off a comment. Asked first, because it deletes the
+    // file from the server and not only the row.
+    var del = e.target.closest('.board-att-del');
+    if (del && panelInner && panelInner.contains(del)) {
+      e.preventDefault();
+      if (!window.confirm('Remove this file? It is deleted from the server.')) return;
+      var host = panelInner.querySelector('.board-comment-form');
+      var pane = del.closest('[data-pane="comments"]');
+      if (!host || !pane) return;
+      del.disabled = true;
+
+      var gone = new FormData();
+      gone.append('delete_attachment', del.getAttribute('data-att'));
+      gone.append('project_id', host.getAttribute('data-project'));
+      gone.append('step_id', host.getAttribute('data-step'));
+      gone.append('item_key', host.getAttribute('data-item'));
+
+      fetch('board_comment.php', { method: 'POST', body: gone, credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) { pane.innerHTML = html; commentsReady(); })
+        .catch(function () { del.disabled = false; });
+    }
   });
 
   document.addEventListener('submit', function (e) {

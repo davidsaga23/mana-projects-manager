@@ -24,6 +24,7 @@ require_once __DIR__ . '/includes/pipeline.php';
 require_once __DIR__ . '/includes/grid.php';
 require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/activity.php';
+require_once __DIR__ . '/includes/notify.php';   // the bell beside your name (migration 060)
 require_login_json();
 
 header('Content-Type: application/json');
@@ -132,6 +133,35 @@ try {
         return (bool)$q->fetchColumn();
     };
 
+    /**
+     * What this task is called, for the sentence in somebody's bell.
+     *
+     * ⚠ READ ONCE AND STORED IN THE NOTIFICATION, never re-derived later — the
+     * same choice migration 021 made for progress_log, and migration 060
+     * repeats: a notification is a record of a moment, and a step renamed next
+     * week must not rewrite what it said today.
+     */
+    $taskName = function () use ($pdo, $step, $kind, $itemId): string {
+        $name = '';
+        if ($kind === 's') {
+            $q = $pdo->prepare('SELECT shot_code FROM shots WHERE id = ?');
+            $q->execute([$itemId]);
+            $name = (string)$q->fetchColumn();
+        } elseif ($kind === 'a') {
+            $q = $pdo->prepare('SELECT name FROM assets WHERE id = ?');
+            $q->execute([$itemId]);
+            $name = (string)$q->fetchColumn();
+        }
+        return $name !== '' ? ($step['name'] . ' on ' . $name) : (string)$step['name'];
+    };
+
+    /** The row's id after a write, which an upsert does not hand back. */
+    $progressIdNow = function () use ($pdo, $stepId, $itemKey): int {
+        $q = $pdo->prepare('SELECT id FROM progress WHERE step_id = ? AND item_key = ?');
+        $q->execute([$stepId, $itemKey]);
+        return (int)$q->fetchColumn();
+    };
+
     /** Write the cell, creating it when the importer never made one. */
     $upsert = function (array $set) use ($pdo, $projectId, $stepId, $itemKey, $kind, $itemId) {
         $cols = array_keys($set);
@@ -174,6 +204,20 @@ try {
             'is_approved'  => $flags['is_approved'],
         ]);
 
+        // Everybody following this task, which is nobody to tick and nobody to
+        // forget to tick — see notify_subscribers(). The person who moved it is
+        // dropped inside notify_add(), so this cannot ring your own bell.
+        $pid = $progressIdNow();
+        notify_add($pdo, notify_subscribers($pdo, $pid), [
+            'kind'        => 'status',
+            'actor'       => current_user_display(),
+            'summary'     => $taskName() . ' → ' . ($status['name'] ?? 'Not started'),
+            'project_id'  => $projectId,
+            'step_id'     => $stepId,
+            'item_key'    => $itemKey,
+            'progress_id' => $pid,
+        ], (int)(effective_crew_id($pdo) ?? 0));
+
         log_status_change_by_id($pdo, $projectId, $step, $itemKey, $was, $statusId, [
             'item_name'  => null,
             'shot_id'    => $kind === 's' ? $itemId : null,
@@ -214,6 +258,23 @@ try {
             if (!$name) throw new RuntimeException('That is not somebody a task can be given to.');
         }
         $upsert(['crew_id' => $crewId]);
+
+        // ⚠ ONLY THE NEW OWNER, and only when there is one. Clearing an
+        // assignee tells nobody: "you no longer have this" is not news anybody
+        // needs at the top of their screen, and the person who DID have it
+        // finds out the moment they look at the board.
+        if ($crewId !== null) {
+            notify_add($pdo, [$crewId], [
+                'kind'        => 'assigned',
+                'actor'       => current_user_display(),
+                'summary'     => $taskName(),
+                'project_id'  => $projectId,
+                'step_id'     => $stepId,
+                'item_key'    => $itemKey,
+                'progress_id' => $progressIdNow(),
+            ], (int)(effective_crew_id($pdo) ?? 0));
+        }
+
         echo json_encode([
             'ok'      => true,
             'crew_id' => $crewId,
