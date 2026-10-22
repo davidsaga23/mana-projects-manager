@@ -4338,3 +4338,19 @@ re-dates six other steps, and saves them, is a bigger edit than the gesture look
 returns nothing, so the library's drag collects just the bar under the cursor. Instance-level, so
 the detailed chart is untouched. Shifting a whole tail of the show now means dragging each bar, or
 re-running the schedule.
+
+## 2026-10-22 — Days off and engagement dates move the plan, per person, at the next run
+**Decision:** a person's days off live in `crew_absences` (migration 060), one row per range, per
+PERSON rather than per show, because a holiday is a holiday on every show. The scheduler reads them
+together with the engagement dates on `crew_projects` (migration 024 left those unread on purpose
+until this): a lane's tasks skip the days its person cannot work, and each item now goes to the lane
+that FINISHES it soonest rather than the lane free soonest.
+**Why that lane rule:** with nobody away the two are identical (ties break on free-soonest, then lane
+number), so every existing plan comes out the same. With somebody away, "free soonest" would park a
+shot on a lane whose artist is on holiday while a colleague sits idle.
+**Past the end of an engagement:** when everyone on a step has finished on the show, the item is still
+planned, on the lane that finishes first, and the step reports it. Dropping it would hide the work;
+the person page already flags work outside somebody's dates.
+**Deliberately not done:** the quota, budget pool and bookings still treat every working day as
+available to everyone; a band (coverage below 100%) ignores absences; the timeline does not shade
+them. Nothing moves until the schedule is re-run, and hand-placed bars never move.

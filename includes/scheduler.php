@@ -27,6 +27,7 @@ require_once __DIR__ . '/calendar.php';
 require_once __DIR__ . '/standards.php';   // effective_days_per_unit()
 require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/quota.php';
+require_once __DIR__ . '/absences.php';   // person_unavailability()
 
 /**
  * How a lane is named.
@@ -103,6 +104,12 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
     // Who fills each lane. A placeholder slot ("Animation 02") counts as filled:
     // the whole point is being able to plan before anyone is hired.
     $laneCrew   = scheduler_lane_crew($pdo, $projectId);
+    // When each of those people cannot work: their days off, and anything
+    // outside their engagement on this show (includes/absences.php). A slot
+    // nobody has dates for is simply absent from this map.
+    $laneIds = [];
+    foreach ($laneCrew as $slots) foreach ($slots as $slot) $laneIds[] = $slot['id'];
+    $unavail = person_unavailability($pdo, $projectId, $laneIds);
 
     // Steps in dependency order. A step's level is one past everything it waits
     // for, so ordering by level is a valid topological order and the graph never
@@ -133,7 +140,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
         $summary = scheduler_schedule_step(
             $pdo, $project, $step, $axis, $anchor, $projectDeadline,
             $items, $progress, $manual, $shotAssets, $shotNa, $stepScope, $depsMap,
-            $stepEnd, $itemEnd, $estimates, $laneCrew, $retakePct
+            $stepEnd, $itemEnd, $estimates, $laneCrew, $retakePct, $unavail
         );
 
         $out['steps'][$stepId] = $summary;
@@ -402,7 +409,7 @@ function scheduler_schedule_step(
     array $items, array $progress, array $manual, array $shotAssets,
     array $shotNa, array $stepScope, array $depsMap,
     array $stepEnd, array $itemEnd, array $estimates, array $laneCrew = [],
-    float $retakePct = 0.0
+    float $retakePct = 0.0, array $unavail = []
 ): array {
     $stepId    = (int)$step['id'];
     $stepName  = $step['name'];
@@ -673,30 +680,68 @@ function scheduler_schedule_step(
                 $step['applies_to'] === 'asset' ? 'assets' : 'shots'
               );
     } else {
+        // Who cannot work when, per lane (lanes are 1-based in $laneCrew).
+        $laneUnavail = [];
+        for ($i = 0; $i < $lanes; $i++) {
+            $cid = $laneCrew[$stepId][$i + 1]['id'] ?? null;
+            $laneUnavail[$i] = $cid !== null ? ($unavail[$cid] ?? null) : null;
+        }
+        $pastEnd = [];   // lane => tasks that had to run past that person's last day
+
         $laneFree = array_fill(0, $lanes, 0.0);
         foreach ($entries as $n => $entry) {
             $item = $entry['item'];
-            $lane = 0;
-            for ($i = 1; $i < $lanes; $i++) {
-                if ($laneFree[$i] < $laneFree[$lane]) $lane = $i;
+            $len  = $duration($item);
+
+            // The lane that FINISHES this item soonest. With nobody away that is
+            // the lane that frees up soonest, as it always was; with somebody
+            // away it is whoever can actually do it first, so an item never
+            // waits for a person to come back while a colleague is free.
+            $pick = scheduler_pick_lane($axis, $laneFree, $laneUnavail,
+                                        (float)$entry['earliest'], (float)$earliestStep, $len, true);
+            if ($pick === null) {
+                // Everyone on the step has finished on the show by then. Plan it
+                // on the lane that finishes first anyway and say so: dropping the
+                // item would hide it.
+                $pick = scheduler_pick_lane($axis, $laneFree, $laneUnavail,
+                                            (float)$entry['earliest'], (float)$earliestStep, $len, false);
+                if ($pick !== null) $pastEnd[$pick[0]] = ($pastEnd[$pick[0]] ?? 0) + 1;
             }
-            $start = max($laneFree[$lane], (float)$entry['earliest'], (float)$earliestStep);
-            $len   = $duration($item);
+            if ($pick === null) break;   // ran off the end of the calendar
+            [$lane, $start, $end] = $pick;
 
             $task = scheduler_make_task(
                 $axis, $projectId, $step, $item, $item['key'], $item['name'],
-                $start, $len, $lane + 1, $lanes, !empty($item['blocked']), $n,
+                $start, $end - $start, $lane + 1, $lanes, !empty($item['blocked']), $n,
                 $laneCrew[$stepId] ?? []
             );
             if ($task === null) break;   // ran off the end of the calendar
 
-            $laneFree[$lane] = $start + $len;
+            $laneFree[$lane] = $end;
             $s['tasks'][] = $task;
             $s['item_end'][$item['key']] = $task['end_index'];
             $s['end_index'] = $s['end_index'] === null
                 ? $task['end_index'] : max($s['end_index'], $task['end_index']);
         }
         $s['scheduled'] = count($s['tasks']);
+
+        $around = [];
+        foreach ($laneUnavail as $i => $u) {
+            if ($u !== null) $around[] = $laneCrew[$stepId][$i + 1]['name'];
+        }
+        if ($around) {
+            $s['notes'][] = 'Planned around the days off and show dates of ' . implode(', ', $around) .
+                            ': their tasks skip the days they are away, and each item goes to ' .
+                            'whoever on this step can finish it first.';
+        }
+        foreach ($pastEnd as $i => $count) {
+            $s['notes'][] = sprintf(
+                '%d task%s run%s past the last day on the show of %s (%s), because nobody else ' .
+                'on this step was still on it. Extend their dates on their person page, or add someone.',
+                $count, $count === 1 ? '' : 's', $count === 1 ? 's' : '',
+                $laneCrew[$stepId][$i + 1]['name'], $laneUnavail[$i]['end'] ?? '?'
+            );
+        }
     }
 
     // --- did it land on time? ------------------------------------------------
@@ -716,6 +761,73 @@ function scheduler_schedule_step(
     }
 
     return $s;
+}
+
+/**
+ * Which lane does an item soonest, and when, around the people's days off.
+ *
+ * Returns [lane index, start, end] on the fractional working-day axis, or null
+ * when no lane can take it (everyone finished on the show, with $honourEnd, or
+ * the calendar ran out). Ties go to the lane free earliest, then the lowest
+ * number, which with nobody away is exactly the old "lane that frees up
+ * soonest" rule, so a plan with no absences comes out unchanged.
+ */
+function scheduler_pick_lane(
+    array &$axis, array $laneFree, array $laneUnavail, float $earliest, float $earliestStep,
+    float $len, bool $honourEnd
+): ?array {
+    $best = null;
+    foreach ($laneFree as $i => $free) {
+        $from  = max($free, $earliest, $earliestStep);
+        $place = scheduler_place_in_lane($axis, $laneUnavail[$i] ?? null, $from, $len, $honourEnd);
+        if ($place === null) continue;
+        $key = [$place[1], $free, $i];
+        if ($best === null || $key < $best['key']) {
+            $best = ['key' => $key, 'pick' => [$i, $place[0], $place[1]]];
+        }
+    }
+    return $best['pick'] ?? null;
+}
+
+/**
+ * Lay $len days of work from $start on one person's lane, skipping the days
+ * they cannot work. Returns [start, end] on the axis, where end - start is the
+ * span on the CALENDAR (the skipped days included), or null.
+ *
+ * Fractional like the rest of the axis: half a day on the Friday before a week
+ * away finishes on the Friday; a day and a half finishes on the Monday back. A
+ * start inside an absence slides to the first day back. The days come from the
+ * axis, so weekends and studio holidays are already gone from it.
+ */
+function scheduler_place_in_lane(array &$axis, ?array $u, float $start, float $len, bool $honourEnd): ?array {
+    if ($u === null) return [$start, $start + $len];
+
+    // 'ok', 'skip' (cannot work that day) or 'stop' (past their last day on the
+    // show, or past the end of the calendar).
+    $state = function (int $idx) use (&$axis, $u, $honourEnd): string {
+        $date = axis_date($axis, $idx);
+        if ($date === null) return 'stop';
+        if ($u['start'] !== null && $date < $u['start']) return 'skip';
+        if ($u['end'] !== null && $date > $u['end'] && $honourEnd) return 'stop';
+        return isset($u['days'][$date]) ? 'skip' : 'ok';
+    };
+
+    $pos   = $start;
+    $begun = null;
+    $left  = $len;
+    // The calendar's own cap ends this through 'stop'; the guard is for safety.
+    for ($guard = 0; $guard < 20000; $guard++) {
+        $day = (int)floor($pos);
+        $st  = $state($day);
+        if ($st === 'stop') return null;
+        if ($st === 'skip') { $pos = $day + 1; continue; }
+        if ($begun === null) $begun = $pos;
+        $take  = min($left, $day + 1 - $pos);
+        $pos  += $take;
+        $left -= $take;
+        if ($left <= 1e-9) return [$begun, $pos];
+    }
+    return null;
 }
 
 /**

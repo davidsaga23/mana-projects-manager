@@ -38,7 +38,8 @@ joined on ids that never move.
 `assign_crew_to_lane()`, which moves the planned work across. Renaming made a new copy of an artist
 for every position they were hired into. The rest of the chain is unchanged.)*
 
-**What is deliberately still missing inside it:** the scheduler does not read engagement dates. A
+**What is deliberately still missing inside it:** the scheduler does not read engagement dates.
+*(Since 2026-10-22 it does, with days off — see "Days off are a scheduler input" below.)* A
 person's start and end dates are recorded and compared against the plan, but nothing moves a bar —
 see the 2026-08-17 entry in `DECISIONS.md`, and build it with `crew_absences`, which is the same
 rule wearing a different hat.
@@ -301,7 +302,16 @@ from production and holds the invoices privately. This is exactly the split the
 separation decision exists to enforce, and it's worth expecting so it doesn't
 feel like an obstacle when it appears.
 
-## Days off are a scheduler input, not an HR note
+## Days off are a scheduler input, not an HR note — BUILT 2026-10-22
+
+✅ **`crew_absences` (migration 060), entered under *Days off* on the person page, and the
+scheduler reads it** together with the engagement dates on `crew_projects`: each lane skips the
+days its person is away or not on the show, and an item goes to whoever on the step can finish it
+first (`scheduler_pick_lane()`, `includes/absences.php`). Public holidays were already built
+(`non_working_days`, the Calendar screen). **Still not done:** the quota, budget-pool and bookings
+maths count every working day as available to everyone, and the timeline does not shade a
+person's days off. A saved schedule moves only when it is re-run. The original note:
+
 
 `working_days_between()` currently counts Mon–Fri and nothing else. If someone
 is away for two weeks, every quota and every scheduled date that assumes they

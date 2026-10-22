@@ -21,6 +21,7 @@ require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/artists.php';
+require_once __DIR__ . '/includes/absences.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -111,6 +112,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_details'])) {
     exit;
 }
 
+// --- days off: add one, or remove one ---------------------------------------
+// Per PERSON, not per show (migration 060): a holiday is a holiday on every
+// show they are on, so this page records it whichever project it was opened from.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
+    && (isset($_POST['add_absence']) || isset($_POST['delete_absence']))) {
+    try {
+        flash('ok', isset($_POST['delete_absence'])
+            ? delete_crew_absence($pdo, $crewId, (int)$_POST['delete_absence'])
+            : add_crew_absence($pdo, $crewId, (string)($_POST['from_date'] ?? ''),
+                               (string)($_POST['to_date'] ?? ''), (string)($_POST['reason'] ?? ''),
+                               current_user_display()));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: ' . $selfUrl . '#days-off');
+    exit;
+}
+
 // --- save the terms (admin only; the guard lives in money.php) --------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
     try {
@@ -146,12 +165,13 @@ try {
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
 
-// When they are on this show, and whether the plan agrees. The scheduler does
-// not read these dates yet (migration 024 says why), so the mismatch is REPORTED
-// rather than silently corrected — a column that looks like it is being obeyed
-// and is not is the failure this codebase keeps paying for.
+// When they are on this show, and whether the plan agrees. The scheduler plans
+// around these dates since 2026-10-22, but only when it is RE-RUN — a saved
+// schedule is a snapshot — and hand-placed bars are never moved, so the
+// mismatch is still reported here rather than assumed away.
 $engagement = engagement($pdo, $crewId, $projectId);
 $dateClash  = engagement_conflicts($pdo, $crewId, $projectId);
+$absences   = crew_absences($pdo, $crewId);
 
 // How this person came to be on the show, if they were hired through the
 // platform. Kept because "where do the people who work out actually come from"
@@ -284,11 +304,10 @@ require __DIR__ . '/includes/header.php';
       <?= e($dateClash['end']) ?>, the last is <?= e($dateClash['last_end']) ?>.
     <?php endif; ?>
     <div class="muted small" style="margin-top:6px;">
-      The scheduler does not yet take engagement dates into account, so it has planned this work
-      as though they were available throughout. Nothing here is wrong by itself, it is a
-      difference between the plan and the agreement that somebody has to resolve, by moving the
-      work on the <a href="timeline.php?project=<?= $projectId ?>">timeline</a> or by changing the
-      dates below.
+      The scheduler plans around these dates when it is re-run, so this is either a schedule saved
+      before the dates were set, bars placed by hand, or work nobody else on the step could take.
+      Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a>, move the work on the
+      <a href="timeline.php?project=<?= $projectId ?>">timeline</a>, or change the dates below.
     </div>
   </div>
 <?php endif; ?>
@@ -409,12 +428,63 @@ require __DIR__ . '/includes/header.php';
     <p class="muted small">
       Recorded per show, not per person, the same artist can be on this one from September and on
       the next from January. Leave either blank while it is genuinely not settled; a guessed date
-      reads as a fact. <strong>The scheduler does not use these yet</strong>, so they do not move
-      any bar on the timeline, where the plan disagrees with them, this page says so above.
+      reads as a fact. The scheduler gives this person no work before the start or after the end
+      the next time the schedule is run; where the plan still disagrees, this page says so above.
     </p>
   <?php endif; ?>
   <div class="actions"><button type="submit">Save details</button></div>
 </form>
+<?php endif; ?>
+
+<?php if (absences_available($pdo) && !$isSlot): ?>
+  <h3 id="days-off">Days off</h3>
+  <p class="muted small">
+    Holidays, leave, a course, any day <?= e($person['name']) ?> is away while the studio works.
+    Recorded for the person, so it counts on every show they are on. Public holidays belong on the
+    studio <a href="calendar.php">Calendar</a> instead, which closes the day for everyone. The
+    scheduler skips these days for this person and hands their work to whoever on the step is free,
+    <strong>the next time the schedule is run</strong>, a saved plan does not move by itself.
+  </p>
+  <?php if ($absences): ?>
+    <table class="review-table">
+      <thead><tr><th>From</th><th>To</th><th class="num">Working days</th><th>Reason</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($absences as $a): ?>
+        <tr>
+          <td><?= e($a['from_date']) ?></td>
+          <td><?= e($a['to_date']) ?></td>
+          <td class="num"><?= working_days_between($a['from_date'], $a['to_date']) ?></td>
+          <td><?= e($a['reason'] ?? '') ?: '<span class="muted">—</span>' ?></td>
+          <td>
+            <?php if (can_edit()): ?>
+              <form method="post" style="display:inline"
+                    onsubmit="return confirm('Remove these days off?');">
+                <input type="hidden" name="delete_absence" value="<?= (int)$a['id'] ?>">
+                <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
+                <button type="submit" class="linkish">Remove</button>
+              </form>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p class="muted small">None recorded.</p>
+  <?php endif; ?>
+  <?php if (can_edit()): ?>
+    <form method="post" class="stack">
+      <input type="hidden" name="add_absence" value="1">
+      <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
+      <div class="row">
+        <label>First day <input type="date" name="from_date" required></label>
+        <label>Last day <input type="date" name="to_date"></label>
+        <label>Reason <input name="reason" maxlength="120" placeholder="e.g. Holiday"></label>
+      </div>
+      <p class="muted small">Leave the last day blank for a single day.</p>
+      <div class="actions"><button type="submit">Add days off</button></div>
+    </form>
+  <?php endif; ?>
 <?php endif; ?>
 
 <?php // ---- ADMIN ONLY. money.php returns nothing at all for anyone else, so a
