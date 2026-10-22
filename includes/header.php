@@ -47,6 +47,17 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
       // finance_nav() both draw. So the top bar carries what is on MY desk, the
       // one way to ALL the shows, and the housekeeping behind a separator.
       ?>
+      <?php // THE BOARD, first and drawn as a button (David, 2026-10-22: "a big
+            // button at the top will give you access to the board where you can
+            // switch between projects so you don't have one per project and
+            // just one place to take a look at the whole thing").
+            //
+            // ⚠ NOT A PROJECT TAB, deliberately. It carries its own show picker,
+            // which is the whole point: it is the one place to see the work,
+            // rather than a screen you reach only after choosing a show. It is
+            // the screen replacing Plaky, so it is the first thing in the bar
+            // and the only one here that looks like a button. ?>
+      <a href="board.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'board.php' ? ' is-on' : '' ?>">Board</a>
       · <a href="mytasks.php">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
           class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
           title="<?= $myTasksBadge['new']

@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — The Board: the screen that replaces Plaky *(needs migration 057 for the Link column only)*
+
+- **A new Board**, reached from a button at the top of every page, with a show picker — one screen
+  for the whole studio rather than a tab inside each show.
+- Shots and assets grouped by episode or asset type, each opening to show its pipeline steps.
+  Whole-show deliverables (an animatic, a colour script) sit in their own group with no sub-rows,
+  exactly as they do in Plaky.
+- **Status, assignee, due date, link and notes all save in place**, with no page reload. A refusal
+  puts the old value back and says why.
+- **A shot's own status is worked out from its tasks**, so nobody has to keep it up to date.
+- **Frames are shown, never edited** — they come from the breakdown.
+- **A due date typed here is the timeline's own date.** Setting one moves that bar and marks the
+  task hand-planned, so re-running the schedule will not overwrite it.
+- **Artists** see the shows they are staffed on and may set their own work to In progress or
+  Pending review, the same limit My tasks keeps. The other statuses are listed but greyed.
+- Search, expand-all and collapse-all across the board.
+
 ## 2026-10-21 — Budget pool: who is on each step *(no migration)*
 
 - **A step's detail on the Budget pool lists everyone on it.** For each person: rate, budget in
