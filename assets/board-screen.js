@@ -117,7 +117,7 @@
         el.style.background = data.color ? tint(data.color) : '';
         el.style.color = data.color || '';
         var item = el.closest('.board-item');
-        if (item) redrawDerived(item);
+        if (item) { redrawDerived(item); redrawBar(item); }
       });
       return;
     }
@@ -206,6 +206,7 @@
     if (!item) return;
     var open = item.classList.toggle('is-open');
     caret.setAttribute('aria-expanded', open ? 'true' : 'false');
+    noteOpen(item, open);
   });
 
   /**
@@ -225,6 +226,7 @@
       item.classList.toggle('is-open', open);
       var c = item.querySelector('.board-row-item .board-caret');
       if (c) c.setAttribute('aria-expanded', open ? 'true' : 'false');
+      noteOpen(item, open);
     });
   }
 
@@ -273,35 +275,184 @@
     if (e.key === 'Escape') shutMenus(null);
   });
 
-  // --- searching ------------------------------------------------------------
+  // --- the bar on a shot ----------------------------------------------------
+  //
+  // ⚠ THE SAME ORDER board_item_bar() USES IN PHP, from the same facts carried
+  // on each option: finished first, then delivered, then blocked, then started,
+  // then nothing yet. These two must move together, or a bar would re-sort
+  // itself the moment somebody touched a status.
+  function rankOf(opt) {
+    if (!opt || opt.value === '') return 4;
+    if (opt.getAttribute('data-approved') === '1') return 0;
+    if (opt.getAttribute('data-delivered') === '1') return 1;
+    if (opt.getAttribute('data-blocked') === '1') return 2;
+    return 3;
+  }
+
+  function redrawBar(item) {
+    var bar = item.querySelector('.board-row-item .board-bar');
+    if (!bar) return;
+    var picks = item.querySelectorAll('.board-row-task .board-status');
+    if (!picks.length) return;
+
+    var buckets = {}, total = 0, done = 0;
+    Array.prototype.forEach.call(picks, function (sel) {
+      var opt = sel.options[sel.selectedIndex];
+      if (!opt || opt.getAttribute('data-excluded') === '1') return;   // N/A is not work
+      total++;
+      if (opt.getAttribute('data-approved') === '1') done++;
+      var key = opt.value === '' ? '__none' : opt.value;
+      if (!buckets[key]) {
+        buckets[key] = {
+          name: opt.value === '' ? 'Not started' : (opt.textContent || '').trim(),
+          color: opt.getAttribute('data-color') || '',
+          rank: rankOf(opt),
+          order: opt.index,
+          n: 0
+        };
+      }
+      buckets[key].n++;
+    });
+    if (!total) { bar.innerHTML = ''; return; }
+
+    var segs = Object.keys(buckets).map(function (k) { return buckets[k]; });
+    segs.sort(function (a, b) { return (a.rank - b.rank) || (a.order - b.order); });
+
+    bar.innerHTML = '';
+    segs.forEach(function (seg) {
+      var span = document.createElement('span');
+      span.className = 'board-bar-seg';
+      span.style.width = (seg.n / total * 100) + '%';
+      span.style.background = seg.color || 'var(--border-strong)';
+      span.title = seg.name + ', ' + seg.n + ' of ' + total;
+      bar.appendChild(span);
+    });
+    bar.title = done + ' of ' + total + ' tasks finished';
+  }
+
+  // --- searching and filtering ----------------------------------------------
   //
   // In the browser, like every other filter on this platform, and for the same
-  // reason: these rows hold unsaved typing, and a server-side search would
+  // reason: these rows hold unsaved typing, and a server-side filter would
   // reload the page under somebody's hands.
+  //
+  // ⚠ A MATCH DEEP IN A SHUT SHOT IS NO USE HIDDEN, so a shot whose TASKS match
+  // is opened. Its own open/shut state is put back the moment the filters are
+  // cleared, so filtering never quietly rearranges somebody's board.
   var search = document.getElementById('boardSearch');
-  if (search) {
-    search.addEventListener('input', function () {
-      var q = search.value.trim().toLowerCase();
+  var fStatus = document.getElementById('fStatus');
+  var fCrew = document.getElementById('fCrew');
+  var fDue = document.getElementById('fDue');
+  var clearBtn = document.getElementById('boardClear');
+  var countEl = document.getElementById('boardCount');
+  var wasOpen = null;                 // what was expanded before filtering began
+
+  /**
+   * Somebody opened or shut a shot BY HAND while a filter was on.
+   *
+   * ⚠ THAT IS THE STATE TO COME BACK TO, not the one from before they started
+   * filtering. Without this, filtering, pressing Collapse all and then Clear
+   * re-opened everything — the board undoing a choice the person had just made.
+   */
+  function noteOpen(item, open) {
+    if (wasOpen) wasOpen[item.getAttribute('data-item')] = open;
+  }
+
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function inDays(n) {
+    var d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function dueMatches(want, due) {
+    if (want === '') return true;
+    if (want === '__none') return due === '';
+    if (due === '') return false;
+    if (want === 'set') return true;
+    if (want === 'late') return due < today();
+    if (want === 'soon') return due >= today() && due <= inDays(7);
+    return true;
+  }
+
+  function applyFilters() {
+    var q = search ? search.value.trim().toLowerCase() : '';
+    var st = fStatus ? fStatus.value : '';
+    var cr = fCrew ? fCrew.value : '';
+    var du = fDue ? fDue.value : '';
+    var on = q !== '' || st !== '' || cr !== '' || du !== '';
+
+    // Remember the board as the person left it, once, so Clear can restore it.
+    if (on && wasOpen === null) {
+      wasOpen = {};
       Array.prototype.forEach.call(document.querySelectorAll('.board-item'), function (item) {
-        if (q === '') {
-          item.hidden = false;
-          Array.prototype.forEach.call(item.querySelectorAll('.board-row-task'), function (r) {
-            r.hidden = false;
-          });
-          return;
-        }
-        var itemRow = item.querySelector('.board-row-item');
-        var itemHit = itemRow && (itemRow.getAttribute('data-search') || '').indexOf(q) !== -1;
-        var any = itemHit;
-        Array.prototype.forEach.call(item.querySelectorAll('.board-row-task'), function (r) {
-          var hit = itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1;
-          r.hidden = !hit;
-          if (hit) any = true;
-        });
-        item.hidden = !any;
-        // A match deep in a shut shot is no use hidden.
-        if (any && !itemHit) item.classList.add('is-open');
+        wasOpen[item.getAttribute('data-item')] = item.classList.contains('is-open');
       });
+    }
+
+    var shown = 0, all = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.board-item'), function (item) {
+      var itemRow = item.querySelector('.board-row-item');
+      var itemHit = itemRow && (itemRow.getAttribute('data-search') || '').indexOf(q) !== -1;
+      var tasks = item.querySelectorAll('.board-row-task');
+      var any = false;
+
+      Array.prototype.forEach.call(tasks, function (r) {
+        all++;
+        // The search matches a shot OR a task; the three dropdowns are about a
+        // task alone, so a shot's name never satisfies them.
+        var hit = (q === '' || itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1)
+               && (st === '' || r.getAttribute('data-status') === st)
+               && (cr === '' || r.getAttribute('data-crew') === cr)
+               && dueMatches(du, r.getAttribute('data-due') || '');
+        r.hidden = on && !hit;
+        if (hit) { any = true; shown++; }
+      });
+
+      if (!on) {
+        item.hidden = false;
+        if (wasOpen) item.classList.toggle('is-open', !!wasOpen[item.getAttribute('data-item')]);
+        return;
+      }
+      // A row with no tasks at all (a whole-show deliverable) rides on its name.
+      item.hidden = tasks.length ? !any : !itemHit;
+      if (any) item.classList.add('is-open');
+    });
+
+    if (!on) wasOpen = null;
+    if (clearBtn) clearBtn.hidden = !on;
+    if (countEl) {
+      countEl.textContent = on ? (shown + ' of ' + all + ' tasks match') : '';
+      countEl.classList.toggle('is-empty', on && shown === 0);
+    }
+  }
+
+  if (search) search.addEventListener('input', applyFilters);
+  [fStatus, fCrew, fDue].forEach(function (el) {
+    if (el) el.addEventListener('change', applyFilters);
+  });
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      if (search) search.value = '';
+      [fStatus, fCrew, fDue].forEach(function (el) { if (el) el.value = ''; });
+      applyFilters();
     });
   }
+
+  // ⚠ A ROW CARRIES WHAT THE FILTERS READ, so a cell that has just been saved
+  // has to update it — otherwise a task moved to Final stays visible under a
+  // filter for In progress, and the board quietly disagrees with itself.
+  document.addEventListener('change', function (e) {
+    var el = e.target;
+    if (!el.matches) return;
+    var row = el.closest ? el.closest('.board-row-task') : null;
+    if (!row) return;
+    if (el.matches('.board-status')) {
+      row.setAttribute('data-status', el.value === '' ? '__none' : el.value);
+    } else if (el.matches('.board-crew')) {
+      row.setAttribute('data-crew', el.value === '' ? '__none' : el.value);
+    } else if (el.matches('.board-due')) {
+      row.setAttribute('data-due', el.value);
+    }
+  });
 }());

@@ -3346,3 +3346,47 @@ button.secondary.danger:hover { background: var(--danger-border); }
   background: var(--surface-2); color: var(--text-2);
   font-size: 12px; font-weight: 600;
 }
+
+/* How far along a shot is, in its own tasks' status colours (2026-10-22).
+   Sits in the space the shot's name leaves and fills from the left. */
+.board-bar {
+  display: flex; flex: 1 1 auto; max-width: 320px; min-width: 60px;
+  height: 7px; border-radius: 4px; overflow: hidden;
+  background: var(--surface-3);
+}
+.board-bar-seg { display: block; height: 100%; }
+
+/* The headings and the filters ride at the top of a long board. */
+.board-sticky {
+  position: sticky; top: 0; z-index: 25;
+  padding-top: 6px; margin-bottom: 4px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-soft);
+}
+.board-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 160px 180px 132px 76px 110px minmax(110px, .9fr);
+  align-items: center; gap: 0; padding: 0 14px 9px;
+}
+.board-filters > div { padding-right: 8px; min-width: 0; }
+.board-filters select {
+  width: 100%; min-height: 30px; padding: 4px 8px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-2); font-size: 12.5px;
+}
+.board-filters select:not([value=""]) { color: var(--text); }
+.board-filter-count { font-size: 12.5px; color: var(--muted); }
+.board-filter-count.is-empty { color: var(--danger); }
+.board-filter-clear {
+  min-height: 30px; padding: 4px 11px; border-radius: 7px;
+  background: transparent; border: 1px solid var(--border); color: var(--text-2);
+  font-size: 12.5px; cursor: pointer;
+}
+.board-filter-clear:hover { background: var(--surface-2); color: var(--text); }
+.board-filter-clear[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  /* Stacked, the seven-column filter row has nothing to line up with. */
+  .board-sticky { position: static; }
+  .board-filters { grid-template-columns: 1fr 1fr; }
+}

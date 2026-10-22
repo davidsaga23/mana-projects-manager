@@ -116,14 +116,57 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php else: ?>
 
-<div class="board-grid-head">
-  <div>Shot and task</div>
-  <div>Status</div>
-  <div>Assignee</div>
-  <div>Due</div>
-  <div class="num">Frames</div>
-  <div>Link</div>
-  <div>Notes</div>
+<?php // ⚠ THE HEADINGS AND THE FILTERS STICK TOGETHER (David, 2026-10-22). On a
+      // 21-shot show expanded this is 170 rows; by the time you have scrolled to
+      // SH150 the column you are reading has no heading on it, and the filter
+      // that got you there has scrolled away too. Both ride at the top. ?>
+<div class="board-sticky">
+  <div class="board-grid-head">
+    <div>Shot and task</div>
+    <div>Status</div>
+    <div>Assignee</div>
+    <div>Due</div>
+    <div class="num">Frames</div>
+    <div>Link</div>
+    <div>Notes</div>
+  </div>
+
+  <?php // Filters on the three columns worth filtering. Frames belongs to the
+        // shot, and Link and Notes are filled on 6 and 2 rows of MSD's 147, so
+        // a dropdown on either would be furniture. ?>
+  <div class="board-filters">
+    <div class="board-filter-count" id="boardCount"></div>
+    <div>
+      <select id="fStatus" aria-label="Filter by status">
+        <option value="">Any status</option>
+        <option value="__none">Not started</option>
+        <?php foreach ($board['statuses'] as $s): ?>
+          <option value="<?= (int)$s['id'] ?>"><?= e($s['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <select id="fCrew" aria-label="Filter by who it is assigned to">
+        <option value="">Anybody</option>
+        <option value="__none">Nobody yet</option>
+        <?php foreach ($crew as $c): ?>
+          <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <select id="fDue" aria-label="Filter by due date">
+        <option value="">Any date</option>
+        <option value="late">Overdue</option>
+        <option value="soon">Due in the next 7 days</option>
+        <option value="set">Has a date</option>
+        <option value="__none">No date</option>
+      </select>
+    </div>
+    <div></div>
+    <div></div>
+    <div><button type="button" class="board-filter-clear" id="boardClear" hidden>Clear</button></div>
+  </div>
 </div>
 
 <?php foreach ($board['groups'] as $g): ?>
@@ -187,6 +230,21 @@ require __DIR__ . '/includes/header.php';
                 <a class="board-name" href="item.php?project=<?= $projectId ?>&amp;item=<?= e(urlencode($item['item_key'])) ?>"><?= e($item['name']) ?></a>
               <?php endif; ?>
               <span class="muted small"><?= e($item['scope']) ?></span>
+
+              <?php // HOW FAR ALONG, in the colours of its own tasks' statuses
+                    // (David, 2026-10-22). Sits in the space the shot's name
+                    // leaves, which is where he pointed, and fills from the left
+                    // as work finishes. A deliverable has no bar: it is one task,
+                    // and a bar of one segment says nothing a status does not. ?>
+              <?php $bar = $item['bar'] ?? null; if ($bar && $bar['total'] > 0): ?>
+                <span class="board-bar"
+                      title="<?= (int)$bar['done'] ?> of <?= (int)$bar['total'] ?> tasks finished">
+                  <?php foreach ($bar['segments'] as $seg): ?>
+                    <span class="board-bar-seg" style="width:<?= e(fmt_num($seg['pct'], 3)) ?>%;background:<?= e($seg['color']) ?>"
+                          title="<?= e($seg['name']) ?>, <?= (int)$seg['n'] ?> of <?= (int)$bar['total'] ?>"></span>
+                  <?php endforeach; ?>
+                </span>
+              <?php endif; ?>
             </div>
 
             <?php if ($self): ?>
@@ -218,8 +276,14 @@ require __DIR__ . '/includes/header.php';
 
           <?php foreach ($item['tasks'] as $t): ?>
             <?php $mine = $t['crew_id'] !== null && $t['crew_id'] === $myCrewId; ?>
+            <?php // What the filters read. On the ROW, not dug out of the
+                  // controls inside it, so a row filters the same whether its
+                  // cells are editable selects or plain text for an artist. ?>
             <div class="board-row board-row-task"
-                 data-search="<?= e(strtolower($item['name'] . ' ' . $t['step'] . ' ' . ($t['person'] ?? ''))) ?>">
+                 data-search="<?= e(strtolower($item['name'] . ' ' . $t['step'] . ' ' . ($t['person'] ?? ''))) ?>"
+                 data-status="<?= $t['status_id'] !== null ? (int)$t['status_id'] : '__none' ?>"
+                 data-crew="<?= $t['crew_id'] !== null ? (int)$t['crew_id'] : '__none' ?>"
+                 data-due="<?= e((string)($t['due'] ?? '')) ?>">
               <div class="board-cell-name board-task-name">
                 <span class="board-dot board-dot-step" style="background:<?= e($t['step_color'] ?: 'var(--step-default)') ?>"></span>
                 <span><?= e($t['step']) ?></span>
