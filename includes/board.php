@@ -266,14 +266,14 @@ function board_data(PDO $pdo, int $projectId): array {
     $hasLink = column_exists($pdo, 'progress', 'link');
 
     $shots = $pdo->prepare(
-        'SELECT id, episode, shot_code, frames, placeholder_seconds
+        'SELECT id, episode, shot_code, frames, placeholder_seconds, notes
            FROM shots WHERE project_id = ? ORDER BY episode, shot_code'
     );
     $shots->execute([$projectId]);
     $shots = $shots->fetchAll();
 
     $assets = $pdo->prepare(
-        "SELECT id, name, COALESCE(asset_type, '') AS asset_type
+        "SELECT id, name, COALESCE(asset_type, '') AS asset_type, notes
            FROM assets WHERE project_id = ? ORDER BY asset_type, name"
     );
     $assets->execute([$projectId]);
@@ -349,9 +349,11 @@ function board_data(PDO $pdo, int $projectId): array {
 
     $groups = [];
     $counts = ['items' => 0, 'tasks' => 0, 'done' => 0];
+    $allTasks = [];                      // every task on the show, for the top bar
 
     /** Fold one built item into its group, making the group when first seen. */
-    $add = function (string $key, string $dept, string $detail, array $item) use (&$groups, &$counts) {
+    $add = function (string $key, string $dept, string $detail, array $item)
+                     use (&$groups, &$counts, &$allTasks) {
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'key'    => $key,
@@ -370,6 +372,7 @@ function board_data(PDO $pdo, int $projectId): array {
         // exactly the work the group holds.
         foreach ($item['tasks'] ?: array_filter([$item['self']]) as $t) {
             $groups[$key]['_tasks'][] = $t;
+            $allTasks[] = $t;
         }
         foreach ($item['tasks'] as $t) {
             if ($t['is_excluded']) continue;
@@ -433,6 +436,7 @@ function board_data(PDO $pdo, int $projectId): array {
             'name'     => (string)$s['shot_code'],
             'scope'    => count($tasks) . ' task' . (count($tasks) === 1 ? '' : 's'),
             'frames'   => $s['frames'] !== null ? (int)$s['frames'] : null,
+            'notes'    => (string)($s['notes'] ?? ''),
             'tasks'    => $tasks,
             'self'     => null,
             'status'   => board_item_status($tasks),

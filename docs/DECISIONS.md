@@ -4308,3 +4308,21 @@ Three more from using the Board, all David's.
 - **Expand all and Collapse all moved into the sticky header**, beside the filters. They sat above
   it, so on a long board they scrolled away exactly when a wall of open shots made them wanted.
   They span the three columns that have nothing to filter.
+
+## 2026-10-22 — The Board went down: a batch edit that failed, and the edit after it that did not
+**What happened:** `board.php` returned a white page the moment the project-wide bar shipped.
+`board_data()` ended with `board_item_bar($allTasks, $statusMap)` and **nothing anywhere declared
+`$allTasks`** — PHP passed null to an `array` parameter and the request died. Neither
+`check_php_blocks.py` nor `php -l` can see that: the file parses perfectly.
+**How it got in, and this is the part worth keeping:** one scripted edit made six replacements and
+threw on the fifth, so it wrote NOTHING — correctly. A second script then applied the pieces that
+CONSUMED those six, and that one succeeded. Each script behaved properly on its own; together they
+shipped a consumer with no producer.
+⚠ **A failed batch edit does not fail safely if a later edit assumes it worked.** When one aborts,
+re-verify every change it was supposed to make before writing anything that depends on it —
+lesson 14 says assert every replacement and lesson 16 says assert what came OUT; this adds: assert
+it is still there before you build on it.
+**What now catches it:** `tools/check_php_blocks.py` gained an eighth pass — variables read inside
+a file that nothing ever assigns. It is crude and biased towards false alarms (a typed parameter in
+a multi-line signature can trip it), because a name a human glances at costs seconds and a white
+page costs an afternoon. It reports `$allTasks` on the broken file and nothing on the fixed one.
