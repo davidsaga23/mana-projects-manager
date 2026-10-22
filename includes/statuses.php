@@ -70,6 +70,45 @@ function status_self_serve(?array $status): bool {
     return in_array($name, SELF_SERVE_STATUS_NAMES, true);
 }
 
+/**
+ * The spellings that mean "nobody has picked this up yet", used ONLY until
+ * migration 058 has run.
+ *
+ * ⚠ AN EXPLICIT LIST, never a fuzzy match — the rule PLAKY_COLUMN_ALIASES
+ * follows, and for the same reason. Once 058 is applied this is not consulted
+ * at all: the answer comes from `statuses.counts_as_started`, which somebody
+ * sets per show on the Statuses screen. A show whose opening state is spelled
+ * some other way reads as started until then, which is the safe direction —
+ * a shot that says In progress a little early is a smaller lie than one that
+ * says Not started while three people are working on it.
+ */
+const STATUS_NOT_BEGUN_NAMES = [
+    'waiting to start', 'waiting', 'not started', 'to do', 'todo',
+    'ready to start', 'ready', 'backlog', 'pending',
+];
+
+/**
+ * Has work on this task actually begun?
+ *
+ * David, 2026-10-22: a shot is in progress "when any of the tasks inside has
+ * other status than Waiting to Start or Ready to Start".
+ *
+ * ⚠ NOT ANSWERABLE FROM maps_to, which is what the Board got wrong at first.
+ * Waiting to start, Ready to start, In progress and Retake all map to 'none' —
+ * that column says whether something COUNTS as delivered, not whether anybody
+ * has touched it. Migration 058 adds the missing fact to the vocabulary itself.
+ *
+ * No status at all is never begun: an untouched cell is untouched.
+ */
+function status_has_begun(?array $status): bool {
+    if (!$status) return false;
+    if (array_key_exists('counts_as_started', $status)) {
+        return (int)$status['counts_as_started'] === 1;
+    }
+    $name = strtolower(trim(preg_replace('/\s+/', ' ', (string)($status['name'] ?? ''))));
+    return !in_array($name, STATUS_NOT_BEGUN_NAMES, true);
+}
+
 /** The refusal both My tasks status handlers give, in one place. */
 function status_self_serve_refusal(): string {
     return 'You can set your own work to In progress or Pending review. Any other status is set by Production.';

@@ -32,6 +32,10 @@ $hasExcluded = column_exists($pdo, 'statuses', 'is_excluded');
 // migration 017. Same treatment: hide the control rather than break the screen.
 $hasBoard = column_exists($pdo, 'statuses', 'on_ticket_board');
 
+// "Work has begun" arrives with the Board in migration 058. Same treatment
+// again: hide the control rather than break the screen.
+$hasBegun = column_exists($pdo, 'statuses', 'counts_as_started');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? 'save';
@@ -44,17 +48,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $blocked  = !empty($_POST['new_is_blocked'])  ? 1 : 0;
             $excluded = !empty($_POST['new_is_excluded']) ? 1 : 0;
             $onBoard  = !empty($_POST['new_on_board'])    ? 1 : 0;
+            // Ticked by default on a new status: almost everything a studio
+            // invents means the work is under way. See migration 058.
+            $begun    = !empty($_POST['new_begun'])       ? 1 : 0;
             $max = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0) FROM statuses WHERE project_id = ?');
             $max->execute([$projectId]);
             try {
                 $cols = 'project_id, name, sort_order, maps_to, is_blocked, color'
                       . ($hasExcluded ? ', is_excluded' : '')
-                      . ($hasBoard ? ', on_ticket_board' : '');
-                $vals = '?, ?, ?, ?, ?, ?' . ($hasExcluded ? ', ?' : '') . ($hasBoard ? ', ?' : '');
+                      . ($hasBoard ? ', on_ticket_board' : '')
+                      . ($hasBegun ? ', counts_as_started' : '');
+                $vals = '?, ?, ?, ?, ?, ?' . ($hasExcluded ? ', ?' : '') . ($hasBoard ? ', ?' : '')
+                      . ($hasBegun ? ', ?' : '');
                 $args = [$projectId, $name, (int)$max->fetchColumn() + 1, $mapsTo, $blocked,
                          trim($_POST['new_color'] ?? '') ?: null];
                 if ($hasExcluded) $args[] = $excluded;
                 if ($hasBoard)    $args[] = $onBoard;
+                if ($hasBegun)    $args[] = $begun;
                 $pdo->prepare("INSERT INTO statuses ($cols) VALUES ($vals)")->execute($args);
             } catch (PDOException $e) {
                 throw new RuntimeException('This project already has a status called "' . $name . '".');
@@ -106,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'UPDATE statuses SET name = ?, maps_to = ?, is_blocked = ?, '
             . ($hasExcluded ? 'is_excluded = ?, ' : '')
             . ($hasBoard ? 'on_ticket_board = ?, ' : '')
+            . ($hasBegun ? 'counts_as_started = ?, ' : '')
             . 'color = ?, sort_order = ?
               WHERE id = ? AND project_id = ?'
         );
@@ -124,11 +135,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $blocked  = !empty($_POST['is_blocked'][$id])  ? 1 : 0;
             $excluded = !empty($_POST['is_excluded'][$id]) ? 1 : 0;
             $onBoard  = !empty($_POST['on_board'][$id])    ? 1 : 0;
+            $begun    = !empty($_POST['begun'][$id])       ? 1 : 0;
             $color = trim($_POST['color'][$id] ?? '') ?: null;
             try {
                 $args = [$name, $mapsTo, $blocked];
                 if ($hasExcluded) $args[] = $excluded;
                 if ($hasBoard)    $args[] = $onBoard;
+                if ($hasBegun)    $args[] = $begun;
                 array_push($args, $color, $order, $id, $projectId);
                 $upd->execute($args);
                 if ($upd->rowCount() > 0) $changed++;
@@ -188,6 +201,9 @@ require __DIR__ . '/includes/header.php';
         <?php if ($hasBoard): ?>
           <th title="Show this status as a column on the tasks board">Board column</th>
         <?php endif; ?>
+        <?php if ($hasBegun): ?>
+          <th title="Somebody has picked the work up. A shot reads In progress as soon as one of its tasks says so">Work begun</th>
+        <?php endif; ?>
         <th>Colour</th><th>In use</th><th></th>
       </tr>
     </thead>
@@ -215,6 +231,15 @@ require __DIR__ . '/includes/header.php';
           <label class="inline">
             <input type="checkbox" name="is_excluded[<?= $id ?>]" value="1" <?= !empty($s['is_excluded']) ? 'checked' : '' ?>>
             not applicable
+          </label>
+        </td>
+        <?php endif; ?>
+        <?php if ($hasBegun): ?>
+        <td>
+          <input type="hidden" name="begun[<?= $id ?>]" value="0">
+          <label class="inline">
+            <input type="checkbox" name="begun[<?= $id ?>]" value="1" <?= !empty($s['counts_as_started']) ? 'checked' : '' ?>>
+            begun
           </label>
         </td>
         <?php endif; ?>
@@ -258,9 +283,19 @@ require __DIR__ . '/includes/header.php';
   <?php if ($hasBoard): ?>
     <label class="inline"><input type="checkbox" name="new_on_board" value="1"> board column</label>
   <?php endif; ?>
+  <?php if ($hasBegun): ?>
+    <label class="inline"><input type="checkbox" name="new_begun" value="1" checked> work begun</label>
+  <?php endif; ?>
   <input type="color" name="new_color" value="#95A5A6">
   <button type="submit" class="secondary">Add</button>
 </form>
+
+<p class="muted small">
+  <strong>Work begun</strong> means somebody has picked the task up. A shot on the Board reads
+  <em>In progress</em> as soon as one of its tasks says so, and <em>Not started</em> while they
+  all say otherwise, so leave it unticked on the one or two states that mean nobody has started,
+  like "Waiting to start" and "Ready to start".
+</p>
 
 <p class="muted small">
   <strong>Blocked</strong> means work that can't proceed, waiting on a client, a dependency

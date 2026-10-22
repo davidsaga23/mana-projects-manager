@@ -4191,3 +4191,22 @@ whose tasks match is opened, and **the board's own expand state is restored when
 cleared**, including any shot somebody opened or collapsed by hand while filtering: without that,
 filtering, pressing Collapse all and then Clear re-opened everything, undoing a choice the person
 had just made.
+
+## 2026-10-22 — A status says whether work has BEGUN; maps_to never could
+**Decision:** `statuses` gains `counts_as_started` (migration 058), and a shot on the Board reads
+**In progress** as soon as one of its tasks carries a status marked begun. David's own rule, after
+seeing SH160 read "Not started" while its BG Layout said In progress: in progress "when any of the
+tasks inside has other status than Waiting to Start or Ready to Start".
+**Why the first version was wrong:** it asked `maps_to`, which says whether a status counts as
+delivered or approved — not whether anybody has touched it. Waiting to start, Ready to start, In
+progress and Retake all map to `none`, so all four read as untouched and a shot stayed "Not
+started" until something was finished. **The database could not answer the question**, so the
+vocabulary gains the fact, exactly as it gained `is_blocked` and `is_excluded` before it.
+**Consequence:** `status_has_begun()` in `includes/statuses.php` is the one reader. Until 058 runs
+it falls back to `STATUS_NOT_BEGUN_NAMES`, an explicit list of spellings (the rule
+PLAKY_COLUMN_ALIASES follows), so **every board is right today** and the migration only makes it
+editable. Replayed over MSD's seven statuses, the answer is identical before and after. The column
+defaults to 1, because almost every status a studio invents means work is under way; the exceptions
+are the one or two at the start, which the migration seeds. A show whose opening state is spelled
+some other way reads as started until somebody unticks it — the safe direction, since a shot saying
+In progress early is a smaller lie than one saying Not started while three people work on it.

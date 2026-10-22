@@ -35,6 +35,9 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   left as work finishes.
 - **The headings stick to the top**, with filters on Status, Assignee and Due, a count of what
   matches, and a Clear button.
+- **A shot reads In progress as soon as one of its tasks has been picked up**, rather than waiting
+  for something to be finished. Which statuses mean that is now a tick on the Statuses screen
+  *(migration 058 — the board is already right without it)*.
 - Groups are named for the studio's phases — Pre-production, Production, Post-production —
   with the episode or asset type beside the name.
 
