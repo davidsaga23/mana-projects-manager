@@ -323,15 +323,27 @@ require __DIR__ . '/includes/header.php';
                 <?php // ⚠ A REAL BUTTON, not a div that listens for clicks: it
                       // is reached by Tab, pressed with the keyboard and read
                       // out as a button. It opens the panel over the board. ?>
-                <?php // ⚠ IT CARRIES THE STEP'S OWN COLOUR, the one set on the
+                <?php // ⚠ IT WEARS THE STEP'S OWN COLOUR, the one set on the
                       // pipeline in setup and drawn on the timeline (David,
-                      // 2026-10-22). Without a style of its own this button
-                      // inherited the app's filled blue one, so every task name
-                      // on the board was a blue blob — and the one thing the
-                      // column could have told you at a glance, which
-                      // department a row belongs to, was thrown away. ?>
-                <button type="button" class="board-open-task"
-                        style="color:<?= e($t['step_color'] ?: 'var(--text-2)') ?>"
+                      // 2026-10-22). Without a style of its own it inherited the
+                      // app's filled blue button, so every task name on the
+                      // board was an identical blue blob — and the one thing
+                      // this column could say at a glance, which department a
+                      // row belongs to, was thrown away.
+                      //
+                      // Flattening it to plain text fixed the blobs and lost the
+                      // button: "bring back the buttons, what you need to change
+                      // are the colors of the buttons not remove them". So it is
+                      // tinted exactly as the status beside it is, and the two
+                      // read as a pair.
+                      //
+                      // ⚠ THE COLOUR IS WRITTEN HERE AND NOT IN THE STYLESHEET,
+                      // the one exception lesson 21 allows and the same one
+                      // board_status_cell() takes: a step's colour is per
+                      // project, so no rule could ever know it.
+                      $sc = trim((string)($t['step_color'] ?? '')); ?>
+                <button type="button" class="board-open-task"<?php if ($sc !== ''): ?>
+                        style="color:<?= e($sc) ?>;background:<?= e(board_tint($sc)) ?>;border-color:<?= e(board_tint($sc, 0.4)) ?>"<?php endif; ?>
                         data-project="<?= $projectId ?>" data-step="<?= (int)$t['step_id'] ?>"
                         data-item="<?= e($t['item_key']) ?>"
                         aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>

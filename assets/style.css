@@ -3602,13 +3602,21 @@ button.secondary.danger:hover { background: var(--danger-border); }
    turned every one of them into a blue blob (2026-10-22). The colour comes from
    the step itself, set on the pipeline in setup and drawn on the timeline, so
    the column says which department a row belongs to at a glance. */
+/* The task name is a BUTTON, and reads like one (David, 2026-10-22: "bring back
+   the buttons, what you need to change are the colors of the buttons not remove
+   them"). It was briefly flattened to plain text because the app's default
+   button style made every one of them a filled blue blob; the fix was the
+   colour, not the shape. Same radius, padding and size as the status control it
+   sits beside, so the two line up as a pair. The step's own colour arrives
+   inline from board.php, since nothing in a stylesheet can know it. */
 .board-open-task {
-  padding: 0; margin: 0; border: none; background: transparent;
-  font-size: 14px; font-weight: 500; letter-spacing: -.012em;
+  margin: 0; padding: 5px 9px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-2);
+  font-size: 13px; font-weight: 600; letter-spacing: -.012em;
   text-align: left; cursor: pointer; min-height: 0;
-  border-radius: 0;
 }
-.board-open-task:hover { text-decoration: underline; }
+.board-open-task:hover { filter: brightness(1.25); }
 .board-open-task:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* --- the Comments tab in the Board's task panel --------------------------- */
