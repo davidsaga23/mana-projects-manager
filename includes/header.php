@@ -13,6 +13,33 @@ $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
 $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
     ? mytasks_badge($pdo, effective_user_id())
     : ['count' => 0, 'new' => false];
+
+// --- the bell (David, 2026-10-22), migration 060 -----------------------------
+//
+// "you need to get a notification in a bell close to your name so you know
+// someone assign, tag or changed a tasked you're subscribed to". So it lives in
+// the top bar beside the name, on every screen, rather than on My tasks — the
+// whole point is that it finds you wherever you are.
+//
+// Drawn for a login linked to a crew member and nobody else: `users` are logins
+// and `crew` are people, and it is the person who is told. effective_crew_id(),
+// like the My tasks badge above, so the whole bar agrees about whose desk is on
+// show while an admin is viewing as somebody.
+//
+// Every function here answers an empty bell rather than throwing — see the note
+// at the top of includes/notify.php. Chrome must not be able to take a page down.
+require_once __DIR__ . '/notify.php';
+$bell = ['on' => false, 'unseen' => 0, 'items' => []];
+if (isset($pdo) && $pdo instanceof PDO && notify_available($pdo)) {
+    $bellCrew = (int)(effective_crew_id($pdo) ?? 0);
+    if ($bellCrew > 0) {
+        $bell = [
+            'on'     => true,
+            'unseen' => notify_unseen($pdo, $bellCrew),
+            'items'  => notify_recent($pdo, $bellCrew),
+        ];
+    }
+}
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
@@ -25,6 +52,46 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
   <div class="topbar">
     <h1><a href="index.php" class="brand"><?= site_logo() ?><span class="brand-name">Anima <span class="muted">| Project manager</span></span></a></h1>
     <div class="topbar-right">
+      <?php if ($bell['on']): ?>
+        <div class="bell" id="bell">
+          <button type="button" class="bell-btn" id="bellBtn" aria-haspopup="true" aria-expanded="false"
+                  aria-label="<?= $bell['unseen']
+                      ? $bell['unseen'] . ' unread notification' . ($bell['unseen'] === 1 ? '' : 's')
+                      : 'Notifications, none unread' ?>">
+            <?php // Inline, like site_logo(): an icon file is a second request
+                  // and a sprite is a third thing to keep in step. ?>
+            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M10 2a5 5 0 0 0-5 5v3.1l-1.3 2.2a.8.8 0 0 0 .7 1.2h11.2a.8.8 0 0 0 .7-1.2L15 10.1V7a5 5 0 0 0-5-5Zm0 15.5a2.3 2.3 0 0 0 2.2-1.7H7.8A2.3 2.3 0 0 0 10 17.5Z"/>
+            </svg>
+            <?php if ($bell['unseen']): ?>
+              <span class="bell-count" id="bellCount"><?= $bell['unseen'] > 9 ? '9+' : (int)$bell['unseen'] ?></span>
+            <?php endif; ?>
+          </button>
+
+          <div class="bell-panel" id="bellPanel" hidden>
+            <div class="bell-head">Notifications<?php if ($bell['unseen']): ?>
+              <span class="muted">· <?= (int)$bell['unseen'] ?> new</span><?php endif; ?></div>
+            <?php if (!$bell['items']): ?>
+              <p class="muted small bell-empty">Nothing yet. You are told here when somebody
+                assigns you a task, names you in a comment, or moves something you are on.</p>
+            <?php else: ?>
+              <ul class="bell-list">
+                <?php foreach ($bell['items'] as $n): ?>
+                  <li class="<?= $n['seen_at'] === null ? 'is-new' : '' ?>">
+                    <a href="<?= e(notify_link($n)) ?>">
+                      <span class="bell-dot bell-<?= e($n['kind']) ?>" aria-hidden="true"></span>
+                      <span class="bell-what"><strong><?= e($n['actor'] ?: 'Somebody') ?></strong>
+                        <?= e(notify_verb((string)$n['kind'])) ?>
+                        <?= e($n['summary'] ?: 'a task') ?></span>
+                      <span class="bell-when muted"><?= e(date('j M', strtotime((string)$n['created_at']))) ?></span>
+                    </a>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endif; ?>
       <span><?= e(current_user_display()) ?></span>
       <?php // Names the role being WORN, so the top bar and the app agree about
             // who you are while a preview is running. ?>
@@ -130,6 +197,7 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
       · <a href="logout.php">Log out</a>
     </div>
   </div>
+<?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
 <?php if (in_preview()): ?>
   <?php
   // ⚠ DRAWN OUTSIDE EVERY is_admin() CHECK ON THIS PAGE. While a preview is

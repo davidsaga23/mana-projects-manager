@@ -45,6 +45,7 @@ require_once __DIR__ . '/grid.php';        // step_covers_item(), the one scope 
 // ticket_thread() rather than growing its own, and a mention typed on the board
 // lands in the same My tasks list as one typed on a ticket.
 require_once __DIR__ . '/tickets.php';
+require_once __DIR__ . '/notify.php';     // the bell beside your name (migration 060)
 
 /* ---------------------------------------------------------------------------
  * The three phases, named as the studio names them.
@@ -874,7 +875,7 @@ function board_task_progress_id(PDO $pdo, int $projectId, int $stepId,
  */
 function board_task_comments(PDO $pdo, int $progressId): array {
     if (!board_comments_available($pdo) || $progressId <= 0) {
-        return ['comments' => [], 'mentions' => []];
+        return ['comments' => [], 'mentions' => [], 'files' => []];
     }
     $q = $pdo->prepare(
         'SELECT c.id, c.parent_id, c.user_id, c.kind, c.body, c.created_at,
@@ -887,6 +888,23 @@ function board_task_comments(PDO $pdo, int $progressId): array {
     $q->execute([$progressId]);
     $comments = $q->fetchAll();
 
+    // What is attached to each, in one query for the lot (migration 061). The
+    // files hang off the COMMENT, not off a ticket — a board comment has none.
+    $files = [];
+    if ($comments) {
+        try {
+            $ids = implode(',', array_map(fn($c) => (int)$c['id'], $comments));
+            foreach ($pdo->query(
+                'SELECT * FROM ticket_attachments WHERE comment_id IN (' . $ids . ')
+                  ORDER BY created_at, id'
+            ) as $a) {
+                $files[(int)$a['comment_id']][] = $a;
+            }
+        } catch (PDOException $e) {
+            $files = [];   // before migration 017, or a table mid-upgrade
+        }
+    }
+
     $mentions = [];
     if ($comments && ticket_mentions_available($pdo)) {
         $ids = implode(',', array_map(fn($c) => (int)$c['id'], $comments));
@@ -896,7 +914,7 @@ function board_task_comments(PDO $pdo, int $progressId): array {
             $mentions[(int)$m['comment_id']][] = (string)$m['named_as'];
         }
     }
-    return ['comments' => $comments, 'mentions' => $mentions];
+    return ['comments' => $comments, 'mentions' => $mentions, 'files' => $files];
 }
 
 /**
@@ -908,12 +926,19 @@ function board_task_comments(PDO $pdo, int $progressId): array {
  * @param array $ctx the task's names, for the email's subject and link
  */
 function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKey,
-                           string $body, ?int $parentId, int $userId, array $ctx = []): array {
+                           string $body, ?int $parentId, int $userId, array $ctx = [],
+                           bool $hasFiles = false): array {
     if (!board_comments_available($pdo)) {
         throw new RuntimeException('Comments need database update 059, which has not been applied yet.');
     }
     $body = trim($body);
-    if ($body === '') throw new RuntimeException('Nothing to post — the box was empty.');
+    // A file on its own is a comment — "here is the reference" said without
+    // typing it. The ticket screen has always allowed this; the placeholder is
+    // the same one, so the two read alike.
+    if ($body === '' && $hasFiles) $body = '(attachment)';
+    if ($body === '') {
+        throw new RuntimeException('Nothing to post — the box was empty and no file was attached.');
+    }
     if (mb_strlen($body) > 5000) {
         throw new RuntimeException('That is longer than a comment holds (5000 characters).');
     }
@@ -942,6 +967,26 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
     // text: the rule migration 039 wrote down.
     $mentions = ticket_parse_mentions($body, board_assignees($pdo, $projectId));
     ticket_save_mentions($pdo, $commentId, $mentions);
+
+    // ⚠ THE BELL FIRST, THE EMAIL SECOND, and the order is the point. David,
+    // 2026-10-22, reading "naming somebody emails them and puts it in their My
+    // tasks": "this is not the right behavior, you need to get a notification
+    // in a bell close to your name". The email is a courtesy that may fail, be
+    // filtered or go to somebody with no address on file; the bell is the one
+    // that is always there when they next open Anima.
+    if ($mentions) {
+        notify_add($pdo, array_keys($mentions), [
+            'kind'        => 'mention',
+            'actor'       => current_user_display(),
+            'summary'     => trim(trim((string)($ctx['step_name'] ?? '')) . ' on '
+                                . trim((string)($ctx['item_name'] ?? '')), ' on '),
+            'project_id'  => $projectId,
+            'step_id'     => $stepId,
+            'item_key'    => $itemKey,
+            'progress_id' => $progressId,
+            'comment_id'  => $commentId,
+        ], (int)(effective_crew_id($pdo) ?? 0));
+    }
 
     $said = $parent ? 'Reply posted.' : 'Comment posted.';
     if ($mentions && function_exists('notify_mentioned_task')) {
@@ -979,7 +1024,8 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
     // ONE RENDERER for a comment and for a reply, so the two cannot drift apart
     // in anything but their indent. Depth is 0 or 1 and nothing else — see
     // migration 039 for why a task is not a forum.
-    $one = function (array $c, int $depth) use ($found, $mayPost, $pdo): string {
+    $myUserId = (int)($_SESSION['user_id'] ?? 0);
+    $one = function (array $c, int $depth) use ($found, $mayPost, $pdo, $myUserId): string {
         $cid = (int)$c['id'];
         $named = $found['mentions'][$cid] ?? [];
         $h = '<div class="comment' . ($depth > 0 ? ' comment-reply' : '')
@@ -993,7 +1039,28 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
                 . '" data-reply-name="' . e($c['display_name'] ?? '') . '">Reply</button>';
         }
         $h .= '</div><div class="comment-body">'
-            . ticket_render_body((string)$c['body'], $named) . '</div></div>';
+            . ticket_render_body((string)$c['body'], $named) . '</div>';
+
+        // The files, drawn by the renderer the ticket screen uses — moved into
+        // includes/uploads.php when this screen needed it too, rather than
+        // copied (David, 2026-10-22: "allow comments to attach files").
+        if (!empty($found['files'][$cid])) {
+            $h .= '<div class="attachment-grid">';
+            foreach ($found['files'][$cid] as $a) {
+                // Yours to remove, or an admin's. An × that refuses when pressed
+                // is worse than no ×, so it is only drawn where it will work.
+                $mine = $myUserId > 0 && (int)$a['uploaded_by'] === $myUserId;
+                $can  = $mayPost && (is_admin() || $mine);
+                ob_start();
+                render_attachment($a, $can, $can
+                    ? '<button type="button" class="link-danger board-att-del" data-att="'
+                      . (int)$a['id'] . '" title="Remove this file">×</button>'
+                    : '');
+                $h .= ob_get_clean();
+            }
+            $h .= '</div>';
+        }
+        $h .= '</div>';
         return $h;
     };
 
@@ -1009,6 +1076,7 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
 
     if ($mayPost) {
         $out .= '<form class="comment-form board-comment-form" method="post"'
+              . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
               . ' data-item="' . e($itemKey) . '">'
               . '<div class="reply-banner" hidden>Replying to <strong></strong> '
@@ -1022,7 +1090,12 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
               . '<textarea name="body" rows="3" class="board-comment-box"'
               . ' placeholder="What is going on with this one… type @ to name somebody"></textarea>'
               . '</label>'
-              . '<p class="muted small">Naming somebody emails them and puts it in their My tasks.</p>'
+              // Same limits, same validation and same folder as a ticket's
+              // attachments — one uploader, which is where the MIME check lives.
+              . '<label class="board-comment-files">Attach files'
+              . '<input type="file" name="attachments[]" multiple>'
+              . '</label>'
+              . '<p class="muted small">Naming somebody rings their bell and emails them.</p>'
               . '<button type="submit" class="primary board-comment-post">Post</button>'
               . '</form>'
               // The picker reads this, exactly as ticket.php feeds assets/mentions.js:
