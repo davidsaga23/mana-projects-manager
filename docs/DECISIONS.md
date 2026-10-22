@@ -4071,3 +4071,22 @@ different steps, which are not the same work.
 to the right of the days used"):** a step's detail now reads, left to right: the days donut, its
 words, then the status donut with its colour key beside it rather than under it. Both rings sit
 on one line (`.pool-pair` in `assets/style.css`).
+
+## 2026-10-21 — Budget pool step detail lists who is on it, against their share of the pool
+**Decision:** under the donuts in a step's detail, a table with one row per person on the step:
+- day rate;
+- budget: their slot's window in working days, and that times their rate;
+- used, unused, and what they have invoiced against the position;
+- their assigned items done;
+- a reading: "over budget by N days" in red, otherwise the card's own days-against-progress
+  comparison (`pool_pace()`) on their items.
+Worst first, unfilled slots last. Totals row underneath. Built by `pool_step_people()` in
+`includes/budgetpool.php`, from the same lanes, windows and logged-or-plan switch as the card, so
+the rows add up to it.
+**Why:** David: "below the pie charts we should see a list to show who is working on it and how
+much has been spent on that person vs. budget, so management can spot who is over/under budget at
+a glance".
+**Consequence:** while a show has no logged time, used days come from the plan (their window up
+to today), which can never pass their budget. So "over budget" only appears once hours are logged,
+and the note under the table says which source is in use. Per-second people are left out, because
+they have no day budget. Two slots held by one person are one row.

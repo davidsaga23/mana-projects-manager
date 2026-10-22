@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — Budget pool: who is on each step *(no migration)*
+
+- **A step's detail on the Budget pool lists everyone on it.** For each person: rate, budget in
+  days and money, used, unused, invoiced, work done, and a plain reading. Over budget shows in
+  red, worst first.
+
 ## 2026-10-21 — Budget pool donuts *(no migration)*
 
 - **The Budget pool shows used and unused days as interactive donuts**, for the whole show and per
