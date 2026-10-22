@@ -4210,3 +4210,22 @@ defaults to 1, because almost every status a studio invents means work is under 
 are the one or two at the start, which the migration seeds. A show whose opening state is spelled
 some other way reads as started until somebody unticks it — the safe direction, since a shot saying
 In progress early is a smaller lie than one saying Not started while three people work on it.
+
+## 2026-10-22 — The bars: on the groups too, interactive, and lined up
+**Decision:** three refinements to the Board's progress bars, all David's, same day.
+- **A bar on every group header**, built from EVERY task in the group rather than its shots' bars
+  averaged — averaging percentages weights a 2-task deliverable the same as an 8-task shot, and a
+  phase would read finished with half its work outstanding.
+- **A panel on hover**, listing each status in the bar with its count and a total. ⚠ A segment's own
+  tooltip is not enough: the bar is 7px tall and a slice holding one task of eight is a few pixels
+  wide, so hovering it exactly is a game and the native tooltip waits a second before saying
+  anything. The bar is focusable, so the panel is reachable from the keyboard; the per-segment
+  titles stay for touch, where nothing hovers. The bar also thickens on hover.
+- **The bars line up down the column**, because the label beside them is a fixed width
+  (`.board-item-label`). Left to itself a bar starts wherever the name ends, so a column holding
+  FutsalInt01 and MadridStreetExt03 had its bars stepping in and out. A longer name is clipped and
+  keeps its full text in a tooltip.
+**Consequence:** `board_bar_html()` renders both bars from one place, and `drawBar()` rebuilds both
+parts when a status changes — the panel is built as nodes, never as a string of HTML, because a
+status is named by a person and goes straight into the page. Alignment is off below 900px, where
+the row stacks and there is no column to line up down.
