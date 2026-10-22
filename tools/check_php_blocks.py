@@ -481,3 +481,117 @@ for name, (path, _) in openers.items():
                   % callee)
 print('')
 print('%d functions open transactions, %d nested unsafely' % (len(openers), bad_tx))
+
+# ---------------------------------------------------------------------------
+# PASS 8 - A VARIABLE NOTHING EVER ASSIGNS.
+#
+# The Board went down on 2026-10-22 with a white page. board_data() ended with
+#
+#     'bar' => board_item_bar($allTasks, $statusMap),
+#
+# and nothing anywhere declared $allTasks, so PHP handed null to an `array`
+# parameter and every request died. The file PARSES PERFECTLY, so every pass
+# above is silent on it and `php -l` would be too - this is a runtime fault that
+# only a reader, or a request, can see.
+#
+# How it got in is the reason this pass exists: one scripted edit made six
+# replacements, threw on the fifth and wrote nothing - correctly. A second
+# script then added the code that CONSUMED those six, and succeeded. Each
+# behaved properly alone; together they shipped a consumer with no producer.
+# A failed batch edit does not fail safely if a later edit assumes it worked.
+#
+# ⚠ DELIBERATELY CRUDE, AND BIASED TOWARDS FALSE ALARMS. It does not know
+# scopes, so a name assigned in one function and read in another passes, and a
+# typed parameter in a multi-line signature can still trip it. That trade is on
+# purpose: a name a human glances at costs seconds, and a white page on the
+# screen the studio lives in costs an afternoon. Every hit below is a name to
+# look at, not a verdict.
+# ---------------------------------------------------------------------------
+SUPERGLOBALS = {
+    'GLOBALS', '_SERVER', '_GET', '_POST', '_FILES', '_COOKIE', '_SESSION',
+    '_REQUEST', '_ENV', 'this', 'argv', 'argc', 'http_response_header',
+    # Set for every page by includes/db.php and includes/functions.php.
+    'pdo', 'config',
+}
+
+VAR = re.compile(r'\$([A-Za-z_]\w*)')
+ASSIGNERS = [
+    # $x = …, $x .= …, $x++, and the compound assignments
+    re.compile(r'\$([A-Za-z_]\w*)\s*(?:=[^=]|\.=|\+=|-=|\*=|/=|\?\?=|\+\+|--)'),
+    re.compile(r'\bas\s+\$([A-Za-z_]\w*)'),          # foreach (… as $x)
+    re.compile(r'=>\s*&?\s*\$([A-Za-z_]\w*)'),       # foreach (… as $k => $v)
+    re.compile(r'\bcatch\s*\([^)$]*\$([A-Za-z_]\w*)'),
+    re.compile(r'\b(?:global|static)\s+\$([A-Za-z_]\w*)'),
+]
+# PHP assigns through these too, and this codebase leans on all three.
+DESTRUCTURE = [
+    re.compile(r'\[([^\]\n]*)\]\s*=[^=]', re.S),   # [$a, $b] = …  and  [, $msg] = …
+    re.compile(r'\bas\s*\[([^\]\n]*)\]'),          # foreach (… as [$table, $col])
+]
+# Builtins that WRITE to an argument. A name passed to one of these and never
+# read again is an out-parameter, not a missing line.
+OUT_PARAMS = re.compile(
+    r'\b(?:preg_match|preg_match_all|stream_socket_client|similar_text|'
+    r'settype|sscanf|openssl_[a-z_]+)\s*\(([^;]*?)\)', re.S)
+# Files included INTO another page's scope, which legitimately read variables
+# the parent set. They are partials, not programs.
+PARTIAL_DIRS = ('import', 'wizard')
+# A parameter list or a use() clause holds several names at once.
+LISTS = [re.compile(r'\bfunction\s*&?\s*\w*\s*\(([^)]*)\)', re.S),
+         re.compile(r'\bfn\s*\(([^)]*)\)', re.S),
+         re.compile(r'\buse\s*\(([^)]*)\)', re.S),
+         re.compile(r'\blist\s*\(([^)]*)\)', re.S)]
+
+bad_vars = 0
+for f in files:
+    code = php_code_only(io.open(f, encoding='utf-8', errors='replace').read())
+    # A double-quoted string can interpolate a variable, and a heredoc always
+    # can, so neither is stripped - but neither assigns, so only reads are lost
+    # by leaving them in, which is the safe direction.
+    assigned = set()
+    for rx in ASSIGNERS:
+        assigned.update(m.group(1) for m in rx.finditer(code))
+    for rx in LISTS + DESTRUCTURE:
+        for m in rx.finditer(code):
+            assigned.update(VAR.findall(m.group(1)))
+    for m in OUT_PARAMS.finditer(code):
+        assigned.update(VAR.findall(m.group(1)))
+    # A partial reads what the page that included it set; that is its job.
+    parts = f.replace(chr(92), '/').split('/')
+    if any(d in parts for d in PARTIAL_DIRS):
+        continue
+
+    # ⚠ ONLY A NAME THAT APPEARS EXACTLY ONCE, and the narrowness is the whole
+    # point. A first cut reported every variable nothing in the file assigned
+    # and found 63 across the codebase - preg_match's $m, stream_socket_client's
+    # $errno, [, $msg] = destructuring, every by-reference out-parameter PHP
+    # has. tools/README.md already records why that is worse than no check at
+    # all: a false alarm on the only gate this project has teaches people to
+    # ignore the one thing that catches real faults.
+    #
+    # A variable written once and read never is a typo. A variable READ once and
+    # written never - which is what $allTasks was - is a missing line. Both show
+    # up as a single mention, and a single mention is almost never deliberate.
+    #
+    # ⚠ ITS BLIND SPOT, found while verifying it: a `use (&$x)` clause counts as
+    # an assignment here, because by reference it genuinely creates one. So a
+    # closure that captures a name the enclosing scope never sets is NOT caught,
+    # even though PHP will hand null to whatever reads it. Treating use() as a
+    # read instead would flag every closure in the codebase. Verified the way
+    # the other passes were: the exact state that took the Board down was put
+    # back and watched to fire, and the file it names is the file that broke.
+    seen = {}
+    for name in VAR.findall(code):
+        seen[name] = seen.get(name, 0) + 1
+    unknown = sorted(n for n in set(VAR.findall(code)) - assigned - SUPERGLOBALS
+                     if seen[n] == 1)
+    for name in unknown:
+        if bad_vars == 0:
+            print('')
+            print('VARIABLE NEVER ASSIGNED - reads null at runtime; the file still parses:')
+        bad_vars += 1
+        line = code[:code.find('$' + name)].count(chr(10)) + 1
+        print('  %s:%d: $%s is read but nothing in this file assigns it' % (f, line, name))
+
+print('')
+print('%d files checked for variables nothing assigns, %d suspect' % (len(files), bad_vars))
