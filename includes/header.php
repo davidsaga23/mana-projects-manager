@@ -57,7 +57,7 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
             // rather than a screen you reach only after choosing a show. It is
             // the screen replacing Plaky, so it is the first thing in the bar
             // and the only one here that looks like a button. ?>
-      <a href="board.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'board.php' ? ' is-on' : '' ?>">Board</a>
+      <a href="spell.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'spell.php' ? ' is-on' : '' ?>">Spell</a>
       · <a href="mytasks.php">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
           class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
           title="<?= $myTasksBadge['new']

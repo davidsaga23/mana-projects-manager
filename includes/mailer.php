@@ -608,7 +608,7 @@ function notify_transcript_tasks(PDO $pdo, array $byCrew): array {
 /**
  * The address that opens one task's panel on the Board.
  *
- * board.php reads `open` and clicks that task's button for you, so a mention
+ * spell.php reads `open` and clicks that task's button for you, so a mention
  * email lands on the conversation rather than on a screen of four hundred rows
  * with "somewhere in here" as the instruction.
  */
@@ -616,7 +616,7 @@ function board_task_url(int $projectId, int $stepId, string $itemKey): string {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
     $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/board.php?project={$projectId}"
+    return "{$scheme}://{$host}{$dir}/spell.php?project={$projectId}"
          . '&open=' . rawurlencode($stepId . ':' . $itemKey);
 }
 
@@ -679,7 +679,7 @@ function notify_mentioned_task(PDO $pdo, array $crewIds, string $body,
     if (mb_strlen(trim($body)) > 600) $snippet .= '…';
 
     $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
-        . '<p><strong>' . $esc($byWho) . '</strong> mentioned you on the board.</p>'
+        . '<p><strong>' . $esc($byWho) . '</strong> mentioned you on Spell.</p>'
         . '<h2 style="font-size:17px;margin:12px 0 6px;">' . $esc($label) . '</h2>'
         . '<p style="color:#5a6a7a;margin:0 0 12px;">'
         . $esc(trim((string)($ctx['project_name'] ?? '')) ?: 'Anima') . '</p>'

@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — The Board is now called Spell *(no migration)*
+
+- **The Board button and screen are renamed Spell**, and the page moved from `board.php` to
+  `spell.php`. `board.php` redirects there, so old bookmarks and mention emails still open it.
+
 ## 2026-10-22 — Days off, and the schedule plans around them *(needs migration 060)*
 
 - **A Days off section on every person page**: a first and last day and a reason. It counts on

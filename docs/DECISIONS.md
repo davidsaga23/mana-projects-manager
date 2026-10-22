@@ -4354,3 +4354,10 @@ the person page already flags work outside somebody's dates.
 **Deliberately not done:** the quota, budget pool and bookings still treat every working day as
 available to everyone; a band (coverage below 100%) ignores absences; the timeline does not shade
 them. Nothing moves until the schedule is re-run, and hand-placed bars never move.
+
+## 2026-10-22 — The Board is called Spell
+**Decision (David):** the screen that replaces Plaky is named **Spell**, in the top bar and on the
+page, and lives at `spell.php`. `board.php` is kept as a 301 redirect carrying the query string,
+because mention emails already sent link to `board.php?project=…&open=…`. Internal names
+(`includes/board.php`, `board_api.php`, `board_task.php`, CSS classes) are unchanged: renaming
+them changes nothing anybody sees and risks a missed reference.

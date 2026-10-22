@@ -291,7 +291,7 @@ require __DIR__ . '/includes/header.php';
 </form>
 
 <p class="muted small">
-  <strong>Work begun</strong> means somebody has picked the task up. A shot on the Board reads
+  <strong>Work begun</strong> means somebody has picked the task up. A shot on Spell reads
   <em>In progress</em> as soon as one of its tasks says so, and <em>Not started</em> while they
   all say otherwise, so leave it unticked on the one or two states that mean nobody has started,
   like "Waiting to start" and "Ready to start".

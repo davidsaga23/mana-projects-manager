@@ -1,4 +1,4 @@
-// The Board (board.php, 2026-10-22): expanding, searching, and saving a cell
+// Spell (spell.php, formerly the Board and board.php, 2026-10-22): expanding, searching, and saving a cell
 // without reloading the page.
 //
 // ⚠ NAMED board-screen.js, NOT board.js, which is already taken — by the
@@ -8,7 +8,7 @@
 // the sake of a filename.
 //
 // ⚠ NOTHING HERE IS A PERMISSION. Every control this file touches was already
-// drawn as editable by board.php, and board_api.php checks the same rules again
+// drawn as editable by spell.php, and board_api.php checks the same rules again
 // on the way in. This only carries the value.
 //
 // ⚠ AND NOTHING SAVES SILENTLY. A board people live in all day has to say what
@@ -174,7 +174,7 @@
     var picks = item.querySelectorAll('.board-row-task .board-status');
     if (!picks.length) return;
 
-    // Read from what each status MEANS, carried on the option by board.php —
+    // Read from what each status MEANS, carried on the option by spell.php —
     // never from its name, which every show spells its own way.
     var live = 0, done = 0, started = 0;
     Array.prototype.forEach.call(picks, function (sel) {
