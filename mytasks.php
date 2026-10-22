@@ -1107,7 +1107,7 @@ require __DIR__ . '/includes/header.php';
         // identical, because to the person reading it the two are one list.
         $onTask = empty($m['ticket_id']) && !empty($m['board_step']);
         $where = $onTask
-            ? 'board.php?project=' . (int)$m['board_project']
+            ? 'spell.php?project=' . (int)$m['board_project']
               . '&open=' . rawurlencode($m['board_step'] . ':' . $m['board_item'])
             : 'ticket.php?id=' . (int)$m['ticket_id'] . '#c' . (int)$m['comment_id'];
         $what = $onTask
@@ -1117,7 +1117,7 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $m['seen_at'] === null ? 'mention-new' : '' ?>">
           <td><a href="<?= e($where) ?>"
                  class="<?= $onTask ? 'ref-task' : ($m['type'] === 'ticket' ? 'ref-ticket' : 'ref-task') ?>"><?=
-                 e($onTask ? 'Board' : ticket_ref($m)) ?></a></td>
+                 e($onTask ? 'Spell' : ticket_ref($m)) ?></a></td>
           <td><a href="<?= e($where) ?>"><?= e($what) ?></a></td>
           <td class="muted small"><?= e($m['project_code']) ?></td>
           <td class="muted small"><?= e($m['said_by'] ?: 'Someone') ?></td>
