@@ -4229,3 +4229,28 @@ In progress early is a smaller lie than one saying Not started while three peopl
 parts when a status changes — the panel is built as nodes, never as a string of HTML, because a
 status is named by a person and goes straight into the page. Alignment is off below 900px, where
 the row stacks and there is no column to line up down.
+
+## 2026-10-22 — Phase 2: the task panel opens OVER the board, and shares its controls
+**Decision:** clicking a task's step name opens `board_task.php` in a panel over the board, never a
+page. David: "instead of taking you to another page it should just pop up in the same screen so you
+can open, adjust, close and open another one."
+**⚠ IT RETURNS MARKUP, NOT JSON.** Every control in the panel is built by the same helpers the board
+row uses — `board_status_cell()`, `board_crew_cell()`, `board_due_cell()`, `board_text_cell()` —
+with the same classes and the same three data attributes. So the delegated handlers already in
+`board-screen.js` save them, nothing about saving is written twice, and an artist gets the same two
+statuses there as on the row, because it is literally the same code.
+**The cost, and what pays it:** a cell now exists twice while the panel is open. `mirror()` keeps
+them in step after every save, and refreshes the row's filter attributes, its shot's bar, its
+derived status and the group's bar from whichever copy was touched.
+**The panel adds what the board has no column for:** the version label, hours logged, and the task's
+own history from `progress_log` — which names its SOURCE, because "the importer moved 140 shots"
+and "somebody moved 140 shots by hand" look identical in a list otherwise.
+**Consequence:** it is a real dialog — `aria-modal`, focus moves in on open and back to the button
+on close, Escape and the veil close it. Comments and @mentions are phase 3 and are not here.
+
+## 2026-10-22 — Never compare a whole className to decide two elements are the same cell
+`mirror()` first matched the row's control to the panel's by comparing `className`. `save()` adds
+`is-saved` to the cell it has just written, one line before calling `mirror()` — so the two copies
+never looked alike, and the row silently kept the old value while the panel showed the new one.
+Matched on the control's KIND now (`board-status`, `board-crew`, `board-due`, `board-text`), which
+is what actually identifies it. **A class string is a set, not an identity.**

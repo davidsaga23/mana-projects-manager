@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — The Board: a task panel *(no migration)*
+
+- **Clicking a task opens it in a panel over the board**, so you can open one, adjust it, close it
+  and open the next without leaving the page. Escape or the backdrop closes it.
+- It carries the same Status, Assignee, Due, Link and Notes controls as the row — edit either, both
+  follow — plus the **version label**, **hours logged**, and the task's own **history**, which says
+  who changed what and whether it came from a person or the Plaky importer.
+
 ## 2026-10-22 — The Board: the screen that replaces Plaky *(needs migration 057 for the Link column only)*
 
 - **A new Board**, reached from a button at the top of every page, with a show picker — one screen

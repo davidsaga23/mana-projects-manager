@@ -294,7 +294,13 @@ require __DIR__ . '/includes/header.php';
                  data-due="<?= e((string)($t['due'] ?? '')) ?>">
               <div class="board-cell-name board-task-name">
                 <span class="board-dot board-dot-step" style="background:<?= e($t['step_color'] ?: 'var(--step-default)') ?>"></span>
-                <span><?= e($t['step']) ?></span>
+                <?php // ⚠ A REAL BUTTON, not a div that listens for clicks: it
+                      // is reached by Tab, pressed with the keyboard and read
+                      // out as a button. It opens the panel over the board. ?>
+                <button type="button" class="board-open-task"
+                        data-project="<?= $projectId ?>" data-step="<?= (int)$t['step_id'] ?>"
+                        data-item="<?= e($t['item_key']) ?>"
+                        aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>
               </div>
               <?= board_status_cell($t, $board['statuses'], $projectId, $mayEdit || $mine,
                                     $myCrewId, $mayEdit) ?>
@@ -310,6 +316,19 @@ require __DIR__ . '/includes/header.php';
     </div>
   </section>
 <?php endforeach; ?>
+
+<?php // THE PANEL. One on the page, filled from board_task.php when something
+      // is opened — so there is nothing to keep in step with 150 rows, and the
+      // markup for a task lives in one file. ?>
+<div class="board-panel-veil" id="boardVeil" hidden></div>
+<aside class="board-panel" id="boardPanel" role="dialog" aria-modal="true"
+       aria-label="Task details" hidden>
+  <button type="button" class="board-panel-close" id="boardPanelClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="board-panel-inner" id="boardPanelInner"></div>
+</aside>
 
 <p class="muted small board-foot">
   Shots, tasks and statuses are the same rows the rest of Anima reads. Frames come from the
