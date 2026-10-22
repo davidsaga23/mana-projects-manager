@@ -424,7 +424,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           <col style="width:6%">   <?php // Covers ?>
           <col style="width:6%">   <?php // Work ?>
           <col style="width:11%">  <?php // Dates ?>
-          <col style="width:6%">   <?php // Days between the dates ?>
+          <col style="width:6%">   <?php // Business days between the dates ?>
           <col style="width:10%">  <?php // Days per item: the number, and whose it is ?>
           <col style="width:5%">   <?php // People ?>
           <col style="width:8%">   <?php // Minimum ?>
@@ -444,7 +444,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // always read together. Stacked they cost one column and a little
                 // height — which is the trade this whole screen now makes. ?>
           <th>Dates<div class="muted small">start / deadline</div></th>
-          <th title="The days from the start date to the deadline, both days counted. Under it, how many of those are working days, weekends and studio holidays left out.">Days<div class="muted small">start to deadline</div></th>
+          <th title="The business days from the start date to the deadline, both days counted. Weekends and studio holidays are left out.">Business days<div class="muted small">start to deadline</div></th>
           <th title="This project's ideal quota: how long one shot or asset takes one person when the work is done properly. The schedule and the budget run on it, and it belongs to this project alone. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage.">Days per item<div class="muted small">this project's ideal</div></th>
           <th title="How many people are on this step. Decimals are fine, 2.5 means someone is half-time.">People</th>
           <?php // The header and its cells are two lists kept in step by hand, and

@@ -3999,7 +3999,9 @@ list" over a new screen of everybody's entries.
 
 ## 2026-10-21 — Dates & headcount shows the days between a step's dates
 **Decision:** a **Days** column beside Dates: the calendar days from start to deadline, both ends
-counted, with the working days (weekends and studio holidays left out) under it. Computed live in
+counted, with the working days (weekends and studio holidays left out) under it. *(Same day, after
+it went live, David: it "should only include business days". Renamed **Business days**; it now shows
+the working-day count only, and the calendar count is gone.)* Computed live in
 `assets/wizard.js` from the same `workingDays()` the verdict uses; it took its width from "Is that
 enough?".
 **Why:** David asked for "a column that extracts the total days in between the start and end dates".
