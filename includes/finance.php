@@ -125,7 +125,8 @@ function save_project_budget(int $projectId, array $project, array $in, string $
  *   Role / Position step name + its scope — "Concept (Character)"
  *   Artist Name     the crew row in that lane, a real hire or a planning slot
  *   Rate type/Rate  crew_terms, from the finance database
- *   Total days      that lane's share of the step's person-days
+ *   Total days      that lane's share of the step's person-days, rounded UP to a
+ *                   whole day (2026-10-21)
  *   Total months    days / 22, the sheet's own divisor
  *   Projected cost  rate x days
  *   Units           how many items the step covers
@@ -226,6 +227,19 @@ function expense_projection(PDO $pdo, int $projectId): array {
             $daysPerLane = $personDays;
         }
 
+        // ⚠ WHOLE DAYS, ROUNDED UP, ON EVERY ROW OF EVERY PROJECT (David,
+        // 2026-10-21: "all these days need to be rounded up in the expense
+        // projections ... in all projects as a rule"). Nobody is booked or paid
+        // for 2.75 days, so a person's share is the next whole day, and the cost,
+        // months and every subtotal follow from it. Done ONCE here, so the screen,
+        // the export, the person page and the kick-off snapshot all agree.
+        //
+        // The round() first: 15.4 x 3 lanes can come back as 15.400000000000002,
+        // and ceil() of that is 16. A per-second cost is unaffected (it is priced
+        // on footage, not days). The unrounded share is kept as days_exact.
+        $daysExact   = $daysPerLane;
+        $daysPerLane = ceil(round($daysPerLane, 6));
+
         foreach ($stepLanes as $lane) {
             $cid = $lane ? (int)($lane['crew_id'] ?? 0) : 0;
             $t = $cid ? ($terms[$cid] ?? null) : null;
@@ -311,7 +325,8 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'rate'        => $rate,
                 'rate_unit'   => $rate !== null ? $unit : null,
                 'currency'    => $rate !== null ? $cur : null,
-                'days'        => $daysPerLane,
+                'days'        => $daysPerLane,      // whole days, rounded up (2026-10-21)
+                'days_exact'  => $daysExact,
                 'months'      => $daysPerLane / DAYS_PER_MONTH,
                 // Which number this row's cost rests on, so the screen can say
                 // so rather than leaving a reader to wonder why two steps of the

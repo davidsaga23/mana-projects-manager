@@ -4034,3 +4034,17 @@ always read-only" rule for person previews.
 for the borrowed role, and no money screen opens. Starting a timer or logging time while viewing as
 someone starts or logs it for that person, recorded as entered by the admin. The banner now says
 "Changes save, as their work, and are recorded as made by you."
+
+## 2026-10-21 — The expense projection counts whole days, rounded up, on every project
+**Decision:** each row's days (one person's share of a step) are rounded UP to a whole day in
+`expense_projection()`, on every project. Months, the projected cost of day- and hour-rate rows,
+department subtotals, the grand total, the xlsx export, the person page and the kick-off snapshot
+all follow, because they all read that one function. The unrounded share is kept as `days_exact`
+and shown when you hover over the Days cell.
+**Why:** David: "all these days need to be rounded up in the expense projections ... in all
+projects as a rule". Nobody is booked or paid for 2.75 days.
+**Consequence:** projected costs go UP on almost every project, by up to one day's rate per person
+per step. Per-second rows are unchanged because they are priced on footage. A project signed off
+at kick-off before today will show the rounding as a difference on "Kick-off vs now", because its
+snapshot stored the fractional days. Only the projection rounds: Dates & headcount, the schedule
+and the budget pool still work in fractional days.
