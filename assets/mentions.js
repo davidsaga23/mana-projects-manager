@@ -46,7 +46,17 @@
   }
 
   // --- naming somebody --------------------------------------------------------
-  if (!box || !people.length) return;
+  //
+  // ⚠ A FUNCTION, SINCE 2026-10-22, not a block that runs once on load. The
+  // Board's task panel has a comment box too, and that box does not exist until
+  // somebody opens a task — so the picker has to be attachable to a textarea
+  // that arrives later. The ticket screen calls it at the bottom of this file
+  // with the one box it has; assets/board-screen.js calls it every time it
+  // renders the Comments tab. One picker, two screens.
+  function attachMentions(box, people) {
+  if (!box || !people || !people.length) return;
+  if (box.getAttribute('data-mentions-on')) return;   // never twice on one box
+  box.setAttribute('data-mentions-on', '1');
 
   var panel = null, list = null;
   var at = -1;            // where the "@" that opened this sits, or -1
@@ -195,4 +205,11 @@
   box.addEventListener('blur', function () { setTimeout(close, 120); });
   window.addEventListener('resize', function () { if (panel && !panel.hidden) place(); });
   window.addEventListener('scroll', function () { if (panel && !panel.hidden) place(); }, true);
+  }
+
+  // The ticket screen's own box, which is here on load.
+  attachMentions(box, people);
+
+  // And the handle the Board reaches for, since its box arrives with the panel.
+  window.animaMentions = { attach: attachMentions };
 }());

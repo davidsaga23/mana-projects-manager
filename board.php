@@ -373,6 +373,9 @@ require __DIR__ . '/includes/header.php';
 
 <?php endif; ?>
 
+<?php // The @ picker, shared with the ticket screen: the Comments tab in the
+      // task panel uses the same one rather than a second of its own. ?>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
 <script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
 <?php endif; ?>
 
