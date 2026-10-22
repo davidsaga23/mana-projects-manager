@@ -102,7 +102,8 @@ From lowest to highest access:
 `includes/auth.php` is the single source of truth for who can do what (`can_edit()`,
 `can_see_money()`, `is_artist()`, `is_supervisor()`, `can_log_own_time()`, the `artist_may_post()`
 allow-list, and the per-user project-visibility helpers). An admin can **preview the app as another
-role or as a specific named person** (read-only) from the Users page.
+role** (read-only) **or as a specific named person** (this one saves, as that person's work, recorded
+as done by the admin) from the Users page. `preview_blocks_saving()` is the gate.
 
 ### The one external call
 `includes/ai.php` is the **only** outbound API call in the whole platform. It powers the

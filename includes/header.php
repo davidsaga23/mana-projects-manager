@@ -137,7 +137,7 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
       <?php if (in_user_preview()): $pvu = preview_user(); ?>
       <strong>Viewing as <?= e((string)($pvu['display_name'] ?: $pvu['username'])) ?> (<?= e(role_in_words(preview_role())) ?>).</strong>
       This is their view: their My tasks, the shows they are on, and the screens and buttons they get.
-      <strong>Nothing saves</strong> while you are in here.
+      <strong>Changes save</strong>, as their work, and are recorded as made by you.
       <?php else: ?>
       <strong>Previewing as <?= e(role_in_words(preview_role())) ?>.</strong>
       This is what they see: the menu, the screens they can open, the buttons they get.

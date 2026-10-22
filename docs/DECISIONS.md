@@ -4017,3 +4017,20 @@ on the list, plus the count row. Ref and Title keep a sort button and no filter,
 the 2026-10-05 "sort only" call for this one list.
 **Consequence:** the Due cell also holds the Snooze date box, so it is read from its `.due-date`
 span; a dash reads as no due date ("(nothing)").
+
+## 2026-10-21 — Viewing as a person saves; previewing a role stays read-only
+**Decision:** while an admin views the app as a specific person, saves go through. They act as
+that person, within that person's role (the same role checks the person would get), on that
+person's own work. The session's real user id and display name are never swapped, so every record
+names the admin as the one who did it (`entered_by`, ticket threads, stage logs). A **role** preview
+("as an artist", nobody in particular) still saves nothing. One gate decides this:
+`preview_blocks_saving()` in `includes/auth.php`, read by `require_login()` and
+`require_login_json()`. Linking a login to a crew member on My tasks is refused during a person
+preview, because it writes to the real admin's login.
+**Why:** David: "allow admins to make changes when they're seeing anima as other users". This
+reverses the 2026-10-21 "read-only" part of the view-as decision, and the 2026-09-02 "a preview is
+always read-only" rule for person previews.
+**Consequence:** admin-only powers stay off during a person preview, because `is_admin()` answers
+for the borrowed role, and no money screen opens. Starting a timer or logging time while viewing as
+someone starts or logs it for that person, recorded as entered by the admin. The banner now says
+"Changes save, as their work, and are recorded as made by you."
