@@ -1292,7 +1292,7 @@ if ($retakePct <= 0):
               </form>
             <?php else: ?><span class="muted">—</span><?php endif; ?>
           </td>
-          <td class="num"><?= e(fmt_num($r['days'], 2)) ?>
+          <td class="num" title="Rounded up to whole days, from <?= e(fmt_num((float)($r['days_exact'] ?? $r['days']), 2)) ?>"><?= e(fmt_num($r['days'], 2)) ?>
             <?php // Which number produced these days. An unmarked row rests on a
                   // studio decision; an "est." row rests on one project's guess,
                   // and the difference matters the moment a budget is queried. ?>

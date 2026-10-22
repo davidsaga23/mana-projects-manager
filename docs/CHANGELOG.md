@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — Expense projection in whole days *(no migration)*
+
+- **Every row's days are rounded up to a whole day on every project's expense projection.** Months,
+  cost, subtotals, the total and the Excel export follow. Hover over a Days cell to see the
+  unrounded figure. Projected costs rise slightly as a result.
+
 ## 2026-10-21 — Admins can make changes while viewing as a person *(no migration)*
 
 - **"View the app as a specific person" now saves.** The admin acts as that person, with that
