@@ -45,12 +45,16 @@ $mayEdit   = can_edit();
 $myCrewId  = (int)(effective_crew_id($pdo) ?? 0);
 $maySetAny = $mayEdit;
 
-// ⚠ OPEN WHEN SMALL, SHUT WHEN BIG. Every task row is rendered and the shut
-// ones are hidden with a class, so nothing has to be fetched when somebody
-// expands a shot — but a 188-shot show is 1,500 rows of markup, and sending
-// that expanded would make the page crawl before anybody had clicked anything.
-// MSD is 23 items, so it opens whole; the ceiling is where this starts to cost.
-$openByDefault = ($board['counts']['items'] ?? 0) <= 40;
+// ⚠ EVERY SHOT STARTS SHUT (David, 2026-10-22, seeing it on the live site:
+// "let's have the items ... always closed by default"). Opened, MSD alone is
+// 150 task rows, and the thing somebody opens this screen to do is find ONE
+// shot — not read every task on the show. The list of shots is the index;
+// opening one is the question being asked.
+//
+// Every task row is still RENDERED and hidden by class, so expanding fetches
+// nothing. That is cheap at MSD's size and is where a 188-shot show would start
+// to want its tasks loaded on demand instead.
+$openByDefault = false;
 
 $pageTitle = 'Board';
 require __DIR__ . '/includes/header.php';
@@ -133,6 +137,22 @@ require __DIR__ . '/includes/header.php';
       <span class="board-dot" style="background:<?= e($g['color']) ?>"></span>
       <strong><?= e($g['name']) ?></strong>
       <span class="muted small"><?= count($g['items']) ?> item<?= count($g['items']) === 1 ? '' : 's' ?></span>
+
+      <?php // ⚠ PER GROUP, BESIDE THE WHOLE-BOARD BUTTONS (David's choice,
+            // 2026-10-22). The arrow to the left hides the group; it cannot
+            // open the TASKS of the shots inside it, and on a show with
+            // episodes that is the thing you actually want — every shot of
+            // EP02 open, the rest of the board left alone. ?>
+      <span class="board-group-menu">
+        <button type="button" class="board-group-menu-btn" aria-haspopup="true" aria-expanded="false"
+                aria-label="Expand or collapse the shots in <?= e($g['name']) ?>">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+        </button>
+        <span class="board-group-pop" hidden>
+          <button type="button" data-act="open">Expand everything in <?= e($g['name']) ?></button>
+          <button type="button" data-act="shut">Collapse everything in <?= e($g['name']) ?></button>
+        </span>
+      </span>
     </div>
 
     <div class="board-rows">
