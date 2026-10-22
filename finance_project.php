@@ -2101,6 +2101,69 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <?php endif; ?>
     </div>
   </div>
+
+  <?php // WHO IS ON IT, AND HOW EACH ONE STANDS (David, 2026-10-21: "a list to show
+        // who is working on it and how much has been spent on that person vs.
+        // budget, so management can spot who is over/under budget at a glance").
+        // Worst first; the reading column carries the verdict in words and colour.
+        // pool_step_people() says where every figure comes from. ?>
+  <?php $who = pool_step_people($pdo, $project, (int)$open['id'], $pool['source']);
+        $wcur = $who['currency']; ?>
+  <h4>Who is on it <span class="muted small">— each person against their share of the pool</span></h4>
+  <?php if (!$who['rows']): ?>
+    <p class="muted small">Nobody paid by the day is on this step.</p>
+  <?php else: ?>
+    <div class="table-scroll">
+    <table class="pool-people">
+      <thead><tr>
+        <th>Person</th><th class="num">Rate</th>
+        <th class="num">Budget</th><th class="num">Used</th><th class="num">Unused</th>
+        <th class="num">Invoiced</th><th class="num">Work done</th><th>Reading</th>
+      </tr></thead>
+      <tbody>
+      <?php foreach ($who['rows'] as $p): ?>
+        <tr class="<?= $p['reading_class'] === 'err' ? 'pool-over' : '' ?>">
+          <td><?php if ($p['is_slot']): ?>
+                <span class="muted"><?= e($p['name']) ?></span> <span class="unit-badge">slot</span>
+              <?php else: ?>
+                <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$p['crew_id'] ?>"><?= e($p['name']) ?></a>
+              <?php endif; ?></td>
+          <td class="num"><?= $p['rate'] !== null ? e(fmt_money_plain($p['rate'], $wcur)) . '<span class="muted small"> / day</span>'
+                                                  : '<span class="warn-text small">no rate</span>' ?></td>
+          <td class="num"><?= e(fmt_num($p['budget_days'], 1)) ?> d
+            <?php if ($p['budget_money'] !== null): ?><div class="muted small"><?= e(fmt_money_plain($p['budget_money'], $wcur)) ?></div><?php endif; ?></td>
+          <td class="num <?= $p['reading_class'] === 'err' ? 'err' : '' ?>"><?= e(fmt_num($p['used_days'], 1)) ?> d
+            <?php if ($p['used_money'] !== null): ?><div class="muted small"><?= e(fmt_money_plain($p['used_money'], $wcur)) ?></div><?php endif; ?></td>
+          <td class="num <?= $p['left_days'] < 0 ? 'err' : '' ?>"><?= $p['left_days'] < 0 ? '−' : '' ?><?= e(fmt_num(abs($p['left_days']), 1)) ?> d
+            <?php if ($p['left_money'] !== null): ?><div class="muted small"><?= $p['left_money'] < 0 ? '−' : '' ?><?= e(fmt_money_plain(abs($p['left_money']), $wcur)) ?></div><?php endif; ?></td>
+          <td class="num"><?= $p['invoiced'] !== null ? e(fmt_money_plain($p['invoiced'], $wcur)) : '<span class="muted">—</span>' ?></td>
+          <td class="num"><?= $p['items'] > 0 ? (int)$p['done'] . ' of ' . (int)$p['items'] : '<span class="muted">—</span>' ?></td>
+          <td class="<?= e($p['reading_class']) ?> small"><?= e($p['reading']) ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+      <?php $tt = $who['totals']; ?>
+      <tfoot><tr>
+        <th>All</th><th></th>
+        <th class="num"><?= e(fmt_num($tt['budget_days'], 1)) ?> d
+          <?php if ($tt['budget_money'] > 0): ?><div class="muted small"><?= e(fmt_money_plain($tt['budget_money'], $wcur)) ?><?= $tt['priced'] ? '' : ' +' ?></div><?php endif; ?></th>
+        <th class="num"><?= e(fmt_num($tt['used_days'], 1)) ?> d
+          <?php if ($tt['used_money'] > 0): ?><div class="muted small"><?= e(fmt_money_plain($tt['used_money'], $wcur)) ?><?= $tt['priced'] ? '' : ' +' ?></div><?php endif; ?></th>
+        <th class="num"><?= e(fmt_num($tt['budget_days'] - $tt['used_days'], 1)) ?> d</th>
+        <th class="num"><?= $tt['invoiced'] > 0 ? e(fmt_money_plain($tt['invoiced'], $wcur)) : '' ?></th>
+        <th></th><th></th>
+      </tr></tfoot>
+    </table>
+    </div>
+    <p class="muted small">
+      Budget is each person's slot window in working days, times their day rate. Used is
+      <?= $pool['source'] === 'plan' ? 'the plan up to today, because no time has been logged on this show yet'
+                                    : 'the days they logged on this step' ?>.
+      Invoiced is what they have billed against this position.
+      <?php if (!$tt['priced']): ?>A "+" on a total means somebody here has no day rate, so money is missing from it.<?php endif; ?>
+      People paid by the second are left out, because they have no day budget.
+    </p>
+  <?php endif; ?>
 <?php endif; ?>
 
 <?php endif; ?>

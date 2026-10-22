@@ -487,3 +487,165 @@ function pool_status_slices(PDO $pdo, int $projectId, int $stepId): array {
     }
     return ['slices' => $slices, 'total' => $total, 'noun' => $word($total)];
 }
+
+/**
+ * Who is working on one step, and how each person stands against their share of
+ * the pool (David, 2026-10-21: "a list to show who is working on it and how much
+ * has been spent on that person vs. budget, so management can spot who is
+ * over/under budget at a glance").
+ *
+ * Per person, built from the same pieces the card is built from, so the rows add
+ * up to the card:
+ *   budget   their slot's window in working days (what the pool gave them), and
+ *            that times their day rate
+ *   used     their logged days on this step once the project has any logged
+ *            time at all, otherwise the plan's days up to today; the same switch
+ *            budget_pool() makes for the whole step
+ *   invoiced what they have actually billed against this position (invoices)
+ *   work     the step's items assigned to them, and how many are approved
+ *
+ * The reading: OVER BUDGET whenever used passes budget; otherwise the same
+ * days-against-progress comparison the card makes (pool_pace()), on their own
+ * items. Somebody with nothing assigned is read on days alone.
+ *
+ * Per-second lanes are left out, as they are from the day pool: they have no
+ * day budget to be over. Two slots held by one person are one row.
+ *
+ * @param string $source 'logged' or 'plan', from budget_pool()
+ * @return array ['rows' => [...], 'totals' => [...], 'currency' => string]
+ */
+function pool_step_people(PDO $pdo, array $project, int $stepId, string $source): array {
+    $projectId = (int)$project['id'];
+    $today = date('Y-m-d');
+    $hpd   = hours_per_day($pdo, $projectId);
+
+    $lanes = array_values(array_filter(project_lanes($pdo, $projectId),
+        fn($l) => (int)$l['step_id'] === $stepId));
+    $crewIds = array_values(array_unique(array_map(fn($l) => (int)$l['crew_id'], $lanes)));
+    $terms   = $crewIds ? crew_terms($crewIds) : [];
+    $billed  = function_exists('invoiced_by_position') ? invoiced_by_position($projectId) : [];
+
+    // Logged days per person on this step, through the progress row the time
+    // was logged against (the same link pool_logged_days() follows).
+    $logged = [];
+    if ($source === 'logged' && $hpd > 0) {
+        try {
+            $q = $pdo->prepare(
+                'SELECT tl.crew_id, COALESCE(SUM(tl.minutes), 0) AS mins
+                   FROM time_logs tl JOIN progress pr ON pr.id = tl.progress_id
+                  WHERE pr.project_id = ? AND pr.step_id = ?
+                  GROUP BY tl.crew_id'
+            );
+            $q->execute([$projectId, $stepId]);
+            foreach ($q as $r) $logged[(int)$r['crew_id']] = ((float)$r['mins'] / 60) / $hpd;
+        } catch (PDOException $e) {
+            $logged = [];
+        }
+    }
+
+    // The step's items assigned to each person, and how many are approved: the
+    // rows the step still covers, N/A left out, primary assignee or a second name.
+    $work = [];
+    if ($crewIds) {
+        $ids = implode(',', array_map('intval', $crewIds));
+        $inScope = progress_in_scope_sql();
+        $q = $pdo->prepare(
+            "SELECT c.crew_id, COUNT(DISTINCT pr.id) AS n,
+                    COUNT(DISTINCT CASE WHEN pr.is_approved = 1 THEN pr.id END) AS done
+               FROM progress pr
+               JOIN pipeline_steps ps ON ps.id = pr.step_id
+               LEFT JOIN statuses st  ON st.id = pr.status_id
+               LEFT JOIN assets a     ON a.id  = pr.asset_id
+               JOIN (SELECT id AS progress_id, crew_id FROM progress
+                      WHERE step_id = ? AND crew_id IN ({$ids})
+                     UNION
+                     SELECT pc.progress_id, pc.crew_id FROM progress_crew pc
+                      WHERE pc.crew_id IN ({$ids})) c ON c.progress_id = pr.id
+              WHERE pr.step_id = ? AND {$inScope} AND COALESCE(st.is_excluded, 0) = 0
+              GROUP BY c.crew_id"
+        );
+        try {
+            $q->execute([$stepId, $stepId]);
+            foreach ($q as $r) $work[(int)$r['crew_id']] = ['n' => (int)$r['n'], 'done' => (int)$r['done']];
+        } catch (PDOException $e) {
+            $work = [];
+        }
+    }
+
+    $people = [];
+    $currency = '';
+    foreach ($lanes as $l) {
+        $cid  = (int)$l['crew_id'];
+        $t    = $terms[$cid] ?? null;
+        $unit = strtolower(trim((string)($t['rate_unit'] ?? 'day')));
+        if (str_contains($unit, 'sec')) continue;     // no day budget to be over
+        $start = (string)($l['step_start'] ?? '');
+        $end   = (string)($l['step_deadline'] ?? '');
+        if ($start === '' || $end === '') continue;   // named as undated on the card
+
+        $slot = !empty($l['is_placeholder']);
+        $key  = $slot ? 'slot' . (int)$l['id'] : 'c' . $cid;
+        if (!isset($people[$key])) {
+            $rate = ($t && $t['day_rate'] !== null && $unit === 'day') ? (float)$t['day_rate'] : null;
+            if ($rate !== null && $currency === '') {
+                $currency = strtoupper(trim((string)($t['rate_currency'] ?? 'USD'))) ?: 'USD';
+            }
+            $people[$key] = [
+                'crew_id' => $cid, 'name' => (string)$l['name'], 'is_slot' => $slot,
+                'rate' => $rate, 'rate_unit' => $t ? $unit : null,
+                'budget_days' => 0.0, 'used_days' => 0.0,
+                'invoiced' => $slot ? null : ($billed[$cid . '|' . $stepId] ?? null),
+                'items' => $work[$cid]['n'] ?? 0, 'done' => $work[$cid]['done'] ?? 0,
+            ];
+        }
+        $people[$key]['budget_days'] += working_days_between($start, $end);
+        // An unfilled slot burns nothing; a person burns their window to today,
+        // unless the project logs time, when their logged days are the answer.
+        if (!$slot && $source !== 'logged') {
+            $upTo = min($today, $end);
+            if ($upTo >= $start) $people[$key]['used_days'] += working_days_between($start, $upTo);
+        }
+    }
+
+    $rows = [];
+    $tot = ['budget_days' => 0.0, 'used_days' => 0.0, 'budget_money' => 0.0, 'used_money' => 0.0,
+            'invoiced' => 0.0, 'priced' => true];
+    foreach ($people as $p) {
+        if ($source === 'logged' && !$p['is_slot']) $p['used_days'] = $logged[$p['crew_id']] ?? 0.0;
+        $p['left_days']    = $p['budget_days'] - $p['used_days'];
+        $p['budget_money'] = $p['rate'] !== null ? round($p['budget_days'] * $p['rate'], 2) : null;
+        $p['used_money']   = $p['rate'] !== null ? round($p['used_days'] * $p['rate'], 2) : null;
+        $p['left_money']   = $p['rate'] !== null ? round($p['left_days'] * $p['rate'], 2) : null;
+        $pctUsed = $p['budget_days'] > 0 ? $p['used_days'] / $p['budget_days'] * 100 : 0.0;
+        $pctDone = $p['items'] > 0 ? $p['done'] / $p['items'] * 100 : 0.0;
+
+        if ($p['is_slot']) {
+            [$cls, $text] = ['warn-text', 'nobody in this slot yet, so nothing is being used'];
+        } elseif ($p['used_days'] > $p['budget_days'] + 0.05) {
+            $cls  = 'err';
+            $text = 'over budget by ' . fmt_num($p['used_days'] - $p['budget_days'], 1) . ' days';
+        } elseif ($p['items'] > 0) {
+            [$cls, $text] = pool_pace($pctUsed, $pctDone, (float)$p['items']);
+        } else {
+            [$cls, $text] = ['muted', sprintf('%d%% of their days used, no items assigned to them yet',
+                                              round($pctUsed))];
+        }
+        $p['pct_used'] = $pctUsed;
+        $p['reading_class'] = $cls;
+        $p['reading'] = $text;
+        $rows[] = $p;
+
+        $tot['budget_days'] += $p['budget_days'];
+        $tot['used_days']   += $p['used_days'];
+        $tot['invoiced']    += (float)($p['invoiced'] ?? 0);
+        if ($p['rate'] === null) { $tot['priced'] = false; continue; }
+        $tot['budget_money'] += $p['budget_money'];
+        $tot['used_money']   += $p['used_money'];
+    }
+    // Real people first, worst first, so the one to talk to is at the top.
+    usort($rows, function ($a, $b) {
+        if ($a['is_slot'] !== $b['is_slot']) return $a['is_slot'] ? 1 : -1;
+        return $b['pct_used'] <=> $a['pct_used'] ?: strcasecmp($a['name'], $b['name']);
+    });
+    return ['rows' => $rows, 'totals' => $tot, 'currency' => $currency ?: 'USD'];
+}

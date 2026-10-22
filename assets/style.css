@@ -1754,6 +1754,11 @@ svg.trend { margin: 0; }
 .pool-pair > .pool-status { display: flex; align-items: flex-start; gap: 20px; flex: 0 0 auto; }
 .pool-status .pool-legend { align-self: flex-start; margin-top: 0; height: 150px;
   display: flex; flex-direction: column; justify-content: center; }
+/* Who is on a step (2026-10-21): one row per person, over budget in red. */
+.pool-people { width: 100%; margin: 6px 0 8px; }
+.pool-people td, .pool-people th { vertical-align: top; }
+.pool-people .num { white-space: nowrap; }
+.pool-people tr.pool-over td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .pool-legend { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12.5px; }
 .pool-legend li { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .pool-legend .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
