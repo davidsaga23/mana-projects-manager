@@ -125,8 +125,8 @@ should reuse this shape. Nothing else in the app talks to the outside world.
   (`finance_install*.sql`) files are imported by hand via phpMyAdmin instead.
 - Full setup guide (FTP secrets, the two-folders trap, rollback): `docs/GIT_SETUP.md`.
 - **App clock is `America/Los_Angeles`** (set 2026-10-16), configured in `config.php` → read by
-  `includes/db.php`. (Earlier history ran on `America/Mexico_City`; see the open date-offset defect
-  in §7.)
+  `includes/db.php`. (Earlier history ran on `America/Mexico_City`.) MySQL is
+  told the same offset on every connection, so the two clocks agree (fixed 2026-10-16, see §7).
 
 ### ⚠ What the cloud dev environment CANNOT do
 This repo is often worked on from a **cloud container that cannot reach the live site.** From the
@@ -216,11 +216,11 @@ status banners are historical — trust `docs/HANDOFF.md` and `docs/MIGRATIONS.m
 
 ## 7. Known defects and boundaries a new account should know
 
-- **⚠ Open date-offset defect (found 2026-10-09, not fixed).** PHP's timezone is set from
-  `config.php` but MySQL's is not, so `CURDATE()`/`NOW()` (used in ~16 places) can disagree with
-  PHP (~45 places) by several hours, filing late-evening work under the wrong day. The one-line fix
-  and its two consequences are written up in `docs/ROADMAP.md` → "Open defect". David has seen it
-  and not yet said to apply it.
+- **The date-offset defect is fixed (found 2026-10-09, fixed 2026-10-16, commit `6fe074a`).**
+  PHP's timezone came from `config.php` but MySQL's did not, so `CURDATE()`/`NOW()` could disagree
+  with PHP by hours and file late-evening work under the next day. `includes/db.php` now sets
+  MySQL's `time_zone` to PHP's offset on every connection. Rows written before the fix keep the day
+  they were filed under; nothing was rewritten. See `docs/ROADMAP.md` → "Fixed defect".
 - **Project visibility scopes the list and the project-hub door only** (PR #26). A scoped user no
   longer sees shows they are not staffed on in the list or via the hub, but **direct deep-links to
   sub-pages** (e.g. `shots.php?project=X`) are still reachable — this matches the app's existing

@@ -32,8 +32,9 @@ without re-deriving context.
 >
 > **The default branch is `master`.** Merging to `master` auto-deploys to the live site in ~30s.
 >
-> **One known unfixed defect: PHP and MySQL disagree about the date by six hours** — see *Open
-> defect* in `docs/ROADMAP.md`. David has seen it and not yet said to apply the one-line fix.
+> **The PHP/MySQL date offset is FIXED** (2026-10-16, commit `6fe074a`): `includes/db.php` sends
+> PHP's UTC offset to MySQL on every connection. See *Fixed defect* in `docs/ROADMAP.md`. Rows
+> written before the fix keep the day they were filed under.
 >
 > ---
 >
