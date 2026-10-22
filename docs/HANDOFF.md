@@ -91,9 +91,11 @@ usually where a schedule actually dies, so it is the most valuable gap.
 
 ### Roles (access levels)
 From lowest to highest access:
-- **artist** — read-only across most of the app; can set the status of work assigned to them, log
-  their own time on their own task cards, and log their own overhead (studio-time) hours.
-- **supervisor** — artist permissions plus view-only Timeline and Staffing, and editable Shots.
+- **artist** — read-only across most of the app; can set the status of work assigned to them (only
+  to In progress or Pending review), log their own time on their own task cards, and log their own
+  overhead (studio-time) hours.
+- **supervisor** — artist permissions plus view-only Timeline and Staffing, editable Shots, and the
+  Hire button on Staffing (every hire emails the admins).
 - **editor** (displayed everywhere as **"Production"**) — full production editing.
 - **admin** — everything, including the finance DB and user management.
 

@@ -164,8 +164,9 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
       // read as two separate problems. ?>
 <?php if (!can_edit() && !in_preview()): ?>
   <?php if (is_supervisor()): ?>
-  <div class="flash flash-warn">You can edit a project's Shots and the status of your own work.
-    Everything else, Timeline and Staffing included, is read-only. Ask an administrator if you need more.</div>
+  <div class="flash flash-warn">You can edit a project's Shots, hire a candidate on Staffing, and set
+    your own work to In progress or Pending review. Everything else, the rest of Timeline and Staffing
+    included, is read-only. Ask an administrator if you need more.</div>
   <?php else: ?>
   <div class="flash flash-warn">You have view-only access, everything is readable, nothing
     can be changed. Ask an administrator if you need to edit something.</div>

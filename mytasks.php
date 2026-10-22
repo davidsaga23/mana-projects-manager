@@ -126,6 +126,7 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_stat
             throw new RuntimeException('That status is not part of that project.');
         }
         $status = $statusId ? $map[$statusId] : null;
+        if (!status_self_serve($status)) throw new RuntimeException(status_self_serve_refusal());
         $flags  = status_flags($status);
         $oldId  = $row['status_id'] !== null ? (int)$row['status_id'] : null;
 
@@ -190,6 +191,7 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_tick
             throw new RuntimeException('That status is not part of that project.');
         }
         $status = $statusId ? $map[$statusId] : null;
+        if (!status_self_serve($status)) throw new RuntimeException(status_self_serve_refusal());
         $oldId  = $tk['status_id'] !== null ? (int)$tk['status_id'] : null;
 
         if ($oldId === $statusId) {
@@ -480,7 +482,8 @@ if ($myCrewId && overhead_available($pdo) && $_SERVER['REQUEST_METHOD'] === 'POS
 
 if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_log'])) {
     try {
-        flash('ok', delete_time_log($pdo, (int)$_POST['delete_log'], $userId, is_admin()));
+        flash('ok', delete_time_log($pdo, (int)$_POST['delete_log'], $userId, is_admin(),
+                                    can_edit() ? (int)$myCrewId : null));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -1016,11 +1019,19 @@ require __DIR__ . '/includes/header.php';
             <form method="post" class="inline-form" style="margin:0;">
               <input type="hidden" name="set_status" value="1">
               <input type="hidden" name="progress_id" value="<?= (int)$row['progress_id'] ?>">
+              <?php // Outside Production only In progress and Pending review are
+                    // offered (status_self_serve()); the current status still
+                    // shows, greyed, so the box says where the work stands. ?>
               <select name="status_id" onchange="this.form.submit()" <?= $canSetStatus ? '' : 'disabled' ?>>
-                <option value="">not started</option>
+                <?php if (can_edit() || $row['status_id'] === null): ?>
+                  <option value="" <?= can_edit() ? '' : 'disabled' ?>>not started</option>
+                <?php endif; ?>
                 <?php foreach (($statusesByProject[$pid] ?? []) as $sid => $s): ?>
                   <?php if ((int)($s['is_excluded'] ?? 0) === 1) continue; ?>
-                  <option value="<?= (int)$sid ?>" <?= (int)$row['status_id'] === (int)$sid ? 'selected' : '' ?>>
+                  <?php $isNow = (int)$row['status_id'] === (int)$sid;
+                        $open  = status_self_serve($s);
+                        if (!$open && !$isNow) continue; ?>
+                  <option value="<?= (int)$sid ?>" <?= $isNow ? 'selected' : '' ?> <?= $open ? '' : 'disabled' ?>>
                     <?= e($s['name']) ?>
                   </option>
                 <?php endforeach; ?>
@@ -1130,10 +1141,16 @@ require __DIR__ . '/includes/header.php';
                 <input type="hidden" name="ticket_id" value="<?= (int)$t3['id'] ?>">
                 <select name="status_id" onchange="this.form.submit()"
                         style="border-color:<?= e($c) ?>44;color:<?= e($c) ?>;">
-                  <option value="">no status</option>
+                  <?php // Same limit as the production tasks above. ?>
+                  <?php if (can_edit() || $t3['status_id'] === null): ?>
+                    <option value="" <?= can_edit() ? '' : 'disabled' ?>>no status</option>
+                  <?php endif; ?>
                   <?php foreach (($statusesByProject[(int)$t3['project_id']] ?? []) as $sid => $st): ?>
                     <?php if ((int)($st['is_excluded'] ?? 0) === 1) continue; ?>
-                    <option value="<?= (int)$sid ?>" <?= (int)$t3['status_id'] === (int)$sid ? 'selected' : '' ?>>
+                    <?php $isNow = (int)$t3['status_id'] === (int)$sid;
+                          $open  = status_self_serve($st);
+                          if (!$open && !$isNow) continue; ?>
+                    <option value="<?= (int)$sid ?>" <?= $isNow ? 'selected' : '' ?> <?= $open ? '' : 'disabled' ?>>
                       <?= e($st['name']) ?>
                     </option>
                   <?php endforeach; ?>
@@ -1227,7 +1244,9 @@ require __DIR__ . '/includes/header.php';
           <td class="num"><?= e(fmt_hours((int)$en['minutes'])) ?></td>
           <td class="muted small"><?= e($en['notes'] ?: '') ?></td>
           <td class="row-actions">
-            <?php if (can_log_own_time() && (is_admin() || (int)$en['entered_by'] === $userId)): ?>
+            <?php // This list is the viewer's own hours, so can_edit() is the
+                  // whole Production rule here (see delete_time_log()). ?>
+            <?php if (can_log_own_time() && (can_edit() || (int)$en['entered_by'] === $userId)): ?>
               <form method="post" onsubmit="return confirm('Remove this entry?');">
                 <button type="submit" name="delete_log" value="<?= (int)$en['id'] ?>" class="link-danger">remove</button>
               </form>

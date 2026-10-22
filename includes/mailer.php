@@ -428,6 +428,91 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
 }
 
 /**
+ * Tell the administrators that somebody was hired, and by whom.
+ *
+ * David, 2026-10-21: once supervisors can press Hire, a hire "should trigger an
+ * email for the admins stating who and whom hired the slot". Sent on EVERY hire,
+ * whoever presses it, so the admins hear about all of them in one shape. The
+ * person who did it is not emailed about their own click.
+ *
+ * Addresses: the login's own email (Users, migration 049) first, else the linked
+ * crew member's, the same rule the kick-off sign-off uses.
+ *
+ * Never throws; returns [sent?, a sentence] like the other notifiers, and says
+ * when there was nobody to tell.
+ *
+ * @param array $h  project_id, project_code, project_name, candidate, slot, step,
+ *                  by (display name), rate_note (or '')
+ */
+function notify_admins_of_hire(PDO $pdo, array $h): array {
+    global $config;
+    if (!SmtpMailer::isConfigured($config)) {
+        return [false, 'Email is not set up on this server, so the administrators were not told about this hire.'];
+    }
+
+    $ownEmail = column_exists($pdo, 'users', 'email')
+        ? "NULLIF(TRIM(COALESCE(u.email, '')), '')" : 'NULL';
+    $me = (int)($_SESSION['user_id'] ?? 0);
+    $q = $pdo->prepare(
+        "SELECT COALESCE(NULLIF(u.display_name, ''), u.username) AS name,
+                COALESCE({$ownEmail}, NULLIF(TRIM(COALESCE(c.email, '')), '')) AS email
+           FROM users u LEFT JOIN crew c ON c.id = u.crew_id
+          WHERE u.role = 'admin' AND u.active = 1 AND u.id <> ?"
+    );
+    $q->execute([$me]);
+    $recipients = [];
+    $noEmail = [];
+    foreach ($q->fetchAll() as $a) {
+        if ($a['email']) $recipients[] = ['email' => $a['email'], 'name' => $a['name']];
+        else             $noEmail[]    = (string)$a['name'];
+    }
+    if (!$recipients) {
+        return [false, $noEmail
+            ? 'The administrators were not emailed about this hire: ' . implode(', ', $noEmail)
+              . ' ' . (count($noEmail) === 1 ? 'has' : 'have') . ' no email address on Users.'
+            : ''];
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
+    $dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $url    = "{$scheme}://{$host}{$dir}/crew.php?project=" . (int)$h['project_id'];
+    $esc    = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+    $where = $h['slot'] !== '' ? $h['slot'] : ($h['step'] !== '' ? $h['step'] : 'no position yet');
+    $code  = $h['project_code'] !== '' ? $h['project_code'] : 'Anima';
+    $subject = sprintf('[%s] %s hired %s', $code, $h['by'], $h['candidate']);
+    $line = sprintf('%s hired %s into %s on %s.', $h['by'], $h['candidate'], $where, $h['project_name']);
+
+    $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
+        . '<p><strong>' . $esc($h['by']) . '</strong> hired <strong>' . $esc($h['candidate']) . '</strong> into <strong>'
+        . $esc($where) . '</strong> on ' . $esc($h['project_name']) . '.</p>'
+        . ($h['step'] !== '' ? '<p style="color:#5a6a7a;margin:0 0 12px;">Step: ' . $esc($h['step']) . '</p>' : '')
+        . ($h['rate_note'] !== '' ? '<p>' . $esc($h['rate_note']) . '</p>' : '')
+        . '<p style="margin-top:16px;"><a href="' . $esc($url) . '" '
+        . 'style="background:#2f6fb2;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;display:inline-block;">'
+        . 'Open Staffing</a></p>'
+        . '<p style="color:#8a97a3;font-size:12px;margin-top:18px;">Anima | Project manager</p>'
+        . '</div>';
+    $text = $line . "\n"
+        . ($h['step'] !== '' ? 'Step: ' . $h['step'] . "\n" : '')
+        . ($h['rate_note'] !== '' ? "\n" . $h['rate_note'] . "\n" : '')
+        . "\nOpen Staffing: {$url}\n";
+
+    try {
+        (new SmtpMailer($config))->send($recipients, $subject, $html, $text);
+        $said = 'Emailed the administrators (' . implode(', ', array_column($recipients, 'name')) . ') about this hire.';
+        if ($noEmail) $said .= ' ' . implode(', ', $noEmail) . (count($noEmail) === 1
+            ? ' has no email address on Users and was not reached.'
+            : ' have no email address on Users and were not reached.');
+        return [true, $said];
+    } catch (Throwable $e) {
+        error_log('[Anima hire mail] ' . $e->getMessage());
+        return [false, 'Hired, but the email to the administrators failed: ' . $e->getMessage()];
+    }
+}
+
+/**
  * ONE summary email per person for a batch of tasks just created from a
  * transcript (David, 2026-10-20).
  *

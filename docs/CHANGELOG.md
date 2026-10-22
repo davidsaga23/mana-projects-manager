@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — supervisor hiring, artist statuses, time removal, step days *(branch, not yet merged)*
+
+All four need **no migration**.
+
+- **Supervisors can press Hire on Staffing**, and only Hire (the stage dropdown, adding candidates
+  and filling slots stay with Production). **Every hire now emails the administrators** who hired
+  whom, into which position, on which show. A hire by someone who cannot see rates does not carry a
+  quoted rate across; the email says so.
+- **Artists and supervisors set their own work only to In progress or Pending review** on My tasks.
+  Anything else is Production's.
+- **Production can remove any time entry on their own My tasks list**, including ones somebody else
+  typed for them. Artists still remove only what they typed.
+- **Dates & headcount has a Days column**: calendar days from start to deadline, both counted, with
+  the working days under it.
+
 ## 2026-10-21 — the latest batch (all merged to `master`, live)
 
 - **PR #26 — Per-user project visibility + "view the app as a specific person".** *(needs migration

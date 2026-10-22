@@ -354,12 +354,30 @@ const SUPERVISOR_SCRIPTS = [
     'shots' => ['shots.php', 'shots_api.php'],
 ];
 
+/**
+ * Single ACTIONS a supervisor may post on a screen that otherwise stays read-only
+ * to them: the script, and a pattern the posted `action` must match in full.
+ *
+ * David, 2026-10-21: a supervisor "should be able to see the hiring button and
+ * click hire". So on Staffing they press Hire and nothing else. The stage
+ * dropdown, adding candidates, filling or emptying a slot all stay with
+ * Production, and hire_candidate() emails the administrators who hired whom.
+ */
+const SUPERVISOR_ACTIONS = [
+    'crew.php' => '/^hire:\d+$/',
+];
+
 /** May the current account change things in this area ('timeline', 'staffing', 'shots')? */
 function can_edit_area(string $area): bool {
     return can_edit() || (is_supervisor() && isset(SUPERVISOR_SCRIPTS[$area]));
 }
 
-/** Is this POST a supervisor saving through one of their three areas? */
+/** May the current account press Hire on Staffing? Production, admins and supervisors. */
+function can_hire(): bool {
+    return can_edit_area('staffing') || is_supervisor();
+}
+
+/** Is this POST a supervisor saving through one of their areas, or one of their single actions? */
 function supervisor_may_post(): bool {
     if (!is_supervisor()) return false;
     // SCRIPT_NAME, not REQUEST_URI — see artist_may_post().
@@ -367,7 +385,8 @@ function supervisor_may_post(): bool {
     foreach (SUPERVISOR_SCRIPTS as $scripts) {
         if (in_array($script, $scripts, true)) return true;
     }
-    return false;
+    $pattern = SUPERVISOR_ACTIONS[$script] ?? null;
+    return $pattern !== null && preg_match($pattern, (string)($_POST['action'] ?? '')) === 1;
 }
 
 /**

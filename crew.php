@@ -40,15 +40,17 @@ function staffing_candidate(array $h, bool $canHire): void {
           </select>
           <input type="hidden" name="action" value="stage:<?= (int)$h['id'] ?>">
         </form>
-        <?php if ($canHire): ?>
-          <form method="post" class="cand-hire"
-                onsubmit="return confirm('Hire <?= e(addslashes($h['candidate_name'])) ?> into this position? Everything already planned for it becomes theirs.');">
-            <button type="submit" class="row-btn row-btn-go" name="action"
-                    value="hire:<?= (int)$h['id'] ?>">Hire</button>
-          </form>
-        <?php endif; ?>
       <?php else: ?>
         <span class="muted small">(<?= e(strtolower(hire_stage_label($h['stage']))) ?>)</span>
+      <?php endif; ?>
+      <?php // A supervisor gets Hire without the stage dropdown (2026-10-21), see
+            // SUPERVISOR_ACTIONS in auth.php. ?>
+      <?php if ($canHire && can_hire()): ?>
+        <form method="post" class="cand-hire"
+              onsubmit="return confirm('Hire <?= e(addslashes($h['candidate_name'])) ?> into this position? Everything already planned for it becomes theirs.');">
+          <button type="submit" class="row-btn row-btn-go" name="action"
+                  value="hire:<?= (int)$h['id'] ?>">Hire</button>
+        </form>
       <?php endif; ?>
       <?php // ⚠ IT GOES TO THE PERSON, not to the Hiring screen (David, 2026-09-02:
             // "the view details should take you to the detailed page of that

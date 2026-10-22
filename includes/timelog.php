@@ -223,8 +223,13 @@ function log_time(PDO $pdo, array $in): string {
     return 'Logged ' . fmt_hours($minutes) . ' on ' . date('j M', strtotime($day)) . '.';
 }
 
-/** Remove one entry, if the person asking is allowed to. */
-function delete_time_log(PDO $pdo, int $id, int $userId, bool $isAdmin): string {
+/**
+ * Remove one entry, if the person asking is allowed to.
+ *
+ * @param int|null $ownCrewId  Production only: the asker's own crew id. Any entry
+ *                             filed under that person may go, whoever typed it.
+ */
+function delete_time_log(PDO $pdo, int $id, int $userId, bool $isAdmin, ?int $ownCrewId = null): string {
     if (!time_logs_available($pdo)) return 'Nothing to remove.';
     $q = $pdo->prepare('SELECT * FROM time_logs WHERE id = ?');
     $q->execute([$id]);
@@ -233,7 +238,12 @@ function delete_time_log(PDO $pdo, int $id, int $userId, bool $isAdmin): string 
 
     // Whoever typed it, or an admin. An artist correcting their own slip should
     // not have to ask; somebody else's hours are not theirs to edit.
-    if (!$isAdmin && (int)$row['entered_by'] !== $userId) {
+    //
+    // PRODUCTION also removes any entry on their OWN list, including one somebody
+    // else typed for them (David, 2026-10-21: "only on their own list"). Not other
+    // people's hours: that stays an admin's.
+    $onOwnList = $ownCrewId !== null && $ownCrewId > 0 && (int)$row['crew_id'] === $ownCrewId;
+    if (!$isAdmin && !$onOwnList && (int)$row['entered_by'] !== $userId) {
         throw new RuntimeException('You can only remove entries you made yourself.');
     }
     $pdo->prepare('DELETE FROM time_logs WHERE id = ?')->execute([$id]);
