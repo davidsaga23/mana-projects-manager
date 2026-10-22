@@ -51,6 +51,29 @@ function step_applicable_count(array $step, int $shotCount, array $typeCounts, i
     return max(0, $n - (int)($step['excluded'] ?? 0));
 }
 
+/**
+ * The SQL test for "this progress row is one the step still covers", over the
+ * aliases pr (progress), ps (pipeline_steps) and a (assets, LEFT JOINed). Why it
+ * exists is written in dashboard_steps() below. One copy, because the Budget
+ * pool's status pie (2026-10-21) has to count exactly the rows the cards count.
+ *
+ * Every THEN is parenthesised. MySQL accepts a bare boolean expression there,
+ * but AND/OR precedence inside a CASE arm is exactly the kind of thing that is
+ * read wrong once and then quietly returns the wrong rows forever.
+ */
+function progress_in_scope_sql(): string {
+    $typeOk = "(ps.applies_to_asset_type IS NULL OR ps.applies_to_asset_type = ''"
+            . " OR a.asset_type = ps.applies_to_asset_type)";
+    return "(pr.id IS NOT NULL AND (CASE ps.applies_to
+                   WHEN 'project' THEN (pr.shot_id IS NULL AND pr.asset_id IS NULL)
+                   WHEN 'shot'    THEN (pr.shot_id IS NOT NULL)
+                   WHEN 'asset'   THEN (pr.asset_id IS NOT NULL AND {$typeOk})
+                   WHEN 'both'    THEN (pr.shot_id IS NOT NULL
+                                        OR (pr.asset_id IS NOT NULL AND {$typeOk}))
+                   ELSE 1
+                 END))";
+}
+
 function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null): array {
     $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 
@@ -76,19 +99,7 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
     // NULL` leads each test because this is a LEFT JOIN: without it a step with
     // no progress at all matches the 'project' branch on two NULL ids and counts
     // itself one tracked row.
-    // Every THEN is parenthesised. MySQL accepts a bare boolean expression there,
-    // but AND/OR precedence inside a CASE arm is exactly the kind of thing that
-    // is read wrong once and then quietly returns the wrong rows forever.
-    $typeOk = "(ps.applies_to_asset_type IS NULL OR ps.applies_to_asset_type = ''"
-            . " OR a.asset_type = ps.applies_to_asset_type)";
-    $inScope = "(pr.id IS NOT NULL AND (CASE ps.applies_to
-                   WHEN 'project' THEN (pr.shot_id IS NULL AND pr.asset_id IS NULL)
-                   WHEN 'shot'    THEN (pr.shot_id IS NOT NULL)
-                   WHEN 'asset'   THEN (pr.asset_id IS NOT NULL AND {$typeOk})
-                   WHEN 'both'    THEN (pr.shot_id IS NOT NULL
-                                        OR (pr.asset_id IS NOT NULL AND {$typeOk}))
-                   ELSE 1
-                 END))";
+    $inScope = progress_in_scope_sql();
 
     $stmt = $pdo->prepare(
         'SELECT ps.*,

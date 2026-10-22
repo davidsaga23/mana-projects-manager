@@ -4048,3 +4048,21 @@ per step. Per-second rows are unchanged because they are priced on footage. A pr
 at kick-off before today will show the rounding as a difference on "Kick-off vs now", because its
 snapshot stored the fractional days. Only the projection rounds: Dates & headcount, the schedule
 and the budget pool still work in fractional days.
+
+## 2026-10-21 — Budget pool: interactive donuts, unused days, and a status pie per step
+**Decision:** on the Budget pool tab the days are drawn as a donut of **used** against **unused**,
+both as segments you can point at, for the whole show at the top and for each step in its detail.
+Hovering a segment puts its figure in the middle of the ring ("10 days unused"); each segment also
+has a `<title>` for touch screens and screen readers. "Left" now reads **Unused** across the tab.
+Beside a step's days donut sits a **status pie**: that step's shots or assets by status, with a
+legend. It counts exactly the rows the cards count, through the new shared `progress_in_scope_sql()`
+(moved out of `dashboard_steps()`) and `step_applicable_count()`. N/A items are left out, and
+anything without a status reads "not started". The helpers are `pool_donut_svg()`,
+`pool_days_donut_svg()` and `pool_status_slices()` in `includes/budgetpool.php`; they replace
+`pool_ring_svg()`.
+**Why:** David: "make sure we show the remaining days unused and those pie charts should be
+dynamic/interactive. When you hover the mouse they should say how many days", then "add all the
+assets or shots in a pie chart next to the days used that show how many assets/shots are in which
+status".
+**Consequence:** the status pie is per step only. A pie for the whole show would add up items from
+different steps, which are not the same work.

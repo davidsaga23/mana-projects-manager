@@ -1867,7 +1867,7 @@ function invAddRows() {
           // number at all. ?>
     <span class="<?= $pool['source'] === 'plan' ? 'warn-text' : 'muted' ?> small">
       <?= $pool['source'] === 'plan' ? 'from the plan, not logged hours' : 'from logged hours' ?></span></div>
-  <div><span class="muted small">Left</span>
+  <div><span class="muted small">Unused</span>
     <strong class="<?= $pool['days']['left'] < 0 ? 'err' : '' ?>">
       <?= e(fmt_num(abs($pool['days']['left']), 1)) ?> days</strong>
     <span class="<?= $pool['days']['left'] < 0 ? 'err' : 'muted' ?> small">
@@ -1880,6 +1880,21 @@ function invAddRows() {
     <strong class="<?= e($pool['days']['pace_class']) ?>">
       <?= e(fmt_num($pool['days']['pct_used'], 0)) ?>% / <?= e(fmt_num($pool['work']['pct'], 0)) ?>%</strong>
     <span class="<?= e($pool['days']['pace_class']) ?> small"><?= e($pool['days']['pace_text']) ?></span></div>
+</div>
+
+<?php // THE WHOLE SHOW AS ONE DONUT, used against unused (David, 2026-10-21:
+      // "show the remaining days unused", and hovering says how many days). ?>
+<div class="pool-detail pool-overall">
+  <?= pool_days_donut_svg((float)$pool['days']['used'], (float)$pool['days']['pool']) ?>
+  <div>
+    <p><strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days used</strong>
+      <span class="muted">of <?= e(fmt_num($pool['days']['pool'], 1)) ?></span></p>
+    <p class="<?= $pool['days']['left'] < 0 ? 'err' : 'muted' ?>">
+      <?= $pool['days']['left'] < 0
+          ? e(fmt_num(abs($pool['days']['left']), 1)) . ' days over the pool'
+          : e(fmt_num($pool['days']['left'], 1)) . ' days still unused' ?></p>
+    <p class="muted small">Point at the donut to see each part in days.</p>
+  </div>
 </div>
 
 <p class="muted small">
@@ -1934,7 +1949,8 @@ function invAddRows() {
       <div class="mini-bar"><span style="width:<?= e(fmt_num(min(100, $r['pct_used']), 1)) ?>%;background:<?= e($bar) ?>"></span></div>
       <div class="mini-num"><?= e(fmt_num($r['used'], 1)) ?><span class="mini-total">/<?= e(fmt_num($r['pool'], 1)) ?> days</span></div>
       <div class="muted small">
-        <?= e(fmt_num($r['left'], 1)) ?> days left
+        <?= $r['left'] < 0 ? e(fmt_num(abs($r['left']), 1)) . ' days over'
+                           : e(fmt_num($r['left'], 1)) . ' days unused' ?>
         <?php if ($r['rate_min'] !== null): ?>
           · <?= $r['rate_same']
                 ? e(fmt_money_plain($r['rate_min'], $pcur)) . ' a day'
@@ -2037,14 +2053,32 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['used'] * $open['rate_min'], $pcur)) ?></strong>
       <span class="muted small">same rate, so it tracks the days</span></div>
-    <div><span class="muted small">Left</span>
+    <div><span class="muted small">Unused</span>
       <strong class="<?= $open['left'] < 0 ? 'err' : '' ?>"><?= e(fmt_num(abs($open['left']), 1)) ?> days</strong>
       <span class="<?= $open['left'] < 0 ? 'err' : 'muted' ?> small">
         <?= $open['left'] < 0 ? 'OVERDRAWN' : e(fmt_num(100 - $open['pct_used'], 0)) . '% still to use' ?></span></div>
   </div>
 
+  <?php // TWO DONUTS SIDE BY SIDE (David, 2026-10-21): the days, used against
+        // unused, and the step's shots or assets by status. Both answer on hover. ?>
+  <?php $spread = pool_status_slices($pdo, $projectId, (int)$open['id']); ?>
   <div class="pool-detail">
-    <?= pool_ring_svg($open['pct_used'], 'of days used') ?>
+    <figure class="pool-fig">
+      <?= pool_days_donut_svg((float)$open['used'], (float)$open['pool']) ?>
+      <figcaption class="muted small">Days, used and unused</figcaption>
+    </figure>
+    <figure class="pool-fig">
+      <?= pool_donut_svg($spread['slices'], (string)$spread['total'], $spread['noun']) ?>
+      <figcaption class="muted small">By status</figcaption>
+      <?php if ($spread['slices']): ?>
+        <ul class="pool-legend">
+          <?php foreach ($spread['slices'] as $sl): ?>
+            <li><span class="dot" style="background:<?= e($sl['color']) ?>"></span><?= e($sl['small']) ?>
+              <span class="muted"><?= e($sl['big']) ?></span></li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+    </figure>
     <div>
       <p class="<?= e($open['pace_class']) ?>"><strong><?= e($open['pace_text']) ?></strong></p>
       <p class="muted small">
@@ -2065,6 +2099,26 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
 <?php endif; ?>
 
 <?php endif; ?>
+<script>
+  // The pool donuts answer on hover: the middle of the ring shows the part under
+  // the pointer, in days or items, and goes back to its own figure on leaving.
+  // Each segment's <title> carries the same words for touch and screen readers.
+  (function () {
+    function say(svg, big, small) {
+      var b = svg.querySelector('.pool-donut-big'), s = svg.querySelector('.pool-donut-small');
+      if (b) b.textContent = big !== null ? big : b.getAttribute('data-rest');
+      if (s) s.textContent = small !== null ? small : s.getAttribute('data-rest');
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.pool-donut'), function (svg) {
+      Array.prototype.forEach.call(svg.querySelectorAll('.pool-seg'), function (seg) {
+        seg.addEventListener('mouseenter', function () {
+          say(svg, seg.getAttribute('data-big'), seg.getAttribute('data-small'));
+        });
+        seg.addEventListener('mouseleave', function () { say(svg, null, null); });
+      });
+    });
+  }());
+</script>
 <?php endif; ?>
 <?php // ---- end BUDGET POOL ------------------------------------------------ ?>
 

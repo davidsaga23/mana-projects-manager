@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — Budget pool donuts *(no migration)*
+
+- **The Budget pool shows used and unused days as interactive donuts**, for the whole show and per
+  step. Hovering a part says how many days it is. "Left" now reads "Unused".
+- **Each step's detail has a status pie** beside the days: its shots or assets by status, with a
+  legend, and hovering works there too.
+
 ## 2026-10-21 — Expense projection in whole days *(no migration)*
 
 - **Every row's days are rounded up to a whole day on every project's expense projection.** Months,
