@@ -4254,3 +4254,20 @@ on close, Escape and the veil close it. Comments and @mentions are phase 3 and a
 never looked alike, and the row silently kept the old value while the panel showed the new one.
 Matched on the control's KIND now (`board-status`, `board-crew`, `board-due`, `board-text`), which
 is what actually identifies it. **A class string is a set, not an identity.**
+
+## 2026-10-22 — Every bar on the Board is the same bar, in the same column
+**Decision:** a group's bar and a shot's bar start at the same x and are the same width. David:
+"make sure you align all bars, department bars and container bars."
+**Three things were making them disagree**, each worth knowing because each is a trap:
+- **A stray `margin-left: 4px`** on the group bar — exactly how far out of line they sat.
+- **A 1px border.** The rows sit inside a bordered panel and the group header does not, so
+  everything in the header began one pixel to the left. The header now carries the same border in
+  `transparent`, which lines it up and draws nothing.
+- **`flex-grow` in two different layouts.** A group's bar lives in a flex row spanning the page, a
+  shot's in a grid cell, so "grow to fit" gave 320px against 146px. Both take a fixed basis now and
+  are allowed to shrink together.
+**Consequence:** the label beside the bar is one fixed width for both rows (`.board-item-label`,
+`.board-group-label`), so changing one means changing the other — said in the stylesheet. The name
+gives way first and the count and chip never wrap, which is what pushed "26 items" onto two lines
+and shoved that group's bar right. The other columns were trimmed to what their contents need so
+the whole board still fits a 1280 laptop without scrolling sideways.
