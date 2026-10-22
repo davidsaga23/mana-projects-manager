@@ -140,9 +140,12 @@ function board_item_status(array $tasks): array {
     if (count($approved) === count($live)) {
         return ['name' => 'Finished', 'color' => 'var(--ok)'];
     }
-    // "Started" is anything that is not an untouched cell: a status with no
-    // meaning yet counts as not started, which is what a blank Plaky cell means.
-    $started = array_filter($live, fn($t) => $t['status_id'] !== null && !$t['is_started_blank']);
+    // ⚠ "STARTED" IS A FACT ON THE STATUS, not a guess from maps_to. David's
+    // own rule: in progress as soon as ANY task says something other than
+    // Waiting to start or Ready to start. See status_has_begun(); the first
+    // version of this asked maps_to, which calls In progress and Retake
+    // untouched, so a shot read Not started while three people worked on it.
+    $started = array_filter($live, fn($t) => $t['begun']);
     if ($started) return ['name' => 'In progress', 'color' => 'var(--warn)'];
 
     return ['name' => 'Not started', 'color' => 'var(--violet)'];
@@ -286,10 +289,9 @@ function board_data(PDO $pdo, int $projectId): array {
             'status_color' => $status ? ($status['color'] ?: '') : '',
             'is_approved' => $cell ? (int)$cell['is_approved'] === 1 : false,
             'is_excluded' => $status ? (int)($status['is_excluded'] ?? 0) === 1 : false,
-            // A status that means nothing yet reads as untouched, like a blank
-            // cell — it is what "Waiting to start" is for.
-            'is_started_blank' => $status ? ($status['maps_to'] ?? 'none') === 'none'
-                                            && (int)($status['is_blocked'] ?? 0) === 0 : true,
+            // Has anybody picked this up? Read from the status itself, so a
+            // show that spells its states its own way still reads right.
+            'begun'       => status_has_begun($status),
             'crew_id'     => $cell && $cell['crew_id'] ? (int)$cell['crew_id'] : null,
             'person'      => $cell['person'] ?? null,
             'due'         => $due,
@@ -492,8 +494,7 @@ function board_status_cell(array $t, array $statuses, int $projectId,
               . (($s['maps_to'] ?? '') === 'delivered' ? ' data-delivered="1"' : '')
               . ((int)($s['is_blocked'] ?? 0) === 1 ? ' data-blocked="1"' : '')
               . ((int)($s['is_excluded'] ?? 0) === 1 ? ' data-excluded="1"' : '')
-              . ((($s['maps_to'] ?? 'none') === 'none' && (int)($s['is_blocked'] ?? 0) === 0)
-                  ? ' data-blank="1"' : '')
+              . (status_has_begun($s) ? ' data-begun="1"' : '')
               . ($isNow ? ' selected' : '')
               // Shown, so the show's whole vocabulary is visible, but not
               // selectable by somebody who may not set it.

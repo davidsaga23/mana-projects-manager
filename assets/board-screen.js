@@ -175,7 +175,7 @@
       if (opt.getAttribute('data-excluded') === '1') return;   // N/A leaves the reckoning
       live++;
       if (opt.getAttribute('data-approved') === '1') done++;
-      if (opt.value !== '' && opt.getAttribute('data-blank') !== '1') started++;
+      if (opt.getAttribute('data-begun') === '1') started++;
     });
 
     var name = 'Not started', color = 'var(--violet)';

@@ -26,7 +26,7 @@ The app shows an **"updates waiting"** banner when production migrations are pen
 
 ## ⚠ Pending right now (as of 2026-10-21) — David to run
 
-**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057`.
+**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058`.
 
 **Finance (import by hand into the finance DB via phpMyAdmin):** `finance_install_08.sql` (the
 money side of the kick-off sign-off, needed together with migration 049).
@@ -48,7 +48,7 @@ these referenced by their old numbers anywhere, this is why:
 ## Full ledger
 
 Applied status is "✅ applied" up to and including 046 (confirmed live), and "⏳ pending" for
-047–057. Finance imports 01–07 are applied; 08 is pending.
+047–058. Finance imports 01–07 are applied; 08 is pending.
 
 ### v1 baseline + early schema (001–016)
 | # | File | What it unlocks |
@@ -105,7 +105,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 045 | studio_project | ✅ "The Studio" — one project row that is not a show, for cards belonging to none. |
 | 046 | status_cbb | ✅ A CBB ("could be better") status. |
 
-### The pending batch (047–057) — code merged, database change NOT yet run
+### The pending batch (047–058) — code merged, database change NOT yet run
 | # | File | What it unlocks (dormant until run) |
 |---|---|---|
 | 047 | role_supervisor | ⏳ The **Supervisor** role — artist perms + view-only Timeline/Staffing + editable Shots. |
@@ -118,6 +118,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 054 | ticket_snooze | ⏳ **Snooze** a card to a future wake-up date (`tickets.snoozed_until`); hidden from active lists until then. *(Was 053 — renumbered after a collision.)* |
 | 055 | last_seen | ⏳ "Last seen" becomes real last-**activity** (`users.last_seen`, stamped per page view, throttled), not stale last-login. |
 | 056 | view_as_audit | ⏳ Audit trail for "view the app as a specific person". **Audit only — the view-as feature itself works whether or not this runs.** *(Was 055 — renumbered after a collision.)* |
+| 058 | status_begun | ⏳ `statuses.counts_as_started` — which of a show's statuses mean somebody has picked the work up, so a shot reads **In progress** as soon as one task does. **The Board is already right without it** (it falls back to an explicit list of spellings); this makes it editable per show on the Statuses screen. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 
 ### Finance DB imports (by hand, phpMyAdmin, once each)
