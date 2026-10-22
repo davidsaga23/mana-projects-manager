@@ -414,20 +414,23 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         // another — that is the point of percentages, and the reason the sum is
         // written down here rather than discovered by trial.
         //
-        //   Step 9 · Covers 6 · Work 6 · Dates 11 · Days/item 7 · People 5
-        //   Minimum 8 · Retakes 9 · Duration 9 · Enough? 18 · Ideal 6 · Days 6
+        //   Step 9 · Covers 6 · Work 6 · Dates 11 · Days 6 · Days/item 10 · People 5
+        //   Minimum 8 · Retakes 9 · Duration 9 · Enough? 12 · Ideal 9
+        //
+        // Days (2026-10-21) took its 6 from "Is that enough?", the widest column.
         ?>
         <colgroup>
           <col style="width:9%">   <?php // Step ?>
           <col style="width:6%">   <?php // Covers ?>
           <col style="width:6%">   <?php // Work ?>
           <col style="width:11%">  <?php // Dates ?>
+          <col style="width:6%">   <?php // Days between the dates ?>
           <col style="width:10%">  <?php // Days per item: the number, and whose it is ?>
           <col style="width:5%">   <?php // People ?>
           <col style="width:8%">   <?php // Minimum ?>
           <col style="width:9%">   <?php // Retakes ?>
           <col style="width:9%">   <?php // Duration ?>
-          <col style="width:18%">  <?php // Is that enough? ?>
+          <col style="width:12%">  <?php // Is that enough? ?>
           <col style="width:9%">   <?php // Ideal ?>
         </colgroup>
         <thead>
@@ -441,6 +444,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // always read together. Stacked they cost one column and a little
                 // height — which is the trade this whole screen now makes. ?>
           <th>Dates<div class="muted small">start / deadline</div></th>
+          <th title="The days from the start date to the deadline, both days counted. Under it, how many of those are working days, weekends and studio holidays left out.">Days<div class="muted small">start to deadline</div></th>
           <th title="This project's ideal quota: how long one shot or asset takes one person when the work is done properly. The schedule and the budget run on it, and it belongs to this project alone. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage.">Days per item<div class="muted small">this project's ideal</div></th>
           <th title="How many people are on this step. Decimals are fine, 2.5 means someone is half-time.">People</th>
           <?php // The header and its cells are two lists kept in step by hand, and
@@ -529,6 +533,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
             <input type="date" name="deadline[<?= $id ?>]" value="<?= e($s['deadline'] ?? '') ?>"
                    title="Deadline">
           </td>
+          <?php // Filled by wizard.js from the two dates beside it, as they change. ?>
+          <td class="span-days"><span class="muted">—</span></td>
           <?php /* step="any" rather than a fixed increment — real estimates land on
                    awkward numbers like 1.5 days or 2.5 people, and the browser
                    should not reject them. */ ?>

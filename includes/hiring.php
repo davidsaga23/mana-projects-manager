@@ -49,6 +49,8 @@ require_once __DIR__ . '/people_merge.php';
 // (START_HERE, lesson 11). Loading the file costs nothing; every function in it
 // refuses on its own for anyone who is not an admin.
 require_once __DIR__ . '/money.php';
+// notify_admins_of_hire(): every hire tells the administrators who hired whom.
+require_once __DIR__ . '/mailer.php';
 
 /**
  * The stages, in the order somebody moves through them.
@@ -889,6 +891,28 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
         // though it failed — the hire is already committed. Report and move on.
         $out[] = 'Hired. The quoted rate could not be carried across: ' . $e->getMessage();
     }
+
+    // The administrators hear about every hire, whoever pressed the button
+    // (David, 2026-10-21). After the commit, because SMTP is slow and a mail
+    // failure must never undo a hire. Somebody who cannot see rates (a
+    // supervisor, Production) never reaches seed_terms_from_quote(), so the
+    // email says the rate is still to be checked.
+    $proj = $pdo->prepare('SELECT code, name FROM projects WHERE id = ?');
+    $proj->execute([$projectId]);
+    $p = $proj->fetch() ?: ['code' => '', 'name' => ''];
+    [, $said] = notify_admins_of_hire($pdo, [
+        'project_id'   => $projectId,
+        'project_code' => (string)$p['code'],
+        'project_name' => (string)$p['name'],
+        'candidate'    => $name,
+        'slot'         => (string)($occupant['name'] ?? ''),
+        'step'         => (string)($hire['step_name'] ?? ''),
+        'by'           => $who !== '' ? $who : 'Somebody',
+        'rate_note'    => can_see_money() ? ''
+            : ($who !== '' ? $who : 'Whoever hired them') . ' cannot see rates, so any rate quoted for ' . $name . ' was not carried onto '
+              . 'their terms. Check it under Finance management.',
+    ]);
+    if ($said !== '') $out[] = $said;
 
     return $out;
 }

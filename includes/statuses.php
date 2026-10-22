@@ -48,6 +48,34 @@ function statuses_by_id(PDO $pdo, int $projectId): array {
 }
 
 /**
+ * The statuses somebody who is not Production may move their own work to, by
+ * name, compared ignoring case and spacing.
+ *
+ * David, 2026-10-21: artists "can change the status of their tasks only to In
+ * Progress, Pending review". Everything past review (approved, final, retake) is
+ * Production's call. By NAME because statuses are each show's own rows; a show
+ * that spells these differently offers its artists nothing to pick, which reads
+ * as "ask Production" rather than as a wrong status.
+ *
+ * ⚠ Applies to supervisors too: they carry every artist permission, and this is
+ * the same status-of-my-own-work hole (artist_may_post()).
+ */
+const SELF_SERVE_STATUS_NAMES = ['in progress', 'pending review'];
+
+/** May the current account move their own work INTO this status? */
+function status_self_serve(?array $status): bool {
+    if (can_edit()) return true;
+    if (!$status) return false;
+    $name = strtolower(trim(preg_replace('/\s+/', ' ', (string)$status['name'])));
+    return in_array($name, SELF_SERVE_STATUS_NAMES, true);
+}
+
+/** The refusal both My tasks status handlers give, in one place. */
+function status_self_serve_refusal(): string {
+    return 'You can set your own work to In progress or Pending review. Any other status is set by Production.';
+}
+
+/**
  * Translate incoming external status text onto one of the project's statuses.
  *
  * Records every distinct value it sees, whether or not it maps — an unmapped

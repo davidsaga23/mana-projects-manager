@@ -3959,3 +3959,49 @@ context in the repo, not in a conversation's memory.
 disagrees with `docs/HANDOFF.md`/`docs/MIGRATIONS.md` about what is live, the handoff pack wins; the
 older files are kept for their reasoning. Keep `docs/DECISIONS.md`, `docs/HANDOFF.md` and
 `docs/MIGRATIONS.md` current as state changes.
+
+## 2026-10-21 — Supervisors may press Hire; every hire emails the administrators
+**Decision:** a supervisor sees and presses **Hire** on Staffing, and nothing else there: the stage
+dropdown, adding candidates and filling or emptying a slot stay with Production. Allowed through a
+new `SUPERVISOR_ACTIONS` allow-list in `includes/auth.php` (script + the posted `action` pattern,
+`crew.php` / `hire:N`), read by `supervisor_may_post()`; the button asks `can_hire()`. **Every hire,
+whoever presses it**, then emails the active administrators (not the person who pressed it) who
+hired whom, into which position, on which show, with a link to Staffing:
+`notify_admins_of_hire()` in `includes/mailer.php`, called from `hire_candidate()` after the commit.
+**Why:** David, using Anima as a supervisor: they "should be able to see the hiring button and click
+hire. That should trigger an email for the admins stating who and whom hired the slot."
+**Consequence:** somebody who cannot see rates never reaches `seed_terms_from_quote()`, so a quoted
+rate is NOT carried onto the new person's terms when a supervisor (or Production) hires; the email
+says so and points at Finance management. Admin addresses are the login's own email (migration 049)
+falling back to the linked crew member's; an admin with neither is named on screen as not reached.
+A mail failure never undoes a hire. Staffing deep-links are not locked per project (the existing
+posture), so a supervisor could hire on a show they can only reach by URL.
+
+## 2026-10-21 — Outside Production, own work moves only to In progress or Pending review
+**Decision:** on My tasks, artists and supervisors may set their own tasks and tickets only to a
+status named **In progress** or **Pending review** (matched by name, ignoring case and spacing:
+`SELF_SERVE_STATUS_NAMES` / `status_self_serve()` in `includes/statuses.php`). The dropdown offers
+just those, plus the current status greyed so the box still says where the work stands; both save
+handlers refuse anything else, so a hand-made POST cannot get round it.
+**Why:** David: artists "can change the status of their tasks only to In Progress, Pending review".
+Approving, finals and retakes are Production's call.
+**Consequence:** by name because statuses are each show's own rows; a show that spells them
+differently offers its artists nothing to pick until the names match. Applied to supervisors too,
+because they carry every artist permission. Moving back to "not started" is Production's.
+
+## 2026-10-21 — Production removes any time entry on their own list
+**Decision:** a Production user may remove any entry on their own My tasks time list, including one
+somebody else typed for them; `delete_time_log()` takes the asker's crew id for this. Artists and
+supervisors still remove only entries they typed themselves; other people's hours stay an admin's.
+**Why:** David asked to enable removing logged time for Production, and chose "only on their own
+list" over a new screen of everybody's entries.
+**Consequence:** no new screen; My tasks remains the only list of time entries.
+
+## 2026-10-21 — Dates & headcount shows the days between a step's dates
+**Decision:** a **Days** column beside Dates: the calendar days from start to deadline, both ends
+counted, with the working days (weekends and studio holidays left out) under it. Computed live in
+`assets/wizard.js` from the same `workingDays()` the verdict uses; it took its width from "Is that
+enough?".
+**Why:** David asked for "a column that extracts the total days in between the start and end dates".
+**Consequence:** shown blank when a date is missing or the dates are the wrong way round (that row
+is already marked).
