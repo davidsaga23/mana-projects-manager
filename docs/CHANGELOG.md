@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Timeline: a dragged bar moves alone *(no migration)*
+
+- **Dragging a step on the general timeline moves only that step.** The steps that wait for it no
+  longer come along. The dependency arrows are still drawn and turn red where the move broke one.
+
 ## 2026-10-22 — The Board: a task panel *(no migration)*
 
 - **Clicking a task opens it in a panel over the board**, so you can open one, adjust it, close it

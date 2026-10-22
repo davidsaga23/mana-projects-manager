@@ -1118,7 +1118,11 @@ only one. What was agreed in discussion, none of it built:
 Everything here came up in the 2 to 18 September run of work. None of it is urgent, and each
 one is a choice David has not made yet rather than work anybody forgot.
 
-### Should a timeline bar carry the steps downstream of it?
+### Should a timeline bar carry the steps downstream of it? — DECIDED 2026-10-22: no
+
+✅ **Each bar now moves on its own; the arrows stay and turn red where a move breaks one**
+(`dragBarsAlone()` in `assets/timeline.js`). The question as it stood:
+
 
 Dragging a bar on the general timeline moves **every step that waits for it** by the same
 amount, and saves them all. That is Frappe Gantt's own behaviour, and it has always worked this
