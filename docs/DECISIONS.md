@@ -4326,3 +4326,15 @@ it is still there before you build on it.
 a file that nothing ever assigns. It is crude and biased towards false alarms (a typed parameter in
 a multi-line signature can trip it), because a name a human glances at costs seconds and a white
 page costs an afternoon. It reports `$allTasks` on the broken file and nothing on the fixed one.
+
+## 2026-10-22 — A timeline bar moves alone; the arrows stay
+**Decision (David):** dragging a bar on the general timeline moves that step only. Steps that wait
+for it stay where they are, and the dependency arrows stay drawn, turning red where the move broke
+one.
+**Why:** carrying every downstream step was Frappe Gantt's own behaviour, never a choice, and it sat
+awkwardly with the 2026-08-31 rule that dependencies are drawn, not enforced. A drag that silently
+re-dates six other steps, and saves them, is a bigger edit than the gesture looks like.
+**How:** `dragBarsAlone()` replaces the chart instance's `get_all_dependent_tasks()` with one that
+returns nothing, so the library's drag collects just the bar under the cursor. Instance-level, so
+the detailed chart is untouched. Shifting a whole tail of the show now means dragging each bar, or
+re-running the schedule.

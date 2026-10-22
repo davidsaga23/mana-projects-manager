@@ -738,6 +738,25 @@
     proto.tlFreeOfDeps = true;
   }
 
+  /**
+   * Drag one bar, not the steps downstream of it.
+   *
+   * Frappe 0.6.1 gathers every step that waits for a bar, transitively, when the
+   * drag starts (get_all_dependent_tasks()) and moves them all by the same
+   * amount, saving each. That was the library's behaviour, never a choice; David
+   * chose on 2026-10-22 that every bar moves alone and the arrows stay, turning
+   * red where the move broke one. The arrows still follow the bar, since each
+   * bar redraws its own on every move.
+   *
+   * On this chart's instance rather than the prototype, so the detailed chart is
+   * untouched -- it sends no dependencies, so it carries nothing anyway.
+   */
+  function dragBarsAlone(gantt) {
+    if (gantt && typeof gantt.get_all_dependent_tasks === 'function') {
+      gantt.get_all_dependent_tasks = function () { return []; };
+    }
+  }
+
   var stepSaveTimer = null;
   /** Says what was written, in the words the server used, then fades. */
   function stepSaved(msg) {
@@ -775,10 +794,11 @@
     return postApi('step_dates', { step_id: stepId, start_date: start, end_date: end });
   }
 
-  // One drag can move several bars, since Frappe carries the steps downstream
-  // along, and each reports on its own. The chart is redrawn ONCE, after the last
-  // save of the gesture is back, and only when a bar has to sit somewhere other
-  // than where it was dropped, or a save was refused.
+  // A drag moves one bar since dragBarsAlone(), but the counter stays: it costs
+  // nothing and keeps a single redraw per gesture should a drag ever report more
+  // than one bar. The chart is redrawn after the last save of the gesture is
+  // back, and only when a bar has to sit somewhere other than where it was
+  // dropped, or a save was refused.
   var generalGesture = { pending: 0, redraw: false };
 
   // --- general chart ---------------------------------------------------------
@@ -875,6 +895,7 @@
       }
     });
     freeBarsFromDependencies(generalGantt);
+    dragBarsAlone(generalGantt);
     applyWidth(generalGantt, z.w);
     restorePlace(el, place);
     setTimeout(function () {
