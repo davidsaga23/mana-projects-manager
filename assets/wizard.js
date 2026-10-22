@@ -195,20 +195,17 @@
     var dateCell = row.querySelector('.date-pair');
     if (dateCell) dateCell.classList.toggle('dates-backwards', datesBackwards);
 
-    // ---- the days between the dates (David, 2026-10-21) ------------------
-    // Both ends INCLUSIVE, the platform-wide rule, so a step starting and ending
-    // on the same day is 1 day. Calendar days first, then the working days the
-    // rest of this screen runs on, from the same workingDays() as the verdict.
+    // ---- the business days between the dates (David, 2026-10-21) --------
+    // Both ends INCLUSIVE, the platform-wide rule. BUSINESS DAYS ONLY: weekends
+    // and studio holidays left out ("should only include business days"), from
+    // the same workingDays() as the verdict, so the two cannot disagree.
     var spanCell = row.querySelector('.span-days');
     if (spanCell) {
-      var spanFrom = parseDate(start), spanTo = parseDate(deadline);
-      if (!spanFrom || !spanTo || datesBackwards) {
+      if (!parseDate(start) || !parseDate(deadline) || datesBackwards) {
         spanCell.innerHTML = '<span class="muted">—</span>';
       } else {
-        // Rounded, because a day that crosses a clock change is 23 or 25 hours.
-        var cal = Math.round((spanTo - spanFrom) / 86400000) + 1;
-        spanCell.innerHTML = '<strong>' + cal + '</strong> <span class="muted">day' + (cal === 1 ? '' : 's') + '</span>'
-          + '<div class="muted small">' + workingDays(start, deadline) + ' working</div>';
+        var biz = workingDays(start, deadline);
+        spanCell.innerHTML = '<strong>' + biz + '</strong> <span class="muted">day' + (biz === 1 ? '' : 's') + '</span>';
       }
     }
     // ⚠ THE BOX IS THE NUMBER IN FORCE. Until 2026-09-16 it showed the project's

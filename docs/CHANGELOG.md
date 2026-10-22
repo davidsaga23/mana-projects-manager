@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-10-21 — supervisor hiring, artist statuses, time removal, step days *(branch, not yet merged)*
+## 2026-10-21 — supervisor hiring, artist statuses, time removal, step days (PR #29 + follow-up, merged)
 
 All four need **no migration**.
 
@@ -26,8 +26,9 @@ All four need **no migration**.
   Anything else is Production's.
 - **Production can remove any time entry on their own My tasks list**, including ones somebody else
   typed for them. Artists still remove only what they typed.
-- **Dates & headcount has a Days column**: calendar days from start to deadline, both counted, with
-  the working days under it.
+- **Dates & headcount has a Business days column**: the business days from start to deadline, both
+  counted, weekends and studio holidays left out. (First shipped as calendar days plus working days,
+  changed the same day.)
 
 ## 2026-10-21 — the latest batch (all merged to `master`, live)
 
