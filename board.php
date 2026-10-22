@@ -323,7 +323,15 @@ require __DIR__ . '/includes/header.php';
                 <?php // ⚠ A REAL BUTTON, not a div that listens for clicks: it
                       // is reached by Tab, pressed with the keyboard and read
                       // out as a button. It opens the panel over the board. ?>
+                <?php // ⚠ IT CARRIES THE STEP'S OWN COLOUR, the one set on the
+                      // pipeline in setup and drawn on the timeline (David,
+                      // 2026-10-22). Without a style of its own this button
+                      // inherited the app's filled blue one, so every task name
+                      // on the board was a blue blob — and the one thing the
+                      // column could have told you at a glance, which
+                      // department a row belongs to, was thrown away. ?>
                 <button type="button" class="board-open-task"
+                        style="color:<?= e($t['step_color'] ?: 'var(--text-2)') ?>"
                         data-project="<?= $projectId ?>" data-step="<?= (int)$t['step_id'] ?>"
                         data-item="<?= e($t['item_key']) ?>"
                         aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>
