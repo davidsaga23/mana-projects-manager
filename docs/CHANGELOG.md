@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — Admins can make changes while viewing as a person *(no migration)*
+
+- **"View the app as a specific person" now saves.** The admin acts as that person, with that
+  person's permissions and on that person's own work, and everything is recorded as done by the
+  admin. Previewing a generic role is still read-only.
+
 ## 2026-10-21 — My tasks: filters on Tasks/Tickets *(no migration)*
 
 - **Tasks/Tickets on My tasks has column filters** on Project, Type, Status, Priority and Due, each a

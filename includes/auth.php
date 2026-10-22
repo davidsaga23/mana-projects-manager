@@ -231,6 +231,25 @@ function in_user_preview(): bool {
 }
 
 /**
+ * Does the current preview refuse every save?
+ *
+ * David, 2026-10-21: "allow admins to make changes when they're seeing anima as
+ * other users". So VIEWING AS A PERSON SAVES: the admin acts as that person,
+ * within that person's role (the same can_edit() / artist_may_post() /
+ * supervisor_may_post() answers they would get), on that person's own work
+ * (effective_crew_id()). Every record still names the REAL admin as the one who
+ * did it, because the session's user id and display name are never swapped:
+ * entered_by on a time entry, the ticket thread, the stage log.
+ *
+ * A ROLE preview ("as an artist", nobody in particular) stays read-only. It
+ * answers "what does this role see", and has no person whose work a save would
+ * belong to.
+ */
+function preview_blocks_saving(): bool {
+    return in_preview() && !in_user_preview();
+}
+
+/**
  * The id of the account the app should behave AS — the previewed person when
  * one is being previewed, otherwise the logged-in account.
  *
@@ -544,10 +563,10 @@ function require_login(): void {
     // those are; mytasks.php checks the row is theirs. A preview still saves
     // nothing at all, artist or not — the rule above has no exceptions.
     if ($_SERVER['REQUEST_METHOD'] === 'POST'
-        && ((!can_edit() && !artist_may_post() && !supervisor_may_post()) || in_preview())) {
+        && ((!can_edit() && !artist_may_post() && !supervisor_may_post()) || preview_blocks_saving())) {
         if (function_exists('flash')) {
-            flash('err', in_preview()
-                ? 'Nothing saves while you are previewing as someone else, leave the preview first.'
+            flash('err', preview_blocks_saving()
+                ? 'Nothing saves while you are previewing a role, leave the preview first, or view the app as a specific person instead.'
                 : (is_supervisor()
                     ? 'Your account can change Shots and the status of your own work, but not this.'
                     : 'Your account can change the status of your own work, but not this.'));
@@ -747,9 +766,9 @@ function require_login_json(): void {
     }
     // API calls are activity too — count them for "last seen" (throttled).
     touch_last_seen();
-    // A preview saves nothing here either, the same rule require_login() keeps.
+    // A role preview saves nothing here either, the same rule require_login() keeps.
     if ($_SERVER['REQUEST_METHOD'] === 'POST'
-        && ((!can_edit() && !supervisor_may_post()) || in_preview())) {
+        && ((!can_edit() && !supervisor_may_post()) || preview_blocks_saving())) {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => 'Your account has view-only access.']);

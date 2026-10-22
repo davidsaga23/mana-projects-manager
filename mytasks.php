@@ -43,7 +43,10 @@ $overheadOn = $canTimer && overhead_available($pdo);
 // the account on the Users screen, which checks the choice against the crew list.
 // The guard in require_login() already refuses the POST; this is the second lock,
 // here so the reason sits next to the code it protects.
-if ($ready && can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])) {
+//
+// Never while viewing as a person: it writes to the REAL login ($userId), so it
+// would link the admin's own account rather than the person being viewed.
+if ($ready && can_edit() && !in_user_preview() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_crew'])) {
     try {
         if ($_POST['set_crew'] === 'new') {
             $me = current_user();
@@ -72,9 +75,10 @@ $canSetStatus = can_edit() || is_artist() || is_supervisor();
 $me = current_user();
 // WHOSE tasks this list shows. Normally the logged-in account; when an admin is
 // previewing AS a specific person (David, 2026-10-21) it is that person's crew
-// link, so the admin sees exactly the cards that person sees. The POST handlers
-// above and below still act as the REAL account — but a preview saves nothing
-// anyway (require_login() refuses the POST), so they never run while viewing.
+// link, so the admin sees exactly the cards that person sees. Since 2026-10-21 a
+// person preview SAVES (preview_blocks_saving()): the handlers below act on this
+// person's rows, and $userId stays the REAL admin, so entered_by and the thread
+// name who actually did it.
 $myCrewId = 0;
 if ($ready) {
     $myCrewId = (int)(effective_crew_id($pdo) ?? 0);
