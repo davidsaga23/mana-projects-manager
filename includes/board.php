@@ -453,6 +453,7 @@ function board_data(PDO $pdo, int $projectId): array {
             'name'     => (string)$a['name'],
             'scope'    => count($tasks) . ' task' . (count($tasks) === 1 ? '' : 's'),
             'frames'   => null,
+            'notes'    => (string)($a['notes'] ?? ''),
             'tasks'    => $tasks,
             'self'     => null,
             'status'   => board_item_status($tasks),
@@ -482,6 +483,9 @@ function board_data(PDO $pdo, int $projectId): array {
         'groups'   => $groups,
         'statuses' => array_values($statusMap),
         'counts'   => $counts,
+        // The whole show in one bar, over every task on it — the same reckoning
+        // a group's bar makes, one level up.
+        'bar'      => board_item_bar($allTasks, $statusMap),
     ];
 }
 
@@ -611,6 +615,29 @@ function board_text_cell(array $t, string $field, int $projectId, bool $mayEdit,
          . ' class="board-text" data-field="' . e($field) . '"' . board_cell_attrs($t, $projectId)
          . ' value="' . e($value) . '" placeholder="' . e($hint) . '"'
          . ' aria-label="' . e(ucfirst($field) . ' for ' . $t['step']) . '"></div>';
+}
+
+/**
+ * A shot's or an asset's OWN note (David, 2026-10-22: "notes for the
+ * containers, they should be linked to those entities").
+ *
+ * ⚠ THIS IS NOT A TASK'S NOTE. `shots.notes` and `assets.notes` have been in
+ * the schema since v1 and describe the THING — "the client hates this angle" —
+ * while `progress.notes` describes one step's work on it. The board had a
+ * column for the second and nowhere for the first. No step id goes with it,
+ * which is what tells board_api.php which of the two is being written.
+ */
+function board_item_note_cell(array $item, int $projectId, bool $mayEdit): string {
+    $value = (string)($item['notes'] ?? '');
+    if (!$mayEdit) {
+        return '<div class="board-cell">' . ($value !== ''
+            ? '<span class="board-note">' . e($value) . '</span>'
+            : '<span class="muted">—</span>') . '</div>';
+    }
+    return '<div class="board-cell"><input type="text" class="board-text board-item-text"'
+         . ' data-project="' . $projectId . '" data-item="' . e($item['item_key']) . '"'
+         . ' data-field="notes" value="' . e($value) . '" placeholder="Notes"'
+         . ' aria-label="Notes about ' . e($item['name']) . '"></div>';
 }
 
 /** Somebody's initials, for the small round avatar. */

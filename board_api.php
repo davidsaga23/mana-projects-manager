@@ -36,6 +36,40 @@ try {
     $projectId = (int)($_POST['project_id'] ?? 0);
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $itemKey   = trim((string)($_POST['item_key'] ?? ''));
+
+    // ---- a shot's or an asset's OWN note -----------------------------------
+    //
+    // ⚠ HANDLED BEFORE THE STEP IS READ, because it has none. `shots.notes` and
+    // `assets.notes` describe the THING ("the client hates this angle") while
+    // `progress.notes` describes one step's work on it, and the absence of a
+    // step id is exactly what tells the two apart. Production only: an artist
+    // may set the status of their own work and nothing else.
+    if (isset($_POST['set_item_note'])) {
+        if (!can_edit()) throw new RuntimeException('Your account cannot change this.');
+        if (!$projectId || $itemKey === '') {
+            throw new RuntimeException('A project and an item are both required.');
+        }
+        $kind = substr($itemKey, 0, 1);
+        $itemId = (int)substr($itemKey, 1);
+        if (!in_array($kind, ['s', 'a'], true) || $itemId <= 0) {
+            // A whole-show deliverable IS a task, so its note is the task's.
+            throw new RuntimeException('That item has no note of its own.');
+        }
+        $table = $kind === 's' ? 'shots' : 'assets';
+        $own = $pdo->prepare("SELECT id FROM {$table} WHERE id = ? AND project_id = ?");
+        $own->execute([$itemId, $projectId]);
+        if (!$own->fetchColumn()) throw new RuntimeException('That item is not part of this project.');
+
+        $value = trim((string)($_POST['value'] ?? ''));
+        if (mb_strlen($value) > 2000) {
+            throw new RuntimeException('That is longer than this field holds (2000 characters).');
+        }
+        $pdo->prepare("UPDATE {$table} SET notes = ? WHERE id = ? AND project_id = ?")
+            ->execute([$value === '' ? null : $value, $itemId, $projectId]);
+        echo json_encode(['ok' => true, 'value' => $value, 'message' => 'Saved.']);
+        exit;
+    }
+
     if (!$projectId || !$stepId || $itemKey === '') {
         throw new RuntimeException('A project, a step and an item are all required.');
     }

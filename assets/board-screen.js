@@ -54,7 +54,9 @@
     var body = new URLSearchParams();
     body.set(field, '1');
     body.set('project_id', el.getAttribute('data-project'));
-    body.set('step_id', el.getAttribute('data-step'));
+    // A container's own note has no step: that is what distinguishes it from a
+    // task's note, here and in board_api.php.
+    if (el.getAttribute('data-step')) body.set('step_id', el.getAttribute('data-step'));
     body.set('item_key', el.getAttribute('data-item'));
     Object.keys(extra).forEach(function (k) { body.set(k, extra[k]); });
 
@@ -143,6 +145,10 @@
     var el = e.target;
     if (!el.matches || !el.matches('.board-text')) return;
     if (el.value === el.getAttribute('data-was')) return;
+    if (el.classList.contains('board-item-text')) {
+      save(el, 'set_item_note', { value: el.value });
+      return;
+    }
     save(el, 'set_text', { field: el.getAttribute('data-field'), value: el.value });
   }, true);
 

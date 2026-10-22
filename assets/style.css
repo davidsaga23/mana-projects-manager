@@ -3571,3 +3571,28 @@ button.secondary.danger:hover { background: var(--danger-border); }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
   font-size: 12px;
 }
+
+/* The whole show in one bar, under the title (2026-10-22). Full width, and a
+   little thicker than the rows' bars, because it is the one that answers
+   "where is this show" from across the room. */
+.board-bar-project {
+  display: flex; width: 100%; max-width: none; flex: 0 0 auto;
+  margin: 2px 0 16px; padding: 0;
+}
+.board-bar-project .board-bar-track { height: 12px; border-radius: 6px; }
+.board-bar-project:hover .board-bar-track,
+.board-bar-project:focus-visible .board-bar-track { height: 16px; }
+.board-bar-project .board-bar-pop { left: 0; }
+
+/* Expand and collapse ride with the filters, spanning the columns that have
+   nothing to filter. */
+.board-filter-actions {
+  grid-column: 5 / -1; display: flex; gap: 6px; justify-content: flex-end;
+  padding-right: 0;
+}
+.board-filter-actions button {
+  min-height: 30px; margin: 0; padding: 4px 11px; border-radius: 7px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-2); font-size: 12.5px; cursor: pointer; white-space: nowrap;
+}
+.board-filter-actions button:hover { background: var(--surface-2); color: var(--text); }

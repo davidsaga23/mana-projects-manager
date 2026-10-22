@@ -95,10 +95,13 @@ require __DIR__ . '/includes/header.php';
       <input type="search" id="boardSearch" aria-label="Search this board"
              placeholder="Search shots, tasks, people">
     </span>
-    <button type="button" class="secondary" id="boardOpenAll">Expand all</button>
-    <button type="button" class="secondary" id="boardShutAll">Collapse all</button>
   </div>
 </div>
+
+<?php // THE WHOLE SHOW IN ONE BAR (David, 2026-10-22), the full width of the
+      // screen: the same reckoning a group's bar makes, one level up. It reads
+      // the same way and answers the same hover. ?>
+<?= board_bar_html($board['bar'] ?? [], 'board-bar-project') ?>
 
 <?php if (!$linkReady): ?>
   <p class="flash flash-warn">
@@ -178,9 +181,15 @@ require __DIR__ . '/includes/header.php';
         <input type="date" id="fDueTo" aria-label="Due until">
       </span>
     </div>
-    <div></div>
-    <div></div>
-    <div><button type="button" class="board-filter-clear" id="boardClear" hidden>Clear</button></div>
+    <?php // ⚠ EXPAND AND COLLAPSE RIDE WITH THE FILTERS (David, 2026-10-22).
+          // They sat above the sticky block, so on a long board they scrolled
+          // away exactly when a wall of open shots made them wanted. They span
+          // the three columns that have nothing to filter. ?>
+    <div class="board-filter-actions">
+      <button type="button" id="boardOpenAll">Expand all</button>
+      <button type="button" id="boardShutAll">Collapse all</button>
+      <button type="button" class="board-filter-clear" id="boardClear" hidden>Clear</button>
+    </div>
   </div>
 </div>
 
@@ -293,7 +302,9 @@ require __DIR__ . '/includes/header.php';
                 <?= $item['frames'] !== null ? e(number_format($item['frames'])) : '<span class="muted">—</span>' ?>
               </div>
               <div class="board-cell"></div>
-              <div class="board-cell"></div>
+              <?php // The shot's or asset's OWN note, about the thing itself
+                    // rather than about one step's work on it. ?>
+              <?= board_item_note_cell($item, $projectId, $mayEdit) ?>
             <?php endif; ?>
           </div>
 
