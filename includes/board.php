@@ -38,6 +38,43 @@ require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/studio.php';      // studio_exclude_sql(): nobody works on the Studio
 require_once __DIR__ . '/grid.php';        // step_covers_item(), the one scope rule
 
+/* ---------------------------------------------------------------------------
+ * The three phases, named as the studio names them.
+ *
+ * David, 2026-10-22: "these names should be the departments Anima already uses
+ * like Pre-Production, production and post-production." They are the same three
+ * the tracking grid has grouped by since 2026-08-14 and the same subtotal
+ * boundaries the expense projection uses, so a board, a grid and a budget all
+ * read the show the same way round.
+ *
+ * ⚠ AN ITEM TAKES A PHASE, NOT A STEP'S DEPARTMENT. A shot passes through eight
+ * departments; it cannot belong to one. So the split is by what the item IS —
+ * assets are pre-production, shots are production — and only a whole-show step,
+ * which really is one piece of work, takes the department it names.
+ * ------------------------------------------------------------------------ */
+
+/** A department as it should read, whatever case somebody typed it in. */
+function board_dept_name(string $dept): string {
+    $known = ['pre-production' => 'Pre-production', 'preproduction' => 'Pre-production',
+              'pre production' => 'Pre-production', 'production' => 'Production',
+              'post-production' => 'Post-production', 'postproduction' => 'Post-production',
+              'post production' => 'Post-production', 'above the line' => 'Above the line'];
+    return $known[strtolower(trim($dept))] ?? $dept;
+}
+
+/** Where a department sits in the order a show is read in. */
+function board_dept_rank(string $dept): int {
+    $order = ['Above the line' => 0, 'Pre-production' => 1, 'Production' => 2, 'Post-production' => 3];
+    return $order[board_dept_name($dept)] ?? 9;
+}
+
+/** A department's colour, so the dots mean the same thing on every group. */
+function board_dept_color(string $dept): string {
+    $by = ['Above the line' => 'var(--chip-teal-ink)', 'Pre-production' => 'var(--primary)',
+           'Production' => 'var(--violet)', 'Post-production' => 'var(--warn)'];
+    return $by[board_dept_name($dept)] ?? 'var(--step-default)';
+}
+
 /**
  * A status's colour at low opacity, for the pill it sits in.
  *
@@ -214,9 +251,16 @@ function board_data(PDO $pdo, int $projectId): array {
     $counts = ['items' => 0, 'tasks' => 0, 'done' => 0];
 
     /** Fold one built item into its group, making the group when first seen. */
-    $add = function (string $key, string $name, string $color, array $item) use (&$groups, &$counts) {
+    $add = function (string $key, string $dept, string $detail, array $item) use (&$groups, &$counts) {
         if (!isset($groups[$key])) {
-            $groups[$key] = ['key' => $key, 'name' => $name, 'color' => $color, 'items' => []];
+            $groups[$key] = [
+                'key'    => $key,
+                'name'   => $dept,
+                'detail' => $detail,
+                'color'  => board_dept_color($dept),
+                'rank'   => board_dept_rank($dept),
+                'items'  => [],
+            ];
         }
         $groups[$key]['items'][] = $item;
         $counts['items']++;
@@ -238,8 +282,12 @@ function board_data(PDO $pdo, int $projectId): array {
     foreach ($steps as $step) {
         if (($step['applies_to'] ?? '') !== 'project') continue;
         $row = $task($step, $projectKey);
-        $dept = trim((string)($step['department'] ?? '')) ?: 'Whole show';
-        $add('d:' . strtolower($dept), $dept, $step['color'] ?: 'var(--danger)', [
+        // Its own department where the step names one, else Post-production —
+        // the phase the tracking grid has put whole-show steps in since 2026-08-14
+        // (SFX, music, the mix, the master). MSD's animatic says Pre-production,
+        // and it is right: this reads the step rather than assuming.
+        $dept = board_dept_name(trim((string)($step['department'] ?? '')) ?: 'Post-production');
+        $add('d:' . strtolower($dept), $dept, '', [
             'kind'      => 'project',
             'id'        => (int)$step['id'],
             'item_key'  => $projectKey,
@@ -262,8 +310,16 @@ function board_data(PDO $pdo, int $projectId): array {
         $itemKey = 's' . (int)$s['id'];
         $tasks = $tasksFor(['asset_type' => null], 'shot', $itemKey);
         if (!$tasks) continue;                   // no step covers shots at all
+        // ⚠ SHOTS ARE PRODUCTION (David, 2026-10-22: "these names should be the
+        // departments Anima already uses"). A shot cannot take a step's
+        // department — it passes through eight of them — so it takes the PHASE
+        // it belongs to, which is the same three-way split the tracking grid has
+        // used since 2026-08-14: assets are pre-production, shots are
+        // production, whole-show steps are post. The episode stays beside the
+        // name rather than replacing it, because a 188-shot show in one group
+        // would lose the one division that makes it readable.
         $ep = trim((string)($s['episode'] ?? ''));
-        $add($ep !== '' ? 'e:' . $ep : 'shots', $ep !== '' ? $ep : 'Shots', 'var(--violet)', [
+        $add('prod:' . $ep, 'Production', $ep, [
             'kind'     => 'shot',
             'id'       => (int)$s['id'],
             'item_key' => $itemKey,
@@ -281,8 +337,8 @@ function board_data(PDO $pdo, int $projectId): array {
         $itemKey = 'a' . (int)$a['id'];
         $tasks = $tasksFor(['asset_type' => $a['asset_type']], 'asset', $itemKey);
         if (!$tasks) continue;
-        $type = trim((string)$a['asset_type']) ?: 'Assets';
-        $add('t:' . strtolower($type), $type, 'var(--primary)', [
+        $type = trim((string)$a['asset_type']);
+        $add('pre:' . strtolower($type), 'Pre-production', $type, [
             'kind'     => 'asset',
             'id'       => (int)$a['id'],
             'item_key' => $itemKey,
@@ -295,8 +351,16 @@ function board_data(PDO $pdo, int $projectId): array {
         ]);
     }
 
+    // Pre-production, Production, Post-production, then anything a step named
+    // itself — the order a crew list, a call sheet and the expense projection
+    // are all already read in.
+    $groups = array_values($groups);
+    usort($groups, function ($a, $b) {
+        return [$a['rank'], $a['detail']] <=> [$b['rank'], $b['detail']];
+    });
+
     return [
-        'groups'   => array_values($groups),
+        'groups'   => $groups,
         'statuses' => array_values($statusMap),
         'counts'   => $counts,
     ];

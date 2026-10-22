@@ -208,18 +208,70 @@
     caret.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 
-  function setAll(open) {
-    Array.prototype.forEach.call(document.querySelectorAll('.board-item'), function (item) {
+  /**
+   * Open or shut every shot in `scope` (the whole page, or one group).
+   *
+   * ⚠ OPENING ALSO UN-SHUTS THE GROUP. Expanding the shots inside a collapsed
+   * group would change nothing anybody can see, which reads as a broken button.
+   */
+  function setAll(open, scope) {
+    scope = scope || document;
+    if (open) {
+      Array.prototype.forEach.call(scope.querySelectorAll('.board-group'), unshutGroup);
+      if (scope.classList && scope.classList.contains('board-group')) unshutGroup(scope);
+    }
+    Array.prototype.forEach.call(scope.querySelectorAll('.board-item'), function (item) {
       if (!item.querySelector('.board-row-task')) return;
       item.classList.toggle('is-open', open);
       var c = item.querySelector('.board-row-item .board-caret');
       if (c) c.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
+
+  function unshutGroup(section) {
+    section.classList.remove('is-shut');
+    var c = section.querySelector('.board-group-head .board-caret');
+    if (c) { c.classList.add('is-open'); c.setAttribute('aria-expanded', 'true'); }
+  }
+
   var openAll = document.getElementById('boardOpenAll');
   var shutAll = document.getElementById('boardShutAll');
   if (openAll) openAll.addEventListener('click', function () { setAll(true); });
   if (shutAll) shutAll.addEventListener('click', function () { setAll(false); });
+
+  // --- the per-group menu ---------------------------------------------------
+  function shutMenus(except) {
+    Array.prototype.forEach.call(document.querySelectorAll('.board-group-pop'), function (pop) {
+      if (pop === except) return;
+      pop.hidden = true;
+      var btn = pop.parentNode.querySelector('.board-group-menu-btn');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.board-group-menu-btn') : null;
+    if (btn) {
+      var pop = btn.parentNode.querySelector('.board-group-pop');
+      var show = pop.hidden;
+      shutMenus(show ? pop : null);
+      pop.hidden = !show;
+      btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      return;
+    }
+
+    var act = e.target.closest ? e.target.closest('.board-group-pop button') : null;
+    if (act) {
+      setAll(act.getAttribute('data-act') === 'open', act.closest('.board-group'));
+      shutMenus(null);
+      return;
+    }
+    shutMenus(null);                       // a click anywhere else closes it
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') shutMenus(null);
+  });
 
   // --- searching ------------------------------------------------------------
   //
