@@ -29,7 +29,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   task hand-planned, so re-running the schedule will not overwrite it.
 - **Artists** see the shows they are staffed on and may set their own work to In progress or
   Pending review, the same limit My tasks keeps. The other statuses are listed but greyed.
-- Search, expand-all and collapse-all across the board.
+- Search, expand-all and collapse-all across the board, plus a menu on each group for that
+  group alone. Shots and assets start collapsed.
+- Groups are named for the studio's phases — Pre-production, Production, Post-production —
+  with the episode or asset type beside the name.
 
 ## 2026-10-21 — Budget pool: who is on each step *(no migration)*
 

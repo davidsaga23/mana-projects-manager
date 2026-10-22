@@ -4137,3 +4137,30 @@ each cell immediately after calling save(), which ran before the answer came bac
 status "rolled back" to the value that had just been refused, leaving the board showing something
 the database did not hold. `save()` now takes the previous value as the request leaves and only
 overwrites it once the server has agreed.
+
+## 2026-10-22 — Board groups are the studio's three phases, not "Shots" and an asset type
+**Decision:** a group on the Board is a DEPARTMENT — Pre-production, Production, Post-production —
+with the episode or asset type shown beside it as a chip rather than instead of it. David: "these
+names should be the departments Anima already uses like Pre-Production, production and
+post-production." Assets are pre-production, shots are production, and a whole-show step takes the
+department it names (falling back to post-production), which is the same three-way split the
+tracking grid has used since 2026-08-14 and the same subtotal boundary the expense projection uses.
+`board_dept_name()` normalises whatever case somebody typed; `board_dept_rank()` orders them.
+**Why:** one vocabulary across the board, the grid and the budget, so the three read a show the same
+way round.
+**Consequence:** ⚠ **an item takes a PHASE, never a step's department.** A shot passes through eight
+departments and cannot belong to one, so only a whole-show step — which really is one piece of work
+— reads `pipeline_steps.department`. The episode stays as a chip because a 188-shot show collapsed
+into one Production group would lose the division that makes it readable.
+
+## 2026-10-22 — Shots start closed, and each group carries its own expand/collapse menu
+**Decision:** every shot and asset renders collapsed (David, on the live site: "let's have the items
+... always closed by default"), and each group header gets a menu offering expand or collapse for
+that group alone. The whole-board buttons stay.
+**Why:** opened, MSD alone is 150 task rows, and the screen is opened to find ONE shot. The group's
+own arrow hides a group but cannot open the tasks inside it, which on an episodic show is the thing
+actually wanted.
+**Consequence:** expanding through the menu also un-shuts the group, because expanding rows inside a
+collapsed group changes nothing visible and reads as a broken button. Every task row is still
+rendered and hidden by class, so expanding fetches nothing; that is where a 188-shot show would
+start to want its tasks loaded on demand.

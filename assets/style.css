@@ -3339,3 +3339,10 @@ button.secondary.danger:hover { background: var(--danger-border); }
   color: var(--text); font-size: 13px; cursor: pointer;
 }
 .board-group-pop button:hover { background: var(--surface-2); }
+
+/* The episode or asset type that divides a phase, beside the phase name. */
+.board-group-detail {
+  padding: 2px 9px; border-radius: 11px;
+  background: var(--surface-2); color: var(--text-2);
+  font-size: 12px; font-weight: 600;
+}

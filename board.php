@@ -136,6 +136,11 @@ require __DIR__ . '/includes/header.php';
       </button>
       <span class="board-dot" style="background:<?= e($g['color']) ?>"></span>
       <strong><?= e($g['name']) ?></strong>
+      <?php // The episode, or the asset type: what divides this phase, beside
+            // the phase rather than instead of it. ?>
+      <?php if (($g['detail'] ?? '') !== ''): ?>
+        <span class="board-group-detail"><?= e($g['detail']) ?></span>
+      <?php endif; ?>
       <span class="muted small"><?= count($g['items']) ?> item<?= count($g['items']) === 1 ? '' : 's' ?></span>
 
       <?php // ⚠ PER GROUP, BESIDE THE WHOLE-BOARD BUTTONS (David's choice,
@@ -145,12 +150,12 @@ require __DIR__ . '/includes/header.php';
             // EP02 open, the rest of the board left alone. ?>
       <span class="board-group-menu">
         <button type="button" class="board-group-menu-btn" aria-haspopup="true" aria-expanded="false"
-                aria-label="Expand or collapse the shots in <?= e($g['name']) ?>">
+                aria-label="Expand or collapse everything in <?= e(trim($g['name'] . ' ' . ($g['detail'] ?? ''))) ?>">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
         </button>
         <span class="board-group-pop" hidden>
-          <button type="button" data-act="open">Expand everything in <?= e($g['name']) ?></button>
-          <button type="button" data-act="shut">Collapse everything in <?= e($g['name']) ?></button>
+          <button type="button" data-act="open">Expand everything in <?= e(trim($g['name'] . ' ' . ($g['detail'] ?? ''))) ?></button>
+          <button type="button" data-act="shut">Collapse everything in <?= e(trim($g['name'] . ' ' . ($g['detail'] ?? ''))) ?></button>
         </span>
       </span>
     </div>
