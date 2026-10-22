@@ -39,9 +39,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   Pending review, the same limit My tasks keeps. The other statuses are listed but greyed.
 - Search, expand-all and collapse-all across the board, plus a menu on each group for that
   group alone. Shots and assets start collapsed.
-- **Each shot and each group carries a progress bar** made of its tasks' own status colours,
+- **A bar across the top for the whole show**, and one on **each shot and each group** made of its tasks' own status colours,
   filling from the left as work finishes. Hovering one lists how many tasks are in each status.
   The bars line up down the column whatever the shots are called.
+- **A shot or asset can carry its own note**, about the thing itself rather than about one
+  step's work on it.
 - **The headings stick to the top**, with filters on Status, Assignee and Due, a count of what
   matches, and a Clear button. Due filters by overdue, today, yesterday, this week (Mon to Fri),
   the next 7 days, a specific date, a range, has a date, or no date.

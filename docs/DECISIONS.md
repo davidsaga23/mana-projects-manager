@@ -4292,3 +4292,19 @@ flex row that margin is neither collapsed nor ignored: it pushed each button 8px
 beside it and made the Apply wrapper 50px tall. `margin: 0` on the bar's controls fixes it.
 **The general shape:** when controls of equal height do not line up, look at their MARGINS before
 touching their padding or height — equal heights prove nothing about where a box sits.
+
+## 2026-10-22 — A bar for the whole show, notes on the containers, and the buttons that stay put
+Three more from using the Board, all David's.
+- **A full-width bar under the title**, over every task on the show: the same reckoning a group's
+  bar makes, one level up, answering the same hover. Thicker than the row bars, because it is the
+  one read from across the room.
+- **A shot or asset carries its OWN note.** ⚠ `shots.notes` and `assets.notes` have been in the
+  schema since v1 and describe the THING — "the client hates this angle" — while `progress.notes`
+  describes one step's work on it. The board had a column for the second and nowhere for the first.
+  **The absence of a step id is what tells the two apart**, in the markup and in board_api.php,
+  which handles the container's note before it reads a step, because there is none. Production
+  only. A whole-show deliverable has no note of its own: its row IS a task, so the task's note is
+  the note.
+- **Expand all and Collapse all moved into the sticky header**, beside the filters. They sat above
+  it, so on a long board they scrolled away exactly when a wall of open shots made them wanted.
+  They span the three columns that have nothing to filter.
