@@ -1096,7 +1096,8 @@ require __DIR__ . '/includes/header.php';
   <?php if (!$tickets): ?>
     <p class="muted">No open tasks or tickets are assigned to you.</p>
   <?php else: ?>
-    <table class="mywork-table">
+    <?php // mytickets-table: the one list here with column filters, see the script at the foot. ?>
+    <table class="mywork-table mytickets-table">
       <thead>
         <tr><th>Ref</th><th>Title</th><th>Project</th><th>Type</th><th>Status</th><th>Priority</th><th>Due</th>
             <?php if ($canLog): ?><th>Log time</th><?php endif; ?>
@@ -1584,16 +1585,68 @@ require __DIR__ . '/includes/header.php';
       }
       return window.GridTools.sortKey(td, text);
     }
-    Array.prototype.forEach.call(document.querySelectorAll('.mywork-table'), function (t) {
-      window.GridTools.attach(t, {
-        sortOnly: true,
-        sortKey: sortKey,
-        // Nothing to sort a form by.
-        skip: function (th) {
-          var t = th.textContent.trim();
-          return t === 'Log time' || t === 'Timer';
+    // Nothing to sort a form by.
+    function skip(th) {
+      var t = th.textContent.trim();
+      return t === 'Log time' || t === 'Timer';
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.mywork-table:not(.mytickets-table)'), function (t) {
+      window.GridTools.attach(t, { sortOnly: true, sortKey: sortKey, skip: skip });
+    });
+
+    // TASKS/TICKETS GETS FILTERS (David, 2026-10-21: "make sure this section is
+    // converted in filters so we can filter"), on the five columns he marked:
+    // Project, Type, Status, Priority and Due. Every one is a DROPDOWN of the
+    // values actually on the list, like Studio Tasks, because each is a short
+    // closed set. Ref and Title keep their sort and get no filter.
+    var tickets = document.querySelector('.mytickets-table');
+    if (!tickets) return;
+    var FILTERED = { 'Project': 1, 'Type': 1, 'Status': 1, 'Priority': 1, 'Due': 1 };
+    var cols = {};
+    Array.prototype.forEach.call(tickets.tHead.rows[0].cells, function (th) {
+      var label = th.textContent.trim();
+      if (FILTERED[label]) cols[th.cellIndex] = label;
+    });
+    // ⚠ THE DUE CELL ALSO HOLDS THE SNOOZE DATE BOX, and the default reader takes
+    // the first input it finds, which is that empty box. So Due is read from its
+    // own span, and its dash means "no due date" (the filter's "(nothing)").
+    function cellText(td) {
+      var due = td ? td.querySelector('.due-date') : null;
+      if (due) {
+        var v = due.textContent.trim();
+        return v === '—' ? '' : v;
+      }
+      return window.GridTools.cellText(td);
+    }
+    window.GridTools.attach(tickets, {
+      noun: ['card', 'cards'],
+      cellText: cellText,
+      sortKey: sortKey,
+      skip: skip,
+      noFilter: function (th, col) { return !cols[col]; },
+      // Built from what is on the list, so nothing is offered that finds nothing.
+      // Priority in urgency order and Due by date; the rest alphabetically.
+      options: function (col) {
+        if (!cols[col]) return null;
+        var seen = {}, out = [];
+        Array.prototype.forEach.call(tickets.tBodies[0].rows, function (tr) {
+          var v = cellText(tr.cells[col]);
+          if (v === '' || seen[v]) return;
+          seen[v] = true;
+          out.push(v);
+        });
+        if (cols[col] === 'Priority') {
+          out.sort(function (a, b) {
+            var ra = RANK[a.toLowerCase()], rb = RANK[b.toLowerCase()];
+            return (ra === undefined ? 9 : ra) - (rb === undefined ? 9 : rb);
+          });
+        } else if (cols[col] === 'Due') {
+          out.sort();
+        } else {
+          out.sort(function (a, b) { return a.localeCompare(b); });
         }
-      });
+        return out.length ? out.map(function (v) { return { value: v, label: v }; }) : null;
+      }
     });
   }());
 </script>

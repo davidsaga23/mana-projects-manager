@@ -4007,3 +4007,13 @@ enough?".
 **Why:** David asked for "a column that extracts the total days in between the start and end dates".
 **Consequence:** shown blank when a date is missing or the dates are the wrong way round (that row
 is already marked).
+
+## 2026-10-21 — My tasks Tasks/Tickets gets column filters
+**Decision:** the Tasks/Tickets list on My tasks gets the shared `assets/gridtools.js` filters on
+the five columns David marked (Project, Type, Status, Priority, Due), each a dropdown of the values
+on the list, plus the count row. Ref and Title keep a sort button and no filter, through a new
+`noFilter` option in gridtools. The production-task and Mentioned lists stay sort-only.
+**Why:** David: "make sure this section is converted in filters so we can filter". This reverses
+the 2026-10-05 "sort only" call for this one list.
+**Consequence:** the Due cell also holds the Snooze date box, so it is read from its `.due-date`
+span; a dash reads as no due date ("(nothing)").

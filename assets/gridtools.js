@@ -86,6 +86,10 @@
    *                                    rather than only what already is.
    *                sortKey(td,text) -> [rank, value], overriding defaultKey
    *                skip(th, index)  -> true to leave a column without controls
+   *                noFilter(th, index) -> true to keep a column's sort button but
+   *                                    give it no filter (My tasks, 2026-10-21:
+   *                                    filters on the columns asked for, not on
+   *                                    every heading)
    *                noun             ['person','people'], for the count line
    *                sortOnly         true for sortable headings and NOTHING else:
    *                                 no filter boxes, no count row, no Clear. For
@@ -288,6 +292,7 @@
       th.appendChild(sort);
 
       if (sortOnly) return;            // the heading is the whole control
+      if (opts.noFilter && opts.noFilter(th, col)) return;
       var f;
       var opened = choices(col);
       if (isChoice(col) || (opts.options && opts.options(col))) {

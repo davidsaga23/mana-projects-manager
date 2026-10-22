@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-21 — My tasks: filters on Tasks/Tickets *(no migration)*
+
+- **Tasks/Tickets on My tasks has column filters** on Project, Type, Status, Priority and Due, each a
+  dropdown of what is on the list (Due also offers "(nothing)" for cards with no due date), with a
+  live "N of M cards" count and a Clear button. Ref and Title keep their sort buttons only.
+
 ## 2026-10-21 — supervisor hiring, artist statuses, time removal, step days (PR #29 + follow-up, merged)
 
 All four need **no migration**.
