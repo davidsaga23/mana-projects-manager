@@ -3218,7 +3218,11 @@ button.secondary.danger:hover { background: var(--danger-border); }
    they cannot drift apart. */
 .board-grid-head, .board-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) 160px 180px 132px 76px 110px minmax(110px, .9fr);
+  /* The first column holds the caret, the 250px label and the 160px bar, so it
+     asks for room for all three before anything else is given any. The rest are
+     trimmed to what their contents need, so the whole board fits a 1280 laptop
+     without scrolling sideways. */
+  grid-template-columns: minmax(476px, 1.6fr) 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center;
 }
 .board-grid-head {
@@ -3229,7 +3233,13 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-grid-head .num { text-align: right; }
 
 .board-group { margin-bottom: 22px; }
-.board-group-head { display: flex; align-items: center; gap: 9px; padding: 0 14px 8px; }
+.board-group-head {
+  display: flex; align-items: center; gap: 9px; padding: 0 14px 8px;
+  /* ⚠ MIRRORS THE 1px BORDER on .board-rows below it. The header sits outside
+     that panel, so without this everything in it starts one pixel left of the
+     rows it heads — including its bar. Transparent, so nothing is drawn. */
+  border-left: 1px solid transparent;
+}
 .board-group-head strong { letter-spacing: -.012em; }
 .board-group.is-shut .board-rows { display: none; }
 
@@ -3365,7 +3375,12 @@ button.secondary.danger:hover { background: var(--danger-border); }
    Sits in the space the shot's name leaves and fills from the left. */
 .board-bar {
   position: relative; display: inline-flex; align-items: center;
-  flex: 1 1 auto; max-width: 320px; min-width: 60px;
+  /* ⚠ A FIXED BASIS, NOT flex-grow. A group's bar sits in a flex row that spans
+     the page and a shot's sits in a grid cell, so "grow to fit" gave them two
+     different lengths — 320px against 146px — and the column read as ragged.
+     The same basis makes them the same bar; shrink is allowed so a narrow
+     window squeezes both rather than overflowing. */
+  flex: 0 1 160px; min-width: 60px;
   padding: 6px 0;                      /* a bigger target than 7px of bar */
   cursor: default;
 }
@@ -3406,7 +3421,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) 160px 180px 132px 76px 110px minmax(110px, .9fr);
+  grid-template-columns: minmax(476px, 1.6fr) 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center; gap: 0; padding: 0 14px 9px;
 }
 .board-filters > div { padding-right: 8px; min-width: 0; }
@@ -3432,20 +3447,33 @@ button.secondary.danger:hover { background: var(--danger-border); }
   .board-filters { grid-template-columns: 1fr 1fr; }
 }
 
-/* The same bar on a group header, a little wider: it is summarising a phase. */
-.board-bar-group { max-width: 420px; margin-left: 4px; }
+/* ⚠ THE GROUP'S BAR IS THE SAME WIDTH AS ITS SHOTS', so the two line up at both
+   ends and read as one column (David, 2026-10-22: "align all bars, department
+   bars and container bars"). It was wider, and carried a 4px left margin —
+   which is exactly how far out of line the group bars sat. Both are gone; this
+   class now only says which bar it is, for the script. */
 
 /* ⚠ THE BARS LINE UP BECAUSE THE LABEL BESIDE THEM IS A FIXED WIDTH. Left to
    itself the bar starts wherever the name ends, so a column of shots called
    FutsalInt01 and MadridStreetExt03 had its bars stepping in and out
    (2026-10-22). A longer name is clipped and keeps its full text in a tooltip. */
-.board-item-label {
-  flex: 0 0 220px; min-width: 0; display: flex; align-items: baseline; gap: 8px;
+/* ⚠ THE SAME WIDTH ON BOTH, so a group's bar starts exactly where its shots'
+   bars do (David, 2026-10-22: "align all bars, department bars and container
+   bars"). The two rows are built the same way — 14px of padding, a 20px caret,
+   a 9px gap, this label, another 9px gap — so equal labels mean equal bars.
+   Change one of these and you must change the other. */
+.board-item-label, .board-group-label {
+  flex: 0 0 250px; min-width: 0; display: flex; gap: 8px;
 }
-.board-item-label .board-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.board-item-scope { flex-shrink: 0; }
-.board-group-label { flex: 0 0 250px; min-width: 0; display: flex; align-items: center; gap: 9px; }
-.board-group-label strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-item-label { align-items: baseline; }
+.board-group-label { align-items: center; }
+/* The name gives way first; the count and the chip beside it never wrap, which
+   is what pushed "26 items" onto two lines and shoved that group's bar right. */
+.board-item-label .board-name,
+.board-group-label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-item-scope,
+.board-group-label .muted,
+.board-group-label .board-group-detail { flex-shrink: 0; white-space: nowrap; }
 
 @media (max-width: 900px) {
   /* Stacked, there is no column for them to line up down. */
