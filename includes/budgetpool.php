@@ -330,30 +330,160 @@ function budget_pool(PDO $pdo, array $project): array {
 }
 
 /**
- * A ring showing how much of a pool has gone, as inline SVG.
+ * An interactive donut, as inline SVG: one segment per slice, and the figure in
+ * the middle swaps to whichever segment the pointer is over (the small script
+ * at the foot of the Budget pool tab, finance_project.php).
  *
  * Inline because this codebase ships no charting library and is not about to
- * start for one circle — dashboard_burnup_svg() and step_trend_svg() draw their
- * own the same way. Red once the pool is overdrawn, because that is the one
- * state somebody must not scroll past.
+ * start for a circle, the same reason grid_donut_svg() draws its own. Each
+ * segment also carries a <title>, so the numbers are there on a touch screen and
+ * to a screen reader, where nothing hovers.
+ *
+ * @param array  $slices [['value' => float, 'color' => css, 'big' => string,
+ *                         'small' => string, 'tip' => string], ...]
+ * @param string $big    the middle figure at rest
+ * @param string $small  the line under it at rest
  */
-function pool_ring_svg(float $pct, string $label = 'of days used', int $size = 150): string {
-    $pct  = max(0.0, min(100.0, $pct));
-    $r    = 54;
-    $circ = 2 * M_PI * $r;
-    $dash = $circ * $pct / 100;
-    $col  = $pct >= 100 ? 'var(--danger)' : ($pct >= 75 ? 'var(--warn)' : 'var(--ok)');
-    $c    = $size / 2;
+function pool_donut_svg(array $slices, string $big, string $small, int $size = 150): string {
+    $total = 0.0;
+    foreach ($slices as $sl) $total += max(0.0, (float)$sl['value']);
+    $c = 75; $ro = 66; $ri = 46;
 
-    return '<svg width="' . $size . '" height="' . $size . '" viewBox="0 0 150 150" role="img"'
-         . ' aria-label="' . (int)round($pct) . ' per cent ' . e($label) . '">'
-         . '<circle cx="75" cy="75" r="' . $r . '" fill="none" stroke="var(--surface-2)" stroke-width="16"/>'
-         . '<circle cx="75" cy="75" r="' . $r . '" fill="none" stroke="' . $col . '" stroke-width="16"'
-         . ' stroke-dasharray="' . round($dash, 1) . ' ' . round($circ - $dash, 1) . '"'
-         . ' stroke-linecap="round" transform="rotate(-90 75 75)"/>'
-         . '<text x="75" y="70" text-anchor="middle" fill="var(--text)"'
-         . ' style="font-size:26px;font-weight:700;">' . (int)round($pct) . '%</text>'
-         . '<text x="75" y="92" text-anchor="middle" fill="var(--muted)"'
-         . ' style="font-size:12px;">' . e($label) . '</text>'
-         . '</svg>';
+    $svg = '<svg class="pool-donut" width="' . $size . '" height="' . $size . '" viewBox="0 0 150 150"'
+         . ' role="img" aria-label="' . e($big . ' ' . $small) . '">';
+
+    if ($total <= 0) {
+        $svg .= '<circle cx="75" cy="75" r="56" fill="none" stroke="var(--border)" stroke-width="20"/>';
+    } else {
+        $angle = -M_PI / 2;   // twelve o'clock
+        foreach ($slices as $sl) {
+            $v = max(0.0, (float)$sl['value']);
+            if ($v <= 0) continue;
+            $frac = $v / $total;
+            $attrs = ' class="pool-seg" data-big="' . e($sl['big']) . '" data-small="' . e($sl['small']) . '"';
+            $title = '<title>' . e($sl['tip']) . '</title>';
+            // A full circle cannot be one arc: its two ends coincide and the path
+            // collapses to nothing. Draw a ring instead.
+            if ($frac >= 0.9999) {
+                $svg .= '<circle' . $attrs . ' cx="75" cy="75" r="56" fill="none" stroke="'
+                      . e($sl['color']) . '" stroke-width="20">' . $title . '</circle>';
+                break;
+            }
+            $end = $angle + $frac * 2 * M_PI;
+            $large = ($end - $angle) > M_PI ? 1 : 0;
+            $d = sprintf('M %.2f %.2f A %d %d 0 %d 1 %.2f %.2f L %.2f %.2f A %d %d 0 %d 0 %.2f %.2f Z',
+                $c + $ro * cos($angle), $c + $ro * sin($angle), $ro, $ro, $large,
+                $c + $ro * cos($end),   $c + $ro * sin($end),
+                $c + $ri * cos($end),   $c + $ri * sin($end), $ri, $ri, $large,
+                $c + $ri * cos($angle), $c + $ri * sin($angle));
+            $svg .= '<path' . $attrs . ' d="' . $d . '" fill="' . e($sl['color']) . '">' . $title . '</path>';
+            $angle = $end;
+        }
+    }
+
+    $svg .= '<text class="pool-donut-big" x="75" y="74" text-anchor="middle" fill="var(--text)"'
+          . ' data-rest="' . e($big) . '">' . e($big) . '</text>'
+          . '<text class="pool-donut-small" x="75" y="94" text-anchor="middle" fill="var(--muted)"'
+          . ' data-rest="' . e($small) . '">' . e($small) . '</text>'
+          . '</svg>';
+    return $svg;
+}
+
+/**
+ * Days used against days still unused, as an interactive donut (David,
+ * 2026-10-21: "show the remaining days unused ... when you hover the mouse they
+ * should say how many days"). The unused part is its own segment, so it can be
+ * pointed at, rather than being the empty track behind a progress ring.
+ *
+ * Red once the pool is overdrawn, the one state nobody may scroll past.
+ */
+function pool_days_donut_svg(float $used, float $pool, int $size = 150): string {
+    $pct    = $pool > 0 ? $used / $pool * 100 : 0.0;
+    $unused = max(0.0, $pool - $used);
+    $over   = max(0.0, $used - $pool);
+    $col    = $pct >= 100 ? 'var(--danger)' : ($pct >= 75 ? 'var(--warn)' : 'var(--ok)');
+    $days   = function (float $n): string {
+        return fmt_num($n, 1) . (abs($n - 1) < 0.05 ? ' day' : ' days');
+    };
+
+    $slices = [
+        ['value' => $pool > 0 ? min($used, $pool) : $used, 'color' => $col,
+         'big'   => fmt_num($used, 1),
+         'small' => $over > 0 ? 'days used, ' . fmt_num($over, 1) . ' over' : 'days used',
+         'tip'   => $days($used) . ' used' . ($over > 0 ? ', ' . $days($over) . ' over the pool' : '')],
+        ['value' => $unused, 'color' => 'var(--border)',
+         'big'   => fmt_num($unused, 1), 'small' => 'days unused',
+         'tip'   => $days($unused) . ' still unused'],
+    ];
+    return pool_donut_svg($slices, (int)round($pct) . '%', 'of days used', $size);
+}
+
+/**
+ * How many of a step's shots or assets sit in each status, for the pie beside
+ * the days (David, 2026-10-21: "all the assets or shots in a pie chart next to
+ * the days used that show how many assets/shots are in which status").
+ *
+ * Counts exactly what the card counts: the rows the step still covers
+ * (progress_in_scope_sql()), against step_applicable_count() as the total, so
+ * N/A items are left out and anything with no status yet is "Not started".
+ *
+ * @return array ['slices' => [...for pool_donut_svg], 'total' => int, 'noun' => string]
+ */
+function pool_status_slices(PDO $pdo, int $projectId, int $stepId): array {
+    $q = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $q->execute([$stepId, $projectId]);
+    $step = $q->fetch();
+    if (!$step) return ['slices' => [], 'total' => 0, 'noun' => 'items'];
+
+    $inScope = progress_in_scope_sql();
+    $q = $pdo->prepare(
+        "SELECT st.id, st.name, st.color, COALESCE(st.is_excluded, 0) AS is_excluded,
+                COALESCE(st.sort_order, 9999) AS so, COUNT(*) AS n
+           FROM progress pr
+           JOIN pipeline_steps ps ON ps.id = pr.step_id
+           LEFT JOIN statuses st  ON st.id = pr.status_id
+           LEFT JOIN assets a     ON a.id  = pr.asset_id
+          WHERE pr.step_id = ? AND {$inScope}
+          GROUP BY st.id, st.name, st.color, st.is_excluded, st.sort_order
+          ORDER BY so, st.name"
+    );
+    $q->execute([$stepId]);
+    $rows = $q->fetchAll();
+
+    $excluded = 0;
+    foreach ($rows as $r) if ((int)$r['is_excluded'] === 1) $excluded += (int)$r['n'];
+
+    $shotCount  = (int)$pdo->query('SELECT COUNT(*) FROM shots WHERE project_id = ' . (int)$projectId)->fetchColumn();
+    $typeCounts = [];
+    $assetCount = 0;
+    $t = $pdo->prepare("SELECT COALESCE(asset_type,'') t, COUNT(*) n FROM assets WHERE project_id = ? GROUP BY asset_type");
+    $t->execute([$projectId]);
+    foreach ($t as $r) { $typeCounts[$r['t']] = (int)$r['n']; $assetCount += (int)$r['n']; }
+    $total = step_applicable_count($step + ['excluded' => $excluded], $shotCount, $typeCounts, $assetCount);
+
+    $nouns = ['shot' => ['shot', 'shots'], 'project' => ['deliverable', 'deliverables'],
+              'both' => ['item', 'items'], 'asset' => ['asset', 'assets']];
+    $noun = $nouns[$step['applies_to']] ?? ['item', 'items'];
+    $word = function (int $n) use ($noun): string { return $n === 1 ? $noun[0] : $noun[1]; };
+
+    $slices  = [];
+    $counted = 0;
+    foreach ($rows as $r) {
+        // N/A leaves the step, and a row with no status is counted as not started below.
+        if ((int)$r['is_excluded'] === 1 || $r['id'] === null) continue;
+        $n = (int)$r['n'];
+        $counted += $n;
+        $slices[] = ['value' => $n, 'color' => $r['color'] ?: 'var(--step-default)',
+                     'big' => (string)$n, 'small' => (string)$r['name'],
+                     'tip' => $r['name'] . ', ' . $n . ' ' . $word($n)];
+    }
+    // Everything the step covers with no status yet: no progress row at all, or a
+    // row with no status on it. Not started either way.
+    $notStarted = max(0, $total - $counted);
+    if ($notStarted > 0) {
+        $slices[] = ['value' => $notStarted, 'color' => 'var(--border)',
+                     'big' => (string)$notStarted, 'small' => 'not started',
+                     'tip' => 'Not started, ' . $notStarted . ' ' . $word($notStarted)];
+    }
+    return ['slices' => $slices, 'total' => $total, 'noun' => $word($total)];
 }
