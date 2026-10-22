@@ -1200,8 +1200,8 @@ if ($retakePct <= 0):
     <input type="hidden" name="bulk_rates" value="1">
     <input type="hidden" name="confirm_people" value="0">
     <strong>Set a rate for many rows</strong>
-    <span class="muted small" id="bulk-count">0 ticked</span>
-    <label class="small">Tick a whole role
+    <span class="muted small" id="bulk-count">0 selected</span>
+    <label class="small">Full departments selection
       <select id="bulk-role">
         <option value="">choose…</option>
         <?php foreach (array_keys($bulkRoles) as $role): ?>
@@ -1209,10 +1209,10 @@ if ($retakePct <= 0):
         <?php endforeach; ?>
       </select>
     </label>
-    <button type="button" class="secondary" id="bulk-clear">Untick all</button>
+    <button type="button" class="secondary" id="bulk-clear">Unselect all</button>
     <span class="bulk-apply">
-      <input name="day_rate" inputmode="decimal" size="6" placeholder="rate" aria-label="Rate for the ticked rows">
-      <button type="submit">Apply to ticked</button>
+      <input name="day_rate" inputmode="decimal" size="6" placeholder="rate" aria-label="Rate for the selected rows">
+      <button type="submit">Apply to selection</button>
     </span>
     <span class="muted small">Each row keeps its own currency and unit (day or second).</span>
   </form>
@@ -1359,7 +1359,7 @@ if ($retakePct <= 0):
     var count = document.getElementById('bulk-count');
     function refresh() {
       var n = rows.filter(function (b) { return b.checked; }).length;
-      count.textContent = n + ' ticked';
+      count.textContent = n + ' selected';
       document.querySelectorAll('.bulk-dept-all').forEach(function (all) {
         var mine = rows.filter(function (b) { return b.dataset.dept === all.dataset.dept; });
         var on = mine.filter(function (b) { return b.checked; }).length;
