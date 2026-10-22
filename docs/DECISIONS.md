@@ -4283,3 +4283,12 @@ with only one end set is open at the other.
 new Date() is read as UTC and comes back a day early west of Greenwich (the timeline's rule 2),
 which here would quietly shift the whole week. Sunday belongs to the week that has just ended,
 which is how a studio reads "this week" on a Sunday evening.
+
+## 2026-10-22 — A global button margin is what breaks a toolbar's alignment, not its heights
+The bulk-rate bar's select, rate box and two buttons were all exactly 34px tall and still sat on
+different lines — David drew a line along their bottom edges to show it. The cause was
+`button { margin-top: 16px }`, written for the stacked forms this stylesheet grew up with. On a
+flex row that margin is neither collapsed nor ignored: it pushed each button 8px below the fields
+beside it and made the Apply wrapper 50px tall. `margin: 0` on the bar's controls fixes it.
+**The general shape:** when controls of equal height do not line up, look at their MARGINS before
+touching their padding or height — equal heights prove nothing about where a box sits.

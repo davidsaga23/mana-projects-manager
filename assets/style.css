@@ -3155,11 +3155,16 @@ button.secondary.danger:hover { background: var(--danger-border); }
    rules, so the row read as four controls of four sizes. Set here, together,
    rather than tuned one at a time — which is how they drifted apart. */
 .bulk-rates select,
-.bulk-rates input[type="text"],
-.bulk-rates .bulk-apply input,
+.bulk-rates input,
 .bulk-rates button {
-  min-height: 34px; padding: 6px 12px; font-size: 13px; line-height: 1.2;
-  border-radius: 7px; box-sizing: border-box;
+  /* ⚠ margin: 0 IS THE ALIGNMENT FIX. The stylesheet gives every button a
+     16px top margin, for the stacked forms it was written for. On a flex row
+     that margin is not collapsed or ignored: it pushes each button 8px below
+     the fields beside it and makes its wrapper 50px tall, which is exactly the
+     step David drew a line along (2026-10-22). Heights alone never fix this —
+     all four controls were already 34px. */
+  height: 34px; margin: 0; padding: 6px 12px; font-size: 13px; line-height: 1.2;
+  border-radius: 7px; box-sizing: border-box; vertical-align: middle;
 }
 .bulk-rates button { cursor: pointer; }
 .bulk-tick { display: inline; margin: 0; }
