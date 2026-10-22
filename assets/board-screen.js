@@ -80,6 +80,7 @@
       el.classList.add('is-saved');
       setTimeout(function () { el.classList.remove('is-saved'); }, 900);
       el.setAttribute('data-was', el.value);     // agreed: this is the value now
+      mirror(el);                                // the row and the panel agree
       if (onOk) onOk(data);
       if (data.message) say(data.message, false);
     }).catch(function (err) {
@@ -499,4 +500,131 @@
       row.setAttribute('data-due', el.value);
     }
   });
+
+  // --- the task panel -------------------------------------------------------
+  //
+  // David, 2026-10-22: the detailed view of a task, "instead of taking you to
+  // another page it should just pop up in the same screen so you can open,
+  // adjust, close and open another one".
+  //
+  // ⚠ THE PANEL'S CONTROLS ARE THE BOARD'S CONTROLS. board_task.php renders the
+  // same helpers with the same classes and the same three data attributes, so
+  // every handler above already saves them and nothing about saving is written
+  // twice. What IS needed is keeping the two copies of a cell in step, which
+  // mirror() below does.
+  var panel = document.getElementById('boardPanel');
+  var panelInner = document.getElementById('boardPanelInner');
+  var veil = document.getElementById('boardVeil');
+  var panelClose = document.getElementById('boardPanelClose');
+  var cameFrom = null;              // the button that opened it, to return focus to
+
+  function panelOpen(btn) {
+    if (!panel) return;
+    cameFrom = btn;
+    panelInner.innerHTML = '<p class="muted small">Opening…</p>';
+    panel.hidden = false;
+    if (veil) veil.hidden = false;
+    document.body.classList.add('has-board-panel');
+
+    var url = 'board_task.php?project=' + encodeURIComponent(btn.getAttribute('data-project'))
+            + '&step=' + encodeURIComponent(btn.getAttribute('data-step'))
+            + '&item=' + encodeURIComponent(btn.getAttribute('data-item'));
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        panelInner.innerHTML = html;
+        // Into the panel, so the keyboard is where the eye is.
+        var first = panelInner.querySelector('select, input, button, a');
+        if (first) first.focus();
+      })
+      .catch(function () {
+        panelInner.innerHTML = '<p class="err">That did not open. Check your connection and try again.</p>';
+      });
+  }
+
+  function panelShut() {
+    if (!panel || panel.hidden) return;
+    panel.hidden = true;
+    if (veil) veil.hidden = true;
+    document.body.classList.remove('has-board-panel');
+    panelInner.innerHTML = '';
+    if (cameFrom) { cameFrom.focus(); cameFrom = null; }
+  }
+
+  document.addEventListener('click', function (e) {
+    var open = e.target.closest ? e.target.closest('.board-open-task') : null;
+    if (open) { panelOpen(open); return; }
+    if (e.target === veil) panelShut();
+    var tab = e.target.closest ? e.target.closest('.panel-tab') : null;
+    if (tab) {
+      Array.prototype.forEach.call(panelInner.querySelectorAll('.panel-tab'), function (t) {
+        var on = t === tab;
+        t.classList.toggle('is-on', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      Array.prototype.forEach.call(panelInner.querySelectorAll('.panel-body'), function (b) {
+        b.hidden = b.getAttribute('data-pane') !== tab.getAttribute('data-tab');
+      });
+    }
+  });
+
+  if (panelClose) panelClose.addEventListener('click', panelShut);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && panel && !panel.hidden) panelShut();
+  });
+
+  /**
+   * The same cell exists twice while the panel is open — once in the row behind
+   * it, once in the panel. A save through either has to move both, or closing
+   * the panel would reveal a row still showing the old value.
+   */
+  function mirror(el) {
+    var step = el.getAttribute('data-step');
+    var item = el.getAttribute('data-item');
+    var field = el.getAttribute('data-field');
+    if (!step || !item) return;
+
+    // ⚠ MATCHED ON THE CONTROL'S KIND, never on its whole class string. The
+    // first version compared className, and save() adds `is-saved` to the cell
+    // it has just written one line before calling this — so the two copies
+    // never looked alike and the row silently kept the old value.
+    var KINDS = ['board-status', 'board-crew', 'board-due', 'board-text'];
+    var kind = null;
+    KINDS.forEach(function (k) { if (el.classList.contains(k)) kind = k; });
+    if (!kind) return;
+
+    var sel = '[data-step="' + step + '"][data-item="' + item + '"]';
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function (other) {
+      if (other === el || !other.classList.contains(kind)) return;
+      // A text cell is only the same cell when it is the same field.
+      if (field && other.getAttribute('data-field') !== field) return;
+      if (other.value === el.value) return;
+      other.value = el.value;
+      if (other.matches('.board-status')) {
+        var opt = other.options[other.selectedIndex];
+        var color = opt ? opt.getAttribute('data-color') : '';
+        other.style.background = color ? tint(color) : '';
+        other.style.color = color || '';
+      }
+    });
+
+    // The row's own attributes feed the filters, and its shot's bar and derived
+    // status are drawn from the row, so both are refreshed from whichever copy
+    // was touched.
+    var rowCtl = document.querySelector('.board-row-task ' + sel);
+    var host = rowCtl ? rowCtl.closest('.board-row-task') : null;
+    if (host) {
+      var st = host.querySelector('.board-status');
+      var cr = host.querySelector('.board-crew');
+      var du = host.querySelector('.board-due');
+      if (st) host.setAttribute('data-status', st.value === '' ? '__none' : st.value);
+      if (cr) host.setAttribute('data-crew', cr.value === '' ? '__none' : cr.value);
+      if (du) host.setAttribute('data-due', du.value);
+      var item2 = host.closest('.board-item');
+      if (item2) { redrawDerived(item2); redrawBar(item2); }
+      redrawGroupBar(host.closest('.board-group'));
+    }
+  }
+
 }());

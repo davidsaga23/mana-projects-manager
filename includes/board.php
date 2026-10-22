@@ -631,6 +631,117 @@ function board_link_label(string $url): string {
 }
 
 /**
+ * One task, for the panel that opens over the board.
+ *
+ * Reads the same row the board drew it from, so the panel can never disagree
+ * with the line behind it, plus the two things the board has no column for:
+ * what has been logged against it, and what has happened to it.
+ *
+ * @return array|null null when the step and item are not this project's
+ */
+function board_task_detail(PDO $pdo, int $projectId, int $stepId, string $itemKey): ?array {
+    $q = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $q->execute([$stepId, $projectId]);
+    $step = $q->fetch();
+    if (!$step) return null;
+
+    $kind = substr($itemKey, 0, 1);
+    $itemId = (int)substr($itemKey, 1);
+    if (!in_array($kind, ['s', 'a', 'p'], true) || $itemId <= 0) return null;
+
+    $item = ['name' => '', 'group' => '', 'frames' => null, 'kind' => $kind];
+    if ($kind === 's') {
+        $r = $pdo->prepare('SELECT episode, shot_code, frames FROM shots WHERE id = ? AND project_id = ?');
+        $r->execute([$itemId, $projectId]);
+        $row = $r->fetch();
+        if (!$row) return null;
+        $item['name']   = (string)$row['shot_code'];
+        $item['group']  = trim((string)$row['episode']) !== '' ? (string)$row['episode'] : 'Production';
+        $item['frames'] = $row['frames'] !== null ? (int)$row['frames'] : null;
+    } elseif ($kind === 'a') {
+        $r = $pdo->prepare("SELECT name, COALESCE(asset_type, '') AS asset_type
+                              FROM assets WHERE id = ? AND project_id = ?");
+        $r->execute([$itemId, $projectId]);
+        $row = $r->fetch();
+        if (!$row) return null;
+        $item['name']  = (string)$row['name'];
+        $item['group'] = trim((string)$row['asset_type']) ?: 'Pre-production';
+    } else {
+        if ($itemId !== $projectId) return null;
+        $item['name']  = (string)$step['name'];
+        $item['group'] = board_dept_name(trim((string)($step['department'] ?? '')) ?: 'Post-production');
+    }
+
+    $itemRow = ['asset_type' => null];
+    if ($kind === 'a') {
+        $t = $pdo->prepare('SELECT asset_type FROM assets WHERE id = ?');
+        $t->execute([$itemId]);
+        $itemRow['asset_type'] = $t->fetchColumn() ?: null;
+    }
+    $scope = ['s' => 'shot', 'a' => 'asset', 'p' => 'project'][$kind];
+    if (!step_covers_item($step, $itemRow, $scope)) return null;
+
+    // The cell itself, built by the same code the board rows are built from, so
+    // the panel and the line behind it cannot drift apart.
+    $board = board_data($pdo, $projectId);
+    $task = null;
+    foreach ($board['groups'] as $g) {
+        foreach ($g['items'] as $it) {
+            if ($it['item_key'] !== $itemKey) continue;
+            foreach (array_merge($it['tasks'], array_filter([$it['self']])) as $t) {
+                if ((int)$t['step_id'] === $stepId) $task = $t;
+            }
+        }
+    }
+    if ($task === null) return null;
+
+    return [
+        'task'      => $task,
+        'step'      => $step,
+        'item'      => $item,
+        'statuses'  => $board['statuses'],
+        'activity'  => board_task_activity($pdo, $projectId, $stepId, $itemKey),
+        'logged'    => board_task_logged($pdo, $projectId, $stepId, $itemKey),
+    ];
+}
+
+/** What has happened to one task, newest first. Empty before migration 021. */
+function board_task_activity(PDO $pdo, int $projectId, int $stepId, string $itemKey): array {
+    if (!function_exists('activity_available') || !activity_available($pdo)) return [];
+    try {
+        $q = $pdo->prepare(
+            'SELECT old_status_name, new_status_name, change_type, source, changed_by,
+                    crew_name, log_date, created_at
+               FROM progress_log
+              WHERE project_id = ? AND step_id = ? AND item_key = ?
+              ORDER BY created_at DESC, id DESC
+              LIMIT 40'
+        );
+        $q->execute([$projectId, $stepId, $itemKey]);
+        return $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+/** Hours logged against this task, or null where time logging is not set up. */
+function board_task_logged(PDO $pdo, int $projectId, int $stepId, string $itemKey): ?float {
+    if (!function_exists('time_logs_available') || !time_logs_available($pdo)) return null;
+    try {
+        $q = $pdo->prepare(
+            'SELECT COALESCE(SUM(tl.minutes), 0)
+               FROM time_logs tl
+               JOIN progress pr ON pr.id = tl.progress_id
+              WHERE pr.project_id = ? AND pr.step_id = ? AND pr.item_key = ?'
+        );
+        $q->execute([$projectId, $stepId, $itemKey]);
+        return ((float)$q->fetchColumn()) / 60;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+/**
  * The crew this show's tasks can be handed to: real people on the project,
  * plus anybody already named on one of its rows.
  *
