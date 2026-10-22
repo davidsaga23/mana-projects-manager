@@ -4066,3 +4066,8 @@ assets or shots in a pie chart next to the days used that show how many assets/s
 status".
 **Consequence:** the status pie is per step only. A pie for the whole show would add up items from
 different steps, which are not the same work.
+
+**Same day, layout (David: "make sure the pie charts are aligned ... the status pie chart should be
+to the right of the days used"):** a step's detail now reads, left to right: the days donut, its
+words, then the status donut with its colour key beside it rather than under it. Both rings sit
+on one line (`.pool-pair` in `assets/style.css`).

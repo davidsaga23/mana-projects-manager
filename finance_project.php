@@ -2059,27 +2059,18 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         <?= $open['left'] < 0 ? 'OVERDRAWN' : e(fmt_num(100 - $open['pct_used'], 0)) . '% still to use' ?></span></div>
   </div>
 
-  <?php // TWO DONUTS SIDE BY SIDE (David, 2026-10-21): the days, used against
-        // unused, and the step's shots or assets by status. Both answer on hover. ?>
+  <?php // TWO DONUTS ON ONE LINE (David, 2026-10-21): the days, used against
+        // unused, with what they say beside them; then the step's shots or assets
+        // by status, "to the right of the days used", with its colour key beside
+        // it rather than under it. Both rings sit on the same line, captioned the
+        // same way, so they read as a pair. Both answer on hover. ?>
   <?php $spread = pool_status_slices($pdo, $projectId, (int)$open['id']); ?>
-  <div class="pool-detail">
+  <div class="pool-detail pool-pair">
     <figure class="pool-fig">
       <?= pool_days_donut_svg((float)$open['used'], (float)$open['pool']) ?>
       <figcaption class="muted small">Days, used and unused</figcaption>
     </figure>
-    <figure class="pool-fig">
-      <?= pool_donut_svg($spread['slices'], (string)$spread['total'], $spread['noun']) ?>
-      <figcaption class="muted small">By status</figcaption>
-      <?php if ($spread['slices']): ?>
-        <ul class="pool-legend">
-          <?php foreach ($spread['slices'] as $sl): ?>
-            <li><span class="dot" style="background:<?= e($sl['color']) ?>"></span><?= e($sl['small']) ?>
-              <span class="muted"><?= e($sl['big']) ?></span></li>
-          <?php endforeach; ?>
-        </ul>
-      <?php endif; ?>
-    </figure>
-    <div>
+    <div class="pool-pair-text">
       <p class="<?= e($open['pace_class']) ?>"><strong><?= e($open['pace_text']) ?></strong></p>
       <p class="muted small">
         <?= e(fmt_unit($open['done'], $open['unit'])) ?> of
@@ -2094,6 +2085,20 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         <a href="step.php?project=<?= $projectId ?>&amp;step=<?= (int)$open['id'] ?>">Open the step</a>
         · <a href="?project=<?= $projectId ?>&amp;tab=pool">close this</a>
       </p>
+    </div>
+    <div class="pool-status">
+      <figure class="pool-fig">
+        <?= pool_donut_svg($spread['slices'], (string)$spread['total'], $spread['noun']) ?>
+        <figcaption class="muted small">By status</figcaption>
+      </figure>
+      <?php if ($spread['slices']): ?>
+        <ul class="pool-legend">
+          <?php foreach ($spread['slices'] as $sl): ?>
+            <li><span class="dot" style="background:<?= e($sl['color']) ?>"></span><?= e($sl['small']) ?>
+              <span class="muted"><?= e($sl['big']) ?></span></li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
     </div>
   </div>
 <?php endif; ?>

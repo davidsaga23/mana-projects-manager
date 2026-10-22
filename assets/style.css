@@ -1746,6 +1746,14 @@ svg.trend { margin: 0; }
 .pool-donut-big { font-size: 26px; font-weight: 700; }
 .pool-donut-small { font-size: 12px; }
 .pool-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; }
+/* The step detail's pair (2026-10-21): days donut, its words, then the status
+   donut with its key BESIDE it. align-items: flex-start keeps both rings on the
+   same line however long the key or the words run. */
+.pool-pair { align-items: flex-start; gap: 40px; }
+.pool-pair > .pool-pair-text { flex: 0 1 300px; align-self: center; }
+.pool-pair > .pool-status { display: flex; align-items: flex-start; gap: 20px; flex: 0 0 auto; }
+.pool-status .pool-legend { align-self: flex-start; margin-top: 0; height: 150px;
+  display: flex; flex-direction: column; justify-content: center; }
 .pool-legend { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12.5px; }
 .pool-legend li { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .pool-legend .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
