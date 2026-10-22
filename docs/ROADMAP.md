@@ -1030,9 +1030,14 @@ left rather than dropped because dropping it needs a hand-run statement in phpMy
 throw away the figure already typed there. Drop it with a `finance_install_08.sql` if the question
 never comes back.
 
-## ⚠ Open defect: PHP and MySQL disagree about what day it is
+## ✅ Fixed defect: PHP and MySQL disagreed about what day it is
 
-**Found 2026-10-09, not fixed.** David: "in the dashboard why is it showing oct 10 when today is
+> **FIXED 2026-10-16** (commit `6fe074a`, "One clock"): `includes/db.php` runs
+> `SET time_zone = date('P')` on every connection, and the studio clock moved to
+> `America/Los_Angeles` the same day. The account below is kept for its reasoning; its
+> "not applied" line is history.
+
+**Found 2026-10-09.** David: "in the dashboard why is it showing oct 10 when today is
 oct 9th?"
 
 `includes/db.php` sets PHP's timezone from `config.php` (`America/Mexico_City`). It never sets
@@ -1060,7 +1065,7 @@ loaded and shared cPanel hosting usually has not. Computed per connection, so DS
 plain DATE and nothing converts it afterwards, so the misfiled days stay misfiled. And **77
 TIMESTAMP columns store UTC and convert on read**, so every "created at" and "updated at" across
 the app will shift back six hours to the correct local time. That is right, but it will look like
-something changed. Not applied because David has not yet said to.
+something changed. (Applied 2026-10-16, see the banner above.)
 
 ## The budget pool, and what it is missing (2026-10-16)
 
