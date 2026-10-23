@@ -786,6 +786,11 @@
       } else {
         var rf = panelInner.querySelector('.board-review-form');
         if (rf) {
+          // ⚠ OPEN THE FOLD FIRST. The form lives in a <details> since
+          // 2026-10-23; without this the button would scroll to a collapsed
+          // box and focus a textarea nobody can see.
+          var fold = rf.closest('details');
+          if (fold) fold.open = true;
           var pick = rf.querySelector('select[name="version_id"]');
           if (pick) pick.value = notes.getAttribute('data-review-version');
           rf.scrollIntoView({ block: 'nearest' });
