@@ -29,6 +29,21 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // question, to find out how many days that question is worth.
         ['key' => 'pool',       'label' => 'Budget pool',
          'href' => 'finance_project.php' . $p . '&tab=pool'],
+        // KICK-OFF, after the budget (David, 2026-10-23: "let's add the tab in
+        // Finance Management after Budget pool"). What the show was signed off
+        // as, against what it is now — which is a money question as often as a
+        // production one: the answer to "that is not what we agreed" is on this
+        // page, and until now nothing linked to it between a project leaving
+        // setup and reaching its postmortem.
+        //
+        // ⚠ A DIFFERENT PAGE, NOT A finance_project.php TAB, so it carries
+        // &section=finance the way the Staffing link does — that is what tells
+        // kickoff.php to draw THIS bar, so the tab that was clicked is the tab
+        // that lights up when it lands. Without it the page would come back
+        // wearing the production bar and the click would look like it had gone
+        // somewhere else entirely.
+        ['key' => 'kickoff',    'label' => 'Kick-off',
+         'href' => 'kickoff.php' . $p . '&section=finance&view=compare'],
         // The SAME screen the project side links to, not a copy of it. Hiring is
         // one conversation whether it is opened from the plan or from the
         // budget, and two copies of it would drift — the money on it is already
