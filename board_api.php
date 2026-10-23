@@ -25,6 +25,7 @@ require_once __DIR__ . '/includes/grid.php';
 require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/notify.php';   // the bell beside your name (migration 060)
+require_once __DIR__ . '/includes/task_events.php';   // the task's Timeline (migration 066)
 require_login_json();
 
 header('Content-Type: application/json');
@@ -259,6 +260,15 @@ try {
         }
         $upsert(['crew_id' => $crewId]);
 
+        // On the task's Timeline: from whom to whom, in names, read now.
+        $wasName = null;
+        if ($cell && $cell['crew_id']) {
+            $w = $pdo->prepare('SELECT name FROM crew WHERE id = ?');
+            $w->execute([(int)$cell['crew_id']]);
+            $wasName = $w->fetchColumn() ?: null;
+        }
+        task_event_log($pdo, $progressIdNow(), 'assignee', $wasName, $crewId !== null ? $name : null);
+
         // ⚠ ONLY THE NEW OWNER, and only when there is one. Clearing an
         // assignee tells nobody: "you no longer have this" is not news anybody
         // needs at the top of their screen, and the person who DID have it
@@ -300,6 +310,11 @@ try {
         $q = $pdo->prepare('SELECT * FROM schedule WHERE step_id = ? AND item_key = ?');
         $q->execute([$stepId, $itemKey]);
         $row = $q->fetch() ?: null;
+
+        // On the task's Timeline. The progress row is made if the importer never
+        // did, so the change has something to hang on.
+        if ($cell === null) $upsert(['notes' => null]);
+        task_event_log($pdo, $progressIdNow(), 'due', $row['end_date'] ?? null, $due !== '' ? $due : null);
 
         if ($due === '') {
             // Clearing a date removes the hand-planned row rather than storing
@@ -373,6 +388,7 @@ try {
         }
 
         $upsert([$field => $value === '' ? null : $value]);
+        task_event_log($pdo, $progressIdNow(), $field, $cell[$field] ?? null, $value);
         echo json_encode(['ok' => true, 'value' => $value, 'message' => 'Saved.']);
         exit;
     }

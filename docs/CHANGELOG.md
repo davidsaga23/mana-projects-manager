@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Spell: a task's Activity is now its Timeline *(migration 066 for reassignments, dates and notes)*
+
+- **The Activity tab is now Timeline**: everything that happened to the task on one vertical line,
+  newest at the top, each with a small date. Status changes, new versions (with a thumbnail that
+  expands when clicked), comments, review notes, and, once migration 066 runs, reassignments, due
+  date changes and edits to the task's note and link.
+- **Every entry opens in a pop-up** over the panel: the full-size version with what changed and its
+  final-files link, the whole comment or review with its files, or the before and after of a
+  change. Buttons in the pop-up jump to Comments or Versions and notes. Escape closes it.
+
 ## 2026-10-22 — Spell: reviews on versions, a Notes column, links to final files *(needs migration 065)*
 
 - **Make a review** (supervisors, Production, admins): on the Versions tab, pick which version it

@@ -98,8 +98,12 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
         // IS, then what people SAID about it, then what HAPPENED to it. ?>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="comments">Comments<?php
     if ($commentCount): ?> <span class="muted">· <?= $commentCount ?></span><?php endif; ?></button>
-  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="activity">Activity<?php
-    if ($detail['activity']): ?> <span class="muted">· <?= count($detail['activity']) ?></span><?php endif; ?></button>
+  <?php // TIMELINE, once Activity (David, 2026-10-22): everything that happened
+        // to the task, newest first. Drawn once here; the count is its entries.
+        $timelineHtml = board_timeline_html($pdo, $projectId, $stepId, $itemKey);
+        $timelineCount = substr_count($timelineHtml, 'class="tl-entry'); ?>
+  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="activity">Timeline<?php
+    if ($timelineCount): ?> <span class="muted">· <?= $timelineCount ?></span><?php endif; ?></button>
   <?php // Last, after Activity, where David asked for it: what the task IS,
         // what people SAID, what HAPPENED, and then what was DELIVERED. ?>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions and notes<?php
@@ -169,33 +173,8 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
   <?= board_versions_html($pdo, $projectId, $stepId, $itemKey, $mayComment) ?>
 </div>
 
+<?php // The pane keeps its old key, "activity", so nothing that already opens it
+      // has to change; what it shows is the whole timeline. ?>
 <div class="panel-body" data-pane="activity" hidden>
-  <?php if (!$detail['activity']): ?>
-    <p class="muted small">Nothing has been recorded against this task yet. Every status change from
-      now on appears here, with who made it and where from.</p>
-  <?php else: ?>
-    <ul class="panel-activity">
-      <?php foreach ($detail['activity'] as $a): ?>
-        <li>
-          <span class="panel-act-dot panel-act-<?= e($a['change_type']) ?>"></span>
-          <span class="panel-act-what">
-            <?php if ($a['old_status_name']): ?>
-              <?= e($a['old_status_name']) ?> <span class="panel-sep">→</span>
-            <?php endif; ?>
-            <strong><?= e($a['new_status_name'] ?: 'nothing recorded') ?></strong>
-          </span>
-          <span class="panel-act-who muted">
-            <?= e($a['changed_by'] ?: $a['crew_name'] ?: 'somebody') ?>
-            <?php // Where it came from matters: "the importer moved 140 shots"
-                  // and "somebody moved 140 shots by hand" look identical here
-                  // otherwise, and mean completely different things. ?>
-            <?php if (($a['source'] ?? '') === 'import'): ?>
-              <span class="panel-src">imported</span>
-            <?php endif; ?>
-          </span>
-          <span class="panel-act-when muted"><?= e(date('j M', strtotime((string)$a['log_date']))) ?></span>
-        </li>
-      <?php endforeach; ?>
-    </ul>
-  <?php endif; ?>
+  <?= $timelineHtml ?>
 </div>
