@@ -806,10 +806,46 @@
 
       fetch(spec.url, { method: 'POST', body: gone, credentials: 'same-origin' })
         .then(function (r) { return r.text(); })
-        .then(function (html) { pane.innerHTML = html; paneReady(which); })
+        .then(function (html) { pane.innerHTML = html; paneReady(which); timelineRefresh(); })
         .catch(function () { del.disabled = false; });
     }
   });
+
+  /**
+   * Re-draw the Timeline tab after anything was posted or taken back in the
+   * panel (David, 2026-10-22: "I just left a comment and it didn't update in
+   * the timeline"). The task is read off any control in the panel that names
+   * it; the count on the tab follows. Quiet on failure: the post itself worked,
+   * and reopening the task shows the timeline as it is.
+   */
+  function timelineRefresh() {
+    if (!panelInner) return;
+    var pane = panelInner.querySelector('[data-pane="activity"]');
+    var who = panelInner.querySelector('[data-project][data-step][data-item]');
+    if (!pane || !who) return;
+    var url = 'board_task.php?pane=timeline&project=' + encodeURIComponent(who.getAttribute('data-project'))
+            + '&step=' + encodeURIComponent(who.getAttribute('data-step'))
+            + '&item=' + encodeURIComponent(who.getAttribute('data-item'));
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (html === null || !panelInner.contains(pane)) return;
+        pane.innerHTML = html;
+        var tab = panelInner.querySelector('.panel-tab[data-tab="activity"]');
+        if (!tab) return;
+        var n = pane.querySelectorAll('.tl-entry').length;
+        var badge = tab.querySelector('.muted');
+        if (n === 0) { if (badge) badge.remove(); return; }
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'muted';
+          tab.appendChild(document.createTextNode(' '));
+          tab.appendChild(badge);
+        }
+        badge.textContent = '· ' + n;
+      })
+      .catch(function () {});
+  }
 
   document.addEventListener('submit', function (e) {
     var form = e.target.closest
@@ -853,6 +889,7 @@
       .then(function (html) {
         pane.innerHTML = html;
         paneReady(which);
+        timelineRefresh();
         var fresh = pane.querySelector('.board-comment-box');
         if (fresh) fresh.focus();
       })
