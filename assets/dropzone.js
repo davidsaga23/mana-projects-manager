@@ -34,7 +34,10 @@
    * this file knowing what either of them is.
    */
   function attach(input) {
-    if (!input || input.getAttribute('data-drop-on')) return;
+    // data-no-drop: an input whose form already keeps its own list of files
+    // (Spell's review form, with pasting and thumbnails). Two lists of one input
+    // overwrite each other.
+    if (!input || input.getAttribute('data-drop-on') || input.hasAttribute('data-no-drop')) return;
     // DataTransfer is how a chosen list is written back to the input. Without
     // it the remove buttons would be a lie, so the native control stays.
     if (typeof DataTransfer === 'undefined') return;
@@ -89,6 +92,13 @@
         list.appendChild(li);
       });
       zone.classList.toggle('has-files', picked.length > 0);
+
+      // ⚠ TELL THE PAGE. Writing input.files fires no event, so a drop or a
+      // removal was invisible to anything checking the files — the naming
+      // convention check on Spell let a wrongly named DROPPED file through
+      // (David, 2026-10-23). Not a 'change' event: this file listens for those
+      // itself and would add the same files twice.
+      input.dispatchEvent(new CustomEvent('anima:files', { bubbles: true }));
     }
 
     function add(files) {

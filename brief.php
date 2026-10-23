@@ -120,7 +120,9 @@ if ($namingReady && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_
         $up = fn($t) => preg_replace_callback('/\{([^}]*)\}/', fn($m) => '{' . strtoupper($m[1]) . '}', $t);
         $codes = ['steps' => [], 'types' => []];
         foreach ((array)($_POST['step_code'] ?? []) as $id => $c) {
-            $c = strtoupper(naming_compact((string)$c));
+            // A step code may carry its department as well: CH_LO for "CH
+            // layout", the way MSD's convention writes MSD_SH220_CH_SH.
+            $c = strtoupper(preg_replace('/[^A-Za-z0-9_\-]+/', '', (string)$c));
             if ($c !== '') $codes['steps'][(string)(int)$id] = mb_substr($c, 0, 12);
         }
         foreach ((array)($_POST['type_code'] ?? []) as $i => $c) {
@@ -369,12 +371,27 @@ require __DIR__ . '/includes/header.php';
           <li><code>{<?= e($tok) ?>}</code> <?= e($what) ?></li>
         <?php endforeach; ?>
       </ul>
-      <p class="muted small">Capitals or not does not matter, and the file's extension (.png, .mp4) is ignored.</p>
+      <p class="muted small">Capitals or not does not matter, and the file's extension (.png, .mp4) is ignored.
+        A placeholder that means nothing for an item, {TYPE} or {ASSET} on a shot, {SHOT} or {EPISODE}
+        on an asset, is left out together with the separator beside it.</p>
     </details>
+
+    <?php // {TYPE} is an ASSET's type. On a shot it has no value, so a shots
+          // template that uses it almost certainly wanted the department in the
+          // step code instead (MSD: CH_SH, Character Shading). Said, not refused. ?>
+    <?php if (stripos($naming['shots'], '{TYPE}') !== false || stripos($naming['shots'], '{ASSET}') !== false): ?>
+      <p class="flash flash-warn small">
+        The shots template uses <code>{TYPE}</code> or <code>{ASSET}</code>, which only mean something
+        for assets, so on shots they are left out. To put the department in a shot's file name
+        (MSD_SH220_<strong>CH_SH</strong>_V01_AA), write it into the step's code below, for example
+        <code>CH_LO</code> for CH layout.
+      </p>
+    <?php endif; ?>
 
     <?php if ($namingSteps): ?>
       <h4>Step codes</h4>
-      <p class="muted small">What {STEP} becomes for each step. Guessed from the name until you type one.</p>
+      <p class="muted small">What {STEP} becomes for each step. Guessed from the name until you type one.
+        A code can carry the department too, like <code>CH_LO</code> or <code>BG_CL</code>.</p>
       <div class="naming-codes">
         <?php foreach ($namingSteps as $s):
           $saved = (string)($naming['codes']['steps'][(string)$s['id']] ?? ''); ?>

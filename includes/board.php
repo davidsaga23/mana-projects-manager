@@ -1689,11 +1689,15 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . ' placeholder="What to change… paste an image straight in, type @ to name somebody">'
                   . '</textarea></label>'
                   . '<label class="board-comment-files">Attach files'
-                  . '<input type="file" name="attachments[]" multiple'
-                  . ' data-drop="Drop reference here">'
+                  // ⚠ data-no-drop: assets/dropzone.js leaves this one alone. The
+                  // review keeps ONE list of its files (pasted, picked or dropped
+                  // anywhere on the form) and draws them as thumbnails; a drop
+                  // zone keeping a second list of the same input lost the pasted
+                  // ones the moment a file was picked.
+                  . '<input type="file" name="attachments[]" multiple data-no-drop>'
                   . '</label>'
-                  // Pasted and picked files as small thumbnails, each with an ×
-                  // (David, 2026-10-22). Drawn by assets/board-screen.js.
+                  // Pasted, picked and dropped files as small thumbnails, each
+                  // with an × (David, 2026-10-22). Drawn by assets/board-screen.js.
                   . '<div class="board-review-thumbs" hidden></div>'
                   . '<p class="muted small">Pasted images and picked files go with the review. '
                   . 'Naming somebody rings their bell and emails them.</p>'
