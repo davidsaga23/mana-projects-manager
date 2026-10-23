@@ -131,6 +131,10 @@
         '</div>';
       zone.querySelector('strong').textContent =
         picker.getAttribute('data-drop') || 'Drop files here';
+      // Say that pasting works. Nobody tries it unless they are told, which is
+      // how this was asked for twice.
+      const also = zone.querySelector('.dropzone-say .muted');
+      if (also) also.textContent = 'paste a screenshot, or choose from your computer';
       picker.parentNode.insertBefore(zone, picker);
       zone.appendChild(picker);
       // ⚠ A LABEL ALREADY DOES THIS. These zones sit inside <label>Attach
@@ -159,6 +163,35 @@
         }
       });
     }
+
+    // --- pasting a screenshot -------------------------------------------------
+    //
+    // David, 2026-10-23: "I can't just paste an image in the clipboard in this
+    // context", and then, after drag-and-drop arrived, "still can't just paste
+    // an image inline". Dropping is not pasting: a screenshot taken with the
+    // snipping tool is ON THE CLIPBOARD and has no file on disk to drag.
+    //
+    // ⚠ BOUND ON THE FORM, NOT THE TEXTAREA, so it works wherever the cursor
+    // happens to be — the title, the notes, the comment box. And TEXT IS LEFT
+    // ALONE: only clipboard items that are image FILES are taken, so pasting a
+    // link or a paragraph still pastes a link or a paragraph.
+    form.addEventListener('paste', (e) => {
+      if (!e.clipboardData) return;
+      const images = [];
+      Array.prototype.forEach.call(e.clipboardData.items || [], (it) => {
+        if (it.kind === 'file' && /^image\//.test(it.type)) {
+          const f = it.getAsFile();
+          if (f) images.push(f);
+        }
+      });
+      if (!images.length) return;
+      e.preventDefault();
+      // Screenshots all arrive called "image.png"; numbered so three are three.
+      addFiles(images.map((f, i) => {
+        const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+        return new File([f], 'pasted-' + (files.length + i + 1) + '.' + ext, { type: f.type });
+      }));
+    });
 
     // Used when a modal is opened or cancelled, so a previous attempt doesn't
     // linger in the fields.
