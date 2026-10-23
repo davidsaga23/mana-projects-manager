@@ -97,7 +97,7 @@ function save_ticket_attachments(PDO $pdo, array $files, int $ticketId, ?int $co
  * second copy of it is a second place for someone to leave out the MIME check.
  * Only the destination table and its foreign key differ.
  *
- * @param string $table    'ticket_attachments' or 'project_attachments'
+ * @param string $table    'ticket_attachments', 'project_attachments' or 'bug_attachments'
  * @param string $fkColumn the owning column in that table
  */
 function save_attachments(PDO $pdo, array $files, string $table, string $fkColumn,
@@ -105,7 +105,7 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
     global $config;
 
     // Whitelisted, never interpolated from anything a request controls.
-    if (!in_array($table, ['ticket_attachments', 'project_attachments'], true)) {
+    if (!in_array($table, ['ticket_attachments', 'project_attachments', 'bug_attachments'], true)) {
         return ['saved' => 0, 'errors' => ['Unknown attachment type, nothing was saved.']];
     }
     $hasComment = $table === 'ticket_attachments';

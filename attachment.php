@@ -15,16 +15,25 @@ require_login();
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { http_response_code(400); exit('Bad request'); }
 
-// Two kinds of owner, one serving route. ?kind=project reads the brief's table;
-// anything else reads a ticket's. Whitelisted rather than interpolated — the
-// table name comes from this file, never from the request.
-$kind = ($_GET['kind'] ?? '') === 'project' ? 'project' : 'ticket';
-$table = $kind === 'project' ? 'project_attachments' : 'ticket_attachments';
+// Three kinds of owner, one serving route. ?kind=project reads the brief's
+// table, ?kind=bug a bug report's (migration 062); anything else reads a
+// ticket's. Whitelisted rather than interpolated — the table name comes from
+// this file, never from the request.
+$kind = (string)($_GET['kind'] ?? '');
+$table = ['project' => 'project_attachments', 'bug' => 'bug_attachments'][$kind] ?? 'ticket_attachments';
 
-$q = $pdo->prepare("SELECT stored_name, original_name, mime_type FROM {$table} WHERE id = ?");
+$q = $pdo->prepare("SELECT stored_name, original_name, mime_type, uploaded_by FROM {$table} WHERE id = ?");
 $q->execute([$id]);
 $a = $q->fetch();
 if (!$a) { http_response_code(404); exit('Not found'); }
+// A bug's screenshot may show anything on the reporter's screen, a rate
+// included, so it is for the person who filed it and the admins who read the
+// reports — the same people bugs.php shows the report to.
+if ($table === 'bug_attachments' && !is_admin()
+    && (int)$a['uploaded_by'] !== (int)($_SESSION['user_id'] ?? 0)) {
+    http_response_code(404);
+    exit('Not found');
+}
 
 $path = upload_dir_path() . '/' . $a['stored_name'];
 // basename() guards against any path traversal sneaking in through stored_name.

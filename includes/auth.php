@@ -475,6 +475,12 @@ function artist_may_post(): bool {
         // in board_comment.php: the show must be one board_projects() returns
         // for this account, and the step and item must be that show's.
         'board_comment.php' => ['add_comment'],
+        // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
+        // About the APPLICATION, not anyone's work, so it writes nothing an
+        // artist could not otherwise touch: one new row in bug_reports, filed
+        // under their own name by bugs.php. Closing a report is admin-only and
+        // checked there, so set_status is deliberately not in this list.
+        'bugs.php' => ['report_bug'],
     ];
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.
