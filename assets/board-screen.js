@@ -884,6 +884,22 @@
     return b + ' B';
   }
 
+  /**
+   * " · about 3 min left", from the average speed since the upload began.
+   *
+   * David, 2026-10-23: "and include time remaining". Nothing for the first two
+   * seconds — the opening burst fills the browser's buffer, not the wire, and
+   * an estimate built on it says "2 s left" for a ten-minute file.
+   */
+  function timeLeft(loaded, total, started) {
+    var secs = (Date.now() - started) / 1000;
+    if (secs < 2 || loaded <= 0) return '';
+    var left = Math.round((total - loaded) / (loaded / secs));
+    if (left < 60) return ' · ' + Math.max(left, 1) + ' s left';
+    if (left < 3600) return ' · about ' + Math.round(left / 60) + ' min left';
+    return ' · about ' + Math.floor(left / 3600) + ' h ' + Math.round((left % 3600) / 60) + ' min left';
+  }
+
   document.addEventListener('submit', function (e) {
     var form = e.target.closest
       ? e.target.closest('.board-comment-form, .board-version-form') : null;
@@ -956,6 +972,7 @@
     }
 
     var xhr = new XMLHttpRequest();
+    var started = Date.now();
     xhr.open('POST', spec.url, true);
     xhr.upload.addEventListener('progress', function (ev) {
       if (!fill || !ev.lengthComputable) return;
@@ -966,6 +983,7 @@
       // saying "done" there would be the lie the bar exists to prevent.
       say.textContent = pct < 100
         ? 'Uploading… ' + pct + '% (' + humanSize(ev.loaded) + ' of ' + humanSize(ev.total) + ')'
+          + timeLeft(ev.loaded, ev.total, started)
         : 'Saving on the server…';
     });
     xhr.addEventListener('load', function () {
