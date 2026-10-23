@@ -189,6 +189,34 @@ th {
 /* Brand lockup — logo beside the product name, on every page */
 .brand { display: inline-flex; align-items: center; gap: 10px; }
 .site-logo { height: 24px; width: auto; display: block; }
+
+/* The A, cut out of the square lockup that also carries the word ANIMA.
+   ⚠ THESE FRACTIONS WERE MEASURED OFF assets/logo.webp, not guessed: the
+   artwork is 1254×1254, the A occupies x 208–1027 and y 194–896, and the
+   52-row blank band at y 897–948 is what separates it from the wordmark. So
+   the A is 65.4% of the width and 56.1% of the height, starting 16.6% in and
+   15.5% down. Replace the artwork and these have to be measured again.
+   --logo-size is the whole square scaled; it is the only number to change. */
+.site-logo-crop {
+  --logo-size: 46px;
+  display: inline-block; position: relative; overflow: hidden;
+  width: calc(var(--logo-size) * 0.654);
+  height: calc(var(--logo-size) * 0.561);
+  flex: 0 0 auto;
+}
+.site-logo-crop img {
+  position: absolute; display: block;
+  width: var(--logo-size); height: var(--logo-size);
+  left: calc(var(--logo-size) * -0.166);
+  top: calc(var(--logo-size) * -0.155);
+  /* The artwork carries its own near-black field (#151515), which is invisible
+     on the page background but shows as a dark rectangle on the login panel.
+     `lighten` takes whichever is brighter per pixel: the backing loses to any
+     surface in this app, and the cream-and-orange A wins everywhere. Safe only
+     because every surface here is darker than the mark. */
+  mix-blend-mode: lighten;
+}
+
 .site-logo-text {
   font-weight: 800; letter-spacing: .06em; font-size: 17px;
   font-style: italic; color: var(--text);
@@ -197,8 +225,13 @@ th {
 .brand-name .muted { font-weight: 400; }
 .login-brand { text-align: center; margin-bottom: 14px; }
 .site-logo-lg { height: 42px; margin: 0 auto; }
+/* After .site-logo-lg, which would otherwise force a height onto the cropping
+   box and squash the A. The login screen gets a bigger mark: it is the first
+   thing anybody sees, and there is room. */
+.site-logo-crop.site-logo-lg { --logo-size: 120px; height: calc(var(--logo-size) * 0.561); }
 @media (max-width: 520px) {
   .site-logo { height: 20px; }
+  .site-logo-crop { --logo-size: 38px; }
   .brand-name { font-size: 16px; }
   .brand-name .muted { display: none; }
 }

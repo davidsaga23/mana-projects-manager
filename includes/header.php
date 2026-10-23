@@ -51,6 +51,8 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($pageTitle) ?> · Anima | Project manager</title>
+<?php // The square lockup is already a tab icon: dark field, centred mark. ?>
+<link rel="icon" href="assets/logo.webp<?= asset_ver('logo.webp') ?>" type="image/webp">
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>
