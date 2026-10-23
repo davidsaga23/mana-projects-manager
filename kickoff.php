@@ -17,6 +17,12 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/kickoff.php';
+// Reached from the Finance tabs as well as the production side since
+// 2026-10-23, and it draws whichever bar it was reached from. ⚠ REQUIRED, NOT
+// LEFT TO function_exists(): without this the finance branch below would fail
+// its guard silently and draw the PRODUCTION bar, so a finance tab would look
+// like it had thrown you back to the other side of the project.
+require_once __DIR__ . '/includes/finance_nav.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -103,7 +109,21 @@ $pageTitle = 'Kick-off · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
 ?>
 
-<?php project_nav($project, 'overview'); ?>
+<?php // ⚠ WHICHEVER BAR IT WAS REACHED FROM. This page hangs off both sides of
+      // a project: the Projects list and the sign-off email lead here from the
+      // production side, and since 2026-10-23 the Finance tabs do too. Drawing
+      // one fixed bar would have sent somebody who clicked a finance tab back
+      // to the production side without saying so. Same page, same data; only
+      // the bar above it differs, exactly as crew.php does. ?>
+<?php // is_admin(), the same rule project_section_nav() uses to offer the
+      // finance side at all — so a hand-typed &section=finance cannot put a
+      // bar of money tabs in front of somebody who has no door to them.
+      ?>
+<?php if (($_GET['section'] ?? '') === 'finance' && is_admin()): ?>
+  <?php finance_nav($project, 'kickoff'); ?>
+<?php else: ?>
+  <?php project_nav($project, 'overview'); ?>
+<?php endif; ?>
 <h2 class="wizard-title">Kick-off <span class="muted">· <?= e($project['name']) ?></span></h2>
 
 <?php if (!$ready): ?>
