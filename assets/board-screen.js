@@ -590,6 +590,7 @@
   function panelOpen(btn, tab, reviewsOf) {
     if (!panel) return;
     cameFrom = btn;
+    tlModal = null;      // a pop-up from the last task went with its contents
     panelInner.innerHTML = '<p class="muted small">Opening…</p>';
     panel.hidden = false;
     if (veil) veil.hidden = false;
@@ -626,6 +627,7 @@
     panel.hidden = true;
     if (veil) veil.hidden = true;
     document.body.classList.remove('has-board-panel');
+    tlModal = null;      // went with the panel's contents
     panelInner.innerHTML = '';
     if (cameFrom) { cameFrom.focus(); cameFrom = null; }
   }
@@ -972,6 +974,78 @@
     form._reviewFiles.splice(parseInt(x.getAttribute('data-thumb'), 10), 1);
     reviewSync(form);
   });
+
+  // --- the task's Timeline: every entry opens in a pop-up --------------------
+  //
+  // David, 2026-10-22: "in every scroll I can access virtually anything that
+  // will open with a pop up so I don't have to leave the timeline. Everything
+  // should be interactive." Each entry carries its whole content in a
+  // <template>; clicking the entry shows it over the panel. Links, thumbnails
+  // and buttons INSIDE an entry keep their own job — a vignette expands in the
+  // lightbox, a link opens — so only a click on the entry itself opens this.
+  var tlModal = null;
+
+  function tlClose() {
+    if (!tlModal) return;
+    tlModal.remove();
+    tlModal = null;
+  }
+
+  function tlOpen(entry) {
+    var tpl = entry.querySelector('template.tl-pop');
+    if (!tpl || !panelInner) return;
+    tlClose();
+    tlModal = document.createElement('div');
+    tlModal.className = 'tl-modal-veil';
+    var box = document.createElement('div');
+    box.className = 'tl-modal';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'tl-modal-close';
+    x.setAttribute('aria-label', 'Close');
+    x.textContent = '×';
+    box.appendChild(x);
+    box.appendChild(tpl.content.cloneNode(true));
+    tlModal.appendChild(box);
+    // Inside the panel, so the panel's own handlers (the jump to a tab) see
+    // what is clicked in it.
+    panelInner.appendChild(tlModal);
+    x.focus();
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (tlModal) {
+      // A button that goes to another tab has already done so (the panel's
+      // handler runs first); the pop-up has nothing left to show.
+      if (e.target === tlModal || e.target.closest('.tl-modal-close') || e.target.closest('.tl-go')) {
+        tlClose();
+      }
+      return;
+    }
+    var entry = e.target.closest('.tl-entry');
+    if (!entry || e.target.closest('a, button, video, input, select, textarea')) return;
+    tlOpen(entry);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    var entry = e.target.closest ? e.target.closest('.tl-entry') : null;
+    if (entry && !tlModal && (e.key === 'Enter' || e.key === ' ') && e.target === entry) {
+      e.preventDefault();
+      tlOpen(entry);
+    }
+  });
+
+  // Escape closes the pop-up and nothing else — not the panel behind it. A
+  // picture expanded from inside the pop-up closes first, by its own handler.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !tlModal) return;
+    if (document.body.classList.contains('lightbox-lock')) return;
+    e.stopImmediatePropagation();
+    tlClose();
+  }, true);
 
   (function openFromUrl() {
     var want = new URLSearchParams(window.location.search).get('open');

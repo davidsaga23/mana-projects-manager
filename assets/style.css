@@ -3949,3 +3949,75 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .board-version-link, .board-notes-btn { height: 26px; min-height: 26px; margin: 0; line-height: 1; }
 .board-notes-btn { width: 26px; min-width: 26px; padding: 0; }
 .board-grid-head > div:nth-child(2) { text-align: center; }
+
+/* THE TASK'S TIMELINE (David, 2026-10-22): a vertical line, newest at the top,
+   a dot per event in the colour of its kind, a small date above one line of
+   what happened. Every entry is clickable and opens its pop-up. */
+.tl-feed { list-style: none; margin: 4px 0 0; padding: 0 0 0 22px; position: relative; }
+.tl-feed::before {
+  content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px;
+  background: var(--border); border-radius: 2px;
+}
+.tl-entry {
+  position: relative; margin: 0 0 6px; padding: 8px 10px; border-radius: 8px;
+  cursor: pointer; border: 1px solid transparent;
+}
+.tl-entry:hover, .tl-entry:focus-visible { background: var(--surface-2); border-color: var(--border); outline: none; }
+.tl-dot {
+  position: absolute; left: -20px; top: 13px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--border-strong); border: 2px solid var(--surface);
+}
+.tl-status .tl-dot   { background: var(--primary); }
+.tl-version .tl-dot  { background: var(--ok); }
+.tl-review .tl-dot   { background: var(--warn); }
+.tl-comment .tl-dot  { background: #a371f7; }
+.tl-assignee .tl-dot { background: #58a6ff; }
+.tl-due .tl-dot      { background: #f0883e; }
+.tl-notes .tl-dot, .tl-link .tl-dot { background: var(--text-2); }
+.tl-meta { display: flex; gap: 8px; align-items: baseline; margin-bottom: 2px; }
+.tl-kind {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.tl-review .tl-kind { color: var(--warn); }
+.tl-when { font-size: 11px; color: var(--faint); }
+.tl-title { font-size: 13.5px; color: var(--text-2); }
+.tl-title strong { color: var(--text); }
+.tl-snippet { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.tl-files { display: inline-block; margin-top: 4px; }
+/* The vignette: small, and expands in the lightbox when clicked. */
+.tl-thumb { display: inline-block; margin-top: 6px; }
+.tl-thumb img {
+  display: block; width: 120px; height: 72px; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.tl-thumb:hover img { border-color: var(--primary); }
+
+/* The pop-up, over the panel, so the timeline stays where it was. */
+.tl-modal-veil {
+  position: fixed; inset: 0; z-index: 5; background: rgba(0, 0, 0, .55);
+  display: flex; align-items: flex-start; justify-content: center; padding: 60px 20px 20px;
+}
+.tl-modal {
+  position: relative; width: min(680px, 100%); max-height: calc(100vh - 90px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px;
+  padding: 18px 20px 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+.tl-modal-close {
+  position: absolute; top: 10px; right: 12px; width: 30px; height: 30px; margin: 0; padding: 0;
+  border-radius: 8px; background: transparent; color: var(--muted); font-size: 20px; line-height: 1;
+}
+.tl-modal-close:hover { background: var(--surface-2); color: var(--text); }
+.tl-pop-head { display: flex; gap: 8px; align-items: baseline; padding-right: 36px; }
+.tl-pop-title { margin: 6px 0 12px; font-size: 16px; font-weight: 500; color: var(--text-2); }
+.tl-pop-title strong { color: var(--text); }
+.tl-pop-change { font-size: 15px; margin: 0 0 8px; }
+.tl-pop-text { margin: 10px 0; font-size: 14px; line-height: 1.5; }
+.tl-was { color: var(--muted); text-decoration: line-through; }
+.tl-pop-media { display: block; margin: 4px 0 8px; }
+.tl-pop-media img, video.tl-pop-media { display: block; max-width: 100%; border-radius: 8px; }
+.tl-pop-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tl-go {
+  margin: 0; min-height: 30px; padding: 4px 12px; border-radius: 7px; font-size: 13px;
+  background: var(--primary-tint); color: var(--primary); border: 1px solid transparent;
+}
+.tl-go:hover { background: var(--primary-fill); color: var(--on-primary); }

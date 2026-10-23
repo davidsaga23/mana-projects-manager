@@ -47,6 +47,7 @@ require_once __DIR__ . '/grid.php';        // step_covers_item(), the one scope 
 require_once __DIR__ . '/tickets.php';
 require_once __DIR__ . '/notify.php';     // the bell beside your name (migration 060)
 require_once __DIR__ . '/uploads.php';    // version_label(), attachment_is_image() for the Version column
+require_once __DIR__ . '/task_events.php'; // the task's Timeline: assignee, due, note and link changes (066)
 
 /* ---------------------------------------------------------------------------
  * The three phases, named as the studio names them.
@@ -1583,4 +1584,247 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                . '</script>';
     }
     return $form . $out;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE TASK'S TIMELINE (David, 2026-10-22).
+ *
+ * "Let's change Activity for Timeline and treat it like a vertical timeline
+ * with the most recent at the top ... new versions (with vignettes, clickable to
+ * expand), status changes, reassignments, review notes, notes, etc so in every
+ * scroll I can access virtually anything that will open with a pop up so I
+ * don't have to leave the timeline. Everything should be interactive."
+ *
+ * ⚠ NOTHING NEW IS STORED FOR THIS EXCEPT THE ROW CHANGES (migration 066). Every
+ * other entry is read from where it already lives — progress_log for statuses,
+ * progress_versions for versions, ticket_comments for comments and reviews — so
+ * the timeline can never disagree with the tab that owns the thing.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Everything that happened to one task, NEWEST FIRST, each entry
+ * ['at' => 'Y-m-d H:i:s', 'type' => status|version|comment|review|assignee|due|notes|link, ...].
+ */
+function board_task_timeline(PDO $pdo, int $projectId, int $stepId, string $itemKey): array {
+    $out = [];
+    $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+
+    // Statuses: the same rows the old Activity tab drew, all of them now.
+    if (function_exists('activity_available') && activity_available($pdo)) {
+        try {
+            $q = $pdo->prepare(
+                'SELECT id, old_status_name, new_status_name, change_type, source, changed_by,
+                        crew_name, created_at
+                   FROM progress_log
+                  WHERE project_id = ? AND step_id = ? AND item_key = ?'
+            );
+            $q->execute([$projectId, $stepId, $itemKey]);
+            foreach ($q as $r) {
+                $out[] = ['at' => (string)$r['created_at'], 'type' => 'status', 'sort' => (int)$r['id'],
+                          'who' => $r['changed_by'] ?: ($r['crew_name'] ?: 'Somebody'), 'row' => $r];
+            }
+        } catch (PDOException $e) {
+            // before migration 021
+        }
+    }
+
+    if ($pid > 0) {
+        foreach (board_task_versions($pdo, $pid) as $v) {
+            $out[] = ['at' => (string)$v['created_at'], 'type' => 'version', 'sort' => (int)$v['id'],
+                      'who' => $v['display_name'] ?? 'Someone', 'row' => $v];
+        }
+
+        $talk = board_task_comments($pdo, $pid);
+        foreach ($talk['comments'] as $c) {
+            $cid = (int)$c['id'];
+            $out[] = ['at' => (string)$c['created_at'],
+                      'type' => !empty($c['review_of']) ? 'review' : 'comment', 'sort' => $cid,
+                      'who' => $c['display_name'] ?? 'Someone', 'row' => $c,
+                      'named' => $talk['mentions'][$cid] ?? [], 'files' => $talk['files'][$cid] ?? []];
+        }
+
+        if (function_exists('task_events_available') && task_events_available($pdo)) {
+            $q = $pdo->prepare('SELECT * FROM progress_events WHERE progress_id = ?');
+            $q->execute([$pid]);
+            foreach ($q as $r) {
+                $out[] = ['at' => (string)$r['created_at'], 'type' => (string)$r['kind'], 'sort' => (int)$r['id'],
+                          'who' => $r['actor'] ?: 'Somebody', 'row' => $r];
+            }
+        }
+    }
+
+    // Newest first; within one second, by the order things were written.
+    usort($out, fn($a, $b) => [$b['at'], $b['sort']] <=> [$a['at'], $a['sort']]);
+    return $out;
+}
+
+/**
+ * The Timeline tab.
+ *
+ * Every entry is a button-like row: a dot on the line, a small date, one line
+ * saying what happened. Clicking it opens a pop-up over the panel with the whole
+ * thing — the full note, the full-size version, the files on a review, the
+ * before and after of a change — built from a <template> carried in the entry,
+ * so opening one costs no round trip. Thumbnails and files inside open the
+ * lightbox the rest of the board uses (`att-zoom`).
+ */
+function board_timeline_html(PDO $pdo, int $projectId, int $stepId, string $itemKey): string {
+    $entries = board_task_timeline($pdo, $projectId, $stepId, $itemKey);
+    $eventsOn = function_exists('task_events_available') && task_events_available($pdo);
+
+    $when = fn(string $at) => e(date('j M Y · g:i A', strtotime($at)));
+    $val  = fn($v, string $none) => trim((string)$v) !== '' ? e((string)$v) : '<span class="muted">' . e($none) . '</span>';
+
+    $labels = [
+        'status' => 'Status', 'version' => 'New version', 'comment' => 'Comment', 'review' => 'Review notes',
+        'assignee' => 'Reassigned', 'due' => 'Due date', 'notes' => 'Task note', 'link' => 'Link',
+    ];
+
+    $out = '';
+    if (!$entries) {
+        $out .= '<p class="muted small">Nothing has happened on this task yet. Status changes, versions, '
+              . 'comments and review notes appear here as they happen, newest at the top.</p>';
+    }
+    if (!$eventsOn) {
+        $out .= '<p class="muted small">Reassignments, due dates and note changes start appearing once '
+              . 'database update 066 has been applied.</p>';
+    }
+    if (!$entries) return $out;
+
+    $out .= '<ol class="tl-feed">';
+    foreach ($entries as $i => $en) {
+        $r = $en['row'];
+        $type = $en['type'];
+        $who = e((string)$en['who']);
+        $title = '';      // the one line in the feed
+        $preview = '';    // a little more, under it
+        $pop = '';        // the whole thing, in the pop-up
+
+        switch ($type) {
+            case 'status':
+                $from = trim((string)$r['old_status_name']);
+                $to = trim((string)$r['new_status_name']) ?: 'Not started';
+                $title = '<strong>' . $who . '</strong> moved it to <strong>' . e($to) . '</strong>';
+                $pop = '<p class="tl-pop-change">' . ($from !== '' ? e($from) : '<span class="muted">Not started</span>')
+                     . ' <span class="panel-sep">→</span> <strong>' . e($to) . '</strong></p>'
+                     . '<p class="muted small">By ' . $who
+                     . (($r['source'] ?? '') === 'import' ? ', from the Plaky import' : '')
+                     . (($r['change_type'] ?? '') === 'retake' ? '. This sent it back: a retake.' : '.') . '</p>';
+                break;
+
+            case 'version':
+                $vid = (int)$r['id'];
+                $url = 'attachment.php?kind=version&amp;id=' . $vid;
+                $name = e((string)$r['original_name']);
+                $label = e(version_label((int)$r['version_no']));
+                $isImg = attachment_is_image((string)($r['mime_type'] ?? ''));
+                $title = '<strong>' . $who . '</strong> sent <strong>' . $label . '</strong> for review';
+                if ($isImg) {
+                    // The vignette: clicking it expands it in the lightbox, the
+                    // rest of the entry opens the pop-up.
+                    $preview .= '<a href="' . $url . '" class="att-zoom tl-thumb" data-name="' . $name
+                              . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
+                }
+                if (trim((string)($r['note'] ?? '')) !== '') {
+                    $preview .= '<p class="tl-snippet">' . e(mb_strimwidth((string)$r['note'], 0, 140, '…')) . '</p>';
+                }
+                $media = $isImg
+                    ? '<a href="' . $url . '" class="att-zoom tl-pop-media" data-name="' . $name
+                      . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>'
+                    : (attachment_is_video((string)($r['mime_type'] ?? ''))
+                        ? '<video class="tl-pop-media" src="' . $url . '" controls preload="metadata"></video>'
+                        : '<a href="' . $url . '" class="file-link" target="_blank" rel="noopener">📄 ' . $name . '</a>');
+                $pop = $media
+                     . (trim((string)($r['note'] ?? '')) !== ''
+                        ? '<p class="tl-pop-text"><strong>What changed:</strong> ' . nl2br(e((string)$r['note'])) . '</p>' : '')
+                     . '<p class="muted small">' . $name . ' · ' . e(human_size((int)$r['file_size'])) . '</p>'
+                     . '<div class="tl-pop-actions">'
+                     . (trim((string)($r['link'] ?? '')) !== ''
+                        ? '<a class="version-files-btn" href="' . e((string)$r['link']) . '" target="_blank" rel="noopener">Open final files</a>' : '')
+                     . '<button type="button" class="panel-tab-link tl-go" data-tab="versions">See it in Versions and notes</button>'
+                     . '</div>';
+                break;
+
+            case 'comment':
+            case 'review':
+                $body = (string)$r['body'];
+                $isReview = $type === 'review';
+                $title = '<strong>' . $who . '</strong> '
+                       . ($isReview ? 'left review notes on <strong>' . e(version_label((int)$r['review_of'])) . '</strong>'
+                                    : 'commented');
+                if ($body !== '(attachment)') {
+                    $preview .= '<p class="tl-snippet">' . e(mb_strimwidth($body, 0, 140, '…')) . '</p>';
+                }
+                $files = '';
+                foreach ($en['files'] as $a) {
+                    ob_start();
+                    render_attachment($a, false);
+                    $files .= ob_get_clean();
+                }
+                if ($en['files']) {
+                    $preview .= '<span class="tl-files muted small">📎 ' . count($en['files']) . ' file'
+                              . (count($en['files']) === 1 ? '' : 's') . '</span>';
+                }
+                $pop = ($body !== '(attachment)'
+                        ? '<div class="comment-body tl-pop-text">' . ticket_render_body($body, $en['named']) . '</div>' : '')
+                     . ($files !== '' ? '<div class="attachment-grid">' . $files . '</div>' : '')
+                     . '<div class="tl-pop-actions"><button type="button" class="panel-tab-link tl-go" data-tab="'
+                     . ($isReview ? 'versions' : 'comments') . '">'
+                     . ($isReview ? 'See it in Versions and notes' : 'Reply in Comments') . '</button></div>';
+                break;
+
+            case 'assignee':
+                $title = '<strong>' . $who . '</strong> '
+                       . (trim((string)$r['new_value']) !== ''
+                          ? 'handed it to <strong>' . e((string)$r['new_value']) . '</strong>'
+                          : 'took it off ' . $val($r['old_value'], 'nobody'));
+                $pop = '<p class="tl-pop-change">' . $val($r['old_value'], 'Nobody') . ' <span class="panel-sep">→</span> <strong>'
+                     . $val($r['new_value'], 'Nobody') . '</strong></p>';
+                break;
+
+            case 'due':
+                $fmt = fn($d) => trim((string)$d) !== '' ? e(date('j M Y', strtotime((string)$d))) : '';
+                $title = '<strong>' . $who . '</strong> '
+                       . (trim((string)$r['new_value']) !== '' ? 'set it due <strong>' . $fmt($r['new_value']) . '</strong>'
+                                                                : 'cleared the due date');
+                $pop = '<p class="tl-pop-change">' . ($fmt($r['old_value']) ?: '<span class="muted">No date</span>')
+                     . ' <span class="panel-sep">→</span> <strong>' . ($fmt($r['new_value']) ?: 'No date') . '</strong></p>';
+                break;
+
+            case 'notes':
+            case 'link':
+                $what = $type === 'notes' ? 'the task note' : 'the link';
+                $title = '<strong>' . $who . '</strong> '
+                       . (trim((string)$r['new_value']) !== '' ? 'changed ' . $what : 'cleared ' . $what);
+                if (trim((string)$r['new_value']) !== '') {
+                    $preview .= '<p class="tl-snippet">' . e(mb_strimwidth((string)$r['new_value'], 0, 140, '…')) . '</p>';
+                }
+                $show = function ($v) use ($type, $val) {
+                    if (trim((string)$v) === '') return '<span class="muted">Empty</span>';
+                    return $type === 'link'
+                        ? '<a href="' . e((string)$v) . '" target="_blank" rel="noopener">' . e((string)$v) . '</a>'
+                        : nl2br(e((string)$v));
+                };
+                $pop = '<p class="muted small">Before</p><div class="tl-pop-text tl-was">' . $show($r['old_value']) . '</div>'
+                     . '<p class="muted small">After</p><div class="tl-pop-text">' . $show($r['new_value']) . '</div>';
+                break;
+
+            default:
+                continue 2;
+        }
+
+        $out .= '<li class="tl-entry tl-' . e($type) . '" tabindex="0" role="button"'
+              . ' aria-label="' . e(strip_tags($title)) . ', ' . $when($en['at']) . '. Open details.">'
+              . '<span class="tl-dot" aria-hidden="true"></span>'
+              . '<div class="tl-body">'
+              . '<div class="tl-meta"><span class="tl-kind">' . e($labels[$type] ?? $type) . '</span>'
+              . '<span class="tl-when">' . $when($en['at']) . '</span></div>'
+              . '<div class="tl-title">' . $title . '</div>' . $preview
+              . '</div>'
+              . '<template class="tl-pop"><div class="tl-pop-head"><span class="tl-kind">'
+              . e($labels[$type] ?? $type) . '</span><span class="tl-when">' . $when($en['at']) . '</span></div>'
+              . '<h3 class="tl-pop-title">' . $title . '</h3>' . $pop . '</template>'
+              . '</li>';
+    }
+    return $out . '</ol>';
 }
