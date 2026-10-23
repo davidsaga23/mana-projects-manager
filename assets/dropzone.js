@@ -37,7 +37,12 @@
     // data-no-drop: an input whose form already keeps its own list of files
     // (Spell's review form, with pasting and thumbnails). Two lists of one input
     // overwrite each other.
-    if (!input || input.getAttribute('data-drop-on') || input.hasAttribute('data-no-drop')) return;
+    // ⚠ data-filepicker BELONGS TO assets/tickets.js, which keeps its own list
+    // of files for its progress bar and its chips. Two components holding two
+    // lists of one input is the bug that put data-no-drop on the review form;
+    // that uploader grew its own zone on 2026-10-23 instead.
+    if (!input || input.getAttribute('data-drop-on') || input.hasAttribute('data-no-drop')
+        || input.hasAttribute('data-filepicker')) return;
     // DataTransfer is how a chosen list is written back to the input. Without
     // it the remove buttons would be a lie, so the native control stays.
     if (typeof DataTransfer === 'undefined') return;
@@ -111,8 +116,13 @@
 
     // Clicking anywhere in the zone opens the picker — except on a remove
     // button, which has already stopped the event.
+    // ⚠ A LABEL ALREADY DOES THIS. These zones sit inside <label>Attach
+    // files … <input></label>, and a click anywhere in a label activates its
+    // control — so calling click() as well opened the file chooser TWICE:
+    // you pick a file, and it asks again. Measured 2026-10-23.
+    var inLabel = !!(zone.closest('label') && zone.closest('label').contains(input));
     zone.addEventListener('click', function (e) {
-      if (e.target === input) return;
+      if (e.target === input || inLabel) return;
       input.click();
     });
 

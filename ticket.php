@@ -552,6 +552,7 @@ require __DIR__ . '/includes/header.php';
           // always happens is just something to read every time. ?>
     <label>Attach files
       <input type="file" name="attachments[]" multiple data-filepicker
+             data-drop="Drop a reference here"
              accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf">
     </label>
     <div class="file-list" data-filelist></div>
