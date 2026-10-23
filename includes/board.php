@@ -1534,7 +1534,9 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . '<label class="board-comment-files">Attach files'
                   . '<input type="file" name="attachments[]" multiple>'
                   . '</label>'
-                  . '<p class="muted small board-review-pasted" hidden></p>'
+                  // Pasted and picked files as small thumbnails, each with an ×
+                  // (David, 2026-10-22). Drawn by assets/board-screen.js.
+                  . '<div class="board-review-thumbs" hidden></div>'
                   . '<p class="muted small">Pasted images and picked files go with the review. '
                   . 'Naming somebody rings their bell and emails them.</p>'
                   . '<button type="submit" class="primary board-version-post">Post review</button>'

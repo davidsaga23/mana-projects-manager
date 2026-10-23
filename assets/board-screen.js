@@ -870,18 +870,70 @@
   // not a screen of four hundred rows with "somewhere in here" as the
   // instruction. The group it sits in has to be opened first, because the board
   // starts with every item collapsed.
-  // --- pasting a picture into a review -----------------------------------------
+  // --- the files going with a review --------------------------------------------
   //
   // David, 2026-10-22: "make sure you can just copy paste images directly into
-  // the text field". A pasted image is turned into a FILE on the review's own
-  // file input, so it travels exactly as a picked file does — one uploader, one
-  // MIME check on the server — and the line under the box says what is going.
+  // the text field", then "small vignettes of the pasted or attached files with
+  // a cross in the corner so you can easily delete them".
+  //
+  // ⚠ ONE LIST PER FORM, KEPT HERE, WRITTEN BACK TO THE INPUT. A file input
+  // REPLACES its files every time somebody picks, so a pasted screenshot would
+  // vanish the moment a file was chosen after it. So every paste and every pick
+  // adds to form._reviewFiles, every × takes one out, and the input is rewritten
+  // from that list each time — the files still travel as the input's own, one
+  // uploader and one MIME check on the server.
+  function reviewInput(form) {
+    return form ? form.querySelector('input[type="file"][name="attachments[]"]') : null;
+  }
+
+  function reviewSync(form) {
+    var input = reviewInput(form);
+    var list = form._reviewFiles || [];
+    if (input && typeof DataTransfer !== 'undefined') {
+      var dt = new DataTransfer();
+      list.forEach(function (f) { dt.items.add(f); });
+      input.files = dt.files;
+    }
+    var strip = form.querySelector('.board-review-thumbs');
+    if (!strip) return;
+    // Object URLs from the last drawing are let go, or each redraw leaks images.
+    (strip._urls || []).forEach(function (u) { URL.revokeObjectURL(u); });
+    strip._urls = [];
+    strip.innerHTML = '';
+    strip.hidden = list.length === 0;
+    list.forEach(function (f, i) {
+      var tile = document.createElement('div');
+      tile.className = 'review-thumb';
+      tile.title = f.name;
+      if (/^image\//.test(f.type)) {
+        var url = URL.createObjectURL(f);
+        strip._urls.push(url);
+        var img = document.createElement('img');
+        img.src = url;
+        img.alt = f.name;
+        tile.appendChild(img);
+      } else {
+        var name = document.createElement('span');
+        name.className = 'review-thumb-name';
+        name.textContent = f.name;
+        tile.appendChild(name);
+      }
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'review-thumb-x';
+      x.setAttribute('data-thumb', String(i));
+      x.setAttribute('aria-label', 'Remove ' + f.name);
+      x.textContent = '×';
+      tile.appendChild(x);
+      strip.appendChild(tile);
+    });
+  }
+
   document.addEventListener('paste', function (e) {
     var box = e.target.closest ? e.target.closest('.board-review-box') : null;
     if (!box || !e.clipboardData) return;
     var form = box.closest('form');
-    var input = form ? form.querySelector('input[type="file"][name="attachments[]"]') : null;
-    if (!input || typeof DataTransfer === 'undefined') return;
+    if (!reviewInput(form) || typeof DataTransfer === 'undefined') return;
 
     var images = [];
     Array.prototype.forEach.call(e.clipboardData.items || [], function (it) {
@@ -893,22 +945,32 @@
     if (!images.length) return;     // text pastes as text, untouched
     e.preventDefault();
 
-    var dt = new DataTransfer();
-    Array.prototype.forEach.call(input.files || [], function (f) { dt.items.add(f); });
-    images.forEach(function (f, i) {
+    form._reviewFiles = form._reviewFiles || [];
+    images.forEach(function (f) {
       // Screenshots all arrive as "image.png"; numbered so three are three.
       var ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
-      var name = 'pasted-' + (dt.items.length + 1) + '.' + ext;
-      dt.items.add(new File([f], name, { type: f.type }));
+      var n = form._reviewFiles.length + 1;
+      form._reviewFiles.push(new File([f], 'pasted-' + n + '.' + ext, { type: f.type }));
     });
-    input.files = dt.files;
+    reviewSync(form);
+  });
 
-    var said = form.querySelector('.board-review-pasted');
-    if (said) {
-      said.hidden = false;
-      said.textContent = 'Going with the review: '
-        + Array.prototype.map.call(input.files, function (f) { return f.name; }).join(', ');
-    }
+  // Picked files join the list instead of replacing it.
+  document.addEventListener('change', function (e) {
+    var input = e.target;
+    if (!input.matches || !input.matches('.board-review-form input[type="file"]')) return;
+    var form = input.closest('form');
+    form._reviewFiles = (form._reviewFiles || []).concat(Array.prototype.slice.call(input.files || []));
+    reviewSync(form);
+  });
+
+  document.addEventListener('click', function (e) {
+    var x = e.target.closest ? e.target.closest('.review-thumb-x') : null;
+    if (!x) return;
+    var form = x.closest('form');
+    if (!form || !form._reviewFiles) return;
+    form._reviewFiles.splice(parseInt(x.getAttribute('data-thumb'), 10), 1);
+    reviewSync(form);
   });
 
   (function openFromUrl() {
