@@ -3663,8 +3663,14 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bell-panel {
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
   width: 340px; max-height: 60vh; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 10px;
-  background: var(--surface-1); box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+  /* ⚠ --surface, NOT --surface-1, WHICH DOES NOT EXIST. It was written here
+     and CSS does what CSS does with an unknown custom property: nothing. The
+     panel had no background at all, so the table underneath read straight
+     through it (David, 2026-10-22: "too transparent I can't read"). Every other
+     floating panel in this file — the mention picker, the board's group menu —
+     is --surface over --border-strong, and this is now the same. */
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  background: var(--surface); box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
 }
 .bell-panel[hidden] { display: none; }
 .bell-head {
