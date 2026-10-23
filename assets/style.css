@@ -2562,7 +2562,15 @@ tr.col-hidden { display: none; }
   width: auto; margin: 0; padding: 0 5px; background: none; border: 0;
   color: var(--faint); font-size: 13px; line-height: 1; cursor: pointer;
 }
-.a-del:hover, .a-del:focus-visible { color: var(--danger); background: none; }
+/* ⚠ IT SHOULD LOOK DANGEROUS BEFORE IT IS PRESSED, not only after. This sits
+   one column from the Worked checkbox on a grid of 409 people, and until
+   2026-10-23 it was the same grey as everything around it — nothing about it
+   said that pressing it removes somebody for good. */
+.a-del { color: var(--muted); }
+.a-del:hover, .a-del:focus-visible {
+  color: var(--on-danger); background: var(--danger);
+  border-radius: 6px;
+}
 .a-del[disabled] { opacity: .4; cursor: default; }
 
 /* The grid fills the page rather than shrinking to its contents. min-width keeps
@@ -4163,6 +4171,31 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .naming-row { padding: 2px 0; }
 .naming-row.is-ok { color: var(--ok); }
 .naming-row.is-bad { color: var(--danger); font-weight: 600; }
+
+/* --- asking before something cannot be undone ---------------------------- */
+/* A native confirm() cannot be styled, cannot list anything, and puts the
+   keyboard on OK. This can do all three the other way round. */
+.confirm-dialog {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 20px 24px; width: min(440px, 92vw);
+}
+.confirm-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.confirm-dialog h3 { margin: 0 0 10px; font-size: 17px; }
+.confirm-who { margin: 0 0 10px; font-size: 14px; }
+.confirm-warn {
+  margin: 0 0 18px; padding: 9px 12px;
+  border-left: 3px solid var(--danger); border-radius: 4px;
+  background: var(--danger-tint, var(--surface-2));
+  font-size: 13px; line-height: 1.5;
+}
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.confirm-actions button { margin: 0; }
+.danger-btn {
+  background: transparent; color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.danger-btn:hover { background: var(--danger); color: var(--on-danger); }
 
 /* --- Copy URL, and the rows a copied link lands on ----------------------- */
 /* David asked for this button in four places on 2026-10-23 — the board column,

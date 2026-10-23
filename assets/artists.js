@@ -238,6 +238,56 @@
   // across every record of them; a delete does the same. The sentence says so,
   // with the shows named, because "remove Ana" and "remove Ana from four shows"
   // are different questions.
+  /**
+   * The question, in the page rather than in a native dialog.
+   *
+   * ⚠ THE KEYBOARD STARTS ON "KEEP THEM". window.confirm() puts it on OK, so
+   * an Enter pressed out of habit — after a filter, after an edit — removed
+   * somebody and there is no undo (David, 2026-10-23). Removing is now the
+   * deliberate click, and Escape keeps them too.
+   *
+   * Falls back to window.confirm where the dialog is missing, so this cannot be
+   * the reason a delete becomes impossible.
+   */
+  function askToRemove(name, detail) {
+    var box = document.getElementById('a-del-dialog');
+    if (!box || typeof box.showModal !== 'function') {
+      return Promise.resolve(window.confirm('Remove ' + name + '? ' + detail
+        + ' This cannot be undone.'));
+    }
+    document.getElementById('a-del-name').textContent = name;
+    document.getElementById('a-del-where').textContent = ' · ' + detail;
+
+    return new Promise(function (resolve) {
+      var yes = document.getElementById('a-del-yes');
+      var no  = document.getElementById('a-del-no');
+      var settled = false;
+      function done(answer) {
+        if (settled) return;        // 'cancel' then 'close' would arrive twice
+        settled = true;
+        yes.removeEventListener('click', onYes);
+        no.removeEventListener('click', onNo);
+        box.removeEventListener('cancel', onNo);
+        box.removeEventListener('close', onNo);
+        if (box.open) box.close();
+        resolve(answer);
+      }
+      function onYes() { done(true); }
+      function onNo() { done(false); }
+      yes.addEventListener('click', onYes);
+      no.addEventListener('click', onNo);
+      // ⚠ BOTH EVENTS, because 'close' cannot be relied on. The spec says
+      // dialog.close() fires it; measured on 2026-10-23, at least one engine
+      // this app is viewed in fires NEITHER on a programmatic close. Escape
+      // fires 'cancel' first, which is the one that actually arrives — and if
+      // this promise never settled, the × would stay disabled until a reload.
+      box.addEventListener('cancel', onNo);
+      box.addEventListener('close', onNo);
+      box.showModal();
+      no.focus();
+    });
+  }
+
   document.addEventListener('click', function (ev) {
     var btn = ev.target.closest ? ev.target.closest('.a-del') : null;
     if (!btn) return;
@@ -259,12 +309,10 @@
         var where = d.projects && d.projects.length
           ? ' on ' + d.projects.join(', ')
           : ', who is on no show';
-        var msg = 'Remove ' + d.name + ' from the artist database?' + String.fromCharCode(10, 10)
-                + d.records + (d.records === 1 ? ' record' : ' records') + where + '.'
-                + String.fromCharCode(10)
-                + 'This cannot be undone.';
-        if (!window.confirm(msg)) return null;
-        return send(true);
+        return askToRemove(
+          d.name,
+          d.records + (d.records === 1 ? ' record' : ' records') + where + '.'
+        ).then(function (yes) { return yes ? send(true) : null; });
       })
       .then(function (d) {
         if (!d) return;

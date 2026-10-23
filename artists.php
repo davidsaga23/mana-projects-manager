@@ -599,6 +599,24 @@ require __DIR__ . '/includes/header.php';
 
   <?php // ---- the one editor ------------------------------------------------ ?>
   <?php if (can_edit()): ?>
+    <?php // ⚠ NOT window.confirm() ANY MORE (David, 2026-10-23: "let's shoot a
+          // warning before instantly deleting any entries in the Artist pool").
+          // There WAS a confirm, and it said the right things — but a native
+          // dialog puts the keyboard on OK, so one stray Enter after any other
+          // action removed somebody from 409 rows with no undo. This one opens
+          // with CANCEL focused and makes Remove the deliberate click, and it
+          // can say what a native dialog cannot: the shows, in a list, and the
+          // fact that there is no undo, in the colour that means it. ?>
+    <dialog id="a-del-dialog" class="confirm-dialog">
+      <h3>Remove from the artist database?</h3>
+      <p class="confirm-who"><strong id="a-del-name"></strong><span id="a-del-where" class="muted"></span></p>
+      <p class="confirm-warn">This cannot be undone. Their rate, their stage history and
+         every record of them goes.</p>
+      <div class="confirm-actions">
+        <button type="button" id="a-del-no" class="primary" autofocus>Keep them</button>
+        <button type="button" id="a-del-yes" class="danger-btn">Remove</button>
+      </div>
+    </dialog>
     <?php // gridtools first: artists.js calls into it as it loads. ?>
     <script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
     <script src="assets/artists.js<?= asset_ver('artists.js') ?>"></script>
