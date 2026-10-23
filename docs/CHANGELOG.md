@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-23 — Invoice notes show in the invoice list *(no migration)*
+
+- **A project's Finance management → Invoices list now prints each invoice's notes**, as a small
+  grey line under the person's name (the way the expense projection shows its own notes). The
+  Record invoices form always saved a Notes box and the finance database always had the column;
+  the list just never showed it, so a note was effectively write-only.
+- The Notes box in Record invoices is the last one on the right of the grid; it now has a
+  placeholder and the help text above the form says where it is.
+
 ## 2026-10-23 — Upload progress bar on Spell's task panel *(no migration)*
 
 - **Uploading a version, a review or a comment with files now shows a progress bar** with the
