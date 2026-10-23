@@ -88,20 +88,75 @@
       }
     }
 
-    if (picker) {
-      picker.addEventListener('change', () => {
-        for (const f of picker.files) {
-          if (files.length >= MAX_FILES) {
-            alert('You can attach at most ' + MAX_FILES + ' files.');
-            break;
-          }
-          // Skip exact duplicates (same name and size) from repeated picks.
-          if (files.some(x => x.name === f.name && x.size === f.size)) continue;
-          files.push(f);
+    /** Take a FileList from either route — the picker, or a drop. */
+    function addFiles(incoming) {
+      for (const f of incoming) {
+        if (files.length >= MAX_FILES) {
+          alert('You can attach at most ' + MAX_FILES + ' files.');
+          break;
         }
-        // Clear the native input, so re-picking the same file still fires change.
-        picker.value = '';
-        render();
+        // Skip exact duplicates (same name and size) from repeated picks.
+        if (files.some(x => x.name === f.name && x.size === f.size)) continue;
+        files.push(f);
+      }
+      // Clear the native input, so re-picking the same file still fires change.
+      if (picker) picker.value = '';
+      render();
+    }
+
+    if (picker) {
+      picker.addEventListener('change', () => addFiles(picker.files));
+
+      // --- "Drop files here" ---------------------------------------------------
+      //
+      // David, 2026-10-23, on the comment box of a ticket: "I can't just paste
+      // an image in the clipboard in this context, let's also add the drop
+      // zone".
+      //
+      // ⚠ BUILT HERE RATHER THAN BY assets/dropzone.js, and that is the whole
+      // point. This form already keeps its own `files` array — it has to, so a
+      // chip can be removed one at a time and so the XHR below can report
+      // progress — and a second component keeping a second list of the same
+      // input is exactly what went wrong on the review form in Spell. So the
+      // zone is only a surface: it drops into addFiles() and the chips under it
+      // stay the one list there is.
+      //
+      // The same classes as everywhere else, so it is the same thing to look at.
+      const zone = document.createElement('div');
+      zone.className = 'dropzone';
+      zone.innerHTML =
+        '<div class="dropzone-say">' +
+          '<strong></strong>' +
+          '<span class="muted small">or <span class="dropzone-link">choose from your computer</span></span>' +
+        '</div>';
+      zone.querySelector('strong').textContent =
+        picker.getAttribute('data-drop') || 'Drop files here';
+      picker.parentNode.insertBefore(zone, picker);
+      zone.appendChild(picker);
+      // ⚠ A LABEL ALREADY DOES THIS. These zones sit inside <label>Attach
+      // files … <input></label>, and a click anywhere in a label activates its
+      // control — so calling click() as well opened the file chooser TWICE:
+      // you pick a file, and it asks again. Measured 2026-10-23.
+      const inLabel = !!(zone.closest('label') && zone.closest('label').contains(picker));
+      zone.addEventListener('click', (e) => {
+        if (e.target === picker || inLabel) return;
+        picker.click();
+      });
+
+      ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        zone.classList.add('is-over');
+      }));
+      ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        // dragleave fires when crossing a child, so only let go on the way out.
+        if (ev === 'dragleave' && zone.contains(e.relatedTarget)) return;
+        zone.classList.remove('is-over');
+      }));
+      zone.addEventListener('drop', (e) => {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+          addFiles(e.dataTransfer.files);
+        }
       });
     }
 
