@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Spell: send a version for review, and name who should look *(no migration)*
+
+- **The Versions tab's button now says "Send for review"**, and the form sits at the top of the
+  tab, above the versions, instead of under every preview.
+- **Type @ in "What changed" to name a reviewer**, with the same picker as comments. They get a
+  bell notification and an email, and their name is highlighted on the version.
+- **The task panel opens to half the screen** (at least 480px wide), so previews have room.
+
 ## 2026-10-22 — Bug reports reach Claude; videos wait for David's description *(needs migration 064)*
 
 - **The Section list on the 🐞 form only offers screens the person can open.** An artist no longer

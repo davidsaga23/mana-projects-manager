@@ -1209,6 +1209,10 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     $progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
     $versions = board_task_versions($pdo, (int)$progressId);
     $myUserId = (int)($_SESSION['user_id'] ?? 0);
+    // The people a note can name (David, 2026-10-22: "make sure we can tag people
+    // in the versions"). The same list the comment box offers and the parser
+    // resolves against, so a highlighted name is always somebody who was told.
+    $people = board_assignees($pdo, $projectId);
 
     $out = '';
     if (!$versions) {
@@ -1251,16 +1255,25 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             $out .= '<div class="version-meta muted small"><span title="' . $name . '">' . $name
                   . '</span> · ' . e(human_size((int)$v['file_size'])) . '</div>';
             if (trim((string)($v['note'] ?? '')) !== '') {
-                $out .= '<p class="version-note">' . nl2br(e((string)$v['note'])) . '</p>';
+                // Names resolved at render time rather than stored: a version note
+                // is not a comment and has no row in ticket_mentions, and the
+                // parser is the same one that decided who to tell on upload.
+                $note = (string)$v['note'];
+                $out .= '<p class="version-note">'
+                      . ticket_render_body($note, ticket_parse_mentions($note, $people)) . '</p>';
             }
             $out .= '</li>';
         }
         $out .= '</ul>';
     }
 
+    // ⚠ THE FORM GOES ON TOP (David, 2026-10-22: "make sure this part is always
+    // at the top"). Versions are newest first and each carries a full-size
+    // preview, so below them the form sank further with every round of review.
+    $form = '';
     if ($mayPost) {
         $next = version_label(count($versions) > 0 ? ((int)$versions[0]['version_no']) + 1 : 1);
-        $out .= '<form class="comment-form board-version-form" method="post"'
+        $form = '<form class="comment-form board-version-form" method="post"'
               . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
               . ' data-item="' . e($itemKey) . '">'
@@ -1269,11 +1282,19 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
               . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple>'
               . '</label>'
               . '<label>What changed <small class="muted">(optional)</small>'
-              . '<textarea name="note" rows="2" placeholder="Fixed the camera move on the tail"></textarea>'
+              // board-comment-box is the hook assets/board-screen.js arms the @
+              // picker on, and the one it refocuses after a post.
+              . '<textarea name="note" rows="2" class="board-comment-box"'
+              . ' placeholder="Fixed the camera move on the tail… type @ to name a reviewer"></textarea>'
               . '</label>'
-              . '<p class="muted small">Each file is its own version, in the order you pick them.</p>'
-              . '<button type="submit" class="primary board-version-post">Upload</button>'
-              . '</form>';
+              . '<p class="muted small">Each file is its own version, in the order you pick them. '
+              . 'Naming somebody rings their bell and emails them.</p>'
+              . '<button type="submit" class="primary board-version-post">Send for review</button>'
+              . '</form>'
+              . '<script type="application/json" class="board-comment-people">'
+              . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
+                            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
+              . '</script>';
     }
-    return $out;
+    return $form . $out;
 }

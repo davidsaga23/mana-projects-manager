@@ -3502,7 +3502,10 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-panel-veil[hidden] { display: none; }
 .board-panel {
-  position: fixed; z-index: 71; top: 0; right: 0; bottom: 0; width: min(480px, 100vw);
+  /* Half the screen (David, 2026-10-22: "open until the middle of the screen to
+     have more room"), never narrower than the 480px it started at, never wider
+     than the window. Previews in Versions are what wanted the room. */
+  position: fixed; z-index: 71; top: 0; right: 0; bottom: 0; width: min(max(480px, 50vw), 100vw);
   display: flex; flex-direction: column;
   background: var(--surface); border-left: 1px solid var(--border-strong);
   box-shadow: -18px 0 50px rgba(0, 0, 0, .5);
@@ -3809,7 +3812,10 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .version-meta { margin-top: 6px; word-break: break-word; }
 .version-note { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
 
-.board-version-form { margin-top: 18px; }
+/* At the TOP of the pane, above the versions, so its rule sits underneath it. */
+.board-version-form {
+  margin: 0 0 18px; padding: 0 0 14px; border-top: 0; border-bottom: 1px solid var(--border);
+}
 .board-version-form label { display: block; margin-bottom: 12px; font-size: 13px; }
 .board-version-form input[type=file] {
   display: block; width: 100%; margin-top: 6px; padding: 6px 0;
