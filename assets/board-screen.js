@@ -877,6 +877,29 @@
       .catch(function () {});
   }
 
+  /** "41.2 MB", the way the drop zone and the ticket uploader say a size. */
+  function humanSize(b) {
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    if (b >= 1024) return Math.round(b / 1024) + ' KB';
+    return b + ' B';
+  }
+
+  /**
+   * " · about 3 min left", from the average speed since the upload began.
+   *
+   * David, 2026-10-23: "and include time remaining". Nothing for the first two
+   * seconds — the opening burst fills the browser's buffer, not the wire, and
+   * an estimate built on it says "2 s left" for a ten-minute file.
+   */
+  function timeLeft(loaded, total, started) {
+    var secs = (Date.now() - started) / 1000;
+    if (secs < 2 || loaded <= 0) return '';
+    var left = Math.round((total - loaded) / (loaded / secs));
+    if (left < 60) return ' · ' + Math.max(left, 1) + ' s left';
+    if (left < 3600) return ' · about ' + Math.round(left / 60) + ' min left';
+    return ' · about ' + Math.floor(left / 3600) + ' h ' + Math.round((left % 3600) / 60) + ' min left';
+  }
+
   document.addEventListener('submit', function (e) {
     var form = e.target.closest
       ? e.target.closest('.board-comment-form, .board-version-form') : null;
@@ -916,23 +939,72 @@
     data.append('step_id', form.getAttribute('data-step'));
     data.append('item_key', form.getAttribute('data-item'));
 
-    fetch(spec.url, { method: 'POST', body: data, credentials: 'same-origin' })
-      .then(function (r) { return r.text(); })
-      .then(function (html) {
-        pane.innerHTML = html;
-        paneReady(which);
-        timelineRefresh();
-        var fresh = pane.querySelector('.board-comment-box');
-        if (fresh) fresh.focus();
-      })
-      .catch(function () {
-        if (btn) { btn.disabled = false; btn.textContent = was; }
-        var warn = document.createElement('p');
-        warn.className = 'err';
-        warn.textContent = 'That did not go through. Check your connection and try again — '
-                         + 'nothing in this box has been lost.';
-        form.insertBefore(warn, form.firstChild);
-      });
+    // ⚠ XHR, NOT fetch(), BECAUSE fetch() CANNOT REPORT UPLOAD PROGRESS. David,
+    // 2026-10-23, once versions could be 512 MB: "Is there a way we can put a
+    // progress bar for uploads?" A file that takes ten minutes to go up behind
+    // a button saying "Working…" looks exactly like a frozen page. The bar is
+    // the same .upload-progress the ticket and task forms draw (tickets.js),
+    // built here because this form is re-rendered by the server after every post.
+    var bytes = 0;
+    if (picker && picker.files) {
+      for (var i = 0; i < picker.files.length; i++) bytes += picker.files[i].size;
+    }
+    var meter = null, fill = null, say = null;
+    if (bytes > 0) {
+      meter = document.createElement('div');
+      meter.className = 'upload-progress';
+      meter.innerHTML = '<div class="progress-track"><div class="progress-fill"></div></div>'
+                      + '<div class="progress-label muted small">Preparing upload…</div>';
+      fill = meter.querySelector('.progress-fill');
+      say = meter.querySelector('.progress-label');
+      var anchor = btn ? (btn.closest('.actions') || btn) : null;
+      if (anchor && anchor.parentNode === form) form.insertBefore(meter, anchor);
+      else form.appendChild(meter);
+    }
+
+    function failed(why) {
+      if (btn) { btn.disabled = false; btn.textContent = was; }
+      if (meter) meter.remove();
+      var warn = document.createElement('p');
+      warn.className = 'err';
+      warn.textContent = why + ' Nothing in this box has been lost.';
+      form.insertBefore(warn, form.firstChild);
+    }
+
+    var xhr = new XMLHttpRequest();
+    var started = Date.now();
+    xhr.open('POST', spec.url, true);
+    xhr.upload.addEventListener('progress', function (ev) {
+      if (!fill || !ev.lengthComputable) return;
+      var pct = Math.round((ev.loaded / ev.total) * 100);
+      fill.style.width = pct + '%';
+      if (btn) btn.textContent = pct < 100 ? 'Uploading ' + pct + '%' : 'Saving…';
+      // At 100% the bytes are on the server but the reply is not back yet —
+      // saying "done" there would be the lie the bar exists to prevent.
+      say.textContent = pct < 100
+        ? 'Uploading… ' + pct + '% (' + humanSize(ev.loaded) + ' of ' + humanSize(ev.total) + ')'
+          + timeLeft(ev.loaded, ev.total, started)
+        : 'Saving on the server…';
+    });
+    xhr.addEventListener('load', function () {
+      // The endpoints answer 200 with their own red line for anything they
+      // refuse. Anything else is the host talking (a size limit, the firewall),
+      // and its page is not something to pour into the pane.
+      if (xhr.status < 200 || xhr.status >= 300) {
+        failed('The server refused that (HTTP ' + xhr.status + ')'
+               + (xhr.status === 413 ? ' — the file is over the host\'s size limit.' : '.'));
+        return;
+      }
+      pane.innerHTML = xhr.responseText;
+      paneReady(which);
+      timelineRefresh();
+      var fresh = pane.querySelector('.board-comment-box');
+      if (fresh) fresh.focus();
+    });
+    xhr.addEventListener('error', function () {
+      failed('That did not go through. Check your connection and try again.');
+    });
+    xhr.send(data);
   });
 
   // --- ?open=<step>:<item> --------------------------------------------------

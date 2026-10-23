@@ -19,6 +19,17 @@
     return b + ' B';
   }
 
+  // " · about 3 min left" — the same estimate as Spell's uploads
+  // (assets/board-screen.js), silent for the first two seconds.
+  function timeLeft(loaded, total, started) {
+    const secs = (Date.now() - started) / 1000;
+    if (secs < 2 || loaded <= 0) return '';
+    const left = Math.round((total - loaded) / (loaded / secs));
+    if (left < 60) return ' · ' + Math.max(left, 1) + ' s left';
+    if (left < 3600) return ' · about ' + Math.round(left / 60) + ' min left';
+    return ' · about ' + Math.floor(left / 3600) + ' h ' + Math.round((left % 3600) / 60) + ' min left';
+  }
+
   /**
    * Wire up one form. It needs:
    *   input[type=file][data-filepicker]  the native picker (kept as a fallback)
@@ -135,6 +146,7 @@
       }
 
       const xhr = new XMLHttpRequest();
+      const started = Date.now();
       xhr.open('POST', form.getAttribute('action') || window.location.href, true);
       // Tells the server this is the uploader, not a browsing click. Without it
       // the server answers with a redirect, XHR silently follows it, and the
@@ -150,6 +162,7 @@
         if (label) {
           label.textContent = pct < 100
             ? 'Uploading… ' + pct + '% (' + humanSize(ev.loaded) + ' of ' + humanSize(ev.total) + ')'
+              + timeLeft(ev.loaded, ev.total, started)
             : 'Processing on the server…';
         }
       });

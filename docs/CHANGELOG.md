@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-23 — Upload progress bar on Spell's task panel *(no migration)*
+
+- **Uploading a version, a review or a comment with files now shows a progress bar** with the
+  percentage, "X MB of Y MB" and the time left ("about 3 min left"), and the button counts up
+  with it. The ticket, task and Brief upload bars show the time left too. Once the bytes are up it says
+  "Saving on the server…" until the reply is back. Tickets, tasks and the Brief already had one.
+- Goes with raising the host's PHP limits to 512 MB a file (cPanel → MultiPHP INI Editor:
+  `upload_max_filesize` 512M, `post_max_size` 600M, `max_input_time` 900) and `upload_max_bytes`
+  in the live `config.php` to match.
+- If the host itself refuses an upload (too large, the firewall), the panel says so with the HTTP
+  code instead of pouring the host's error page into the pane.
+
 ## 2026-10-23 — Naming convention on the Brief, enforced on every upload *(needs migration 067)*
 
 - **A Naming convention section on the Brief**: one template for shots and one for assets, written
