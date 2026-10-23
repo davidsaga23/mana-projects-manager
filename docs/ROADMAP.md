@@ -1220,6 +1220,81 @@ conversation doesn't propose them again:
 - **The My-tasks "new" badge keys off card creation**, not reassignment of an old card — can extend
   if David asks.
 
+## Asked for on 2026-10-23
+
+### Final internal review in Spell — the reviewer's own screen
+
+David: *"add to the roadmap to have a feature for final internal reviews in Spell for Jorik so he
+can easily see what's for review, give review notes, approve directly or copy the URL of that
+version to bring the conversation to slack"*.
+
+**Who it is for, and why that matters.** Jorik is not working the board — he is the last pair of
+eyes before something leaves the studio. Everything Spell does today is built around somebody
+*doing* a task: find my work, set its status, log my hours. A reviewer's day is the opposite
+shape. He does not want the show; he wants the queue of things waiting on him, in one list, and
+he wants to be finished with each one in a click. If he has to open four hundred rows and hunt,
+he will keep doing it in Slack, which is exactly where this is supposed to stop happening.
+
+**What already exists to build on, as of 2026-10-22/23.** Nearly all of it:
+
+- **Versions** (migration 063) — `progress_versions`, numbered v01 upward from the files people
+  upload, with the current one marked. A review is a review *of a version*, and that is now a real
+  row with a real id.
+- **Comments with threads, @mentions and files** (059, 061) — review notes do not need inventing.
+  They are comments on the task, in the one conversation My tasks already shows.
+- **The bell** (060) — "assigned / mentioned / moved", already delivering. A review request and a
+  verdict are two more things it could carry.
+- **Statuses** — the project's own vocabulary, with `maps_to = 'approved'`, which is what "approve
+  directly" has to write so every chart and every ready-for-pickup calculation moves with it.
+- **Ready-for-pickup filtering** (2026-10-23) — the same machinery that answers "what can my
+  department start" answers "what is waiting on me", from the other end of the step.
+
+So this is mostly **assembly and one screen**, not new foundations. That is worth saying plainly
+before anybody budgets it as a phase.
+
+**The four things he asked for, and what each one actually needs.**
+
+1. **See what is for review.** A filter is probably not enough — a filter is a thing you have to
+   go and set. The honest version is a *view*: Spell with a "For review" mode, or a short standing
+   list, showing every task whose current status means delivered-not-yet-approved, newest version
+   first, across the shows he can see. Note that this needs no new state at all: `maps_to =
+   'delivered'` already means "handed over, not signed off". ⚠ Check that against the real MSD
+   vocabulary before building — if the studio has been using a differently-named status for "ready
+   for Jorik", the view should key off *that*, and the lesson from `status_has_begun()` applies:
+   ask the status model, not the words.
+
+2. **Give review notes.** A comment, posted from the review screen rather than from inside the
+   task panel. ⚠ The one thing to get right is that it must be the *same* comment row the task
+   already carries — the argument migration 059 makes at length. A separate "review notes" store
+   would split the conversation about a shot in two.
+
+3. **Approve directly.** One button that sets the project's approved status on that task. It has
+   to go through the same path `board_api.php` already uses, so `is_delivered`/`is_approved` are
+   recomputed and `progress_log` records it — writing `status_id` alone moves a colour and leaves
+   every number unchanged, which `production_api.php` learned the hard way. Worth considering a
+   **"needs changes"** verdict beside it, which is a status move plus a required note; approving
+   with no note is fine, rejecting without one is not.
+
+4. **Copy the version's URL for Slack.** The deep link already exists —
+   `spell.php?project=N&open=<step>:<item>` opens that task's panel, and it is what mention emails
+   use. What is missing is a link that lands on *a version* rather than the task, and a copy
+   button that puts it on the clipboard in one click. ⚠ Whoever opens that link in Slack has to be
+   able to see it: the link is only useful inside the studio, and `attachment.php` serves files to
+   any logged-in user, so a pasted link is studio-wide, not public. Say so in the UI next to the
+   button rather than letting somebody assume either way.
+
+**The open question worth asking David before building.** Does an approval here mean the same
+thing as an approval anywhere else in Anima — i.e. is "Jorik approved it" simply the task reaching
+the approved status, or is it a *second* sign-off on top, the way kick-off has its own sign-off
+list (migration 049)? The cheap version is the first and it reuses everything. The second is a
+real feature with its own table, and is only worth it if a supervisor's approval and a final
+internal approval genuinely need to coexist on one task.
+
+**Where it sits against the client loop.** This is the internal half of the delivery record the
+roadmap has wanted since August ("The step missing from the list itself"). Versions plus an
+internal approval is most of what a delivery log needs; what it still would not have is *what was
+sent to the client and what came back*. Building this well makes that one smaller, later.
+
 ## The "sell the app to customers" exploration (not part of the internal app)
 
 A separate, **planning-only** workstream (its chat thread since deleted) explored turning the
