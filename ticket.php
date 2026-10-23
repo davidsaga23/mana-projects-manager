@@ -385,32 +385,6 @@ $staffHref = $projectId ? 'crew.php?project=' . $projectId : 'crew.php';
 $statusColor = $t['status_color'] ?: '#8a97a3';
 
 /** One attachment: previewed inline when the browser can show it, linked otherwise. */
-function render_attachment(array $a, bool $canDelete): void {
-    $url  = 'attachment.php?id=' . (int)$a['id'];
-    $name = e($a['original_name']);
-    echo '<div class="attachment">';
-    if (attachment_is_image($a['mime_type'])) {
-        // The href is real and still works — ctrl-click, middle-click and a
-        // browser with JavaScript off all open the file directly. The click
-        // handler in tickets.js intercepts an ordinary click and shows the image
-        // full size over this page instead, so looking at a reference does not
-        // cost you the ticket you were reading.
-        echo '<a href="' . $url . '" class="att-zoom" data-name="' . $name . '"'
-           . ' target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
-    } elseif (attachment_is_video($a['mime_type'])) {
-        echo '<video src="' . $url . '" controls preload="metadata"></video>';
-    } else {
-        echo '<a href="' . $url . '" class="file-link" target="_blank" rel="noopener">📄 ' . $name . '</a>';
-    }
-    echo '<div class="attachment-meta"><span title="' . $name . '">' . $name . '</span>';
-    echo '<span class="muted small">' . human_size((int)$a['file_size']) . '</span>';
-    if ($canDelete) {
-        echo '<form method="post" style="display:inline;" onsubmit="return confirm(\'Remove this attachment?\');">'
-           . '<button type="submit" name="delete_attachment" value="' . (int)$a['id'] . '" class="link-danger">×</button>'
-           . '</form>';
-    }
-    echo '</div></div>';
-}
 
 $pageTitle = $label . ' · ' . ($project['name'] ?? 'no project yet');
 require __DIR__ . '/includes/header.php';

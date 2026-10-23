@@ -3665,3 +3665,85 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bug-fixed .bug-status { background: var(--ok-tint); color: var(--ok); }
 .bug-wontfix .bug-status { background: var(--surface-3); color: var(--muted); }
 .bug-desc { white-space: normal; margin: 10px 0; }
+/* --- the bell beside your name (David, 2026-10-22) ------------------------ */
+/* "a notification in a bell close to your name so you know someone assign, tag
+   or changed a tasked you're subscribed to". It sits in the top bar on every
+   screen, which is the point — it has to find you wherever you are. */
+.bell { position: relative; display: inline-flex; }
+.bell-btn {
+  margin: 0; padding: 5px; min-height: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--text-2); cursor: pointer;
+}
+.bell-btn:hover { background: var(--surface-2); color: var(--text); }
+.bell-btn[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+
+/* The count rides the bell rather than sitting beside it: the top bar is
+   crowded and an unread badge has to read at a glance, not be found. */
+.bell-count {
+  position: absolute; top: -2px; right: -3px;
+  min-width: 15px; padding: 0 3px;
+  border-radius: 999px;
+  background: var(--danger); color: var(--on-danger, #fff);
+  font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
+}
+
+.bell-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 70;
+  width: 340px; max-height: 60vh; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-1); box-shadow: 0 10px 28px rgba(0, 0, 0, .38);
+}
+.bell-panel[hidden] { display: none; }
+.bell-head {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600;
+}
+.bell-empty { padding: 14px; margin: 0; line-height: 1.5; }
+.bell-list { list-style: none; margin: 0; padding: 0; }
+.bell-list li { border-bottom: 1px solid var(--border); }
+.bell-list li:last-child { border-bottom: 0; }
+.bell-list a {
+  display: grid; grid-template-columns: 8px 1fr auto; gap: 9px;
+  align-items: start; padding: 10px 14px;
+  color: var(--text); text-decoration: none; font-size: 13px;
+}
+.bell-list a:hover { background: var(--surface-2); }
+
+/* Unread, until the page is reloaded — so you can still see which ones they
+   were after the count has gone. */
+.bell-list li.is-new a { background: var(--primary-tint); }
+.bell-list li.is-new a:hover { background: var(--surface-2); }
+
+/* Which of the three it is, said in a colour rather than a word: there is no
+   room in a 340px panel for "assigned" as a label as well as a sentence. */
+.bell-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--faint); }
+.bell-mention  { background: var(--primary); }
+.bell-assigned { background: var(--warn); }
+.bell-status   { background: var(--ok); }
+
+.bell-what { line-height: 1.45; }
+.bell-when { white-space: nowrap; font-size: 11px; padding-top: 1px; }
+
+/* Files on a Board comment (David, 2026-10-22: "allow comments to attach
+   files"). The grid and the thumbnails are the ticket screen's — only the
+   picker and the × are new, and both have to survive a 420px panel. */
+.board-comment-files { display: block; margin-top: 12px; font-size: 13px; }
+.board-comment-files input[type=file] {
+  display: block; width: 100%; margin-top: 6px; padding: 6px 0;
+  border: 0; background: none; font-size: 12px; color: var(--text-2);
+}
+.board-att-del {
+  margin: 0; padding: 0 2px; min-height: 0; border: 0; background: none;
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.board-att-del:disabled { opacity: .5; cursor: progress; }
+.panel-body[data-pane="comments"] .attachment-grid { margin-top: 8px; }
+
+/* A 340px panel anchored to the bell runs off the left edge of a narrow
+   window, where the bell is not near the right edge to begin with. Pinned to
+   the viewport instead below the breakpoint the rest of the chrome uses. */
+@media (max-width: 640px) {
+  .bell-panel { position: fixed; top: 54px; left: 12px; right: 12px; width: auto; }
+}

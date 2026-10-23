@@ -474,7 +474,11 @@ function artist_may_post(): bool {
         // this screen exists to end. The scope that remains is real and checked
         // in board_comment.php: the show must be one board_projects() returns
         // for this account, and the step and item must be that show's.
-        'board_comment.php' => ['add_comment'],
+        // delete_attachment alongside it: an artist may take back a file THEY
+        // attached (board_comment.php checks uploaded_by, and an admin may
+        // remove any). Without it the × would draw and then be refused, which
+        // is worse than no × at all.
+        'board_comment.php' => ['add_comment', 'delete_attachment'],
         // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
         // About the APPLICATION, not anyone's work, so it writes nothing an
         // artist could not otherwise touch: one new row in bug_reports, filed
@@ -482,6 +486,12 @@ function artist_may_post(): bool {
         // checked there, so set_status is deliberately not in this list.
         'bugs.php' => ['report_bug'],
     ];
+    // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
+    // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
+    // comes from the session, so there is nothing to forge and nobody else's
+    // row it could touch. An artist whose bell could not be cleared would have
+    // a number that only ever goes up, which is the same as no bell.
+    if (basename((string)($_SERVER['SCRIPT_NAME'] ?? '')) === 'notify_seen.php') return true;
     // SCRIPT_NAME is the file the server resolved, not anything the caller typed
     // — unlike REQUEST_URI, which the redirect below has to defend against.
     $script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));

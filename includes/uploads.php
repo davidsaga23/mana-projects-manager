@@ -109,6 +109,15 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
         return ['saved' => 0, 'errors' => ['Unknown attachment type, nothing was saved.']];
     }
     $hasComment = $table === 'ticket_attachments';
+
+    // ⚠ AN OWNERLESS ATTACHMENT IS LEGAL ON A COMMENT, SINCE MIGRATION 061, and
+    // only there. A comment on a Board task has no ticket (migration 059), but
+    // it does have an id, and comment_id is the link that matters — the file
+    // belongs to what somebody said, not to a card. Without a comment there is
+    // nothing for the row to hang off at all, which is a bug, not a file.
+    if ($ownerId <= 0 && !($hasComment && $commentId !== null)) {
+        return ['saved' => 0, 'errors' => ['Nothing to attach that file to, so it was not saved.']];
+    }
     $maxBytes = (int)($config['upload_max_bytes'] ?? 25 * 1024 * 1024);
     $maxFiles = (int)($config['upload_max_files'] ?? 5);
     $allowed = allowed_upload_types();
@@ -172,9 +181,10 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
             continue;
         }
 
+        $owner = $ownerId > 0 ? $ownerId : null;      // NULL on a board comment
         $args = $hasComment
-            ? [$ownerId, $commentId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId]
-            : [$ownerId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId];
+            ? [$owner, $commentId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId]
+            : [$owner, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId];
         $ins->execute($args);
         $saved++;
     }
@@ -220,4 +230,45 @@ function attachment_is_image(?string $mime): bool {
 
 function attachment_is_video(?string $mime): bool {
     return $mime !== null && str_starts_with($mime, 'video/');
+}
+
+/**
+ * One attachment, as a thumbnail, a player or a file link.
+ *
+ * ⚠ MOVED HERE FROM ticket.php ON 2026-10-22, when David asked for files on
+ * Board comments too ("allow comments to attach files"). It was page-scoped
+ * while one page drew attachments; two screens later it is shared, and the
+ * alternative was a second copy that would have drifted the first time one of
+ * them learned a new media type.
+ *
+ * $deleteControl is the markup for removing it, because removing one is the
+ * only part each screen does differently: the ticket posts a form to itself,
+ * the board sends a button to its own endpoint. An empty string draws none.
+ */
+function render_attachment(array $a, bool $canDelete, string $deleteControl = ''): void {
+    $url  = 'attachment.php?id=' . (int)$a['id'];
+    $name = e($a['original_name']);
+    echo '<div class="attachment">';
+    if (attachment_is_image($a['mime_type'])) {
+        // The href is real and still works — ctrl-click, middle-click and a
+        // browser with JavaScript off all open the file directly. The click
+        // handler in tickets.js intercepts an ordinary click and shows the image
+        // full size over this page instead, so looking at a reference does not
+        // cost you the ticket you were reading.
+        echo '<a href="' . $url . '" class="att-zoom" data-name="' . $name . '"'
+           . ' target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
+    } elseif (attachment_is_video($a['mime_type'])) {
+        echo '<video src="' . $url . '" controls preload="metadata"></video>';
+    } else {
+        echo '<a href="' . $url . '" class="file-link" target="_blank" rel="noopener">📄 ' . $name . '</a>';
+    }
+    echo '<div class="attachment-meta"><span title="' . $name . '">' . $name . '</span>';
+    echo '<span class="muted small">' . human_size((int)$a['file_size']) . '</span>';
+    if ($canDelete) {
+        echo $deleteControl !== '' ? $deleteControl
+           : '<form method="post" style="display:inline;" onsubmit="return confirm(\'Remove this attachment?\');">'
+             . '<button type="submit" name="delete_attachment" value="' . (int)$a['id'] . '" class="link-danger">×</button>'
+             . '</form>';
+    }
+    echo '</div></div>';
 }
