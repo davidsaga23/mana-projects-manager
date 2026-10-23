@@ -4214,10 +4214,17 @@ a.version-shot:hover { border-color: var(--border-strong); }
 }
 .dropzone:hover { border-color: var(--primary); }
 .dropzone.is-over { border-color: var(--primary); background: var(--primary-tint); }
-/* Hidden from sight, not from the form: it still carries the files. */
+/* Hidden from sight, not from the form: it still carries the files.
+   ⚠ opacity, NOT clip/visibility/display. A REQUIRED file input that the
+   browser considers unfocusable makes the whole form refuse to submit with
+   "An invalid form control is not focusable" in the console and no message on
+   screen — which is exactly what transcript.php's input is. A 1px transparent
+   element is focusable, so the validation bubble appears, anchored inside the
+   zone where it belongs. */
 .dropzone input[type="file"] {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  position: absolute; left: 14px; bottom: 8px;
+  width: 1px; height: 1px; opacity: 0;
+  padding: 0; margin: 0; border: 0;
 }
 .dropzone-say { text-align: center; font-size: 13px; line-height: 1.5; }
 .dropzone-say strong { display: block; font-weight: 600; }
