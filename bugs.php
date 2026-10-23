@@ -6,6 +6,7 @@
  *   (render_bug_button() in includes/bugs.php). Anyone signed in may file one,
  *   artists and supervisors included: artist_may_post() lists this field.
  * POST set_status — an admin marks a report fixed, won't fix, or open again.
+ * POST save_notes — an admin adds the detail a report is waiting on (064).
  * GET — the reports. Admins see everybody's; everybody else sees their own, so
  *   they can tell a report went through and whether it has been dealt with.
  */
@@ -82,6 +83,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['report_bug'])) {
         $result = save_attachments($pdo, normalize_files_array($_FILES['files']),
                                    'bug_attachments', 'bug_id', $bugId, null, $userId);
     }
+    // A VIDEO FLAGS THE REPORT (migration 064). Claude, which works these
+    // reports through bugs_export.php, can read a screenshot but cannot watch a
+    // recording, so a report carried by a video waits for David to say what
+    // happens in it. Read back from what was SAVED, not what was posted, so a
+    // refused video flags nothing.
+    if ($result['saved'] && bugs_flags_available($pdo)) {
+        $v = $pdo->prepare("SELECT 1 FROM bug_attachments WHERE bug_id = ? AND mime_type LIKE 'video/%' LIMIT 1");
+        $v->execute([$bugId]);
+        if ($v->fetchColumn()) {
+            $pdo->prepare('UPDATE bug_reports SET needs_info = 1, flag_reason = ? WHERE id = ?')
+                ->execute([BUG_VIDEO_FLAG, $bugId]);
+        }
+    }
     // A post bigger than post_max_size arrives with $_FILES and $_POST both
     // empty, so it never reaches here; a single file over upload_max_filesize
     // does, and save_attachments() names it.
@@ -108,13 +122,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_notes'])) {
+    if (!is_admin()) {
+        flash('err', 'Only an administrator can add notes to a bug report.');
+    } elseif (bugs_flags_available($pdo)) {
+        // Writing the detail IS the answer to the flag, so a note clears it;
+        // emptying the note leaves the flag where it was.
+        $notes = trim((string)($_POST['admin_notes'] ?? ''));
+        $pdo->prepare("UPDATE bug_reports
+                          SET admin_notes = ?, needs_info = IF(? = '', needs_info, 0)
+                        WHERE id = ?")
+            ->execute([$notes === '' ? null : mb_substr($notes, 0, 5000), $notes, (int)($_POST['bug_id'] ?? 0)]);
+        flash('ok', 'Notes saved.');
+    }
+    header('Location: bugs.php' . (isset($_GET['show']) ? '?show=' . urlencode((string)$_GET['show']) : ''));
+    exit;
+}
+
 // ---- the list --------------------------------------------------------------
-$show = in_array($_GET['show'] ?? '', ['open', 'closed', 'all'], true) ? $_GET['show'] : 'open';
+$flags = bugs_flags_available($pdo);
+$show = in_array($_GET['show'] ?? '', ['open', 'needs', 'closed', 'all'], true) ? $_GET['show'] : 'open';
+if ($show === 'needs' && !$flags) $show = 'open';
 $where = [];
 $args = [];
 if (!is_admin()) { $where[] = 'b.user_id = ?'; $args[] = $userId; }
 if ($show === 'open')   $where[] = "b.status = 'open'";
 if ($show === 'closed') $where[] = "b.status <> 'open'";
+if ($show === 'needs')  $where[] = "b.status = 'open' AND b.needs_info = 1";
 $sql = 'SELECT b.* FROM bug_reports b'
      . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
      . ' ORDER BY b.created_at DESC, b.id DESC LIMIT 500';
@@ -139,19 +173,24 @@ require __DIR__ . '/includes/header.php';
     : 'The bugs you have reported with the 🐞 button, and whether they have been dealt with.' ?></p>
 
 <div class="bug-filter">
-  <?php foreach (['open' => 'Open', 'closed' => 'Closed', 'all' => 'All'] as $k => $label): ?>
+  <?php foreach (['open' => 'Open'] + ($flags ? ['needs' => 'Needs your description'] : [])
+                 + ['closed' => 'Closed', 'all' => 'All'] as $k => $label): ?>
     <a class="button<?= $show === $k ? '' : ' secondary' ?>" href="bugs.php?show=<?= $k ?>"><?= $label ?></a>
   <?php endforeach; ?>
 </div>
 
 <?php if (!$bugs): ?>
-  <p class="muted">No <?= $show === 'all' ? '' : e($show) . ' ' ?>bug reports.</p>
+  <p class="muted"><?= $show === 'needs' ? 'Nothing is waiting on you.'
+      : 'No ' . ($show === 'all' ? '' : e($show) . ' ') . 'bug reports.' ?></p>
 <?php endif; ?>
 
-<?php foreach ($bugs as $b): $bid = (int)$b['id']; ?>
+<?php foreach ($bugs as $b): $bid = (int)$b['id'];
+      $hasVideo = false;
+      foreach ($files[$bid] ?? [] as $a) $hasVideo = $hasVideo || attachment_is_video($a['mime_type']); ?>
   <div class="panel bug-report bug-<?= e($b['status']) ?>">
     <div class="bug-head">
-      <strong>#<?= $bid ?> · <?= e($b['section']) ?></strong>
+      <strong>#<?= $bid ?> · <?= e($b['section']) ?>
+        <?php if ($hasVideo): ?><span class="bug-tag" title="This report has a video">🎥 Video</span><?php endif; ?></strong>
       <span class="bug-status"><?= e(bug_status_label($b['status'])) ?></span>
     </div>
     <div class="muted small">
@@ -178,6 +217,24 @@ require __DIR__ . '/includes/header.php';
           </div>
         <?php endforeach; ?>
       </div>
+    <?php endif; ?>
+    <?php if ($flags && $b['status'] === 'open' && (int)$b['needs_info'] === 1): ?>
+      <div class="bug-needs"><strong>Waiting for your description.</strong> <?= e((string)$b['flag_reason']) ?></div>
+    <?php endif; ?>
+    <?php if ($flags && is_admin()): ?>
+      <form method="post" class="bug-notes">
+        <input type="hidden" name="bug_id" value="<?= $bid ?>">
+        <label>Your notes for Claude
+          <textarea name="admin_notes" rows="3" maxlength="5000"
+            placeholder="What happens in the video, how to reproduce it, what should happen instead."><?= e((string)$b['admin_notes']) ?></textarea>
+        </label>
+        <button type="submit" name="save_notes" value="1" class="secondary">Save notes</button>
+      </form>
+    <?php elseif ($flags && !empty($b['admin_notes'])): ?>
+      <p class="bug-desc"><strong>Notes:</strong> <?= nl2br(e($b['admin_notes'])) ?></p>
+    <?php endif; ?>
+    <?php if ($flags && !empty($b['fix_note'])): ?>
+      <p class="muted small">Fix: <?= e($b['fix_note']) ?></p>
     <?php endif; ?>
     <?php if (is_admin()): ?>
       <form method="post" class="bug-actions">

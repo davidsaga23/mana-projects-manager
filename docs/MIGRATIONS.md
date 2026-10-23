@@ -26,7 +26,7 @@ The app shows an **"updates waiting"** banner when production migrations are pen
 
 ## ⚠ Pending right now (as of 2026-10-21) — David to run
 
-**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 (both `060_crew_absences` and `060_notifications`), 061, 062`.
+**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 (both `060_crew_absences` and `060_notifications`), 061, 062, 064`. *(063 is being used by another branch in progress.)*
 
 **Finance (import by hand into the finance DB via phpMyAdmin):** `finance_install_08.sql` (the
 money side of the kick-off sign-off, needed together with migration 049).
@@ -124,6 +124,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |
 | 062 | bug_reports | ⏳ **Bug reports** (`bug_reports`, `bug_attachments`): the 🐞 button on every screen and the Bugs page. Hidden entirely until run. |
+| 064 | bug_needs_info | ⏳ **Bug reports wait for David** (`needs_info`, `flag_reason`, `admin_notes`, `fix_note` on `bug_reports`): video reports are flagged for a description, admins write notes for Claude, and the export records how each was fixed. Needs 062 first. |
 
 ### Finance DB imports (by hand, phpMyAdmin, once each)
 | File | What it unlocks |

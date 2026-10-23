@@ -3810,3 +3810,15 @@ a.version-shot:hover { border-color: var(--border-strong); }
 }
 .board-version-form textarea { width: 100%; margin-top: 6px; resize: vertical; }
 .board-version-form .board-version-post { margin-top: 4px; }
+/* A report waiting on David (migration 064): a video Claude cannot watch, or a
+   question Claude asked. Warn-coloured, because it is the one thing on the page
+   asking him to do something. */
+.bug-tag { margin-left: 8px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-2); }
+.bug-needs { margin: 8px 0; padding: 8px 12px; border-left: 4px solid var(--warn); border-radius: 4px;
+  background: var(--surface-2); font-size: 14px; }
+.bug-notes { margin-top: 10px; }
+.bug-notes label { display: block; font-weight: 600; font-size: 13px; }
+.bug-notes textarea { display: block; width: 100%; box-sizing: border-box; margin: 4px 0 6px; padding: 8px 10px;
+  border: 1px solid var(--border-strong); border-radius: 4px; font-family: inherit; font-size: 14px;
+  background: var(--surface); color: var(--text); resize: vertical; }

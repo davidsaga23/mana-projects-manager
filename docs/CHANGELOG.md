@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Bug reports reach Claude; videos wait for David's description *(needs migration 064)*
+
+- **The Section list on the 🐞 form only offers screens the person can open.** An artist no longer
+  sees Historic fees, Finance, Users, Dashboard, Staffing and the other screens hidden from them.
+- **A report filed with a video is marked 🎥 and flagged "Waiting for your description"**, because
+  Claude can read screenshots but cannot watch a video. A new **Needs your description** filter on
+  the Bugs page lists them, and admins write **notes for Claude** on any report; saving a note
+  clears the flag.
+- **Claude can pull every open report, screenshots included, and close it after fixing it.**
+  `bugs_export.php` answers only requests carrying the secret `bug_export_key` from `config.php`;
+  `tools/pull_bugs.py` downloads into `bug-inbox/`; the `/bugs` command works through them, opens
+  a PR per fix, marks the report Fixed with the PR number, and flags anything unclear back to David.
+- **Setup once:** put a long random `bug_export_key` in the server's `config.php` and the same value
+  in `tools/.bug_key` on the machine that runs Claude.
+
 ## 2026-10-22 — A 🐞 Report a bug button on every screen *(needs migration 062)*
 
 - **A Report a bug button, bottom left of every screen**, for everyone, artists and supervisors

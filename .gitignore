@@ -5,6 +5,10 @@
 # Live credentials — DB password, SMTP password.
 # config.example.php IS committed as documentation; config.php never is.
 config.php
+# The bug export key on the machine that pulls (tools/pull_bugs.py), and what
+# it pulls: reporters' screenshots can show anything on their screen.
+tools/.bug_key
+bug-inbox/
 
 # Server-side runtime state. Committing (or deploying) these would overwrite or
 # delete real production data.
