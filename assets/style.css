@@ -3836,22 +3836,53 @@ a.version-shot:hover { border-color: var(--border-strong); }
   border: 1px solid var(--border-strong); border-radius: 4px; font-family: inherit; font-size: 14px;
   background: var(--surface); color: var(--text); resize: vertical; }
 
-/* Spell's Version and Comments columns (2026-10-22). Narrow, so their cells
-   give up most of the board's 14px side padding. */
-.board-version-cell, .board-comments-cell { padding-left: 4px; padding-right: 4px; }
-.board-comments-cell, .board-head-center { text-align: center; }
-.board-version-link {
-  font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
-  color: var(--primary); text-decoration: none;
-}
-.board-version-link:hover { text-decoration: underline; }
-/* Only a circle with a number: how many comments, leading to them. */
-.board-comment-dot {
+/* Spell's Version and Notes columns (2026-10-22). Narrow, so their cells give
+   up most of the board's 14px side padding. Both are BUTTONS, not links
+   (David: "make that one and the version link buttons instead of hyperlinks"). */
+.board-version-cell, .board-notes-cell { padding-left: 4px; padding-right: 4px; }
+.board-notes-cell, .board-head-center { text-align: center; }
+.board-version-link, .board-notes-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
+  min-height: 26px; padding: 0 9px; border-radius: 7px; cursor: pointer;
   background: var(--primary-tint); color: var(--primary); border: 1px solid transparent;
-  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+  font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: none;
 }
-.board-comment-dot:hover { background: var(--primary-fill); color: var(--on-primary); }
+.board-notes-btn { min-width: 28px; border-radius: 999px; }
+.board-version-link:hover, .board-notes-btn:hover {
+  background: var(--primary-fill); color: var(--on-primary); text-decoration: none;
+}
+
+/* A version's own button: its review notes, or a way to start them. */
+.version-reviews-btn {
+  margin-left: auto; min-height: 26px; padding: 2px 10px; border-radius: 7px;
+  background: var(--primary-tint); color: var(--primary); border: 1px solid transparent;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.version-reviews-btn:hover { background: var(--primary-fill); color: var(--on-primary); }
+.version-reviews {
+  margin: 8px 0 12px; padding: 4px 12px; border-left: 3px solid var(--primary);
+  background: var(--surface-2); border-radius: 6px;
+}
+.version-reviews[hidden] { display: none; }
+.version-review + .version-review { border-top: 1px solid var(--border-soft); }
+.review-tag { margin: 0 6px; }
+.version-files-btn {
+  display: inline-flex; align-items: center; margin: 6px 0; min-height: 28px; padding: 3px 12px;
+  border-radius: 7px; border: 1px solid var(--border); color: var(--text-2);
+  font-size: 12.5px; font-weight: 600; text-decoration: none;
+}
+.version-files-btn:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+
+/* Make a review: its title with the version picker beside it. */
+.board-review-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.board-review-top .board-review-version { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.board-review-top select { width: auto; min-height: 30px; padding: 3px 8px; }
+.board-review-form input[type=file] {
+  display: block; width: 100%; margin-top: 6px; padding: 6px 0;
+  border: 0; background: none; font-size: 12px; color: var(--text-2);
+}
+.board-upload-instead { margin: 0 0 18px; }
+.board-upload-instead > summary { cursor: pointer; font-size: 13px; color: var(--primary); margin-bottom: 10px; }
+.board-version-form input[type=url] { display: block; width: 100%; margin-top: 6px; }
 /* "Upload new version", 20% larger than a form label (David, 2026-10-22). */
 .board-version-form .board-version-title { font-size: 1.2em; font-weight: 600; }

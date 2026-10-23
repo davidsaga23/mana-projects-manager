@@ -330,24 +330,27 @@ function board_data(PDO $pdo, int $projectId): array {
         $q->execute([$projectId]);
         foreach ($q as $r) $latestVersion[(int)$r['progress_id']] = $r;
     }
-    $commentCount = [];
-    if (board_comments_available($pdo)) {
+    // How many review notes each VERSION has (migration 065). The Notes column
+    // (David, 2026-10-22: "adjust the comments to be Notes instead") counts the
+    // ones on the task's current version and leads to them.
+    $reviewCount = [];
+    if (board_comments_available($pdo) && board_reviews_available($pdo)) {
         $q = $pdo->prepare(
-            'SELECT c.progress_id, COUNT(*) AS n
+            'SELECT c.version_id, COUNT(*) AS n
                FROM ticket_comments c
                JOIN progress p ON p.id = c.progress_id
-              WHERE p.project_id = ?
-              GROUP BY c.progress_id'
+              WHERE p.project_id = ? AND c.version_id IS NOT NULL
+              GROUP BY c.version_id'
         );
         $q->execute([$projectId]);
-        foreach ($q as $r) $commentCount[(int)$r['progress_id']] = (int)$r['n'];
+        foreach ($q as $r) $reviewCount[(int)$r['version_id']] = (int)$r['n'];
     }
 
     $today = date('Y-m-d');
 
     /** One task row: a step's work on one item. */
     $task = function (array $step, string $itemKey) use ($byCell, $byDate, $statusMap, $today, $hasLink,
-                                                         $latestVersion, $commentCount): array {
+                                                         $latestVersion, $reviewCount): array {
         $key = (int)$step['id'] . '|' . $itemKey;
         $cell = $byCell[$key] ?? null;
         $sched = $byDate[$key] ?? null;
@@ -376,7 +379,8 @@ function board_data(PDO $pdo, int $projectId): array {
             'manual'      => $sched ? (int)$sched['is_manual'] === 1 : false,
             'version'     => $cell['version'] ?? null,
             'latest'      => $cell ? ($latestVersion[(int)$cell['id']] ?? null) : null,
-            'comments'    => $cell ? ($commentCount[(int)$cell['id']] ?? 0) : 0,
+            'review_notes' => ($cell && isset($latestVersion[(int)$cell['id']]))
+                              ? ($reviewCount[(int)$latestVersion[(int)$cell['id']]['id']] ?? 0) : 0,
             'notes'       => $cell['notes'] ?? null,
             'link'        => $hasLink ? ($cell['link'] ?? null) : null,
             // Overwritten by $tasksFor() for a shot or an asset, where the
@@ -670,8 +674,10 @@ function board_crew_cell(array $t, array $crew, int $projectId, bool $mayEdit): 
 
 /**
  * The Version column (David, 2026-10-22): the current version's number, as a
- * link that opens its preview. An image opens in the lightbox (`att-zoom`, the
- * hook assets/tickets.js listens for), anything else in a new tab. A dash
+ * BUTTON ("make that one and the version link buttons instead of hyperlinks")
+ * that opens its preview. Still an <a> underneath, styled as a button, because
+ * the lightbox (`att-zoom`, assets/tickets.js) listens for links and ctrl-click
+ * should still open a tab. Anything not an image opens in a new tab. A dash
  * before the first version, so an empty column is visibly empty.
  */
 function board_version_cell(array $t): string {
@@ -687,19 +693,24 @@ function board_version_cell(array $t): string {
 }
 
 /**
- * The Comments column: a circle with how many comments the task has, nothing
- * more (David, 2026-10-22). It opens the task on its Comments tab — the number
- * is only worth showing because it leads to the conversation. Empty at zero, so
- * the column draws the eye only where something has been said.
+ * The Notes column: a button with how many REVIEW NOTES the task's current
+ * version has (David, 2026-10-22, first a comment count, then "let's adjust the
+ * comments to be Notes instead and they can also be a link to the note related
+ * to that version"). It opens the task on Versions with that version's notes
+ * shown. Empty at zero, so the column draws the eye only where somebody has
+ * reviewed the latest work.
  */
-function board_comments_cell(array $t, int $projectId, string $itemName): string {
-    $n = (int)($t['comments'] ?? 0);
-    if ($n === 0) return '<div class="board-cell board-comments-cell"></div>';
-    return '<div class="board-cell board-comments-cell"><button type="button" class="board-comment-dot"'
+function board_notes_cell(array $t, int $projectId, string $itemName): string {
+    $n = (int)($t['review_notes'] ?? 0);
+    $v = $t['latest'] ?? null;
+    if ($n === 0 || !$v) return '<div class="board-cell board-notes-cell"></div>';
+    $label = version_label((int)$v['version_no']);
+    return '<div class="board-cell board-notes-cell"><button type="button" class="board-notes-btn"'
          . ' data-project="' . $projectId . '" data-step="' . (int)$t['step_id'] . '"'
-         . ' data-item="' . e($t['item_key']) . '"'
-         . ' aria-label="' . $n . ' comment' . ($n === 1 ? '' : 's') . ' on ' . e($t['step'] ?? 'this task')
-         . ($itemName !== '' ? ' on ' . e($itemName) : '') . '">' . ($n > 99 ? '99+' : $n) . '</button></div>';
+         . ' data-item="' . e($t['item_key']) . '" data-version="' . (int)$v['id'] . '"'
+         . ' aria-label="' . $n . ' review note' . ($n === 1 ? '' : 's') . ' on ' . e($label) . ' of '
+         . e($t['step'] ?? 'this task') . ($itemName !== '' ? ' on ' . e($itemName) : '') . '">'
+         . ($n > 99 ? '99+' : $n) . '</button></div>';
 }
 
 /** The due date — schedule.end_date, the same one the timeline draws. */
@@ -983,9 +994,11 @@ function board_task_comments(PDO $pdo, int $progressId): array {
     }
     $q = $pdo->prepare(
         'SELECT c.id, c.parent_id, c.user_id, c.kind, c.body, c.created_at,
-                u.display_name
+                u.display_name'
+        . (board_reviews_available($pdo) ? ', c.version_id, pv.version_no AS review_of' : '') . '
            FROM ticket_comments c
-           LEFT JOIN users u ON u.id = c.user_id
+           LEFT JOIN users u ON u.id = c.user_id'
+        . (board_reviews_available($pdo) ? ' LEFT JOIN progress_versions pv ON pv.id = c.version_id' : '') . '
           WHERE c.progress_id = ?
           ORDER BY c.created_at, c.id'
     );
@@ -1031,7 +1044,7 @@ function board_task_comments(PDO $pdo, int $progressId): array {
  */
 function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKey,
                            string $body, ?int $parentId, int $userId, array $ctx = [],
-                           bool $hasFiles = false): array {
+                           bool $hasFiles = false, ?int $versionId = null): array {
     if (!board_comments_available($pdo)) {
         throw new RuntimeException('Comments need database update 059, which has not been applied yet.');
     }
@@ -1060,10 +1073,22 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
         $parent = $q->fetchColumn() ?: null;
     }
 
+    // ⚠ A REVIEW'S VERSION MUST BE THIS TASK'S, by the same reasoning as the
+    // parent above: a posted id is otherwise a way to pin a note on another
+    // show's work. Dropped silently before migration 065.
+    $version = null;
+    if ($versionId && board_reviews_available($pdo)) {
+        $q = $pdo->prepare('SELECT id FROM progress_versions WHERE id = ? AND progress_id = ?');
+        $q->execute([$versionId, $progressId]);
+        $version = $q->fetchColumn() ?: null;
+        if (!$version) throw new RuntimeException('That version is not on this task any more.');
+    }
+
     $cols  = 'progress_id, user_id, kind, body';
     $marks = "?, ?, 'user', ?";
     $args  = [$progressId, $userId ?: null, $body];
     if (ticket_threads_available($pdo)) { $cols .= ', parent_id'; $marks .= ', ?'; $args[] = $parent; }
+    if ($version !== null) { $cols .= ', version_id'; $marks .= ', ?'; $args[] = (int)$version; }
     $pdo->prepare('INSERT INTO ticket_comments (' . $cols . ') VALUES (' . $marks . ')')->execute($args);
     $commentId = (int)$pdo->lastInsertId();
 
@@ -1092,7 +1117,7 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
         ], (int)(effective_crew_id($pdo) ?? 0));
     }
 
-    $said = $parent ? 'Reply posted.' : 'Comment posted.';
+    $said = $version !== null ? 'Review posted.' : ($parent ? 'Reply posted.' : 'Comment posted.');
     if ($mentions && function_exists('notify_mentioned_task')) {
         // Naming somebody tells them, here as on a ticket — David settled that
         // on 2026-10-06 ("not an option but something already built in by
@@ -1136,6 +1161,10 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
            . '" id="bc' . $cid . '">'
            . '<div class="comment-head"><strong>'
            . e($c['display_name'] ?? 'Someone') . '</strong>'
+           // A review shows here too, saying which version it is about.
+           . (!empty($c['review_of'])
+                ? '<span class="version-tag review-tag">review of ' . e(version_label((int)$c['review_of'])) . '</span>'
+                : '')
            . '<span class="muted small">'
            . e(date('j M Y · g:i A', strtotime((string)$c['created_at']))) . '</span>';
         if ($mayPost && $depth === 0 && ticket_threads_available($pdo)) {
@@ -1226,6 +1255,28 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
  * that nobody can type "v07" on a task that has three versions.
  * ------------------------------------------------------------------------ */
 
+/** Does a version carry a link to its final files? Also migration 065. */
+function board_version_links_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'progress_versions', 'link');
+    return $ok;
+}
+
+/** Has migration 065 run? A review is a comment that names its version. */
+function board_reviews_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'ticket_comments', 'version_id');
+    return $ok;
+}
+
+/**
+ * Who makes reviews rather than versions: supervisors, Production and admins
+ * (David, 2026-10-22). Artists put work up; these people say what to change.
+ */
+function board_is_reviewer(): bool {
+    return is_admin() || can_edit() || is_supervisor();
+}
+
 /** Has migration 063 run? Until it has, the tab says so instead of failing. */
 function board_versions_available(PDO $pdo): bool {
     static $ok = null;
@@ -1284,6 +1335,45 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     // resolves against, so a highlighted name is always somebody who was told.
     $people = board_assignees($pdo, $projectId);
 
+    // REVIEWS (David, 2026-10-22): supervisors, Production and admins "make a
+    // review" against a version rather than putting one up. A review is a
+    // comment that names its version (migration 065), so it is read here from
+    // the same table, with its files and its mentions.
+    $reviewsOn = board_comments_available($pdo) && board_reviews_available($pdo);
+    $reviewer  = $mayPost && $reviewsOn && board_is_reviewer();
+    $reviews = [];      // version id => [comment rows]
+    $files   = [];      // comment id => [attachments]
+    $named   = [];      // comment id => [names as written]
+    if ($reviewsOn && $progressId) {
+        $q = $pdo->prepare(
+            'SELECT c.id, c.version_id, c.body, c.created_at, u.display_name
+               FROM ticket_comments c
+               LEFT JOIN users u ON u.id = c.user_id
+              WHERE c.progress_id = ? AND c.version_id IS NOT NULL
+              ORDER BY c.created_at, c.id'
+        );
+        $q->execute([(int)$progressId]);
+        $ids = [];
+        foreach ($q as $r) { $reviews[(int)$r['version_id']][] = $r; $ids[] = (int)$r['id']; }
+        if ($ids) {
+            $in = implode(',', $ids);
+            try {
+                foreach ($pdo->query('SELECT * FROM ticket_attachments WHERE comment_id IN (' . $in . ')
+                                       ORDER BY created_at, id') as $a) {
+                    $files[(int)$a['comment_id']][] = $a;
+                }
+            } catch (PDOException $e) {
+                $files = [];
+            }
+            if (ticket_mentions_available($pdo)) {
+                foreach ($pdo->query('SELECT comment_id, named_as FROM ticket_mentions
+                                       WHERE comment_id IN (' . $in . ')') as $m) {
+                    $named[(int)$m['comment_id']][] = (string)$m['named_as'];
+                }
+            }
+        }
+    }
+
     $out = '';
     if (!$versions) {
         $out .= '<p class="muted small">No versions yet. The first file put up here is '
@@ -1295,6 +1385,8 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             $url = 'attachment.php?kind=version&amp;id=' . (int)$v['id'];
             $name = e((string)$v['original_name']);
             $isTop = $i === 0;
+            $vid = (int)$v['id'];
+            $mine = $reviews[$vid] ?? [];
 
             $out .= '<li class="version' . ($isTop ? ' is-current' : '') . '">'
                   . '<div class="version-head">'
@@ -1302,6 +1394,17 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . ($isTop ? '<span class="version-tag">current</span>' : '')
                   . '<span class="muted small">' . e($v['display_name'] ?? 'Someone') . ' · '
                   . e(date('j M Y · g:i A', strtotime((string)$v['created_at']))) . '</span>';
+
+            // AT THE TOP OF EVERY VERSION (David, 2026-10-22): the way to its
+            // review notes, or — for a reviewer, where there are none yet — the
+            // way to start them, with this version already picked in the form.
+            if ($mine) {
+                $out .= '<button type="button" class="version-reviews-btn" aria-expanded="false"'
+                      . ' data-version-reviews="vr' . $vid . '">Review notes · ' . count($mine) . '</button>';
+            } elseif ($reviewer) {
+                $out .= '<button type="button" class="version-reviews-btn" data-review-version="' . $vid
+                      . '">Make a review</button>';
+            }
 
             // Yours to remove, or an admin's — and only while it is the latest,
             // because taking a version out of the middle would leave a gap in a
@@ -1311,6 +1414,35 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                       . (int)$v['id'] . '" title="Remove this version">&times;</button>';
             }
             $out .= '</div>';
+
+            // The thread itself, under the head and shut until asked for: a
+            // version with eight notes must not push its own picture off screen.
+            if ($mine) {
+                $out .= '<div class="version-reviews" id="vr' . $vid . '" hidden>';
+                foreach ($mine as $r) {
+                    $cid = (int)$r['id'];
+                    $out .= '<div class="comment version-review"><div class="comment-head"><strong>'
+                          . e($r['display_name'] ?? 'Someone') . '</strong><span class="muted small">'
+                          . e(date('j M Y · g:i A', strtotime((string)$r['created_at']))) . '</span></div>';
+                    // "(attachment)" is the placeholder for a review that is only
+                    // a picture; the picture says it, so the word is not drawn.
+                    if ((string)$r['body'] !== '(attachment)') {
+                        $out .= '<div class="comment-body">'
+                              . ticket_render_body((string)$r['body'], $named[$cid] ?? []) . '</div>';
+                    }
+                    if (!empty($files[$cid])) {
+                        $out .= '<div class="attachment-grid">';
+                        foreach ($files[$cid] as $a) {
+                            ob_start();
+                            render_attachment($a, false);
+                            $out .= ob_get_clean();
+                        }
+                        $out .= '</div>';
+                    }
+                    $out .= '</div>';
+                }
+                $out .= '</div>';
+            }
 
             if (attachment_is_image((string)($v['mime_type'] ?? ''))) {
                 $out .= '<a href="' . $url . '" class="att-zoom version-shot" data-name="' . $name
@@ -1324,6 +1456,10 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
 
             $out .= '<div class="version-meta muted small"><span title="' . $name . '">' . $name
                   . '</span> · ' . e(human_size((int)$v['file_size'])) . '</div>';
+            if (trim((string)($v['link'] ?? '')) !== '') {
+                $out .= '<a class="version-files-btn" href="' . e((string)$v['link'])
+                      . '" target="_blank" rel="noopener">Open final files</a>';
+            }
             if (trim((string)($v['note'] ?? '')) !== '') {
                 // Names resolved at render time rather than stored: a version note
                 // is not a comment and has no row in ticket_mentions, and the
@@ -1344,7 +1480,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     if ($mayPost) {
         // "Upload new version", not "Put up v02" (David, 2026-10-22): the
         // number is the app's business, and the version list says what it was.
-        $form = '<form class="comment-form board-version-form" method="post"'
+        $upload = '<form class="comment-form board-version-form" method="post"'
               . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
               . ' data-item="' . e($itemKey) . '">'
@@ -1361,14 +1497,57 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
               . '<textarea name="note" rows="2" class="board-comment-box" required'
               . ' placeholder="Fixed the camera move on the tail… type @ to name a reviewer"></textarea>'
               . '</label>'
+              // Where the final files live (David, 2026-10-22), optional: a
+              // work-in-progress round may have nothing worth linking yet.
+              . (board_version_links_available($pdo)
+                  ? '<label>Link to the final files <small class="muted">(Drive or LucidLink, optional)</small>'
+                    . '<input type="url" name="link" maxlength="500" placeholder="https://…"></label>'
+                  : '')
               . '<p class="muted small">Each file is its own version, in the order you pick them. '
               . 'Naming somebody rings their bell and emails them.</p>'
               . '<button type="submit" class="primary board-version-post">Send for review</button>'
-              . '</form>'
-              . '<script type="application/json" class="board-comment-people">'
-              . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
-                            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
-              . '</script>';
+              . '</form>';
+
+        if ($reviewer && $versions) {
+            // MAKE A REVIEW, for the people who review (David, 2026-10-22): which
+            // version it is about, what to change, and pictures pasted straight
+            // into the text or picked from disk. Uploading a version stays one
+            // click away, for the day a supervisor paints over a frame.
+            $opts = '';
+            foreach ($versions as $i => $v) {
+                $opts .= '<option value="' . (int)$v['id'] . '"' . ($i === 0 ? ' selected' : '') . '>'
+                       . e(version_label((int)$v['version_no'])) . ($i === 0 ? ' (current)' : '')
+                       . '</option>';
+            }
+            $form = '<form class="comment-form board-version-form board-review-form" method="post"'
+                  . ' enctype="multipart/form-data"'
+                  . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
+                  . ' data-item="' . e($itemKey) . '">'
+                  . '<input type="hidden" name="add_review" value="1">'
+                  . '<div class="board-review-top"><span class="board-version-title">Make a review</span>'
+                  . '<label class="board-review-version">on <select name="version_id"'
+                  . ' aria-label="Which version this review is about">' . $opts . '</select></label></div>'
+                  . '<label>Notes'
+                  . '<textarea name="body" rows="3" class="board-comment-box board-review-box"'
+                  . ' placeholder="What to change… paste an image straight in, type @ to name somebody">'
+                  . '</textarea></label>'
+                  . '<label class="board-comment-files">Attach files'
+                  . '<input type="file" name="attachments[]" multiple>'
+                  . '</label>'
+                  . '<p class="muted small board-review-pasted" hidden></p>'
+                  . '<p class="muted small">Pasted images and picked files go with the review. '
+                  . 'Naming somebody rings their bell and emails them.</p>'
+                  . '<button type="submit" class="primary board-version-post">Post review</button>'
+                  . '</form>'
+                  . '<details class="board-upload-instead"><summary>Upload a new version instead</summary>'
+                  . $upload . '</details>';
+        } else {
+            $form = $upload;
+        }
+        $form .= '<script type="application/json" class="board-comment-people">'
+               . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
+                             JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
+               . '</script>';
     }
     return $form . $out;
 }

@@ -585,9 +585,9 @@
   var panelClose = document.getElementById('boardPanelClose');
   var cameFrom = null;              // the button that opened it, to return focus to
 
-  // tab: open on that tab rather than Details — the Comments column's circle
-  // leads straight to the conversation it counts.
-  function panelOpen(btn, tab) {
+  // tab: open on that tab rather than Details. reviewsOf: a version id whose
+  // review notes to show — the Notes column leads straight to what it counts.
+  function panelOpen(btn, tab, reviewsOf) {
     if (!panel) return;
     cameFrom = btn;
     panelInner.innerHTML = '<p class="muted small">Opening…</p>';
@@ -609,6 +609,12 @@
         paneReady('comments');
         paneReady('versions');
         if (tab) showTab(tab);
+        if (reviewsOf) {
+          var thread = panelInner.querySelector('#vr' + CSS.escape(String(reviewsOf)));
+          var opener = panelInner.querySelector('[data-version-reviews="vr' + CSS.escape(String(reviewsOf)) + '"]');
+          if (thread) { thread.hidden = false; thread.scrollIntoView({ block: 'start' }); }
+          if (opener) opener.setAttribute('aria-expanded', 'true');
+        }
       })
       .catch(function () {
         panelInner.innerHTML = '<p class="err">That did not open. Check your connection and try again.</p>';
@@ -627,8 +633,9 @@
   document.addEventListener('click', function (e) {
     var open = e.target.closest ? e.target.closest('.board-open-task') : null;
     if (open) { panelOpen(open); return; }
-    var talk = e.target.closest ? e.target.closest('.board-comment-dot') : null;
-    if (talk) { panelOpen(talk, 'comments'); return; }
+    // The Notes column: straight to that version's review notes, shown.
+    var notesBtn = e.target.closest ? e.target.closest('.board-notes-btn') : null;
+    if (notesBtn) { panelOpen(notesBtn, 'versions', notesBtn.getAttribute('data-version')); return; }
     if (e.target === veil) panelShut();
     var tab = e.target.closest ? e.target.closest('.panel-tab') : null;
     if (tab) {
@@ -738,6 +745,30 @@
 
     if (form && e.target.closest('[data-reply-cancel]')) replyTo(form, '', '');
 
+    // A version's own button (2026-10-22): its review notes, shown or hidden in
+    // place, or — where there are none and you review — the form, set to it.
+    var notes = e.target.closest('.version-reviews-btn');
+    if (notes && panelInner && panelInner.contains(notes)) {
+      var target = notes.getAttribute('data-version-reviews');
+      if (target) {
+        var thread = panelInner.querySelector('#' + CSS.escape(target));
+        if (thread) {
+          thread.hidden = !thread.hidden;
+          notes.setAttribute('aria-expanded', thread.hidden ? 'false' : 'true');
+        }
+      } else {
+        var rf = panelInner.querySelector('.board-review-form');
+        if (rf) {
+          var pick = rf.querySelector('select[name="version_id"]');
+          if (pick) pick.value = notes.getAttribute('data-review-version');
+          rf.scrollIntoView({ block: 'nearest' });
+          var rb = rf.querySelector('.board-review-box');
+          if (rb) rb.focus();
+        }
+      }
+      return;
+    }
+
     // Jumping to the Versions tab from the Current version line on Details.
     var jump = e.target.closest('.panel-tab-link');
     if (jump && panelInner && panelInner.contains(jump)) {
@@ -795,7 +826,8 @@
     var picker = form.querySelector('input[type="file"]');
 
     // A comment needs words or a file; a version IS a file, so it needs one.
-    if (which === 'comments') {
+    // A review, like a comment, needs words or a picture.
+    if (which === 'comments' || form.classList.contains('board-review-form')) {
       var hasFile = picker && picker.files && picker.files.length > 0;
       if ((!box || !box.value.trim()) && !hasFile) { if (box) box.focus(); return; }
     } else if (!picker || !picker.files || !picker.files.length) {
@@ -838,6 +870,47 @@
   // not a screen of four hundred rows with "somewhere in here" as the
   // instruction. The group it sits in has to be opened first, because the board
   // starts with every item collapsed.
+  // --- pasting a picture into a review -----------------------------------------
+  //
+  // David, 2026-10-22: "make sure you can just copy paste images directly into
+  // the text field". A pasted image is turned into a FILE on the review's own
+  // file input, so it travels exactly as a picked file does — one uploader, one
+  // MIME check on the server — and the line under the box says what is going.
+  document.addEventListener('paste', function (e) {
+    var box = e.target.closest ? e.target.closest('.board-review-box') : null;
+    if (!box || !e.clipboardData) return;
+    var form = box.closest('form');
+    var input = form ? form.querySelector('input[type="file"][name="attachments[]"]') : null;
+    if (!input || typeof DataTransfer === 'undefined') return;
+
+    var images = [];
+    Array.prototype.forEach.call(e.clipboardData.items || [], function (it) {
+      if (it.kind === 'file' && /^image\//.test(it.type)) {
+        var f = it.getAsFile();
+        if (f) images.push(f);
+      }
+    });
+    if (!images.length) return;     // text pastes as text, untouched
+    e.preventDefault();
+
+    var dt = new DataTransfer();
+    Array.prototype.forEach.call(input.files || [], function (f) { dt.items.add(f); });
+    images.forEach(function (f, i) {
+      // Screenshots all arrive as "image.png"; numbered so three are three.
+      var ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      var name = 'pasted-' + (dt.items.length + 1) + '.' + ext;
+      dt.items.add(new File([f], name, { type: f.type }));
+    });
+    input.files = dt.files;
+
+    var said = form.querySelector('.board-review-pasted');
+    if (said) {
+      said.hidden = false;
+      said.textContent = 'Going with the review: '
+        + Array.prototype.map.call(input.files, function (f) { return f.name; }).join(', ');
+    }
+  });
+
   (function openFromUrl() {
     var want = new URLSearchParams(window.location.search).get('open');
     if (!want) return;

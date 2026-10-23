@@ -487,7 +487,10 @@ function artist_may_post(): bool {
         // scope that matters — a show this account can see, a step that applies
         // to that item — and refuses a delete of anything but the LATEST
         // version, by the person who put it up or an admin.
-        'board_version.php' => ['add_version', 'delete_version'],
+        // add_review (2026-10-22): a supervisor's review of a version. The field
+        // is allowed here so a SUPERVISOR (artist permissions plus) can post it;
+        // board_version.php refuses it from anybody board_is_reviewer() says no to.
+        'board_version.php' => ['add_version', 'delete_version', 'add_review'],
         // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
         // About the APPLICATION, not anyone's work, so it writes nothing an
         // artist could not otherwise touch: one new row in bug_reports, filed

@@ -52,13 +52,51 @@ if (!board_versions_available($pdo)) board_version_fail('Versions need database 
 $said = '';
 $bad  = '';
 
+// --- make a review ------------------------------------------------------------
+//
+// David, 2026-10-22: supervisors, Production and admins review a version rather
+// than put one up. A review is a comment on this task that names its version
+// (migration 065), so board_comment_add() does the saving, the mentions, the
+// bell and the email, and save_ticket_attachments() takes the pictures — pasted
+// or picked, they arrive as the same files[] field.
+if (isset($_POST['add_review'])) {
+    if (!board_is_reviewer()) {
+        $bad = 'Reviews are made by supervisors, Production and admins.';
+    } elseif (!board_reviews_available($pdo)) {
+        $bad = 'Reviews need database update 065.';
+    } else {
+        $files = isset($_FILES['attachments']) ? normalize_files_array($_FILES['attachments']) : [];
+        $hasFiles = (bool)array_filter($files, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        $pq = $pdo->prepare('SELECT code, name FROM projects WHERE id = ?');
+        $pq->execute([$projectId]);
+        $project = $pq->fetch() ?: ['code' => '', 'name' => ''];
+        try {
+            [$commentId, $said] = board_comment_add(
+                $pdo, $projectId, $stepId, $itemKey, (string)($_POST['body'] ?? ''), null, $userId,
+                [
+                    'step_name'    => (string)$detail['step']['name'],
+                    'item_name'    => (string)$detail['item']['name'],
+                    'project_code' => (string)$project['code'],
+                    'project_name' => (string)$project['name'],
+                ],
+                $hasFiles, (int)($_POST['version_id'] ?? 0) ?: null
+            );
+            if ($hasFiles) {
+                $res = save_ticket_attachments($pdo, $files, 0, $commentId, $userId);
+                if ($res['saved'])  $said .= ' ' . $res['saved'] . ' file(s) attached.';
+                if ($res['errors']) $said .= ' ' . implode(' ', $res['errors']);
+            }
+        } catch (Throwable $e) {
+            $bad = $e->getMessage();
+        }
+    }
 // --- take the latest version back -------------------------------------------
 //
 // ⚠ THE LATEST ONLY, and that is a rule rather than an oversight. Versions are
 // quoted at each other ("looks good on v03"), so removing one from the middle
 // would leave a hole in a sequence people are using as a shared reference. The
 // top one is the only one nobody has had time to refer to yet.
-if (isset($_POST['delete_version'])) {
+} elseif (isset($_POST['delete_version'])) {
     $vid = (int)$_POST['delete_version'];
     $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
     $q = $pdo->prepare(
@@ -93,17 +131,32 @@ if (isset($_POST['delete_version'])) {
     // --- put one up ---------------------------------------------------------
     $files = isset($_FILES['versions']) ? normalize_files_array($_FILES['versions']) : [];
     $any = (bool)array_filter($files, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+    $link = trim((string)($_POST['link'] ?? ''));
     if (!$any) {
         $bad = 'Pick a file first — a version is a file.';
     } elseif (trim((string)($_POST['note'] ?? '')) === '') {
         // Required since 2026-10-22, here as well as on the form: a browser
         // without the `required` check, or a script, must not slip one past.
         $bad = 'Say what changed — a version needs a note so the reviewer knows what to look at.';
+    } elseif ($link !== '' && !preg_match('~^https?://~i', $link)) {
+        // Only a web address: anything else in an href is either a typo or a
+        // javascript: link waiting for a click.
+        $bad = 'The link has to be a web address starting with https:// — nothing was saved.';
     } else {
         // The progress row is created if the importer never made one, exactly
         // as a comment or a first status does.
         $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey, true);
         $res = save_task_versions($pdo, $files, $pid, $userId, (string)($_POST['note'] ?? ''));
+        if ($res['saved'] > 0 && $link !== '' && board_version_links_available($pdo)) {
+            // The link belongs to what this upload just made: the top $saved
+            // versions. Copied to the task's own Link (migration 057) as well, so
+            // the board column shows where the latest files are.
+            $pdo->prepare('UPDATE progress_versions SET link = ? WHERE progress_id = ? AND version_no > ?')
+                ->execute([mb_substr($link, 0, 500), $pid, $res['latest'] - $res['saved']]);
+            if (column_exists($pdo, 'progress', 'link')) {
+                $pdo->prepare('UPDATE progress SET link = ? WHERE id = ?')->execute([mb_substr($link, 0, 500), $pid]);
+            }
+        }
         if ($res['saved'] > 0) {
             $label = version_label($res['latest']);
             $said = $res['saved'] === 1

@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Spell: reviews on versions, a Notes column, links to final files *(needs migration 065)*
+
+- **Make a review** (supervisors, Production, admins): on the Versions tab, pick which version it
+  is about, write notes, and paste images straight into the text or attach files. Naming somebody
+  rings their bell and emails them. Uploading a new version is still there, one click away.
+- **Every version has a button at its top**: *Review notes · N* to show its notes, or *Make a
+  review* to start one with that version already picked. Reviews also appear on the Comments tab,
+  marked "review of v02".
+- **The Comments column is now Notes**: a button with how many review notes the current version
+  has, opening the task straight to them. The Version column is a button too.
+- **Link to the final files** (Drive or LucidLink) can be left with a version. It shows as *Open
+  final files* on that version and fills the task's Link column.
+
 ## 2026-10-22 — Spell: Version and Comments columns; a note on every version *(no migration)*
 
 - **Version column:** each task shows its current version (v03). Click it to open the latest
