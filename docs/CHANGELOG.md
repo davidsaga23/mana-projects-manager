@@ -14,12 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-10-23 — Invoice notes show in the invoice list *(no migration)*
+## 2026-10-23 — Invoice notes: a Notes column you can type in *(no migration)*
 
-- **A project's Finance management → Invoices list now prints each invoice's notes**, as a small
-  grey line under the person's name (the way the expense projection shows its own notes). The
-  Record invoices form always saved a Notes box and the finance database always had the column;
-  the list just never showed it, so a note was effectively write-only.
+- **A project's Finance management → Invoices list has a Notes column**, and each row's note is a
+  box you can type in: press Enter or click away and it saves (only the note; nothing else on the
+  invoice changes). Empty the box to clear it. So a note can go on an invoice recorded weeks ago.
+- Same day, first pass (#86): the list printed notes as a grey line under the name, but only for
+  invoices that already had one, and there was no way to add one afterwards, so on most screens
+  nothing appeared. The Record invoices form always saved a Notes box and the finance database
+  always had the column; the list just never showed it.
 - The Notes box in Record invoices is the last one on the right of the grid; it now has a
   placeholder and the help text above the form says where it is.
 

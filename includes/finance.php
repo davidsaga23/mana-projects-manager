@@ -915,6 +915,22 @@ function save_invoices_bulk(array $rows, array $project, array $positionMap, str
     return $out;
 }
 
+/**
+ * Change only the note on an invoice already recorded — the Notes box in the
+ * invoice list. Deliberately NOT save_invoice(): that writes every column from
+ * what it is given, so a form carrying just the note would wipe the amount, the
+ * dates and the status. An empty box clears the note.
+ */
+function save_invoice_notes(int $id, string $notes, string $who = ''): string {
+    if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    $db = finance_db();
+    if (!$db) throw new RuntimeException('The finance database is not set up yet.');
+    $notes = trim($notes);
+    $db->prepare('UPDATE invoices SET notes = ?, updated_by = ? WHERE id = ?')
+       ->execute([$notes !== '' ? $notes : null, $who, $id]);
+    return $notes !== '' ? 'Note saved.' : 'Note cleared.';
+}
+
 /** Remove an invoice. */
 function delete_invoice(int $id): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');

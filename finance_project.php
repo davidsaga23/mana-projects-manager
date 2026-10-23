@@ -194,6 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } elseif (isset($_POST['save_invoice'])) {
             flash('ok', save_invoice($_POST, $project, $who));
+        } elseif (isset($_POST['save_invoice_notes'])) {
+            flash('ok', save_invoice_notes((int)$_POST['save_invoice_notes'], (string)($_POST['notes'] ?? ''), $who));
         } elseif (isset($_POST['delete_invoice'])) {
             flash('ok', delete_invoice((int)$_POST['delete_invoice']));
         }
@@ -1637,23 +1639,13 @@ if ($retakePct <= 0):
   <table>
     <thead>
       <tr><th>Who</th><th>Position</th><th>Ref</th><th>Period</th><th class="num">Amount</th>
-          <th>Issued</th><th>Due</th><th>Status</th><th></th></tr>
+          <th>Issued</th><th>Due</th><th>Status</th><th>Notes</th><th></th></tr>
     </thead>
     <tbody>
     <?php foreach ($invoices as $iv):
       $late = !$iv['paid_date'] && $iv['due_date'] && $iv['due_date'] < $todayStr; ?>
       <tr class="<?= $late ? 'row-overdue' : '' ?>">
-        <?php // Notes as a quiet line under the name, the way the expense table
-              // shows its own, rather than a tenth column: they are rare, can
-              // run to a sentence, and a column would be empty on most rows and
-              // squeeze the dates on the rest. They were always saved by the form
-              // below; until 2026-10-23 this table simply never printed them, so
-              // a note typed in was only ever seen again in phpMyAdmin. ?>
-        <td><?= e($iv['crew_name'] ?: '—') ?>
-          <?php if (!empty($iv['notes'])): ?>
-            <div class="muted small"><?= e($iv['notes']) ?></div>
-          <?php endif; ?>
-        </td>
+        <td><?= e($iv['crew_name'] ?: '—') ?></td>
         <td class="muted small"><?= e($iv['step_name'] ?: '') ?: '<span class="warn-text">unattached</span>' ?></td>
         <td class="muted small">
           <?php if (!empty($iv['document_url'])): ?>
@@ -1667,6 +1659,24 @@ if ($retakePct <= 0):
         <td><?= $iv['paid_date']
               ? '<span class="ok">paid ' . e($iv['paid_date']) . '</span>'
               : '<span class="' . ($iv['status'] === 'disputed' ? 'err' : 'warn-text') . '">' . e($iv['status']) . '</span>' ?></td>
+        <?php // ⚠ NOTES ARE EDITABLE IN PLACE, the one field on a recorded invoice
+              // that is. A note is what you learn AFTER recording ("paid by wire,
+              // fee deducted", "disputed: missing week 3"), so a note box that
+              // only exists at recording time is a note nobody writes. Until
+              // 2026-10-23 this table did not even print them.
+              //
+              // Saves when you press Enter or leave the box. It posts only the id
+              // and the note to save_invoice_notes(), never the whole invoice:
+              // save_invoice() rewrites every column, and a form that sent only
+              // the note through it would blank the rest. ?>
+        <td>
+          <form method="post" class="invoice-note">
+            <input type="hidden" name="save_invoice_notes" value="<?= (int)$iv['id'] ?>">
+            <input name="notes" value="<?= e($iv['notes'] ?? '') ?>" size="22" maxlength="2000"
+                   placeholder="add a note" title="Press Enter or click away to save"
+                   onchange="this.form.submit()">
+          </form>
+        </td>
         <td class="row-actions">
           <form method="post" onsubmit="return confirm('Remove this invoice?');">
             <button type="submit" name="delete_invoice" value="<?= (int)$iv['id'] ?>" class="link-danger">remove</button>
@@ -1687,7 +1697,7 @@ if ($retakePct <= 0):
           <th class="num"><?= e(fmt_money_plain(
                 ($stop['paid'][$c] ?? 0) + ($stop['unpaid'][$c] ?? 0), $c)) ?></th>
           <th colspan="2"><?= e(fmt_money_plain($stop['paid'][$c] ?? 0, $c)) ?> paid</th>
-          <th colspan="2"><?= ($stop['unpaid'][$c] ?? 0) > 0
+          <th colspan="3"><?= ($stop['unpaid'][$c] ?? 0) > 0
                   ? '<span class="warn-text">' . e(fmt_money_plain($stop['unpaid'][$c], $c)) . ' outstanding</span>'
                   : 'nothing outstanding' ?></th>
         </tr>
@@ -1710,8 +1720,8 @@ if ($retakePct <= 0):
   each was six page loads to do one afternoon's bookkeeping. Only the <strong>amount</strong> is
   required; blank rows are ignored. A row with details but no amount is <em>not</em> ignored, it
   is reported, because that is somebody who was interrupted mid-typing rather than a row nobody
-  wanted. <strong>Notes</strong> is the last box on the right (scroll the grid sideways); whatever
-  goes there shows under the name in the list above.
+  wanted. <strong>Notes</strong> is the last box on the right (scroll the grid sideways); a note
+  can also be added or changed later, straight in the Notes column of the list above.
 </p>
 
 <form method="post">
@@ -1766,7 +1776,7 @@ if ($retakePct <= 0):
             <td><input type="date" name="<?= $n ?>[due_date]"></td>
             <td><input type="date" name="<?= $n ?>[paid_date]"></td>
             <td><input type="url" name="<?= $n ?>[document_url]" size="16" placeholder="https://drive.google.com/…"></td>
-            <td><input name="<?= $n ?>[notes]" size="18" placeholder="Shown under the name above"></td>
+            <td><input name="<?= $n ?>[notes]" size="18" placeholder="optional"></td>
           </tr>
         <?php endfor; ?>
       </tbody>
