@@ -21,6 +21,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/board.php';
 require_once __DIR__ . '/includes/uploads.php';
+require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
 require_login();
 
 header('Content-Type: text/html; charset=utf-8');
@@ -100,9 +101,46 @@ if (isset($_POST['delete_version'])) {
         $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey, true);
         $res = save_task_versions($pdo, $files, $pid, $userId, (string)($_POST['note'] ?? ''));
         if ($res['saved'] > 0) {
+            $label = version_label($res['latest']);
             $said = $res['saved'] === 1
-                ? (version_label($res['latest']) . ' is up.')
-                : ($res['saved'] . ' versions up, now at ' . version_label($res['latest']) . '.');
+                ? ($label . ' sent for review.')
+                : ($res['saved'] . ' versions sent for review, now at ' . $label . '.');
+
+            // --- tell anybody the note named -------------------------------
+            //
+            // David, 2026-10-22: "make sure we can tag people in the versions".
+            // The same promise a comment makes, through the same two doors: the
+            // bell first (always there next time they open Anima), the email
+            // second (a courtesy that may fail, and says so). Once per upload,
+            // however many files it carried — it is one request for review.
+            $note = trim((string)($_POST['note'] ?? ''));
+            $named = $note !== '' ? ticket_parse_mentions($note, board_assignees($pdo, $projectId)) : [];
+            if ($named) {
+                $pq = $pdo->prepare('SELECT code, name FROM projects WHERE id = ?');
+                $pq->execute([$projectId]);
+                $project = $pq->fetch() ?: ['code' => '', 'name' => ''];
+                $stepName = (string)$detail['step']['name'];
+                $itemName = (string)$detail['item']['name'];
+
+                notify_add($pdo, array_keys($named), [
+                    'kind'        => 'mention',
+                    'actor'       => current_user_display(),
+                    'summary'     => $label . ' of ' . trim($stepName . ' on ' . $itemName, ' on '),
+                    'project_id'  => $projectId,
+                    'step_id'     => $stepId,
+                    'item_key'    => $itemKey,
+                    'progress_id' => $pid,
+                ], (int)(effective_crew_id($pdo) ?? 0));
+
+                [, $more] = notify_mentioned_task($pdo, array_keys($named),
+                    $label . ' is up for review: ' . $note, current_user_display(), [
+                        'project_id'   => $projectId, 'step_id' => $stepId, 'item_key' => $itemKey,
+                        'step_name'    => $stepName,  'item_name' => $itemName,
+                        'project_code' => (string)$project['code'],
+                        'project_name' => (string)$project['name'],
+                    ]);
+                if ($more !== '') $said .= ' ' . $more;
+            }
         }
         // Reported, never swallowed: a file that silently vanishes looks exactly
         // like one that worked.
