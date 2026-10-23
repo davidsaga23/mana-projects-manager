@@ -123,4 +123,12 @@ return [
     // -------------------------------------------------------------------------
     'upload_max_bytes' => 25 * 1024 * 1024,  // 25 MB per file
     'upload_max_files' => 5,
+
+    // -------------------------------------------------------------------------
+    // Bug export (bugs_export.php), read by tools/pull_bugs.py so Claude can
+    // work through the bug reports. A long random secret, 32+ characters; the
+    // same value goes in tools/.bug_key on the machine that pulls. Leave it
+    // empty and the export is switched off.
+    // -------------------------------------------------------------------------
+    'bug_export_key' => '',
 ];
