@@ -3552,6 +3552,8 @@ button.secondary.danger:hover { background: var(--danger-border); }
   /* Stacked, the seven-column filter row has nothing to line up with. */
   .board-sticky { position: static; }
   .board-filters { grid-template-columns: 1fr 1fr; }
+  /* Two columns here, so "the last three" would reach off the left edge. */
+  .board-filter-actions { grid-column: 1 / -1; }
 }
 
 /* ⚠ THE GROUP'S BAR IS THE SAME WIDTH AS ITS SHOTS', so the two line up at both
@@ -3699,10 +3701,15 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-bar-project .board-bar-pop { left: 0; }
 
 /* Expand and collapse ride with the filters, spanning the columns that have
-   nothing to filter. */
+   nothing to filter: Frames, Link and Notes, the last three of the ten.
+   ⚠ COUNTED FROM THE RIGHT (-4 / -1), not from the left. It said 7 / -1, which
+   was right until Step and Ready moved into the first column and a column was
+   added; column 7 became the Due filter's, and the buttons fell to a row of
+   their own (David, 2026-10-23: "let's line up these ones"). The last three
+   columns stay the last three however the left side is rearranged. */
 .board-filter-actions {
-  grid-column: 7 / -1; display: flex; gap: 6px; justify-content: flex-end;
-  padding-right: 0;
+  grid-column: -4 / -1; display: flex; gap: 6px; justify-content: flex-end;
+  padding-right: 0; min-width: 0;
 }
 .board-filter-actions button {
   min-height: 30px; margin: 0; padding: 4px 11px; border-radius: 7px;
