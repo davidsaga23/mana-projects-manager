@@ -194,8 +194,11 @@ function notify_link(array $n): string {
              . (!empty($n['comment_id']) ? '#c' . (int)$n['comment_id'] : '');
     }
     if (!empty($n['project_id']) && !empty($n['step_id']) && !empty($n['item_key'])) {
-        // board.php reads `open` and opens that task's panel for you.
-        return 'board.php?project=' . (int)$n['project_id']
+        // spell.php reads `open` and opens that task's panel for you. (The
+        // screen was still called the Board when this was written; board.php
+        // is now a 301 that keeps the query string, so old bells still work —
+        // but a new one should not spend a redirect.)
+        return 'spell.php?project=' . (int)$n['project_id']
              . '&open=' . rawurlencode($n['step_id'] . ':' . $n['item_key']);
     }
     return 'mytasks.php';

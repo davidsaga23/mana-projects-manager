@@ -157,6 +157,27 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
       </select>
     </div>
+    <div>
+      <?php // ⚠ A SUPERVISOR'S TWO CONTROLS, and the reason this screen folded
+            // in the tracking grid's question (David, during the design: "it's
+            // still useful if I'm a supervisor taking a look at what
+            // shots/assets are ready for my department"). Step narrows the
+            // board to one department; Ready narrows it to the work that can
+            // actually start today. Together they answer "what can my people
+            // pick up this morning" in two clicks. ?>
+      <select id="fStep" aria-label="Filter by pipeline step">
+        <option value="">Any step</option>
+        <?php foreach ($board['steps'] as $st): ?>
+          <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <select id="fReady" aria-label="Filter by whether the work can start">
+        <option value="">Started or not</option>
+        <option value="1">Ready to pick up</option>
+      </select>
+    </div>
     <div class="board-due-filter">
       <select id="fDue" aria-label="Filter by due date">
         <option value="">Any date</option>
@@ -317,6 +338,10 @@ require __DIR__ . '/includes/header.php';
                  data-search="<?= e(strtolower($item['name'] . ' ' . $t['step'] . ' ' . ($t['person'] ?? ''))) ?>"
                  data-status="<?= $t['status_id'] !== null ? (int)$t['status_id'] : '__none' ?>"
                  data-crew="<?= $t['crew_id'] !== null ? (int)$t['crew_id'] : '__none' ?>"
+                 data-step-id="<?= (int)$t['step_id'] ?>"
+                 <?php // Worked out in pipeline order by board_data(): nothing
+                       // before it outstanding, and nobody started it yet. ?>
+                 data-ready="<?= !empty($t['ready']) ? '1' : '0' ?>"
                  data-due="<?= e((string)($t['due'] ?? '')) ?>">
               <div class="board-cell-name board-task-name">
                 <span class="board-dot board-dot-step" style="background:<?= e($t['step_color'] ?: 'var(--step-default)') ?>"></span>
