@@ -413,6 +413,13 @@ require __DIR__ . '/includes/header.php';
 <?php // The @ picker, shared with the ticket screen: the Comments tab in the
       // task panel uses the same one rather than a second of its own. ?>
 <script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<?php // ⚠ FOR THE LIGHTBOX AND NOTHING ELSE. assets/tickets.js carries two
+      // things: an uploader that only wakes for form[data-ticket-form] (none
+      // here), and the attachment lightbox, which is delegated from `document`
+      // and so works on a version thumbnail that arrives with the panel. David
+      // asked to "open a preview"; this is the preview the ticket screen has
+      // had since the start, rather than a second one written for this tab. ?>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
 <script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
 <?php endif; ?>
 

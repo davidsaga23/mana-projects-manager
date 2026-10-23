@@ -60,6 +60,7 @@ $mayComment = !preview_blocks_saving();
 $progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
 $commentCount = $progressId
     ? count(board_task_comments($pdo, $progressId)['comments']) : 0;
+$versionCount = $progressId ? count(board_task_versions($pdo, $progressId)) : 0;
 
 // A mention stops being new when the person OPENS the task it is on, which is
 // this request — not when they glance at the list on My tasks, which is a
@@ -99,6 +100,10 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
     if ($commentCount): ?> <span class="muted">· <?= $commentCount ?></span><?php endif; ?></button>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="activity">Activity<?php
     if ($detail['activity']): ?> <span class="muted">· <?= count($detail['activity']) ?></span><?php endif; ?></button>
+  <?php // Last, after Activity, where David asked for it: what the task IS,
+        // what people SAID, what HAPPENED, and then what was DELIVERED. ?>
+  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions<?php
+    if ($versionCount): ?> <span class="muted">· <?= $versionCount ?></span><?php endif; ?></button>
 </div>
 
 <div class="panel-body" data-pane="details">
@@ -123,25 +128,27 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
     <?= board_text_cell($t, 'link', $projectId, $mayEdit && $linkReady, 'https://…') ?>
     <?php if (!$linkReady): ?><small class="warn-text">Needs database update 057.</small><?php endif; ?>
   </label>
+  <?php // ⚠ READ, NOT TYPED, SINCE 2026-10-22. David: "Version should not be
+        // typed in but got from the number of files uploaded". It is still
+        // `progress.version` and the board column still reads it — what
+        // changed is that save_task_versions() writes it, so nobody can put
+        // "v07" on a task that has three versions. board_api.php refuses the
+        // field now, so a hand-made POST cannot either. ?>
   <label class="panel-field">
-    <span>Version</span>
-    <?= board_text_cell($t, 'version', $projectId, $mayEdit, 'v01') ?>
+    <span>Current version</span>
+    <?php if (trim((string)($t['version'] ?? '')) !== ''): ?>
+      <p class="panel-read"><?= e((string)$t['version']) ?></p>
+    <?php else: ?>
+      <p class="panel-read muted">Nothing up yet</p>
+    <?php endif; ?>
+    <small class="muted">Counted from what is on the <button type="button"
+      class="linkish panel-tab-link" data-tab="versions">Versions</button> tab.</small>
   </label>
   <label class="panel-field">
     <span>Notes</span>
     <?= board_text_cell($t, 'notes', $projectId, $mayEdit, 'Anything worth saying about this task') ?>
   </label>
 
-  <p class="panel-foot muted small">
-    <?php if ($detail['logged'] !== null && $detail['logged'] > 0): ?>
-      <?= e(fmt_num($detail['logged'], 1)) ?> h logged ·
-    <?php endif; ?>
-    <?php if ($item['frames'] !== null): ?>
-      Frames come from the <a href="shots.php?project=<?= $projectId ?>">breakdown</a>
-    <?php else: ?>
-      Edited here and on the board, the same row either way
-    <?php endif; ?>
-  </p>
 </div>
 
 <?php // ⚠ THE SAME ROWS THE TICKET SCREEN SHOWS (migration 059). David,
@@ -152,6 +159,12 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
       // the same function after a post. ?>
 <div class="panel-body" data-pane="comments" hidden>
   <?= board_comments_html($pdo, $projectId, $stepId, $itemKey, $mayComment, $crew) ?>
+</div>
+
+<?php // One renderer for the pane, shared with board_version.php so an upload
+      // re-draws it through the same code that drew it. ?>
+<div class="panel-body" data-pane="versions" hidden>
+  <?= board_versions_html($pdo, $projectId, $stepId, $itemKey, $mayComment) ?>
 </div>
 
 <div class="panel-body" data-pane="activity" hidden>

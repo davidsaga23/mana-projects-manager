@@ -16,11 +16,13 @@ $id = (int)($_GET['id'] ?? 0);
 if (!$id) { http_response_code(400); exit('Bad request'); }
 
 // Three kinds of owner, one serving route. ?kind=project reads the brief's
-// table, ?kind=bug a bug report's (migration 062); anything else reads a
+// table, ?kind=bug a bug report's (migration 062), ?kind=version a task's
+// uploaded version (migration 063); anything else reads a
 // ticket's. Whitelisted rather than interpolated — the table name comes from
 // this file, never from the request.
 $kind = (string)($_GET['kind'] ?? '');
-$table = ['project' => 'project_attachments', 'bug' => 'bug_attachments'][$kind] ?? 'ticket_attachments';
+$table = ['project' => 'project_attachments', 'bug' => 'bug_attachments',
+          'version' => 'progress_versions'][$kind] ?? 'ticket_attachments';
 
 $q = $pdo->prepare("SELECT stored_name, original_name, mime_type, uploaded_by FROM {$table} WHERE id = ?");
 $q->execute([$id]);

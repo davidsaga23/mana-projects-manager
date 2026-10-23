@@ -479,6 +479,15 @@ function artist_may_post(): bool {
         // remove any). Without it the × would draw and then be refused, which
         // is worse than no × at all.
         'board_comment.php' => ['add_comment', 'delete_attachment'],
+        // add_version / delete_version: putting work up for review, and taking
+        // back the one you just put up (2026-10-22). ⚠ ALSO WIDER THAN "your
+        // own row", and for the same reason comments are: the artist doing the
+        // work is the person holding the file, and a review loop only
+        // Production can feed is not a review loop. board_version.php keeps the
+        // scope that matters — a show this account can see, a step that applies
+        // to that item — and refuses a delete of anything but the LATEST
+        // version, by the person who put it up or an admin.
+        'board_version.php' => ['add_version', 'delete_version'],
         // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
         // About the APPLICATION, not anyone's work, so it writes nothing an
         // artist could not otherwise touch: one new row in bug_reports, filed

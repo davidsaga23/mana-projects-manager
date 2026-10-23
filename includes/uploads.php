@@ -152,44 +152,158 @@ function save_attachments(PDO $pdo, array $files, string $table, string $fkColum
             $errors[] = "Only {$maxFiles} files allowed, the rest were skipped.";
             break;
         }
-        if ($f['error'] !== UPLOAD_ERR_OK) {
-            $errors[] = $f['name'] . ': upload failed (' . upload_error_text((int)$f['error']) . ').';
-            continue;
-        }
-        if ($f['size'] > $maxBytes) {
-            $errors[] = $f['name'] . ': too large (' . human_size((int)$f['size'])
-                      . ', max ' . human_size($maxBytes) . ').';
-            continue;
-        }
-
-        $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
-        if (!isset($allowed[$ext])) {
-            $errors[] = $f['name'] . ': that file type is not allowed.';
-            continue;
-        }
-        // Trust the file's contents, not the name someone gave it.
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($f['tmp_name']) ?: '';
-        if (!in_array($mime, $allowed[$ext], true)) {
-            $errors[] = $f['name'] . ": the contents don't match the file type ({$mime}).";
-            continue;
-        }
-
-        $stored = bin2hex(random_bytes(16)) . '.' . $ext;
-        if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $stored)) {
-            $errors[] = $f['name'] . ': could not be saved to disk.';
-            continue;
-        }
+        $ok = accept_upload($f, $dir, $errors);
+        if ($ok === null) continue;
 
         $owner = $ownerId > 0 ? $ownerId : null;      // NULL on a board comment
         $args = $hasComment
-            ? [$owner, $commentId, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId]
-            : [$owner, $stored, mb_substr($f['name'], 0, 255), $mime, (int)$f['size'], $userId];
+            ? [$owner, $commentId, $ok['stored'], $ok['name'], $ok['mime'], $ok['size'], $userId]
+            : [$owner, $ok['stored'], $ok['name'], $ok['mime'], $ok['size'], $userId];
         $ins->execute($args);
         $saved++;
     }
 
     return ['saved' => $saved, 'errors' => $errors];
+}
+
+/**
+ * Check ONE uploaded file and move it into the uploads folder.
+ *
+ * ⚠ THIS IS THE WHOLE DEFENCE, and it is why there is one copy of it. It was
+ * inline in save_attachments() until versions needed the same checks
+ * (migration 063); a second copy is a second place for somebody to leave out
+ * the MIME test, which is the one that stops a .jpg that is really a .php.
+ *
+ * The size and type rules come from config, so a studio can widen them in one
+ * place. The stored name is random — never the name the uploader chose, which
+ * is a path, a duplicate and a collision all at once.
+ *
+ * @param array $errors appended to with a sentence per refusal, by reference
+ * @return array|null ['stored','name','mime','size'] or null if refused
+ */
+function accept_upload(array $f, string $dir, array &$errors): ?array {
+    global $config;
+    $maxBytes = (int)($config['upload_max_bytes'] ?? 25 * 1024 * 1024);
+    $allowed = allowed_upload_types();
+
+    if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $errors[] = $f['name'] . ': upload failed (' . upload_error_text((int)$f['error']) . ').';
+        return null;
+    }
+    if ($f['size'] > $maxBytes) {
+        $errors[] = $f['name'] . ': too large (' . human_size((int)$f['size'])
+                  . ', max ' . human_size($maxBytes) . ').';
+        return null;
+    }
+
+    $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+    if (!isset($allowed[$ext])) {
+        $errors[] = $f['name'] . ': that file type is not allowed.';
+        return null;
+    }
+    // Trust the file's contents, not the name someone gave it.
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($f['tmp_name']) ?: '';
+    if (!in_array($mime, $allowed[$ext], true)) {
+        $errors[] = $f['name'] . ": the contents don't match the file type ({$mime}).";
+        return null;
+    }
+
+    $stored = bin2hex(random_bytes(16)) . '.' . $ext;
+    if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $stored)) {
+        $errors[] = $f['name'] . ': could not be saved to disk.';
+        return null;
+    }
+
+    return [
+        'stored' => $stored,
+        'name'   => mb_substr($f['name'], 0, 255),
+        'mime'   => $mime,
+        'size'   => (int)$f['size'],
+    ];
+}
+
+/** "v01". The number is the record; the padding is presentation. */
+function version_label(int $n): string {
+    return 'v' . str_pad((string)max(1, $n), 2, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Put one or more new versions up against a task (migration 063).
+ *
+ * David, 2026-10-22: "versions will start at v01 and increment by 1 every time
+ * a new version is up". So the caller never picks a number — this does, from
+ * what is already there.
+ *
+ * ⚠ THE NUMBER IS READ AND WRITTEN INSIDE ONE TRANSACTION, and the table
+ * carries UNIQUE (progress_id, version_no). Two people uploading in the same
+ * second therefore collide loudly instead of quietly sharing v04, which is the
+ * bargain next_ticket_seq() makes for a ticket's reference.
+ *
+ * Several files in one go become several versions, in the order they were
+ * picked: six takes of a shot are six versions, not one version with six files.
+ *
+ * @return array{saved:int, errors:string[], latest:int}
+ */
+function save_task_versions(PDO $pdo, array $files, int $progressId, int $userId,
+                            string $note = ''): array {
+    global $config;
+    if ($progressId <= 0) {
+        return ['saved' => 0, 'errors' => ['There is no task to put that against.'], 'latest' => 0];
+    }
+    $maxFiles = (int)($config['upload_max_files'] ?? 5);
+    $dir = ensure_upload_dir();
+    $errors = [];
+    $saved = 0;
+
+    $q = $pdo->prepare('SELECT COALESCE(MAX(version_no), 0) FROM progress_versions WHERE progress_id = ?');
+    $q->execute([$progressId]);
+    $latest = (int)$q->fetchColumn();
+
+    $ins = $pdo->prepare(
+        'INSERT INTO progress_versions
+           (progress_id, version_no, stored_name, original_name, mime_type, file_size, note, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $cleanNote = trim($note) !== '' ? mb_substr(trim($note), 0, 500) : null;
+
+    foreach ($files as $f) {
+        if (($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+        if ($saved >= $maxFiles) {
+            $errors[] = "Only {$maxFiles} files at a time, the rest were skipped.";
+            break;
+        }
+        $ok = accept_upload($f, $dir, $errors);
+        if ($ok === null) continue;
+
+        try {
+            $pdo->beginTransaction();
+            $n = $pdo->prepare(
+                'SELECT COALESCE(MAX(version_no), 0) + 1 FROM progress_versions WHERE progress_id = ?'
+            );
+            $n->execute([$progressId]);
+            $no = (int)$n->fetchColumn();
+            $ins->execute([$progressId, $no, $ok['stored'], $ok['name'], $ok['mime'],
+                           $ok['size'], $cleanNote, $userId ?: null]);
+            $pdo->commit();
+            $latest = max($latest, $no);
+            $saved++;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            // The row failed, so the file on disk belongs to nothing. Remove it
+            // rather than leave a megabyte nobody can ever reach.
+            @unlink($dir . '/' . $ok['stored']);
+            $errors[] = $ok['name'] . ': that version could not be recorded.';
+        }
+    }
+
+    // The label everything else reads. Derived now, never typed.
+    if ($saved > 0) {
+        $pdo->prepare('UPDATE progress SET version = ? WHERE id = ?')
+            ->execute([version_label($latest), $progressId]);
+    }
+
+    return ['saved' => $saved, 'errors' => $errors, 'latest' => $latest];
 }
 
 function upload_error_text(int $code): string {

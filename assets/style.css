@@ -3516,11 +3516,20 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .panel-sep { color: var(--faint); }
 .panel-head h2 { margin: 0; font-size: 23px; letter-spacing: -.022em; }
 
-.panel-tabs { display: flex; gap: 3px; margin: 16px 0 0; border-bottom: 1px solid var(--border-soft); }
+/* Four tabs with counts do not fit a 420px panel at the old padding: "Comments
+   · 2" wrapped its count onto a second line, which pushed the underline off
+   the word it belongs to. The row scrolls sideways instead, and no label
+   breaks. (Versions arrived 2026-10-22 and made it four.) */
+.panel-tabs {
+  display: flex; gap: 3px; margin: 16px 0 0;
+  border-bottom: 1px solid var(--border-soft);
+  overflow-x: auto; scrollbar-width: none;
+}
+.panel-tabs::-webkit-scrollbar { display: none; }
 .panel-tab {
-  padding: 9px 13px; margin-bottom: -1px; background: transparent; border: none;
+  padding: 9px 10px; margin-bottom: -1px; background: transparent; border: none;
   border-bottom: 1.5px solid transparent; color: var(--muted);
-  font-size: 13.5px; cursor: pointer;
+  font-size: 13.5px; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
 }
 .panel-tab.is-on { color: var(--text); border-bottom-color: var(--primary); font-weight: 600; }
 
@@ -3754,6 +3763,53 @@ button.secondary.danger:hover { background: var(--danger-border); }
   .bell-panel { position: fixed; top: 54px; left: 12px; right: 12px; width: auto; }
 }
 
+/* --- Versions and review, in the task panel (David, 2026-10-22) ----------- */
+/* "Versions will start at v01 and increment by 1 every time a new version is
+   up." Newest first, the current one marked, each with a thumbnail you can
+   open full size — the lightbox is the ticket screen's, reached through
+   a.att-zoom. */
+.panel-read {
+  margin: 0; padding: 5px 0; font-size: 14px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.panel-tab-link { font-size: 12px; }
+
+.version-list { list-style: none; margin: 0; padding: 0; }
+.version {
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.version:last-child { border-bottom: 0; }
+.version-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.version-no { font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* The current one says so, because "the top of the list" is a convention and
+   this is the thing people actually ask about. */
+.version-tag {
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--ok-tint); color: var(--ok);
+  font-size: 11px; font-weight: 600; letter-spacing: .01em;
+}
+.version .board-version-del { margin-left: auto; }
+
+.version-shot {
+  display: block; margin-top: 8px; width: 100%;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  background: var(--surface-2);
+}
+.version-shot img, .version-shot video { display: block; width: 100%; height: auto; }
+a.version-shot:hover { border-color: var(--border-strong); }
+
+.version-meta { margin-top: 6px; word-break: break-word; }
+.version-note { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+
+.board-version-form { margin-top: 18px; }
+.board-version-form label { display: block; margin-bottom: 12px; font-size: 13px; }
+.board-version-form input[type=file] {
+  display: block; width: 100%; margin-top: 6px; padding: 6px 0;
+  border: 0; background: none; font-size: 12px; color: var(--text-2);
+}
+.board-version-form textarea { width: 100%; margin-top: 6px; resize: vertical; }
+.board-version-form .board-version-post { margin-top: 4px; }
 /* A report waiting on David (migration 064): a video Claude cannot watch, or a
    question Claude asked. Warn-coloured, because it is the one thing on the page
    asking him to do something. */
