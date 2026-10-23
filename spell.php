@@ -126,6 +126,9 @@ require __DIR__ . '/includes/header.php';
 <div class="board-sticky">
   <div class="board-grid-head">
     <div>Shot and task</div>
+    <?php // Unlabelled on purpose: the button says what it does, and "URL" over
+          // a column of buttons reading "Copy URL" is the same word twice. ?>
+    <div></div>
     <div>Version</div>
     <div class="board-head-center">Notes</div>
     <div>Status</div>
@@ -140,8 +143,31 @@ require __DIR__ . '/includes/header.php';
         // shot, and Link and Notes are filled on 6 and 2 rows of MSD's 147, so
         // a dropdown on either would be furniture. ?>
   <div class="board-filters">
-    <div class="board-filter-count" id="boardCount"></div>
-    <?php // Version and Notes have nothing to filter. ?>
+    <?php // ⚠ THE FIRST CELL CARRIES THREE THINGS, because the filter bar
+          // lines up ONLY while its children land in the same grid tracks as
+          // the headings above. Step and Ready match no column — they narrow
+          // which rows are shown rather than filter one column — so they ride
+          // here under "Shot and task" instead of taking cells of their own,
+          // which is what pushed Due under Link when they were first added. ?>
+    <div class="board-filter-lead">
+      <div class="board-filter-count" id="boardCount"></div>
+      <?php // A supervisor's two (David, during the design: "it's still useful
+            // if I'm a supervisor taking a look at what shots/assets are ready
+            // for my department"). Step picks the department; Ready narrows to
+            // the work that can actually start today. ?>
+      <select id="fStep" aria-label="Filter by pipeline step">
+        <option value="">Any step</option>
+        <?php foreach ($board['steps'] as $st): ?>
+          <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select id="fReady" aria-label="Filter by whether the work can start">
+        <option value="">Started or not</option>
+        <option value="1">Ready to pick up</option>
+      </select>
+    </div>
+    <?php // Copy URL, Version and Notes have nothing to filter. ?>
+    <div></div>
     <div></div>
     <div></div>
     <div>
@@ -160,27 +186,6 @@ require __DIR__ . '/includes/header.php';
         <?php foreach ($crew as $c): ?>
           <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
         <?php endforeach; ?>
-      </select>
-    </div>
-    <div>
-      <?php // ⚠ A SUPERVISOR'S TWO CONTROLS, and the reason this screen folded
-            // in the tracking grid's question (David, during the design: "it's
-            // still useful if I'm a supervisor taking a look at what
-            // shots/assets are ready for my department"). Step narrows the
-            // board to one department; Ready narrows it to the work that can
-            // actually start today. Together they answer "what can my people
-            // pick up this morning" in two clicks. ?>
-      <select id="fStep" aria-label="Filter by pipeline step">
-        <option value="">Any step</option>
-        <?php foreach ($board['steps'] as $st): ?>
-          <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div>
-      <select id="fReady" aria-label="Filter by whether the work can start">
-        <option value="">Started or not</option>
-        <option value="1">Ready to pick up</option>
       </select>
     </div>
     <div class="board-due-filter">
@@ -307,6 +312,7 @@ require __DIR__ . '/includes/header.php';
 
             <?php if ($self): ?>
               <?php // The deliverable's own controls, the same ones a task row carries. ?>
+              <?= board_copy_cell($self, $projectId, (string)$item['name']) ?>
               <?= board_version_cell($self) ?>
               <?= board_notes_cell($self, $projectId, (string)$item['name']) ?>
               <?= board_status_cell($self, $board['statuses'], $projectId, $maySetAny,
@@ -317,6 +323,9 @@ require __DIR__ . '/includes/header.php';
               <?= board_text_cell($self, 'link', $projectId, $mayEdit && $linkReady, 'https://…') ?>
               <?= board_text_cell($self, 'notes', $projectId, $mayEdit, 'Notes') ?>
             <?php else: ?>
+              <?php // A shot is not a task and has no task URL. Its own page is
+                    // a click away on its name, which is a link already. ?>
+              <div class="board-cell"></div>
               <div class="board-cell"></div>
               <div class="board-cell"></div>
               <?php // Read-only, so it is text with a dot and never a control. ?>
@@ -382,6 +391,7 @@ require __DIR__ . '/includes/header.php';
                         data-item="<?= e($t['item_key']) ?>"
                         aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>
               </div>
+              <?= board_copy_cell($t, $projectId, (string)$item['name']) ?>
               <?= board_version_cell($t) ?>
               <?= board_notes_cell($t, $projectId, (string)$item['name']) ?>
               <?= board_status_cell($t, $board['statuses'], $projectId, $mayEdit || $mine,
@@ -424,6 +434,10 @@ require __DIR__ . '/includes/header.php';
 <?php // The @ picker, shared with the ticket screen: the Comments tab in the
       // task panel uses the same one rather than a second of its own. ?>
 <script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<?php // "Drop files here" over every native file picker in the task panel
+      // (David, 2026-10-23). It enhances the real input and leaves what the
+      // form submits exactly as it was. ?>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
 <?php // ⚠ FOR THE LIGHTBOX AND NOTHING ELSE. assets/tickets.js carries two
       // things: an uploader that only wakes for form[data-ticket-form] (none
       // here), and the attachment lightbox, which is delegated from `document`
