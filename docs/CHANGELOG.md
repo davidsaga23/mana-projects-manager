@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — Spell: Version and Comments columns; a note on every version *(no migration)*
+
+- **Version column:** each task shows its current version (v03). Click it to open the latest
+  file: an image opens full size over the board, a video or PDF in a new tab.
+- **Comments column:** a circle with the number of comments on the task. Click it to open the task
+  on its Comments tab. Empty when nobody has said anything.
+- **"What changed" is now required** when sending a version for review, and the form is headed
+  **Upload new version**, in larger text.
+
 ## 2026-10-22 — Spell: send a version for review, and name who should look *(no migration)*
 
 - **The Versions tab's button now says "Send for review"**, and the form sits at the top of the

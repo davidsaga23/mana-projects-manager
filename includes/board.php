@@ -46,6 +46,7 @@ require_once __DIR__ . '/grid.php';        // step_covers_item(), the one scope 
 // lands in the same My tasks list as one typed on a ticket.
 require_once __DIR__ . '/tickets.php';
 require_once __DIR__ . '/notify.php';     // the bell beside your name (migration 060)
+require_once __DIR__ . '/uploads.php';    // version_label(), attachment_is_image() for the Version column
 
 /* ---------------------------------------------------------------------------
  * The three phases, named as the studio names them.
@@ -291,7 +292,7 @@ function board_data(PDO $pdo, int $projectId): array {
     // The cells. LEFT JOIN on crew because an unassigned task is the normal
     // case, not a missing row — 76 of MSD's 147 have nobody on them.
     $cells = $pdo->prepare(
-        'SELECT pr.step_id, pr.item_key, pr.status_id, pr.version, pr.notes'
+        'SELECT pr.id, pr.step_id, pr.item_key, pr.status_id, pr.version, pr.notes'
         . ($hasLink ? ', pr.link' : '') . ',
                 pr.crew_id, pr.is_delivered, pr.is_approved, c.name AS person
            FROM progress pr
@@ -310,10 +311,43 @@ function board_data(PDO $pdo, int $projectId): array {
     $byDate = [];
     foreach ($dates as $r) $byDate[$r['step_id'] . '|' . $r['item_key']] = $r;
 
+    // The latest version of every task, and how many comments each has — the
+    // Version and Comments columns (David, 2026-10-22). One query each for the
+    // whole show, keyed by progress id, for the reason this function gives at
+    // the top. Guarded: before migrations 063 / 059 the columns read a dash.
+    $latestVersion = [];
+    if (board_versions_available($pdo)) {
+        $q = $pdo->prepare(
+            'SELECT v.progress_id, v.id, v.version_no, v.mime_type, v.original_name
+               FROM progress_versions v
+               JOIN (SELECT pv.progress_id, MAX(pv.version_no) AS top
+                       FROM progress_versions pv
+                       JOIN progress p ON p.id = pv.progress_id
+                      WHERE p.project_id = ?
+                      GROUP BY pv.progress_id) m
+                 ON m.progress_id = v.progress_id AND m.top = v.version_no'
+        );
+        $q->execute([$projectId]);
+        foreach ($q as $r) $latestVersion[(int)$r['progress_id']] = $r;
+    }
+    $commentCount = [];
+    if (board_comments_available($pdo)) {
+        $q = $pdo->prepare(
+            'SELECT c.progress_id, COUNT(*) AS n
+               FROM ticket_comments c
+               JOIN progress p ON p.id = c.progress_id
+              WHERE p.project_id = ?
+              GROUP BY c.progress_id'
+        );
+        $q->execute([$projectId]);
+        foreach ($q as $r) $commentCount[(int)$r['progress_id']] = (int)$r['n'];
+    }
+
     $today = date('Y-m-d');
 
     /** One task row: a step's work on one item. */
-    $task = function (array $step, string $itemKey) use ($byCell, $byDate, $statusMap, $today, $hasLink): array {
+    $task = function (array $step, string $itemKey) use ($byCell, $byDate, $statusMap, $today, $hasLink,
+                                                         $latestVersion, $commentCount): array {
         $key = (int)$step['id'] . '|' . $itemKey;
         $cell = $byCell[$key] ?? null;
         $sched = $byDate[$key] ?? null;
@@ -341,6 +375,8 @@ function board_data(PDO $pdo, int $projectId): array {
                              && !($cell && (int)$cell['is_approved'] === 1),
             'manual'      => $sched ? (int)$sched['is_manual'] === 1 : false,
             'version'     => $cell['version'] ?? null,
+            'latest'      => $cell ? ($latestVersion[(int)$cell['id']] ?? null) : null,
+            'comments'    => $cell ? ($commentCount[(int)$cell['id']] ?? 0) : 0,
             'notes'       => $cell['notes'] ?? null,
             'link'        => $hasLink ? ($cell['link'] ?? null) : null,
             // Overwritten by $tasksFor() for a shot or an asset, where the
@@ -630,6 +666,40 @@ function board_crew_cell(array $t, array $crew, int $projectId, bool $mayEdit): 
               . e($t['person'] ?: 'Somebody no longer listed') . '</option>';
     }
     return $out . '</select></div>';
+}
+
+/**
+ * The Version column (David, 2026-10-22): the current version's number, as a
+ * link that opens its preview. An image opens in the lightbox (`att-zoom`, the
+ * hook assets/tickets.js listens for), anything else in a new tab. A dash
+ * before the first version, so an empty column is visibly empty.
+ */
+function board_version_cell(array $t): string {
+    $v = $t['latest'] ?? null;
+    if (!$v) return '<div class="board-cell board-version-cell muted">—</div>';
+    $url  = 'attachment.php?kind=version&amp;id=' . (int)$v['id'];
+    $name = e((string)$v['original_name']);
+    $label = e(version_label((int)$v['version_no']));
+    $zoom = attachment_is_image((string)($v['mime_type'] ?? '')) ? ' att-zoom' : '';
+    return '<div class="board-cell board-version-cell"><a href="' . $url . '" class="board-version-link'
+         . $zoom . '" data-name="' . $name . '" target="_blank" rel="noopener" title="Open ' . $label
+         . ', ' . $name . '">' . $label . '</a></div>';
+}
+
+/**
+ * The Comments column: a circle with how many comments the task has, nothing
+ * more (David, 2026-10-22). It opens the task on its Comments tab — the number
+ * is only worth showing because it leads to the conversation. Empty at zero, so
+ * the column draws the eye only where something has been said.
+ */
+function board_comments_cell(array $t, int $projectId, string $itemName): string {
+    $n = (int)($t['comments'] ?? 0);
+    if ($n === 0) return '<div class="board-cell board-comments-cell"></div>';
+    return '<div class="board-cell board-comments-cell"><button type="button" class="board-comment-dot"'
+         . ' data-project="' . $projectId . '" data-step="' . (int)$t['step_id'] . '"'
+         . ' data-item="' . e($t['item_key']) . '"'
+         . ' aria-label="' . $n . ' comment' . ($n === 1 ? '' : 's') . ' on ' . e($t['step'] ?? 'this task')
+         . ($itemName !== '' ? ' on ' . e($itemName) : '') . '">' . ($n > 99 ? '99+' : $n) . '</button></div>';
 }
 
 /** The due date — schedule.end_date, the same one the timeline draws. */
@@ -1272,19 +1342,23 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     // preview, so below them the form sank further with every round of review.
     $form = '';
     if ($mayPost) {
-        $next = version_label(count($versions) > 0 ? ((int)$versions[0]['version_no']) + 1 : 1);
+        // "Upload new version", not "Put up v02" (David, 2026-10-22): the
+        // number is the app's business, and the version list says what it was.
         $form = '<form class="comment-form board-version-form" method="post"'
               . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
               . ' data-item="' . e($itemKey) . '">'
               . '<input type="hidden" name="add_version" value="1">'
-              . '<label>Put up ' . e($next)
+              . '<label><span class="board-version-title">Upload new version</span>'
               . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple>'
               . '</label>'
-              . '<label>What changed <small class="muted">(optional)</small>'
+              // ⚠ REQUIRED (David, 2026-10-22: "so people describe what they
+              // modify"). A reviewer handed v04 with no note has to diff it by
+              // eye against v03. board_version.php refuses an empty one too.
+              . '<label>What changed'
               // board-comment-box is the hook assets/board-screen.js arms the @
               // picker on, and the one it refocuses after a post.
-              . '<textarea name="note" rows="2" class="board-comment-box"'
+              . '<textarea name="note" rows="2" class="board-comment-box" required'
               . ' placeholder="Fixed the camera move on the tail… type @ to name a reviewer"></textarea>'
               . '</label>'
               . '<p class="muted small">Each file is its own version, in the order you pick them. '

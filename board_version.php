@@ -95,6 +95,10 @@ if (isset($_POST['delete_version'])) {
     $any = (bool)array_filter($files, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
     if (!$any) {
         $bad = 'Pick a file first — a version is a file.';
+    } elseif (trim((string)($_POST['note'] ?? '')) === '') {
+        // Required since 2026-10-22, here as well as on the form: a browser
+        // without the `required` check, or a script, must not slip one past.
+        $bad = 'Say what changed — a version needs a note so the reviewer knows what to look at.';
     } else {
         // The progress row is created if the importer never made one, exactly
         // as a comment or a first status does.
