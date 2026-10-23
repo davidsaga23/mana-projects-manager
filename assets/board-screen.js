@@ -1103,9 +1103,19 @@
       var expect = rule.next + i - 1 + rule.first;
       var m = re.exec(base);
       var why = '';
-      if (!m) why = 'does not follow the naming convention';
+      // ⚠ THE NAME IS WORKED OUT PER FILE, because each file picked becomes
+      // its OWN version: drop two and the second is v05, not v04. The one
+      // shared "rename it to..." line below used to carry the server's example,
+      // which is built for the FIRST file only — so on a multi-file upload it
+      // told you to name the second one V04, then went on refusing it when you
+      // did (David, 2026-10-23).
+      var want = (rule.exampleTpl || rule.example).replace('{V}', namingPad(expect, rule.pad));
+      // And it says WHICH name it wanted, as the server's identical check has
+      // always done. One rule, two implementations, and the one everybody
+      // actually reads was the less helpful of them.
+      if (!m) why = 'does not follow the naming convention — it should be ' + want;
       else if (parseInt(m[1], 10) !== expect) {
-        why = 'is numbered ' + parseInt(m[1], 10) + ', but this is version ' + namingPad(expect, rule.pad);
+        why = 'is numbered ' + parseInt(m[1], 10) + ', but this one is ' + want;
       }
       if (why) bad++;
       if (!out) return;
@@ -1120,7 +1130,10 @@
       if (bad) {
         var tip = document.createElement('div');
         tip.className = 'naming-row muted';
-        tip.textContent = 'Rename it to follow ' + rule.example + ' and pick it again.';
+        // The name is on each line now, so this only says what to do with it.
+        tip.textContent = bad === 1
+          ? 'Rename it and pick it again.'
+          : 'Rename them and pick them again — each file is its own version.';
         out.appendChild(tip);
       }
     }

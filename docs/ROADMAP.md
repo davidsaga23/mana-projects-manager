@@ -1295,6 +1295,59 @@ roadmap has wanted since August ("The step missing from the list itself"). Versi
 internal approval is most of what a delivery log needs; what it still would not have is *what was
 sent to the client and what came back*. Building this well makes that one smaller, later.
 
+### Anima should name the file, not ask the artist to
+
+David, 2026-10-23, looking at a rejected upload on the FX task of SH010 — the
+file was `MSD_SH010_CH_V04_DS.png`, a character file picked for an effects
+task, so the check was right to stop it. What it then said was:
+
+> Rename it to follow `MSD_SH010_FX_V04_DS` and pick it again.
+
+**Anima already knows every part of that name.** It printed it. It knows the
+show is MSD, the shot is SH010, the step's code is FX, that this upload becomes
+v04, and whose initials to use — `naming_example()` assembles exactly that
+string from `naming_rule()` before a file has been chosen. Then it sends a
+freelancer to Finder to retype it and come back.
+
+⚠ AND THE NAME IT IS ARGUING ABOUT IS A DISPLAY FIELD. The file on disk is
+`bin2hex(random_bytes(16))` + the extension (`accept_upload()`); the name the
+artist typed lives in `original_name` and is never used for anything but being
+shown. So the round trip buys nothing a rename on arrival would not.
+
+**What to build.** On upload, record the version under the name the convention
+says it should have, and tell the artist that is what happened — "saved as
+MSD_SH010_FX_V04_DS.png" — rather than refusing the file. The check stops being
+a gate and becomes a label.
+
+**What it must still refuse, and this is the part worth getting right.** Not
+every mismatch is a typo. `MSD_SH010_CH_V04_DS.png` on an FX task is somebody
+uploading *the wrong file*, and silently renaming it to FX would bury that —
+the artist would never learn, and a character render would sit in the effects
+version history looking official. So:
+
+- The parts Anima can know for certain and the artist cannot get wrong — the
+  project code, the shot or asset, the step, the version number, the initials —
+  are Anima's to write. Rename, say so, move on.
+- A name that parses as the convention but names a DIFFERENT step, shot or
+  asset than the task it is being uploaded to is the one case to keep stopping,
+  with the words it has now. That is a wrong file, not a wrong name.
+- A name that matches nothing at all (`render_final_FINAL2.png`) is the easy
+  case: there is nothing to contradict, so name it and carry on.
+
+Telling those three apart needs the regex to capture the step and item parts
+rather than only `{VERSION}` — `naming_rule()` builds the pattern token by
+token already, so this is a change of two or three lines in how it emits each
+placeholder, not a rewrite.
+
+**Two defects in the current check, found while reading it (fixed 2026-10-23):**
+the "Rename it to follow …" line was built once, server-side, for the FIRST
+file, so on a multi-file upload — where each file becomes its own version — it
+told you to name the second one V04 when the check wanted V05, and went on
+refusing it when you complied. And the browser's message said only "does not
+follow the naming convention" while the server's identical check names the file
+it wanted: one rule, two implementations, already drifted. The browser's was
+the one anybody ever saw.
+
 ## The "sell the app to customers" exploration (not part of the internal app)
 
 A separate, **planning-only** workstream (its chat thread since deleted) explored turning the
