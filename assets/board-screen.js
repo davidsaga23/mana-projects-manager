@@ -604,7 +604,8 @@
         // Into the panel, so the keyboard is where the eye is.
         var first = panelInner.querySelector('select, input, button, a');
         if (first) first.focus();
-        commentsReady();
+        paneReady('comments');
+        paneReady('versions');
       })
       .catch(function () {
         panelInner.innerHTML = '<p class="err">That did not open. Check your connection and try again.</p>';
@@ -652,10 +653,20 @@
   // only the three things a page reload would otherwise have done: send the
   // form, swap the pane, put the picker back on the new box.
 
-  /** Re-arm a freshly rendered comments pane: the @ picker, and the count. */
-  function commentsReady() {
-    var pane = panelInner ? panelInner.querySelector('[data-pane="comments"]') : null;
-    if (!pane) return;
+  // What each refreshable pane is made of: where it posts, and what one of its
+  // rows looks like for the count on its tab. Two entries, one piece of code —
+  // the versions pane arrived (2026-10-22) and needed none of this written
+  // again.
+  var PANES = {
+    comments: { url: 'board_comment.php', row: '.comment' },
+    versions: { url: 'board_version.php', row: '.version' }
+  };
+
+  /** Re-arm a freshly rendered pane: the @ picker where there is one, and the count. */
+  function paneReady(which) {
+    var spec = PANES[which];
+    var pane = panelInner ? panelInner.querySelector('[data-pane="' + which + '"]') : null;
+    if (!spec || !pane) return;
 
     var box = pane.querySelector('.board-comment-box');
     var json = pane.querySelector('.board-comment-people');
@@ -669,9 +680,9 @@
 
     // "Comments · 4" on the tab, kept honest after a post without reloading
     // anything: the pane in front of us IS the count.
-    var tab = panelInner.querySelector('.panel-tab[data-tab="comments"]');
+    var tab = panelInner.querySelector('.panel-tab[data-tab="' + which + '"]');
     if (!tab) return;
-    var n = pane.querySelectorAll('.comment').length;
+    var n = pane.querySelectorAll(spec.row).length;
     var badge = tab.querySelector('.muted');
     if (n === 0) { if (badge) badge.remove(); return; }
     if (!badge) {
@@ -681,6 +692,13 @@
       tab.appendChild(badge);
     }
     badge.textContent = '· ' + n;
+  }
+
+  /** Show one tab, as if its button had been pressed. */
+  function showTab(which) {
+    if (!panelInner) return;
+    var tab = panelInner.querySelector('.panel-tab[data-tab="' + which + '"]');
+    if (tab) tab.click();
   }
 
   /** The hidden parent_id is what makes a comment a reply (migration 039). */
@@ -715,65 +733,96 @@
 
     if (form && e.target.closest('[data-reply-cancel]')) replyTo(form, '', '');
 
-    // Taking a file back off a comment. Asked first, because it deletes the
-    // file from the server and not only the row.
-    var del = e.target.closest('.board-att-del');
+    // Jumping to the Versions tab from the Current version line on Details.
+    var jump = e.target.closest('.panel-tab-link');
+    if (jump && panelInner && panelInner.contains(jump)) {
+      e.preventDefault();
+      showTab(jump.getAttribute('data-tab') || 'versions');
+      return;
+    }
+
+    // Taking a file back — a comment's attachment, or the latest version.
+    // Asked first, because both delete the file from the server, not just a row.
+    var del = e.target.closest('.board-att-del, .board-version-del');
     if (del && panelInner && panelInner.contains(del)) {
       e.preventDefault();
-      if (!window.confirm('Remove this file? It is deleted from the server.')) return;
-      var host = panelInner.querySelector('.board-comment-form');
-      var pane = del.closest('[data-pane="comments"]');
-      if (!host || !pane) return;
+      var isVersion = del.classList.contains('board-version-del');
+      if (!window.confirm(isVersion
+            ? 'Remove this version? The file is deleted from the server.'
+            : 'Remove this file? It is deleted from the server.')) return;
+
+      var pane = del.closest('[data-pane]');
+      if (!pane) return;
+      var which = pane.getAttribute('data-pane');
+      var spec = PANES[which];
+      var host = pane.querySelector('form[data-project]');
+      if (!spec || !host) return;
       del.disabled = true;
 
       var gone = new FormData();
-      gone.append('delete_attachment', del.getAttribute('data-att'));
+      gone.append(isVersion ? 'delete_version' : 'delete_attachment',
+                  del.getAttribute(isVersion ? 'data-version' : 'data-att'));
       gone.append('project_id', host.getAttribute('data-project'));
       gone.append('step_id', host.getAttribute('data-step'));
       gone.append('item_key', host.getAttribute('data-item'));
 
-      fetch('board_comment.php', { method: 'POST', body: gone, credentials: 'same-origin' })
+      fetch(spec.url, { method: 'POST', body: gone, credentials: 'same-origin' })
         .then(function (r) { return r.text(); })
-        .then(function (html) { pane.innerHTML = html; commentsReady(); })
+        .then(function (html) { pane.innerHTML = html; paneReady(which); })
         .catch(function () { del.disabled = false; });
     }
   });
 
   document.addEventListener('submit', function (e) {
-    var form = e.target.closest ? e.target.closest('.board-comment-form') : null;
+    var form = e.target.closest
+      ? e.target.closest('.board-comment-form, .board-version-form') : null;
     if (!form) return;
     e.preventDefault();
 
-    var pane = form.closest('[data-pane="comments"]');
+    var pane = form.closest('[data-pane]');
+    if (!pane) return;
+    var which = pane.getAttribute('data-pane');
+    var spec = PANES[which];
+    if (!spec) return;
+
     var btn = form.querySelector('button[type="submit"]');
     var box = form.querySelector('.board-comment-box');
-    if (!pane || !box) return;
-    if (!box.value.trim()) { box.focus(); return; }
+    var picker = form.querySelector('input[type="file"]');
 
-    // ⚠ LOCKED WHILE IT IS IN FLIGHT. Naming somebody opens SMTP inline, so a
-    // comment with an @ in it can take a second or two — long enough for an
-    // impatient second click to post the same paragraph twice.
-    if (btn) { btn.disabled = true; btn.textContent = 'Posting…'; }
+    // A comment needs words or a file; a version IS a file, so it needs one.
+    if (which === 'comments') {
+      var hasFile = picker && picker.files && picker.files.length > 0;
+      if ((!box || !box.value.trim()) && !hasFile) { if (box) box.focus(); return; }
+    } else if (!picker || !picker.files || !picker.files.length) {
+      picker.focus();
+      return;
+    }
+
+    // ⚠ LOCKED WHILE IT IS IN FLIGHT. Naming somebody opens SMTP inline and a
+    // version can be tens of megabytes — either is long enough for an impatient
+    // second click to send the same thing twice.
+    var was = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Working…'; }
 
     var data = new FormData(form);
     data.append('project_id', form.getAttribute('data-project'));
     data.append('step_id', form.getAttribute('data-step'));
     data.append('item_key', form.getAttribute('data-item'));
 
-    fetch('board_comment.php', { method: 'POST', body: data, credentials: 'same-origin' })
+    fetch(spec.url, { method: 'POST', body: data, credentials: 'same-origin' })
       .then(function (r) { return r.text(); })
       .then(function (html) {
         pane.innerHTML = html;
-        commentsReady();
+        paneReady(which);
         var fresh = pane.querySelector('.board-comment-box');
         if (fresh) fresh.focus();
       })
       .catch(function () {
-        if (btn) { btn.disabled = false; btn.textContent = 'Post'; }
+        if (btn) { btn.disabled = false; btn.textContent = was; }
         var warn = document.createElement('p');
         warn.className = 'err';
-        warn.textContent = 'That did not post. Check your connection and try again — your '
-                         + 'words are still in the box.';
+        warn.textContent = 'That did not go through. Check your connection and try again — '
+                         + 'nothing in this box has been lost.';
         form.insertBefore(warn, form.firstChild);
       });
   });

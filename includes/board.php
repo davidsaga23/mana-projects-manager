@@ -1141,3 +1141,139 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
     }
     return $out;
 }
+
+/* ---------------------------------------------------------------------------
+ * VERSIONS AND REVIEW (David, 2026-10-22), migration 063.
+ *
+ * "Version should not be typed in but got from the number of files uploaded",
+ * and "Let's create a Versions and review tab next to activity — people should
+ * be able to upload images, open a preview, versions will start at v01 and
+ * increment by 1 every time a new version is up".
+ *
+ * So `progress.version` is no longer a field somebody fills in; it is a label
+ * written by save_task_versions() from the rows that exist. The panel shows it
+ * and the board column goes on reading it, both unchanged — what changed is
+ * that nobody can type "v07" on a task that has three versions.
+ * ------------------------------------------------------------------------ */
+
+/** Has migration 063 run? Until it has, the tab says so instead of failing. */
+function board_versions_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'progress_versions', 'version_no');
+    return $ok;
+}
+
+/**
+ * Every version of one task, NEWEST FIRST.
+ *
+ * Newest first because the question this tab answers is "what is the current
+ * one" far more often than "what did we start with" — the opposite of the
+ * comments tab, where a conversation is read downwards.
+ */
+function board_task_versions(PDO $pdo, int $progressId): array {
+    if ($progressId <= 0 || !board_versions_available($pdo)) return [];
+    try {
+        $q = $pdo->prepare(
+            'SELECT v.*, u.display_name
+               FROM progress_versions v
+               LEFT JOIN users u ON u.id = v.uploaded_by
+              WHERE v.progress_id = ?
+              ORDER BY v.version_no DESC'
+        );
+        $q->execute([$progressId]);
+        return $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+/**
+ * The Versions and review tab.
+ *
+ * ⚠ MARKUP, NOT JSON, the same choice board_task.php and board_comments_html()
+ * make: uploading re-renders this pane through the function that drew it, so a
+ * thumbnail, a version label and the empty state are written once.
+ *
+ * Images get a real thumbnail linked with class="att-zoom", which is the hook
+ * the lightbox in assets/tickets.js already listens for — clicking one shows it
+ * full size over the board instead of taking you off the screen you are on.
+ * The href is a working link underneath, so ctrl-click and middle-click behave.
+ */
+function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $itemKey,
+                             bool $mayPost): string {
+    if (!board_versions_available($pdo)) {
+        return '<p class="warn-text small">Versions need database update 063. '
+             . 'Everything else on this task works meanwhile.</p>';
+    }
+
+    $progressId = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+    $versions = board_task_versions($pdo, (int)$progressId);
+    $myUserId = (int)($_SESSION['user_id'] ?? 0);
+
+    $out = '';
+    if (!$versions) {
+        $out .= '<p class="muted small">No versions yet. The first file put up here is '
+              . '<strong>v01</strong>, and every one after it counts on from there — nobody '
+              . 'types a version number.</p>';
+    } else {
+        $out .= '<ul class="version-list">';
+        foreach ($versions as $i => $v) {
+            $url = 'attachment.php?kind=version&amp;id=' . (int)$v['id'];
+            $name = e((string)$v['original_name']);
+            $isTop = $i === 0;
+
+            $out .= '<li class="version' . ($isTop ? ' is-current' : '') . '">'
+                  . '<div class="version-head">'
+                  . '<strong class="version-no">' . e(version_label((int)$v['version_no'])) . '</strong>'
+                  . ($isTop ? '<span class="version-tag">current</span>' : '')
+                  . '<span class="muted small">' . e($v['display_name'] ?? 'Someone') . ' · '
+                  . e(date('j M Y · g:i A', strtotime((string)$v['created_at']))) . '</span>';
+
+            // Yours to remove, or an admin's — and only while it is the latest,
+            // because taking a version out of the middle would leave a gap in a
+            // sequence people quote at each other.
+            if ($mayPost && $isTop && (is_admin() || (int)$v['uploaded_by'] === $myUserId)) {
+                $out .= '<button type="button" class="link-danger board-version-del" data-version="'
+                      . (int)$v['id'] . '" title="Remove this version">&times;</button>';
+            }
+            $out .= '</div>';
+
+            if (attachment_is_image((string)($v['mime_type'] ?? ''))) {
+                $out .= '<a href="' . $url . '" class="att-zoom version-shot" data-name="' . $name
+                      . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
+            } elseif (attachment_is_video((string)($v['mime_type'] ?? ''))) {
+                $out .= '<video class="version-shot" src="' . $url . '" controls preload="metadata"></video>';
+            } else {
+                $out .= '<a href="' . $url . '" class="file-link" target="_blank" rel="noopener">📄 '
+                      . $name . '</a>';
+            }
+
+            $out .= '<div class="version-meta muted small"><span title="' . $name . '">' . $name
+                  . '</span> · ' . e(human_size((int)$v['file_size'])) . '</div>';
+            if (trim((string)($v['note'] ?? '')) !== '') {
+                $out .= '<p class="version-note">' . nl2br(e((string)$v['note'])) . '</p>';
+            }
+            $out .= '</li>';
+        }
+        $out .= '</ul>';
+    }
+
+    if ($mayPost) {
+        $next = version_label(count($versions) > 0 ? ((int)$versions[0]['version_no']) + 1 : 1);
+        $out .= '<form class="comment-form board-version-form" method="post"'
+              . ' enctype="multipart/form-data"'
+              . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
+              . ' data-item="' . e($itemKey) . '">'
+              . '<input type="hidden" name="add_version" value="1">'
+              . '<label>Put up ' . e($next)
+              . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple>'
+              . '</label>'
+              . '<label>What changed <small class="muted">(optional)</small>'
+              . '<textarea name="note" rows="2" placeholder="Fixed the camera move on the tail"></textarea>'
+              . '</label>'
+              . '<p class="muted small">Each file is its own version, in the order you pick them.</p>'
+              . '<button type="submit" class="primary board-version-post">Upload</button>'
+              . '</form>';
+    }
+    return $out;
+}

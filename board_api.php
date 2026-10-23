@@ -346,7 +346,13 @@ try {
     // ---- the free text: a link, a note, a version label --------------------
     if (isset($_POST['set_text'])) {
         $field = (string)($_POST['field'] ?? '');
-        $limits = ['link' => 500, 'notes' => 2000, 'version' => 40];
+        // ⚠ 'version' IS NOT IN HERE ANY MORE (2026-10-22). David: "Version
+        // should not be typed in but got from the number of files uploaded".
+        // save_task_versions() writes progress.version from the rows that
+        // exist, and a field that is derived must not also be settable — the
+        // two would disagree the first time somebody typed over it. The panel
+        // shows it as text; this refuses it as a post.
+        $limits = ['link' => 500, 'notes' => 2000];
         if (!isset($limits[$field])) throw new RuntimeException('That is not a field this screen sets.');
         if (!column_exists($pdo, 'progress', $field)) {
             throw new RuntimeException($field === 'link'
