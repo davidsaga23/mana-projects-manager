@@ -1387,8 +1387,12 @@ button:hover { background: var(--primary-hover); }
 .reply-banner .linkish { margin-left: 8px; font-size: 12px; }
 /* The @ picker. Fixed and in <body> for the reason the shot picker is: it must
    not be clipped by the panel the comment box sits in. */
+/* ⚠ ABOVE SPELL'S TASK PANEL (z-index 71) AND ITS VEIL (70). At 60 the list
+   opened BEHIND the panel, so typing @ in a comment, a review or a version note
+   there showed nothing at all (David, 2026-10-22: "still can't tag"). The
+   ticket screen has no panel, which is why it always worked there. */
 .mention-panel {
-  position: fixed; z-index: 60; width: 260px;
+  position: fixed; z-index: 90; width: 260px;
   background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.38);
   padding: 4px; font-size: 13px;
