@@ -868,6 +868,8 @@
     if (which === 'comments' || form.classList.contains('board-review-form')) {
       var hasFile = picker && picker.files && picker.files.length > 0;
       if ((!box || !box.value.trim()) && !hasFile) { if (box) box.focus(); return; }
+    } else if (form.getAttribute('data-naming-bad') === '1') {
+      return;   // a file that breaks the naming convention: listed under the picker
     } else if (!picker || !picker.files || !picker.files.length) {
       picker.focus();
       return;
@@ -1010,6 +1012,61 @@
     if (!form || !form._reviewFiles) return;
     form._reviewFiles.splice(parseInt(x.getAttribute('data-thumb'), 10), 1);
     reviewSync(form);
+  });
+
+  // --- the show's naming convention, checked as files are picked -------------
+  //
+  // David, 2026-10-22: the Brief carries the convention, and an upload whose
+  // file does not match it is blocked. The rule rides on the form as
+  // data-naming (includes/naming.php built it); each picked file is checked
+  // here, the result is listed under the picker, and Send for review stays off
+  // until every one passes. board_version.php refuses the same files anyway.
+  function namingPad(n, width) {
+    var s = String(n);
+    while (s.length < width) s = '0' + s;
+    return s;
+  }
+
+  document.addEventListener('change', function (e) {
+    var input = e.target;
+    if (!input.matches || !input.matches('.board-version-form[data-naming] input[name="versions[]"]')) return;
+    var form = input.closest('form');
+    var rule;
+    try { rule = JSON.parse(form.getAttribute('data-naming')); } catch (err) { return; }
+    var re = new RegExp(rule.re, 'i');
+    var out = form.querySelector('.naming-check');
+    var btn = form.querySelector('button[type="submit"]');
+    var bad = 0;
+    if (out) out.innerHTML = '';
+
+    Array.prototype.forEach.call(input.files || [], function (f, i) {
+      var base = f.name.replace(/\.[^.]*$/, '');
+      var expect = rule.next + i - 1 + rule.first;
+      var m = re.exec(base);
+      var why = '';
+      if (!m) why = 'does not follow the naming convention';
+      else if (parseInt(m[1], 10) !== expect) {
+        why = 'is numbered ' + parseInt(m[1], 10) + ', but this is version ' + namingPad(expect, rule.pad);
+      }
+      if (why) bad++;
+      if (!out) return;
+      var row = document.createElement('div');
+      row.className = 'naming-row ' + (why ? 'is-bad' : 'is-ok');
+      row.textContent = (why ? '✗ ' : '✓ ') + f.name + (why ? ' ' + why + '.' : '');
+      out.appendChild(row);
+    });
+
+    if (out) {
+      out.hidden = !input.files || !input.files.length;
+      if (bad) {
+        var tip = document.createElement('div');
+        tip.className = 'naming-row muted';
+        tip.textContent = 'Rename it to follow ' + rule.example + ' and pick it again.';
+        out.appendChild(tip);
+      }
+    }
+    form.setAttribute('data-naming-bad', bad ? '1' : '0');
+    if (btn) btn.disabled = bad > 0;
   });
 
   // --- the task's Timeline: every entry opens in a pop-up --------------------

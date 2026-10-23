@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-23 — Naming convention on the Brief, enforced on every upload *(needs migration 067)*
+
+- **A Naming convention section on the Brief**: one template for shots and one for assets, written
+  with placeholders ({PROJECT}, {EPISODE}, {SHOT}, {TYPE}, {ASSET}, {STEP}, {VERSION}, {INITIALS}),
+  with one-click presets matching Mana's MSD, FCM and STFC2 documents.
+- **Step and asset type codes** (FX, AN, CH, EN…) are set per show, guessed from the names until
+  typed. Whether the first version is V00 or V01 is set per show too.
+- **On Spell's upload form** the expected name is shown before anything is picked, every picked file
+  is checked straight away, and Send for review stays off until each one matches and carries the
+  next version number. The server refuses the same files, so nothing gets around it.
+- Matching ignores capitals and the file extension. Whole-show deliverables are not checked.
+
 ## 2026-10-22 — Spell: a task's Activity is now its Timeline *(migration 066 for reassignments, dates and notes)*
 
 - **The Activity tab is now Timeline**: everything that happened to the task on one vertical line,

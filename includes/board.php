@@ -48,6 +48,7 @@ require_once __DIR__ . '/tickets.php';
 require_once __DIR__ . '/notify.php';     // the bell beside your name (migration 060)
 require_once __DIR__ . '/uploads.php';    // version_label(), attachment_is_image() for the Version column
 require_once __DIR__ . '/task_events.php'; // the task's Timeline: assignee, due, note and link changes (066)
+require_once __DIR__ . '/naming.php';      // the show's file naming convention, checked on upload (067)
 
 /* ---------------------------------------------------------------------------
  * The three phases, named as the studio names them.
@@ -1510,16 +1511,37 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     // preview, so below them the form sank further with every round of review.
     $form = '';
     if ($mayPost) {
+        // THE SHOW'S NAMING CONVENTION (migration 067, set on the Brief): what
+        // the file must be called is said BEFORE anything is picked, and the
+        // rule rides on the form so assets/board-screen.js can check each file
+        // the moment it is chosen. board_version.php checks it again.
+        $nextNo = count($versions) > 0 ? ((int)$versions[0]['version_no']) + 1 : 1;
+        $rule = naming_rule($pdo, $projectId, $stepId, $itemKey);
+        $initials = naming_initials(current_user_display());
+        $namingAttr = '';
+        $namingHint = '';
+        if ($rule) {
+            $namingAttr = ' data-naming="' . e(json_encode([
+                're' => $rule['regex'], 'first' => $rule['first'], 'next' => $nextNo,
+                'pad' => 2, 'example' => naming_example($rule, $nextNo, $initials),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '"';
+            $namingHint = '<p class="naming-hint">Name it <code>' . e(naming_example($rule, $nextNo, $initials))
+                        . '</code> <span class="muted small">· the show\'s naming convention, set on the '
+                        . '<a href="brief.php?project=' . $projectId . '#naming">Brief</a></span></p>';
+        }
+
         // "Upload new version", not "Put up v02" (David, 2026-10-22): the
         // number is the app's business, and the version list says what it was.
         $upload = '<form class="comment-form board-version-form" method="post"'
               . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
-              . ' data-item="' . e($itemKey) . '">'
+              . ' data-item="' . e($itemKey) . '"' . $namingAttr . '>'
               . '<input type="hidden" name="add_version" value="1">'
               . '<label><span class="board-version-title">Upload new version</span>'
+              . $namingHint
               . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple>'
               . '</label>'
+              . ($rule ? '<div class="naming-check" hidden></div>' : '')
               // ⚠ REQUIRED (David, 2026-10-22: "so people describe what they
               // modify"). A reviewer handed v04 with no note has to diff it by
               // eye against v03. board_version.php refuses an empty one too.

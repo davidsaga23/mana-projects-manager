@@ -4025,3 +4025,20 @@ a.version-shot:hover { border-color: var(--border-strong); }
   background: var(--primary-tint); color: var(--primary); border: 1px solid transparent;
 }
 .tl-go:hover { background: var(--primary-fill); color: var(--on-primary); }
+
+/* The show's naming convention (migration 067): on the Brief, and as the
+   "Name it …" line and per-file check on Spell's upload form. */
+.naming-form input[name^="naming_"] { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.naming-presets { margin: -4px 0 6px; color: var(--muted); }
+.naming-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; }
+.naming-codes label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
+.naming-codes input { width: 80px; text-transform: uppercase; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.naming-examples code, .naming-hint code {
+  font-size: 13px; padding: 2px 6px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border);
+}
+.naming-hint { margin: 6px 0 2px; font-size: 13px; font-weight: 400; }
+.naming-check { margin: -4px 0 12px; font-size: 12.5px; }
+.naming-check[hidden] { display: none; }
+.naming-row { padding: 2px 0; }
+.naming-row.is-ok { color: var(--ok); }
+.naming-row.is-bad { color: var(--danger); font-weight: 600; }

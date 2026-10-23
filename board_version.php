@@ -22,6 +22,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/board.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
+require_once __DIR__ . '/includes/naming.php';   // the show's file naming convention (067)
 require_login();
 
 header('Content-Type: text/html; charset=utf-8');
@@ -132,6 +133,25 @@ if (isset($_POST['add_review'])) {
     $files = isset($_FILES['versions']) ? normalize_files_array($_FILES['versions']) : [];
     $any = (bool)array_filter($files, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
     $link = trim((string)($_POST['link'] ?? ''));
+
+    // THE SHOW'S NAMING CONVENTION (migration 067, set on the Brief). Every
+    // file must follow it and carry the next version number, or nothing is
+    // saved — David: "otherwise it block the ability to upload that file". The
+    // form checks the same rule as files are picked; this is the lock behind it.
+    $namingBad = [];
+    $rule = naming_rule($pdo, $projectId, $stepId, $itemKey);
+    if ($rule && $any) {
+        $pidNow = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+        $top = $pdo->prepare('SELECT COALESCE(MAX(version_no), 0) FROM progress_versions WHERE progress_id = ?');
+        $top->execute([$pidNow]);
+        $names = [];
+        foreach ($files as $f) {
+            if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) $names[] = (string)$f['name'];
+        }
+        $namingBad = naming_check($rule, $names, (int)$top->fetchColumn() + 1,
+                                  naming_initials(current_user_display()));
+    }
+
     if (!$any) {
         $bad = 'Pick a file first — a version is a file.';
     } elseif (trim((string)($_POST['note'] ?? '')) === '') {
@@ -142,6 +162,8 @@ if (isset($_POST['add_review'])) {
         // Only a web address: anything else in an href is either a typo or a
         // javascript: link waiting for a click.
         $bad = 'The link has to be a web address starting with https:// — nothing was saved.';
+    } elseif ($namingBad) {
+        $bad = 'Nothing was uploaded. ' . implode(' ', $namingBad);
     } else {
         // The progress row is created if the importer never made one, exactly
         // as a comment or a first status does.
