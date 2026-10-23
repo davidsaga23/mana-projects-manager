@@ -1030,6 +1030,31 @@
     reviewSync(form);
   });
 
+  // Files DROPPED anywhere on the review form join the same list (2026-10-23),
+  // now that the drop zone leaves this form's input to it (data-no-drop).
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var form = e.target.closest ? e.target.closest('.board-review-form') : null;
+      if (!form) return;
+      e.preventDefault();
+      form.classList.add('is-drop-over');
+    });
+  });
+  document.addEventListener('dragleave', function (e) {
+    var form = e.target.closest ? e.target.closest('.board-review-form') : null;
+    if (form && !form.contains(e.relatedTarget)) form.classList.remove('is-drop-over');
+  });
+  document.addEventListener('drop', function (e) {
+    var form = e.target.closest ? e.target.closest('.board-review-form') : null;
+    if (!form) return;
+    e.preventDefault();
+    form.classList.remove('is-drop-over');
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    form._reviewFiles = (form._reviewFiles || []).concat(Array.prototype.slice.call(files));
+    reviewSync(form);
+  });
+
   document.addEventListener('click', function (e) {
     var x = e.target.closest ? e.target.closest('.review-thumb-x') : null;
     if (!x) return;
@@ -1052,7 +1077,11 @@
     return s;
   }
 
-  document.addEventListener('change', function (e) {
+  // ⚠ ON TWO EVENTS. A file PICKED fires 'change'; a file DROPPED or taken off
+  // the drop zone's list fires only 'anima:files' (assets/dropzone.js), because
+  // writing input.files raises nothing. Listening to 'change' alone let a
+  // wrongly named dropped file straight through (David, 2026-10-23).
+  function namingCheck(e) {
     var input = e.target;
     if (!input.matches || !input.matches('.board-version-form[data-naming] input[name="versions[]"]')) return;
     var form = input.closest('form');
@@ -1092,7 +1121,9 @@
     }
     form.setAttribute('data-naming-bad', bad ? '1' : '0');
     if (btn) btn.disabled = bad > 0;
-  });
+  }
+  document.addEventListener('change', namingCheck);
+  document.addEventListener('anima:files', namingCheck);
 
   // --- the task's Timeline: every entry opens in a pop-up --------------------
   //

@@ -134,18 +134,27 @@ function naming_rule(PDO $pdo, int $projectId, int $stepId, string $itemKey): ?a
     if (!$step) return null;
 
     $values = ['PROJECT' => strtoupper((string)$p->fetchColumn()), 'STEP' => naming_step_code($set, $step)];
+    // ⚠ EVERY PLACEHOLDER GETS A VALUE, empty where it means nothing for this
+    // kind of item — {TYPE} and {ASSET} on a shot, {SHOT} and {EPISODE} on an
+    // asset. Left unset, one was matched as the literal text "{TYPE}": the form
+    // told artists to name a shot file MSD_SH010_{TYPE}_FX_V04_DS (David,
+    // 2026-10-23). Empty, it is dropped below with its separator.
     if ($kind === 's') {
         $q = $pdo->prepare('SELECT episode, shot_code FROM shots WHERE id = ? AND project_id = ?');
         $q->execute([$itemId, $projectId]);
         $r = $q->fetch() ?: ['episode' => '', 'shot_code' => ''];
         $values['SHOT'] = (string)$r['shot_code'];
         $values['EPISODE'] = naming_episode((string)$r['episode']);
+        $values['TYPE'] = '';
+        $values['ASSET'] = '';
     } else {
         $q = $pdo->prepare("SELECT name, COALESCE(asset_type, '') AS asset_type FROM assets WHERE id = ? AND project_id = ?");
         $q->execute([$itemId, $projectId]);
         $r = $q->fetch() ?: ['name' => '', 'asset_type' => ''];
         $values['ASSET'] = naming_compact((string)$r['name']);
         $values['TYPE'] = naming_type_code($set, (string)$r['asset_type']);
+        $values['SHOT'] = '';
+        $values['EPISODE'] = '';
     }
 
     // A placeholder with nothing behind it (a shot with no episode on a show
