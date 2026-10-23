@@ -3553,7 +3553,8 @@ button.secondary.danger:hover { background: var(--danger-border); }
   .board-sticky { position: static; }
   .board-filters { grid-template-columns: 1fr 1fr; }
   /* Two columns here, so "the last three" would reach off the left edge. */
-  .board-filter-actions { grid-column: 1 / -1; }
+  /* Two selectors, to outrank the rule further down that counts from the right. */
+  .board-filters .board-filter-actions { grid-column: 1 / -1; }
 }
 
 /* ⚠ THE GROUP'S BAR IS THE SAME WIDTH AS ITS SHOTS', so the two line up at both
