@@ -53,7 +53,7 @@ foreach (board_projects($pdo) as $p) if ((int)$p['id'] === $projectId) $allowed 
 $detail = $allowed ? board_task_detail($pdo, $projectId, $stepId, $itemKey) : null;
 if (!$detail) board_comment_fail('That task is not one this screen can comment on.');
 
-$crew = board_assignees($pdo, $projectId);
+$crew = board_mentionable($pdo, $projectId);   // who a comment can name
 $mayPost = !preview_blocks_saving();
 if (!$mayPost) board_comment_fail('Nothing saves while you are previewing a role.');
 

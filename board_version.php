@@ -171,7 +171,7 @@ if (isset($_POST['add_review'])) {
             // second (a courtesy that may fail, and says so). Once per upload,
             // however many files it carried — it is one request for review.
             $note = trim((string)($_POST['note'] ?? ''));
-            $named = $note !== '' ? ticket_parse_mentions($note, board_assignees($pdo, $projectId)) : [];
+            $named = $note !== '' ? ticket_parse_mentions($note, board_mentionable($pdo, $projectId)) : [];
             if ($named) {
                 $pq = $pdo->prepare('SELECT code, name FROM projects WHERE id = ?');
                 $pq->execute([$projectId]);

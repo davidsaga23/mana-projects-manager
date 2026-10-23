@@ -158,7 +158,9 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
       // conversation — and board_comment.php re-renders this very pane through
       // the same function after a post. ?>
 <div class="panel-body" data-pane="comments" hidden>
-  <?= board_comments_html($pdo, $projectId, $stepId, $itemKey, $mayComment, $crew) ?>
+  <?php // Who a comment can NAME is wider than who can be assigned: anybody
+        // with a login, so producers who are on no show's crew can be tagged. ?>
+  <?= board_comments_html($pdo, $projectId, $stepId, $itemKey, $mayComment, board_mentionable($pdo, $projectId)) ?>
 </div>
 
 <?php // One renderer for the pane, shared with board_version.php so an upload

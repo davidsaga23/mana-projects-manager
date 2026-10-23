@@ -918,6 +918,26 @@ function board_assignees(PDO $pdo, int $projectId): array {
     return $q->fetchAll();
 }
 
+/**
+ * Who can be NAMED on a task: the show's crew, and everybody with a login.
+ *
+ * ⚠ WIDER THAN board_assignees() ON PURPOSE (David, 2026-10-22: "still can't
+ * tag people here", typing @rena). Assigning is about who works the show;
+ * naming is about who should look — and the people who review are producers
+ * and supervisors who are on no show's crew. The ticket screen settled this
+ * long ago in ticket_assignees() ("anyone with a login is an owner on EVERY
+ * project"), so the same list is used here, less teams and empty slots, which
+ * have nobody behind them to ring.
+ */
+function board_mentionable(PDO $pdo, int $projectId): array {
+    $out = [];
+    foreach (ticket_assignees($pdo, $projectId) as $p) {
+        if ((int)($p['is_team'] ?? 0) === 1 || (int)($p['is_placeholder'] ?? 0) === 1) continue;
+        $out[] = ['id' => (int)$p['id'], 'name' => (string)$p['name']];
+    }
+    return $out;
+}
+
 /* ---------------------------------------------------------------------------
  * TALKING ABOUT A TASK (David, 2026-10-22), migration 059.
  *
@@ -1094,7 +1114,7 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
 
     // Resolved against this show's people and stored as ids, never left in the
     // text: the rule migration 039 wrote down.
-    $mentions = ticket_parse_mentions($body, board_assignees($pdo, $projectId));
+    $mentions = ticket_parse_mentions($body, board_mentionable($pdo, $projectId));
     ticket_save_mentions($pdo, $commentId, $mentions);
 
     // ⚠ THE BELL FIRST, THE EMAIL SECOND, and the order is the point. David,
@@ -1333,7 +1353,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     // The people a note can name (David, 2026-10-22: "make sure we can tag people
     // in the versions"). The same list the comment box offers and the parser
     // resolves against, so a highlighted name is always somebody who was told.
-    $people = board_assignees($pdo, $projectId);
+    $people = board_mentionable($pdo, $projectId);
 
     // REVIEWS (David, 2026-10-22): supervisors, Production and admins "make a
     // review" against a version rather than putting one up. A review is a
