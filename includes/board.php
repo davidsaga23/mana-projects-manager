@@ -1398,9 +1398,17 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             // AT THE TOP OF EVERY VERSION (David, 2026-10-22): the way to its
             // review notes, or — for a reviewer, where there are none yet — the
             // way to start them, with this version already picked in the form.
+            //
+            // ⚠ NOTES ARE LOUD ON PURPOSE (David, 2026-10-22: "a bit more on the
+            // face so we don't miss them, or the artists"). The button is filled
+            // in the warning colour, and the CURRENT version's notes are open
+            // from the start — they are what the artist has to act on next.
             if ($mine) {
-                $out .= '<button type="button" class="version-reviews-btn" aria-expanded="false"'
-                      . ' data-version-reviews="vr' . $vid . '">Review notes · ' . count($mine) . '</button>';
+                $n = count($mine);
+                $out .= '<button type="button" class="version-reviews-btn has-notes"'
+                      . ' aria-expanded="' . ($isTop ? 'true' : 'false') . '"'
+                      . ' data-version-reviews="vr' . $vid . '">' . $n . ' review note' . ($n === 1 ? '' : 's')
+                      . '</button>';
             } elseif ($reviewer) {
                 $out .= '<button type="button" class="version-reviews-btn" data-review-version="' . $vid
                       . '">Make a review</button>';
@@ -1415,10 +1423,13 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             }
             $out .= '</div>';
 
-            // The thread itself, under the head and shut until asked for: a
-            // version with eight notes must not push its own picture off screen.
+            // The thread itself, under the head and ABOVE the picture. Open on the
+            // current version, shut on older ones, whose notes have been acted on
+            // and would only push their own pictures off screen.
             if ($mine) {
-                $out .= '<div class="version-reviews" id="vr' . $vid . '" hidden>';
+                $out .= '<div class="version-reviews" id="vr' . $vid . '"' . ($isTop ? '' : ' hidden') . '>'
+                      . '<div class="version-reviews-title">Review notes on '
+                      . e(version_label((int)$v['version_no'])) . '</div>';
                 foreach ($mine as $r) {
                     $cid = (int)$r['id'];
                     $out .= '<div class="comment version-review"><div class="comment-head"><strong>'
