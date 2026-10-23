@@ -16,6 +16,8 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/uploads.php';
+require_once __DIR__ . '/includes/naming.php';
+require_once __DIR__ . '/includes/pipeline.php';   // applies_to_phrase(), on the step codes
 require_login();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -83,6 +85,64 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_atta
         flash('warn', 'That file is already gone.');
     }
     header('Location: ' . $selfUrl);
+    exit;
+}
+
+// --- the naming convention (migration 067) ----------------------------------
+//
+// David, 2026-10-22: the Brief carries the show's naming convention "as a
+// standard procedure", and a version whose file does not follow it is refused.
+// Its own form and its own save, beside the brief rather than inside it: the
+// brief is prose people rewrite, this is a rule a machine enforces, and saving
+// one must not quietly re-save the other.
+$namingReady = $ready && naming_available($pdo);
+if ($namingReady && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_naming']) && can_edit()) {
+    $clean = fn($t) => mb_substr(preg_replace('/\s+/', '', trim((string)$t)), 0, 255);
+    $shots  = $clean($_POST['naming_shots'] ?? '');
+    $assets = $clean($_POST['naming_assets'] ?? '');
+
+    // A template that names a placeholder nobody knows would check against a
+    // literal "{SHOTCODE}" and refuse every file on the show. Said, not saved.
+    $known = array_keys(naming_tokens());
+    $unknown = [];
+    foreach ([$shots, $assets] as $t) {
+        preg_match_all('/\{([^}]*)\}/', $t, $m);
+        foreach ($m[1] as $tok) if (!in_array(strtoupper($tok), $known, true)) $unknown[] = '{' . $tok . '}';
+    }
+    $noVersion = array_filter([$shots, $assets], fn($t) => $t !== '' && stripos($t, '{VERSION}') === false);
+
+    if ($unknown) {
+        flash('err', 'Not saved: ' . implode(', ', array_unique($unknown)) . ' is not a placeholder this screen knows.');
+    } elseif ($noVersion) {
+        flash('err', 'Not saved: a template needs {VERSION}, or nothing can tell v03 from v02.');
+    } else {
+        // Placeholders upper-cased, so {shot} and {SHOT} are one thing.
+        $up = fn($t) => preg_replace_callback('/\{([^}]*)\}/', fn($m) => '{' . strtoupper($m[1]) . '}', $t);
+        $codes = ['steps' => [], 'types' => []];
+        foreach ((array)($_POST['step_code'] ?? []) as $id => $c) {
+            $c = strtoupper(naming_compact((string)$c));
+            if ($c !== '') $codes['steps'][(string)(int)$id] = mb_substr($c, 0, 12);
+        }
+        foreach ((array)($_POST['type_code'] ?? []) as $i => $c) {
+            $type = (string)($_POST['type_name'][$i] ?? '');
+            $c = strtoupper(naming_compact((string)$c));
+            if ($type !== '' && $c !== '') $codes['types'][$type] = mb_substr($c, 0, 12);
+        }
+        $pdo->prepare(
+            'INSERT INTO project_brief (project_id, naming_shots, naming_assets, naming_codes, naming_first_version, updated_by)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE naming_shots = VALUES(naming_shots), naming_assets = VALUES(naming_assets),
+               naming_codes = VALUES(naming_codes), naming_first_version = VALUES(naming_first_version),
+               updated_by = VALUES(updated_by)'
+        )->execute([
+            $projectId, $up($shots) ?: null, $up($assets) ?: null,
+            json_encode($codes, JSON_UNESCAPED_UNICODE),
+            ((string)($_POST['naming_first_version'] ?? '1')) === '0' ? 0 : 1,
+            current_user_display(),
+        ]);
+        flash('ok', 'Naming convention saved. New versions on this show are checked against it from now on.');
+    }
+    header('Location: ' . $selfUrl . '#naming');
     exit;
 }
 
@@ -226,6 +286,143 @@ require __DIR__ . '/includes/header.php';
       </div>
     <?php endforeach; ?>
   </div>
+<?php endif; ?>
+
+<?php if ($namingReady):
+    // What the section draws from: the convention, every step with its code,
+    // every asset type on the show with its code, and one worked example of
+    // each template on a real task so the rule can be read as a file name.
+    $naming = naming_settings($pdo, $projectId);
+    $st = $pdo->prepare('SELECT id, name, applies_to, applies_to_asset_type FROM pipeline_steps
+                          WHERE project_id = ? ORDER BY step_order, id');
+    $st->execute([$projectId]);
+    $namingSteps = $st->fetchAll();
+    $ty = $pdo->prepare("SELECT DISTINCT asset_type FROM assets WHERE project_id = ? AND COALESCE(asset_type, '') <> ''
+                          ORDER BY asset_type");
+    $ty->execute([$projectId]);
+    $namingTypes = $ty->fetchAll(PDO::FETCH_COLUMN);
+
+    $examples = [];
+    $me = naming_initials(current_user_display());
+    foreach (['shot' => 's', 'asset' => 'a'] as $applies => $kind) {
+        foreach ($namingSteps as $s) {
+            if ($s['applies_to'] !== $applies) continue;
+            $sql = $kind === 's'
+                ? 'SELECT id FROM shots WHERE project_id = ? ORDER BY episode, shot_code LIMIT 1'
+                : "SELECT id FROM assets WHERE project_id = ?"
+                  . (trim((string)$s['applies_to_asset_type']) !== '' ? ' AND asset_type = ?' : '') . ' ORDER BY name LIMIT 1';
+            $q = $pdo->prepare($sql);
+            $q->execute(trim((string)$s['applies_to_asset_type']) !== '' && $kind === 'a'
+                        ? [$projectId, $s['applies_to_asset_type']] : [$projectId]);
+            $id = $q->fetchColumn();
+            if (!$id) continue;
+            $rule = naming_rule($pdo, $projectId, (int)$s['id'], $kind . $id);
+            if ($rule) {
+                $examples[$applies] = ['step' => $s['name'], 'name' => naming_example($rule, 1, $me)];
+            }
+            break;
+        }
+    }
+    $mayNaming = can_edit();
+?>
+  <h3 id="naming">Naming convention</h3>
+  <p class="muted small">
+    How every file on this show is named, as a rule Anima checks. When somebody uploads a new
+    version on Spell, the file name must follow this and carry the next version number, or the
+    upload is refused and the expected name is shown. Leave a template empty and that kind of
+    item is not checked.
+  </p>
+
+  <form method="post" class="stack naming-form">
+    <input type="hidden" name="save_naming" value="1">
+    <label>Shots
+      <input name="naming_shots" value="<?= e($naming['shots']) ?>" <?= $mayNaming ? '' : 'disabled' ?>
+             placeholder="{PROJECT}_{SHOT}_{STEP}_V{VERSION}_{INITIALS}">
+    </label>
+    <label>Assets
+      <input name="naming_assets" value="<?= e($naming['assets']) ?>" <?= $mayNaming ? '' : 'disabled' ?>
+             placeholder="{PROJECT}_{TYPE}_{ASSET}_{STEP}_V{VERSION}_{INITIALS}">
+    </label>
+    <?php if ($mayNaming): ?>
+      <?php // The three shapes Mana's own documents use (MSD, FCM, STFC2). ?>
+      <p class="naming-presets small">Start from Mana's standard:
+        <button type="button" class="linkish" data-naming-preset="shots"
+                data-value="{PROJECT}_{SHOT}_{STEP}_V{VERSION}_{INITIALS}">Shots</button> ·
+        <button type="button" class="linkish" data-naming-preset="shots"
+                data-value="{PROJECT}_{EPISODE}_{SHOT}_{STEP}_V{VERSION}_{INITIALS}">Shots with episodes</button> ·
+        <button type="button" class="linkish" data-naming-preset="assets"
+                data-value="{PROJECT}_{TYPE}_{ASSET}_{STEP}_V{VERSION}_{INITIALS}">Assets</button>
+      </p>
+    <?php endif; ?>
+    <label>The first version is called
+      <select name="naming_first_version" <?= $mayNaming ? '' : 'disabled' ?>>
+        <option value="0" <?= $naming['first'] === 0 ? 'selected' : '' ?>>V00</option>
+        <option value="1" <?= $naming['first'] === 1 ? 'selected' : '' ?>>V01</option>
+      </select>
+      <small class="muted">Anima counts v01 first; if this show's files start at V00, every check is offset by one.</small>
+    </label>
+
+    <details class="naming-help">
+      <summary>Placeholders</summary>
+      <ul class="small">
+        <?php foreach (naming_tokens() as $tok => $what): ?>
+          <li><code>{<?= e($tok) ?>}</code> <?= e($what) ?></li>
+        <?php endforeach; ?>
+      </ul>
+      <p class="muted small">Capitals or not does not matter, and the file's extension (.png, .mp4) is ignored.</p>
+    </details>
+
+    <?php if ($namingSteps): ?>
+      <h4>Step codes</h4>
+      <p class="muted small">What {STEP} becomes for each step. Guessed from the name until you type one.</p>
+      <div class="naming-codes">
+        <?php foreach ($namingSteps as $s):
+          $saved = (string)($naming['codes']['steps'][(string)$s['id']] ?? ''); ?>
+          <label><span><?= e($s['name']) ?> <span class="muted small">· <?= e(applies_to_phrase((string)$s['applies_to'], $s['applies_to_asset_type'] ?? null)) ?></span></span>
+            <input name="step_code[<?= (int)$s['id'] ?>]" value="<?= e($saved) ?>" maxlength="12"
+                   placeholder="<?= e(naming_default_code((string)$s['name'])) ?>" <?= $mayNaming ? '' : 'disabled' ?>>
+          </label>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($namingTypes): ?>
+      <h4>Asset type codes</h4>
+      <p class="muted small">What {TYPE} becomes for each kind of asset on this show.</p>
+      <div class="naming-codes">
+        <?php foreach ($namingTypes as $i => $type):
+          $saved = (string)($naming['codes']['types'][$type] ?? ''); ?>
+          <label><span><?= e($type) ?></span>
+            <input type="hidden" name="type_name[<?= (int)$i ?>]" value="<?= e($type) ?>">
+            <input name="type_code[<?= (int)$i ?>]" value="<?= e($saved) ?>" maxlength="12"
+                   placeholder="<?= e(naming_default_code((string)$type)) ?>" <?= $mayNaming ? '' : 'disabled' ?>>
+          </label>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($examples): ?>
+      <div class="naming-examples">
+        <?php foreach ($examples as $applies => $ex): ?>
+          <p><span class="muted small">A <?= e($applies) ?>, first version of <?= e($ex['step']) ?>:</span>
+            <code><?= e($ex['name']) ?></code></p>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($mayNaming): ?>
+      <div class="actions"><button type="submit">Save naming convention</button></div>
+    <?php endif; ?>
+  </form>
+  <script>
+  // The preset links fill their template box; nothing is saved until Save.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-naming-preset]') : null;
+    if (!b) return;
+    var box = document.querySelector('input[name="naming_' + b.getAttribute('data-naming-preset') + '"]');
+    if (box) { box.value = b.getAttribute('data-value'); box.focus(); }
+  });
+  </script>
 <?php endif; ?>
 
 <p class="muted small">
