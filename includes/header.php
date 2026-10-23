@@ -131,7 +131,9 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
             // the screen replacing Plaky, so it is the first thing in the bar
             // and the only one here that looks like a button. ?>
       <a href="spell.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'spell.php' ? ' is-on' : '' ?>">Spell</a>
-      · <a href="mytasks.php">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
+      <?php // A button too, beside Spell (David, 2026-10-22): the two screens
+            // people open first thing, so they are the two that stand out. ?>
+      <a href="mytasks.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'mytasks.php' ? ' is-on' : '' ?>">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
           class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
           title="<?= $myTasksBadge['new']
               ? 'You have a new task' : 'Your active tasks' ?>"><?= (int)$myTasksBadge['count'] ?></span><?php endif; ?></a>

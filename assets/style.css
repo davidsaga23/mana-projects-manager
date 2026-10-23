@@ -3343,6 +3343,13 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .nav-board:hover { background: var(--primary-fill); color: var(--on-primary); text-decoration: none; }
 .nav-board.is-on { background: var(--primary); color: var(--on-primary); }
+.nav-board + .nav-board { margin-left: 6px; }
+/* My tasks is a button too, so its badge sits on a blue fill: a "new" badge in
+   the same blue would vanish on the lit button, and on hover. */
+.nav-board:hover .mytasks-badge.is-new,
+.nav-board.is-on .mytasks-badge.is-new {
+  background: var(--on-primary); color: var(--primary); border-color: var(--on-primary);
+}
 
 /* The per-group expand/collapse menu (2026-10-22). Quiet until pointed at:
    one of these sits on every group header and most of the time nobody wants it. */
