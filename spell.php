@@ -126,6 +126,8 @@ require __DIR__ . '/includes/header.php';
 <div class="board-sticky">
   <div class="board-grid-head">
     <div>Shot and task</div>
+    <div>Version</div>
+    <div class="board-head-center">Comments</div>
     <div>Status</div>
     <div>Assignee</div>
     <div>Due</div>
@@ -139,6 +141,9 @@ require __DIR__ . '/includes/header.php';
         // a dropdown on either would be furniture. ?>
   <div class="board-filters">
     <div class="board-filter-count" id="boardCount"></div>
+    <?php // Version and Comments have nothing to filter. ?>
+    <div></div>
+    <div></div>
     <div>
       <select id="fStatus" aria-label="Filter by status">
         <option value="">Any status</option>
@@ -302,6 +307,8 @@ require __DIR__ . '/includes/header.php';
 
             <?php if ($self): ?>
               <?php // The deliverable's own controls, the same ones a task row carries. ?>
+              <?= board_version_cell($self) ?>
+              <?= board_comments_cell($self, $projectId, (string)$item['name']) ?>
               <?= board_status_cell($self, $board['statuses'], $projectId, $maySetAny,
                                     $myCrewId, $mayEdit) ?>
               <?= board_crew_cell($self, $crew, $projectId, $mayEdit) ?>
@@ -310,6 +317,8 @@ require __DIR__ . '/includes/header.php';
               <?= board_text_cell($self, 'link', $projectId, $mayEdit && $linkReady, 'https://…') ?>
               <?= board_text_cell($self, 'notes', $projectId, $mayEdit, 'Notes') ?>
             <?php else: ?>
+              <div class="board-cell"></div>
+              <div class="board-cell"></div>
               <?php // Read-only, so it is text with a dot and never a control. ?>
               <div class="board-cell">
                 <span class="board-derived">
@@ -373,6 +382,8 @@ require __DIR__ . '/includes/header.php';
                         data-item="<?= e($t['item_key']) ?>"
                         aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>
               </div>
+              <?= board_version_cell($t) ?>
+              <?= board_comments_cell($t, $projectId, (string)$item['name']) ?>
               <?= board_status_cell($t, $board['statuses'], $projectId, $mayEdit || $mine,
                                     $myCrewId, $mayEdit) ?>
               <?= board_crew_cell($t, $crew, $projectId, $mayEdit) ?>

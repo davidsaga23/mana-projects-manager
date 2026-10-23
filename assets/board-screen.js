@@ -585,7 +585,9 @@
   var panelClose = document.getElementById('boardPanelClose');
   var cameFrom = null;              // the button that opened it, to return focus to
 
-  function panelOpen(btn) {
+  // tab: open on that tab rather than Details — the Comments column's circle
+  // leads straight to the conversation it counts.
+  function panelOpen(btn, tab) {
     if (!panel) return;
     cameFrom = btn;
     panelInner.innerHTML = '<p class="muted small">Opening…</p>';
@@ -606,6 +608,7 @@
         if (first) first.focus();
         paneReady('comments');
         paneReady('versions');
+        if (tab) showTab(tab);
       })
       .catch(function () {
         panelInner.innerHTML = '<p class="err">That did not open. Check your connection and try again.</p>';
@@ -624,6 +627,8 @@
   document.addEventListener('click', function (e) {
     var open = e.target.closest ? e.target.closest('.board-open-task') : null;
     if (open) { panelOpen(open); return; }
+    var talk = e.target.closest ? e.target.closest('.board-comment-dot') : null;
+    if (talk) { panelOpen(talk, 'comments'); return; }
     if (e.target === veil) panelShut();
     var tab = e.target.closest ? e.target.closest('.panel-tab') : null;
     if (tab) {

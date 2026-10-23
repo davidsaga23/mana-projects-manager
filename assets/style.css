@@ -3219,7 +3219,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
 }
 
-/* The seven columns, declared once and reused by the head and every row so
+/* The nine columns (Version and Comments since 2026-10-22), declared once and reused by the head and every row so
    they cannot drift apart. */
 .board-grid-head, .board-row {
   display: grid;
@@ -3227,7 +3227,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
      asks for room for all three before anything else is given any. The rest are
      trimmed to what their contents need, so the whole board fits a 1280 laptop
      without scrolling sideways. */
-  grid-template-columns: minmax(476px, 1.6fr) 150px 170px 118px 70px 92px minmax(100px, .9fr);
+  grid-template-columns: minmax(476px, 1.6fr) 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center;
 }
 .board-grid-head {
@@ -3433,7 +3433,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-filters {
   display: grid;
-  grid-template-columns: minmax(476px, 1.6fr) 150px 170px 118px 70px 92px minmax(100px, .9fr);
+  grid-template-columns: minmax(476px, 1.6fr) 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center; gap: 0; padding: 0 14px 9px;
 }
 .board-filters > div { padding-right: 8px; min-width: 0; }
@@ -3606,7 +3606,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 /* Expand and collapse ride with the filters, spanning the columns that have
    nothing to filter. */
 .board-filter-actions {
-  grid-column: 5 / -1; display: flex; gap: 6px; justify-content: flex-end;
+  grid-column: 7 / -1; display: flex; gap: 6px; justify-content: flex-end;
   padding-right: 0;
 }
 .board-filter-actions button {
@@ -3835,3 +3835,23 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .bug-notes textarea { display: block; width: 100%; box-sizing: border-box; margin: 4px 0 6px; padding: 8px 10px;
   border: 1px solid var(--border-strong); border-radius: 4px; font-family: inherit; font-size: 14px;
   background: var(--surface); color: var(--text); resize: vertical; }
+
+/* Spell's Version and Comments columns (2026-10-22). Narrow, so their cells
+   give up most of the board's 14px side padding. */
+.board-version-cell, .board-comments-cell { padding-left: 4px; padding-right: 4px; }
+.board-comments-cell, .board-head-center { text-align: center; }
+.board-version-link {
+  font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--primary); text-decoration: none;
+}
+.board-version-link:hover { text-decoration: underline; }
+/* Only a circle with a number: how many comments, leading to them. */
+.board-comment-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
+  background: var(--primary-tint); color: var(--primary); border: 1px solid transparent;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.board-comment-dot:hover { background: var(--primary-fill); color: var(--on-primary); }
+/* "Upload new version", 20% larger than a form label (David, 2026-10-22). */
+.board-version-form .board-version-title { font-size: 1.2em; font-weight: 600; }
