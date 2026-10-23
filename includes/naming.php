@@ -186,6 +186,22 @@ function naming_example(array $rule, int $versionNo, string $initials): string {
 }
 
 /**
+ * The same name with the version left as the marker {V}.
+ *
+ * ⚠ FOR THE BROWSER, WHICH HAS TO BUILD ONE NAME PER FILE: each file picked
+ * becomes its own version, so the second of two is V05 where the first is V04.
+ * It cannot get there by replacing "04" in a finished example — SH040 carries
+ * the same two digits, and MSD_SH040_FX_V04_DS would come back as
+ * MSD_SH050_FX_V04_DS. A marker is the only safe seam.
+ */
+function naming_example_template(array $rule, string $initials): string {
+    $fill = $rule['values'] + ['VERSION' => '{V}', 'INITIALS' => $initials];
+    // preg_replace_callback does not re-scan what it substitutes, so the {V}
+    // this puts in is not matched again.
+    return preg_replace_callback('/\{([A-Z]+)\}/', fn($m) => $fill[$m[1]] ?? $m[0], $rule['template']);
+}
+
+/**
  * Check every file of one upload. $names in the order they will be numbered;
  * $nextVersion is what the first of them becomes in Anima (3 for v03).
  * Returns the sentences to show, one per file that fails; empty when all pass.

@@ -1628,6 +1628,10 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             $namingAttr = ' data-naming="' . e(json_encode([
                 're' => $rule['regex'], 'first' => $rule['first'], 'next' => $nextNo,
                 'pad' => 2, 'example' => naming_example($rule, $nextNo, $initials),
+                // The same name with {V} where the number goes, so the browser
+                // can build one per file without string-replacing digits that
+                // also appear in a shot code.
+                'exampleTpl' => naming_example_template($rule, $initials),
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '"';
             $namingHint = '<p class="naming-hint">Name it <code>' . e(naming_example($rule, $nextNo, $initials))
                         . '</code> <span class="muted small">· the show\'s naming convention, set on the '
