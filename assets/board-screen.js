@@ -393,6 +393,9 @@
   var search = document.getElementById('boardSearch');
   var fStatus = document.getElementById('fStatus');
   var fCrew = document.getElementById('fCrew');
+  // A supervisor's two: which department, and what can start today.
+  var fStep = document.getElementById('fStep');
+  var fReady = document.getElementById('fReady');
   var fDue = document.getElementById('fDue');
   var fDueOn = document.getElementById('fDueOn');
   var fDueOnDate = document.getElementById('fDueOnDate');
@@ -478,12 +481,14 @@
     var st = fStatus ? fStatus.value : '';
     var cr = fCrew ? fCrew.value : '';
     var du = fDue ? fDue.value : '';
+    var sp = fStep ? fStep.value : '';
+    var rd = fReady ? fReady.value : '';
 
     // The extra boxes belong to their own choice and nothing else.
     if (fDueOn) fDueOn.hidden = du !== 'on';
     if (fDueRange) fDueRange.hidden = du !== 'range';
 
-    var on = q !== '' || st !== '' || cr !== '' || du !== '';
+    var on = q !== '' || st !== '' || cr !== '' || du !== '' || sp !== '' || rd !== '';
 
     // Remember the board as the person left it, once, so Clear can restore it.
     if (on && wasOpen === null) {
@@ -507,6 +512,8 @@
         var hit = (q === '' || itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1)
                && (st === '' || r.getAttribute('data-status') === st)
                && (cr === '' || r.getAttribute('data-crew') === cr)
+               && (sp === '' || r.getAttribute('data-step-id') === sp)
+               && (rd === '' || r.getAttribute('data-ready') === rd)
                && dueMatches(du, r.getAttribute('data-due') || '');
         r.hidden = on && !hit;
         if (hit) { any = true; shown++; }
@@ -531,13 +538,13 @@
   }
 
   if (search) search.addEventListener('input', applyFilters);
-  [fStatus, fCrew, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
+  [fStatus, fCrew, fStep, fReady, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
     if (el) el.addEventListener('change', applyFilters);
   });
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
       if (search) search.value = '';
-      [fStatus, fCrew, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
+      [fStatus, fCrew, fStep, fReady, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
         if (el) el.value = '';
       });
       applyFilters();

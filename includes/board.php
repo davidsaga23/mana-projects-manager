@@ -343,15 +343,46 @@ function board_data(PDO $pdo, int $projectId): array {
             'version'     => $cell['version'] ?? null,
             'notes'       => $cell['notes'] ?? null,
             'link'        => $hasLink ? ($cell['link'] ?? null) : null,
+            // Overwritten by $tasksFor() for a shot or an asset, where the
+            // steps before this one are what decide it. A whole-show
+            // deliverable has nothing upstream, so this is its answer.
+            'ready'       => !status_has_begun($status)
+                             && !($cell && (int)$cell['is_approved'] === 1)
+                             && !($status && (int)($status['is_excluded'] ?? 0) === 1),
         ];
     };
 
-    /** The tasks covering one shot or asset, in pipeline order. */
+    /**
+     * The tasks covering one shot or asset, in pipeline order.
+     *
+     * ⚠ READINESS IS WORKED OUT HERE AND NOWHERE ELSE, in this one left-to-right
+     * pass, because it is the only place that sees a shot's steps IN ORDER.
+     * David asked for it when the board was being designed: "it's still useful
+     * if I'm a supervisor taking a look at what shots/assets are ready for my
+     * department".
+     *
+     * A task is ready to pick up when nothing before it is outstanding and
+     * nobody has started it. Three details carry the meaning:
+     *
+     *   APPROVED, NOT DELIVERED, clears the way. Delivered-not-approved is work
+     *   sitting in review — the next department starting on it is exactly the
+     *   rework this is meant to prevent.
+     *
+     *   AN EXCLUDED STEP IS NOT WORK, so it blocks nothing. "This shot has no
+     *   FX" must not leave Comp waiting forever, which is the same rule the
+     *   grid and the scheduler already keep.
+     *
+     *   THE FIRST STEP IS READY BY DEFAULT: there is nothing upstream of it.
+     */
     $tasksFor = function (array $itemRow, string $scope, string $itemKey) use ($steps, $task): array {
         $out = [];
+        $clear = true;
         foreach ($steps as $step) {
             if (!step_covers_item($step, $itemRow, $scope)) continue;
-            $out[] = $task($step, $itemKey);
+            $t = $task($step, $itemKey);
+            $t['ready'] = $clear && !$t['begun'] && !$t['is_approved'] && !$t['is_excluded'];
+            if (!$t['is_excluded'] && !$t['is_approved']) $clear = false;
+            $out[] = $t;
         }
         return $out;
     };
@@ -495,6 +526,9 @@ function board_data(PDO $pdo, int $projectId): array {
     return [
         'groups'   => $groups,
         'statuses' => array_values($statusMap),
+        // In pipeline order, for the Step filter: a supervisor picks their own
+        // department and the board narrows to it.
+        'steps'    => $steps,
         'counts'   => $counts,
         // The whole show in one bar, over every task on it — the same reckoning
         // a group's bar makes, one level up.
