@@ -3251,14 +3251,22 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .board-dot-step { width: 5px; height: 5px; }
 
+/* The expand arrows: a square button with rounded corners, bigger, and level
+   with the name beside it (David, 2026-10-22). ⚠ margin: 0 is the alignment
+   fix — the global `button` rule adds a 16px top margin, which is what sat the
+   arrow below its row. Only the ARROW turns, not the square around it. */
 .board-caret {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; padding: 0; flex-shrink: 0;
-  background: transparent; border: none; cursor: pointer; color: var(--faint);
-  transition: transform .18s ease;
+  width: 26px; height: 26px; margin: 0; padding: 0; flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px;
+  cursor: pointer; color: var(--text-2); font-size: 0;
 }
-.board-caret.is-open, .board-item.is-open > .board-row .board-caret { transform: rotate(90deg); }
-.board-caret-blank { cursor: default; }
+.board-caret:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-strong); }
+.board-caret svg { width: 14px; height: 14px; transition: transform .18s ease; }
+.board-caret.is-open svg, .board-item.is-open > .board-row .board-caret svg { transform: rotate(90deg); }
+/* A shot with no tasks keeps the space, not the button. */
+.board-caret-blank { cursor: default; background: transparent; border-color: transparent; }
+.board-caret-blank:hover { background: transparent; border-color: transparent; }
 
 .board-rows {
   background: var(--surface); border: 1px solid var(--border-soft);
@@ -3279,7 +3287,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-cell, .board-cell-name { padding: 7px 14px; min-width: 0; }
 .board-cell.num { text-align: right; font-variant-numeric: tabular-nums; }
 .board-cell-name { display: flex; align-items: center; gap: 9px; }
-.board-task-name { padding-left: 43px; color: var(--text-2); }
+.board-task-name { padding-left: 49px; color: var(--text-2); }   /* 6px more since the arrow grew to 26px */
 .board-name { font-weight: 600; letter-spacing: -.015em; }
 
 .board-derived { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
