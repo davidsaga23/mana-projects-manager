@@ -33,36 +33,59 @@ function bugs_available(PDO $pdo): bool {
  * Keyed by the script that draws each, so the form can preselect the screen the
  * reporter was on. Several scripts share a section where they are one screen
  * to the person using it (the Board's endpoints, a ticket and its list).
+ *
+ * The second value says who can open it: null for everyone, 'admin', or
+ * 'tab:<key>' for a project tab, answered by hidden_from_viewers() so this
+ * list and the project tabs can never disagree about who sees what.
+ */
+function bug_section_rules(): array {
+    return [
+        'spell.php'          => ['Spell (the Board)', null],
+        'mytasks.php'        => ['My tasks', null],
+        'alltasks.php'       => ['Studio Tasks', null],
+        'artists.php'        => ['Artists', null],
+        'bookings.php'       => ['Bookings', null],
+        'history_quotas.php' => ['Historic quotas', null],
+        'history_fees.php'   => ['Historic fees', 'admin'],
+        'index.php'          => ['Projects list', null],
+        'project.php'        => ['Project overview', 'tab:overview'],
+        'brief.php'          => ['Brief', 'tab:brief'],
+        'kickoff.php'        => ['Kick-off', null],
+        'dashboard.php'      => ['Dashboard', 'tab:dashboard'],
+        'crew.php'           => ['Staffing', 'tab:crew'],
+        'person.php'         => ['Person page', null],
+        'schedule.php'       => ['Schedule', 'tab:schedule'],
+        'timeline.php'       => ['Timeline', 'tab:timeline'],
+        'shots.php'          => ['Shots', 'tab:shots'],
+        'production.php'     => ['Production tracking', 'tab:production'],
+        'tasks.php'          => ['Tasks / tickets', 'tab:tasks'],
+        'team.php'           => ['Team performance', 'tab:team'],
+        'wizard.php'         => ['Project setup', 'tab:setup'],
+        'import.php'         => ['Import', 'tab:import'],
+        'finance.php'        => ['Finance', 'admin'],
+        'users.php'          => ['Users', 'admin'],
+        'login.php'          => ['Logging in', null],
+        ''                   => ['Something else', null],
+    ];
+}
+
+/**
+ * The sections THIS account may file under: script => label.
+ *
+ * David, 2026-10-22: "make sure the list only shows the sections that are
+ * visible/allowed per user". An artist offered "Historic fees" learns a screen
+ * exists that they cannot open, and a report filed against it is noise.
+ * Answers for the role being worn, like the menu does, so an admin viewing as
+ * an artist sees the artist's list.
  */
 function bug_sections(): array {
-    return [
-        'spell.php'         => 'Spell (the Board)',
-        'mytasks.php'       => 'My tasks',
-        'alltasks.php'      => 'Studio Tasks',
-        'artists.php'       => 'Artists',
-        'bookings.php'      => 'Bookings',
-        'history_quotas.php'=> 'Historic quotas',
-        'history_fees.php'  => 'Historic fees',
-        'index.php'         => 'Projects list',
-        'project.php'       => 'Project overview',
-        'brief.php'         => 'Brief',
-        'kickoff.php'       => 'Kick-off',
-        'dashboard.php'     => 'Dashboard',
-        'crew.php'          => 'Staffing',
-        'person.php'        => 'Person page',
-        'schedule.php'      => 'Schedule',
-        'timeline.php'      => 'Timeline',
-        'shots.php'         => 'Shots',
-        'production.php'    => 'Production tracking',
-        'tasks.php'         => 'Tasks / tickets',
-        'team.php'          => 'Team performance',
-        'wizard.php'        => 'Project setup',
-        'import.php'        => 'Import',
-        'finance.php'       => 'Finance',
-        'users.php'         => 'Users',
-        'login.php'         => 'Logging in',
-        ''                  => 'Something else',
-    ];
+    $out = [];
+    foreach (bug_section_rules() as $script => [$label, $gate]) {
+        if ($gate === 'admin' && !is_admin()) continue;
+        if (is_string($gate) && str_starts_with($gate, 'tab:') && hidden_from_viewers(substr($gate, 4))) continue;
+        $out[$script] = $label;
+    }
+    return $out;
 }
 
 /** The section a script belongs to, for preselecting the form. */
@@ -101,6 +124,16 @@ function bug_upload_limits(): array {
                 $toBytes((string)ini_get('upload_max_filesize')), $post);
     return ['file' => $file, 'total' => $post];
 }
+
+/** Has migration 064 run (needs_info, flag_reason, admin_notes, fix_note)? */
+function bugs_flags_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = bugs_available($pdo) && column_exists($pdo, 'bug_reports', 'needs_info');
+    return $ok;
+}
+
+/** Why a report with a video waits for David: said once, here. */
+const BUG_VIDEO_FLAG = 'Has a video, and Claude cannot watch videos. Describe what happens in it.';
 
 /** "Open", "Fixed", "Won't fix". */
 function bug_status_label(string $status): string {
