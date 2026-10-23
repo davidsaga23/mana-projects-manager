@@ -102,7 +102,7 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
     if ($detail['activity']): ?> <span class="muted">· <?= count($detail['activity']) ?></span><?php endif; ?></button>
   <?php // Last, after Activity, where David asked for it: what the task IS,
         // what people SAID, what HAPPENED, and then what was DELIVERED. ?>
-  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions<?php
+  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions and notes<?php
     if ($versionCount): ?> <span class="muted">· <?= $versionCount ?></span><?php endif; ?></button>
 </div>
 
@@ -142,7 +142,7 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
       <p class="panel-read muted">Nothing up yet</p>
     <?php endif; ?>
     <small class="muted">Counted from what is on the <button type="button"
-      class="linkish panel-tab-link" data-tab="versions">Versions</button> tab.</small>
+      class="linkish panel-tab-link" data-tab="versions">Versions and notes</button> tab.</small>
   </label>
   <label class="panel-field">
     <span>Notes</span>
