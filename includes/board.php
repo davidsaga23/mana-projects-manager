@@ -778,6 +778,78 @@ function board_initials(string $name): string {
     return mb_strtoupper($a . $b);
 }
 
+/**
+ * "Copy URL" — this one task's address, on the clipboard in one click.
+ *
+ * David, 2026-10-23: "let's create another column here with a button that says
+ * copy URL. That button will copy the URL of that specific task to the
+ * clipboard with just that click." It is the piece of the review loop that
+ * already pays for itself: a producer looking at a shot wants to paste it into
+ * Slack and say "this one", and today that means reading the address bar of a
+ * page they are not on, because the panel opens over the board.
+ *
+ * ⚠ THE ADDRESS IS STORED AS A PATH, NOT AN ABSOLUTE URL, and assets/
+ * board-screen.js resolves it against location.href at the moment of the
+ * click. PHP would have to guess the scheme and host from $_SERVER to write an
+ * absolute one here — which is exactly the guess that puts "http://localhost"
+ * into somebody's Slack message when the app sits behind a proxy. The browser
+ * already knows the answer.
+ *
+ * The link is the same one mention emails use, so a task opened from Slack and
+ * a task opened from a notification land in the same place: the panel, over
+ * the board, already open.
+ */
+function board_copy_cell(array $t, int $projectId, string $itemName = ''): string {
+    $what = trim(($itemName !== '' ? $itemName . ' · ' : '') . (string)($t['step'] ?? 'this task'));
+    return '<div class="board-cell">'
+         . board_copy_button(board_task_path($projectId, (int)$t['step_id'], (string)$t['item_key']), $what)
+         . '</div>';
+}
+
+/**
+ * The address of one task, or of one thing inside it.
+ *
+ * ⚠ ONE FUNCTION BUILDS EVERY DEEP LINK IN THIS APP — the board's Copy URL
+ * column, the per-comment and per-version buttons, and the links in mention
+ * emails. They have to agree, because assets/board-screen.js reads all three
+ * parts of what this writes: `open` says which task, `tab` which tab to show,
+ * and the fragment which row inside it to scroll to.
+ *
+ * A PATH, never an absolute URL. The scheme and host are the browser's to
+ * know; guessing them from $_SERVER is what puts "http://localhost" into
+ * somebody's Slack message when the app sits behind a proxy.
+ *
+ * @param string $tab  a tab key as board_task.php writes it: comments,
+ *                     versions, timeline. Empty opens the task as it is.
+ * @param string $frag an element id inside that tab, e.g. "bc12" or "v34"
+ */
+function board_task_path(int $projectId, int $stepId, string $itemKey,
+                         string $tab = '', string $frag = ''): string {
+    return 'spell.php?project=' . $projectId
+         . '&open=' . rawurlencode($stepId . ':' . $itemKey)
+         . ($tab !== '' ? '&tab=' . rawurlencode($tab) : '')
+         . ($frag !== '' ? '#' . rawurlencode($frag) : '');
+}
+
+/**
+ * "Copy URL" — one address, on the clipboard in one click.
+ *
+ * David asked for this four times on 2026-10-23, in four places: the board
+ * ("the URL of that specific task"), each comment thread, each version and
+ * each review ("so it's easy to share"), and the timeline. It is one button
+ * because it is one need — a producer looking at something wants to paste it
+ * into Slack and say "this one", and today that means reading the address bar
+ * of a page they are not on, because all of it opens in a panel over the board.
+ *
+ * $compact is for the ones that sit inside a line of text rather than in a
+ * column of their own.
+ */
+function board_copy_button(string $path, string $what, bool $compact = false): string {
+    return '<button type="button" class="board-copy-url' . ($compact ? ' is-compact' : '') . '"'
+         . ' data-copy="' . e($path) . '"'
+         . ' aria-label="Copy a link to ' . e($what) . '">Copy URL</button>';
+}
+
 /** What a link reads as: the service, not three hundred characters of address. */
 function board_link_label(string $url): string {
     $host = parse_url($url, PHP_URL_HOST) ?: $url;
@@ -1176,7 +1248,9 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
     // in anything but their indent. Depth is 0 or 1 and nothing else — see
     // migration 039 for why a task is not a forum.
     $myUserId = (int)($_SESSION['user_id'] ?? 0);
-    $one = function (array $c, int $depth) use ($found, $mayPost, $pdo, $myUserId): string {
+    $cProject = $projectId; $cStep = $stepId; $cItem = $itemKey;   // for the copy links
+    $one = function (array $c, int $depth) use ($found, $mayPost, $pdo, $myUserId,
+                                                $cProject, $cStep, $cItem): string {
         $cid = (int)$c['id'];
         $named = $found['mentions'][$cid] ?? [];
         $h = '<div class="comment' . ($depth > 0 ? ' comment-reply' : '')
@@ -1190,9 +1264,19 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
            . '<span class="muted small">'
            . e(date('j M Y · g:i A', strtotime((string)$c['created_at']))) . '</span>';
         if ($mayPost && $depth === 0 && ticket_threads_available($pdo)) {
-            $h .= '<button type="button" class="comment-reply-btn linkish" data-reply-to="' . $cid
+            // ⚠ A BUTTON THAT LOOKS LIKE ONE (David, 2026-10-23: "let's make
+            // that reply a button too"). It was `linkish` — blue, underlined,
+            // indistinguishable from the shot link three lines up — so it read
+            // as somewhere to go rather than something to do.
+            $h .= '<button type="button" class="comment-reply-btn" data-reply-to="' . $cid
                 . '" data-reply-name="' . e($c['display_name'] ?? '') . '">Reply</button>';
         }
+        // Every thread is worth sharing on its own: the link opens the task
+        // with Comments showing and scrolls to this one.
+        $h .= board_copy_button(
+            board_task_path($cProject, $cStep, $cItem, 'comments', 'bc' . $cid),
+            'this comment', true
+        );
         $h .= '</div><div class="comment-body">'
             . ticket_render_body((string)$c['body'], $named) . '</div>';
 
@@ -1248,7 +1332,8 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
               // Same limits, same validation and same folder as a ticket's
               // attachments — one uploader, which is where the MIME check lives.
               . '<label class="board-comment-files">Attach files'
-              . '<input type="file" name="attachments[]" multiple>'
+              . '<input type="file" name="attachments[]" multiple'
+              . ' data-drop="Drop files here">'
               . '</label>'
               . '<p class="muted small">Naming somebody rings their bell and emails them.</p>'
               . '<button type="submit" class="primary board-comment-post">Post</button>'
@@ -1410,7 +1495,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             $vid = (int)$v['id'];
             $mine = $reviews[$vid] ?? [];
 
-            $out .= '<li class="version' . ($isTop ? ' is-current' : '') . '">'
+            $out .= '<li class="version' . ($isTop ? ' is-current' : '') . '" id="v' . $vid . '">'
                   . '<div class="version-head">'
                   . '<strong class="version-no">' . e(version_label((int)$v['version_no'])) . '</strong>'
                   . ($isTop ? '<span class="version-tag">current</span>' : '')
@@ -1436,6 +1521,15 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                       . '">Make a review</button>';
             }
 
+            // ⚠ EVERY VERSION IS ITS OWN ADDRESS (David, 2026-10-23: "copy url
+            // button for each of the new versions and also for the reviews so
+            // it's easy to share"). v02 is a thing people talk about by name,
+            // and the link lands on it with the tab already open.
+            $out .= board_copy_button(
+                board_task_path($projectId, $stepId, $itemKey, 'versions', 'v' . $vid),
+                version_label((int)$v['version_no']), true
+            );
+
             // Yours to remove, or an admin's — and only while it is the latest,
             // because taking a version out of the middle would leave a gap in a
             // sequence people quote at each other.
@@ -1454,9 +1548,17 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                       . e(version_label((int)$v['version_no'])) . '</div>';
                 foreach ($mine as $r) {
                     $cid = (int)$r['id'];
-                    $out .= '<div class="comment version-review"><div class="comment-head"><strong>'
+                    $out .= '<div class="comment version-review" id="bc' . $cid . '">'
+                          . '<div class="comment-head"><strong>'
                           . e($r['display_name'] ?? 'Someone') . '</strong><span class="muted small">'
-                          . e(date('j M Y · g:i A', strtotime((string)$r['created_at']))) . '</span></div>';
+                          . e(date('j M Y · g:i A', strtotime((string)$r['created_at']))) . '</span>'
+                          // A review is the thing most worth pasting into Slack:
+                          // it is somebody's verdict on a named version.
+                          . board_copy_button(
+                                board_task_path($projectId, $stepId, $itemKey, 'versions', 'bc' . $cid),
+                                'these review notes', true
+                            )
+                          . '</div>';
                     // "(attachment)" is the placeholder for a review that is only
                     // a picture; the picture says it, so the word is not drawn.
                     if ((string)$r['body'] !== '(attachment)') {
@@ -1539,7 +1641,8 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
               . '<input type="hidden" name="add_version" value="1">'
               . '<label><span class="board-version-title">Upload new version</span>'
               . $namingHint
-              . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple>'
+              . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple'
+              . ' data-drop="Drop the new version here">'
               . '</label>'
               . ($rule ? '<div class="naming-check" hidden></div>' : '')
               // ⚠ REQUIRED (David, 2026-10-22: "so people describe what they
@@ -1586,7 +1689,8 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . ' placeholder="What to change… paste an image straight in, type @ to name somebody">'
                   . '</textarea></label>'
                   . '<label class="board-comment-files">Attach files'
-                  . '<input type="file" name="attachments[]" multiple>'
+                  . '<input type="file" name="attachments[]" multiple'
+                  . ' data-drop="Drop reference here">'
                   . '</label>'
                   // Pasted and picked files as small thumbnails, each with an ×
                   // (David, 2026-10-22). Drawn by assets/board-screen.js.
@@ -1702,7 +1806,15 @@ function board_timeline_html(PDO $pdo, int $projectId, int $stepId, string $item
         'assignee' => 'Reassigned', 'due' => 'Due date', 'notes' => 'Task note', 'link' => 'Link',
     ];
 
-    $out = '';
+    // At the top, before anything in the feed: the history of one task is a
+    // thing people send each other ("look at what happened on FX"), and unlike
+    // a comment or a version it has no row of its own to hang a button on.
+    $out = '<div class="tl-bar">'
+         . board_copy_button(
+               board_task_path($projectId, $stepId, $itemKey, 'timeline'),
+               'this timeline', true
+           )
+         . '</div>';
     if (!$entries) {
         $out .= '<p class="muted small">Nothing has happened on this task yet. Status changes, versions, '
               . 'comments and review notes appear here as they happen, newest at the top.</p>';
@@ -1712,6 +1824,7 @@ function board_timeline_html(PDO $pdo, int $projectId, int $stepId, string $item
               . 'database update 066 has been applied.</p>';
     }
     if (!$entries) return $out;
+
 
     $out .= '<ol class="tl-feed">';
     foreach ($entries as $i => $en) {

@@ -584,6 +584,7 @@
   var veil = document.getElementById('boardVeil');
   var panelClose = document.getElementById('boardPanelClose');
   var cameFrom = null;              // the button that opened it, to return focus to
+  var panelWants = null;            // a tab and a row asked for by the URL, once
 
   // tab: open on that tab rather than Details. reviewsOf: a version id whose
   // review notes to show — the Notes column leads straight to what it counts.
@@ -609,6 +610,25 @@
         if (first) first.focus();
         paneReady('comments');
         paneReady('versions');
+        if (window.animaDropzone) window.animaDropzone.attachAll(panelInner);
+
+        // A link from Slack says which tab and which row. Done once, and
+        // cleared, so closing and reopening a task by hand behaves normally.
+        if (panelWants) {
+            var wants = panelWants;
+            panelWants = null;
+            if (wants.tab) showTab(wants.tab);
+            if (wants.frag) {
+                var target = panelInner.querySelector('#' + CSS.escape(wants.frag));
+                if (target) {
+                    target.scrollIntoView({ block: 'center' });
+                    // Said, not just scrolled to: in a long thread "it is the
+                    // one in the middle of your screen" is not obvious.
+                    target.classList.add('is-linked');
+                    setTimeout(function () { target.classList.remove('is-linked'); }, 2400);
+                }
+            }
+        }
         if (tab) showTab(tab);
         if (reviewsOf) {
           var thread = panelInner.querySelector('#vr' + CSS.escape(String(reviewsOf)));
@@ -691,6 +711,11 @@
       // exist when the page loaded. See assets/mentions.js.
       window.animaMentions.attach(box, people);
     }
+
+    // "Drop files here" over the native picker, on whatever this pane just
+    // rendered. See assets/dropzone.js — it enhances the real input and the
+    // form still submits exactly what it submitted before.
+    if (window.animaDropzone) window.animaDropzone.attachAll(pane);
 
     // "Comments · 4" on the tab, kept honest after a post without reloading
     // anything: the pane in front of us IS the count.
@@ -1142,8 +1167,17 @@
   }, true);
 
   (function openFromUrl() {
-    var want = new URLSearchParams(window.location.search).get('open');
+    var q = new URLSearchParams(window.location.search);
+    var want = q.get('open');
     if (!want) return;
+    // Which tab, and which row inside it — what board_task_path() writes.
+    // "timeline" is what the tab is CALLED; "activity" is what its data-tab
+    // has always been, and renaming that would break every link already
+    // pasted into Slack. So the URL says the friendly word and this maps it.
+    var tabWanted = q.get('tab') || '';
+    if (tabWanted === 'timeline') tabWanted = 'activity';
+    var fragWanted = (window.location.hash || '').replace(/^#/, '');
+    panelWants = { tab: tabWanted, frag: fragWanted };
     var bits = want.split(':');
     if (bits.length < 2) return;
     var btn = document.querySelector('.board-open-task[data-step="' + CSS.escape(bits[0])
@@ -1164,6 +1198,58 @@
     btn.scrollIntoView({ block: 'center' });
     panelOpen(btn);
   }());
+
+  // --- Copy URL --------------------------------------------------------------
+  //
+  // David asked for this in four places on 2026-10-23 — the board's own
+  // column, each comment, each version and review, and the timeline — so
+  // there is one handler and one button class for all of them. The element
+  // carries a PATH; the absolute address is the browser's to build, because
+  // PHP guessing the host is how "http://localhost" ends up in Slack.
+  function copied(btn, ok, url) {
+    var was = btn.textContent;
+    btn.textContent = ok ? 'Copied' : 'Copy failed';
+    btn.classList.toggle('is-copied', ok);
+    setTimeout(function () {
+      btn.textContent = was;
+      btn.classList.remove('is-copied');
+    }, ok ? 1400 : 2000);
+    // ⚠ NEVER A DEAD END. Both clipboard routes can be refused — an insecure
+    // origin, a browser policy, a window that does not have focus — and a
+    // button that just says "failed" leaves somebody with no way to get the
+    // link at all. The prompt is ugly and it is selectable, which is the whole
+    // point: Ctrl-C works from it.
+    if (!ok && url) window.prompt('Copy this link:', url);
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.board-copy-url') : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();          // never also opens the row behind it
+
+    var url = new URL(btn.getAttribute('data-copy') || '', window.location.href).href;
+
+    // navigator.clipboard needs a secure context; the fallback is for a studio
+    // running this over plain http on the LAN, where it would otherwise fail
+    // silently and look like a broken button.
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url)
+        .then(function () { copied(btn, true); })
+        .catch(function () { copied(btn, false, url); });
+      return;
+    }
+    var box = document.createElement('textarea');
+    box.value = url;
+    box.setAttribute('readonly', '');
+    box.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(box);
+    box.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    document.body.removeChild(box);
+    copied(btn, ok, url);
+  });
 
   if (panelClose) panelClose.addEventListener('click', panelShut);
   document.addEventListener('keydown', function (e) {

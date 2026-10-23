@@ -3263,8 +3263,21 @@ button.secondary.danger:hover { background: var(--danger-border); }
   /* The first column holds the caret, the 250px label and the 160px bar, so it
      asks for room for all three before anything else is given any. The rest are
      trimmed to what their contents need, so the whole board fits a 1280 laptop
-     without scrolling sideways. */
-  grid-template-columns: minmax(476px, 1.6fr) 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
+     without scrolling sideways.
+
+     ⚠ THIS TRACK LIST EXISTS TWICE — here and on .board-filters, which lines
+     its dropdowns up under these headings. Change one and the filters slide
+     out from under their columns, which is exactly what happened when Step and
+     Ready were added on 2026-10-23 and pushed Due under Link.
+
+     ⚠ THE COPY URL COLUMN (2026-10-23) COST 84px, and the first column gave
+     up 24 of them to pay for part of it — it had that much slack over the
+     250px label plus the 160px bar plus the caret, and no more. The board's
+     minimum is now about 1356px rather than 1296px, so a 1280 laptop scrolls a
+     little. The cheapest thing to drop if that ever matters is Frames: 70px
+     that reads "—" on every task row and carries a number only on the shot
+     above them. */
+  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center;
 }
 .board-grid-head {
@@ -3310,6 +3323,20 @@ button.secondary.danger:hover { background: var(--danger-border); }
   border-radius: 14px; overflow: hidden;
 }
 .board-item + .board-item { border-top: 1px solid var(--border-soft); }
+/* Quiet until you want it: a producer scanning statuses should not be reading
+   a column of buttons. It comes up on hovering the row, and is always there
+   for the keyboard. */
+.board-copy-url {
+  margin: 0; padding: 4px 8px; min-height: 0;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: transparent; color: var(--muted);
+  font-size: 11.5px; font-weight: 500; white-space: nowrap;
+  opacity: .45; transition: opacity .12s ease;
+}
+.board-row:hover .board-copy-url, .board-copy-url:focus-visible { opacity: 1; }
+.board-copy-url:hover { border-color: var(--border-strong); color: var(--text); }
+.board-copy-url.is-copied { opacity: 1; border-color: var(--ok); color: var(--ok); }
+
 .board-row { min-height: 50px; }
 .board-row:hover { background: var(--surface-2); }
 .board-row-task { min-height: 46px; border-top: 1px solid var(--border-soft); }
@@ -3483,10 +3510,20 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-filters {
   display: grid;
-  grid-template-columns: minmax(476px, 1.6fr) 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
+  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center; gap: 0; padding: 0 14px 9px;
 }
 .board-filters > div { padding-right: 8px; min-width: 0; }
+/* ⚠ STEP AND READY LIVE IN THE FIRST COLUMN, not in columns of their own.
+   They were given their own grid cells when they were added, which pushed Due
+   one column right and left it sitting under Link — the filter bar only lines
+   up because its children land in the same tracks as the headings, so a filter
+   that matches no heading has to ride along with one that does. These two
+   narrow WHICH ROWS rather than filter a column, so they belong under "Shot
+   and task" beside the count. */
+.board-filter-lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.board-filter-lead .board-filter-count { flex: 0 0 auto; }
+.board-filter-lead select { flex: 0 1 auto; max-width: 150px; }
 .board-filters select {
   width: 100%; min-height: 30px; padding: 4px 8px; border-radius: 7px;
   border: 1px solid var(--border); background: var(--surface-2);
@@ -4088,3 +4125,71 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .naming-row { padding: 2px 0; }
 .naming-row.is-ok { color: var(--ok); }
 .naming-row.is-bad { color: var(--danger); font-weight: 600; }
+
+/* --- Copy URL, and the rows a copied link lands on ----------------------- */
+/* David asked for this button in four places on 2026-10-23 — the board column,
+   each comment, each version and review, and the timeline — so there is one
+   class for all of them. `is-compact` is the one that sits inside a line of
+   text rather than in a column of its own. */
+.board-copy-url.is-compact {
+  margin-left: auto; padding: 2px 7px;
+  font-size: 11px; opacity: 0;
+}
+.comment:hover .board-copy-url.is-compact,
+.version:hover .board-copy-url.is-compact,
+.tl-bar .board-copy-url.is-compact,
+.board-copy-url.is-compact:focus-visible { opacity: .75; }
+.board-copy-url.is-compact:hover { opacity: 1; }
+.tl-bar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+
+/* Reply reads as something you DO, not somewhere you go (David: "let's make
+   that reply a button too"). It was `linkish` — blue and underlined, the same
+   as the shot link three lines above it. */
+.comment-reply-btn {
+  margin: 0 0 0 4px; padding: 2px 9px; min-height: 0;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: transparent; color: var(--text-2);
+  font-size: 11.5px; font-weight: 500;
+}
+.comment-reply-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+/* Where a pasted link just landed. Said rather than merely scrolled to: in a
+   long thread, "it is the one in the middle of your screen" is not obvious. */
+.is-linked {
+  animation: linked-flash 2.4s ease-out;
+  border-radius: 8px;
+}
+@keyframes linked-flash {
+  0%, 55% { background: var(--primary-tint); }
+  100% { background: transparent; }
+}
+
+/* --- "Drop files here" (assets/dropzone.js) ------------------------------ */
+/* The native control cannot be styled, says nothing about what is allowed, and
+   gives no way to remove one file from a selection. This sits over it; the
+   real input is still inside, still what the form submits. */
+.dropzone {
+  position: relative; margin-top: 6px; padding: 14px 12px;
+  border: 1.5px dashed var(--border-strong); border-radius: 10px;
+  background: var(--surface-2); cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+.dropzone:hover { border-color: var(--primary); }
+.dropzone.is-over { border-color: var(--primary); background: var(--primary-tint); }
+/* Hidden from sight, not from the form: it still carries the files. */
+.dropzone input[type="file"] {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.dropzone-say { text-align: center; font-size: 13px; line-height: 1.5; }
+.dropzone-say strong { display: block; font-weight: 600; }
+.dropzone-link { text-decoration: underline; }
+.dropzone-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.dropzone-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; margin-top: 4px; border-radius: 7px;
+  background: var(--surface-3); font-size: 12.5px;
+}
+.dropzone-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropzone-list .link-danger { margin: 0; padding: 0 2px; min-height: 0; border: 0; background: none; font-size: 15px; line-height: 1; }
+.dropzone.has-files .dropzone-say strong { font-weight: 500; }
