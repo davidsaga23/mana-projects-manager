@@ -42,6 +42,15 @@ if (!$detail) {
     exit;
 }
 
+// ?pane=timeline: the Timeline alone, re-drawn after somebody posts a comment,
+// a review or a version, so it is current without reopening the task (David,
+// 2026-10-22: "I just left a comment and it didn't update in the timeline").
+// Same checks as the whole panel above; nothing else is rendered or stamped.
+if (($_GET['pane'] ?? '') === 'timeline') {
+    echo board_timeline_html($pdo, $projectId, $stepId, $itemKey);
+    exit;
+}
+
 $t     = $detail['task'];
 $item  = $detail['item'];
 $crew  = board_assignees($pdo, $projectId);
@@ -94,20 +103,19 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
 
 <div class="panel-tabs" role="tablist">
   <button type="button" class="panel-tab is-on" role="tab" aria-selected="true" data-tab="details">Details</button>
-  <?php // Between Details and Activity, where David asked for it: what the task
-        // IS, then what people SAID about it, then what HAPPENED to it. ?>
+  <?php // What the task IS, what people SAID, what was DELIVERED and said about
+        // it, and last the TIMELINE of all of it (David, 2026-10-22: "let's change
+        // the order of timeline to the end"). ?>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="comments">Comments<?php
     if ($commentCount): ?> <span class="muted">· <?= $commentCount ?></span><?php endif; ?></button>
+  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions and notes<?php
+    if ($versionCount): ?> <span class="muted">· <?= $versionCount ?></span><?php endif; ?></button>
   <?php // TIMELINE, once Activity (David, 2026-10-22): everything that happened
         // to the task, newest first. Drawn once here; the count is its entries.
         $timelineHtml = board_timeline_html($pdo, $projectId, $stepId, $itemKey);
         $timelineCount = substr_count($timelineHtml, 'class="tl-entry'); ?>
   <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="activity">Timeline<?php
     if ($timelineCount): ?> <span class="muted">· <?= $timelineCount ?></span><?php endif; ?></button>
-  <?php // Last, after Activity, where David asked for it: what the task IS,
-        // what people SAID, what HAPPENED, and then what was DELIVERED. ?>
-  <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="versions">Versions and notes<?php
-    if ($versionCount): ?> <span class="muted">· <?= $versionCount ?></span><?php endif; ?></button>
 </div>
 
 <div class="panel-body" data-pane="details">
