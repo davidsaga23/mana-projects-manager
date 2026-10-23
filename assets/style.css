@@ -3930,3 +3930,14 @@ a.version-shot:hover { border-color: var(--border-strong); }
   color: var(--warn); margin: 2px 0 4px;
 }
 .version-reviews .comment-body { font-size: 15px; color: var(--text); }
+
+/* Version and Notes side by side, centred on the same line (David,
+   2026-10-22). Both cells are flex boxes centring one control, and the notes
+   button drops the global button margin, which is what sat it lower than the
+   version beside it. Same height for both. */
+.board-version-cell, .board-notes-cell {
+  display: flex; align-items: center; justify-content: center;
+}
+.board-version-link, .board-notes-btn { height: 26px; min-height: 26px; margin: 0; line-height: 1; }
+.board-notes-btn { width: 26px; min-width: 26px; padding: 0; }
+.board-grid-head > div:nth-child(2) { text-align: center; }
