@@ -1512,7 +1512,9 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             // from the start — they are what the artist has to act on next.
             if ($mine) {
                 $n = count($mine);
-                $out .= '<button type="button" class="version-reviews-btn has-notes"'
+                // The chevron comes from the CSS on [aria-expanded], so the
+                // arrow and the state cannot disagree: there is only one of them.
+                $out .= '<button type="button" class="version-reviews-btn has-notes is-toggle"'
                       . ' aria-expanded="' . ($isTop ? 'true' : 'false') . '"'
                       . ' data-version-reviews="vr' . $vid . '">' . $n . ' review note' . ($n === 1 ? '' : 's')
                       . '</button>';
@@ -1676,14 +1678,25 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                        . e(version_label((int)$v['version_no'])) . ($i === 0 ? ' (current)' : '')
                        . '</option>';
             }
-            $form = '<form class="comment-form board-version-form board-review-form" method="post"'
+            // ⚠ BOTH FORMS ARE FOLDED AWAY NOW (David, 2026-10-23: "let's make
+            // 'Make review' an expandable item too"). The tab is for LOOKING at
+            // versions and the notes on them; putting the work up and reviewing
+            // it are two things you do occasionally, and a form open by default
+            // pushed the current version — the thing everybody came to see —
+            // below the fold.
+            //
+            // The version picker moves out of the title and into the body: a
+            // <select> inside a <summary> is a trap, because clicking it
+            // collapses the thing you were about to fill in.
+            $form = '<details class="board-expand board-review-expand">'
+                  . '<summary><span class="board-version-title">Make a review</span></summary>'
+                  . '<form class="comment-form board-version-form board-review-form" method="post"'
                   . ' enctype="multipart/form-data"'
                   . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
                   . ' data-item="' . e($itemKey) . '">'
                   . '<input type="hidden" name="add_review" value="1">'
-                  . '<div class="board-review-top"><span class="board-version-title">Make a review</span>'
-                  . '<label class="board-review-version">on <select name="version_id"'
-                  . ' aria-label="Which version this review is about">' . $opts . '</select></label></div>'
+                  . '<label class="board-review-version">Reviewing <select name="version_id"'
+                  . ' aria-label="Which version this review is about">' . $opts . '</select></label>'
                   . '<label>Notes'
                   . '<textarea name="body" rows="3" class="board-comment-box board-review-box"'
                   . ' placeholder="What to change… paste an image straight in, type @ to name somebody">'
@@ -1702,8 +1715,9 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . '<p class="muted small">Pasted images and picked files go with the review. '
                   . 'Naming somebody rings their bell and emails them.</p>'
                   . '<button type="submit" class="primary board-version-post">Post review</button>'
-                  . '</form>'
-                  . '<details class="board-upload-instead"><summary>Upload a new version instead</summary>'
+                  . '</form></details>'
+                  . '<details class="board-expand board-upload-instead">'
+                  . '<summary><span class="board-version-title">Upload a new version</span></summary>'
                   . $upload . '</details>';
         } else {
             $form = $upload;

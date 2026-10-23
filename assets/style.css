@@ -3969,15 +3969,53 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .version-files-btn:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 
 /* Make a review: its title with the version picker beside it. */
-.board-review-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.board-review-top .board-review-version { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
-.board-review-top select { width: auto; min-height: 30px; padding: 3px 8px; }
+.board-review-version { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.board-review-version select { width: auto; min-height: 30px; padding: 3px 8px; }
 .board-review-form input[type=file] {
   display: block; width: 100%; margin-top: 6px; padding: 6px 0;
   border: 0; background: none; font-size: 12px; color: var(--text-2);
 }
-.board-upload-instead { margin: 0 0 18px; }
-.board-upload-instead > summary { cursor: pointer; font-size: 13px; color: var(--primary); margin-bottom: 10px; }
+/* --- a fold, with an arrow that turns (David, 2026-10-23) ----------------- */
+/* "let's improve both versions and reviews expandable with a nicer arrow".
+   The native <details> marker is a tiny filled triangle nobody can style
+   consistently across browsers, so it is hidden and this is drawn instead.
+
+   ⚠ BORDERS AND currentColor, NOT A BACKGROUND IMAGE. An inline SVG would
+   have to name a colour, and a colour written into a rule is the one thing
+   lesson 21 forbids — two corners of a box inherit the text colour for free
+   and turn with a transform. */
+.board-expand { margin: 0 0 18px; border-bottom: 1px solid var(--border-soft); }
+.board-expand:last-of-type { border-bottom: 0; }
+.board-expand > summary {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 0; cursor: pointer; list-style: none;
+  color: var(--text); user-select: none;
+}
+.board-expand > summary::-webkit-details-marker { display: none; }
+.board-expand > summary:hover { color: var(--primary); }
+.board-expand > summary::before {
+  content: ''; flex: 0 0 auto;
+  width: 7px; height: 7px; margin-left: 2px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform .15s ease;
+}
+.board-expand[open] > summary::before { transform: rotate(45deg); }
+.board-expand[open] > summary { margin-bottom: 4px; }
+
+/* The same arrow on the per-version "3 review notes" toggle, which is a button
+   rather than a <details> but opens and shuts exactly like one. */
+.version-reviews-btn.is-toggle { display: inline-flex; align-items: center; gap: 7px; }
+.version-reviews-btn.is-toggle::after {
+  content: ''; flex: 0 0 auto;
+  width: 6px; height: 6px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform .15s ease;
+}
+.version-reviews-btn.is-toggle[aria-expanded="true"]::after { transform: rotate(45deg); }
 .board-version-form input[type=url] { display: block; width: 100%; margin-top: 6px; }
 /* "Upload new version", 20% larger than a form label (David, 2026-10-22). */
 .board-version-form .board-version-title { font-size: 1.2em; font-weight: 600; }
