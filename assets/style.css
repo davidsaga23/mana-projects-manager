@@ -3908,3 +3908,25 @@ a.version-shot:hover { border-color: var(--border-strong); }
   background: rgba(0, 0, 0, .7); color: #fff; font-size: 14px; line-height: 1;
 }
 .review-thumb-x:hover { background: var(--danger); }
+
+/* REVIEW NOTES, LOUD (David, 2026-10-22: "a bit more on the face so we don't
+   miss them, or the artists"). The warning colour, filled, wherever notes
+   exist: the button at the top of a version, the thread under it, and the
+   Notes column on the board. */
+.version-reviews-btn.has-notes,
+.board-notes-btn {
+  background: var(--warn); color: var(--on-warn); border-color: var(--warn);
+  font-weight: 700;
+}
+.version-reviews-btn.has-notes:hover,
+.board-notes-btn:hover { background: var(--warn-strong); color: var(--on-warn); border-color: var(--warn-strong); }
+.version-reviews-btn.has-notes { font-size: 13.5px; padding: 4px 14px; }
+.version-reviews {
+  border-left: 4px solid var(--warn); background: var(--warn-tint);
+  padding: 8px 14px; margin: 10px 0 14px;
+}
+.version-reviews-title {
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--warn); margin: 2px 0 4px;
+}
+.version-reviews .comment-body { font-size: 15px; color: var(--text); }
