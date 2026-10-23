@@ -3328,7 +3328,12 @@ button.secondary.danger:hover { background: var(--danger-border); }
 
 /* What a save did, bottom right, out of the way of the rows. */
 .board-note-bar {
-  position: fixed; right: 18px; bottom: 18px; z-index: 60; max-width: 420px;
+  /* ⚠ CLEARS THE 🐞 BUTTON, which has sat in this corner since 2026-10-23.
+     66px is that button's height plus its 16px gap plus a little air; if it
+     moves or changes size, this moves with it. A toast landing on top of the
+     one button that is on every screen would hide it exactly when somebody is
+     saving things and might want to report what just happened. */
+  position: fixed; right: 18px; bottom: 66px; z-index: 60; max-width: 420px;
   padding: 11px 15px; border-radius: 10px;
   background: var(--surface-3); color: var(--text);
   border: 1px solid var(--border-strong); box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
@@ -3668,11 +3673,19 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .panel-body[data-pane="comments"] .comment-head { gap: 6px; }
 
 /* --- bug reports (migration 062) ---
-   The 🐞 button sits bottom-LEFT, fixed, on every screen. Bottom-right is
-   taken by the Board's .board-note-bar (what a save did),
-   and the button must never sit on top of something you were trying to click. */
+   The 🐞 button sits bottom-RIGHT, fixed, on every screen. David moved it there
+   on 2026-10-23 ("let's move the report a bug to the other side of the
+   screen") — bottom-left put it on top of the Add artists button on Staffing,
+   which is exactly the thing a floating button must never do.
+
+   ⚠ THAT CORNER WAS ALREADY TAKEN, by Spell's .board-note-bar (what a save
+   did), which is why it was on the left to begin with. The toast now sits
+   ABOVE the button rather than under it: see the bottom offset on
+   .board-note-bar, which is this button's height plus its gap and has to move
+   if this one does. The permanent thing keeps the corner; the transient one
+   steps over it. */
 .bug-fab {
-  position: fixed; left: 16px; bottom: 16px; z-index: 90;
+  position: fixed; right: 16px; bottom: 16px; z-index: 90;
   border-radius: 999px; padding: 8px 14px; font-size: 13px;
   box-shadow: 0 4px 14px rgba(0,0,0,.25); opacity: .85;
 }
