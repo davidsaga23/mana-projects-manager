@@ -299,7 +299,8 @@ require __DIR__ . '/includes/header.php';
   <form method="post" enctype="multipart/form-data" class="stack">
     <input type="hidden" name="read" value="1">
     <label>Transcript (.md or .txt)
-      <input type="file" name="file" accept=".md,.txt,.markdown,text/plain,text/markdown" required>
+      <input type="file" name="file" accept=".md,.txt,.markdown,text/plain,text/markdown" required
+             data-drop="Drop the transcript here">
       <small>The whole transcript. It is read once, here, and not stored.</small>
     </label>
     <div class="actions">
@@ -430,4 +431,10 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 </div>
+<?php // "let's create a drop zone here too" (David, 2026-10-23). The same
+      // component the task panel uses: it enhances the real input and leaves
+      // what the form posts exactly as it was, so read_transcript() upstream
+      // is untouched and unaware. ?>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
+<script>window.animaDropzone.attachAll(document);</script>
 </body></html>
