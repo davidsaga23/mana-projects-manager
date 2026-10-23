@@ -27,12 +27,35 @@ function asset_ver(string $filename): string {
  * logo appears everywhere at once the moment it exists.
  */
 function site_logo(string $class = 'site-logo'): string {
+    // A drop-in replacement is shown exactly as it is: an svg or png put here
+    // is assumed to be a tight mark already, and nothing below should crop it.
     foreach (['logo.svg', 'logo.png'] as $file) {
         if (is_file(__DIR__ . '/../assets/' . $file)) {
-            return '<img src="assets/' . $file . asset_ver($file) . '" alt="Mana" class="' . e($class) . '">';
+            return '<img src="assets/' . $file . asset_ver($file) . '" alt="Anima" class="' . e($class) . '">';
         }
     }
-    return '<span class="' . e($class) . ' site-logo-text">MANA</span>';
+
+    // ⚠ THE ARTWORK IS ONE SQUARE IMAGE HOLDING TWO THINGS: the A, and the
+    // word ANIMA under it (David, 2026-10-23: "let's use this as the platform
+    // official logo"). Only the A is ever shown, and the crop is CSS — see
+    // .site-logo-crop, whose fractions were MEASURED off this exact file.
+    //
+    // The wordmark is dropped because every place a logo appears in this app
+    // already says the name in words beside it or under it: "Anima | Project
+    // manager" in the top bar, and the same again as the login heading. A
+    // lockup there would say Anima twice, and at 24px its wordmark would be
+    // four pixels tall and unreadable anyway.
+    //
+    // Cropping rather than shipping a second cropped file keeps ONE image to
+    // replace when the artwork changes — and if it does change, those
+    // fractions have to be measured again.
+    $lockup = 'logo.webp';
+    if (is_file(__DIR__ . '/../assets/' . $lockup)) {
+        return '<span class="' . e($class) . ' site-logo-crop">'
+             . '<img src="assets/' . $lockup . asset_ver($lockup) . '" alt="Anima"></span>';
+    }
+
+    return '<span class="' . e($class) . ' site-logo-text">ANIMA</span>';
 }
 
 /**
