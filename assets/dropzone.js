@@ -57,7 +57,8 @@
     zone.innerHTML =
       '<div class="dropzone-say">' +
         '<strong></strong>' +
-        '<span class="muted small">or <span class="dropzone-link">choose from your computer</span></span>' +
+        '<span class="muted small">paste a screenshot, or ' +
+          '<span class="dropzone-link">choose from your computer</span></span>' +
       '</div>' +
       '<ul class="dropzone-list"></ul>';
     zone.querySelector('strong').textContent = says;
@@ -106,6 +107,7 @@
       input.dispatchEvent(new CustomEvent('anima:files', { bubbles: true }));
     }
 
+    /** Takes a FileList (a pick, a drop) or a plain Array (a paste). */
     function add(files) {
       for (var i = 0; i < files.length; i++) {
         if (!multiple) picked = [];
@@ -151,6 +153,35 @@
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
         add(e.dataTransfer.files);
       }
+    });
+
+    // --- pasting a screenshot -------------------------------------------------
+    //
+    // David, 2026-10-23: "I can't just paste an image in the clipboard in this
+    // context", and then, after drag-and-drop arrived, "still can't just paste
+    // an image inline". Dropping is not pasting: a screenshot taken with the
+    // snipping tool is ON THE CLIPBOARD and has no file on disk to drag.
+    //
+    // ⚠ BOUND ON THE FORM, NOT THE TEXTAREA, so it works wherever the cursor
+    // happens to be — the title, the notes, the comment box. And TEXT IS LEFT
+    // ALONE: only clipboard items that are image FILES are taken, so pasting a
+    // link or a paragraph still pastes a link or a paragraph.
+    var host = input.closest('form') || zone;
+    host.addEventListener('paste', function (e) {
+      if (!e.clipboardData) return;
+      var images = [];
+      Array.prototype.forEach.call(e.clipboardData.items || [], function (it) {
+        if (it.kind === 'file' && /^image\//.test(it.type)) {
+          var f = it.getAsFile();
+          if (f) images.push(f);
+        }
+      });
+      if (!images.length) return;
+      e.preventDefault();
+      add(images.map(function (f, i) {
+        var ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+        return new File([f], 'pasted-' + (picked.length + i + 1) + '.' + ext, { type: f.type });
+      }));
     });
 
     // A form that has been submitted and re-rendered starts over; one that is
