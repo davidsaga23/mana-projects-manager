@@ -1643,7 +1643,17 @@ if ($retakePct <= 0):
     <?php foreach ($invoices as $iv):
       $late = !$iv['paid_date'] && $iv['due_date'] && $iv['due_date'] < $todayStr; ?>
       <tr class="<?= $late ? 'row-overdue' : '' ?>">
-        <td><?= e($iv['crew_name'] ?: '—') ?></td>
+        <?php // Notes as a quiet line under the name, the way the expense table
+              // shows its own, rather than a tenth column: they are rare, can
+              // run to a sentence, and a column would be empty on most rows and
+              // squeeze the dates on the rest. They were always saved by the form
+              // below; until 2026-10-23 this table simply never printed them, so
+              // a note typed in was only ever seen again in phpMyAdmin. ?>
+        <td><?= e($iv['crew_name'] ?: '—') ?>
+          <?php if (!empty($iv['notes'])): ?>
+            <div class="muted small"><?= e($iv['notes']) ?></div>
+          <?php endif; ?>
+        </td>
         <td class="muted small"><?= e($iv['step_name'] ?: '') ?: '<span class="warn-text">unattached</span>' ?></td>
         <td class="muted small">
           <?php if (!empty($iv['document_url'])): ?>
@@ -1700,7 +1710,8 @@ if ($retakePct <= 0):
   each was six page loads to do one afternoon's bookkeeping. Only the <strong>amount</strong> is
   required; blank rows are ignored. A row with details but no amount is <em>not</em> ignored, it
   is reported, because that is somebody who was interrupted mid-typing rather than a row nobody
-  wanted.
+  wanted. <strong>Notes</strong> is the last box on the right (scroll the grid sideways); whatever
+  goes there shows under the name in the list above.
 </p>
 
 <form method="post">
@@ -1755,7 +1766,7 @@ if ($retakePct <= 0):
             <td><input type="date" name="<?= $n ?>[due_date]"></td>
             <td><input type="date" name="<?= $n ?>[paid_date]"></td>
             <td><input type="url" name="<?= $n ?>[document_url]" size="16" placeholder="https://drive.google.com/…"></td>
-            <td><input name="<?= $n ?>[notes]" size="18"></td>
+            <td><input name="<?= $n ?>[notes]" size="18" placeholder="Shown under the name above"></td>
           </tr>
         <?php endfor; ?>
       </tbody>
