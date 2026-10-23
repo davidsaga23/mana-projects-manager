@@ -479,6 +479,12 @@ function artist_may_post(): bool {
         // remove any). Without it the × would draw and then be refused, which
         // is worse than no × at all.
         'board_comment.php' => ['add_comment', 'delete_attachment'],
+        // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
+        // About the APPLICATION, not anyone's work, so it writes nothing an
+        // artist could not otherwise touch: one new row in bug_reports, filed
+        // under their own name by bugs.php. Closing a report is admin-only and
+        // checked there, so set_status is deliberately not in this list.
+        'bugs.php' => ['report_bug'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

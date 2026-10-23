@@ -3636,6 +3636,35 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .panel-body[data-pane="comments"] .comment { margin-bottom: 15px; }
 .panel-body[data-pane="comments"] .comment-head { gap: 6px; }
 
+/* --- bug reports (migration 062) ---
+   The 🐞 button sits bottom-LEFT, fixed, on every screen. Bottom-right is
+   taken by the Board's .board-note-bar (what a save did),
+   and the button must never sit on top of something you were trying to click. */
+.bug-fab {
+  position: fixed; left: 16px; bottom: 16px; z-index: 90;
+  border-radius: 999px; padding: 8px 14px; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25); opacity: .85;
+}
+.bug-fab:hover { opacity: 1; }
+@media (max-width: 640px) { .bug-fab span { display: none; } }
+.bug-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 18px 22px; width: min(560px, 92vw); }
+.bug-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+.bug-dialog h3 { margin: 0 0 4px; }
+.bug-dialog label { display: block; margin: 12px 0 0; font-weight: 600; }
+.bug-dialog select, .bug-dialog textarea, .bug-dialog input[type="file"] {
+  display: block; width: 100%; margin-top: 4px; font-weight: 400; box-sizing: border-box; }
+.bug-dialog textarea { padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  font-family: inherit; font-size: 15px; resize: vertical; background: var(--surface); color: var(--text); }
+.bug-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 14px; }
+.bug-filter { display: flex; gap: 8px; margin: 0 0 16px; }
+.bug-report { margin-bottom: 14px; }
+.bug-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.bug-status { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: var(--danger-tint); color: var(--danger-strong); }
+.bug-fixed .bug-status { background: var(--ok-tint); color: var(--ok); }
+.bug-wontfix .bug-status { background: var(--surface-3); color: var(--muted); }
+.bug-desc { white-space: normal; margin: 10px 0; }
 /* --- the bell beside your name (David, 2026-10-22) ------------------------ */
 /* "a notification in a bell close to your name so you know someone assign, tag
    or changed a tasked you're subscribed to". It sits in the top bar on every

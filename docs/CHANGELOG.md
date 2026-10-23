@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-22 — A 🐞 Report a bug button on every screen *(needs migration 062)*
+
+- **A Report a bug button, bottom left of every screen**, for everyone, artists and supervisors
+  included. It asks for the **section** (preselected from the screen you are on), **what went
+  wrong**, and **screenshots, GIFs or videos**. Your **name, your role and the date** are added
+  automatically, along with the page you were on.
+- **A Bugs link in the top bar** opens `bugs.php`: admins see every report (with a count of the
+  open ones) and can mark each **Fixed**, **Won't fix** or reopen it; everyone else sees their own.
+- Oversized files are refused in the form before sending, so the description is never lost.
+- The button stays hidden until migration 062 is applied.
+
 ## 2026-10-22 — The Board is now called Spell *(no migration)*
 
 - **The Board button and screen are renamed Spell**, and the page moved from `board.php` to

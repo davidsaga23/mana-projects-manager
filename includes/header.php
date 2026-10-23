@@ -40,6 +40,12 @@ if (isset($pdo) && $pdo instanceof PDO && notify_available($pdo)) {
         ];
     }
 }
+// The Bug button (migration 062) and, for admins, how many reports are open.
+require_once __DIR__ . '/bugs.php';
+$openBugs = 0;
+if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
+    $openBugs = (int)$pdo->query("SELECT COUNT(*) FROM bug_reports WHERE status = 'open'")->fetchColumn();
+}
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
@@ -194,6 +200,13 @@ if (isset($pdo) && $pdo instanceof PDO && notify_available($pdo)) {
              if ($pendingMigrations > 0): ?><span class="pending-badge"><?= $pendingMigrations ?></span><?php endif;
            ?></a>
       <?php endif; ?>
+      <?php // BUGS, for everyone: an admin reads every report here, anyone
+            // else the ones they filed. Filing one is the 🐞 button at the
+            // bottom right of every screen, not this link. ?>
+      <?php if (isset($pdo) && $pdo instanceof PDO && bugs_available($pdo)): ?>
+        · <a href="bugs.php">Bugs<?php if ($openBugs > 0): ?><span class="pending-badge"
+             title="Open bug reports"><?= $openBugs ?></span><?php endif; ?></a>
+      <?php endif; ?>
       · <a href="logout.php">Log out</a>
     </div>
   </div>
@@ -265,3 +278,4 @@ if (isset($pdo) && $pdo instanceof PDO && notify_available($pdo)) {
       // defer, so it never blocks the page it is trying to make less annoying;
       // it needs nothing from the DOM until DOMContentLoaded anyway. ?>
 <script defer src="assets/keepplace.js<?= asset_ver('keepplace.js') ?>"></script>
+<?php if (isset($pdo) && $pdo instanceof PDO) render_bug_button($pdo); ?>

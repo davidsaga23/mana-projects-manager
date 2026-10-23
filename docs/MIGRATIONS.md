@@ -26,7 +26,7 @@ The app shows an **"updates waiting"** banner when production migrations are pen
 
 ## ⚠ Pending right now (as of 2026-10-21) — David to run
 
-**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060`.
+**Production (open `migrate.php`):** `047, 048, 049, 050, 051, 052, 053, 054, 055, 056, 057, 058, 059, 060 (both `060_crew_absences` and `060_notifications`), 061, 062`.
 
 **Finance (import by hand into the finance DB via phpMyAdmin):** `finance_install_08.sql` (the
 money side of the kick-off sign-off, needed together with migration 049).
@@ -121,6 +121,9 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 058 | status_begun | ⏳ `statuses.counts_as_started` — which of a show's statuses mean somebody has picked the work up, so a shot reads **In progress** as soon as one task does. **The Board is already right without it** (it falls back to an explicit list of spellings); this makes it editable per show on the Statuses screen. |
 | 060 | crew_absences | ⏳ **Days off per person** (`crew_absences`), entered on the person page. The scheduler plans each person's lane around them, and around their engagement dates on the show, the next time the schedule is run. Without it, engagement dates already count; only days off are switched off. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
+| 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
+| 061 | comment_files | ⏳ **Files on a Board comment.** |
+| 062 | bug_reports | ⏳ **Bug reports** (`bug_reports`, `bug_attachments`): the 🐞 button on every screen and the Bugs page. Hidden entirely until run. |
 
 ### Finance DB imports (by hand, phpMyAdmin, once each)
 | File | What it unlocks |
