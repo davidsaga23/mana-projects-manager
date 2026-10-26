@@ -60,12 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // mistyped or tampered id would otherwise write a pay rate against
             // somebody who does not exist, in a table nothing would ever clean up.
             //
-            // project_lanes() is the same source the table itself is drawn from,
-            // so every row on screen passes by construction and nothing else can.
+            // project_positions() is the same source the table itself is drawn
+            // from, slots and supervision positions both, so every row on screen
+            // passes by construction and nothing else can.
             $crewId = (int)($_POST['crew_id'] ?? 0);
             $name = '';
-            foreach (project_lanes($pdo, $projectId) as $l) {
-                if ((int)$l['crew_id'] === $crewId) { $name = (string)$l['name']; break; }
+            foreach (project_positions($pdo, $projectId) as $l) {
+                if ($l['crew_id'] === $crewId) { $name = $l['crew_name']; break; }
             }
             if ($crewId <= 0 || $name === '') {
                 throw new RuntimeException('That person is not on this project, so no rate was saved.');
@@ -90,11 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Everybody is checked against this project's lanes, same as the
             // single box: an id the table did not draw cannot be written to.
             $onShow = [];
-            foreach (project_lanes($pdo, $projectId) as $l) {
-                $onShow[(int)$l['crew_id']] = [
-                    'name' => (string)$l['name'],
-                    'slot' => (int)($l['is_placeholder'] ?? 0) === 1,
-                ];
+            foreach (project_positions($pdo, $projectId) as $l) {
+                $onShow[$l['crew_id']] = ['name' => $l['crew_name'], 'slot' => $l['is_placeholder']];
             }
             $ids = array_unique(array_map('intval', (array)($_POST['crew_ids'] ?? [])));
             $ids = array_values(array_filter($ids, fn($id) => isset($onShow[$id])));
@@ -174,12 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // four fields an invoice stores. Rebuilt here rather than trusted
             // from the browser — see save_invoices_bulk().
             $posMap = [];
-            foreach (project_lanes($pdo, $projectId) as $l) {
-                $posMap[(int)$l['crew_id'] . ':' . (int)$l['step_id']] = [
-                    'crew_id'   => (int)$l['crew_id'],
-                    'step_id'   => (int)$l['step_id'],
-                    'crew_name' => (string)$l['name'],
-                    'step_name' => (string)$l['step_name'],
+            foreach (project_positions($pdo, $projectId) as $l) {
+                $posMap[$l['crew_id'] . ':' . $l['step_id']] = [
+                    'crew_id'   => $l['crew_id'],
+                    'step_id'   => $l['step_id'],
+                    'crew_name' => $l['crew_name'],
+                    'step_name' => $l['step_name'],
                 ];
             }
             $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
@@ -212,12 +210,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // show's own lanes, never trusted from the browser.
             $in['crew_id'] = null; $in['step_id'] = null; $in['step_name'] = null;
             $pos = (string)($_POST['position'] ?? '');
-            foreach (project_lanes($pdo, $projectId) as $l) {
-                if ((int)$l['crew_id'] . ':' . (int)$l['step_id'] !== $pos) continue;
-                $in['crew_id'] = (int)$l['crew_id'];
-                $in['step_id'] = (int)$l['step_id'];
-                $in['step_name'] = (string)$l['step_name'];
-                if (trim((string)($in['crew_name'] ?? '')) === '') $in['crew_name'] = (string)$l['name'];
+            foreach (project_positions($pdo, $projectId) as $l) {
+                if ($l['crew_id'] . ':' . $l['step_id'] !== $pos) continue;
+                $in['crew_id'] = $l['crew_id'];
+                $in['step_id'] = $l['step_id'];
+                $in['step_name'] = $l['step_name'];
+                if (trim((string)($in['crew_name'] ?? '')) === '') $in['crew_name'] = $l['crew_name'];
             }
             flash('ok', save_invoice($in, $project, $who));
         } elseif (isset($_POST['save_invoice'])) {
@@ -252,19 +250,10 @@ $proj    = expense_projection($pdo, $projectId);
 // exactly the set of rows the projection draws. Built from the same
 // project_lanes() the projection uses, so the picker and the table can never
 // offer different things.
-$positions = [];
-foreach (project_lanes($pdo, $projectId) as $l) {
-    $positions[] = [
-        'crew_id'   => (int)$l['crew_id'],
-        'step_id'   => (int)$l['step_id'],
-        'crew_name' => (string)$l['name'],
-        'step_name' => (string)$l['step_name'],
-        'label'     => $l['name'] . ', ' . $l['step_name'],
-        // Carried for the Final balance test below: a PLACEHOLDER is a slot
-        // nobody filled, and nobody can invoice for work that was never done.
-        'is_placeholder' => !empty($l['is_placeholder']),
-    ];
-}
+// Slots and supervision positions (project_positions()). is_placeholder is
+// carried for the Final balance test below: a PLACEHOLDER is a position nobody
+// filled, and nobody can invoice for work that was never done.
+$positions = project_positions($pdo, $projectId);
 $people  = project_people($pdo, $projectId);
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
@@ -1353,11 +1342,14 @@ if ($retakePct <= 0):
           <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
                 e(fmt_num($r['units'], 1)) ?></td>
           <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
-          <td class="num"><?= $r['actual_cost'] === null || $r['actual_days'] <= 0
+          <?php // A supervisor logs no days on a step, so their invoiced cost
+                // shows without any; a lane's still waits for logged days. ?>
+          <?php $hasActual = $r['actual_days'] > 0 || !empty($r['supervision']); ?>
+          <td class="num"><?= $r['actual_cost'] === null || !$hasActual
                 ? '<span class="muted">—</span>' : e(number_format($r['actual_cost'], 2)) ?></td>
-          <td class="num <?= $r['variance'] !== null && $r['actual_days'] > 0
+          <td class="num <?= $r['variance'] !== null && $hasActual
                 ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
-            <?= $r['variance'] === null || $r['actual_days'] <= 0
+            <?= $r['variance'] === null || !$hasActual
                 ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
           </td>
         </tr>

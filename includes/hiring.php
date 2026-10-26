@@ -185,6 +185,23 @@ function hiring_available(PDO $pdo): bool {
     return column_exists($pdo, 'hires', 'stage');
 }
 
+/** Can a record point at a supervision position? Migration 069, checked separately. */
+function hire_supervision_available(PDO $pdo): bool {
+    return column_exists($pdo, 'hires', 'supervision_id')
+        && column_exists($pdo, 'supervision_positions', 'crew_id');
+}
+
+/**
+ * The extra SELECT columns and JOIN that bring a record's supervision position
+ * along, or two empty strings before migration 069. sup_crew_id is who holds the
+ * position now, read the same way lane_crew_id is for a slot.
+ */
+function hire_supervision_sql(PDO $pdo): array {
+    if (!hire_supervision_available($pdo)) return ['', ''];
+    return [', sp.crew_id AS sup_crew_id, sp.title AS sup_title',
+            ' LEFT JOIN supervision_positions sp ON sp.id = h.supervision_id'];
+}
+
 /** Are the freelancer-database columns there? Migration 025, checked separately. */
 function hire_extras_available(PDO $pdo): bool {
     return column_exists($pdo, 'hires', 'position');
@@ -233,7 +250,7 @@ function hire_extra_values(array $in): array {
  * includes/artists.php makes when it writes an edit back across somebody's rows.
  */
 function add_known_candidate(PDO $pdo, int $projectId, int $laneId, int $fromHireId,
-                             string $who = ''): array {
+                             string $who = '', int $supervisionId = 0): array {
     $src = get_hire($pdo, $fromHireId);
     if (!$src) throw new RuntimeException('That person is no longer in the artist database.');
 
@@ -246,7 +263,8 @@ function add_known_candidate(PDO $pdo, int $projectId, int $laneId, int $fromHir
         'phone'          => $src['phone'] ?? '',
         'portfolio_url'  => $src['portfolio_url'] ?? '',
         'source'         => $src['source'] ?? '',
-        'lane_id'        => $laneId,
+        'lane_id'        => $supervisionId > 0 ? 0 : $laneId,
+        'supervision_id' => $supervisionId,
         'stage'          => HIRE_STAGE_NEW,
     ];
     if (hire_extras_available($pdo)) {
@@ -327,25 +345,34 @@ function known_candidates(PDO $pdo): array {
  * @return array|null the existing record, with its slot named, or null
  */
 function hire_duplicate(PDO $pdo, int $projectId, string $name, ?string $email,
-                        ?int $laneId, int $excludeId = 0): ?array {
+                        ?int $laneId, int $excludeId = 0, ?int $supervisionId = null): ?array {
     if (!hiring_available($pdo)) return null;
     $name = trim($name);
     if ($name === '') return null;
     $email = trim((string)$email);
 
+    // A supervision position is a job of its own, so the same person up for
+    // Anim Sup and for no slot at all is two conversations, not one.
+    $sup = hire_supervision_available($pdo);
     $q = $pdo->prepare(
-        'SELECT h.*, cl.lane_no, c.name AS slot_name, ps.name AS slot_step
+        'SELECT h.*, cl.lane_no, COALESCE(c.name, ' . ($sup ? 'sp.title' : 'NULL') . ') AS slot_name,
+                ps.name AS slot_step
            FROM hires h
            LEFT JOIN crew_lanes cl     ON cl.id = h.lane_id
            LEFT JOIN crew c            ON c.id  = cl.crew_id
-           LEFT JOIN pipeline_steps ps ON ps.id = cl.step_id
+           LEFT JOIN pipeline_steps ps ON ps.id = cl.step_id'
+        . ($sup ? ' LEFT JOIN supervision_positions sp ON sp.id = h.supervision_id' : '') . '
           WHERE h.project_id = ?
             AND (LOWER(h.candidate_name) = LOWER(?) OR (? <> \'\' AND h.email = ?))
-            AND h.lane_id <=> ?
+            AND h.lane_id <=> ?'
+        . ($sup ? ' AND h.supervision_id <=> ?' : '') . '
             AND h.id <> ?
           LIMIT 1'
     );
-    $q->execute([$projectId, $name, $email, $email, $laneId, $excludeId]);
+    $args = [$projectId, $name, $email, $email, $laneId];
+    if ($sup) $args[] = $supervisionId ?: null;
+    $args[] = $excludeId;
+    $q->execute($args);
     return $q->fetch() ?: null;
 }
 
@@ -375,16 +402,17 @@ function engagement_dates_available(PDO $pdo): bool {
  */
 function project_hires(PDO $pdo, int $projectId): array {
     if (!hiring_available($pdo)) return [];
+    [$supCols, $supJoin] = hire_supervision_sql($pdo);
     $stmt = $pdo->prepare(
         'SELECT h.*,
                 cl.lane_no, cl.step_id AS lane_step_id, cl.crew_id AS lane_crew_id,
                 ps.name AS live_step_name, ps.color AS step_color,
                 ps.applies_to, ps.applies_to_asset_type,
-                c.name AS slot_name, c.is_placeholder
+                c.name AS slot_name, c.is_placeholder' . $supCols . '
            FROM hires h
            LEFT JOIN crew_lanes cl     ON cl.id = h.lane_id
            LEFT JOIN pipeline_steps ps ON ps.id = COALESCE(cl.step_id, h.step_id)
-           LEFT JOIN crew c            ON c.id = cl.crew_id
+           LEFT JOIN crew c            ON c.id = cl.crew_id' . $supJoin . '
           WHERE h.project_id = ?
           ORDER BY ps.step_order IS NULL, ps.step_order, cl.lane_no,
                    h.stage_changed_at DESC, h.id DESC'
@@ -407,10 +435,11 @@ function project_hires(PDO $pdo, int $projectId): array {
  * because there is nothing to compare.
  */
 function hire_has_left(array $h): bool {
-    return ($h['stage'] ?? '') === 'hired'
-        && !empty($h['lane_id'])
-        && (int)($h['crew_id'] ?? 0) > 0
-        && (int)$h['crew_id'] !== (int)($h['lane_crew_id'] ?? 0);
+    if (($h['stage'] ?? '') !== 'hired' || (int)($h['crew_id'] ?? 0) <= 0) return false;
+    if (!empty($h['lane_id'])) return (int)$h['crew_id'] !== (int)($h['lane_crew_id'] ?? 0);
+    // A supervision position (069), read the same way.
+    if (!empty($h['supervision_id'])) return (int)$h['crew_id'] !== (int)($h['sup_crew_id'] ?? 0);
+    return false;
 }
 
 /** When each of these records last left its position, from the stage log: id => datetime. */
@@ -456,11 +485,40 @@ function note_left_position(PDO $pdo, int $projectId, int $laneId, int $crewId, 
     }
 }
 
-/** Hiring records grouped by the lane they are for. Key 0 holds the unattached ones. */
+/** note_left_position(), for a supervision position. */
+function note_left_supervision(PDO $pdo, int $projectId, int $supervisionId, int $crewId, string $who = ''): void {
+    if ($crewId <= 0 || !hire_supervision_available($pdo)) return;
+    $stmt = $pdo->prepare(
+        "SELECT id, candidate_name FROM hires
+          WHERE project_id = ? AND supervision_id = ? AND crew_id = ? AND stage = 'hired'"
+    );
+    $stmt->execute([$projectId, $supervisionId, $crewId]);
+    foreach ($stmt->fetchAll() as $h) {
+        log_hire_stage($pdo, (int)$h['id'], (string)$h['candidate_name'], 'hired', 'left',
+                       'Taken out of the position', $who);
+    }
+}
+
+/**
+ * Hiring records grouped by the lane they are for. Key 0 holds the unattached ones.
+ * A record for a supervision position is not unattached, so it is left out here
+ * and grouped by hires_by_supervision() instead.
+ */
 function hires_by_lane(PDO $pdo, int $projectId): array {
     $out = [];
     foreach (project_hires($pdo, $projectId) as $h) {
+        if (empty($h['lane_id']) && !empty($h['supervision_id'])) continue;
         $out[(int)($h['lane_id'] ?? 0)][] = $h;
+    }
+    return $out;
+}
+
+/** Hiring records grouped by the supervision position they are for (069). */
+function hires_by_supervision(PDO $pdo, int $projectId): array {
+    if (!hire_supervision_available($pdo)) return [];
+    $out = [];
+    foreach (project_hires($pdo, $projectId) as $h) {
+        if (!empty($h['supervision_id'])) $out[(int)$h['supervision_id']][] = $h;
     }
     return $out;
 }
@@ -468,10 +526,11 @@ function hires_by_lane(PDO $pdo, int $projectId): array {
 /** One hiring record, or null. */
 function get_hire(PDO $pdo, int $hireId): ?array {
     if (!hiring_available($pdo)) return null;
+    [$supCols, $supJoin] = hire_supervision_sql($pdo);
     $stmt = $pdo->prepare(
-        'SELECT h.*, cl.lane_no, cl.crew_id AS lane_crew_id, cl.step_id AS lane_step_id
+        'SELECT h.*, cl.lane_no, cl.crew_id AS lane_crew_id, cl.step_id AS lane_step_id' . $supCols . '
            FROM hires h
-           LEFT JOIN crew_lanes cl ON cl.id = h.lane_id
+           LEFT JOIN crew_lanes cl ON cl.id = h.lane_id' . $supJoin . '
           WHERE h.id = ?'
     );
     $stmt->execute([$hireId]);
@@ -597,6 +656,24 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
         $stepName = $lane['name'];
     }
 
+    // OR A SUPERVISION POSITION (069), checked against this project the same
+    // way. One or the other: a record is about one job. The title is copied
+    // into step_name, so the record still says what it was for if the
+    // position is later removed.
+    $supId = (int)($in['supervision_id'] ?? 0) ?: null;
+    if ($supId !== null) {
+        if (!hire_supervision_available($pdo)) {
+            throw new RuntimeException('Lining up for a supervision position needs database update 069, '
+                                     . 'which has not been applied yet. Nothing was saved.');
+        }
+        $q = $pdo->prepare('SELECT title FROM supervision_positions WHERE id = ? AND project_id = ?');
+        $q->execute([$supId, $projectId]);
+        $title = $q->fetchColumn();
+        if ($title === false) throw new RuntimeException('That supervision position is not on this project.');
+        $laneId = null; $stepId = null;
+        $stepName = mb_substr((string)$title, 0, 100);
+    }
+
     $stage = in_array($in['stage'] ?? '', array_keys(HIRE_STAGES), true)
            ? $in['stage'] : HIRE_STAGE_NEW;
     $id    = (int)($in['hire_id'] ?? 0);
@@ -605,7 +682,7 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
     // this codebase detects near-duplicates and never resolves them silently
     // (asset types, 2026-08-13), and a second record would split one person's
     // history down the middle with nothing on screen to say why.
-    $dup = hire_duplicate($pdo, $projectId, $name, $email, $laneId, $id);
+    $dup = hire_duplicate($pdo, $projectId, $name, $email, $laneId, $id, $supId);
     if ($dup !== null) {
         throw new RuntimeException(sprintf(
             '"%s" is already %s. Open that record and update it rather than adding a second one.',
@@ -633,6 +710,12 @@ function save_hire(PDO $pdo, int $projectId, array $in, string $who = ''): array
     // column that is not there.
     if (hire_extras_available($pdo)) {
         $set = array_merge($set, hire_extra_values($in));
+    }
+    // Only written when 069 is there and the caller says which job this is: an
+    // edit from the Hiring screen's grid knows nothing of supervision and must
+    // not detach a record from its position.
+    if (hire_supervision_available($pdo) && ($supId !== null || $laneId !== null)) {
+        $set['supervision_id'] = $supId;
     }
     // 031, probed on its own: a database with 025 and not 031 keeps working.
     if (column_exists($pdo, 'hires', 'portfolio_password')) {
@@ -856,6 +939,26 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                                        . 'management.', $name);
                     }
                 }
+            }
+        } elseif (!empty($hire['supervision_id']) && isset($hire['sup_crew_id'])) {
+            // A SUPERVISION POSITION (069). Nothing is scheduled on it, so there
+            // is no work to carry; the same refusal as a slot when somebody
+            // real already holds it.
+            $occupantId = (int)$hire['sup_crew_id'];
+            $slot = $pdo->prepare('SELECT id, name, is_placeholder FROM crew WHERE id = ?');
+            $slot->execute([$occupantId]);
+            $occupant = $slot->fetch() ?: null;
+            if ($occupant && $occupantId === $crewId) {
+                $out[] = sprintf('%s already holds %s, so nothing moved.', $name, $hire['sup_title']);
+            } elseif ($occupant && (int)$occupant['is_placeholder'] === 0) {
+                throw new RuntimeException(sprintf(
+                    '%s is already held by %s, so it was not overwritten. Take them out on the '
+                    . 'Staffing screen first if %s is replacing them.',
+                    $hire['sup_title'], $occupant['name'], $name));
+            } else {
+                require_once __DIR__ . '/supervision.php';
+                supervision_assign($pdo, $projectId, (int)$hire['supervision_id'], $crewId);
+                $out[] = sprintf('%s is now %s on this show.', $name, $hire['sup_title']);
             }
         }
 

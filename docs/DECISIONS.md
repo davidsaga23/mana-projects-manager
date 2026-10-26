@@ -4377,3 +4377,16 @@ named after it, so it can carry a rate before anyone is in it, exactly as a slot
 line on each show. This is for a supervisor the show itself hires.
 **Not built yet:** candidates on Hiring for these positions, invoices attaching to them (needs a
 finance DB change), the staffing export.
+
+## 2026-10-26 — A supervision invoice carries the position as a negative step id
+**Decision:** an invoice for a supervision position stores `step_id = -<position id>` in the finance
+database, with the title in `step_name`. Every reader already finds an invoice's row by
+"crew + step", step ids are never negative, and `invoices.step_id` has no foreign key (it cannot,
+across two databases), so the position needed no finance import. `project_positions()` in
+`includes/finance.php` is the one list of what an invoice (or a rate on the Finance screen) may
+name: slots and supervision positions together.
+**Hiring:** `hires.supervision_id` (migration 069), the twin of `lane_id`; a record holds one or the
+other. Hiring a candidate goes through the same `hire_candidate()`, which puts them in the position
+via `supervision_assign()` (now safe inside the hire's transaction).
+**Not changed:** an artist statement's "due" for a day rate is still days LOGGED, so a supervisor who
+logs no time shows nothing due; flat-fee supervisors read correctly.

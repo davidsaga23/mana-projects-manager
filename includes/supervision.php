@@ -42,6 +42,14 @@ function supervision_positions(PDO $pdo, int $projectId): array {
     return $stmt->fetchAll();
 }
 
+/** Who holds a position right now: its crew id, or 0 when it is not on this project. */
+function supervision_crew_id(PDO $pdo, int $projectId, int $posId): int {
+    if (!supervision_available($pdo)) return 0;
+    $stmt = $pdo->prepare('SELECT crew_id FROM supervision_positions WHERE id = ? AND project_id = ?');
+    $stmt->execute([$posId, $projectId]);
+    return (int)($stmt->fetchColumn() ?: 0);
+}
+
 /**
  * The working days a position covers, both ends counted, weekends and studio
  * holidays left out — the same count the steps on Dates & headcount use, so a
@@ -180,6 +188,13 @@ function supervision_delete(PDO $pdo, int $projectId, int $id): void {
     if (!$row) return;
     $pdo->prepare('DELETE FROM supervision_positions WHERE id = ? AND project_id = ?')
         ->execute([$id, $projectId]);
+    // The conversations about it outlive it, as they do a removed slot: the
+    // records stay, pointing at nothing, their copied title still saying what
+    // they were for. 069 may not be applied yet.
+    if (column_exists($pdo, 'hires', 'supervision_id')) {
+        $pdo->prepare('UPDATE hires SET supervision_id = NULL WHERE supervision_id = ? AND project_id = ?')
+            ->execute([$id, $projectId]);
+    }
     if ((int)$row['is_placeholder'] === 1) supervision_drop_placeholder($pdo, (int)$row['crew_id']);
 }
 
@@ -236,16 +251,20 @@ function supervision_assign(PDO $pdo, int $projectId, int $posId, int $crewId, s
         throw new RuntimeException('That is not somebody on the studio crew list.');
     }
 
-    $pdo->beginTransaction();
+    // ⚠ SAFE INSIDE ANOTHER TRANSACTION, the way assign_crew_to_lane() is:
+    // hire_candidate() calls this from the middle of its own, and MySQL has no
+    // nested transactions. Opens one only as the outermost caller.
+    $own = !$pdo->inTransaction();
+    if ($own) $pdo->beginTransaction();
     try {
         $pdo->prepare('UPDATE supervision_positions SET crew_id = ? WHERE id = ?')->execute([$crewId, $posId]);
         // On the show: it is what lets a supervisor log in and find it.
         $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
             ->execute([$crewId, $projectId]);
         if ((int)$pos['is_placeholder'] === 1) supervision_drop_placeholder($pdo, (int)$pos['crew_id']);
-        $pdo->commit();
+        if ($own) $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($own && $pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
     return sprintf('%s is now %s on this show%s.', $person['name'], $pos['title'],
