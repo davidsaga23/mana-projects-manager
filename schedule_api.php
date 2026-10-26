@@ -47,6 +47,44 @@ function progress_set_by(): string {
 const PROGRESS_NEEDS_036 = 'Recording progress needs database update 036, so nothing was saved. '
                          . 'An administrator can apply it from Migrations.';
 
+// BACK TO AUTOMATIC (David, 2026-10-26). A step's progress is the share of its
+// work delivered unless somebody set it; setting it is what writes "Set by …",
+// so clearing that stamp is what hands the bar back to the count. The answer
+// carries the automatic figure, so the bar can redraw without a reload.
+if ($action === 'step_progress_auto') {
+    require_once __DIR__ . '/includes/timeline_versions.php';   // timeline_auto_progress()
+    $stepId    = (int)($_POST['step_id'] ?? 0);
+    $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+    if (!column_exists($pdo, 'pipeline_steps', 'progress_pct')) api_fail(PROGRESS_NEEDS_036);
+
+    $chk = $pdo->prepare('SELECT name FROM pipeline_steps WHERE id = ? AND project_id = ?');
+    $chk->execute([$stepId, $projectId]);
+    $name = $chk->fetchColumn();
+    if ($name === false) api_fail('That step is not on this project.');
+
+    $pdo->prepare('UPDATE pipeline_steps SET progress_pct = 0, progress_source = NULL WHERE id = ? AND project_id = ?')
+        ->execute([$stepId, $projectId]);
+
+    $pq = $pdo->prepare('SELECT delivery_date FROM projects WHERE id = ?');
+    $pq->execute([$projectId]);
+    $auto = null; $text = '';
+    foreach (dashboard_steps($pdo, $projectId, $pq->fetchColumn() ?: null) as $ds) {
+        if ((int)$ds['step']['id'] !== $stepId) continue;
+        $auto = timeline_auto_progress($ds);
+        $text = timeline_tracked_text($ds);
+    }
+    echo json_encode([
+        'ok'       => true,
+        'progress' => $auto ?? 0,
+        'progress_auto' => $auto,
+        'progress_source' => '',
+        'tracked_text' => $text,
+        'note'     => $name . ': automatic again, ' . ($auto ?? 0) . '% delivered',
+    ]);
+    exit;
+}
+
 if ($action === 'step_progress') {
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
@@ -64,7 +102,9 @@ if ($action === 'step_progress') {
     // Only a CHANGED number is re-attributed, so "set by" always names whoever
     // last actually moved it.
     $source = (string)($row['progress_source'] ?? '');
-    if ($pct !== (int)$row['progress_pct']) {
+    // Also when nothing is stamped yet: on an AUTOMATIC bar the stored number is
+    // stale, so a hand-set value equal to it is still a hand-set value.
+    if ($pct !== (int)$row['progress_pct'] || trim($source) === '') {
         $source = progress_set_by();
         $pdo->prepare(
             'UPDATE pipeline_steps SET progress_pct = ?, progress_source = ? WHERE id = ? AND project_id = ?'
@@ -138,7 +178,7 @@ if ($action === 'step_dates' || $action === 'step_edit') {
     $source   = $progressReady ? (string)($row['progress_source'] ?? '') : '';
     // Only a CHANGED number is re-attributed: saving new dates must not stamp
     // "set by" on a progress nobody touched.
-    if ($pct !== null && $pct !== $progress) {
+    if ($pct !== null && ($pct !== $progress || trim($source) === '')) {
         $progress = $pct;
         $source   = progress_set_by();
         $set     .= ', progress_pct = ?, progress_source = ?';

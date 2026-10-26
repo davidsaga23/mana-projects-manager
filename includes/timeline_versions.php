@@ -179,9 +179,23 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
             'name'       => $s['name'] . ' · ' . $scope,
             'start'      => $start,
             'end'        => $end,
-            // Frappe's own field, drawn as the darker part of the bar: the
-            // progress somebody recorded by hand (migration 036), 0 before it.
-            'progress'   => max(0, min(100, (int)($s['progress_pct'] ?? 0))),
+            // Frappe's own field, drawn as the darker part of the bar.
+            //
+            // ⚠ AUTOMATIC UNLESS SOMEBODY SET IT (David, 2026-10-26: "record the
+            // progress in the bars automatically based on the assets/shots/
+            // seconds delivered vs the pending ones ... with the option to
+            // override manually"). Automatic is the share DELIVERED — approved
+            // counts, being delivered and then some — in the step's own unit:
+            // items, or seconds of footage for a step that tracks seconds, with
+            // N/A items out of the total. The same figure the dashboard draws.
+            //
+            // HAND-SET is a progress with a "Set by … on …" beside it, which is
+            // exactly what dragging the handle or typing in the editor has always
+            // written (migration 036). So no new column: what people set before
+            // today stays theirs, and "Back to automatic" clears the stamp.
+            'progress'   => timeline_step_progress($s, $trk),
+            'progress_auto'   => timeline_auto_progress($trk),
+            'progress_manual' => trim((string)($s['progress_source'] ?? '')) !== '',
             'progress_source' => (string)($s['progress_source'] ?? ''),
             'color'      => $s['color'] ?: '#5FB2FF',
             // For the step editor.
@@ -189,7 +203,7 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
             'scope'      => $scope,
             'need_days'  => $dur['days'],
             'need_text'  => timeline_need_text($dur),
-            'tracked_pct'  => ($trk && (int)$trk['tracked'] > 0) ? $trk['pct'] : null,
+            'tracked_pct'  => timeline_auto_progress($trk),
             'tracked_text' => timeline_tracked_text($trk),
             // Frappe 0.6.1 reads this as a comma-separated list of task ids.
             'dependencies' => implode(',', $depIds),
@@ -288,17 +302,33 @@ function timeline_need_text(array $d): string {
  * nobody knows, which are different statements (the same rule as the pace).
  */
 function timeline_tracked_text(?array $t): string {
-    if ($t === null || (int)$t['tracked'] === 0) {
-        return 'Nothing tracked for this step on the grid yet.';
-    }
-    if ((float)$t['target'] <= 0) {
-        return 'Tracked on the grid, but there is nothing yet to count it against.';
+    if ($t === null || (float)$t['target'] <= 0) {
+        return 'Nothing to count yet: this step has no shots, assets or seconds against it.';
     }
     $fmt = function ($v) use ($t) {
         return $t['unit'] === 'sec' ? fmt_secs((float)$v) : (string)(int)round((float)$v);
     };
-    return sprintf('%s of %s approved on the tracking grid, %d%%.',
-                   $fmt($t['approved_v']), $fmt($t['target']), (int)$t['pct']);
+    $what = $t['unit'] === 'sec' ? 'seconds' : 'items';
+    return sprintf('%s of %s %s delivered, %d%%.',
+                   $fmt($t['delivered_v']), $fmt($t['target']), $what, (int)$t['pct_delivered']);
+}
+
+/**
+ * A step's AUTOMATIC progress: the share of its work delivered, 0 to 100, or
+ * null when there is nothing to count against (no items, no seconds).
+ * Delivered includes approved — status_flags() sets both for an approved status.
+ */
+function timeline_auto_progress(?array $t): ?int {
+    if ($t === null || (float)$t['target'] <= 0 || $t['pct_delivered'] === null) return null;
+    return max(0, min(100, (int)$t['pct_delivered']));
+}
+
+/** What the bar draws: the hand-set figure where there is one, else automatic. */
+function timeline_step_progress(array $step, ?array $t): int {
+    if (trim((string)($step['progress_source'] ?? '')) !== '') {
+        return max(0, min(100, (int)($step['progress_pct'] ?? 0)));
+    }
+    return timeline_auto_progress($t) ?? 0;
 }
 
 /**

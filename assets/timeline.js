@@ -885,6 +885,7 @@
         postApi('step_progress', { step_id: src.step_id, progress_pct: progress }).then(function (d) {
           src.progress = d.progress;
           src.progress_source = d.progress_source;
+          src.progress_manual = true;     // dragged by hand: overrides the count
           var host = $('generalGantt');
           if (host) paintProgress(host, window.GENERAL_TASKS);
           stepSaved(d.note || 'Saved.');
@@ -1100,7 +1101,15 @@
       tag.setAttribute('class', 'tl-pct');
       tag.setAttribute('x', x + wd + 6);
       tag.setAttribute('y', y + h / 2 + 4);
-      tag.textContent = pct + '%';
+      // A pencil after a number somebody SET (2026-10-26): the rest are counted
+      // from what has been delivered, and the two must not read the same.
+      tag.textContent = pct + '%' + (o.progress_manual ? ' ✎' : '');
+      if (o.progress_manual) {
+        var why = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        why.textContent = 'Set by hand' + (o.progress_source ? ': ' + o.progress_source : '')
+                        + '. Open the step to put it back to automatic.';
+        tag.appendChild(why);
+      }
       w.appendChild(tag);
     });
   }
@@ -1381,18 +1390,21 @@
     setProgressInputs(src.progress);
     $('seProgress').disabled = progressOff;
     $('seProgressRange').disabled = progressOff;
-    $('seProgressSource').textContent = src.progress_source
-      ? src.progress_source + '.' : (+src.progress ? '' : 'Not recorded yet.');
+    // AUTOMATIC UNLESS SET BY HAND (2026-10-26). What is shown is what the
+    // bar draws; only a number somebody CHANGES here is saved, and saving one
+    // is what makes it hand-set. "Back to automatic" hands it back.
+    src._shown = +src.progress;
+    var auto = (src.progress_auto === undefined || src.progress_auto === null) ? null : +src.progress_auto;
+    $('seProgressSource').textContent = src.progress_manual
+      ? src.progress_source + (auto !== null ? ', overriding the automatic ' + auto + '%.' : '.')
+      : (auto !== null ? 'Automatic, from what has been delivered. Change it to set it by hand.'
+                       : 'Nothing to count yet, so 0% until something is delivered or set by hand.');
 
     $('seTracked').textContent = src.tracked_text || '';
     var use = $('seUseTracked');
     if (use) {
-      var tp = (src.tracked_pct === undefined || src.tracked_pct === null) ? null : +src.tracked_pct;
-      use.hidden = tp === null || progressOff;
-      if (tp !== null) {
-        use.textContent = 'Use ' + tp + '%';
-        use.setAttribute('data-pct', tp);
-      }
+      use.hidden = !src.progress_manual || progressOff;
+      use.textContent = 'Back to automatic' + (auto !== null ? ' (' + auto + '%)' : '');
     }
     $('seCancel').textContent = ro ? 'Close' : 'Cancel';
     refreshStepEditor();
@@ -1430,7 +1442,20 @@
     }
     if ($('seUseTracked')) {
       $('seUseTracked').addEventListener('click', function () {
-        setProgressInputs(this.getAttribute('data-pct'));
+        var src = stepEd;
+        if (!src || !window.TL_CAN_EDIT) return;
+        var btn = this;
+        btn.disabled = true;
+        postApi('step_progress_auto', { step_id: src.step_id }).then(function (d) {
+          src.progress = d.progress;
+          src.progress_auto = d.progress_auto;
+          src.progress_manual = false;
+          src.progress_source = '';
+          if (d.tracked_text) src.tracked_text = d.tracked_text;
+          window.closeStepEditor();
+          renderGeneral(true);
+          stepSaved(d.note || 'Automatic again.');
+        }).catch(function () {}).then(function () { btn.disabled = false; });
       });
     }
 
@@ -1442,7 +1467,9 @@
       var fields = { step_id: src.step_id, start_date: $('seStart').value, end_date: $('seEnd').value };
       if (window.TL_PROGRESS_READY) {
         setProgressInputs($('seProgress').value);
-        fields.progress_pct = $('seProgress').value;
+        // Only when CHANGED: saving new dates must not turn an automatic bar
+        // into a hand-set one at whatever it happened to show.
+        if (+$('seProgress').value !== +src._shown) fields.progress_pct = $('seProgress').value;
       }
       var save = $('seSave');
       if (save) save.disabled = true;
@@ -1450,9 +1477,10 @@
         src.start = d.start;
         src.end = d.end;
         markLate(src);
-        if (window.TL_PROGRESS_READY) {
+        if (window.TL_PROGRESS_READY && fields.progress_pct !== undefined) {
           src.progress = d.progress;
           src.progress_source = d.progress_source;
+          src.progress_manual = true;
         }
         window.closeStepEditor();
         renderGeneral(true);
