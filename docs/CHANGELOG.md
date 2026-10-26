@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Supervision positions: Anim Sup, CG Sup, costed from their dates *(migration 068)*
+
+- **Dates & headcount has a Supervision section** under the steps: a position title, a start and an
+  end date, nothing else. No days per item, no headcount, never scheduled.
+- **Staffing shows them first**, under "Supervision": put somebody from the crew list in, or type a
+  new name; take them out again without losing the position.
+- **The expense projection costs them**: a "Supervision" band right after Above the line, at the
+  working days between the two dates (weekends and studio holidays left out) times the person's
+  rate (per day, per hour at the show's hours per day, or flat). The Excel export, the person page
+  and the kick-off snapshot carry the same rows.
+- Not yet: lining up candidates for a supervision position on Hiring, invoices attached to one,
+  and the staffing export. The studio's own leadership still goes in the quote's markup.
+
 ## 2026-10-26 — Invoices: Expected / Pending / Paid, and editable in place *(finance_install_09)*
 
 - **An invoice's status is now Expected, Pending or Paid** (expected: not arrived yet; pending:

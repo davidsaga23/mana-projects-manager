@@ -97,6 +97,18 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 6);
     }
 
+    // SUPERVISION, its own form under the steps (David, 2026-10-26). A position
+    // with dates and nothing else, so it posts on its own rather than riding the
+    // steps' form: saving a supervisor must not re-save every step's dates.
+    if ($action === 'supervision') {
+        require_once __DIR__ . '/../supervision.php';
+        $r = save_supervision($pdo, $project, $_POST, current_user_display());
+        foreach ($r['ok'] as $m) flash('ok', $m);
+        foreach ($r['warn'] as $m) flash('warn', $m);
+        if (!$r['ok'] && !$r['warn']) flash('ok', 'Nothing to save, the supervision positions were already like that.');
+        return wizard_url($projectId, 6) . '#supervision';
+    }
+
     // A deliberate re-plan. Never automatic: the value of a baseline is that it
     // says what was believed at a particular moment, and one that silently
     // followed every edit would say nothing at all.
@@ -614,6 +626,74 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
       you add people, only each person's share does.
     </p>
 
+    <?php wizard_render_supervision($pdo, $project); ?>
+
     <script src="assets/wizard.js<?= asset_ver('wizard.js') ?>"></script>
+    <?php
+}
+
+/**
+ * The Supervision table under the steps: Anim Sup, CG Sup, anybody the show pays
+ * for a stretch of dates with no quota (David, 2026-10-26). A title and two dates,
+ * nothing else; Staffing says who, the Finance screen says what it costs.
+ */
+function wizard_render_supervision(PDO $pdo, array $project): void {
+    require_once __DIR__ . '/../supervision.php';
+    $projectId = (int)$project['id'];
+    ?>
+    <h3 id="supervision" class="crew-dept-head">Supervision</h3>
+    <p class="muted small">
+      Positions on the show for a stretch of dates, with no quota and no hands-on work, an
+      Anim Sup or a CG Sup. They are never scheduled. Each one becomes a position on
+      <a href="crew.php?project=<?= $projectId ?>">Staffing</a> and a line on the expense
+      projection, costed at the working days between the two dates.
+      The studio's own leadership still goes in the quote's markup, not here.
+    </p>
+    <?php if (!supervision_available($pdo)): ?>
+      <div class="flash flash-warn">
+        Supervision positions need database update 068.
+        <?= is_admin() ? '<a href="migrate.php">Open the database updates →</a>' : 'Ask an administrator to apply it.' ?>
+      </div>
+      <?php return; ?>
+    <?php endif; ?>
+    <?php $positions = supervision_positions($pdo, $projectId); ?>
+    <form method="post">
+      <input type="hidden" name="action" value="supervision">
+      <table class="review-table supervision-table">
+        <tr>
+          <th>Position</th><th>Start</th><th>End</th>
+          <th title="Weekends and studio holidays left out, both dates counted.">Working days</th>
+          <th>Who</th><th></th>
+        </tr>
+        <?php foreach ($positions as $p): $id = (int)$p['id']; $days = supervision_days($p); ?>
+          <tr>
+            <td><input name="title[<?= $id ?>]" value="<?= e($p['title']) ?>" maxlength="120" required
+                       aria-label="Position title"></td>
+            <td><input type="date" name="start_date[<?= $id ?>]" value="<?= e($p['start_date'] ?? '') ?>"
+                       aria-label="Start"></td>
+            <td><input type="date" name="end_date[<?= $id ?>]" value="<?= e($p['end_date'] ?? '') ?>"
+                       aria-label="End"></td>
+            <td class="num"><?= $days > 0 ? $days : '<span class="warn-text small">set both dates</span>' ?></td>
+            <td>
+              <?php if ((int)$p['is_placeholder'] === 1): ?>
+                <span class="slot-state slot-state-nobody">Nobody yet</span>
+              <?php else: ?>
+                <?= e($p['name']) ?>
+              <?php endif; ?>
+            </td>
+            <td><label class="small"><input type="checkbox" name="remove[<?= $id ?>]" value="1"> remove</label></td>
+          </tr>
+        <?php endforeach; ?>
+        <tr>
+          <td><input name="new_title" maxlength="120" placeholder="e.g. Anim Sup" aria-label="New position title"></td>
+          <td><input type="date" name="new_start" value="<?= e($project['start_date'] ?? '') ?>" aria-label="New position start"></td>
+          <td><input type="date" name="new_end" value="<?= e($project['delivery_date'] ?? '') ?>" aria-label="New position end"></td>
+          <td class="muted small" colspan="3">a new position, filled in from the project's dates</td>
+        </tr>
+      </table>
+      <div class="actions">
+        <button type="submit" class="secondary">Save supervision</button>
+      </div>
+    </form>
     <?php
 }

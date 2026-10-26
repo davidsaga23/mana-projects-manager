@@ -251,7 +251,16 @@ foreach ($proj['by_department'] as $dept => $group) {
                     ? 'Per second of footage, column I is the whole step, shared '
                       . $laneCount . ' ways, so this row is one share'
                     : 'Per second of footage, retakes lengthen the days, not the seconds')
-                : 'Per-second rate on a step not measured in seconds, cannot be priced';
+                : (!empty($row['supervision'])
+                    ? 'Per-second rate on a supervision position, cannot be priced'
+                    : 'Per-second rate on a step not measured in seconds, cannot be priced');
+        }
+        // Costed from its dates rather than a quota, and the sheet says which.
+        if (!empty($row['supervision'])) {
+            $span = $row['start_date'] && $row['end_date']
+                ? 'Supervision, ' . $row['start_date'] . ' to ' . $row['end_date'] . ', working days'
+                : 'Supervision, no dates set yet';
+            $note = $note === '' ? $span : $span . '. ' . $note;
         }
         $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];
 

@@ -4361,3 +4361,19 @@ page, and lives at `spell.php`. `board.php` is kept as a 301 redirect carrying t
 because mention emails already sent link to `board.php?project=…&open=…`. Internal names
 (`includes/board.php`, `board_api.php`, `board_task.php`, CSS classes) are unchanged: renaming
 them changes nothing anybody sees and risks a missed reference.
+
+## 2026-10-26 — Supervisors a show pays for are positions with dates, not steps
+**Decision (David):** "positions like anim sup or cg sup ... won't have days per item or people, we
+just need to add the start and end dates so they're reflected in the staffing and expense
+projections." A new table, `supervision_positions` (migration 068), read by Dates & headcount,
+Staffing and `expense_projection()` only (`includes/supervision.php`).
+**Why not a whole-project step:** that worked as a stopgap but a step is read by the scheduler, the
+quota, the Budget pool and the timeline, so a supervisor became a block of work on the timeline and
+a pool card reading 0% done for the life of the show.
+**Costing:** working days between the two dates, both counted, holidays out, times the person's rate;
+a per-second rate is a mismatch and left unpriced. An empty position holds a placeholder crew row
+named after it, so it can carry a rate before anyone is in it, exactly as a slot can.
+**Unchanged:** the 2026-10-07 rule that the studio's own leadership is recovered by markup, not as a
+line on each show. This is for a supervisor the show itself hires.
+**Not built yet:** candidates on Hiring for these positions, invoices attaching to them (needs a
+finance DB change), the staffing export.

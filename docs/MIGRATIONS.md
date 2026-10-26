@@ -123,6 +123,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 065 | review_version | ⏳ **Reviews on versions** (`ticket_comments.version_id`) and **a link to the final files** on each version (`progress_versions.link`). Until it runs, reviewers see the plain upload form, the Notes column stays empty and the link field is hidden. |
 | 066 | task_events | ⏳ **The task Timeline's row changes** (`progress_events`): reassignments, due dates, and edits to a task's note and link, logged from now on. The Timeline works without it, showing statuses, versions, comments and reviews. |
 | 067 | naming_convention | ⏳ **The show's file naming convention** on the Brief (`project_brief.naming_*`), checked on every version upload. Until it runs, the section is hidden and nothing is checked. |
+| 068 | supervision_positions | ⏳ **Supervision positions** (`supervision_positions`): Anim Sup, CG Sup and the like, with a start and end date and no quota, set on Dates & headcount, filled on Staffing, costed on the expense projection. Until it runs, the Supervision section says it needs this update and nothing else changes. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |
