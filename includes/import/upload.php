@@ -13,7 +13,10 @@
   <input type="hidden" name="action" value="upload">
 
   <label>Board export (.csv)
-    <input type="file" name="file" accept=".csv,text/csv" required>
+    <?php // The shared drop zone (assets/dropzone.js), loaded at the foot of
+          // this screen, David 2026-10-26: "let's add a drop zone here". ?>
+    <input type="file" name="file" accept=".csv,text/csv" required
+           data-drop="Drop the Plaky export here" data-drop-paste="no">
     <small>In Plaky: open the board → menu → Export → CSV. Export the whole board,
            including subitems, the subitems are the pipeline steps.</small>
   </label>
@@ -33,3 +36,6 @@
       shot code, or on asset name.</li>
   <li>A blank cell never wipes something already recorded, an import adds what it knows.</li>
 </ul>
+
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
+<script>window.animaDropzone.attachAll(document);</script>
