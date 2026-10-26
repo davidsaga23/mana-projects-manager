@@ -62,6 +62,16 @@
       '</div>' +
       '<ul class="dropzone-list"></ul>';
     zone.querySelector('strong').textContent = says;
+    // data-drop-paste="no": a zone for something no clipboard holds (a Plaky
+    // CSV) does not offer to take a pasted screenshot.
+    if (input.getAttribute('data-drop-paste') === 'no') {
+      var sub = zone.querySelector('.dropzone-say .muted');
+      sub.textContent = 'or ';
+      var pick = document.createElement('span');
+      pick.className = 'dropzone-link';
+      pick.textContent = 'choose from your computer';
+      sub.appendChild(pick);
+    }
 
     input.parentNode.insertBefore(zone, input);
     zone.appendChild(input);           // the real input rides inside, hidden
