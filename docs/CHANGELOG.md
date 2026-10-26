@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Timeline bars fill themselves from what has been delivered *(no migration)*
+
+- **Each step's bar on the general timeline now shows its progress automatically**: the share of
+  its shots or assets delivered (approved counts), or of its seconds for a step measured in footage,
+  with N/A items left out. The same figure the dashboard counts.
+- **Setting it by hand still works and overrides it**: drag the bar's progress handle or type a
+  percentage in the step editor. Hand-set numbers carry a ✎ after the percentage.
+- **"Back to automatic"** in the step editor hands a bar back to the count. Progress set by hand
+  before today stays as it was until then.
+
 ## 2026-10-23 — Invoice notes: a Notes column you can type in *(no migration)*
 
 - **A project's Finance management → Invoices list has a Notes column**, and each row's note is a
