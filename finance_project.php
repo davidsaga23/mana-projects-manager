@@ -1333,6 +1333,13 @@ if ($retakePct <= 0):
                     // confident wrong number nothing on screen would question. ?>
               <div class="err small">rate is per second, this step is not</div>
             <?php endif; ?>
+            <?php // A supervision position is costed from its dates, not from a
+                  // quota, and the row says which dates. ?>
+            <?php if (!empty($r['supervision'])): ?>
+              <div class="muted small"><?= $r['start_date'] && $r['end_date']
+                  ? e($r['start_date'] . ' → ' . $r['end_date'])
+                  : '<a href="wizard.php?project=' . $projectId . '&amp;step=6#supervision">set its dates</a>' ?></div>
+            <?php endif; ?>
             <?php if (($r['days_source'] ?? '') === 'estimate'): ?>
               <span class="est-tag" title="No studio standard for this step, so this row is costed from the project's own estimate">est.</span>
             <?php endif; ?>

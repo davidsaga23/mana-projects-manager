@@ -15,6 +15,7 @@ require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/people_merge.php';
 require_once __DIR__ . '/includes/artists.php';   // artist_missing(), for the gaps marker
 require_once __DIR__ . '/includes/money.php';    // crew_terms(), for the contract line on a filled slot
+require_once __DIR__ . '/includes/supervision.php';
 require_login();
 
 /**
@@ -257,6 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // The person hired into it has left it: said in their history, and
             // shown with everybody else talked to for this position.
             note_left_position($pdo, $projectId, (int)$m[1], $was, current_user_display());
+
+        } elseif (preg_match('/^supassign:(\d+)$/', $action, $m)) {
+            // A supervision position (migration 068): somebody on the list, or a
+            // name typed in. No scheduled work to carry, so nothing else moves.
+            flash('ok', supervision_assign($pdo, $projectId, (int)$m[1],
+                                           (int)($_POST['sup_crew'][$m[1]] ?? 0),
+                                           (string)($_POST['sup_name'][$m[1]] ?? '')));
+
+        } elseif (preg_match('/^supunassign:(\d+)$/', $action, $m)) {
+            flash('ok', supervision_unassign($pdo, $projectId, (int)$m[1]));
 
         } elseif (preg_match('/^remove_work:(\d+)$/', $action, $m)) {
             // THE WAY THROUGH. remove: refuses while a slot carries scheduled
@@ -649,6 +660,74 @@ require __DIR__ . '/includes/header.php';
     <a href="people_merge.php">Put them back together &rarr;</a>
   </div>
 <?php endif; ?>
+
+  <?php // SUPERVISION FIRST (David, 2026-10-26): Anim Sup, CG Sup, set with their
+        // dates on Dates & headcount. No hiring loop on these rows yet: the
+        // candidates on Hiring hang off a slot, and a supervisor is usually
+        // somebody the studio already knows, so the row takes a person straight. ?>
+  <?php $supPositions = supervision_positions($pdo, $projectId); ?>
+  <?php if ($supPositions): ?>
+    <h3 class="crew-dept-head">
+      Supervision
+      <span class="muted small">
+        <?= count($supPositions) ?> position<?= count($supPositions) === 1 ? '' : 's' ?>
+        · <a href="wizard.php?project=<?= $projectId ?>&amp;step=6#supervision">edit titles and dates</a>
+      </span>
+    </h3>
+    <table class="review-table">
+      <tr><th>Position</th><th>Who</th><th>Dates</th><th></th></tr>
+      <?php foreach ($supPositions as $sp): $spPh = (int)$sp['is_placeholder'] === 1; ?>
+        <tr class="slot-<?= $spPh ? 'nobody' : 'filled' ?>">
+          <td><strong><?= e($sp['title']) ?></strong></td>
+          <td>
+            <?php if ($spPh): ?>
+              <span class="slot-state slot-state-nobody">Nobody yet</span>
+            <?php else: ?>
+              <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$sp['crew_id'] ?>"><?= e($sp['name']) ?></a>
+            <?php endif; ?>
+          </td>
+          <td class="small">
+            <?php if ($sp['start_date'] && $sp['end_date']): ?>
+              <?= e($sp['start_date']) ?> → <?= e($sp['end_date']) ?>
+              <span class="muted">· <?= supervision_days($sp) ?> working days</span>
+            <?php else: ?>
+              <span class="warn-text">no dates yet</span>
+            <?php endif; ?>
+          </td>
+          <td class="slot-actions">
+            <?php if (can_edit_area('staffing')): ?>
+              <div class="slot-row">
+                <details class="slot-change">
+                  <summary class="slot-btn"><?= $spPh ? 'Put somebody in' : 'Change assignee' ?></summary>
+                  <form method="post" class="inline-form slot-change-bar">
+                    <select name="sup_crew[<?= (int)$sp['id'] ?>]">
+                      <option value="">pick somebody</option>
+                      <?php foreach ($people as $p): ?>
+                        <option value="<?= (int)$p['id'] ?>" <?= (int)$p['id'] === (int)$sp['crew_id'] ? 'selected' : '' ?>>
+                          <?= e($p['name']) ?><?= $p['active'] ? '' : ' (inactive)' ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                    <input name="sup_name[<?= (int)$sp['id'] ?>]" placeholder="or type a name" size="16"
+                           aria-label="A name not on the list">
+                    <button type="submit" class="secondary" name="action" value="supassign:<?= (int)$sp['id'] ?>">Save</button>
+                    <button type="button" class="popover-close" aria-label="Close">&times;</button>
+                  </form>
+                </details>
+                <?php if (!$spPh): ?>
+                  <form method="post"
+                        onsubmit="return confirm('Take <?= e(addslashes($sp['name'])) ?> out of <?= e(addslashes($sp['title'])) ?>? The position stays, and they stay on the studio crew list.');">
+                    <button type="submit" class="secondary danger" name="action"
+                            value="supunassign:<?= (int)$sp['id'] ?>">Remove assignee</button>
+                  </form>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </table>
+  <?php endif; ?>
 
   <?php if (!$lanes): ?>
     <div class="empty-state">

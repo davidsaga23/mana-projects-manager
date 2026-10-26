@@ -355,8 +355,87 @@ function expense_projection(PDO $pdo, int $projectId): array {
         }
     }
 
+    // ---- supervision: a person for a stretch of dates -----------------------
+    // Anim Sup, CG Sup (David, 2026-10-26, migration 068). No quota and no
+    // items, so the days are the working days between the position's two dates,
+    // rounded the same way as every other row (they are already whole). Priced
+    // from the person's own rate exactly as a lane is: per day, per hour at the
+    // project's hours per day, or flat. A per-second rate has no footage to
+    // multiply here, so it is a mismatch, as it is on a step that is not
+    // measured in seconds. See includes/supervision.php.
+    require_once __DIR__ . '/supervision.php';
+    $supervision = supervision_positions($pdo, $projectId);
+    $supTerms = $supervision
+        ? crew_terms(array_values(array_unique(array_map(fn($p) => (int)$p['crew_id'], $supervision))))
+        : [];
+    foreach ($supervision as $p) {
+        $cid  = (int)$p['crew_id'];
+        $days = (float)supervision_days($p);
+        $t    = $supTerms[$cid] ?? null;
+        $rate = ($t && $t['day_rate'] !== null) ? (float)$t['day_rate'] : null;
+        $unit = $t['rate_unit'] ?? 'day';
+        $cur  = $t['rate_currency'] ?? 'USD';
+
+        $cost = null; $rateMismatch = false;
+        if ($rate !== null && $days > 0) {
+            if ($unit === 'flat')       $cost = $rate;
+            elseif ($unit === 'hour')   $cost = $rate * $hoursPerDay * $days;
+            elseif ($unit === 'second') $rateMismatch = true;
+            else                        $cost = $rate * $days;
+        }
+        if ($cost !== null) {
+            $cost = round($cost, 2);
+            $total += $cost;
+            if ($currency === null) $currency = $cur;
+            elseif ($currency !== $cur) $mixed = true;
+        } else {
+            $unpricedDays += $days;
+        }
+
+        $rows[] = [
+            'department'     => 'Supervision',
+            // Shaped like a step so every reader that draws a dot or sorts by
+            // step order keeps working. id 0: no invoice, ideal or pool row can
+            // attach to it.
+            'step'           => ['id' => 0, 'name' => $p['title'], 'color' => '#8a8f98',
+                                 'step_order' => (int)$p['sort_order'], 'applies_to' => 'project',
+                                 'applies_to_asset_type' => null, 'tracks_seconds' => 0],
+            'role'           => $p['title'],
+            'crew_id'        => $cid,
+            'artist'         => $p['name'],
+            'is_slot'        => (int)$p['is_placeholder'] === 1,
+            'rate'           => $rate,
+            'rate_unit'      => $rate !== null ? $unit : null,
+            'currency'       => $rate !== null ? $cur : null,
+            'days'           => $days,
+            'days_exact'     => $days,
+            'months'         => $days / DAYS_PER_MONTH,
+            'days_source'    => 'dates',
+            'supervision'    => true,
+            'start_date'     => $p['start_date'],
+            'end_date'       => $p['end_date'],
+            'tracks_seconds' => false,
+            'units_per_lane' => 0,
+            'lane_count'     => 1,
+            'rate_mismatch'  => $rateMismatch,
+            'ideal_days'     => null,
+            'estimate_days'  => null,
+            'cost'           => $cost,
+            'units'          => 0,
+            'unit_label'     => 'days',
+            // Actuals come from invoices attached to a lane, and a supervisor
+            // has none yet; a dash, not a zero.
+            'actual_days'    => 0.0,
+            'actual_cost'    => null,
+            'variance'       => null,
+        ];
+    }
+
     // Department order as the sheet reads it, with anything unrecognised last.
-    $order = ['Above the line' => 1, 'Pre-production' => 2, 'Production' => 3, 'Post-production' => 4];
+    // Supervision sits straight after Above the line: it runs the length of the
+    // show rather than belonging to one phase of it.
+    $order = ['Above the line' => 1, 'Supervision' => 1.5, 'Pre-production' => 2, 'Production' => 3,
+              'Post-production' => 4];
     usort($rows, function ($a, $b) use ($order) {
         $oa = $order[$a['department']] ?? 9;
         $ob = $order[$b['department']] ?? 9;

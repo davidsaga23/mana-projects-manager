@@ -241,6 +241,7 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
             ['crew_aliases', 'crew_id'],
             ['progress_log', 'crew_id'],
             ['crew_absences', 'crew_id'],
+            ['supervision_positions', 'crew_id'],
         ];
         foreach ($plain as [$table, $col]) {
             try {
