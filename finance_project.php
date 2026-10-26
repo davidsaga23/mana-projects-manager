@@ -192,6 +192,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('warn', 'No row had an amount in it, so nothing was recorded.');
             }
 
+        } elseif (isset($_POST['update_invoice'])) {
+            // EDITING A RECORDED INVOICE IN PLACE (David, 2026-10-26: "make sure
+            // we can edit again these entries from the same in line"). Every
+            // field, through save_invoice()'s update path, which rewrites every
+            // column — so the form carries every column.
+            //
+            // ⚠ THE INVOICE MUST BE THIS SHOW'S. save_invoice() sets project_id
+            // from the page, so an id posted from another show would be MOVED
+            // here rather than refused.
+            $id = (int)$_POST['update_invoice'];
+            $mine = false;
+            foreach (project_invoices($projectId) as $iv) if ((int)$iv['id'] === $id) $mine = true;
+            if (!$mine) throw new RuntimeException('That invoice is not on this show, so nothing was changed.');
+
+            $in = $_POST;
+            $in['invoice_id'] = $id;
+            // The position picker sends "crewId:stepId"; resolved from this
+            // show's own lanes, never trusted from the browser.
+            $in['crew_id'] = null; $in['step_id'] = null; $in['step_name'] = null;
+            $pos = (string)($_POST['position'] ?? '');
+            foreach (project_lanes($pdo, $projectId) as $l) {
+                if ((int)$l['crew_id'] . ':' . (int)$l['step_id'] !== $pos) continue;
+                $in['crew_id'] = (int)$l['crew_id'];
+                $in['step_id'] = (int)$l['step_id'];
+                $in['step_name'] = (string)$l['step_name'];
+                if (trim((string)($in['crew_name'] ?? '')) === '') $in['crew_name'] = (string)$l['name'];
+            }
+            flash('ok', save_invoice($in, $project, $who));
         } elseif (isset($_POST['save_invoice'])) {
             flash('ok', save_invoice($_POST, $project, $who));
         } elseif (isset($_POST['save_invoice_notes'])) {
@@ -1657,8 +1685,9 @@ if ($retakePct <= 0):
         <td class="muted small"><?= e($iv['issued_date'] ?: '—') ?></td>
         <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($iv['due_date'] ?: '—') ?></td>
         <td><?= $iv['paid_date']
-              ? '<span class="ok">paid ' . e($iv['paid_date']) . '</span>'
-              : '<span class="' . ($iv['status'] === 'disputed' ? 'err' : 'warn-text') . '">' . e($iv['status']) . '</span>' ?></td>
+              ? '<span class="ok">Paid ' . e($iv['paid_date']) . '</span>'
+              : '<span class="' . ($iv['status'] === 'disputed' ? 'err' : ($iv['status'] === 'expected' ? 'muted' : 'warn-text')) . '">'
+                . e(invoice_status_label((string)$iv['status'])) . '</span>' ?></td>
         <?php // ⚠ NOTES ARE EDITABLE IN PLACE, the one field on a recorded invoice
               // that is. A note is what you learn AFTER recording ("paid by wire,
               // fee deducted", "disputed: missing week 3"), so a note box that
@@ -1678,8 +1707,56 @@ if ($retakePct <= 0):
           </form>
         </td>
         <td class="row-actions">
+          <button type="button" class="linkish invoice-edit-btn" data-invoice="<?= (int)$iv['id'] ?>"
+                  aria-expanded="false">edit</button>
           <form method="post" onsubmit="return confirm('Remove this invoice?');">
             <button type="submit" name="delete_invoice" value="<?= (int)$iv['id'] ?>" class="link-danger">remove</button>
+          </form>
+        </td>
+      </tr>
+      <?php // EDIT IN PLACE (David, 2026-10-26): every field of this invoice,
+            // opened under its own row by "edit", saved through save_invoice()'s
+            // update path. ALL the columns travel, because that path rewrites
+            // every one of them. ?>
+      <tr class="invoice-edit" id="invoiceEdit<?= (int)$iv['id'] ?>" hidden>
+        <td colspan="10">
+          <form method="post" class="invoice-edit-form">
+            <input type="hidden" name="update_invoice" value="<?= (int)$iv['id'] ?>">
+            <label>Position
+              <select name="position">
+                <option value="">no particular position</option>
+                <?php foreach ($positions as $ps):
+                  $v = (int)$ps['crew_id'] . ':' . (int)$ps['step_id']; ?>
+                  <option value="<?= e($v) ?>" <?= ((int)($iv['crew_id'] ?? 0) === (int)$ps['crew_id']
+                      && (int)($iv['step_id'] ?? 0) === (int)$ps['step_id']) ? 'selected' : '' ?>><?= e($ps['label']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>Name on the invoice <input name="crew_name" value="<?= e($iv['crew_name'] ?? '') ?>" size="16"></label>
+            <label>Their reference <input name="invoice_ref" value="<?= e($iv['invoice_ref'] ?? '') ?>" size="10"></label>
+            <label>Amount <input name="amount" inputmode="decimal" size="9" required
+                   value="<?= e(number_format((float)$iv['amount'], 2, '.', '')) ?>"></label>
+            <label>Currency <input name="currency" maxlength="3" size="3" style="text-transform:uppercase"
+                   value="<?= e($iv['currency'] ?? 'USD') ?>"></label>
+            <label>Status
+              <select name="status">
+                <?php foreach (invoice_statuses() as $sv => $sl): ?>
+                  <option value="<?= e($sv) ?>" <?= ($iv['status'] ?? '') === $sv ? 'selected' : '' ?>><?= e($sl) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </label>
+            <label>Period from <input type="date" name="period_start" value="<?= e($iv['period_start'] ?? '') ?>"></label>
+            <label>Period to <input type="date" name="period_end" value="<?= e($iv['period_end'] ?? '') ?>"></label>
+            <label>Issued <input type="date" name="issued_date" value="<?= e($iv['issued_date'] ?? '') ?>"></label>
+            <label>Due <input type="date" name="due_date" value="<?= e($iv['due_date'] ?? '') ?>"></label>
+            <label>Paid on <input type="date" name="paid_date" value="<?= e($iv['paid_date'] ?? '') ?>"></label>
+            <label>Document link <input type="url" name="document_url" value="<?= e($iv['document_url'] ?? '') ?>" size="22"></label>
+            <label class="invoice-edit-notes">Notes <input name="notes" value="<?= e($iv['notes'] ?? '') ?>" maxlength="2000"></label>
+            <div class="invoice-edit-actions">
+              <button type="submit">Save</button>
+              <button type="button" class="secondary invoice-edit-cancel" data-invoice="<?= (int)$iv['id'] ?>">Cancel</button>
+              <span class="muted small">Setting a paid date marks it paid; Paid with no date fills in today.</span>
+            </div>
           </form>
         </td>
       </tr>
@@ -1763,11 +1840,12 @@ if ($retakePct <= 0):
             <td><input name="<?= $n ?>[currency]" maxlength="3" size="3"
                        style="text-transform:uppercase" value="<?= e($cur) ?>"></td>
             <td>
+              <?php // Expected / Pending / Paid once finance_install_09 is in
+                    // (David, 2026-10-26); the old four until then. ?>
               <select name="<?= $n ?>[status]">
-                <option value="received">received</option>
-                <option value="approved">approved</option>
-                <option value="paid">paid</option>
-                <option value="disputed">disputed</option>
+                <?php foreach (invoice_statuses() as $sv => $sl): ?>
+                  <option value="<?= e($sv) ?>" <?= $sv === invoice_default_status() ? 'selected' : '' ?>><?= e($sl) ?></option>
+                <?php endforeach; ?>
               </select>
             </td>
             <td><input type="date" name="<?= $n ?>[period_start]"></td>
@@ -1797,6 +1875,20 @@ if ($retakePct <= 0):
 </form>
 
 <script>
+// "edit" on a recorded invoice opens its row of fields underneath; Cancel or a
+// second "edit" shuts it again. Nothing saves until Save.
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('.invoice-edit-btn, .invoice-edit-cancel') : null;
+  if (!b) return;
+  var row = document.getElementById('invoiceEdit' + b.getAttribute('data-invoice'));
+  if (!row) return;
+  var open = b.classList.contains('invoice-edit-cancel') ? false : row.hidden;
+  row.hidden = !open;
+  var btn = document.querySelector('.invoice-edit-btn[data-invoice="' + b.getAttribute('data-invoice') + '"]');
+  if (btn) { btn.setAttribute('aria-expanded', open ? 'true' : 'false'); btn.textContent = open ? 'close' : 'edit'; }
+  if (open) { var f = row.querySelector('input[name="amount"]'); if (f) f.focus(); }
+});
+
 // Fill the visible name from the position picker, within THIS row only.
 //
 // The old single form did this with document.getElementById, which addresses
