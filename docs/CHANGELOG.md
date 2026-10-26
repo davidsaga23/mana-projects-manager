@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Artist statements: what each person should invoice *(no migration)*
+
+- **A new Finance management tab, Artist statements**: everybody with a position, a task or logged
+  time on the show, with their contract dates, rate, days planned, time logged, seconds approved,
+  what is due so far, what they have invoiced and what is left to invoice.
+- **Each person's full statement** (statement.php): the same figures with where the plan has them
+  and their invoices, printable or saved as PDF.
+- **Counted over each person's contract dates** from the person page, or the dates of their steps
+  where none are set. Days come from logged time (÷ the show's hours per day), seconds only from
+  **approved** shots (split evenly when shared), and the amount follows the rate unit (day, hour,
+  second or flat).
+- **Artists see their own** from a *My statement* button on My tasks, and nobody else's: the money
+  is read through two new readers in `includes/money.php` that only return a record to an admin or
+  to the person it belongs to.
+
 ## 2026-10-26 — Timeline bars fill themselves from what has been delivered *(no migration)*
 
 - **Each step's bar on the general timeline now shows its progress automatically**: the share of

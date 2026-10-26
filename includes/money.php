@@ -54,11 +54,21 @@ function can_see_money(): bool {
  * codebase has paid for that confusion before (START_HERE, lesson 11).
  */
 function finance_db(): ?PDO {
+    if (!can_see_money()) return null;
+    return finance_connection();
+}
+
+/**
+ * The connection itself, with NO permission check. Called from exactly two
+ * places: finance_db() above, after its admin check, and money_own_db() below,
+ * after checking the asker is the person whose record it reads. Nothing else
+ * may call it — that is what rules 1 and 2 at the top of this file mean now.
+ */
+function finance_connection(): ?PDO {
     static $pdo = null;
     static $tried = false;
     global $config;
 
-    if (!can_see_money()) return null;
     if ($tried) return $pdo;
     $tried = true;
 
@@ -145,6 +155,50 @@ function crew_terms(array $crewIds): array {
 /** One person's terms, or null. */
 function crew_term(int $crewId): ?array {
     return crew_terms([$crewId])[$crewId] ?? null;
+}
+
+/* ---------------------------------------------------------------------------
+ * YOUR OWN, AND NOBODY ELSE'S (David, 2026-10-26).
+ *
+ * The artist statement: "Artists see it". An artist sees what Anima says they
+ * should invoice, which needs THEIR rate and THEIR invoices — and nothing about
+ * anybody else. So these are the one exception to rule 2, and it is narrow: an
+ * administrator gets any record (as everywhere in this file); anybody else gets
+ * a record only when its crew id is the one their own login is linked to. A
+ * caller passing somebody else's id gets nothing, exactly as a non-admin gets
+ * nothing from crew_terms().
+ * ------------------------------------------------------------------------ */
+
+/** The finance connection, for an admin or for the person the record belongs to. */
+function money_own_db(int $crewId): ?PDO {
+    if (can_see_money()) return finance_db();
+    $pdo = $GLOBALS['pdo'] ?? null;
+    if ($crewId <= 0 || !($pdo instanceof PDO)) return null;
+    if (!function_exists('effective_crew_id') || effective_crew_id($pdo) !== $crewId) return null;
+    return finance_connection();
+}
+
+/** A person's own pay terms; null for anybody else's (unless admin). */
+function own_crew_term(int $crewId): ?array {
+    $db = money_own_db($crewId);
+    if (!$db) return null;
+    $q = $db->prepare('SELECT * FROM crew_terms WHERE crew_id = ?');
+    $q->execute([$crewId]);
+    return $q->fetch() ?: null;
+}
+
+/** A person's own invoices on one project, newest first; empty for anybody else's. */
+function own_invoices(int $crewId, int $projectId): array {
+    $db = money_own_db($crewId);
+    if (!$db) return [];
+    try {
+        $q = $db->prepare('SELECT * FROM invoices WHERE crew_id = ? AND project_id = ?
+                            ORDER BY issued_date DESC, id DESC');
+        $q->execute([$crewId, $projectId]);
+        return $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];      // before finance_install_02
+    }
 }
 
 /**

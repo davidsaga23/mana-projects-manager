@@ -29,6 +29,12 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // question, to find out how many days that question is worth.
         ['key' => 'pool',       'label' => 'Budget pool',
          'href' => 'finance_project.php' . $p . '&tab=pool'],
+        // ARTIST STATEMENTS (David, 2026-10-26: "project and inform artists how
+        // many days, logged time and seconds we need to pay/account for their
+        // invoices ... it could be a separate tab"). One row per person; each
+        // opens statement.php, the same page the artist sees as their own.
+        ['key' => 'statements', 'label' => 'Artist statements',
+         'href' => 'finance_project.php' . $p . '&tab=statements'],
         // KICK-OFF, after the budget (David, 2026-10-23: "let's add the tab in
         // Finance Management after Budget pool"). What the show was signed off
         // as, against what it is now — which is a money question as often as a
@@ -67,7 +73,7 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
 
 /** The tabs this file knows about, for validating a ?tab= value. */
 function finance_tabs(): array {
-    return ['overview', 'projection', 'invoices', 'pool'];
+    return ['overview', 'projection', 'invoices', 'pool', 'statements'];
 }
 
 /** Render the bar. $current is the key of the tab drawing it. */

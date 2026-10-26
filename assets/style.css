@@ -4282,3 +4282,16 @@ a.version-shot:hover { border-color: var(--border-strong); }
 
 /* A file dragged over the review form (2026-10-23): the whole form takes it. */
 .board-review-form.is-drop-over { outline: 2px dashed var(--primary); outline-offset: 6px; border-radius: 8px; }
+
+/* The artist statement (2026-10-26): statement.php and the Finance tab. */
+.statement-link { margin-left: 12px; font-size: 13px; padding: 5px 12px; vertical-align: middle; }
+.statement-pick select { width: auto; }
+.statement-window { margin: 6px 0 14px; color: var(--text-2); }
+.statement-due { max-width: 520px; }
+.statement-due th { text-align: left; font-weight: 500; color: var(--muted); width: 40%; }
+.statement-left td strong { font-size: 1.15em; }
+.statement-list td.num { white-space: nowrap; }
+.statement-how { margin-top: 18px; }
+@media print {
+  .topbar, .crumb, .statement-pick, .finance-nav, .project-nav, button { display: none !important; }
+}

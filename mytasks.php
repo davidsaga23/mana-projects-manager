@@ -862,7 +862,14 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <p class="crumb"><a href="index.php">← All projects</a></p>
-<h2 class="wizard-title">My tasks</h2>
+<h2 class="wizard-title">My tasks
+  <?php // YOUR STATEMENT (David, 2026-10-26: "Artists see it"): what Anima says
+        // you should invoice on each show, from your logged time and approved
+        // seconds. Only ever your own — statement.php forces it. ?>
+  <?php if ((int)(effective_crew_id($pdo) ?? 0) > 0): ?>
+    <a class="button secondary statement-link" href="statement.php">My statement</a>
+  <?php endif; ?>
+</h2>
 
 <?php if (!$ready): ?>
   <div class="empty-state">
