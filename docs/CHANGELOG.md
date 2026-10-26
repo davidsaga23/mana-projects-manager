@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Artist statements: totals row and pinned header *(no migration)*
+
+- **A Total row under the Artist statements list**: days planned, hours and days logged, approved
+  seconds, and due / invoiced / left to invoice. Money adds up per currency, one line each, since
+  USD and GBP cannot be summed.
+- **The list scrolls in its own box**, so the column headings stay at the top and the totals stay
+  at the bottom however long the cast is. Prints straight through.
+
 ## 2026-10-26 — Supervision positions: candidates, invoices, staffing export *(migration 069)*
 
 - **Line up candidates for a supervision position on Staffing**, exactly as for a slot: from the

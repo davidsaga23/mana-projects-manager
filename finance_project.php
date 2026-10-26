@@ -1966,6 +1966,11 @@ function invAddRows() {
   <?php if (!$stPeople): ?>
     <div class="empty-state"><p>Nobody has a position, a task or logged time on this show yet.</p></div>
   <?php else: ?>
+    <?php // A box of its own so the headings and the totals both stay in view
+          // on a long cast (David, 2026-10-26: "total sum at the end for all
+          // columns and a sticky header at the top") — the .bd-scroll note in
+          // style.css says why sticky needs the bounded box. ?>
+    <div class="bd-scroll">
     <table class="review-table statement-list">
       <thead><tr>
         <th>Artist</th><th>Dates</th><th>Rate</th>
@@ -1973,10 +1978,21 @@ function invAddRows() {
         <th class="num">Due so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
       <tbody>
-      <?php foreach ($stPeople as $cid => $name):
+      <?php
+      // Totals. Days, hours and seconds add up across everybody; money only
+      // within one currency, so the money columns get a line per currency.
+      $stTot = ['planned_days' => 0.0, 'hours' => 0.0, 'days' => 0.0, 'approved_seconds' => 0.0];
+      $stMoney = [];   // currency => ['due' =>, 'invoiced' =>, 'left' =>]
+      foreach ($stPeople as $cid => $name):
           $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj);
           $w = $st['window'];
-          $cur = $st['currency']; ?>
+          $cur = $st['currency'];
+          foreach ($stTot as $k => $v) $stTot[$k] = $v + (float)$st[$k];
+          $m = $stMoney[$cur] ?? ['due' => 0.0, 'invoiced' => 0.0, 'left' => 0.0];
+          $m['due'] += (float)($st['due'] ?? 0);
+          $m['invoiced'] += (float)$st['invoiced'];
+          $m['left'] += (float)($st['left'] ?? 0);
+          $stMoney[$cur] = $m; ?>
         <tr>
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>"><?= e($name) ?></a></td>
           <td class="muted small">
@@ -1995,7 +2011,24 @@ function invAddRows() {
         </tr>
       <?php endforeach; ?>
       </tbody>
+      <?php ksort($stMoney);
+            $stMoneyCell = function (string $k) use ($stMoney) {
+                $lines = [];
+                foreach ($stMoney as $c => $m) $lines[] = e(fmt_money_plain(round($m[$k], 2), $c));
+                return $lines ? implode('<br>', $lines) : '—';
+            }; ?>
+      <tfoot><tr>
+        <td colspan="3"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
+        <td class="num"><strong><?= e(fmt_num($stTot['planned_days'], 1)) ?></strong></td>
+        <td class="num"><strong><?= e(fmt_num($stTot['hours'], 1)) ?> h</strong><br><span class="muted small"><?= e(fmt_num($stTot['days'], 2)) ?> d</span></td>
+        <td class="num"><strong><?= $stTot['approved_seconds'] > 0 ? e(statement_secs($stTot['approved_seconds'])) : '—' ?></strong></td>
+        <td class="num"><strong><?= $stMoneyCell('due') ?></strong></td>
+        <td class="num"><strong><?= $stMoneyCell('invoiced') ?></strong></td>
+        <td class="num"><strong><?= $stMoneyCell('left') ?></strong></td>
+        <td></td>
+      </tr></tfoot>
     </table>
+    </div>
   <?php endif; ?>
 <?php endif; ?>
 
