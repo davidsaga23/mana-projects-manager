@@ -23,6 +23,7 @@ require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/artists.php';
 require_once __DIR__ . '/includes/xlsx.php';
+require_once __DIR__ . '/includes/supervision.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -44,7 +45,10 @@ if (!xlsx_available()) {
 }
 
 $lanes = column_exists($pdo, 'crew', 'is_placeholder') ? project_lanes($pdo, $projectId) : [];
-if (!$lanes) {
+// Anim Sup, CG Sup (migration 068): positions too, first in the sheet as on the
+// screen, with their own dates.
+$supPositions = supervision_positions($pdo, $projectId);
+if (!$lanes && !$supPositions) {
     flash('warn', 'There are no positions to export yet.');
     header('Location: ' . $back);
     exit;
@@ -52,9 +56,10 @@ if (!$lanes) {
 
 $hiringReady = hiring_available($pdo);
 $byLane = $hiringReady ? hires_by_lane($pdo, $projectId) : [];
+$bySup  = $hiringReady ? hires_by_supervision($pdo, $projectId) : [];
 // Freelance or Vendor per person, from the artist database (migration 051).
 $filledCrew = [];
-foreach ($lanes as $l) {
+foreach (array_merge($lanes, $supPositions) as $l) {
     if ((int)$l['is_placeholder'] !== 1) $filledCrew[(int)$l['crew_id']] = ['id' => (int)$l['crew_id'], 'name' => (string)$l['name']];
 }
 $collabTypes = crew_collaborator_types($pdo, array_values($filledCrew));
@@ -123,6 +128,13 @@ foreach ($lanes as $l) {
         fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true)) : [];
     if (!$live) $totNobody++;
 }
+foreach ($supPositions as $sp) {
+    $totAll++;
+    if ((int)$sp['is_placeholder'] !== 1) continue;
+    $totOpen++;
+    $live = array_filter($bySup[(int)$sp['id']] ?? [], fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true));
+    if (!$live) $totNobody++;
+}
 $put([['v' => 'Positions', 's' => XLSX_SUB_LABEL], ['v' => $totAll, 's' => XLSX_SUB_NUM],
       ['v' => 'Filled', 's' => XLSX_SUB_LABEL], ['v' => $totAll - $totOpen, 's' => XLSX_SUB_NUM],
       ['v' => 'Still to fill', 's' => XLSX_SUB_LABEL], ['v' => $totOpen, 's' => XLSX_SUB_NUM],
@@ -130,6 +142,63 @@ $put([['v' => 'Positions', 's' => XLSX_SUB_LABEL], ['v' => $totAll, 's' => XLSX_
       // The one number that should be read as a problem, painted as one.
       ['v' => $totNobody, 's' => $totNobody > 0 ? XLSX_WARN : XLSX_SUB_NUM]]);
 $put([]);
+
+// ---- supervision first, as on the screen -----------------------------------
+// One row per position, the position's own dates in the two date columns, no
+// step, no lane number, no scheduled tasks: a supervisor has none.
+if ($supPositions) {
+    $open = 0; $nobody = 0;
+    $supLive = [];
+    foreach ($supPositions as $sp) {
+        $supLive[(int)$sp['id']] = array_filter($bySup[(int)$sp['id']] ?? [],
+            fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true));
+        if ((int)$sp['is_placeholder'] !== 1) continue;
+        $open++;
+        if (!$supLive[(int)$sp['id']]) $nobody++;
+    }
+    $count = count($supPositions);
+    $band = 'Supervision  ·  ' . $count . ' position' . ($count === 1 ? '' : 's')
+          . ($open > 0 ? ', ' . $open . ' still to fill' : ', all filled')
+          . ($nobody > 0 ? ', ' . $nobody . ' with nobody in the frame' : '');
+    $bandRow = [['v' => $band, 's' => XLSX_BAND]];
+    for ($i = 1; $i < 8; $i++) $bandRow[] = ['v' => '', 's' => XLSX_BAND];
+    $put($bandRow);
+    $put([['v' => 'Position', 's' => XLSX_HEAD], ['v' => '', 's' => XLSX_HEAD],
+          ['v' => 'State', 's' => XLSX_HEAD], ['v' => 'Who', 's' => XLSX_HEAD],
+          ['v' => 'Stage', 's' => XLSX_HEAD],
+          ['v' => 'Starts', 's' => XLSX_HEAD], ['v' => 'Ends', 's' => XLSX_HEAD],
+          ['v' => 'Working days', 's' => XLSX_HEAD]]);
+    $shaded = false;
+    foreach ($supPositions as $sp) {
+        $shaded = !$shaded;
+        $live = $supLive[(int)$sp['id']];
+        [$state, $bad] = staffing_state($sp, $live);
+        if ((int)$sp['is_placeholder'] === 1) {
+            $names = array_map(fn($h) => (string)$h['candidate_name'], $live);
+            $who = $names ? implode(', ', $names) : 'nobody yet';
+            $stages = [];
+            foreach ($live as $h) $stages[] = strtolower(hire_stage_label($h['stage']));
+            $stage = $stages ? implode(', ', array_unique($stages)) : '';
+        } else {
+            $who = (string)$sp['name'];
+            if (($collabTypes[(int)$sp['crew_id']] ?? '') === 'vendor') $who .= ' (Vendor)';
+            $stage = 'hired';
+        }
+        $txt = xlsx_alt(XLSX_TEXT, $shaded);
+        $days = supervision_days($sp);
+        $put([
+            ['v' => (string)$sp['title'], 's' => $txt],
+            ['v' => '', 's' => $txt],
+            ['v' => $state, 's' => $bad ? XLSX_WARN : $txt],
+            ['v' => $who, 's' => $bad ? XLSX_WARN : $txt],
+            ['v' => $stage, 's' => xlsx_alt(XLSX_NOTE, $shaded)],
+            ['v' => $sp['start_date'] ?: '', 's' => xlsx_alt(XLSX_NOTE, $shaded)],
+            ['v' => $sp['end_date'] ?: '', 's' => xlsx_alt(XLSX_NOTE, $shaded)],
+            ['v' => $days ?: '', 's' => xlsx_alt(XLSX_INT, $shaded)],
+        ]);
+    }
+    $put([]);
+}
 
 // ---- department by department ----------------------------------------------
 foreach ($byDept as $deptName => $deptSteps) {

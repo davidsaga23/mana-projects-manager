@@ -392,12 +392,14 @@ function expense_projection(PDO $pdo, int $projectId): array {
             $unpricedDays += $days;
         }
 
+        $supBilled = $billedBy[$cid . '|' . -(int)$p['id']] ?? null;
         $rows[] = [
             'department'     => 'Supervision',
             // Shaped like a step so every reader that draws a dot or sorts by
-            // step order keeps working. id 0: no invoice, ideal or pool row can
-            // attach to it.
-            'step'           => ['id' => 0, 'name' => $p['title'], 'color' => '#8a8f98',
+            // step order keeps working. The id is the position's, NEGATIVE, the
+            // same number an invoice for it carries in step_id (see
+            // project_positions()); no ideal or pool row can match it.
+            'step'           => ['id' => -(int)$p['id'], 'name' => $p['title'], 'color' => '#8a8f98',
                                  'step_order' => (int)$p['sort_order'], 'applies_to' => 'project',
                                  'applies_to_asset_type' => null, 'tracks_seconds' => 0],
             'role'           => $p['title'],
@@ -423,12 +425,13 @@ function expense_projection(PDO $pdo, int $projectId): array {
             'cost'           => $cost,
             'units'          => 0,
             'unit_label'     => 'days',
-            // Actuals come from invoices attached to a lane, and a supervisor
-            // has none yet; a dash, not a zero.
+            // Actual cost is what has been invoiced against the position, as
+            // for a lane. No actual days: a supervisor logs no time on a step.
             'actual_days'    => 0.0,
-            'actual_cost'    => null,
-            'variance'       => null,
+            'actual_cost'    => $supBilled,
+            'variance'       => ($cost !== null && $supBilled !== null) ? $cost - $supBilled : null,
         ];
+        if ($supBilled !== null) $actualTotal += $supBilled;
     }
 
     // Department order as the sheet reads it, with anything unrecognised last.
@@ -755,6 +758,45 @@ function delete_expense(int $id): string {
 }
 
 /** Remove an invoice. */
+
+/**
+ * Every position on a show an invoice can name, and a rate can be set for: each
+ * slot (crew id + step id) and each supervision position (crew id + MINUS the
+ * position's id, migration 068).
+ *
+ * ⚠ THE NEGATIVE STEP ID IS DELIBERATE. invoices.step_id lives in the finance
+ * database and is a plain INT with no foreign key (the two databases cannot have
+ * one), and "crew + step" is how every reader already finds an invoice's row. A
+ * pipeline step id is never negative, so -12 can only ever mean supervision
+ * position 12, and supervision invoices needed no finance import to work.
+ *
+ * [['crew_id','step_id','crew_name','step_name','label','is_placeholder'], ...]
+ */
+function project_positions(PDO $pdo, int $projectId): array {
+    $out = [];
+    foreach (project_lanes($pdo, $projectId) as $l) {
+        $out[] = [
+            'crew_id'   => (int)$l['crew_id'],
+            'step_id'   => (int)$l['step_id'],
+            'crew_name' => (string)$l['name'],
+            'step_name' => (string)$l['step_name'],
+            'label'     => $l['name'] . ', ' . $l['step_name'],
+            'is_placeholder' => !empty($l['is_placeholder']),
+        ];
+    }
+    require_once __DIR__ . '/supervision.php';
+    foreach (supervision_positions($pdo, $projectId) as $p) {
+        $out[] = [
+            'crew_id'   => (int)$p['crew_id'],
+            'step_id'   => -(int)$p['id'],
+            'crew_name' => (string)$p['name'],
+            'step_name' => (string)$p['title'],
+            'label'     => $p['name'] . ', ' . $p['title'] . ' (supervision)',
+            'is_placeholder' => (int)$p['is_placeholder'] === 1,
+        ];
+    }
+    return $out;
+}
 
 /**
  * What has actually been INVOICED, per position, keyed "crewId|stepId".

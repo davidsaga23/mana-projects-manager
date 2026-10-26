@@ -237,6 +237,7 @@ $slotsByStep = [];
 foreach ($lanes as $l) $slotsByStep[(int)$l['step_id']][] = $l;
 
 $unattached = $byLane[0] ?? [];
+$supHires   = $ready ? hires_by_supervision($pdo, $projectId) : [];
 
 $pageTitle = 'Hiring · ' . $project['name'];
 require __DIR__ . '/includes/header.php';
@@ -748,6 +749,32 @@ if ($fromFinance) {
       </table>
     <?php endif; ?>
 
+  <?php endif; ?>
+
+  <?php // SUPERVISION POSITIONS (069). Their candidates are lined up and hired on
+        // Staffing, the row the position lives on; listed here so a person up
+        // for Anim Sup is not missing from the screen that lists everybody. ?>
+  <?php if ($supHires): ?>
+    <h3>Supervision</h3>
+    <p class="muted small">
+      Candidates for Anim Sup, CG Sup and the like. Line them up, move them and hire them on
+      <a href="crew.php?project=<?= $projectId ?>">Staffing</a>.
+    </p>
+    <table class="review-table">
+      <tr><th>Position</th><th>Who</th><th>Stage</th><th>Where from</th></tr>
+      <?php foreach ($supHires as $rows): foreach ($rows as $h): $c = hire_stage_color($h['stage']); ?>
+        <tr>
+          <td><?= e($h['sup_title'] ?? $h['step_name'] ?? '') ?></td>
+          <td><strong><?= e($h['candidate_name']) ?></strong>
+            <?php if (!empty($h['email'])): ?><div class="muted small"><?= e($h['email']) ?></div><?php endif; ?>
+          </td>
+          <td><span class="status-chip"
+                    style="background:<?= e($c) ?>1a;color:<?= e($c) ?>;border:1px solid <?= e($c) ?>44;">
+                <?= e(hire_has_left($h) ? 'Left' : hire_stage_label($h['stage'])) ?></span></td>
+          <td class="muted small"><?= e($h['source'] ?: '—') ?></td>
+        </tr>
+      <?php endforeach; endforeach; ?>
+    </table>
   <?php endif; ?>
 
   <?php // ---- who is on the show, and until when -------------------------- ?>

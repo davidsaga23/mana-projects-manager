@@ -103,6 +103,46 @@ function staffing_earlier_candidate(array $h, array $leftDates): void {
     <?php
 }
 
+/**
+ * "+ Add a candidate" for one position: somebody from the artist database, or a
+ * name new to the studio. $action is the button value the POST handler reads,
+ * addcand:N for a slot, addsupcand:N for a supervision position.
+ */
+function staffing_add_candidate(string $action, array $book): void {
+    ?>
+    <details class="cand-add">
+      <summary class="row-btn">+ Add a candidate</summary>
+
+      <?php // THE BOOK FIRST, typing second, because most people put up for a
+            // position are already in it and picking carries their email, reel,
+            // position and rating across. Typing a name that is already in the
+            // book is how a second, emptier copy of somebody gets made. ?>
+      <?php if ($book): ?>
+        <form method="post" class="inline-form cand-add-form">
+          <select name="known_id" aria-label="Somebody already in the artist database">
+            <option value="">from the artist database…</option>
+            <?php foreach ($book as $k): ?>
+              <option value="<?= (int)$k['id'] ?>"><?= e($k['candidate_name']) ?><?php
+                if (!empty($k['position'])) echo ' · ' . e($k['position']);
+                if (!empty($k['project_code'])) echo ' · last on ' . e($k['project_code']);
+              ?></option>
+            <?php endforeach; ?>
+          </select>
+          <button type="submit" class="secondary" name="action" value="<?= e($action) ?>">Line up candidate</button>
+        </form>
+      <?php endif; ?>
+
+      <form method="post" class="inline-form cand-add-form">
+        <input name="candidate_name" placeholder="or a name new to the studio" required
+               aria-label="New candidate name">
+        <input name="candidate_email" type="email" placeholder="Email (optional)"
+               aria-label="New candidate email">
+        <button type="submit" class="secondary" name="action" value="<?= e($action) ?>">Add and line up candidate</button>
+      </form>
+    </details>
+    <?php
+}
+
 $projectId = (int)($_GET['project'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
 $stmt->execute([$projectId]);
@@ -262,12 +302,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (preg_match('/^supassign:(\d+)$/', $action, $m)) {
             // A supervision position (migration 068): somebody on the list, or a
             // name typed in. No scheduled work to carry, so nothing else moves.
+            $was = supervision_crew_id($pdo, $projectId, (int)$m[1]);
             flash('ok', supervision_assign($pdo, $projectId, (int)$m[1],
                                            (int)($_POST['sup_crew'][$m[1]] ?? 0),
                                            (string)($_POST['sup_name'][$m[1]] ?? '')));
+            if ($was !== supervision_crew_id($pdo, $projectId, (int)$m[1])) {
+                note_left_supervision($pdo, $projectId, (int)$m[1], $was, current_user_display());
+            }
 
         } elseif (preg_match('/^supunassign:(\d+)$/', $action, $m)) {
+            $was = supervision_crew_id($pdo, $projectId, (int)$m[1]);
             flash('ok', supervision_unassign($pdo, $projectId, (int)$m[1]));
+            note_left_supervision($pdo, $projectId, (int)$m[1], $was, current_user_display());
+
+        } elseif (preg_match('/^addsupcand:(\d+)$/', $action, $m)) {
+            // Lining somebody up for a supervision position (069): the same two
+            // ways in as a slot, through the same save_hire(), which checks the
+            // position is this show's.
+            $supId   = (int)$m[1];
+            $knownId = (int)($_POST['known_id'] ?? 0);
+            $r = $knownId > 0
+                ? add_known_candidate($pdo, $projectId, 0, $knownId, current_user_display(), $supId)
+                : save_hire($pdo, $projectId, [
+                      'candidate_name' => $_POST['candidate_name'] ?? '',
+                      'email'          => $_POST['candidate_email'] ?? '',
+                      'supervision_id' => $supId,
+                      'stage'          => HIRE_STAGE_NEW,
+                  ], current_user_display());
+            foreach ((array)$r as $said) if (is_string($said)) flash('ok', $said);
 
         } elseif (preg_match('/^remove_work:(\d+)$/', $action, $m)) {
             // THE WAY THROUGH. remove: refuses while a slot carries scheduled
@@ -557,8 +619,9 @@ require __DIR__ . '/includes/header.php';
       // the other supervisors know about these staffing decisions. It carries
       // the step's own dates, which this screen does not need and a message
       // leaving the building does: "empty" is a fact, "empty and starts on the
-      // 14th" is a deadline with a name missing from it. ?>
-<?php if ($lanes): ?>
+      // 14th" is a deadline with a name missing from it. Supervision positions
+      // are in it too, so a show staffed only with supervisors still exports. ?>
+<?php if ($lanes || supervision_positions($pdo, $projectId)): ?>
   <p class="page-actions button-row">
     <a class="button secondary" href="export_staffing.php?project=<?= $projectId ?>">Export staffing ↓</a>
   </p>
@@ -662,10 +725,15 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
   <?php // SUPERVISION FIRST (David, 2026-10-26): Anim Sup, CG Sup, set with their
-        // dates on Dates & headcount. No hiring loop on these rows yet: the
-        // candidates on Hiring hang off a slot, and a supervisor is usually
-        // somebody the studio already knows, so the row takes a person straight. ?>
-  <?php $supPositions = supervision_positions($pdo, $projectId); ?>
+        // dates on Dates & headcount. The same staffing loop as a slot, lining
+        // candidates up and hiring one (069), plus putting somebody the studio
+        // already knows straight in. ?>
+  <?php $supPositions = supervision_positions($pdo, $projectId);
+        $supHires = $hiringReady ? hires_by_supervision($pdo, $projectId) : [];
+        $supCanLineUp = $hiringReady && hire_supervision_available($pdo);
+        $supLeftIds = [];
+        foreach ($supHires as $hs) foreach ($hs as $h) if (hire_has_left($h)) $supLeftIds[] = (int)$h['id'];
+        $supLeftDates = $hiringReady ? hire_left_dates($pdo, $supLeftIds) : []; ?>
   <?php if ($supPositions): ?>
     <h3 class="crew-dept-head">
       Supervision
@@ -676,14 +744,58 @@ require __DIR__ . '/includes/header.php';
     </h3>
     <table class="review-table">
       <tr><th>Position</th><th>Who</th><th>Dates</th><th></th></tr>
-      <?php foreach ($supPositions as $sp): $spPh = (int)$sp['is_placeholder'] === 1; ?>
-        <tr class="slot-<?= $spPh ? 'nobody' : 'filled' ?>">
+      <?php foreach ($supPositions as $sp): $spPh = (int)$sp['is_placeholder'] === 1;
+        // The same three states a slot carries: filled, somebody in the running,
+        // nobody at all.
+        $spAll = $supHires[(int)$sp['id']] ?? [];
+        $spOpen = array_values(array_filter($spAll, fn($h) => in_array($h['stage'], HIRE_STAGES_OPEN, true)));
+        $spEarlier = array_values(array_filter($spAll,
+            fn($h) => in_array($h['stage'], ['declined', 'passed'], true) || hire_has_left($h)));
+        $spState = !$spPh ? 'filled' : ($spOpen ? 'inplay' : 'nobody'); ?>
+        <tr class="slot-<?= $spState ?>">
           <td><strong><?= e($sp['title']) ?></strong></td>
           <td>
-            <?php if ($spPh): ?>
-              <span class="slot-state slot-state-nobody">Nobody yet</span>
-            <?php else: ?>
+            <?php if (!$spPh): ?>
               <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$sp['crew_id'] ?>"><?= e($sp['name']) ?></a>
+            <?php elseif ($spOpen): ?>
+              <span class="slot-state slot-state-inplay"><?= count($spOpen) ?> in the running</span>
+            <?php else: ?>
+              <span class="slot-state slot-state-nobody">Nobody yet</span>
+            <?php endif; ?>
+            <?php if ($spPh && $supCanLineUp): ?>
+              <div class="lined-up">
+                <?php foreach ($spOpen as $h): ?>
+                  <?php staffing_candidate($h, true); ?>
+                <?php endforeach; ?>
+                <?php if (!$spOpen): ?>
+                  <div class="muted small warn-text">Nobody lined up for this position yet.</div>
+                <?php endif; ?>
+                <?php if ($spEarlier): ?>
+                  <details class="closed-cands cand-earlier-list" <?= $spOpen ? '' : 'open' ?>>
+                    <summary>Talked to before (<?= count($spEarlier) ?>)</summary>
+                    <?php foreach ($spEarlier as $h): ?>
+                      <?php staffing_earlier_candidate($h, $supLeftDates); ?>
+                    <?php endforeach; ?>
+                  </details>
+                <?php endif; ?>
+                <?php if (can_edit_area('staffing')): ?>
+                  <?php staffing_add_candidate('addsupcand:' . (int)$sp['id'], $book); ?>
+                <?php endif; ?>
+              </div>
+            <?php elseif (!$spPh && ($spOpen || $spEarlier)): ?>
+              <details class="closed-cands cand-backups">
+                <summary>Also lined up for this position (<?= count($spOpen) + count($spEarlier) ?>)</summary>
+                <div class="lined-up">
+                  <?php foreach ($spOpen as $h): ?>
+                    <?php staffing_candidate($h, false); ?>
+                  <?php endforeach; ?>
+                  <?php foreach ($spEarlier as $h): ?>
+                    <?php staffing_earlier_candidate($h, $supLeftDates); ?>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php elseif ($spPh && $hiringReady && !$supCanLineUp): ?>
+              <div class="muted small">Lining up candidates here needs database update 069.</div>
             <?php endif; ?>
           </td>
           <td class="small">
@@ -965,41 +1077,7 @@ require __DIR__ . '/includes/header.php';
                         // are being considered for. Two fields, because that is
                         // all a first conversation has; everything else about
                         // them is filled in later on their record. ?>
-                  <details class="cand-add">
-                    <summary class="row-btn">+ Add a candidate</summary>
-
-                    <?php // THE BOOK FIRST, typing second, because most people
-                          // put up for a position are already in it and picking
-                          // carries their email, reel, position and rating
-                          // across. Typing a name that is already in the book
-                          // is how a second, emptier copy of somebody gets
-                          // made. Same order, and the same reasoning, as the
-                          // two ways into a slot on the row above. ?>
-                    <?php if ($book): ?>
-                      <form method="post" class="inline-form cand-add-form">
-                        <select name="known_id" aria-label="Somebody already in the artist database">
-                          <option value="">from the artist database…</option>
-                          <?php foreach ($book as $k): ?>
-                            <option value="<?= (int)$k['id'] ?>"><?= e($k['candidate_name']) ?><?php
-                              if (!empty($k['position'])) echo ' · ' . e($k['position']);
-                              if (!empty($k['project_code'])) echo ' · last on ' . e($k['project_code']);
-                            ?></option>
-                          <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="secondary" name="action"
-                                value="addcand:<?= (int)$l['id'] ?>">Line up candidate</button>
-                      </form>
-                    <?php endif; ?>
-
-                    <form method="post" class="inline-form cand-add-form">
-                      <input name="candidate_name" placeholder="or a name new to the studio" required
-                             aria-label="New candidate name">
-                      <input name="candidate_email" type="email" placeholder="Email (optional)"
-                             aria-label="New candidate email">
-                      <button type="submit" class="secondary" name="action"
-                              value="addcand:<?= (int)$l['id'] ?>">Add and line up candidate</button>
-                    </form>
-                  </details>
+                  <?php staffing_add_candidate('addcand:' . (int)$l['id'], $book); ?>
                 <?php endif; ?>
               </div>
             <?php endif; ?>

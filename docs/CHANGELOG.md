@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Supervision positions: candidates, invoices, staffing export *(migration 069)*
+
+- **Line up candidates for a supervision position on Staffing**, exactly as for a slot: from the
+  artist database or a new name, move their stage, press Hire. Hiring puts them in the position.
+  "Talked to before" and "Also lined up" work the same. The Hiring screen lists them under
+  Supervision. Needs migration 069.
+- **Invoices can name a supervision position** ("Name, Anim Sup (supervision)" in the position
+  picker, adding and editing). Its Actual and Difference columns on the expense projection fill in
+  from those invoices. No finance-database import needed.
+- **Rates can be set on supervision rows** on the Finance screen (the first version refused them as
+  "not on this project").
+- **The staffing export has a Supervision band first**, with each position's dates and working days.
+- **Artist statements include supervisors**, with their position's dates as the window.
+
 ## 2026-10-26 — Supervision positions: Anim Sup, CG Sup, costed from their dates *(migration 068)*
 
 - **Dates & headcount has a Supervision section** under the steps: a position title, a start and an

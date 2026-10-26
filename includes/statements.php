@@ -48,6 +48,7 @@ function statement_people(PDO $pdo, int $projectId): array {
         }
     };
     $add('SELECT crew_id FROM crew_lanes WHERE project_id = ?');
+    $add('SELECT crew_id FROM supervision_positions WHERE project_id = ?');   // 068
     $add('SELECT DISTINCT crew_id FROM time_logs WHERE project_id = ?');
     $add('SELECT DISTINCT crew_id FROM progress WHERE project_id = ? AND crew_id IS NOT NULL');
     if (!$ids) return [];
@@ -85,6 +86,21 @@ function statement_window(PDO $pdo, int $projectId, int $crewId): array {
             if (!$to && !empty($r['e']))   { $to = $r['e'];   $source = $source === 'none' ? 'department' : $source; }
         } catch (PDOException $e) {
             // crew_lanes before migration 012
+        }
+    }
+    // A supervisor holds no slot: their supervision position's own dates (068).
+    if (!$from || !$to) {
+        try {
+            $q = $pdo->prepare(
+                'SELECT MIN(start_date) AS s, MAX(end_date) AS e FROM supervision_positions
+                  WHERE project_id = ? AND crew_id = ?'
+            );
+            $q->execute([$projectId, $crewId]);
+            $r = $q->fetch() ?: [];
+            if (!$from && !empty($r['s'])) { $from = $r['s']; $source = $source === 'none' ? 'department' : $source; }
+            if (!$to && !empty($r['e']))   { $to = $r['e'];   $source = $source === 'none' ? 'department' : $source; }
+        } catch (PDOException $e) {
+            // supervision_positions before migration 068
         }
     }
     return ['from' => $from ?: null, 'to' => $to ?: null, 'source' => $source];
