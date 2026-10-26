@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Invoices: Expected / Pending / Paid, and editable in place *(finance_install_09)*
+
+- **An invoice's status is now Expected, Pending or Paid** (expected: not arrived yet; pending:
+  arrived, waiting to be paid). Needs `finance_install_09.sql` imported into the finance database;
+  until then the dropdown keeps the old four. Expected invoices do not count as "invoiced" on an
+  artist's statement.
+- **Every recorded invoice can be edited in place**: "edit" on its row opens all its fields under
+  it (position, name, reference, amount, currency, status, period, dates, link, notes).
+
 ## 2026-10-26 — Artist statements: what each person should invoice *(no migration)*
 
 - **A new Finance management tab, Artist statements**: everybody with a position, a task or logged

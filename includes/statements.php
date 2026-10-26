@@ -168,6 +168,9 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
 
     $invoiced = 0.0; $otherCurrency = false;
     foreach ($invoices as $inv) {
+        // An EXPECTED invoice has not arrived (finance_install_09): it is not
+        // something the artist has invoiced yet, so it is not subtracted.
+        if (($inv['status'] ?? '') === 'expected') continue;
         if (strtoupper((string)($inv['currency'] ?? $cur)) !== strtoupper($cur)) { $otherCurrency = true; continue; }
         $invoiced += (float)$inv['amount'];
     }

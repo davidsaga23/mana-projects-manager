@@ -763,6 +763,43 @@ function invoice_totals(array $projectIds): array {
     return $out;
 }
 
+/**
+ * The statuses an invoice can have, value => label, in dropdown order.
+ *
+ * Expected / Pending / Paid since 2026-10-26 (David), once finance_install_09
+ * has been imported into the finance database. Until then the database still
+ * holds the old four and would refuse the new values, so the old ones are
+ * offered — read from the column itself rather than assumed, so the dropdown
+ * can never offer a value the database will not store.
+ */
+function invoice_statuses(): array {
+    static $out = null;
+    if ($out !== null) return $out;
+    $new = ['expected' => 'Expected', 'pending' => 'Pending', 'paid' => 'Paid'];
+    $old = ['received' => 'Received', 'approved' => 'Approved', 'paid' => 'Paid', 'disputed' => 'Disputed'];
+    $db = finance_db();
+    if (!$db) return $out = $new;
+    try {
+        $col = $db->query("SHOW COLUMNS FROM invoices LIKE 'status'")->fetch();
+        $type = strtolower((string)($col['Type'] ?? ''));
+    } catch (PDOException $e) {
+        $type = '';
+    }
+    return $out = strpos($type, "'pending'") !== false ? $new : $old;
+}
+
+/** The status a new invoice gets when none is chosen. */
+function invoice_default_status(): string {
+    return isset(invoice_statuses()['pending']) ? 'pending' : 'received';
+}
+
+/** An invoice's status in words, for a value from either the old or new set. */
+function invoice_status_label(string $status): string {
+    $all = ['expected' => 'Expected', 'pending' => 'Pending', 'paid' => 'Paid',
+            'received' => 'Received', 'approved' => 'Approved', 'disputed' => 'Disputed'];
+    return $all[$status] ?? ucfirst($status);
+}
+
 /** Record or update an invoice. Returns a sentence for the flash message. */
 function save_invoice(array $in, array $project, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can record an invoice.');
@@ -780,8 +817,8 @@ function save_invoice(array $in, array $project, string $who = ''): string {
     $cur = strtoupper(trim((string)($in['currency'] ?? 'USD')));
     if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
 
-    $status = in_array($in['status'] ?? '', ['received','approved','paid','disputed'], true)
-        ? $in['status'] : 'received';
+    $status = isset(invoice_statuses()[(string)($in['status'] ?? '')])
+        ? (string)$in['status'] : invoice_default_status();
 
     $date = function ($v) {
         $v = trim((string)$v);

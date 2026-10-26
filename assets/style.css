@@ -4295,3 +4295,17 @@ a.version-shot:hover { border-color: var(--border-strong); }
 @media print {
   .topbar, .crumb, .statement-pick, .finance-nav, .project-nav, button { display: none !important; }
 }
+
+/* Editing a recorded invoice in place (2026-10-26): its fields open in a row
+   under it, wrapped so they fit the table's width. */
+tr.invoice-edit[hidden] { display: none; }
+tr.invoice-edit td { background: var(--surface-2); padding: 12px 14px; }
+.invoice-edit-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.invoice-edit-form label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; color: var(--muted); }
+.invoice-edit-form .invoice-edit-notes { flex: 1 1 260px; }
+.invoice-edit-form .invoice-edit-notes input { width: 100%; }
+.invoice-edit-actions { display: flex; gap: 10px; align-items: center; flex-basis: 100%; }
+.invoice-edit-actions button { margin: 0; }
+.row-actions .invoice-edit-btn { margin: 0 10px 0 0; }
+.row-actions { white-space: nowrap; }
+.row-actions form { display: inline; }
