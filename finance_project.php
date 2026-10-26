@@ -1853,6 +1853,61 @@ function invAddRows() {
       // steer by the pool draining. Everything is computed in budget_pool(); this
       // block only draws it, which is the same split every other tab here keeps.
       ?>
+<?php if ($tab === 'statements'):
+    // ARTIST STATEMENTS (David, 2026-10-26). Everybody with something to invoice
+    // on this show, what each should invoice so far, and a link to the full
+    // statement — the same page the artist opens as their own from My tasks.
+    // Computed in includes/statements.php; this block only draws it.
+    require_once __DIR__ . '/includes/statements.php';
+    $stPeople = statement_people($pdo, $projectId);
+    $stTerms = crew_terms(array_keys($stPeople));
+    $stInv = [];
+    foreach (project_invoices($projectId) as $inv) $stInv[(int)$inv['crew_id']][] = $inv;
+    $stProj = expense_projection($pdo, $projectId);
+?>
+  <h3>Artist statements</h3>
+  <p class="muted small">
+    What each person on the show should invoice, counted from their contract dates (or, where none
+    are set, from the dates of the steps they are on). Days come from time logged in Anima, seconds
+    from shots <strong>approved</strong> on the footage steps, and the amount follows each person's
+    rate unit. Every artist sees their own statement, and only theirs, from My tasks.
+  </p>
+  <?php if (!$stPeople): ?>
+    <div class="empty-state"><p>Nobody has a position, a task or logged time on this show yet.</p></div>
+  <?php else: ?>
+    <table class="review-table statement-list">
+      <thead><tr>
+        <th>Artist</th><th>Dates</th><th>Rate</th>
+        <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Approved sec</th>
+        <th class="num">Due so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
+      </tr></thead>
+      <tbody>
+      <?php foreach ($stPeople as $cid => $name):
+          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj);
+          $w = $st['window'];
+          $cur = $st['currency']; ?>
+        <tr>
+          <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>"><?= e($name) ?></a></td>
+          <td class="muted small">
+            <?= $w['from'] ? e(date('j M', strtotime($w['from']))) : '—' ?> –
+            <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
+            <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their steps">steps</span><?php endif; ?>
+          </td>
+          <td class="small"><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $cur)) : '<span class="warn-text">no rate</span>' ?></td>
+          <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
+          <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h<br><span class="muted small"><?= e(fmt_num($st['days'], 2)) ?> d</span></td>
+          <td class="num"><?= $st['approved_seconds'] > 0 ? e(statement_secs($st['approved_seconds'])) : '<span class="muted">—</span>' ?></td>
+          <td class="num"><?= e(fmt_money_plain($st['due'], $cur)) ?></td>
+          <td class="num"><?= e(fmt_money_plain($st['invoiced'], $cur)) ?></td>
+          <td class="num"><strong class="<?= ($st['left'] ?? 0) < 0 ? 'warn-text' : '' ?>"><?= e(fmt_money_plain($st['left'], $cur)) ?></strong></td>
+          <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>">Statement →</a></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+<?php endif; ?>
+
 <?php if ($tab === 'pool'): ?>
 <?php $pool = budget_pool($pdo, $project); $pcur = $pool['currency']; ?>
 
