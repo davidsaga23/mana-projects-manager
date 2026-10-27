@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-27 — Last import date on the Import screen *(no migration)*
+
+- **The Import screen shows the last import**: date and time, who ran it, the file name and how many
+  rows it had. Recorded when an import is applied (a cancelled one does not count), as a project
+  setting. Imports before 27 Oct 2026 were never recorded, so a project shows "none recorded yet"
+  until its next one.
+
 ## 2026-10-27 — Breakdown frames no longer change the setup seconds *(no migration)*
 
 - **Frame counts on the shot breakdown belong to the breakdown only.** Typing one used to rewrite
