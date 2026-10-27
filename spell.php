@@ -446,6 +446,9 @@ require __DIR__ . '/includes/header.php';
       // had since the start, rather than a second one written for this tab. ?>
 <script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
 <script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
+<?php // The review viewer: an image version full screen with a pen (David,
+      // 2026-10-27). Built from the Versions pane board-screen.js keeps fresh. ?>
+<script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
 <?php endif; ?>
 
 </div>

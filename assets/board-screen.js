@@ -1430,4 +1430,12 @@
     }
   }
 
+  // For the review viewer (assets/review-viewer.js), which posts a review from
+  // outside the panel's own forms and has to leave the pane exactly as a post
+  // from inside it would: re-rendered, re-armed, and the timeline caught up.
+  window.animaBoard = {
+    paneReady: paneReady,
+    timelineRefresh: timelineRefresh
+  };
+
 }());
