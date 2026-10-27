@@ -1581,9 +1581,17 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                 $out .= '</div>';
             }
 
-            if (attachment_is_image((string)($v['mime_type'] ?? ''))) {
-                $out .= '<a href="' . $url . '" class="att-zoom version-shot" data-name="' . $name
-                      . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . $name . '"></a>';
+            // ⚠ AN IMAGE OPENS THE REVIEW VIEWER, NOT THE LIGHTBOX (David,
+            // 2026-10-27: "a very basic image editor to review new versions
+            // online"). assets/review-viewer.js builds it from this pane —
+            // data-review-open names the version, img.version-img is how it
+            // finds the pictures. The href stays a working link, so ctrl-click
+            // still opens the file on its own.
+            $isImage = attachment_is_image((string)($v['mime_type'] ?? ''));
+            if ($isImage) {
+                $out .= '<a href="' . $url . '" class="version-shot" data-review-open="' . $vid . '"'
+                      . ' title="Open in the review viewer" target="_blank" rel="noopener">'
+                      . '<img class="version-img" src="' . $url . '" alt="' . $name . '"></a>';
             } elseif (attachment_is_video((string)($v['mime_type'] ?? ''))) {
                 $out .= '<video class="version-shot" src="' . $url . '" controls preload="metadata"></video>';
             } else {
@@ -1592,7 +1600,12 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             }
 
             $out .= '<div class="version-meta muted small"><span title="' . $name . '">' . $name
-                  . '</span> · ' . e(human_size((int)$v['file_size'])) . '</div>';
+                  . '</span> · ' . e(human_size((int)$v['file_size']))
+                  . ($isImage
+                      ? ' <button type="button" class="version-review-open" data-review-open="' . $vid . '">'
+                        . ($reviewer ? 'Review &amp; draw' : 'Open viewer') . '</button>'
+                      : '')
+                  . '</div>';
             if (trim((string)($v['link'] ?? '')) !== '') {
                 $out .= '<a class="version-files-btn" href="' . e((string)$v['link'])
                       . '" target="_blank" rel="noopener">Open final files</a>';

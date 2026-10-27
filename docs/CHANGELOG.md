@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-27 — A review viewer with a pen, for image versions *(no migration)*
+
+- **Clicking an image version on Spell's Versions tab opens it full screen** (or its "Review & draw" /
+  "Open viewer" button). Step through the task's versions at the top (‹ ›, the picker or the arrow
+  keys), zoom in and out, fit or 100%, and read that version's review notes down the right.
+- **Supervisors, Production and admins get a pen**: six colours, three thicknesses, undo (Ctrl+Z)
+  and clear, and a box to write the review in. Posting sends the text, plus the version with the
+  drawing on top as one JPEG at full resolution, as an ordinary review on that version. So the
+  paint-over shows wherever review notes already do: the tab, the timeline, the email.
+- Everyone else can open the viewer to look and read, without the pen. Videos and PDFs open as before.
+- Ctrl-click on a version still opens the file on its own.
+
 ## 2026-10-27 — Reviews: a queue and a verdict for supervisors and Production *(no migration)*
 
 - **A Reviews button in the top bar**, beside My tasks, with the number of tasks waiting on you.
