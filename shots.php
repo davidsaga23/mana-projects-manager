@@ -179,7 +179,10 @@ $missingNote = $noFrames > 0
         <td><strong><?= e($r['shot_code']) ?></strong></td>
         <td class="num bd-frames">
           <?php if (can_edit_area('shots')): ?>
-            <input class="bd-frame-input" inputmode="numeric" size="5"
+            <?php // placeholder="?" is what the empty-box highlight in style.css
+                  // keys on (:placeholder-shown), so it follows typing live. ?>
+            <input class="bd-frame-input" inputmode="numeric" size="5" placeholder="?"
+                   title="<?= $r['frames'] === null ? 'No frame count yet. The seconds under it are the placeholder from setup, and that is what the projection is still using.' : '' ?>"
                    value="<?= $r['frames'] !== null ? (int)$r['frames'] : '' ?>"
                    aria-label="Frames in <?= e($r['shot_code']) ?>">
           <?php else: ?>
