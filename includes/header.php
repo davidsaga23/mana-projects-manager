@@ -14,6 +14,13 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
     ? mytasks_badge($pdo, effective_user_id())
     : ['count' => 0, 'new' => false];
 
+// The Reviews button and its count (David, 2026-10-27: "at the top as a button,
+// similar to the task button with a number of pending reviews"). Only for the
+// people who review: supervisors, Production and admins. See includes/review.php.
+require_once __DIR__ . '/review_badge.php';
+$reviewStage = review_stage();
+$reviewCount = ($reviewStage && isset($pdo) && $pdo instanceof PDO) ? review_count($pdo) : 0;
+
 // --- the bell (David, 2026-10-22), migration 060 -----------------------------
 //
 // "you need to get a notification in a bell close to your name so you know
@@ -139,6 +146,10 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
           class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
           title="<?= $myTasksBadge['new']
               ? 'You have a new task' : 'Your active tasks' ?>"><?= (int)$myTasksBadge['count'] ?></span><?php endif; ?></a>
+      <?php if ($reviewStage): ?>
+      <a href="review.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'review.php' ? ' is-on' : '' ?>">Reviews<?php if ($reviewCount > 0): ?><span
+          class="mytasks-badge is-new" title="Waiting for your review"><?= $reviewCount ?></span><?php endif; ?></a>
+      <?php endif; ?>
       <?php // TASKS, next to My tasks and not inside a project, because the
             // question it answers spans them: "what is open everywhere, and how
             // are we doing across the shows" (David, 2026-10-07). Same reasoning

@@ -791,77 +791,11 @@ exactly the clutter archiving exists to remove.
 **Open:** per department or per step; and whether a postmortem is visible to everybody on the show or
 only to production (an honest postmortem and a published one are not always the same document).
 
-### A PM tool for the day-to-day work, to replace Plaky
+### A PM tool for the day-to-day work, to replace Plaky — CLOSED 2026-10-27: it is Spell
 
-> *"Similar to Plaky we need a place (it could be a separate URL/subdomain) so we can do essentially
-> everything we do in Plaky. Assign tasks, track them, update status, upload versions, create
-> playlists to review, create filters per task, log working hours, access my assignments, etc. Even
-> if it lives in a different URL all the data should be readable from Anima and vice versa. In fact
-> the assets and shots done in Anima should land directly there along with the pipeline steps so it's
-> just a matter of assigning and adding dates per task."*
-
-**This is the big one, and it is worth being exact about how much already exists, because it is much
-more than it looks.**
-
-⚠ **THE TASK MATRIX IS ALREADY IN THE DATABASE.** `progress` is one row per *step per item*
-(`UNIQUE KEY uniq_step_item (step_id, item_key)`, where `item_key` is `s<shot>` / `a<asset>` /
-`p<project>`). That row already carries: status (resolved **and** the raw external text),
-`is_delivered`, `is_approved`, a primary assignee, **a full assignee list** (`progress_crew`, because
-the live board really does say two names), logged minutes, **a version string**, and notes.
-`schedule` is keyed identically and carries **`start_date`, `end_date` and `crew_id` per step per
-item**, with `is_manual` so hand-planned rows survive the auto-scheduler.
-
-So David's closing sentence — *"it's just a matter of assigning and adding dates per task"* — is
-**already true at the schema level, for both halves**. Shots, assets and pipeline steps do not need
-to "land there"; they are there, and `production.php` already draws the grid.
-
-**What Plaky genuinely has that Anima does not:**
-
-| Wanted | State |
-|---|---|
-| Assign tasks | `progress.crew_id` + `progress_crew`. Exists. |
-| Track them, update status | `progress`, `statuses`, `progress_log`. Exists. |
-| Dates per task | `schedule.start_date` / `end_date`. Exists. |
-| Log working hours | `time_logs` (migration 022). Exists. |
-| My assignments | `mytasks.php`. Exists. |
-| Filters | Column filters exist on the grids; **saved, named, shareable** filters do not. |
-| **Upload versions** | **Does not exist.** `progress.version` is a free-text label, not a file. |
-| **Review playlists** | **Does not exist.** Nothing here holds media. |
-
-⚠ **THE TWO MISSING ITEMS ARE A DIFFERENT KIND OF SOFTWARE FROM EVERYTHING ELSE IN THIS PLATFORM,
-AND THAT IS THE WHOLE COST OF THIS FEATURE.** Anima is a tracker: it stores numbers, dates and names,
-every page is a form and a table, and the largest thing it has ever written is a CSV. Uploading
-versions and reviewing playlists means **storing, serving and playing media**: multi-GB files on
-shared cPanel hosting, upload limits, thumbnails and proxies (nobody reviews a 4K sequence in a
-browser over a shared host), a player with frame-accurate scrubbing, and annotation if the review is
-to be worth having. That is a media application. It is the part to scope honestly, and it is the part
-that decides whether this is three weeks or three months.
-
-**Storage sits above `public_html`**, like FamHealth's — files served through a PHP gate that checks
-the login, never by a public URL, because a shot that leaks before delivery is a client problem, not
-an IT one.
-
-**On the separate subdomain.** Two readings, very far apart in cost:
-
-1. **Same database, same codebase, different entry point** — `pm.davidsaga.com` pointed at the same
-   install, serving an artist-facing view of `progress` and `schedule`. "Readable from Anima and vice
-   versa" is then free, because it is one database. **This is the recommendation**, and it is nearly
-   all of what was asked for.
-2. **A separate application with its own database, synced to Anima.** This is what "a separate URL"
-   sounds like, and it buys almost nothing while costing a sync layer, two sources of truth, and the
-   question of which one wins when they disagree — which is the exact problem the Plaky importer
-   exists to manage today, rebuilt on purpose.
-
-⚠ **AND THE REAL BLOCKER IS NOT ANY OF THE ABOVE.** It is that **Plaky currently owns the statuses**
-(DECISIONS: Plaky as source of truth, for now). Artists updating status in Anima instead of Plaky is
-not a feature — it is the decision that the import stops being the source of truth and becomes a
-one-time migration. Everything in this section is easy to build and impossible to adopt until that
-call is made. It also unlocks version counting on its own, which is blocked for exactly the same
-reason.
-
-**Open:** when Plaky stops being the source of truth — because nothing here matters before that; and
-whether version *upload* is in scope at all, or whether a version *label* plus a link to wherever the
-file already lives (Drive, the server) is enough to start.
+David, 2026-10-27: *"this one is Spell so you can take it out"*. The board, task panel, versions,
+review notes and timeline built since 2026-10-22 are that tool; nothing further is planned under
+this heading.
 
 ### An assistant that can be asked about production, costs and delays
 
@@ -1222,7 +1156,14 @@ conversation doesn't propose them again:
 
 ## Asked for on 2026-10-23
 
-### Final internal review in Spell — the reviewer's own screen
+### Final internal review in Spell — the reviewer's own screen — BUILT 2026-10-27
+
+✅ `review.php`, reached from the **Reviews** button in the top bar (count of what waits on you).
+Decided with David on 2026-10-27: approving IS the status move (no second sign-off table); two
+stages by status name, Pending review → Ready for review for supervisors and Ready for review →
+Complete for admins and Production; Send back needs a note. Rules in `includes/review.php`. The
+brief as written before the build:
+
 
 David: *"add to the roadmap to have a feature for final internal reviews in Spell for Jorik so he
 can easily see what's for review, give review notes, approve directly or copy the URL of that
@@ -1295,58 +1236,10 @@ roadmap has wanted since August ("The step missing from the list itself"). Versi
 internal approval is most of what a delivery log needs; what it still would not have is *what was
 sent to the client and what came back*. Building this well makes that one smaller, later.
 
-### Anima should name the file, not ask the artist to
+### Anima should name the file, not ask the artist to — DROPPED 2026-10-27
 
-David, 2026-10-23, looking at a rejected upload on the FX task of SH010 — the
-file was `MSD_SH010_CH_V04_DS.png`, a character file picked for an effects
-task, so the check was right to stop it. What it then said was:
-
-> Rename it to follow `MSD_SH010_FX_V04_DS` and pick it again.
-
-**Anima already knows every part of that name.** It printed it. It knows the
-show is MSD, the shot is SH010, the step's code is FX, that this upload becomes
-v04, and whose initials to use — `naming_example()` assembles exactly that
-string from `naming_rule()` before a file has been chosen. Then it sends a
-freelancer to Finder to retype it and come back.
-
-⚠ AND THE NAME IT IS ARGUING ABOUT IS A DISPLAY FIELD. The file on disk is
-`bin2hex(random_bytes(16))` + the extension (`accept_upload()`); the name the
-artist typed lives in `original_name` and is never used for anything but being
-shown. So the round trip buys nothing a rename on arrival would not.
-
-**What to build.** On upload, record the version under the name the convention
-says it should have, and tell the artist that is what happened — "saved as
-MSD_SH010_FX_V04_DS.png" — rather than refusing the file. The check stops being
-a gate and becomes a label.
-
-**What it must still refuse, and this is the part worth getting right.** Not
-every mismatch is a typo. `MSD_SH010_CH_V04_DS.png` on an FX task is somebody
-uploading *the wrong file*, and silently renaming it to FX would bury that —
-the artist would never learn, and a character render would sit in the effects
-version history looking official. So:
-
-- The parts Anima can know for certain and the artist cannot get wrong — the
-  project code, the shot or asset, the step, the version number, the initials —
-  are Anima's to write. Rename, say so, move on.
-- A name that parses as the convention but names a DIFFERENT step, shot or
-  asset than the task it is being uploaded to is the one case to keep stopping,
-  with the words it has now. That is a wrong file, not a wrong name.
-- A name that matches nothing at all (`render_final_FINAL2.png`) is the easy
-  case: there is nothing to contradict, so name it and carry on.
-
-Telling those three apart needs the regex to capture the step and item parts
-rather than only `{VERSION}` — `naming_rule()` builds the pattern token by
-token already, so this is a change of two or three lines in how it emits each
-placeholder, not a rewrite.
-
-**Two defects in the current check, found while reading it (fixed 2026-10-23):**
-the "Rename it to follow …" line was built once, server-side, for the FIRST
-file, so on a multi-file upload — where each file becomes its own version — it
-told you to name the second one V04 when the check wanted V05, and went on
-refusing it when you complied. And the browser's message said only "does not
-follow the naming convention" while the server's identical check names the file
-it wanted: one rule, two implementations, already drifted. The browser's was
-the one anybody ever saw.
+David, 2026-10-27: *"we won't develop this one anymore"*. The naming check stays a gate on version
+uploads, as built in PR #76 and fixed in PR #81.
 
 ## The "sell the app to customers" exploration (not part of the internal app)
 

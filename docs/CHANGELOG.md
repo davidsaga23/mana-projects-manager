@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-27 — Reviews: a queue and a verdict for supervisors and Production *(no migration)*
+
+- **A Reviews button in the top bar**, beside My tasks, with the number of tasks waiting on you.
+  Shown to supervisors, Production and admins only.
+- **Two stages, by status name.** Artists put work up as **Pending review**; a supervisor's
+  queue is Pending review, and Approve moves it to **Ready for review**. Production's and admins'
+  queue is Ready for review, and Approve moves it to **Complete**. Either can **Send back** to a
+  status they pick, which needs a note.
+- **Each card shows the current version** (thumbnail for images, the file otherwise), who did it,
+  the version note, the final-files link, and how many review notes it already has. A note typed
+  there is posted as a review on that version, so it sits in the task's own conversation in Spell.
+- **Open in Spell** and **Copy URL** on every card; the URL lands on that version and opens for
+  anyone signed in to Anima.
+- A show without a "Ready for review" or "Complete" status is named on the screen, and Approve is
+  refused there until the status is added on the Statuses screen.
+
 ## 2026-10-27 — Last import date on the Import screen *(no migration)*
 
 - **The Import screen shows the last import**: date and time, who ran it, the file name and how many
