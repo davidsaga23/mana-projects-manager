@@ -653,3 +653,87 @@
     }
   });
 })();
+
+// The planning table as a CSV (David, 2026-10-26: "let's add an export button
+// for this table"). Read off the page as it stands, unsaved edits included,
+// because the Minimum, Retakes, Duration, verdict and Ideal columns only exist
+// here: they are worked out above as the boxes change.
+(function () {
+  'use strict';
+
+  var button = document.querySelector('.planning-export');
+  var table = document.getElementById('planning-table');
+  if (!button || !table) return;
+
+  function clean(text) {
+    return String(text || '').replace(/\s*\n\s*/g, ' · ').replace(/[ \t]+/g, ' ').trim();
+  }
+
+  // A cell's words, with any box in it read for its value: innerText leaves
+  // boxes out. "15.2" and its "%" beside it read as one figure.
+  function cellText(td) {
+    var values = [];
+    td.querySelectorAll('input, select, textarea').forEach(function (el) {
+      if (el.value !== '') values.push(el.value);
+    });
+    var text = clean(td.innerText);
+    if (!values.length) return text;
+    if (text === '%') return values.join(' ') + ' %';
+    return values.join(' ') + (text ? ' · ' + text : '');
+  }
+
+  function csv(v) {
+    v = String(v);
+    return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+
+  button.addEventListener('click', function () {
+    var rows = [];
+    var retake = document.getElementById('retake-pct');
+    if (retake) rows.push(['Retake allowance', retake.value + ' %']);
+    rows.push([]);
+
+    // The step name and its scope, and the start and the deadline, are each
+    // two things in one cell on screen; in a sheet they are columns.
+    var head = [];
+    table.querySelectorAll('thead th').forEach(function (th, i) {
+      var t = clean(th.innerText);
+      if (i === 0) { head.push('Step', 'Scope'); return; }
+      if (th.textContent.indexOf('Dates') !== -1 && i < 5) { head.push('Start', 'Deadline'); return; }
+      head.push(t);
+    });
+    rows.push(head);
+
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+      var out = [];
+      tr.querySelectorAll('td').forEach(function (td, i) {
+        if (i === 0) {
+          var scope = td.querySelector('.step-scope');
+          var name = td.cloneNode(true);
+          var s = name.querySelector('.step-scope');
+          if (s) s.remove();
+          out.push(clean(name.textContent), scope ? clean(scope.textContent) : '');
+          return;
+        }
+        if (td.classList.contains('date-pair')) {
+          var d = td.querySelectorAll('input');
+          out.push(d[0] ? d[0].value : '', d[1] ? d[1].value : '');
+          return;
+        }
+        out.push(cellText(td));
+      });
+      rows.push(out);
+    });
+
+    // A byte-order mark so Excel reads the dashes and dots as UTF-8.
+    var body = '\ufeff' + rows.map(function (r) { return r.map(csv).join(','); }).join('\r\n');
+    var url = URL.createObjectURL(new Blob([body], { type: 'text/csv;charset=utf-8' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = button.getAttribute('data-filename') || 'planning.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+})();

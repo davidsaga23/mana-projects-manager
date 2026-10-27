@@ -408,6 +408,12 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           22 assets after a revision, they just take longer. Every figure below includes it, and
           the <strong>Retakes</strong> column shows what it comes to in days.
         </span>
+        <?php // Export (David, 2026-10-26). Built in the browser by wizard.js from
+              // the table as it stands, because most of its figures are worked out
+              // there as you type: a server-side export would miss them, or
+              // disagree with the screen the moment a box was changed. ?>
+        <button type="button" class="secondary planning-export"
+                data-filename="<?= e(($project['code'] ?: 'project') . '_planning_' . date('Y-m-d') . '.csv') ?>">Export ↓</button>
       </p>
 
       <table class="planning-table" id="planning-table" data-today="<?= e(date('Y-m-d')) ?>"

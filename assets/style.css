@@ -442,6 +442,7 @@ label.inline input { width: auto; }
 }
 .retake-bar input { width: 6em; }
 .retake-bar label { display: inline; margin: 0; }
+.retake-bar .planning-export { margin: 0 0 0 auto; }
 
 .planning-table th.col-sep,
 .planning-table td.col-sep { border-left: 2px solid var(--border-strong); }
