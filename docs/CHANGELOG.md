@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-26 — Export button on the planning table *(no migration)*
+
+- **Export ↓ on the Dates & headcount planning table** (right of the Retake allowance bar) downloads
+  the table as a CSV that opens in Excel: the retake allowance on top, then one row per step with
+  every column, step and scope, start and deadline split into their own columns. It is read off the
+  screen as it stands, so unsaved edits and the live Minimum / Retakes / Duration / verdict / Ideal
+  figures are all in it.
+
 ## 2026-10-26 — Artist statements: totals row and pinned header *(no migration)*
 
 - **A Total row under the Artist statements list**: days planned, hours and days logged, approved
