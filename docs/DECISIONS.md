@@ -4404,3 +4404,19 @@ Plaky import) and is read by the breakdown, its export, Spell and the kick-off s
 shows frames ÷ fps, computed, never stored. Existing values were left as they are: whatever the
 breakdown wrote before today stays in the setup seconds until setup changes it.
 
+## 2026-10-27 — Reviews run on two named statuses, and approving is the status move
+
+**Asked by David:** the final internal review in Spell, as a top-bar button "similar to the task
+button with a number of pending reviews". Who reviews what: *"Admins and production only versions
+with their tasks as 'Ready for review', this will change to 'Complete'. Supervisors will review
+'Pending review' and will change to 'Ready for review'."* Approve means the task becomes approved,
+not a second sign-off.
+
+**Decided:** `REVIEW_STAGES` in `includes/review_badge.php` names the two stages. Statuses are matched
+by name (case and spacing ignored), as `SELF_SERVE_STATUS_NAMES` already is, because they are each
+show's own rows. Approving writes `status_id` with `status_flags()`, notifies subscribers and logs
+to `progress_log` with source `review`, the same as a board status change. A note is a review
+comment on the current version (migration 065). Supervisors may post `approve|back` to `review.php`
+only (`SUPERVISOR_ACTIONS`); `review_apply()` checks the task is in their stage's status on a show
+they see. Whether "Complete" counts as approved for the charts is whatever the Statuses screen says.
+
