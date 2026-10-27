@@ -9,6 +9,22 @@
 <p class="lead">Reads a Plaky board export and updates this project's shots, assets and
    progress. Nothing is written until you've seen exactly what will change.</p>
 
+<?php
+// The last import that was applied (recorded since 2026-10-27; a cancelled one
+// writes nothing, so it is not counted).
+$lastImport = json_decode((string)project_setting($pdo, $projectId, 'last_import', ''), true);
+?>
+<p class="last-import">
+  <?php if (!empty($lastImport['at'])): $li = strtotime($lastImport['at']); ?>
+    <strong>Last import:</strong> <?= e(date('j M Y', $li)) ?> at <?= e(date('H:i', $li)) ?>
+    <span class="muted"><?= !empty($lastImport['by']) ? ' · by ' . e($lastImport['by']) : '' ?>
+      <?= !empty($lastImport['file']) ? ' · ' . e($lastImport['file']) : '' ?>
+      <?= !empty($lastImport['rows']) ? ' · ' . (int)$lastImport['rows'] . ' rows' : '' ?></span>
+  <?php else: ?>
+    <strong>Last import:</strong> <span class="muted">none recorded yet. Imports are recorded from 27 Oct 2026 on.</span>
+  <?php endif; ?>
+</p>
+
 <form method="post" enctype="multipart/form-data" class="stack">
   <input type="hidden" name="action" value="upload">
 

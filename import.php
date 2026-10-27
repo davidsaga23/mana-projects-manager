@@ -240,6 +240,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($state['mapping'])) throw new RuntimeException('Nothing has been mapped yet.');
             $parsed = plaky_read_csv($state['file']);
             $report = plaky_run($pdo, $projectId, $parsed['rows'], $state['mapping'], false);
+            // The last import, shown on the upload screen (David, 2026-10-27:
+            // "let's include here the latest date and time of the last import").
+            // A project setting rather than a table: only the latest is asked for.
+            set_project_setting($pdo, $projectId, 'last_import', json_encode([
+                'at'   => date('Y-m-d H:i:s'),
+                'by'   => current_user_display(),
+                'file' => (string)($state['name'] ?? ''),
+                'rows' => (int)($state['rows'] ?? 0),
+            ]));
             $_SESSION['import_report'][$projectId] = $report;
             import_clear($projectId);
             header('Location: ' . $selfUrl . '&step=done');
