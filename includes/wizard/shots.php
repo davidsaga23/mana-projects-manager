@@ -291,7 +291,10 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
         </label>
         <small>A placeholder until real timings exist, steps measured in seconds need it
                to work out a quota. Overwrites every shot's current value.</small>
-        <button type="submit" class="secondary">Spread evenly</button>
+        <?php // Asks first (2026-10-27): it rewrites every shot's seconds, which
+              // is what the expense projection prices, and there is no undo. ?>
+        <button type="submit" class="secondary"
+                onclick="return confirm('This replaces the seconds on all <?= count($shots) ?> shots with the same even share, and the expense projection follows. Each shot\'s current value is lost. Go ahead?');">Spread evenly</button>
       </form>
       <?php endif; ?>
     </div>

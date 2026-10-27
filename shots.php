@@ -160,10 +160,10 @@ $missingNote = $noFrames > 0
     <tr>
       <?php if (count($episodes) > 1): ?><th class="bd-ep">Ep</th><?php endif; ?>
       <th class="bd-shot">Shot</th>
-      <?php // FRAMES, not seconds. Frames are what an editor knows; the seconds
-            // underneath are derived from them and the project's fps, and they
-            // are what the expense projection prices. See breakdown_set_frames(). ?>
-      <th class="bd-frames num" title="Type the frame count; the footage under it is worked out from the project's <?= (int)$project['fps'] ?> fps and is what the expense projection prices">Frames</th>
+      <?php // FRAMES, not seconds. The seconds underneath are worked out from
+            // them and the project's fps, for this screen only: the expense
+            // projection prices the seconds on shot setup. See breakdown_set_frames(). ?>
+      <th class="bd-frames num" title="Type the frame count; the footage under it is worked out from the project's <?= (int)$project['fps'] ?> fps. It belongs to the breakdown only: the expense projection uses the seconds on shot setup.">Frames</th>
       <?php foreach ($types as $t): ?>
         <th><?= e($t !== '' ? $t : 'No type set') ?></th>
       <?php endforeach; ?>
@@ -182,7 +182,7 @@ $missingNote = $noFrames > 0
             <?php // placeholder="?" is what the empty-box highlight in style.css
                   // keys on (:placeholder-shown), so it follows typing live. ?>
             <input class="bd-frame-input" inputmode="numeric" size="5" placeholder="?"
-                   title="<?= $r['frames'] === null ? 'No frame count yet. The seconds under it are the placeholder from setup, and that is what the projection is still using.' : '' ?>"
+                   title="<?= $r['frames'] === null ? 'No frame count yet' : '' ?>"
                    value="<?= $r['frames'] !== null ? (int)$r['frames'] : '' ?>"
                    aria-label="Frames in <?= e($r['shot_code']) ?>">
           <?php else: ?>

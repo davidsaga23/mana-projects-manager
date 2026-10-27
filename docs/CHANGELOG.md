@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-27 — Breakdown frames no longer change the setup seconds *(no migration)*
+
+- **Frame counts on the shot breakdown belong to the breakdown only.** Typing one used to rewrite
+  that shot's seconds on shot setup as well, which moved the expense projection, the per-second
+  quotas and the artist statements. Now only shot setup sets the seconds the money reads; the
+  breakdown's seconds are its own frames ÷ fps, worked out for display and its export.
+- **"Spread evenly" asks before it overwrites** every shot's seconds.
+- Shots with no frame count are yellow on the breakdown.
+
 ## 2026-10-26 — Export button on the planning table *(no migration)*
 
 - **Export ↓ on the Dates & headcount planning table** (right of the Retake allowance bar) downloads
