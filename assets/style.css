@@ -567,6 +567,19 @@ p.crumb a { white-space: normal; }
 .planning-table input { padding: 5px 7px; font-size: 14px; }
 .step-table input[type=color] { padding: 1px; height: 30px; width: 44px; }
 .step-table td, .workflow-table td, .planning-table td { vertical-align: middle; }
+/* The pipeline steps: every field sits on the line of the step's name box
+   (David, 2026-10-27: "let's better align these"). Centred, they lined up with
+   the middle of the name box AND the scope chip under it, so each sat half a
+   chip lower than the name. Top-aligned on one 30px line instead, with the chip
+   alone below it; the cells that hold text rather than a box get the same
+   30px line so their words centre on it too. */
+.step-table tbody td { vertical-align: top; }
+.step-table tbody input:not([type=checkbox]), .step-table tbody select { height: 30px; }
+.step-table tbody .drag-handle { line-height: 30px; }
+.step-table tbody label.inline { height: 30px; }
+.step-table tbody .row-actions { line-height: 30px; }
+.step-table tbody .row-actions button { vertical-align: middle; }
+.step-table tbody .cat-chip { margin: 4px 0 0; }
 
 /* =========================================================================
    Dates & headcount — fitting fourteen columns in a window.
