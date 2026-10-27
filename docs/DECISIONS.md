@@ -4390,3 +4390,17 @@ other. Hiring a candidate goes through the same `hire_candidate()`, which puts t
 via `supervision_assign()` (now safe inside the hire's transaction).
 **Not changed:** an artist statement's "due" for a day rate is still days LOGGED, so a supervisor who
 logs no time shows nothing due; flat-fee supervisors read correctly.
+
+## 2026-10-27 — Setup seconds drive the money; breakdown frames are the breakdown's
+
+**Asked by David:** *"Setup frame count should be used for expense projections, frame counts in the
+breakdown should only apply to the breakdown."* He had the setup total at 63.7 s against 53 s on the
+breakdown and could not tell which shots had moved, because `breakdown_set_frames()` wrote
+`placeholder_seconds` (frames ÷ fps) on every frame edit and nothing recorded the old value.
+
+**Decided:** `shots.placeholder_seconds` is set on shot setup only and is what the projection,
+quotas, dashboard, scheduler and statements read. `shots.frames` is set on the breakdown (and by the
+Plaky import) and is read by the breakdown, its export, Spell and the kick-off sheet. The breakdown
+shows frames ÷ fps, computed, never stored. Existing values were left as they are: whatever the
+breakdown wrote before today stays in the setup seconds until setup changes it.
+

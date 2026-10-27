@@ -71,9 +71,9 @@ try {
 
     if ($action === 'frames') {
         $r = breakdown_set_frames($pdo, $project, $shotId, (string)($_POST['frames'] ?? ''));
-        // The derived seconds go back so the row can show what the money will
-        // now use, without a reload and without the browser doing the division
-        // a second time and rounding it differently.
+        // The footage goes back so the row can show it without a reload and
+        // without the browser doing the division a second time. It is the
+        // breakdown's own figure: the setup seconds are not touched.
         echo json_encode([
             'ok'      => true,
             'frames'  => $r['frames'],

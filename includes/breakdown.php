@@ -196,6 +196,14 @@ function breakdown_rows(PDO $pdo, int $projectId, string $episode = ''): array {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($args);
 
+    // 'seconds' is the breakdown's footage, frames ÷ fps, and never the setup
+    // seconds (placeholder_seconds) that the money reads: see
+    // breakdown_set_frames() for why the two are kept apart.
+    $fq = $pdo->prepare('SELECT fps FROM projects WHERE id = ?');
+    $fq->execute([$projectId]);
+    $fps = (int)$fq->fetchColumn();
+    if ($fps <= 0) $fps = 24;
+
     $rows = [];
     foreach ($stmt as $r) {
         $rows[(int)$r['id']] = [
@@ -203,7 +211,7 @@ function breakdown_rows(PDO $pdo, int $projectId, string $episode = ''): array {
             'episode'   => (string)$r['episode'],
             'shot_code' => (string)$r['shot_code'],
             'frames'    => $r['frames'] !== null ? (int)$r['frames'] : null,
-            'seconds'   => $r['placeholder_seconds'] !== null ? (float)$r['placeholder_seconds'] : null,
+            'seconds'   => $r['frames'] !== null ? round((int)$r['frames'] / $fps, 3) : null,
             'notes'     => (string)($r['notes'] ?? ''),
             'assets'    => [],
             // Asset types this shot has been marked as needing NONE of. Kept
@@ -371,22 +379,22 @@ function breakdown_set_na(PDO $pdo, int $projectId, int $shotId, string $type, b
 }
 
 /**
- * Set a shot's frame count, and DERIVE ITS FOOTAGE FROM IT.
+ * Set a shot's frame count. THE BREAKDOWN'S OWN NUMBER, AND NOTHING ELSE'S.
  *
- * ⚠ THIS WRITES placeholder_seconds TOO, AND THAT MOVES MONEY. Despite the
- * name, placeholder_seconds is not a placeholder: step_quota() sums it as the
- * project's real footage, and every per-second rate on the expense projection is
- * multiplied by it. Frames are the thing an editor actually knows, so frames are
- * what gets typed and seconds are what gets computed — one number entered once,
- * rather than the same duration typed twice in two units and free to disagree.
+ * Until 2026-10-27 this also wrote placeholder_seconds (frames ÷ fps), so typing
+ * a frame count here rewrote the seconds on shot setup, and with them the
+ * expense projection, every per-second quota and the artist statements. David,
+ * the same day: "Setup frame count should be used for expense projections,
+ * frame counts in the breakdown should only apply to the breakdown." He had
+ * found the setup total moving under him from a screen he thought was only a
+ * breakdown, with no way to tell which shots had moved.
  *
- * At 24 fps a 96-frame shot is 4.000 seconds. DECIMAL(6,3) holds that exactly;
- * 100 frames at 24 fps is 4.167, rounded at 3dp, which is a thousandth of a
- * second on a shot and cannot accumulate into anything visible.
- *
- * CLEARING THE FRAMES LEAVES THE SECONDS ALONE. The wizard can set a blanket
- * placeholder for every shot before anyone has cut anything, and wiping that on
- * an accidental empty field would silently shrink the budget.
+ * So the two are separate now:
+ *   shots.placeholder_seconds  set on shot setup, read by the money and quotas
+ *   shots.frames               set here, read by the breakdown, its export,
+ *                              Spell and the kick-off sheet
+ * The seconds this returns are frames ÷ fps for the breakdown to show, worked
+ * out, never stored.
  *
  * @return array ['frames' => ?int, 'seconds' => ?float]
  */
@@ -399,10 +407,7 @@ function breakdown_set_frames(PDO $pdo, array $project, int $shotId, string $raw
     $raw = trim($raw);
     if ($raw === '') {
         $pdo->prepare('UPDATE shots SET frames = NULL WHERE id = ?')->execute([$shotId]);
-        $stmt = $pdo->prepare('SELECT placeholder_seconds FROM shots WHERE id = ?');
-        $stmt->execute([$shotId]);
-        $secs = $stmt->fetchColumn();
-        return ['frames' => null, 'seconds' => $secs !== null ? (float)$secs : null];
+        return ['frames' => null, 'seconds' => null];
     }
 
     if (!preg_match('/^[0-9]+$/', $raw)) {
@@ -415,8 +420,7 @@ function breakdown_set_frames(PDO $pdo, array $project, int $shotId, string $raw
     if ($fps <= 0) $fps = 24;
     $seconds = round($frames / $fps, 3);
 
-    $pdo->prepare('UPDATE shots SET frames = ?, placeholder_seconds = ? WHERE id = ?')
-        ->execute([$frames, $seconds, $shotId]);
+    $pdo->prepare('UPDATE shots SET frames = ? WHERE id = ?')->execute([$frames, $shotId]);
     return ['frames' => $frames, 'seconds' => $seconds];
 }
 
