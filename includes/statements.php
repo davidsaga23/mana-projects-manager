@@ -27,6 +27,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/finance.php';      // expense_projection()
+require_once __DIR__ . '/fx.php';           // the project's fixed exchange rates
 require_once __DIR__ . '/money.php';        // own_crew_term(), own_invoices()
 require_once __DIR__ . '/timelog.php';      // hours_per_day(), logged_total_for_crew()
 require_once __DIR__ . '/hiring.php';       // engagement()
@@ -144,7 +145,7 @@ function statement_approved_seconds(PDO $pdo, int $projectId, int $crewId): floa
  * own_*() doors. Either may be empty: the figures still stand without a rate.
  */
 function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, array $invoices,
-                          ?array $projection = null): array {
+                          ?array $projection = null, array $fx = []): array {
     $hpd = hours_per_day($pdo, $projectId);
     $win = statement_window($pdo, $projectId, $crewId);
 
@@ -172,7 +173,7 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     // What is due, in the unit the rate is a price of.
     $rate = ($terms && $terms['day_rate'] !== null) ? (float)$terms['day_rate'] : null;
     $unit = (string)($terms['rate_unit'] ?? 'day');
-    $cur  = (string)($terms['rate_currency'] ?? 'USD');
+    $cur  = fx_code($terms['rate_currency'] ?? 'USD') ?? 'USD';
     $basis = null; $basisLabel = '';
     switch ($unit) {
         case 'hour':   $basis = $hours;        $basisLabel = 'logged hours'; break;
@@ -182,13 +183,30 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     }
     $due = $rate !== null ? round($rate * $basis, 2) : null;
 
+    // ⚠ A CONTRACT IN ANOTHER CURRENCY, WITH A RATE FIXED FOR THE PROJECT
+    // ($fx, from project_fx_rates() or own_project_fx_rates()), is stated in
+    // DOLLARS, with its own currency beside it (Tim and Jorik, 2026-10-28:
+    // "$520/day (£400)"). `currency` is then USD and is the money every figure
+    // below is in; `rate_currency` and `due_own` keep the contract's own.
+    // Without a fixed rate it stays in its own currency, as before.
+    $fxRow = ($cur !== 'USD' && isset($fx[$cur])) ? $fx[$cur] : null;
+    $money = $fxRow ? 'USD' : $cur;
+    $dueOwn = null;
+    if ($fxRow && $due !== null) { $dueOwn = $due; $due = fx_to_usd($due, $cur, $fx); }
+
     $invoiced = 0.0; $otherCurrency = false;
     foreach ($invoices as $inv) {
         // An EXPECTED invoice has not arrived (finance_install_09): it is not
         // something the artist has invoiced yet, so it is not subtracted.
         if (($inv['status'] ?? '') === 'expected') continue;
-        if (strtoupper((string)($inv['currency'] ?? $cur)) !== strtoupper($cur)) { $otherCurrency = true; continue; }
-        $invoiced += (float)$inv['amount'];
+        // In the statement's money, converting at the fixed rate when there is
+        // one; an invoice in a currency with no fixed rate is left out and
+        // reported, as it always was.
+        $ic = fx_code($inv['currency'] ?? $cur) ?? $cur;
+        $amt = $ic === $money ? (float)$inv['amount']
+             : ($money === 'USD' ? fx_to_usd((float)$inv['amount'], $ic, $fx) : null);
+        if ($amt === null) { $otherCurrency = true; continue; }
+        $invoiced += $amt;
     }
 
     return [
@@ -203,7 +221,11 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         'approved_seconds'=> $approvedSecs,
         'rate'            => $rate,
         'unit'            => $unit,
-        'currency'        => $cur,
+        'currency'        => $money,
+        'rate_currency'   => $cur,
+        'rate_usd'        => ($fxRow && $rate !== null) ? $rate * (float)$fxRow['usd_per_unit'] : null,
+        'due_own'         => $dueOwn,
+        'fx'              => $fxRow,
         'basis'           => $basis,
         'basis_label'     => $basisLabel,
         'due'             => $due,

@@ -26,6 +26,7 @@ require_once __DIR__ . '/quota.php';
 require_once __DIR__ . '/crew.php';
 require_once __DIR__ . '/timelog.php';   // hours_per_day(), for converting an hourly rate
 require_once __DIR__ . '/standards.php'; // the IDEAL quota, which the budget is built on
+require_once __DIR__ . '/fx.php';        // the project's fixed exchange rates
 
 /** The agreed budget for one project, or null. Empty for a non-admin. */
 function project_budget(int $projectId): ?array {
@@ -255,6 +256,31 @@ function expense_projection(PDO $pdo, int $projectId): array {
 
     $rows = []; $total = 0.0; $actualTotal = 0.0;
     $unpricedDays = 0.0; $currency = null; $mixed = false;
+
+    // ---- a contract in another currency ------------------------------------
+    // Tim and Jorik, 2026-10-28: a rare contract in another currency (Lewis in
+    // £) is costed in DOLLARS at the one exchange rate fixed for this project,
+    // and the row keeps what it is in its own currency so the screen can show
+    // both. Converted HERE, once, after the cost is rounded to cents in its own
+    // currency, so every total below is in one currency by construction.
+    //
+    // ⚠ THE ROW'S `rate` AND `currency` STAY THE CONTRACT'S. The rate box on
+    // the projection writes straight back into crew_terms; showing it a dollar
+    // figure would save dollars over a sterling rate. Only `cost` (and the
+    // totals) move to dollars, and `cost_currency` says which they are in.
+    //
+    // A currency with no fixed rate is left as it is and still counts as mixed,
+    // with the old warning (see includes/fx.php).
+    $fx = project_fx_rates($projectId);
+    $currenciesSeen = [];
+    $inDollars = function (?float $cost, $cur) use ($fx, &$currenciesSeen): array {
+        $cur = fx_code($cur) ?? 'USD';
+        if ($cost === null) return [null, null, null, null];
+        $currenciesSeen[$cur] = true;
+        $usd = $cur === 'USD' ? null : fx_to_usd($cost, $cur, $fx);
+        if ($usd === null) return [$cost, $cur, null, null];
+        return [$usd, 'USD', $cost, $fx[$cur]];
+    };
     // How much of the plan is costed against a studio standard rather than one
     // project's estimate. Counted so the screen can report it in one line
     // instead of making somebody read every row.
@@ -323,7 +349,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
             $unit = $t['rate_unit'] ?? 'day';
             $cur  = $t['rate_currency'] ?? 'USD';
 
-            $cost = null;
+            $cost = null; $costCur = null; $costOwn = null; $rowFx = null;
             $rateMismatch = false;
             if ($rate !== null) {
                 // Hourly converts at the project's own hours per day. A flat fee
@@ -368,11 +394,12 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 // total hiding behind the rounding, because nobody can be paid
                 // 563.5575.
                 if ($cost !== null) $cost = round($cost, 2);
+                [$cost, $costCur, $costOwn, $rowFx] = $inDollars($cost, $cur);
 
                 if ($cost !== null) {
                     $total += $cost;
-                    if ($currency === null) $currency = $cur;
-                    elseif ($currency !== $cur) $mixed = true;
+                    if ($currency === null) $currency = $costCur;
+                    elseif ($currency !== $costCur) $mixed = true;
                 } else {
                     // Priced at a unit this step cannot be measured in — counted
                     // with the unpriced days rather than as free.
@@ -401,6 +428,13 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'rate'        => $rate,
                 'rate_unit'   => $rate !== null ? $unit : null,
                 'currency'    => $rate !== null ? $cur : null,
+                // The cost's own currency: USD when a fixed rate converted it.
+                // cost_own is the same cost in the contract's currency, and fx
+                // the project rate used (null when nothing was converted).
+                'cost_currency' => $costCur,
+                'cost_own'    => $costOwn,
+                'fx'          => $rowFx,
+                'rate_usd'    => ($rowFx && $rate !== null) ? $rate * (float)$rowFx['usd_per_unit'] : null,
                 'days'        => $daysPerLane,      // whole days, rounded up (2026-10-21)
                 'days_exact'  => $daysExact,
                 'months'      => $daysPerLane / DAYS_PER_MONTH,
@@ -459,11 +493,12 @@ function expense_projection(PDO $pdo, int $projectId): array {
             elseif ($unit === 'second') $rateMismatch = true;
             else                        $cost = $rate * $days;
         }
+        $costCur = null; $costOwn = null; $rowFx = null;
         if ($cost !== null) {
-            $cost = round($cost, 2);
+            [$cost, $costCur, $costOwn, $rowFx] = $inDollars(round($cost, 2), $cur);
             $total += $cost;
-            if ($currency === null) $currency = $cur;
-            elseif ($currency !== $cur) $mixed = true;
+            if ($currency === null) $currency = $costCur;
+            elseif ($currency !== $costCur) $mixed = true;
         } else {
             $unpricedDays += $days;
         }
@@ -485,6 +520,10 @@ function expense_projection(PDO $pdo, int $projectId): array {
             'rate'           => $rate,
             'rate_unit'      => $rate !== null ? $unit : null,
             'currency'       => $rate !== null ? $cur : null,
+            'cost_currency'  => $costCur,
+            'cost_own'       => $costOwn,
+            'fx'             => $rowFx,
+            'rate_usd'       => ($rowFx && $rate !== null) ? $rate * (float)$rowFx['usd_per_unit'] : null,
             'days'           => $days,
             'days_exact'     => $days,
             'months'         => $days / DAYS_PER_MONTH,
@@ -542,8 +581,14 @@ function expense_projection(PDO $pdo, int $projectId): array {
     $other = project_expenses($projectId);
     $otherTotal = 0.0; $otherPaid = 0.0;
     $byCategory = [];
-    foreach ($other as $e) {
-        $amt = (float)$e['amount'];
+    foreach ($other as $i => $e) {
+        // In dollars at the project's fixed rate when it has one; the row keeps
+        // `amount` and `currency` as entered (the edit form reads them) and
+        // gains amount_usd for the totals and the screen (2026-10-28).
+        [$amt, $eCur, $eOwn] = $inDollars((float)$e['amount'], $e['currency']);
+        $e['amount_usd'] = $eCur === 'USD' ? $amt : null;
+        $e['amount_own'] = $eOwn;
+        $other[$i] = $e;
         $otherTotal += $amt;
         if (!empty($e['paid_date'])) $otherPaid += $amt;
 
@@ -553,8 +598,8 @@ function expense_projection(PDO $pdo, int $projectId): array {
         $byCategory[$c]['amount'] += $amt;
         if (!empty($e['paid_date'])) $byCategory[$c]['paid'] += $amt;
 
-        if ($currency === null) $currency = $e['currency'];
-        elseif ($currency !== $e['currency']) $mixed = true;
+        if ($currency === null) $currency = $eCur;
+        elseif ($currency !== $eCur) $mixed = true;
     }
     ksort($byCategory, SORT_NATURAL | SORT_FLAG_CASE);
 
@@ -576,6 +621,11 @@ function expense_projection(PDO $pdo, int $projectId): array {
         'grand_total'    => $total + $otherTotal,
         'currency'       => $currency ?: 'USD',
         'mixed_currency' => $mixed,
+        // Every currency the costs came in, and the fixed rates that turned
+        // them into dollars. fx_project_currencies() reads the first to know
+        // which rates a project still lacks.
+        'currencies_seen' => $currenciesSeen,
+        'fx'             => $fx,
         'unpriced_days'  => $unpricedDays,
         'hours_per_day'  => $hoursPerDay,
         // The mix of sources behind the cost above.
@@ -891,15 +941,23 @@ function invoiced_by_position(int $projectId): array {
     // no position on an invoice, so nothing can attach — reported by
     // invoices_need_upgrade() rather than crashing the page.
     if (!finance_column_exists('invoices', 'step_id')) return [];
+    // Per currency, then into dollars at the project's fixed rate (2026-10-28),
+    // because the projection row it lands on is costed in dollars. A currency
+    // with no fixed rate is added as it is, which is what this always did; the
+    // projection's mixed-currency warning covers that case.
     $q = $db->prepare(
-        'SELECT crew_id, step_id, SUM(amount) AS billed
+        'SELECT crew_id, step_id, currency, SUM(amount) AS billed
            FROM invoices
           WHERE project_id = ? AND crew_id IS NOT NULL AND step_id IS NOT NULL
-          GROUP BY crew_id, step_id'
+          GROUP BY crew_id, step_id, currency'
     );
     $q->execute([$projectId]);
+    $fx = project_fx_rates($projectId);
     $out = [];
-    foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = (float)$r['billed'];
+    foreach ($q as $r) {
+        $k = (int)$r['crew_id'] . '|' . (int)$r['step_id'];
+        $out[$k] = round(($out[$k] ?? 0.0) + fx_usd_or_own((float)$r['billed'], $r['currency'], $fx)[0], 2);
+    }
     return $out;
 }
 
@@ -947,15 +1005,23 @@ function invoice_totals(array $projectIds): array {
     $db = finance_db();
     if (!$db) return [];
     $ids = implode(',', array_map('intval', $projectIds));
+    // Per currency, then into dollars at each project's fixed rate (2026-10-28).
+    // A currency with no fixed rate is added as it is, as before.
     $out = [];
     foreach ($db->query(
-        "SELECT project_id,
+        "SELECT project_id, currency,
                 COUNT(*) AS n,
                 COALESCE(SUM(amount), 0) AS billed,
                 COALESCE(SUM(CASE WHEN paid_date IS NOT NULL THEN amount ELSE 0 END), 0) AS paid
-           FROM invoices WHERE project_id IN ({$ids}) GROUP BY project_id"
+           FROM invoices WHERE project_id IN ({$ids}) GROUP BY project_id, currency"
     ) as $r) {
-        $out[(int)$r['project_id']] = $r;
+        $pid = (int)$r['project_id'];
+        $fx  = project_fx_rates($pid);
+        $o   = $out[$pid] ?? ['project_id' => $pid, 'n' => 0, 'billed' => 0.0, 'paid' => 0.0];
+        $o['n']      += (int)$r['n'];
+        $o['billed'] = round($o['billed'] + fx_usd_or_own((float)$r['billed'], $r['currency'], $fx)[0], 2);
+        $o['paid']   = round($o['paid'] + fx_usd_or_own((float)$r['paid'], $r['currency'], $fx)[0], 2);
+        $out[$pid] = $o;
     }
     return $out;
 }

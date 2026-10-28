@@ -52,7 +52,8 @@ $s = null;
 if ($project) {
     $terms = own_crew_term($crewId);
     $invoices = own_invoices($crewId, $projectId);
-    $s = artist_statement($pdo, $projectId, $crewId, $terms, $invoices);
+    $sFx = own_project_fx_rates($crewId, $projectId);
+    $s = artist_statement($pdo, $projectId, $crewId, $terms, $invoices, null, $sFx);
 }
 
 $money = fn(?float $v) => $v === null ? '—' : fmt_money_plain($v, $s['currency'] ?? 'USD');
@@ -127,7 +128,13 @@ if ($admin && $project) {
     <table class="review-table statement-due">
       <tbody>
         <tr><th>Rate</th>
-          <td><?= e(fmt_money($s['rate'], $s['unit'], $s['currency'])) ?></td></tr>
+          <td><?= e(fmt_money($s['rate'], $s['unit'], $s['rate_currency'])) ?>
+            <?php // A contract in another currency, converted at the one rate
+                  // fixed for the show (2026-10-28): both, and where it came from. ?>
+            <?php if ($s['fx'] && $s['rate_usd'] !== null): ?>
+              <div class="muted small">= <?= e(number_format($s['rate_usd'], 2)) ?> USD, at the show's fixed
+                rate (<?= e(fx_describe($s['fx'])) ?>). The amounts below are in US dollars.</div>
+            <?php endif; ?></td></tr>
         <tr><th>Counted on</th>
           <td>
             <?php if ($s['unit'] === 'flat'): ?>
@@ -140,7 +147,8 @@ if ($admin && $project) {
               <?= e(fmt_num($s['days'], 2)) ?> days logged
             <?php endif; ?>
           </td></tr>
-        <tr><th>Due so far</th><td><strong><?= e($money($s['due'])) ?></strong></td></tr>
+        <tr><th>Due so far</th><td><strong><?= e($s['due_own'] !== null
+              ? fmt_money_both($s['due'], $s['due_own'], $s['rate_currency']) : $money($s['due'])) ?></strong></td></tr>
         <tr><th>Invoiced</th><td><?= e($money($s['invoiced'])) ?></td></tr>
         <tr class="statement-left"><th>Left to invoice</th>
           <td><strong class="<?= ($s['left'] ?? 0) < 0 ? 'warn-text' : '' ?>"><?= e($money($s['left'])) ?></strong></td></tr>
@@ -156,7 +164,8 @@ if ($admin && $project) {
       these dates and are not counted above.</p>
   <?php endif; ?>
   <?php if ($s['invoiced_other_currency']): ?>
-    <p class="warn-text small">Some invoices are in another currency and are not in the Invoiced total.</p>
+    <p class="warn-text small">Some invoices are in a currency with no exchange rate fixed for this show,
+      and are not in the Invoiced total.</p>
   <?php endif; ?>
 
   <?php if ($s['positions']): ?>
@@ -182,7 +191,11 @@ if ($admin && $project) {
           <tr>
             <td><?= e((string)($inv['invoice_ref'] ?? '') ?: '—') ?></td>
             <td class="muted small"><?= e($dateFmt($inv['period_start'] ?? null)) ?> – <?= e($dateFmt($inv['period_end'] ?? null)) ?></td>
-            <td class="num"><?= e(fmt_money_plain((float)$inv['amount'], (string)($inv['currency'] ?? 'USD'))) ?></td>
+            <?php $invUsd = ($inv['currency'] ?? 'USD') !== 'USD' && $s['currency'] === 'USD'
+                      ? fx_to_usd((float)$inv['amount'], $inv['currency'], $sFx) : null; ?>
+            <td class="num"><?= e($invUsd !== null
+                  ? fmt_money_both($invUsd, (float)$inv['amount'], (string)$inv['currency'])
+                  : fmt_money_plain((float)$inv['amount'], (string)($inv['currency'] ?? 'USD'))) ?></td>
             <td><?= e(ucfirst((string)($inv['status'] ?? ''))) ?></td>
             <td class="muted small"><?= e($dateFmt($inv['paid_date'] ?? null)) ?></td>
           </tr>

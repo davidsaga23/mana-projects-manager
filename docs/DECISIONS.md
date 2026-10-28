@@ -4541,6 +4541,30 @@ for old users that need to log in again to anima for a new project."*
   person is on the team page but not staffed, the form offers a ticked box to add them. David,
   2026-10-28: keep the ticked box rather than adding them silently, so production can untick it.
 
+## 2026-10-28 — How the project-fixed exchange rate works
+
+**Built** from Tim and Jorik's answer above ("a rare contract in another currency ... Anima saves
+that day's exchange rate automatically when the project is set up / signed off").
+
+**Decided (in the build; David to confirm the timing):**
+- **One row per project per foreign currency** in the finance database (`project_fx_rates`,
+  finance_install_11): dollars per unit, the date the rate is for, its source, who saved it.
+  Every change goes to `project_fx_rates_log` with the old rate and a required reason.
+- **When it is fixed: at set-up.** The first time a project's Finance page meets a currency with
+  no rate, it fetches the ECB reference rate (frankfurter, free, no key) and saves it; kick-off
+  sign-off fetches any still missing, before the money snapshot. *Asked David whether he would
+  rather fix it at sign-off only; switching is a one-block change in `finance_project.php`.*
+- **Never blocks anything.** A failed fetch is said on screen, the rate can be typed by hand,
+  and the same project and currency are not retried for ten minutes. Nothing in
+  `includes/header.php` fetches.
+- **What converts:** rates (through the projection's costs), other expenses and invoices.
+  Amounts round to cents in their own currency first, then convert and round again. The rate box
+  on the projection stays in the contract's own currency, because it writes back to `crew_terms`.
+- **The budget is not converted:** it is approved in dollars. The budget pool tab still prices in
+  the first rate's currency, as before.
+- **A currency without a fixed rate** behaves exactly as since 2026-08-18: flagged, never added
+  up with dollars.
+
 ## 2026-10-28 — Home is a person's own page, and artists land on it
 
 **Asked by David:** one screen an artist opens to see their work, contract and invoice information

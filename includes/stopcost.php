@@ -39,6 +39,7 @@
 
 require_once __DIR__ . '/money.php';
 require_once __DIR__ . '/finance.php';   // fmt_money_plain()
+require_once __DIR__ . '/fx.php';        // the project's fixed exchange rates
 require_once __DIR__ . '/timelog.php';   // hours_per_day()
 require_once __DIR__ . '/calendar.php';
 
@@ -78,9 +79,15 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
     // Per currency from the start. An invoice carries its own, and the two
     // halves must split the same way or the paid and unpaid totals on screen
     // would be in different money from each other.
+    //
+    // ⚠ A CURRENCY WITH A FIXED PROJECT RATE BECOMES DOLLARS (Tim and Jorik,
+    // 2026-10-28). That rate is the studio's own, named and dated on the
+    // Overview, which is what the warning below always asked for: "a rate you
+    // can name and date". Here and in sections 3 and 4. A currency with no
+    // fixed rate still keeps its own total and the warning.
+    $fx = project_fx_rates($projectId);
     foreach ($invoices as $iv) {
-        $c = strtoupper(trim((string)($iv['currency'] ?? 'USD'))) ?: 'USD';
-        $amt = (float)$iv['amount'];
+        [$amt, $c] = fx_usd_or_own((float)$iv['amount'], $iv['currency'] ?? 'USD', $fx);
         if (!empty($iv['paid_date'])) $out['paid'][$c]   = ($out['paid'][$c]   ?? 0) + $amt;
         else                          $out['unpaid'][$c] = ($out['unpaid'][$c] ?? 0) + $amt;
     }
@@ -138,18 +145,24 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
         // A flat fee is not a function of hours. Pricing it per hour would
         // invent a number; it is listed separately and left out of the total.
         if ($unit === 'flat') {
+            [$fAmt, $fCur] = fx_usd_or_own($rate, $c, $fx);
             $out['flat'][] = ['name' => (string)$r['name'], 'hours' => $hours,
-                              'amount' => $rate, 'currency' => $c];
+                              'amount' => $fAmt, 'currency' => $fCur,
+                              'amount_own' => $fCur !== $c ? $rate : null, 'currency_own' => $c];
             continue;
         }
 
         $cost = $unit === 'hour' ? $hours * $rate : ($hours / $hoursPerDay) * $rate;
         $cost = round($cost, 2);
+        // `rate` and `rate_currency` stay the contract's; `cost` and
+        // `currency` are dollars when the project has a rate for it.
+        [$usd, $cc] = fx_usd_or_own($cost, $c, $fx);
         $out['worked']['rows'][] = [
             'name' => (string)$r['name'], 'hours' => $hours,
-            'rate' => $rate, 'unit' => $unit, 'currency' => $c, 'cost' => $cost,
+            'rate' => $rate, 'unit' => $unit, 'rate_currency' => $c,
+            'currency' => $cc, 'cost' => $usd, 'cost_own' => $cc !== $c ? $cost : null,
         ];
-        $out['worked']['totals'][$c] = ($out['worked']['totals'][$c] ?? 0) + $cost;
+        $out['worked']['totals'][$cc] = ($out['worked']['totals'][$cc] ?? 0) + $usd;
     }
 
     // ---- 4: still booked after today ---------------------------------------
@@ -196,15 +209,18 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
         // at hours-per-day, which is a planning assumption rather than a fact
         // about them; a flat fee has no per-day meaning at all. Both are shown
         // with their days and no money, which is the honest reading.
-        $cost = null;
+        $cost = null; $costOwn = null; $cc = '';
         if ($rate !== null && $rate > 0 && $unit !== 'flat') {
-            $cost = round($unit === 'hour' ? $days * $hoursPerDay * $rate : $days * $rate, 2);
-            $out['booked']['totals'][$c] = ($out['booked']['totals'][$c] ?? 0) + $cost;
+            $own = round($unit === 'hour' ? $days * $hoursPerDay * $rate : $days * $rate, 2);
+            [$cost, $cc] = fx_usd_or_own($own, $c, $fx);
+            if ($cc !== $c) $costOwn = $own;
+            $out['booked']['totals'][$cc] = ($out['booked']['totals'][$cc] ?? 0) + $cost;
         }
         $out['booked']['rows'][] = [
             'name' => (string)$r['name'], 'step' => (string)$r['step_name'],
             'from' => $from, 'to' => (string)$r['deadline'],
-            'days' => $days, 'cost' => $cost, 'currency' => $cost === null ? '' : $c,
+            'days' => $days, 'cost' => $cost, 'currency' => $cc,
+            'cost_own' => $costOwn, 'currency_own' => $c,
         ];
     }
 

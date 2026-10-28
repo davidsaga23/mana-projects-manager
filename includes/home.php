@@ -294,9 +294,10 @@ function home_rate_phrase(?float $rate, string $unit, string $cur, ?float $usdRa
 }
 
 /**
- * The show's fixed exchange rates, for this person — once PR #114 (one rate
- * fixed per project, includes/fx.php) is on the site. Until then there are none,
- * and a non-dollar rate is shown in its own currency, as statement.php does.
+ * The show's fixed exchange rates, for this person (one rate fixed per
+ * project, includes/fx.php). Before finance_install_11 is imported, or for a
+ * show with no rate fixed yet, there are none, and a non-dollar rate is shown
+ * in its own currency, as statement.php does.
  */
 function home_fx(int $crewId, int $projectId): array {
     if (!function_exists('own_project_fx_rates')) {
