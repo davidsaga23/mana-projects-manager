@@ -4492,3 +4492,27 @@ Ideally it will also update the invoice section in the financial management tab.
   linked to the PDF in Drive.
 - **Depends on IN4** (one invoice split across projects): today an `invoices` row belongs to one
   project.
+
+## 2026-10-28 — Home is a person's own page, and artists land on it
+
+**Asked by David:** one screen an artist opens to see their work, contract and invoice information
+across every show, instead of My tasks plus `statement.php` one show at a time.
+
+**Decided:**
+- **Home (`home.php`) is read-only and links to My tasks for editing.** Statuses and time logging stay
+  on My tasks and Spell, so two screens never change the same thing.
+- **The crew id is never a parameter, for anybody.** Home is always `effective_crew_id()`; an admin
+  sees a person's Home only by viewing as them. Money is read only through `own_crew_term()`,
+  `own_invoices_all()` (new, same rule as `own_invoices()`) and `own_project_fx_rates()`.
+- **Artists and supervisors land on Home after login** (when their login is linked to a person).
+  Admins and Production still land on the project list. The project list stays the "one home where
+  you can see all the projects" of 2026-08-17; this Home is a person's desk.
+- **Invoice information is per project and step for one month**, counted like the statement: time
+  logged in the month and inside the person's dates on the show; a day is the show's hours per day.
+  Not an invoice: the freelancer sends their own, one per month, to accounting@mana.tv.
+- **A note is "waiting" until the person replies on the task or puts up a new version.**
+- **A missing log day** is a working day, not a day off, inside their dates on at least one show,
+  with nothing logged. Last week and this week, up to yesterday.
+- **Salaried, until a flag exists:** admin and Production logins, and `$config['salaried_crew_ids']`,
+  in `home_is_salaried()` only. They see no invoice information, amounts or invoice status.
+- **Terminology:** "invoice", never "bill", on this page and in its code.
