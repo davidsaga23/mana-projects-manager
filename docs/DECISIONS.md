@@ -4515,5 +4515,5 @@ for old users that need to log in again to anima for a new project."*
 - **The public page reveals nothing.** It only takes a link; there is no "email me a link" form, so
   nothing can be used to test whether an address or username exists.
 - **Seeing the show:** being staffed (`crew_projects`) is what lets an artist see a show. Where the
-  person is on the team page but not staffed, the form offers a ticked box to add them. *Open for
-  David:* whether Resend should do that silently instead of asking.
+  person is on the team page but not staffed, the form offers a ticked box to add them. David,
+  2026-10-28: keep the ticked box rather than adding them silently, so production can untick it.
