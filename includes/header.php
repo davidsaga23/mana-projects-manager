@@ -139,6 +139,13 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
             // rather than a screen you reach only after choosing a show. It is
             // the screen replacing Plaky, so it is the first thing in the bar
             // and the only one here that looks like a button. ?>
+      <?php // HOME (David, 2026-10-28): one person's shows, logs, notes and
+            // invoice information. Only for a login linked to a person, because
+            // that is whose Home it is; effective_crew_id() is cached and never
+            // throws, so this costs the bar nothing. ?>
+      <?php if (isset($pdo) && $pdo instanceof PDO && (int)(effective_crew_id($pdo) ?? 0) > 0): ?>
+      <a href="home.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'home.php' ? ' is-on' : '' ?>">Home</a>
+      <?php endif; ?>
       <a href="spell.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'spell.php' ? ' is-on' : '' ?>">Spell</a>
       <?php // A button too, beside Spell (David, 2026-10-22): the two screens
             // people open first thing, so they are the two that stand out. ?>
