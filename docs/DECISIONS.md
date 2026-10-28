@@ -4443,3 +4443,25 @@ true", written down so every session builds on them instead of rediscovering the
    that only he changes it, by hand. Being built on its own branch (see CHANGELOG when it ships).
 6. **Artists log their time every day.** Statements, actual cost and the scheduler may rely on daily
    logs, and a missing day is a gap to chase, not zero work.
+
+## 2026-10-28 — The money rules' open questions, answered by Tim and Jorik
+
+**Answered by Tim** (with Jorik), replying to the rules recorded earlier today.
+
+**Decided:**
+- **No personal salaries in Anima.** Jorik supplies **one blended internal day rate** for all
+  salaried staff (total salaried cost ÷ number of people ÷ ~22 days). Every salaried person's
+  project time costs that one rate. Anima stores the rate, never a salary.
+- **Freelancers send one bill per person per month** to accounting@mana.tv, with a line per project
+  (e.g. "FCM CH Layout 5 days, MSD BG Color 3 days"), paid once. Anima splits that bill across the
+  projects, so the split-bill feature (Studio board ticket IN4) must allow lines from different
+  projects. Today an `invoices` row belongs to one project and one position.
+- **USD is the default for every rate, bill and total;** almost all contracts are in USD (US
+  accounts, or Wise). No conversion for those.
+- **A rare contract in another currency** (e.g. Lewis in £) is entered in that currency. Anima saves
+  that day's exchange rate automatically when the project is set up / signed off, uses that fixed
+  rate for the whole project, and shows both: "$520/day (£400)".
+- **No daily rates, no Wise fees, no small currency differences in Anima.** The bank and the books
+  hold the exact amounts. This replaces "flagged, never converted" (2026-08-18) for rates only:
+  a project-fixed rate is a known conversion, not a guess.
+- **Budget changes after sign-off** save the old amount, new amount, who, when and a short reason.
