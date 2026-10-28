@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-28 — A contract in another currency is converted at one rate fixed per project *(finance DB: finance_install_11)*
+
+- **USD stays the default for everything.** A rare contract in another currency (Lewis in £) is
+  still entered in that currency, and is now costed in dollars at **one exchange rate fixed for the
+  project**, shown both ways: `531.52 USD (400.00 GBP)`.
+- **The rate is saved automatically**: the day's European Central Bank reference rate (through
+  frankfurter, free) the first time a project's Finance page meets the currency, and at sign-off
+  for any still missing. It never moves after that unless an admin changes it, with a reason;
+  every change is kept (old, new, who, when, why).
+- **If the fetch fails, nothing is blocked**: the Overview's new *Exchange rates* table says so and
+  takes the rate by hand. Each rate shows its date and its source.
+- Converted at that rate: the expense projection and its totals, other expenses, Invoiced / Paid /
+  Final balance, Cost to date, invoice totals, the Finance hub, artist statements (the artist's own
+  too), the person page, the Excel export and the kick-off snapshot.
+- A currency **without** a fixed rate keeps the old "more than one currency" warning, now naming it.
+- Needs **`finance_install_11.sql`** in the finance database (imported by David, 2026-10-28).
+
 ## 2026-10-28 — Create user / Resend link from the person page *(migration 071)*
 
 - **On a person's page (Team performance → a person), Production and admins get an "Anima login"

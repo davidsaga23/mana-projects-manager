@@ -120,7 +120,12 @@ foreach ($proj['by_department'] as $dept => $group) {
     foreach ($group['rows'] as $row) {
         $shade = !$shade;                       // alternate the row fill
         $rateUnit = $row['rate_unit'] ?: 'day';
-        $rate     = $row['rate'];
+        // ⚠ IN DOLLARS when the project's fixed exchange rate converted the row
+        // (2026-10-28): the cost beside it is a live E*F in a USD column, so a
+        // sterling rate here would recompute to a sterling cost on opening.
+        // Unrounded, so E*F lands on the same cents as the screen; the
+        // contract's own rate goes in the note.
+        $rate     = $row['rate_usd'] ?? $row['rate'];
 
         // FULL PRECISION, because this cell is MULTIPLIED, not just read.
         //
@@ -255,6 +260,11 @@ foreach ($proj['by_department'] as $dept => $group) {
                     ? 'Per-second rate on a supervision position, cannot be priced'
                     : 'Per-second rate on a step not measured in seconds, cannot be priced');
         }
+        if (!empty($row['fx']) && $row['rate'] !== null) {
+            $fxNote = 'Contract ' . number_format((float)$row['rate'], 2) . ' ' . $row['currency']
+                    . ' per ' . $rateUnit . ', in USD at the fixed rate: ' . fx_describe($row['fx']);
+            $note = $note === '' ? $fxNote : $note . '. ' . $fxNote;
+        }
         // Costed from its dates rather than a quota, and the sheet says which.
         if (!empty($row['supervision'])) {
             $span = $row['start_date'] && $row['end_date']
@@ -313,15 +323,18 @@ if (!empty($proj['other'])) {
             $cells[COL_ROLE]     = ['v' => $cat, 's' => xlsx_alt(XLSX_TEXT, $shade)];
             $cells[COL_ARTIST]   = ['v' => $ex['vendor'] ?: '', 's' => xlsx_alt(XLSX_TEXT, $shade)];
             $cells[COL_RATETYPE] = ['v' => $ex['status'], 's' => xlsx_alt(XLSX_TEXT, $shade)];
-            $cells[COL_COST]     = ['v' => round((float)$ex['amount'], 2),
+            // In dollars when the project's fixed rate converted it (2026-10-28).
+            $exAmt = (float)($ex['amount_usd'] ?? $ex['amount']);
+            $cells[COL_COST]     = ['v' => round($exAmt, 2),
                                     's' => xlsx_alt(XLSX_MONEY, $shade)];
-            $cells[COL_ACOST]    = ['v' => !empty($ex['paid_date']) ? round((float)$ex['amount'], 2) : '',
+            $cells[COL_ACOST]    = ['v' => !empty($ex['paid_date']) ? round($exAmt, 2) : '',
                                     's' => xlsx_alt(XLSX_MONEY, $shade)];
             $cells[COL_VS]       = ['f' => 'IFERROR(H' . $rn . '-L' . $rn . ',0)',
-                                    'v' => round((float)$ex['amount']
-                                          - (!empty($ex['paid_date']) ? (float)$ex['amount'] : 0), 2),
+                                    'v' => round($exAmt - (!empty($ex['paid_date']) ? $exAmt : 0), 2),
                                     's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
-            $cells[COL_NOTES]    = ['v' => trim($ex['description'] . ($ex['notes'] ? ', ' . $ex['notes'] : '')),
+            $cells[COL_NOTES]    = ['v' => trim($ex['description'] . ($ex['notes'] ? ', ' . $ex['notes'] : '')
+                                           . (($ex['amount_own'] ?? null) !== null
+                                               ? ' (' . number_format((float)$ex['amount'], 2) . ' ' . $ex['currency'] . ')' : '')),
                                     's' => xlsx_alt(XLSX_NOTE, $shade)];
             for ($i = 0; $i < COL_COUNT; $i++) {
                 if (!isset($cells[$i])) $cells[$i] = ['v' => '', 's' => xlsx_alt(XLSX_TEXT, $shade)];
@@ -410,7 +423,13 @@ if ($proj['unpriced_days'] > 0) {
 if ($proj['mixed_currency']) {
     $put([['v' => '', 's' => XLSX_DEFAULT], ['v' => '', 's' => XLSX_DEFAULT],
           ['v' => 'People on this show are paid in more than one currency and these totals simply '
-                . 'add the numbers. Nothing here converts between currencies.', 's' => XLSX_NOTE]]);
+                . 'add the numbers. A currency is converted only at an exchange rate fixed for the '
+                . 'project, and at least one has none yet.', 's' => XLSX_NOTE]]);
+}
+// The fixed rates the dollar figures rest on, dated and sourced (2026-10-28).
+foreach ($proj['fx'] ?? [] as $fxRow) {
+    $put([['v' => 'Exchange rate', 's' => XLSX_TEXT], ['v' => '', 's' => XLSX_DEFAULT],
+          ['v' => fx_describe($fxRow) . ', fixed for this project', 's' => XLSX_NOTE]]);
 }
 $put([['v' => 'A day is', 's' => XLSX_TEXT],
       ['v' => round($hoursDay, 2), 's' => XLSX_NUM],

@@ -250,6 +250,9 @@ if (hiring_available($pdo)) {
 // expense_projection() the Finance screen draws, so the two cannot disagree —
 // this is a slice of that table, not a second calculation of it.
 $myRows = []; $myDays = 0.0; $myCost = 0.0; $myUnpriced = false;
+// The currency the costs are in: the rate's own, or USD when the project's fixed
+// exchange rate converted them (2026-10-28). $myCostOwn keeps the contract's.
+$myCostCur = null; $myCostOwn = 0.0;
 if (can_see_money()) {
     try {
         foreach (expense_projection($pdo, $projectId)['rows'] as $r) {
@@ -257,7 +260,11 @@ if (can_see_money()) {
             $myRows[] = $r;
             $myDays += (float)$r['days'];
             if ($r['cost'] === null) $myUnpriced = true;
-            else $myCost += (float)$r['cost'];
+            else {
+                $myCost += (float)$r['cost'];
+                $myCostCur = $r['cost_currency'] ?? $myCostCur;
+                $myCostOwn += (float)($r['cost_own'] ?? 0);
+            }
         }
     } catch (Throwable $e) {
         // The projection is a convenience here, not the point of the page.
@@ -793,6 +800,9 @@ require __DIR__ . '/includes/header.php';
               <?= $r['cost'] === null
                     ? '<span class="warn-text">no rate yet</span>'
                     : e(number_format($r['cost'], 2)) ?>
+              <?php if (($r['cost_own'] ?? null) !== null): ?>
+                <div class="muted small"><?= e(number_format($r['cost_own'], 2) . ' ' . $r['currency']) ?></div>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -804,7 +814,9 @@ require __DIR__ . '/includes/header.php';
             <th class="num"><?= e(fmt_num($myDays / DAYS_PER_MONTH, 2)) ?></th>
             <th class="num">
               <?= $myCost > 0
-                    ? e(fmt_money_plain($myCost, $terms['rate_currency'] ?? 'USD'))
+                    ? e($myCostOwn > 0
+                        ? fmt_money_both($myCost, $myCostOwn, (string)($terms['rate_currency'] ?? 'USD'))
+                        : fmt_money_plain($myCost, $myCostCur ?? ($terms['rate_currency'] ?? 'USD')))
                     : '<span class="muted">—</span>' ?>
             </th>
           </tr>

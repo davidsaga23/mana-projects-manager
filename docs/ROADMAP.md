@@ -936,9 +936,9 @@ either a notice period or a guaranteed-minimum amount. That is a finance-DB chan
 studio that cannot answer *"what do we owe if this stops"* in under a minute is a studio that answers
 it wrong under pressure.
 
-**Open:** whether the panel reports in one currency (the rates carry their own, and there is no FX
-table anywhere in this platform — mixing them silently would be the worst possible bug on exactly
-this screen), and whether "committed" should mean contractual minimum or booked-and-not-yet-released.
+**Open:** ~~whether the panel reports in one currency~~ — answered 2026-10-28: a currency with a
+rate fixed for the project (finance_install_11) is converted to dollars; one without still reports
+side by side. Still open: whether "committed" should mean contractual minimum or booked-and-not-yet-released.
 
 ## Built between 2026-10-07 and 2026-10-16
 

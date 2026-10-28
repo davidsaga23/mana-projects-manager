@@ -485,8 +485,10 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
     $projRows = [];
     foreach ($proj['rows'] as $r) {
         $key = $r['role'] . ' · ' . ($r['artist'] !== null && !$r['is_slot'] ? $r['artist'] : 'unfilled');
+        // In dollars when the project's fixed rate converted the row, like its
+        // cost; the rate in its own currency is in the Exchange rates text.
         $projRows[kickoff_unique_key($projRows, $key)] = [
-            'rate' => $r['rate'], 'unit' => (string)($r['rate_unit'] ?? ''),
+            'rate' => $r['rate_usd'] ?? $r['rate'], 'unit' => (string)($r['rate_unit'] ?? ''),
             'days' => round((float)$r['days'], 2), 'cost' => $r['cost'],
         ];
     }
@@ -494,11 +496,13 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
     foreach ($proj['other'] ?? [] as $x) {
         $key = trim(($x['category'] ?? '') . ': ' . ($x['description'] ?? ''), ': ');
         $otherRows[kickoff_unique_key($otherRows, $key ?: 'Expense')] = [
-            'amount' => (float)$x['amount'], 'status' => (string)($x['status'] ?? ''),
+            'amount' => (float)($x['amount_usd'] ?? $x['amount']), 'status' => (string)($x['status'] ?? ''),
         ];
     }
     $invRows = []; $invoiced = 0.0;
+    $fx = $proj['fx'] ?? [];
     foreach (project_invoices($pid) as $i) {
+        $i['amount'] = fx_usd_or_own((float)$i['amount'], $i['currency'] ?? 'USD', $fx)[0];
         $invoiced += (float)$i['amount'];
         $key = trim((string)($i['invoice_ref'] ?? '')) ?: ('Invoice ' . (int)$i['id']);
         $invRows[kickoff_unique_key($invRows, $key)] = [
@@ -527,7 +531,10 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'Budget pool, days'              => [round((float)$pool['days']['pool'], 2), 'num'],
             'Budget pool, days used'         => [round((float)$pool['days']['used'], 2), 'num'],
         ],
-        'texts' => [],
+        // The fixed rates the dollar figures above rest on, with their dates
+        // and sources (2026-10-28). Empty, and so not drawn, on an all-dollar
+        // show.
+        'texts' => $fx ? ['Exchange rates' => implode('; ', array_map('fx_describe', $fx))] : [],
         'lists' => [
             'Expense projection' => [
                 'cols' => ['rate' => ['Rate', 'money'], 'unit' => ['Per', 'text'],
@@ -633,6 +640,24 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
         throw new RuntimeException('Choose at least one person to sign it off. Nothing was sent.');
     }
 
+    // ⚠ THE EXCHANGE RATE IS FIXED BY NOW AT THE LATEST (Tim and Jorik,
+    // 2026-10-28). Normally the Finance page saved it at set-up; any foreign
+    // currency still without one gets the day's rate here, before the money is
+    // snapshotted, so the snapshot is in dollars. fx_fix_missing() never
+    // throws and a failed fetch leaves that currency unconverted (the
+    // snapshot says so): a currency service being down must not stop a
+    // sign-off. Its sentences go back to the screen with the rest.
+    $fxNotes = [];
+    if (can_see_money() && finance_db()) {
+        require_once __DIR__ . '/finance.php';
+        try {
+            $fxNotes = fx_fix_missing($pid, fx_project_currencies(expense_projection($pdo, $pid), project_invoices($pid)),
+                                      current_user_display(), true);
+        } catch (Throwable $e) {
+            error_log('[Anima fx at sign-off] ' . $e->getMessage());
+        }
+    }
+
     $snap = kickoff_snapshot($pdo, $project);
     $fin  = kickoff_finance_snapshot($pdo, $project);
     $user = current_user();
@@ -695,7 +720,7 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
         $upd->execute([mb_substr($res, 0, 255), $kid, (int)$s['id']]);
         $msgs[] = $s['name'] . ': ' . $res . '.';
     }
-    return $msgs;
+    return array_merge($fxNotes, $msgs);
 }
 
 /**
