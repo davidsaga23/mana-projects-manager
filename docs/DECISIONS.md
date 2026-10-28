@@ -4516,6 +4516,31 @@ change after sign-off saves the old amount, new amount, who, when and a short re
 - The check runs in `save_project_budget()` as well as on the form; a previewing admin never
   borrows the tick (the real session user is checked).
 
+## 2026-10-28 — New logins from the person page, by one-time link, never by password
+
+**Asked by David:** *"We need to have a quick way to create the slots profiles from the staffing
+section, to actual users with user name and password. I was thinking that you might add a 'Create
+user' from the detailed view in case that hire doesn't have an account created and a 'Resend link'
+for old users that need to log in again to anima for a new project."*
+
+**Decided:**
+- **Production and admins** (`can_edit()`) may create a login and send links, because they are the
+  people who staff a show. Create always makes an **artist**; a different role is set on Users.
+- **A link, never a password, goes by email.** Random 64-character token, stored only as its sha256
+  in `user_invites`, single use, 7 days, and sending a new one retires the older unused ones.
+- **Who may send a link for whom:** Production for artist and supervisor logins; an admin also for
+  Production logins; **nobody for an admin login** from this page. Whoever sends a link can see it
+  on screen when the email fails, so it must never let somebody into an account stronger than their
+  own.
+- **Resend switches a deactivated login back on**, says so, and records it on the link's row.
+- **Every link sent is logged** in `user_invites`: who, when, to which address, for which show,
+  whether the email went, and when it was used.
+- **The public page reveals nothing.** It only takes a link; there is no "email me a link" form, so
+  nothing can be used to test whether an address or username exists.
+- **Seeing the show:** being staffed (`crew_projects`) is what lets an artist see a show. Where the
+  person is on the team page but not staffed, the form offers a ticked box to add them. David,
+  2026-10-28: keep the ticked box rather than adding them silently, so production can untick it.
+
 ## 2026-10-28 — Home is a person's own page, and artists land on it
 
 **Asked by David:** one screen an artist opens to see their work, contract and invoice information

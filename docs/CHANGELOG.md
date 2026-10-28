@@ -44,6 +44,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Always your own: there is no way to ask for somebody else's Home. No budgets, other people's
   rates, forecasts or comparisons appear anywhere on it.
 
+## 2026-10-28 — Create user / Resend link from the person page *(migration 071)*
+
+- **On a person's page (Team performance → a person), Production and admins get an "Anima login"
+  section.** A person with no login gets **Create user**: an **artist** login linked to them, with a
+  suggested username (from their email, else their first name) that can be changed.
+- **Nobody types or emails a password.** The person is emailed a **one-time link** to choose their
+  own. It works once, for 7 days, and only the newest link for a login works. The email names the
+  show, the site address and their username.
+- **A person who already has a login** shows it (username, role, last seen, when the last link was
+  sent, by whom and whether it was used) and gets **Resend link**, e.g. for an old hire back on a new
+  show. If the login had been switched off, sending the link switches it back on and says so.
+- **If they are on the team page but not staffed on the show**, a ticked box also lets them see it,
+  so they do not log in to an empty list.
+- **If the email cannot go out** (no address, mail not set up, or a send error), the link is shown
+  once on the page to pass on privately.
+- **Never for an admin login.** Only an admin can send a link for a Production login.
+- The public page is `set_password.php`; after setting the password they are logged straight in.
+- Until migration 071 runs, the section says it needs it and logins are made on Users as before.
+
 ## 2026-10-28 — A signed-off show's budget is fixed; only a ticked admin changes it *(migration 070 + finance_install_10)*
 
 - **Once a show's kick-off is signed off, its approved production budget is read-only** on the
