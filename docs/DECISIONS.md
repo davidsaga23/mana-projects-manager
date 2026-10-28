@@ -4493,6 +4493,29 @@ Ideally it will also update the invoice section in the financial management tab.
 - **Depends on IN4** (one invoice split across projects): today an `invoices` row belongs to one
   project.
 
+## 2026-10-28 — The budget lock: fixed at sign-off, changed only by a ticked admin, with a reason
+
+**Asked by David:** *"Only Jorik can raise a budget. I can make the budget static after the project
+sign off but he'll need to change it manually. Let's implement this already."* Tim and Jorik: a
+change after sign-off saves the old amount, new amount, who, when and a short reason.
+
+**Decided:**
+- **The lock starts when a kick-off is approved** (`project_kickoffs.state = 'approved'`); before
+  that the budget is edited as it always was, and the pending-sign-off freeze is unchanged.
+- **Who may change it is a tick on an account, `users.changes_budget` (migration 070)**, not
+  Jorik's id in the code, mirroring `signs_off_kickoff`. It is ticked on Kick-off → Who signs off,
+  and **only administrators can hold it**, because only they can see money (`can_see_money()`).
+  Any administrator can tick it, as with the sign-off list; the tick is the policy, not a security
+  boundary against other admins.
+- **"Raise" is read as "change":** a cut after sign-off is as much a change to what was approved,
+  so both need the tick and a reason.
+- **Amount, currency, terms and notes are all locked**; a change records old/new amount and
+  currency and names which of terms/notes changed too (`budget_changes`, finance_install_10).
+- **A change that cannot be recorded is not made:** without migration 070 or finance_install_10
+  nobody can change a signed-off budget, and the screen says which is missing.
+- The check runs in `save_project_budget()` as well as on the form; a previewing admin never
+  borrows the tick (the real session user is checked).
+
 ## 2026-10-28 — How the project-fixed exchange rate works
 
 **Built** from Tim and Jorik's answer above ("a rare contract in another currency ... Anima saves

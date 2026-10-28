@@ -125,6 +125,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 067 | naming_convention | ⏳ **The show's file naming convention** on the Brief (`project_brief.naming_*`), checked on every version upload. Until it runs, the section is hidden and nothing is checked. |
 | 068 | supervision_positions | ⏳ **Supervision positions** (`supervision_positions`): Anim Sup, CG Sup and the like, with a start and end date and no quota, set on Dates & headcount, filled on Staffing, costed on the expense projection. Until it runs, the Supervision section says it needs this update and nothing else changes. |
 | 069 | hire_supervision | ⏳ **Candidates for a supervision position** (`hires.supervision_id`): line people up for Anim Sup / CG Sup on Staffing and hire them. Until it runs, those rows say they need it; the rest of supervision (068) works without it. |
+| 070 | budget_changer | ⏳ **Who may change a signed-off budget** (`users.changes_budget`), ticked on Kick-off → Who signs off. Until it runs, a show whose kick-off is signed off has its budget locked for everybody. **Also needs `finance_install_10.sql` imported by hand** (the change history). |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |
@@ -141,6 +142,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_07 | ✅ Finance Overview's seven cost figures (incl. an unused `revenue_amount` column, kept not dropped). |
 | finance_install_08 | ⏳ **The money side of the kick-off sign-off — import with migration 049.** |
 | finance_install_09 | ⏳ **Invoice status becomes Expected / Pending / Paid.** Received, approved and disputed become pending; a disputed one keeps "Disputed." at the front of its note. Until it is imported, the dropdown offers the old four. |
+| finance_install_10 | ⏳ **The history of a budget changed after kick-off sign-off** (`budget_changes`: old and new amount, who, when, reason). Import with migration 070. Until it is imported, nobody can change a signed-off budget. |
 | finance_install_11 | ✅ One exchange rate per project per foreign currency (`project_fx_rates`, `project_fx_rates_log`). Imported by David 2026-10-28. |
 
 ---

@@ -9,7 +9,7 @@ is probably not the next thing.
 | # | Step | Coverage | Where |
 |---|---|---|---|
 | 1 | Timeline | **Built** | `schedule.php`, `timeline.php`, `.gan` both directions, saved versions to look back at, a step editor with progress, drags that keep working days (all 2026-09-18) |
-| 2 | Budget | **Built** 2026-08-18 | `finance_project.php` — agreed amount, currency, terms |
+| 2 | Budget | **Built** 2026-08-18 | `finance_project.php` — agreed amount, currency, terms; fixed at kick-off sign-off, changed after only by a ticked admin with a reason (2026-10-28) |
 | 3 | New brief | **Built** 2026-08-18 | `brief.php` — the ask, deliverables, reference, files |
 | 4 | Breakdown | **Built** | Wizard (paste) + Plaky import |
 | 5 | Project expense | **Built** 2026-08-18 | Expense projection, computed live in the shape of `RTC_ExpenseProjection_v01.xlsx`, costed from **each project's own ideal quotas** (2026-09-17), which can be copied from another project or matched to an approved sheet |
