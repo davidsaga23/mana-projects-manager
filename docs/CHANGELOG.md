@@ -25,6 +25,8 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   paint-over shows wherever review notes already do: the tab, the timeline, the email.
 - Everyone else can open the viewer to look and read, without the pen. Videos and PDFs open as before.
 - Ctrl-click on a version still opens the file on its own.
+- The **Review & draw** / **Open viewer** button sits at the top of each image version, next to its
+  review notes button (moved there the same day, at David's ask).
 
 ## 2026-10-27 — Reviews: a queue and a verdict for supervisors and Production *(no migration)*
 
