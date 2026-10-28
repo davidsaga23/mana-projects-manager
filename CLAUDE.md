@@ -38,6 +38,16 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
   `finance_install_NN.sql` files David imports by hand in phpMyAdmin. Say so explicitly.
 - Never change real data (rates, frame counts, statuses) to "fix" a report unless David asks.
 
+## Money rules (David, 2026-10-28 — detail in `docs/DECISIONS.md`)
+
+- Anima tracks **budget against cost, never profit**.
+- The budget pays for **everyone** on the show: freelancers, and salaried staff (David, Tim, Renata,
+  Junior) at an internal day rate. Diego is paid per job, like a freelancer.
+- Freelancers are paid for the days they work, from their statement.
+- **Everyone is paid in USD.** Don't add conversion code; how euros come in is still open.
+- **Only Jorik can raise a budget**, and only after the kick-off sign-off has fixed it.
+- Artists log their time **every day**.
+
 ## Code conventions
 
 - Match the surrounding code: long explanatory comments that say WHY and quote David with a date,
