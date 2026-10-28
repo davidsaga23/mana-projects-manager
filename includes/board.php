@@ -1523,6 +1523,16 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                       . '">Make a review</button>';
             }
 
+            // THE VIEWER, BESIDE THE NOTES (David, 2026-10-27: "add the review &
+            // draw button at the top of the version like the make a review
+            // one"). Images only: the pen draws on a picture, and a video or a
+            // PDF has nothing assets/review-viewer.js can open.
+            $isImage = attachment_is_image((string)($v['mime_type'] ?? ''));
+            if ($isImage) {
+                $out .= '<button type="button" class="version-review-open" data-review-open="' . $vid . '">'
+                      . ($reviewer ? 'Review &amp; draw' : 'Open viewer') . '</button>';
+            }
+
             // ⚠ EVERY VERSION IS ITS OWN ADDRESS (David, 2026-10-23: "copy url
             // button for each of the new versions and also for the reviews so
             // it's easy to share"). v02 is a thing people talk about by name,
@@ -1587,7 +1597,6 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             // data-review-open names the version, img.version-img is how it
             // finds the pictures. The href stays a working link, so ctrl-click
             // still opens the file on its own.
-            $isImage = attachment_is_image((string)($v['mime_type'] ?? ''));
             if ($isImage) {
                 $out .= '<a href="' . $url . '" class="version-shot" data-review-open="' . $vid . '"'
                       . ' title="Open in the review viewer" target="_blank" rel="noopener">'
@@ -1600,12 +1609,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             }
 
             $out .= '<div class="version-meta muted small"><span title="' . $name . '">' . $name
-                  . '</span> · ' . e(human_size((int)$v['file_size']))
-                  . ($isImage
-                      ? ' <button type="button" class="version-review-open" data-review-open="' . $vid . '">'
-                        . ($reviewer ? 'Review &amp; draw' : 'Open viewer') . '</button>'
-                      : '')
-                  . '</div>';
+                  . '</span> · ' . e(human_size((int)$v['file_size'])) . '</div>';
             if (trim((string)($v['link'] ?? '')) !== '') {
                 $out .= '<a class="version-files-btn" href="' . e((string)$v['link'])
                       . '" target="_blank" rel="noopener">Open final files</a>';
