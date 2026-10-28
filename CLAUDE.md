@@ -45,7 +45,8 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
   Junior) at **one blended internal day rate** Jorik supplies. Never store personal salaries.
   Diego is paid per job, like a freelancer.
 - Freelancers are paid for the days they work: **one invoice per person per month**, a line per
-  project, split across projects by Anima. Always say **"invoice"**, never "bill" (UI, code, docs).
+  project, sent **only to accounting@mana.tv** and paid once by Jorik; Anima splits it across the
+  projects. Always say **"invoice"**, never "bill" (UI, code, docs).
 - **USD by default for every rate, invoice and total.** A rare non-USD contract is entered in its own
   currency and converted at **one exchange rate fixed per project** at set-up/sign-off, shown as
   "$520/day (£400)". No daily rates, no Wise fees.
