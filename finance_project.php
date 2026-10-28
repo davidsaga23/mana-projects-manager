@@ -43,7 +43,31 @@ $who = current_user_display();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (isset($_POST['set_rate'])) {
+        if (isset($_POST['set_fx']) || isset($_POST['fetch_fx'])) {
+            // THE PROJECT'S EXCHANGE RATE for one foreign currency (Tim and
+            // Jorik, 2026-10-28; includes/fx.php). "Fetch" asks the ECB's rate
+            // for today; "Save" takes one typed by hand, for when the fetch
+            // fails or the contract names its own. Replacing a fixed rate
+            // needs a reason, and the old one is kept in the log.
+            $c = fx_code($_POST['currency'] ?? '');
+            if ($c === null || $c === 'USD') throw new RuntimeException('Choose a three-letter currency other than USD.');
+            $reason = (string)($_POST['reason'] ?? '');
+            if (isset($_POST['fetch_fx'])) {
+                $got = fx_fetch($c);
+                if ($got === null) {
+                    throw new RuntimeException('The exchange-rate service did not answer for ' . $c
+                        . '. Type the rate by hand instead; nothing was saved.');
+                }
+                flash('ok', fx_save($projectId, $c, $got['usd_per_unit'], $got['rate_date'], $got['source'], $who, $reason));
+            } else {
+                $raw = str_replace(',', '.', trim((string)($_POST['usd_per_unit'] ?? '')));
+                if ($raw === '' || !is_numeric($raw)) {
+                    throw new RuntimeException('"' . $raw . '" is not a rate. Type how many dollars one ' . $c . ' buys.');
+                }
+                $date = (string)($_POST['rate_date'] ?? '') ?: date('Y-m-d');
+                flash('ok', fx_save($projectId, $c, (float)$raw, $date, 'manual', $who, $reason));
+            }
+        } elseif (isset($_POST['set_rate'])) {
             // A DAY RATE, SET FROM THE PROJECTION. Previously this meant leaving
             // for person.php and coming back for each one — a dozen round trips
             // to fill in a dozen slots.
@@ -246,6 +270,21 @@ if ($configured) {
 
 $proj    = expense_projection($pdo, $projectId);
 
+// ⚠ THE RATE IS FIXED AT SET-UP: the first time this page meets a foreign
+// currency with no rate for this project, it fetches the day's rate and saves
+// it, and that one rate holds for the whole show (Tim and Jorik, 2026-10-28).
+// Sign-off fetches any that are still missing (includes/kickoff.php). Only on
+// a GET, at most once per currency per ten minutes when the service is down,
+// and never fatal: includes/fx.php.
+$fxNotes = [];
+if ($configured && $dbError === null && $_SERVER['REQUEST_METHOD'] === 'GET' && fx_available()) {
+    $fxMissing = array_values(array_diff(fx_project_currencies($proj, $invoices), array_keys($proj['fx'] ?? [])));
+    if ($fxMissing) {
+        $fxNotes = fx_fix_missing($projectId, $fxMissing, $who);
+        if ($fxNotes) $proj = expense_projection($pdo, $projectId);
+    }
+}
+
 // The positions an invoice can be attached to: every lane on the show, which is
 // exactly the set of rows the projection draws. Built from the same
 // project_lanes() the projection uses, so the picker and the table can never
@@ -258,13 +297,17 @@ $people  = project_people($pdo, $projectId);
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
 
+// An invoice in another currency counts in dollars at the project's fixed rate
+// (2026-10-28). One with no fixed rate is added as it is, as it always was.
+$fxRates = project_fx_rates($projectId);
 $billed = 0.0; $paid = 0.0; $unpaid = 0.0; $overdue = 0;
 $todayStr = date('Y-m-d');
 foreach ($invoices as $iv) {
-    $billed += (float)$iv['amount'];
-    if ($iv['paid_date']) $paid += (float)$iv['amount'];
+    $ivUsd = fx_usd_or_own((float)$iv['amount'], $iv['currency'] ?? 'USD', $fxRates)[0];
+    $billed += $ivUsd;
+    if ($iv['paid_date']) $paid += $ivUsd;
     else {
-        $unpaid += (float)$iv['amount'];
+        $unpaid += $ivUsd;
         if ($iv['due_date'] && $iv['due_date'] < $todayStr) $overdue++;
     }
 }
@@ -377,7 +420,9 @@ $stop = project_stop_cost($pdo, $projectId, $invoices);
 // on a projection row. Reported rather than quietly dropped.
 $unattached = 0.0;
 foreach ($invoices as $iv) {
-    if (empty($iv['step_id']) || empty($iv['crew_id'])) $unattached += (float)$iv['amount'];
+    if (empty($iv['step_id']) || empty($iv['crew_id'])) {
+        $unattached += fx_usd_or_own((float)$iv['amount'], $iv['currency'] ?? 'USD', $fxRates)[0];
+    }
 }
 
 // Which tab. One file rather than four, because every tab needs the same
@@ -593,13 +638,92 @@ try {
 </p>
 
 
+<?php foreach ($fxNotes as $n): ?>
+  <div class="flash <?= strpos($n, 'Could not') === 0 || strpos($n, 'could not') !== false ? 'flash-warn' : 'flash-ok' ?>"><?= e($n) ?></div>
+<?php endforeach; ?>
+
 <?php if ($proj['mixed_currency']): ?>
   <div class="flash flash-warn">
-    People on this show are paid in more than one currency, and these totals simply add the
-    numbers together. <strong>Treat the current forecast cost as indicative until that is resolved</strong>,
-    nothing here converts between currencies, and inventing an exchange rate would be worse than
-    saying so.
+    People on this show are paid in more than one currency<?php
+      $fxUnfixed = array_values(array_diff(fx_project_currencies($proj, $invoices), array_keys($fxRates)));
+      if ($fxUnfixed): ?>, and <strong><?= e(implode(', ', $fxUnfixed)) ?></strong> has no exchange rate
+      fixed for this project yet<?php endif; ?>, so these totals simply add the numbers together.
+    <strong>Treat the current forecast cost as indicative until that is resolved</strong>:
+    <?= fx_available() ? 'fix a rate under Exchange rates below.'
+                       : 'import <code>finance_install_11.sql</code> into the finance database to fix one.' ?>
   </div>
+<?php endif; ?>
+
+<?php // ---- EXCHANGE RATES ----------------------------------------------
+      // Tim and Jorik, 2026-10-28: one rate per foreign currency, fixed for the
+      // whole project, with its date and its source on screen so anybody
+      // reading a converted total can say where it came from. Shown only when
+      // the show has money in another currency, or a rate already fixed: on an
+      // all-dollar show (nearly all of them) there is nothing to say.
+      $fxCurrencies = array_values(array_unique(array_merge(
+          array_keys($fxRates), fx_project_currencies($proj, $invoices))));
+      sort($fxCurrencies);
+      if ($fxCurrencies && fx_available()):
+        $fxLog = project_fx_log($projectId); ?>
+<h3>Exchange rates <span class="muted">— one fixed rate per currency, for the whole project</span></h3>
+<p class="muted small">
+  Every total on this screen is in US dollars. A contract in another currency is entered in that
+  currency and converted at the rate below, which was saved when the project was set up and does
+  not follow the market. Amounts show both, dollars first: 520.00 USD (400.00 GBP). No Wise fees and
+  no daily rates: the bank and the books hold the exact amounts.
+</p>
+<table>
+  <thead><tr><th>Currency</th><th>Fixed rate</th><th>Saved</th><th>Change it</th></tr></thead>
+  <tbody>
+  <?php foreach ($fxCurrencies as $c): $fr = $fxRates[$c] ?? null; ?>
+    <tr>
+      <td><strong><?= e($c) ?></strong></td>
+      <td><?php if ($fr): ?><?= e(fx_describe($fr)) ?>
+          <?php else: ?><span class="warn-text">no rate yet, <?= e($c) ?> amounts are not converted</span><?php endif; ?></td>
+      <td class="muted small"><?= $fr ? e(substr((string)$fr['set_at'], 0, 16) . ' by ' . ($fr['set_by'] ?: '?')) : '—' ?></td>
+      <td>
+        <form method="post" class="inline-actions small">
+          <input type="hidden" name="currency" value="<?= e($c) ?>">
+          1 <?= e($c) ?> =
+          <input name="usd_per_unit" inputmode="decimal" size="8" placeholder="1.2345"
+                 value="<?= $fr ? e(rtrim(rtrim(number_format((float)$fr['usd_per_unit'], 6, '.', ''), '0'), '.')) : '' ?>"> USD
+          on <input type="date" name="rate_date" value="<?= e($fr['rate_date'] ?? date('Y-m-d')) ?>">
+          <?php if ($fr): ?>
+            <input name="reason" size="18" placeholder="why it is changing" required>
+          <?php endif; ?>
+          <button type="submit" name="set_fx" value="1">Save</button>
+          <?php // Both buttons need the reason when a rate is already fixed: a
+                // fetched rate replaces it just as a typed one does. ?>
+          <button type="submit" name="fetch_fx" value="1"
+                  title="Ask for the European Central Bank's reference rate for today">Fetch today's rate</button>
+        </form>
+      </td>
+    </tr>
+  <?php endforeach; ?>
+  </tbody>
+</table>
+<?php if ($fxLog): ?>
+  <details class="stop-detail">
+    <summary class="muted small">Rate history (<?= count($fxLog) ?>)</summary>
+    <table>
+      <thead><tr><th>When</th><th>Who</th><th>Currency</th><th>Was</th><th>Now</th><th>Rate of</th><th>Source</th><th>Why</th></tr></thead>
+      <tbody>
+      <?php foreach ($fxLog as $l): ?>
+        <tr>
+          <td class="muted small"><?= e(substr((string)$l['changed_at'], 0, 16)) ?></td>
+          <td class="small"><?= e($l['changed_by'] ?: '?') ?></td>
+          <td><?= e($l['currency']) ?></td>
+          <td class="num"><?= $l['old_usd_per_unit'] === null ? '—' : e(rtrim(rtrim((string)$l['old_usd_per_unit'], '0'), '.')) ?></td>
+          <td class="num"><?= e(rtrim(rtrim((string)$l['new_usd_per_unit'], '0'), '.')) ?></td>
+          <td class="muted small"><?= e($l['rate_date']) ?></td>
+          <td class="muted small"><?= e($l['source']) ?></td>
+          <td class="small"><?= e($l['reason'] ?? '') ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </details>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php // ---- COST TO DATE -------------------------------------------------
@@ -630,9 +754,10 @@ try {
 <?php if ($stop['mixed']): ?>
   <div class="flash flash-warn">
     <strong>This show pays in more than one currency, so these are listed side by side and
-    never added up.</strong> Nothing in this platform converts between currencies, and inventing
-    an exchange rate on the screen that goes to a client would be the worst possible place to
-    do it. Convert them yourself, at a rate you can name and date.
+    never added up.</strong> A currency is converted only at the exchange rate fixed for this
+    project (see Exchange rates above), never at an invented one, and
+    <?= e(implode(', ', array_diff($stop['currencies'], ['USD']))) ?> has none yet. Fix one, or
+    convert them yourself at a rate you can name and date.
   </div>
 <?php endif; ?>
 
@@ -683,7 +808,9 @@ try {
     <strong>Paid a flat fee, so their hours cannot price the work:</strong>
     <?php $bits = [];
           foreach ($stop['flat'] as $f) {
-              $bits[] = e($f['name']) . ' (' . e(fmt_money_plain((float)$f['amount'], $f['currency']))
+              $bits[] = e($f['name']) . ' (' . e(($f['amount_own'] ?? null) !== null
+                    ? fmt_money_both((float)$f['amount'], (float)$f['amount_own'], $f['currency_own'])
+                    : fmt_money_plain((float)$f['amount'], $f['currency']))
                       . ', ' . e(fmt_num($f['hours'], 1)) . ' h logged)';
           }
           echo implode(', ', $bits); ?>.
@@ -711,9 +838,11 @@ try {
           <tr>
             <td><?= e($r['name']) ?></td>
             <td class="num"><?= e(fmt_num($r['hours'], 1)) ?></td>
-            <td class="muted small"><?= e(fmt_money_plain($r['rate'], $r['currency'])) ?>
+            <td class="muted small"><?= e(fmt_money_plain($r['rate'], $r['rate_currency'] ?? $r['currency'])) ?>
                 / <?= e($r['unit']) ?></td>
-            <td class="num"><?= e(fmt_money_plain($r['cost'], $r['currency'])) ?></td>
+            <td class="num"><?= e($r['cost_own'] !== null
+                  ? fmt_money_both($r['cost'], $r['cost_own'], $r['rate_currency'])
+                  : fmt_money_plain($r['cost'], $r['currency'])) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -740,7 +869,9 @@ try {
             <td class="num"><?= (int)$r['days'] ?></td>
             <td class="num"><?= $r['cost'] === null
                   ? '<span class="warn-text small">no day rate</span>'
-                  : e(fmt_money_plain($r['cost'], $r['currency'])) ?></td>
+                  : e($r['cost_own'] !== null
+                      ? fmt_money_both($r['cost'], $r['cost_own'], $r['currency_own'])
+                      : fmt_money_plain($r['cost'], $r['currency'])) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -1308,6 +1439,11 @@ if ($retakePct <= 0):
                        placeholder="set" aria-label="Day rate for <?= e((string)$r['artist']) ?>"
                        class="<?= $r['rate'] === null ? 'rate-unset' : '' ?>">
                 <span class="muted"><?= e($r['currency'] ?: 'USD') ?> / <?= e($r['rate_unit'] ?: 'day') ?></span>
+                <?php // The box is the CONTRACT's rate, in its own currency; the
+                      // dollars it is costed at sit beside it (2026-10-28). ?>
+                <?php if (!empty($r['fx']) && $r['rate_usd'] !== null): ?>
+                  <div class="muted small" title="<?= e(fx_describe($r['fx'])) ?>">= <?= e(number_format($r['rate_usd'], 2)) ?> USD</div>
+                <?php endif; ?>
               </form>
             <?php else: ?><span class="muted">—</span><?php endif; ?>
           </td>
@@ -1334,7 +1470,10 @@ if ($retakePct <= 0):
             <?php endif; ?>
           </td>
           <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
-          <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?></td>
+          <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?>
+            <?php if (($r['cost_own'] ?? null) !== null): ?>
+              <div class="muted small"><?= e(number_format($r['cost_own'], 2) . ' ' . $r['currency']) ?></div>
+            <?php endif; ?></td>
           <?php // 1dp, not 0. Whole numbers still print clean because fmt_num()
                 // trims the trailing zero, but 40.5 seconds of footage was
                 // rendering as "41" — overstating the show and disagreeing with
@@ -1520,8 +1659,13 @@ if ($retakePct <= 0):
               <?php endif; ?>
             </td>
             <td class="muted small"><?= e($ex['vendor'] ?: '—') ?></td>
-            <td class="num"><?= e(number_format((float)$ex['amount'], 2)) ?>
-              <span class="muted small"><?= e($ex['currency']) ?></span></td>
+            <td class="num"><?php if (($ex['amount_own'] ?? null) !== null): // converted at the project's fixed rate ?>
+                <?= e(number_format((float)$ex['amount_usd'], 2)) ?> <span class="muted small">USD
+                (<?= e(number_format((float)$ex['amount'], 2) . ' ' . $ex['currency']) ?>)</span>
+              <?php else: ?>
+                <?= e(number_format((float)$ex['amount'], 2)) ?>
+                <span class="muted small"><?= e($ex['currency']) ?></span>
+              <?php endif; ?></td>
             <td class="small">
               <span class="<?= $ex['status'] === 'paid' ? 'ok' : ($ex['status'] === 'planned' ? 'muted' : '') ?>">
                 <?= e($ex['status']) ?></span>
@@ -1680,7 +1824,13 @@ if ($retakePct <= 0):
           <?php else: ?><?= e($iv['invoice_ref'] ?: '—') ?><?php endif; ?>
         </td>
         <td class="muted small"><?= e(($iv['period_start'] ?: '—') . ' → ' . ($iv['period_end'] ?: '—')) ?></td>
-        <td class="num"><?= e(fmt_money_plain((float)$iv['amount'], $iv['currency'])) ?></td>
+        <?php // Both amounts when the project's fixed rate converts it, dollars
+              // first (2026-10-28). The invoice itself stays in its own money. ?>
+        <?php $ivUsd = ($iv['currency'] ?? 'USD') !== 'USD'
+                  ? fx_to_usd((float)$iv['amount'], $iv['currency'], $fxRates) : null; ?>
+        <td class="num"><?= e($ivUsd !== null
+              ? fmt_money_both($ivUsd, (float)$iv['amount'], (string)$iv['currency'])
+              : fmt_money_plain((float)$iv['amount'], $iv['currency'])) ?></td>
         <td class="muted small"><?= e($iv['issued_date'] ?: '—') ?></td>
         <td class="muted small <?= $late ? 'err' : '' ?>"><?= e($iv['due_date'] ?: '—') ?></td>
         <td><?= $iv['paid_date']
@@ -1765,7 +1915,7 @@ if ($retakePct <= 0):
           // "what have we invoiced on this show" meant adding the column up by
           // hand, which is slow and, on a long list, wrong. Split paid from
           // unpaid because those are two different facts, and kept per currency
-          // because nothing here converts between them. ?>
+          // unless the project's fixed rate converts it to dollars (2026-10-28). ?>
     <tfoot>
       <?php foreach (array_unique(array_merge(array_keys($stop['paid']), array_keys($stop['unpaid']))) as $c): ?>
         <tr>
@@ -1782,7 +1932,8 @@ if ($retakePct <= 0):
   </table>
   <?php if ($stop['mixed']): ?>
     <p class="muted small">
-      One total per currency, never added together — nothing here converts between them.
+      One total per currency, never added together: a currency is converted only at a rate
+      fixed for this project, and these have none.
     </p>
   <?php endif; ?>
 <?php else: ?>
@@ -1984,7 +2135,7 @@ function invAddRows() {
       $stTot = ['planned_days' => 0.0, 'hours' => 0.0, 'days' => 0.0, 'approved_seconds' => 0.0];
       $stMoney = [];   // currency => ['due' =>, 'invoiced' =>, 'left' =>]
       foreach ($stPeople as $cid => $name):
-          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj);
+          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj, $fxRates);
           $w = $st['window'];
           $cur = $st['currency'];
           foreach ($stTot as $k => $v) $stTot[$k] = $v + (float)$st[$k];
@@ -2000,7 +2151,8 @@ function invAddRows() {
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
             <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their steps">steps</span><?php endif; ?>
           </td>
-          <td class="small"><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $cur)) : '<span class="warn-text">no rate</span>' ?></td>
+          <td class="small"><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?>
+            <?php if ($st['fx'] && $st['rate_usd'] !== null): ?><br><span class="muted">= <?= e(number_format($st['rate_usd'], 2)) ?> USD</span><?php endif; ?></td>
           <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
           <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h<br><span class="muted small"><?= e(fmt_num($st['days'], 2)) ?> d</span></td>
           <td class="num"><?= $st['approved_seconds'] > 0 ? e(statement_secs($st['approved_seconds'])) : '<span class="muted">—</span>' ?></td>
