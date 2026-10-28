@@ -141,7 +141,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_07 | ✅ Finance Overview's seven cost figures (incl. an unused `revenue_amount` column, kept not dropped). |
 | finance_install_08 | ⏳ **The money side of the kick-off sign-off — import with migration 049.** |
 | finance_install_09 | ⏳ **Invoice status becomes Expected / Pending / Paid.** Received, approved and disputed become pending; a disputed one keeps "Disputed." at the front of its note. Until it is imported, the dropdown offers the old four. |
-| finance_install_11 | ⏳ **One exchange rate per project per foreign currency** (`project_fx_rates`, `project_fx_rates_log`). Until it is imported, a non-USD contract is not converted and keeps the mixed-currency warning. |
+| finance_install_11 | ✅ One exchange rate per project per foreign currency (`project_fx_rates`, `project_fx_rates_log`). Imported by David 2026-10-28. |
 
 ---
 

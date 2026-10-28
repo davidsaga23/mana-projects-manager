@@ -29,8 +29,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   Final balance, Cost to date, invoice totals, the Finance hub, artist statements (the artist's own
   too), the person page, the Excel export and the kick-off snapshot.
 - A currency **without** a fixed rate keeps the old "more than one currency" warning, now naming it.
-- Needs **`finance_install_11.sql`** imported by hand into the finance database. Until then
-  nothing converts and everything behaves as before.
+- Needs **`finance_install_11.sql`** in the finance database (imported by David, 2026-10-28).
 
 ## 2026-10-27 — Videos open in the review viewer: frame by frame, 0.25× to 4× *(no migration)*
 
