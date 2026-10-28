@@ -14,6 +14,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-28 — Create user / Resend link from the person page *(migration 071)*
+
+- **On a person's page (Team performance → a person), Production and admins get an "Anima login"
+  section.** A person with no login gets **Create user**: an **artist** login linked to them, with a
+  suggested username (from their email, else their first name) that can be changed.
+- **Nobody types or emails a password.** The person is emailed a **one-time link** to choose their
+  own. It works once, for 7 days, and only the newest link for a login works. The email names the
+  show, the site address and their username.
+- **A person who already has a login** shows it (username, role, last seen, when the last link was
+  sent, by whom and whether it was used) and gets **Resend link**, e.g. for an old hire back on a new
+  show. If the login had been switched off, sending the link switches it back on and says so.
+- **If they are on the team page but not staffed on the show**, a ticked box also lets them see it,
+  so they do not log in to an empty list.
+- **If the email cannot go out** (no address, mail not set up, or a send error), the link is shown
+  once on the page to pass on privately.
+- **Never for an admin login.** Only an admin can send a link for a Production login.
+- The public page is `set_password.php`; after setting the password they are logged straight in.
+- Until migration 071 runs, the section says it needs it and logins are made on Users as before.
+
 ## 2026-10-27 — Videos open in the review viewer: frame by frame, 0.25× to 4× *(no migration)*
 
 - **Video versions get the Review & draw / Open viewer button too**, and open full screen with a
