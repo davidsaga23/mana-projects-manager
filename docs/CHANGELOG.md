@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-28 — A signed-off show's budget is fixed; only a ticked admin changes it *(migration 070 + finance_install_10)*
+
+- **Once a show's kick-off is signed off, its approved production budget is read-only** on the
+  finance Overview, with a 🔒 line saying when it was fixed and who can still change it. Before
+  sign-off nothing changes.
+- **Who can change it is a tick, "Changes budget"**, on the Kick-off page under *Who signs off*,
+  beside the sign-off tick. Only administrators can be ticked (nobody else can see a budget).
+- **Every change after sign-off needs a short reason** and is recorded: old amount, new amount, who,
+  when, why. The list sits under the budget box as *Changes since sign-off*.
+- Needs **migration 070** (the tick) and **`finance_install_10.sql`** imported by hand into the
+  finance DB (the history). Until both are in, a signed-off budget cannot be changed by anybody,
+  and the box says which one is missing.
+
 ## 2026-10-27 — Videos open in the review viewer: frame by frame, 0.25× to 4× *(no migration)*
 
 - **Video versions get the Review & draw / Open viewer button too**, and open full screen with a
