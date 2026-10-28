@@ -4420,3 +4420,26 @@ comment on the current version (migration 065). Supervisors may post `approve|ba
 only (`SUPERVISOR_ACTIONS`); `review_apply()` checks the task is in their stage's status on a show
 they see. Whether "Complete" counts as approved for the charts is whatever the Statuses screen says.
 
+
+## 2026-10-28 — The studio's money rules, stated once
+
+**Asked by David,** at the start of the October development push: rules "we already know will be
+true", written down so every session builds on them instead of rediscovering them.
+
+**Decided:**
+1. **Anima tracks budget against cost, not profit.** The finance screens already do (Margin became
+   Budget variance; revenue left the screen on 2026-10-12). Nothing new should compute profit.
+2. **The production budget pays for everyone who works on the show**, freelancers and salaried
+   people alike (David, Tim, Renata, Junior). Salaried time on a project is cost, at an internal day
+   rate. Diego is paid per job, like a freelancer. *Open: how a salary becomes an internal day rate
+   and how salaried time reaches a project. Nothing in the code knows "salaried" yet; today a person
+   costs only if they have a `crew_terms` rate.*
+3. **Freelancers are paid for the days they work.** Their statement (logged time for the month, an
+   invoice summary, their contracts and shows) is how they get paid; it will get its own screen.
+4. **Everyone is paid in US dollars.** One currency for pay; no GBP. *Open: David asked how and when
+   amounts become euros when rates change daily.* The code already stores a currency per rate,
+   budget, invoice and expense, and flags mixed currencies without converting (2026-08-18).
+5. **Only Jorik can raise a budget.** The budget is fixed once the kick-off is signed off; after
+   that only he changes it, by hand. Being built on its own branch (see CHANGELOG when it ships).
+6. **Artists log their time every day.** Statements, actual cost and the scheduler may rely on daily
+   logs, and a missing day is a gap to chase, not zero work.
