@@ -17,6 +17,7 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/kickoff.php';
+require_once __DIR__ . '/includes/budget_lock.php';
 // Reached from the Finance tabs as well as the production side since
 // 2026-10-23, and it draws whichever bar it was reached from. ⚠ REQUIRED, NOT
 // LEFT TO function_exists(): without this the finance branch below would fail
@@ -83,6 +84,12 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $emails = (array)($_POST['email'] ?? []);
             $users  = $pdo->query("SELECT id, role FROM users WHERE active = 1")->fetchAll();
             $up = $pdo->prepare('UPDATE users SET signs_off_kickoff = ?, email = ? WHERE id = ?');
+            // WHO CHANGES A SIGNED-OFF BUDGET (David, 2026-10-28: "Only Jorik
+            // can raise a budget"), ticked beside who signs off because it is
+            // the other half of the same decision. Administrators only: nobody
+            // else can see a budget. Skipped until migration 070 has run.
+            $budgetTicks = budget_lock_ready($pdo) ? array_map('intval', (array)($_POST['budget'] ?? [])) : null;
+            $upBudget = $budgetTicks !== null ? $pdo->prepare('UPDATE users SET changes_budget = ? WHERE id = ?') : null;
             foreach ($users as $u) {
                 $id = (int)$u['id'];
                 $email = trim((string)($emails[$id] ?? ''));
@@ -93,8 +100,12 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 // and an artist's POST is refused before this page sees it.
                 $signs = in_array($id, $ticks, true) && in_array($u['role'], ['admin', 'editor'], true);
                 $up->execute([$signs ? 1 : 0, $email !== '' ? $email : null, $id]);
+                if ($upBudget) {
+                    $upBudget->execute([in_array($id, $budgetTicks, true) && $u['role'] === 'admin' ? 1 : 0, $id]);
+                }
             }
-            flash('ok', 'Saved who signs off kick-offs.');
+            flash('ok', $upBudget ? 'Saved who signs off kick-offs and who changes signed-off budgets.'
+                                  : 'Saved who signs off kick-offs.');
             $back = $selfUrl . '&view=people';
         }
     } catch (Throwable $e) {
@@ -152,9 +163,11 @@ if ($view === 'people'):
     if (!is_admin()): ?>
       <p class="muted">Only an administrator chooses who signs off.</p>
     <?php else:
+    $budgetCol = budget_lock_ready($pdo);
     $users = $pdo->query(
         "SELECT u.id, u.username, COALESCE(NULLIF(u.display_name, ''), u.username) AS name, u.role,
-                u.email, u.signs_off_kickoff, c.email AS crew_email
+                u.email, u.signs_off_kickoff, c.email AS crew_email"
+        . ($budgetCol ? ', u.changes_budget' : ', 0 AS changes_budget') . "
            FROM users u LEFT JOIN crew c ON c.id = u.crew_id
           WHERE u.active = 1 ORDER BY name"
     )->fetchAll(); ?>
@@ -163,7 +176,8 @@ if ($view === 'people'):
   <form method="post">
     <input type="hidden" name="action" value="people">
     <table class="data kickoff-people">
-      <thead><tr><th>Signs off</th><th>Person</th><th>Role</th><th>Email for sign-off requests</th></tr></thead>
+      <thead><tr><th>Signs off</th><th>Person</th><th>Role</th><th>Email for sign-off requests</th>
+        <th title="May change a show's budget after its kick-off is signed off">Changes budget</th></tr></thead>
       <tbody>
       <?php foreach ($users as $u): $canSign = in_array($u['role'], ['admin', 'editor'], true); ?>
         <tr>
@@ -174,12 +188,20 @@ if ($view === 'people'):
           <td><?= e($u['role']) ?><?php if (!$canSign): ?><div class="muted small">Can't sign off: this role can't save.</div><?php endif; ?></td>
           <td><input type="email" name="email[<?= (int)$u['id'] ?>]" value="<?= e((string)$u['email']) ?>"
                      placeholder="<?= e($u['crew_email'] ? $u['crew_email'] . ' (from Staffing)' : 'none') ?>" size="32"></td>
+          <td><input type="checkbox" name="budget[]" value="<?= (int)$u['id'] ?>"
+                     <?= (int)$u['changes_budget'] === 1 ? 'checked' : '' ?> <?= $budgetCol && $u['role'] === 'admin' ? '' : 'disabled' ?>
+                     aria-label="<?= e($u['name']) ?> changes signed-off budgets"></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
     </table>
     <p class="muted small">With no email typed here, the address of the crew member linked to the login on
       Users is used, shown greyed in the box.</p>
+    <p class="muted small"><strong>Changes budget:</strong> once a show's kick-off is signed off, its approved
+      production budget is fixed, and only the administrators ticked here can change it, each time with a
+      reason that is kept beside the budget (David, 2026-10-28).<?php if (!$budgetCol): ?>
+      <span class="warn-text">This tick needs migration 070 (open migrate.php); until then nobody can change
+      a signed-off budget.</span><?php endif; ?></p>
     <button type="submit">Save</button>
   </form>
     <?php endif;

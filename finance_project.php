@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/standards.php';
 require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/stopcost.php';
 require_once __DIR__ . '/includes/budgetpool.php';
+require_once __DIR__ . '/includes/budget_lock.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -138,7 +139,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('ok', $said);
 
         } elseif (isset($_POST['save_budget'])) {
-            flash('ok', save_project_budget($projectId, $project, $_POST, $who));
+            // Fixed once the kick-off is signed off (David, 2026-10-28); see
+            // includes/budget_lock.php for who may still change it, and how.
+            flash('ok', save_project_budget($projectId, $project, $_POST, $who, budget_lock($pdo, $projectId)));
         } elseif (isset($_POST['save_departments'])) {
             // Writes pipeline_steps.department on the ORDINARY production
             // connection. It is a production fact, not a financial one — see
@@ -234,11 +237,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $configured = finance_configured();
 $dbError = null;
-$budget = null; $invoices = [];
+$budget = null; $invoices = []; $budgetChanges = [];
+$budgetLock = budget_lock($pdo, $projectId);
 if ($configured) {
     try {
         $budget   = project_budget($projectId);
         $invoices = project_invoices($projectId);
+        $budgetChanges = project_budget_changes($projectId);
     } catch (Throwable $e) {
         $dbError = $e->getMessage();
     }
@@ -822,34 +827,89 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   of Anima. Everything beside it on the strip above is computed: the forecast from the pipeline,
   the staffing and the rates, and the invoice figures from the Invoices tab.
 </p>
+<?php
+// LOCKED ONCE THE KICK-OFF IS SIGNED OFF. David, 2026-10-28: "Only Jorik can
+// raise a budget. I can make the budget static after the project sign off but
+// he'll need to change it manually." The boxes stay on screen, read-only, so
+// the figure is still read in the same place; the save refuses as well
+// (save_project_budget()), since a disabled box is no protection on its own.
+$budgetFixed = $budgetLock !== null && !$budgetLock['may_change'];
+$ro = $budgetFixed ? ' readonly' : '';
+if ($budgetLock !== null): ?>
+  <p class="<?= $budgetFixed && ($budgetLock['problem'] || !$budgetLock['changers']) ? 'flash flash-warn' : '' ?>">
+    🔒 <strong>Fixed at kick-off sign-off</strong><?php if (!empty($budgetLock['signed_at'])): ?>
+      on <?= e(substr((string)$budgetLock['signed_at'], 0, 10)) ?><?php endif; ?>.
+    <?php if ($budgetLock['problem']): ?>
+      <?= e($budgetLock['problem']) ?>
+    <?php elseif ($budgetLock['changers']): ?>
+      Only <?= e(implode(' or ', $budgetLock['changers'])) ?> can change it<?= $budgetLock['may_change'] ? ' (you can)' : '' ?>,
+      and every change is recorded below with a reason.
+    <?php else: ?>
+      Nobody is ticked to change it yet. An administrator ticks <em>Changes budget</em> on the
+      <a href="kickoff.php?project=<?= (int)$projectId ?>&amp;view=people">Kick-off page, under Who signs off</a>.
+    <?php endif; ?>
+  </p>
+<?php endif; ?>
 <form method="post" class="money-form">
   <input type="hidden" name="save_budget" value="1">
   <div class="row">
     <?php // Named exactly as the strip names it, because two names for one box
           // is how the client fee came to be typed into it in the first place. ?>
     <label>Approved production budget
-      <input name="budget_amount" inputmode="decimal" placeholder="e.g. 85000"
+      <input name="budget_amount" inputmode="decimal" placeholder="e.g. 85000"<?= $ro ?>
              value="<?= e($budgetAmount !== null ? fmt_num($budgetAmount, 2) : '') ?>">
     </label>
     <label style="flex:0 1 90px;">Currency
-      <input name="currency" maxlength="3" style="text-transform:uppercase" value="<?= e($cur) ?>">
+      <input name="currency" maxlength="3" style="text-transform:uppercase" value="<?= e($cur) ?>"<?= $ro ?>>
     </label>
     <label>Terms
-      <input name="terms" placeholder="e.g. fixed fee, 50% on start" value="<?= e($budget['terms'] ?? '') ?>">
+      <input name="terms" placeholder="e.g. fixed fee, 50% on start" value="<?= e($budget['terms'] ?? '') ?>"<?= $ro ?>>
     </label>
     <?php // Still a textarea, not an input: notes here can run to a paragraph
           // about how a deal is structured, and switching to a single-line field
           // would flatten any newlines already saved the next time somebody
           // pressed Save. It is sized to match the inputs and drags taller. ?>
     <label style="flex:2 1 220px;">Notes
-      <textarea name="notes" rows="1"><?= e($budget['notes'] ?? '') ?></textarea>
+      <textarea name="notes" rows="1"<?= $ro ?>><?= e($budget['notes'] ?? '') ?></textarea>
     </label>
-    <div class="row-save"><button type="submit">Save budget</button></div>
+    <?php if ($budgetLock !== null && !$budgetFixed): ?>
+      <?php // Required by the save too. Tim and Jorik, 2026-10-28: a change
+            // after sign-off keeps "a short reason". ?>
+      <label style="flex:2 1 220px;">Why it is changing
+        <input name="change_reason" maxlength="500" required placeholder="e.g. client added two episodes">
+      </label>
+    <?php endif; ?>
+    <?php if (!$budgetFixed): ?>
+      <div class="row-save"><button type="submit"><?= $budgetLock !== null ? 'Change signed-off budget' : 'Save budget' ?></button></div>
+    <?php endif; ?>
   </div>
 </form>
 <?php if ($budget && !empty($budget['updated_at'])): ?>
   <p class="muted small">Last changed <?= e(substr((string)$budget['updated_at'], 0, 16)) ?><?php
     if (!empty($budget['updated_by'])): ?> by <?= e($budget['updated_by']) ?><?php endif; ?>.</p>
+<?php endif; ?>
+<?php // THE HISTORY, under the box it is the history of: every change made
+      // after sign-off, newest first, from finance_install_10.sql. ?>
+<?php if ($budgetChanges): ?>
+  <h4>Changes since sign-off</h4>
+  <table class="data budget-changes">
+    <thead><tr><th>When</th><th>Who</th><th class="num">Was</th><th class="num">Now</th><th>Why</th></tr></thead>
+    <tbody>
+    <?php foreach ($budgetChanges as $bc): ?>
+      <tr>
+        <td><?= e(substr((string)$bc['changed_at'], 0, 16)) ?></td>
+        <td><?= e($bc['changed_by']) ?></td>
+        <td class="num"><?= $bc['old_amount'] === null ? '—' : e(fmt_money_plain((float)$bc['old_amount'], (string)($bc['old_currency'] ?: 'USD'))) ?></td>
+        <td class="num"><?= $bc['new_amount'] === null ? '—' : e(fmt_money_plain((float)$bc['new_amount'], (string)($bc['new_currency'] ?: 'USD'))) ?></td>
+        <td><?= e($bc['reason']) ?><?php if (!empty($bc['also_changed'])): ?>
+          <div class="muted small">Also changed: <?= e($bc['also_changed']) ?>.</div><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+<?php elseif ($budgetLock !== null && $configured && !finance_column_exists('budget_changes', 'reason')): ?>
+  <p class="muted small">Changes after sign-off are recorded once <code>finance_install_10.sql</code> has been
+    imported into the finance database (by hand, in phpMyAdmin). Until then nobody can change this budget.</p>
 <?php endif; ?>
 
 <?php endif; ?>
