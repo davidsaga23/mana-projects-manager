@@ -4465,3 +4465,30 @@ true", written down so every session builds on them instead of rediscovering the
   hold the exact amounts. This replaces "flagged, never converted" (2026-08-18) for rates only:
   a project-fixed rate is a known conversion, not a guess.
 - **Budget changes after sign-off** save the old amount, new amount, who, when and a short reason.
+
+## 2026-10-28 — Invoices arrive by email and file themselves (design agreed, not built)
+
+**Asked by David:** *"we also need to setup a way to store and manage all the invoices through the
+accounting@mana.tv account. The idea is that all the invoices are sent directly there, it will check
+against the needed information, it will identify the project, download it and upload it to drive.
+Ideally it will also update the invoice section in the financial management tab."*
+
+**Decided:**
+- **mana.tv is on Google Workspace.** The mailbox and Drive side runs as a Google Apps Script inside
+  the studio's account (no mailbox password on the Anima server). Anima does the checking and the
+  finance update, reached by the script with a shared key in a header (the `pull_bugs.py` pattern).
+- **Only invoices from a known artist's email address are taken in;** anything else stays in the
+  inbox untouched.
+- **Gemini reads the PDF** (David: no additional fees). This is a second AI provider next to the
+  Claude transcript reader in `includes/ai.php`. *To confirm before building:* Gemini's free API tier
+  may let Google use what it is sent to improve its products; the paid tier does not. Invoices carry
+  bank details and addresses.
+- **Each invoice is checked** against what Anima expects (days logged per project × rate, the same
+  figures the artist's Home shows) and against the required fields David will supply.
+- **PDFs are filed in Drive per project.**
+- **A mismatch is flagged to David first.** Nothing emails the artist automatically, and nothing is
+  ever marked paid automatically; Jorik pays.
+- **It updates Finance management:** each line lands on its project's Invoices section as received,
+  linked to the PDF in Drive.
+- **Depends on IN4** (one invoice split across projects): today an `invoices` row belongs to one
+  project.
