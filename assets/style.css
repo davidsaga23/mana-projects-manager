@@ -4433,9 +4433,33 @@ body.rv-open { overflow: hidden; }
   display: grid; place-items: center; padding: 16px;
   background: var(--bg);
 }
-.rv-canvas { display: block; background: var(--surface-2); box-shadow: 0 6px 30px rgba(0,0,0,.45); touch-action: none; }
+/* The picture or video, with the drawing on a canvas laid exactly over it. */
+.rv-center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rv-frame { position: relative; background: var(--surface-2); box-shadow: 0 6px 30px rgba(0,0,0,.45); }
+.rv-frame[hidden] { display: none; }
+.rv-media { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; -webkit-user-drag: none; }
+.rv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .rv-canvas.is-pen { cursor: crosshair; }
-.rv-canvas[hidden] { display: none; }
+
+/* The video transport: scrubber on top, buttons under it. */
+.rv-transport { padding: 8px 16px 10px; border-top: 1px solid var(--border); background: var(--surface); }
+.rv-transport[hidden] { display: none; }
+.rv-scrub { width: 100%; margin: 0 0 8px; accent-color: var(--primary); cursor: pointer; }
+.rv-transport-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rv-transport-gap { flex: 1; }
+.rv-play { min-width: 44px; font-size: 14px; }
+.rv-counter { margin-left: 10px; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: pre; }
+.rv-speeds { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.rv-speed {
+  height: 30px; padding: 0 9px; border: 0; border-radius: 0; background: var(--surface-3);
+  color: var(--text-2); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.rv-speed + .rv-speed { border-left: 1px solid var(--border); }
+.rv-speed:hover { background: var(--surface-2); color: var(--text); }
+.rv-speed.is-on { background: var(--primary-tint); color: var(--primary); }
+.rv-btn.is-on { color: var(--primary); border-color: var(--primary-border); background: var(--primary-tint); }
+.rv-rate { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: 12.5px; color: var(--muted); }
+.rv-rate .rv-pick { height: 30px; font-weight: 500; }
 .rv-loading { margin: 0; }
 
 .rv-side {

@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-27 — Videos open in the review viewer: frame by frame, 0.25× to 4× *(no migration)*
+
+- **Video versions get the Review & draw / Open viewer button too**, and open full screen with a
+  transport under the picture: play/pause, one frame back and forward, first and last frame, a
+  scrubber, and **Frame N / total · HH:MM:SS:FF**.
+- **Speeds .25× .5× 1× 1.5× 2× 3× 4×**, loop on by default, sound off by default (one click on).
+- **The frame rate is a picker beside the counter (24 to start)**, remembered in your browser. The
+  browser cannot read it from the file, and a wrong rate makes frame steps land between frames.
+- **Reviewers draw on a paused frame.** The drawing shows only on that frame. The review is posted
+  as "Frame 18 (00:00:00:17) — your note", with that frame and the drawing as a JPEG
+  (`…_f0018_review.jpg`). Posting without drawing still records the frame you're paused on.
+- Keys on a video: Space plays, ← → (or , .) step frames, Home/End, L loops, M sound. [ and ]
+  switch version.
+- A file the browser cannot play (usually a ProRes .mov) says so and asks for an H.264 .mp4.
+
 ## 2026-10-27 — A review viewer with a pen, for image versions *(no migration)*
 
 - **Clicking an image version on Spell's Versions tab opens it full screen** (or its "Review & draw" /
