@@ -13,9 +13,38 @@ on:
   push:
     branches: [main, master]   # this repo's branch is "master"; either name deploys
   workflow_dispatch:        # allows a manual run from the Actions tab
+  pull_request:             # a PR gets the syntax check before it is merged;
+    branches: [main, master]  # the deploy job below is skipped for PRs
 
 jobs:
+  # ⚠ A SYNTAX CHECK BEFORE ANYTHING REACHES THE SERVER (2026-10-28). Nothing
+  # else stands between a merge and the live site, and nobody working on this
+  # repo can run PHP locally, so one missing bracket in a file every page loads
+  # (header.php, auth.php) would take the whole app down in 30 seconds. php -l
+  # only proves each file PARSES; it does not run anything or touch a database.
+  # If it fails, the deploy job below never starts and the live site is untouched.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: PHP syntax check (php -l on every tracked .php file)
+        run: |
+          php --version
+          failed=0
+          while IFS= read -r f; do
+            out=$(php -l "$f" 2>&1) || { echo "$out"; failed=1; }
+          done < <(git ls-files '*.php')
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::PHP syntax errors above. Nothing was deployed."
+            exit 1
+          fi
+          echo "Every PHP file parses."
+
   deploy:
+    needs: lint
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
