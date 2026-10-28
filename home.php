@@ -313,8 +313,17 @@ $anyNext = $next['overdue'] || $next['week'] || $next['later'];
       · <a href="home.php?month=<?= e($nextMonth) ?>"><?= e(date('F', strtotime($nextMonth . '-01'))) ?> →</a>
     <?php endif; ?>
   </p>
-  <p class="muted small">What to put on your invoice for this month. Send <strong>one invoice per month</strong>,
-    with a line per project, to <a href="mailto:accounting@mana.tv">accounting@mana.tv</a>.
+  <?php // HOW TO SEND IT, in Tim's words (relayed by David, 2026-10-28): "Send one
+        // invoice a month to accounting@mana.tv, with one line per project.
+        // Nowhere else. Jorik pays it once." Said plainly, because an invoice sent
+        // to a producer or a supervisor as well is one that can be paid twice. ?>
+  <div class="flash flash-ok home-howto">
+    <strong>How to invoice:</strong> send <strong>one invoice a month</strong>, with
+    <strong>one line per project</strong>, to <a href="mailto:accounting@mana.tv">accounting@mana.tv</a>
+    and nowhere else (not to producers or supervisors). Jorik pays it once.
+  </div>
+  <p class="muted small">Below is what to put on your invoice for this month. It is information for
+    your own invoice, not an invoice.
     <?= $monthTo < $monthEnd ? 'The month is not over yet: these figures count up to today.' : '' ?></p>
   <?php if (!$invoiceInfo['lines']): ?>
     <p class="muted">No time logged on your shows in <?= e(date('F', strtotime($monthFrom))) ?>.</p>

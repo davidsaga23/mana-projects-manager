@@ -34,7 +34,9 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   **invoice information** for the month (one line per project and step: rate, days or hours, line
   total, month total, with a link to the previous month), and **your invoices** with their status
   (not received yet / received, not paid yet / paid) and dates. Information to put on your own
-  invoice to accounting@mana.tv, not a ready-made invoice.
+  invoice, not a ready-made invoice. The panel says plainly how to send it (Tim, 2026-10-28): one
+  invoice a month, one line per project, to accounting@mana.tv and nowhere else (not to producers
+  or supervisors); Jorik pays it once.
 - **Supervisors** also get **Your team**: each person on the shows they supervise, the days they
   haven't logged this week and how many notes are waiting on them. No money.
 - **Salaried staff** (no invoice information, amounts or invoice status): admins and Production
