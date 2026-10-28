@@ -50,8 +50,28 @@ function project_budgets(array $projectIds): array {
     return $out;
 }
 
-/** Save the agreed budget. Returns a sentence for the flash message. */
-function save_project_budget(int $projectId, array $project, array $in, string $who = ''): string {
+/**
+ * Every change made to a project's budget after kick-off sign-off, newest
+ * first. Empty for a non-admin, and before finance_install_10.sql is imported.
+ */
+function project_budget_changes(int $projectId): array {
+    if (!can_see_money() || !finance_column_exists('budget_changes', 'reason')) return [];
+    $db = finance_db();
+    if (!$db) return [];
+    $q = $db->prepare('SELECT * FROM budget_changes WHERE project_id = ? ORDER BY changed_at DESC, id DESC');
+    $q->execute([$projectId]);
+    return $q->fetchAll();
+}
+
+/**
+ * Save the agreed budget. Returns a sentence for the flash message.
+ *
+ * $lock is budget_lock() from includes/budget_lock.php: null while the show is
+ * not signed off (saved as it always was), otherwise the save is refused unless
+ * the account may change a signed-off budget, needs a reason, and writes one
+ * budget_changes row (finance_install_10.sql) in the same transaction.
+ */
+function save_project_budget(int $projectId, array $project, array $in, string $who = '', ?array $lock = null): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can change a budget.');
     $db = finance_db();
     if (!$db) throw new RuntimeException('The finance database is not set up yet, see finance_install.sql.');
@@ -92,17 +112,73 @@ function save_project_budget(int $projectId, array $project, array $in, string $
     $upd  = 'project_code = VALUES(project_code), project_name = VALUES(project_name), '
           . 'budget_amount = VALUES(budget_amount), currency = VALUES(currency), '
           . 'terms = VALUES(terms), notes = VALUES(notes), updated_by = VALUES(updated_by)';
+    $terms = trim((string)($in['terms'] ?? '')) ?: null;
+    $notes = trim((string)($in['notes'] ?? '')) ?: null;
     $args = [
         $projectId, $project['code'] ?? null, $project['name'] ?? null,
-        $amount, $cur,
-        trim((string)($in['terms'] ?? '')) ?: null,
-        trim((string)($in['notes'] ?? '')) ?: null,
-        $who,
+        $amount, $cur, $terms, $notes, $who,
     ];
-    $db->prepare(
+    $upsert = $db->prepare(
         'INSERT INTO project_budgets (' . $cols . ') VALUES (' . $marks . ')
          ON DUPLICATE KEY UPDATE ' . $upd
-    )->execute($args);
+    );
+
+    if ($lock === null) {
+        $upsert->execute($args);
+    } else {
+        // SIGNED OFF: the approved figure is fixed (David, 2026-10-28). Checked
+        // here as well as by the read-only form, because a form is only a
+        // suggestion to whoever sends the POST.
+        if (!$lock['may_change']) {
+            throw new RuntimeException('This budget was fixed when the kick-off was signed off. '
+                . ($lock['problem'] ?? ($lock['changers']
+                    ? 'Only ' . implode(' or ', $lock['changers']) . ' can change it.'
+                    : 'Nobody is ticked to change it yet ("Changes budget", on the Kick-off page under Who signs off).'))
+                . ' Nothing was saved.');
+        }
+        // A change that cannot be recorded is not made: the history is half
+        // of what was asked for.
+        if (!finance_column_exists('budget_changes', 'reason')) {
+            throw new RuntimeException('A signed-off budget can only be changed once finance_install_10.sql has been '
+                . 'imported (by hand, in phpMyAdmin), so the change can be recorded. Nothing was saved.');
+        }
+        $reason = trim((string)($in['change_reason'] ?? ''));
+        if ($reason === '') {
+            throw new RuntimeException('Say in a few words why the signed-off budget is changing. Nothing was saved.');
+        }
+        $reason = mb_substr($reason, 0, 500);
+
+        $q = $db->prepare('SELECT budget_amount, currency, terms, notes FROM project_budgets WHERE project_id = ?');
+        $q->execute([$projectId]);
+        $old = $q->fetch() ?: ['budget_amount' => null, 'currency' => null, 'terms' => null, 'notes' => null];
+        $oldAmount = $old['budget_amount'] !== null ? round((float)$old['budget_amount'], 2) : null;
+
+        $also = [];
+        if ((string)($old['terms'] ?? '') !== (string)$terms) $also[] = 'terms';
+        if ((string)($old['notes'] ?? '') !== (string)$notes) $also[] = 'notes';
+        $amountChanged = $oldAmount !== $amount || (string)($old['currency'] ?? '') !== $cur;
+        if (!$amountChanged && !$also) {
+            throw new RuntimeException('Nothing on the budget is different from what is saved, so nothing was recorded.');
+        }
+
+        $db->beginTransaction();
+        try {
+            $db->prepare(
+                'INSERT INTO budget_changes (project_id, kickoff_id, old_amount, new_amount, old_currency,
+                    new_currency, also_changed, reason, changed_by_user_id, changed_by, changed_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            )->execute([
+                $projectId, $lock['kickoff_id'] ?: null, $oldAmount, $amount, $old['currency'], $cur,
+                $also ? implode(' and ', $also) : null, $reason,
+                $lock['user_id'] ?: null, $who !== '' ? $who : 'unknown', date('Y-m-d H:i:s'),
+            ]);
+            $upsert->execute($args);
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+    }
 
     $said = $amount === null
         ? 'Approved production budget cleared.'
