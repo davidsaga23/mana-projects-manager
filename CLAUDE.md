@@ -44,9 +44,9 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
 - The budget pays for **everyone** on the show: freelancers, and salaried staff (David, Tim, Renata,
   Junior) at **one blended internal day rate** Jorik supplies. Never store personal salaries.
   Diego is paid per job, like a freelancer.
-- Freelancers are paid for the days they work: **one bill per person per month**, a line per
-  project, split across projects by Anima.
-- **USD by default for every rate, bill and total.** A rare non-USD contract is entered in its own
+- Freelancers are paid for the days they work: **one invoice per person per month**, a line per
+  project, split across projects by Anima. Always say **"invoice"**, never "bill" (UI, code, docs).
+- **USD by default for every rate, invoice and total.** A rare non-USD contract is entered in its own
   currency and converted at **one exchange rate fixed per project** at set-up/sign-off, shown as
   "$520/day (£400)". No daily rates, no Wise fees.
 - **Only Jorik can change a budget** after the kick-off sign-off; save old, new, who, when, reason.
