@@ -22,6 +22,7 @@ require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/hiring.php';
 require_once __DIR__ . '/includes/artists.php';
 require_once __DIR__ . '/includes/absences.php';
+require_once __DIR__ . '/includes/invites.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -130,6 +131,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
     exit;
 }
 
+// --- an Anima login for this person: create one, or resend the link ---------
+// See includes/invites.php for who may do which, and why a password is never
+// emailed. Production and admins only; the guard in auth.php already refuses a
+// POST from anyone else, and may_send_invite_for() is the second lock, on the
+// login's own role.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
+    && (isset($_POST['create_login']) || isset($_POST['resend_link']))) {
+    try {
+        if (!invites_available($pdo)) {
+            throw new RuntimeException('Logins from this page need migration 071, run it on the Migrations screen first.');
+        }
+        if ((int)$person['is_placeholder'] === 1 || (int)$person['is_team'] === 1) {
+            throw new RuntimeException('A planning slot or a team cannot have a login, only a person can.');
+        }
+        $by = current_user_display();
+
+        if (isset($_POST['create_login'])) {
+            create_login_for_crew($pdo, $crewId, (string)$person['name'], (string)($_POST['username'] ?? ''));
+            $login  = crew_login($pdo, $crewId);
+            flash('ok', 'Created the artist login "' . $login['username'] . '" for ' . $person['name'] . '.');
+            $kind = 'create'; $reactivated = false;
+        } else {
+            $login = crew_login($pdo, $crewId);
+            if ($login === null) throw new RuntimeException('This person has no login yet, use Create user instead.');
+            if (!may_send_invite_for((string)$login['role'])) {
+                throw new RuntimeException($login['role'] === 'admin'
+                    ? 'Administrator passwords are not reset from here; do it on the Users screen.'
+                    : 'Only an administrator can send a link for a Production login.');
+            }
+            $reactivated = (int)$login['active'] !== 1;
+            if ($reactivated) {
+                $pdo->prepare('UPDATE users SET active = 1 WHERE id = ?')->execute([(int)$login['id']]);
+                flash('ok', 'The login "' . $login['username'] . '" had been switched off; it is switched back on.');
+            }
+            $kind = 'resend';
+        }
+
+        // Seeing THIS show. A person staffed into a slot already can
+        // (crew_projects, written by Staffing); the box is offered only when
+        // they are on the team page some other way and would otherwise log in
+        // to an empty list.
+        if (!empty($_POST['give_access'])) {
+            $pdo->prepare('INSERT IGNORE INTO crew_projects (crew_id, project_id) VALUES (?, ?)')
+                ->execute([$crewId, $projectId]);
+            flash('ok', 'They can now see ' . $project['name'] . '.');
+        }
+
+        $email = invite_address($pdo, (int)$login['id'], (string)($person['email'] ?? ''));
+        [$sent, $said, $link] = invite_issue($pdo, $login, $email, $kind, $project, $by, $reactivated);
+        flash($sent ? 'ok' : 'warn', $said);
+        if ($link !== '') $_SESSION['invite_link'] = $link;
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: ' . $selfUrl . '#login');
+    exit;
+}
+
 // --- save the terms (admin only; the guard lives in money.php) --------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
     try {
@@ -229,6 +288,25 @@ if (column_exists($pdo, 'tickets', 'id')) {
     );
     $t->execute([$crewId, $projectId]);
     $tickets = $t->fetchAll();
+}
+
+// Their Anima login, for the panel under Details. Production and admins only,
+// and never for a slot or a team, which are not anybody who could log in.
+$loginPanel = can_edit() && !$isSlot && (int)$person['is_team'] !== 1;
+$login = null; $lastInvite = null; $onShow = true; $inviteLink = '';
+if ($loginPanel && invites_available($pdo)) {
+    $login = crew_login($pdo, $crewId);
+    if ($login) $lastInvite = last_invite($pdo, (int)$login['id']);
+    try {
+        $m = $pdo->prepare('SELECT 1 FROM crew_projects WHERE crew_id = ? AND project_id = ?');
+        $m->execute([$crewId, $projectId]);
+        $onShow = (bool)$m->fetchColumn();
+    } catch (PDOException $e) {
+        $onShow = true;   // no crew_projects table: nothing is scoped, nothing to offer
+    }
+    // Shown once, only when the email did not go out (invite_issue()).
+    $inviteLink = (string)($_SESSION['invite_link'] ?? '');
+    unset($_SESSION['invite_link']);
 }
 
 $pageTitle = $person['name'] . ' · ' . $project['name'];
@@ -441,6 +519,102 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
   <div class="actions"><button type="submit">Save details</button></div>
 </form>
+<?php endif; ?>
+
+<?php if ($loginPanel): ?>
+  <h3 id="login">Anima login</h3>
+  <?php if (!invites_available($pdo)): ?>
+    <p class="muted small">
+      Creating a login from here needs migration 071, which hasn't been run yet. Open the
+      Migrations screen to run it; until then logins are made by hand on Users.
+    </p>
+  <?php else: ?>
+    <?php if ($inviteLink !== ''): ?>
+      <div class="flash flash-warn">
+        <strong>The link was not emailed.</strong> Copy it and send it to <?= e($person['name']) ?>
+        privately. It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
+        <input type="text" readonly value="<?= e($inviteLink) ?>" onclick="this.select()"
+               style="width:100%;margin-top:6px;">
+      </div>
+    <?php endif; ?>
+
+    <?php if ($login === null): ?>
+      <p class="muted small">
+        <?= e($person['name']) ?> has no login yet. <strong>Create user</strong> makes an
+        <strong>artist</strong> login linked to them and emails them a link to choose their own
+        password; nobody else ever knows it. The link works once, for <?= INVITE_DAYS ?> days.
+        To make them Production or a Supervisor, change the role on Users afterwards.
+      </p>
+      <?php if (empty($person['email'])): ?>
+        <p class="muted small warn-text">There is no email for them above, so the link would have
+           nowhere to go. Add one under Details first, or create it anyway and pass the link on by hand.</p>
+      <?php endif; ?>
+      <form method="post" class="stack">
+        <input type="hidden" name="create_login" value="1">
+        <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
+        <div class="row">
+          <label>Username
+            <input name="username" required maxlength="50" pattern="[A-Za-z0-9._@\-]+"
+                   value="<?= e(suggest_username($pdo, (string)$person['name'], (string)($person['email'] ?? ''))) ?>">
+          </label>
+        </div>
+        <?php if (!$onShow): ?>
+          <label class="inline"><input type="checkbox" name="give_access" value="1" checked>
+            Let them see <?= e($project['name']) ?> (they are not staffed on it yet, so they would log in to an empty list)</label>
+        <?php endif; ?>
+        <div class="actions"><button type="submit">Create user</button></div>
+      </form>
+
+    <?php else: ?>
+      <?php $role = (string)$login['role']; ?>
+      <p>
+        <strong><?= e($login['username']) ?></strong>
+        <span class="muted">· <?= e(role_in_words($role)) ?></span>
+        <?php if ((int)$login['active'] !== 1): ?><span class="warn-text">· switched off</span><?php endif; ?>
+        <span class="muted small">· last seen <?= e($login['last_seen'] ? substr((string)$login['last_seen'], 0, 16) : 'never') ?></span>
+      </p>
+      <?php if ($lastInvite): ?>
+        <p class="muted small">
+          Last link <?= $lastInvite['kind'] === 'create' ? 'created the login and was sent' : 'sent' ?>
+          <?= e(substr((string)$lastInvite['created_at'], 0, 16)) ?>
+          <?php if (!empty($lastInvite['created_by'])): ?>by <?= e($lastInvite['created_by']) ?><?php endif; ?>
+          <?php if (!empty($lastInvite['sent_to'])): ?>to <?= e($lastInvite['sent_to']) ?><?php endif; ?>,
+          <?php if ($lastInvite['used_at'] !== null): ?>
+            used <?= e(substr((string)$lastInvite['used_at'], 0, 16)) ?>.
+          <?php elseif (strtotime((string)$lastInvite['expires_at']) < time()): ?>
+            never used, and it has expired.
+          <?php else: ?>
+            not used yet<?= (int)$lastInvite['email_sent'] === 1 ? '' : ' (the email did not go out)' ?>.
+          <?php endif; ?>
+          <?php if ((int)$lastInvite['reactivated'] === 1): ?>It switched the login back on.<?php endif; ?>
+        </p>
+      <?php endif; ?>
+
+      <?php if (may_send_invite_for($role)): ?>
+        <p class="muted small">
+          <strong>Resend link</strong> emails them a fresh one-time link to set a new password and
+          log in, for someone coming back on a new show or who has forgotten it. Their current
+          password stops working only once they use it; any earlier link stops working at once.
+          <?php if ((int)$login['active'] !== 1): ?>
+            <strong>The login is switched off, sending the link switches it back on.</strong>
+          <?php endif; ?>
+        </p>
+        <form method="post" class="stack">
+          <input type="hidden" name="resend_link" value="1">
+          <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
+          <?php if (!$onShow): ?>
+            <label class="inline"><input type="checkbox" name="give_access" value="1" checked>
+              Let them see <?= e($project['name']) ?> (they are not staffed on it yet, so they would not see it)</label>
+          <?php endif; ?>
+          <div class="actions"><button type="submit" class="secondary">Resend link</button></div>
+        </form>
+      <?php elseif ($role === 'admin'): ?>
+        <p class="muted small">An administrator's password is not reset from here; that is done on Users.</p>
+      <?php else: ?>
+        <p class="muted small">Only an administrator can send a link for a Production login.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+  <?php endif; ?>
 <?php endif; ?>
 
 <?php if (absences_available($pdo) && !$isSlot): ?>
