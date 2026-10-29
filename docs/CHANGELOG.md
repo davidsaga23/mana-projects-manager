@@ -27,6 +27,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   short, filled, a heat-map cell) keeps its colour and only gets a shade lighter.
 - **Number columns line up digit under digit.**
 
+## 2026-10-29 — My tasks opens Spell's task panel *(no migration)*
+
+- **Clicking a production task on My tasks opens Spell's side panel** over the list: details,
+  versions (upload yours, see the review notes), comments and timeline, exactly as in Spell.
+- **"Show details"** beside each task goes to the item page, where the click used to go.
+- The list reloads when you close the panel after changing something in it, so the row's status
+  and versions are current.
+
 ## 2026-10-29 — Monthly invoices: one freelancer invoice split across projects (IN4) *(finance_install_12, imported by hand)*
 
 - **Finance → Monthly invoices** (`finance_invoice.php`, linked from Studio finances): pick a month

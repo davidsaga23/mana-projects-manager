@@ -4611,3 +4611,8 @@ body.rv-open { overflow: hidden; }
 .invite-copy input { flex: 1; min-width: 0; }
 .invite-copy button { margin: 0; white-space: nowrap; }
 
+/* My tasks rows open Spell's task panel (2026-10-29): the item reads as a link,
+   not as Spell's step chip, with "Show details" (the item page) beside it. */
+.mytask-open { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
+.mytask-open:hover { text-decoration: underline; filter: none; }
+.mytask-details { margin-left: 8px; font-size: 11.5px; padding: 1px 8px; }
