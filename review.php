@@ -7,14 +7,24 @@
 // in the top bar, beside My tasks, which carries the count.
 //
 // Supervisors see Pending review and approve to Ready for review; admins and
-// Production see Ready for review and approve to Complete. Either may send work
-// back with a note. The rules are in includes/review.php.
+// Production see Ready for review and approve to Complete. Either may send it
+// to Retake instead. The rules are in includes/review.php.
+//
+// A GRID OF CARDS, AND THE PICTURE OPENS SPELL'S VIEWER (David, 2026-10-29: "a
+// grid of cards instead of one item per line/box ... Once a supervisor clicks
+// the image, they will see the same review view as in spell, they can leave
+// notes directly there or have the option to attached images"). The viewer is
+// assets/review-viewer.js, built from the task's Versions pane, which this page
+// fetches from board_task.php?pane=versions when a picture is clicked. So the
+// notes, the drawing and the files go through the same add_review as in Spell,
+// and who may post is decided where it always was. Approve and Retake ride
+// along into the viewer's top bar.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/review.php';
-require_once __DIR__ . '/includes/uploads.php';   // version_label()
+require_once __DIR__ . '/includes/uploads.php';   // version_label(), attachment_is_image()
 require_once __DIR__ . '/includes/mailer.php';    // notify_mentioned_task(), for @ in a note
 require_login();
 
@@ -31,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (preview_blocks_saving()) throw new RuntimeException('Nothing saves while you are previewing a role.');
         flash('ok', review_apply($pdo, (int)($_POST['progress_id'] ?? 0),
-            $action, (string)($_POST['note'] ?? ''), (int)($_POST['back_status'] ?? 0)));
+            $action, (string)($_POST['note'] ?? '')));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -54,12 +64,14 @@ $only = (int)($_GET['project'] ?? 0);
 if ($only && !isset($shows[$only])) $only = 0;
 $shown = $only ? array_values(array_filter($queue, fn($t) => (int)$t['project_id'] === $only)) : $queue;
 
-// The send-back choices, per show, worked out once rather than per row.
-$backOptions = [];
-$missingTarget = [];
+// The two statuses the verdicts move to, per show, worked out once rather than
+// per card. A show missing one gets a warning and that button off, rather than
+// a button that is only refused after the click.
+$noApprove = [];
+$noRetake = [];
 foreach (array_keys($shows) as $pid) {
-    $backOptions[$pid] = review_back_statuses($pdo, $pid, $stage);
-    if (!review_status_named($pdo, $pid, $cfg['to'])) $missingTarget[] = $shows[$pid]['code'];
+    if (!review_status_named($pdo, $pid, $cfg['to'])) $noApprove[$pid] = $shows[$pid]['code'];
+    if (!review_status_named($pdo, $pid, REVIEW_RETAKE)) $noRetake[$pid] = $shows[$pid]['code'];
 }
 
 $pageTitle = 'Reviews';
@@ -70,18 +82,20 @@ require __DIR__ . '/includes/header.php';
   <span class="muted">· <?= count($queue) ?> waiting on you</span></h2>
 <p class="lead">
   Everything in <strong><?= e(ucwords($cfg['from'])) ?></strong> on the shows you can see, newest version
-  first. <strong>Approve</strong> moves it to <strong><?= e(ucwords($cfg['to'])) ?></strong>;
-  <strong>Send back</strong> needs a note and goes to the status you pick. A note is posted as a review
-  on the current version, so it is in the task's own conversation in Spell.
+  first. Click the picture to open it in the review viewer, the same one as in Spell: step through it, draw on
+  it, write notes and attach images. <strong>Approve</strong> moves it to
+  <strong><?= e(ucwords($cfg['to'])) ?></strong>; <strong>Retake</strong> moves it to <strong>Retake</strong>.
+  Both are also at the top of the viewer.
 </p>
 
-<?php if ($missingTarget): ?>
+<?php foreach ([[$noApprove, ucwords($cfg['to']), 'Approve'], [$noRetake, 'Retake', 'Retake']] as [$missing, $named, $button]):
+    if (!$missing) continue; ?>
   <p class="flash flash-warn">
-    <?= e(implode(', ', $missingTarget)) ?> <?= count($missingTarget) === 1 ? 'has' : 'have' ?> no status called
-    <strong><?= e(ucwords($cfg['to'])) ?></strong>, so Approve is refused there until it is added on the
+    <?= e(implode(', ', $missing)) ?> <?= count($missing) === 1 ? 'has' : 'have' ?> no status called
+    <strong><?= e($named) ?></strong>, so <?= e($button) ?> is off there until it is added on the
     Statuses screen.
   </p>
-<?php endif; ?>
+<?php endforeach; ?>
 
 <?php if (count($shows) > 1): ?>
   <p class="board-projects review-shows">
@@ -96,74 +110,96 @@ require __DIR__ . '/includes/header.php';
   <div class="empty-state"><p>Nothing is waiting for your review. Tasks arrive here when they are set to
     <strong><?= e(ucwords($cfg['from'])) ?></strong>.</p></div>
 <?php else: ?>
-  <ul class="review-queue">
+  <ul class="rq-grid">
   <?php foreach ($shown as $t):
       $pid = (int)$t['project_id'];
       $v = $t['version'];
       $openPath = board_task_path($pid, (int)$t['step_id'], (string)$t['item_key'], 'versions', $v ? 'v' . (int)$v['id'] : '');
-      $isImage = $v && strpos((string)($v['mime_type'] ?? ''), 'image/') === 0;
+      $mime = $v ? (string)($v['mime_type'] ?? '') : '';
+      $isImage = $v && attachment_is_image($mime);
+      $isVideo = $v && attachment_is_video($mime);
       $fileUrl = $v ? 'attachment.php?kind=version&amp;id=' . (int)$v['id'] : '';
+      $vName = $v ? e((string)$v['original_name']) : '';
+      // The version and its note count, laid over the corners of the picture.
+      $tags = '';
+      if ($v) $tags .= '<span class="version-tag">' . e(version_label((int)$v['version_no'])) . '</span>';
+      if ($t['notes'] > 0) {
+          $tags .= '<span class="review-notes-count" title="Review notes already on this version">'
+                 . (int)$t['notes'] . ' note' . ($t['notes'] === 1 ? '' : 's') . '</span>';
+      }
   ?>
-    <li class="review-item">
-      <div class="review-thumb">
-        <?php if ($isImage): ?>
-          <a href="<?= $fileUrl ?>" class="att-zoom" data-name="<?= e((string)$v['original_name']) ?>">
-            <img src="<?= $fileUrl ?>" alt="<?= e((string)$v['original_name']) ?>" loading="lazy"></a>
-        <?php elseif ($v): ?>
-          <a href="<?= $fileUrl ?>" class="review-file" target="_blank" rel="noopener"><?= e((string)$v['original_name']) ?></a>
-        <?php else: ?>
-          <span class="muted small">no version uploaded</span>
-        <?php endif; ?>
-      </div>
+    <li class="rq-card">
+      <?php if ($isImage || $isVideo): ?>
+        <?php // The way into the viewer: which task, and which version to open on. ?>
+        <button type="button" class="rq-media" title="Open in the review viewer"
+                data-rq-open="<?= (int)$v['id'] ?>" data-project="<?= $pid ?>"
+                data-step="<?= (int)$t['step_id'] ?>" data-item="<?= e((string)$t['item_key']) ?>">
+          <?php if ($isImage): ?>
+            <img src="<?= $fileUrl ?>" alt="<?= $vName ?>" loading="lazy">
+          <?php else: ?>
+            <?php // A frame just in, as the thumbnail; preload="metadata" fetches only the start until it is opened. ?>
+            <video src="<?= $fileUrl ?>#t=0.1" preload="metadata" muted playsinline></video>
+            <span class="rq-play" aria-hidden="true">▶</span>
+          <?php endif; ?>
+          <?= $tags ?>
+        </button>
+      <?php elseif ($v): ?>
+        <?php // A PDF or anything else the viewer cannot show: the file itself. ?>
+        <a class="rq-media is-file" href="<?= $fileUrl ?>" target="_blank" rel="noopener"><?= $vName ?><?= $tags ?></a>
+      <?php else: ?>
+        <div class="rq-media is-empty">No version uploaded yet</div>
+      <?php endif; ?>
 
-      <div class="review-body">
-        <div class="review-title">
+      <div class="rq-info">
+        <div class="rq-title">
           <span class="dot" style="background:<?= e($t['step_color'] ?: '#ccc') ?>"></span>
-          <strong><?= e($t['item_name']) ?></strong> · <?= e($t['step_name']) ?>
-          <span class="muted small"><?= e($t['project_code']) ?></span>
-          <?php if ($v): ?>
-            <span class="version-tag"><?= e(version_label((int)$v['version_no'])) ?></span>
-          <?php endif; ?>
-          <?php if ($t['notes'] > 0): ?>
-            <span class="review-notes-count" title="Review notes already on this version"><?= (int)$t['notes'] ?> note<?= $t['notes'] === 1 ? '' : 's' ?></span>
-          <?php endif; ?>
+          <strong title="<?= e($t['item_name'] . ' · ' . $t['step_name']) ?>"><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong>
+          <span class="muted small rq-show" title="<?= e((string)$t['project_name']) ?>"><?= e($t['project_code']) ?></span>
         </div>
-        <div class="muted small">
+        <div class="muted small rq-meta">
           <?= $t['crew_name'] ? e($t['crew_name']) : 'Nobody assigned' ?>
-          <?php if ($v): ?>· put up <?= e(date('j M Y · H:i', strtotime((string)$v['created_at']))) ?><?php endif; ?>
-          <?php if ($v && trim((string)($v['note'] ?? '')) !== ''): ?>· “<?= e((string)$v['note']) ?>”<?php endif; ?>
+          <?php if ($v): ?>· put up <?= e(date('j M · H:i', strtotime((string)$v['created_at']))) ?><?php endif; ?>
         </div>
+        <?php if ($v && trim((string)($v['note'] ?? '')) !== ''): ?>
+          <div class="muted small rq-meta" title="<?= e((string)$v['note']) ?>">“<?= e((string)$v['note']) ?>”</div>
+        <?php endif; ?>
         <?php if ($v && !empty($v['link'])): ?>
           <div class="small"><a href="<?= e((string)$v['link']) ?>" target="_blank" rel="noopener">Final files ↗</a></div>
         <?php endif; ?>
-
-        <form method="post" class="review-verdict">
-          <input type="hidden" name="progress_id" value="<?= (int)$t['id'] ?>">
-          <input type="hidden" name="project" value="<?= $only ?: '' ?>">
-          <textarea name="note" rows="2" placeholder="Review note: optional to approve, needed to send back. @Name tags someone."></textarea>
-          <div class="review-actions">
-            <button type="submit" name="action" value="approve">Approve → <?= e(ucwords($cfg['to'])) ?></button>
-            <span class="review-back">
-              <select name="back_status" aria-label="Status to send it back to">
-                <?php foreach ($backOptions[$pid] as $s): ?>
-                  <option value="<?= (int)$s['id'] ?>"><?= e($s['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
-              <button type="submit" name="action" value="back" class="secondary">Send back</button>
-            </span>
-            <span class="spacer"></span>
-            <a class="button secondary" href="<?= e($openPath) ?>">Open in Spell</a>
-            <button type="button" class="secondary board-copy-url" data-copy="<?= e($openPath) ?>"
-                    title="A link to this version. It opens for anyone signed in to Anima, not publicly.">Copy URL</button>
-          </div>
-        </form>
       </div>
+
+      <form method="post" class="rq-verdict">
+        <input type="hidden" name="progress_id" value="<?= (int)$t['id'] ?>">
+        <input type="hidden" name="project" value="<?= $only ?: '' ?>">
+        <div class="rq-buttons">
+          <button type="submit" name="action" value="approve"
+                  title="<?= isset($noApprove[$pid]) ? e($t['project_code'] . ' has no ' . ucwords($cfg['to']) . ' status')
+                                                     : 'Moves it to ' . e(ucwords($cfg['to'])) ?>"
+                  <?= isset($noApprove[$pid]) ? 'disabled' : '' ?>>Approve</button>
+          <button type="submit" name="action" value="retake" class="secondary danger"
+                  title="<?= isset($noRetake[$pid]) ? e($t['project_code'] . ' has no Retake status') : 'Moves it to Retake' ?>"
+                  <?= isset($noRetake[$pid]) ? 'disabled' : '' ?>>Retake</button>
+        </div>
+        <div class="rq-links">
+          <a href="<?= e($openPath) ?>">Open in Spell</a>
+          <button type="button" class="secondary board-copy-url" data-copy="<?= e($openPath) ?>"
+                  title="A link to this version. It opens for anyone signed in to Anima, not publicly.">Copy URL</button>
+        </div>
+      </form>
     </li>
   <?php endforeach; ?>
   </ul>
 <?php endif; ?>
 
+<?php // Where the clicked task's Versions pane is put for the viewer to read. ?>
+<div id="rqPane" hidden></div>
+
+<?php // The @ picker in the viewer's box, the lightbox (tickets.js) for a picture
+      // in somebody's note, the files going with a review, and the viewer. ?>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
 <script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<script src="assets/review-files.js<?= asset_ver('review-files.js') ?>"></script>
+<script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
 <script>
 // Copy URL, the same as Spell's: a full address on the clipboard, with a
 // fallback for a studio on plain http where navigator.clipboard is refused.
@@ -191,16 +227,41 @@ document.addEventListener('click', function (e) {
   box.remove();
   done(ok);
 });
-// Send back without a note would only be refused by the server; say so here.
-document.addEventListener('submit', function (e) {
-  var f = e.target;
-  if (!f.classList || !f.classList.contains('review-verdict')) return;
-  var btn = e.submitter;
-  if (btn && btn.value === 'back' && !f.note.value.trim()) {
-    e.preventDefault();
-    f.note.focus();
-    f.note.placeholder = 'Say what needs changing before sending it back.';
-  }
+// A picture opens Spell's review viewer. The viewer is built from the task's
+// Versions pane, so that pane is fetched first (board_task.php?pane=versions,
+// the same checks as the task panel), and the card's own Approve and Retake
+// go into the viewer's top bar: pressing one there presses it here.
+document.addEventListener('click', function (e) {
+  var t = e.target.closest ? e.target.closest('[data-rq-open]') : null;
+  if (!t || t.classList.contains('is-loading')) return;
+  e.preventDefault();
+  var card = t.closest('.rq-card');
+  var spell = card.querySelector('.rq-links a');
+  var host = document.getElementById('rqPane');
+  var url = 'board_task.php?pane=versions&project=' + encodeURIComponent(t.getAttribute('data-project'))
+          + '&step=' + encodeURIComponent(t.getAttribute('data-step'))
+          + '&item=' + encodeURIComponent(t.getAttribute('data-item'));
+  t.classList.add('is-loading');
+  fetch(url, { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(function (html) {
+      t.classList.remove('is-loading');
+      host.innerHTML = html;
+      var pane = host.querySelector('[data-pane]');
+      if (!pane || !window.animaReviewViewer || !pane.querySelector('li.version')) throw new Error('no pane');
+      var actions = [];
+      card.querySelectorAll('.rq-buttons button').forEach(function (b) {
+        if (b.disabled) return;
+        actions.push({ label: b.textContent.trim(), cls: b.className, title: b.title,
+                       run: function () { b.click(); } });
+      });
+      window.animaReviewViewer.open(pane, t.getAttribute('data-rq-open'), { actions: actions });
+    })
+    .catch(function () {
+      // Whatever went wrong, the task in Spell still has everything.
+      t.classList.remove('is-loading');
+      if (spell) window.location.href = spell.href;
+    });
 });
 </script>
 

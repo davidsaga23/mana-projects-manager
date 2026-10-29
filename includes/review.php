@@ -6,8 +6,8 @@
 // TWO STAGES, BY STATUS NAME, settled with David the same day:
 //
 //   artist puts work up        → Pending review
-//   a SUPERVISOR reviews it    → Ready for review   (or sends it back)
-//   ADMINS / PRODUCTION review → Complete           (or send it back)
+//   a SUPERVISOR reviews it    → Ready for review   (or Retake)
+//   ADMINS / PRODUCTION review → Complete           (or Retake)
 //
 // So the queue is not "delivered and not approved": it is one named status per
 // reviewer, and approving moves the task to the next named status. Names, not
@@ -113,36 +113,24 @@ function review_queue(PDO $pdo, string $stage): array {
 }
 
 /**
- * The statuses a task can be SENT BACK to: everything on the show except the
- * two this stage moves between and anything that counts as approved. The first
- * one that reads like a retake is offered first.
+ * RETAKE IS ONE NAMED STATUS TOO (David, 2026-10-29: "two buttons: 1. Approve
+ * ... 2. Retake: It will change the status from pending review to Retake. Not
+ * sure what the send back is for."). The old "Send back" offered every status
+ * on the show in a dropdown; nobody used it for anything but Retake, so the
+ * reviewer now has the two verdicts and nothing to pick. Matched by name like
+ * REVIEW_STAGES, so a show that has no "Retake" says so instead of guessing.
  */
-function review_back_statuses(PDO $pdo, int $projectId, string $stage): array {
-    $skip = [REVIEW_STAGES[$stage]['from'], REVIEW_STAGES[$stage]['to']];
-    $out = [];
-    foreach (project_statuses($pdo, $projectId) as $s) {
-        if (in_array(review_norm((string)$s['name']), $skip, true)) continue;
-        if (($s['maps_to'] ?? '') === 'approved') continue;
-        $out[] = $s;
-    }
-    usort($out, function ($a, $b) {
-        $score = fn($s) => preg_match('/retake|change|revis|fix|redo/i', (string)$s['name']) ? 0
-                        : (preg_match('/in progress/i', (string)$s['name']) ? 1 : 2);
-        return $score($a) <=> $score($b);
-    });
-    return $out;
-}
+const REVIEW_RETAKE = 'retake';
 
 /**
- * Approve a task, or send it back. Returns the sentence for the flash.
+ * Approve a task, or send it to Retake. Returns the sentence for the flash.
  *
  * Every id arrives from the browser, so all of it is checked here: the show is
  * one this account sees, the task is in THIS account's queue right now (so a
  * stale page cannot approve something somebody already moved), and the target
  * status is the show's own.
  */
-function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, int $backStatusId,
-                      bool $postNote = true): string {
+function review_apply(PDO $pdo, int $progressId, string $verdict, string $note = ''): string {
     $stage = review_stage();
     if (!$stage) throw new RuntimeException('Your account does not review work.');
     $cfg = REVIEW_STAGES[$stage];
@@ -168,15 +156,16 @@ function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, 
             throw new RuntimeException('This show has no status called "' . ucwords($cfg['to'])
                 . '". Add it on the Statuses screen first.');
         }
-    } elseif ($verdict === 'back') {
-        if ($note === '') throw new RuntimeException('Say what needs changing: sending work back needs a note.');
-        $target = null;
-        foreach (review_back_statuses($pdo, $projectId, $stage) as $s) {
-            if ((int)$s['id'] === $backStatusId) $target = $s;
+    } elseif ($verdict === 'retake') {
+        // ⚠ NO NOTE NEEDED (the open question to David, 2026-10-29). The notes
+        // are written in the review viewer, on the version, before the verdict;
+        // a note typed with the verdict is still posted as one.
+        $target = review_status_named($pdo, $projectId, REVIEW_RETAKE);
+        if (!$target) {
+            throw new RuntimeException('This show has no status called "Retake". Add it on the Statuses screen first.');
         }
-        if (!$target) throw new RuntimeException('Pick the status to send it back to.');
     } else {
-        throw new RuntimeException('Approve or send back, nothing else.');
+        throw new RuntimeException('Approve or Retake, nothing else.');
     }
 
     $detail = board_task_detail($pdo, $projectId, $stepId, $itemKey);
@@ -184,9 +173,7 @@ function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, 
 
     // The note first: it is the part that matters to the artist, and the same
     // review comment the task panel shows, on the current version.
-    // $postNote false: the caller posts the note itself, on the version it was
-    // made on and with its drawing (the review viewer, board_version.php).
-    if ($postNote && $note !== '' && board_comments_available($pdo)) {
+    if ($note !== '' && board_comments_available($pdo)) {
         $versionId = null;
         if (board_reviews_available($pdo) && board_versions_available($pdo)) {
             $vq = $pdo->prepare('SELECT id FROM progress_versions WHERE progress_id = ?
@@ -236,5 +223,5 @@ function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, 
 
     return $verdict === 'approve'
         ? $taskName . ' approved, now ' . $target['name'] . '.'
-        : $taskName . ' sent back to ' . $target['name'] . ', with your note.';
+        : $taskName . ' sent to ' . $target['name'] . ($note !== '' ? ', with your note.' : '.');
 }

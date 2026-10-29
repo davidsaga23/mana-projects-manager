@@ -143,20 +143,20 @@ $bad  = '';
 // bell and the email, and save_ticket_attachments() takes the pictures — pasted
 // or picked, they arrive as the same files[] field.
 //
-// APPROVE / SEND BACK from the review viewer (David, 2026-10-29) arrive here as
-// add_review with a `verdict`: the status moves first, through review_apply(),
-// the same rules and checks as the Reviews page; then the note and any drawing
-// are posted as the review on the version being looked at. Approving with
-// nothing written posts no review at all.
+// APPROVE / RETAKE from the viewer opened on a task (David, 2026-10-29) arrive
+// here as add_review with a `verdict`: the status moves through review_apply(),
+// the same rules and checks as the Reviews screen, and the Versions pane comes
+// back redrawn. A note or drawing sent with it is posted as the review on the
+// version being looked at; the viewer's buttons send none.
 if (isset($_POST['add_review'])) {
     $verdict = (string)($_POST['verdict'] ?? '');
     $verdictSaid = '';
     if ($verdict !== '') {
         try {
-            if (!in_array($verdict, ['approve', 'back'], true)) throw new RuntimeException('Approve or send back, nothing else.');
+            if (!in_array($verdict, ['approve', 'retake'], true)) throw new RuntimeException('Approve or Retake, nothing else.');
             $vpid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
-            $verdictSaid = review_apply($pdo, $vpid, $verdict, (string)($_POST['body'] ?? ''),
-                                        (int)($_POST['back_status'] ?? 0), false);
+            // No note here: any text is posted below, on the version on screen.
+            $verdictSaid = review_apply($pdo, $vpid, $verdict, '');
         } catch (Throwable $e) {
             $bad = $e->getMessage();
         }

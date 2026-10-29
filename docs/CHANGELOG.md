@@ -14,17 +14,30 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-10-29 — Approve and Send back in the review viewer *(no migration)*
+## 2026-10-29 — Approve and Retake in the viewer from Spell and My tasks too *(no migration)*
 
-- **The full-screen review viewer now has Approve and Send back** beside Post review, for the
+- **The review viewer opened from a task** (Spell's panel, or My tasks) now shows the same
+  **Approve** and **Retake** buttons in its top bar as it does from the Reviews screen, for the
   reviewer whose turn it is: a supervisor on a task in Pending review, Production and admins on one
-  in Ready for review (the same stages as the Reviews page).
-- **Approve** moves the task on (to Ready for review, or Complete). Anything written or drawn is
-  posted with it as the review on the version on screen.
-- **Send back** needs a note and goes to the status picked beside it (a retake status first). The
-  note and the drawing are posted as the review.
-- The buttons only show while the task is waiting on you; after a verdict they go and the viewer
-  says where the task went.
+  in Ready for review.
+- They give the verdict through the same rules as the Reviews screen, then the Versions pane is
+  redrawn so the task shows where it went. Nothing is posted with them; notes and drawings are
+  posted with Post review as before.
+- They only show while the task is waiting on you.
+
+## 2026-10-29 — Reviews: a grid of cards, Approve / Retake, and Spell's viewer *(no migration)*
+
+- **The Reviews screen is a grid of cards**: the newest version's picture (or a video's first
+  frame), the shot or asset and step, the show, the artist, and two buttons.
+- **Two verdicts: Approve and Retake.** Approve moves the task on as before (supervisors: Pending
+  review → Ready for review; admins and Production: Ready for review → Complete). Retake moves it
+  to the show's **Retake** status. The status dropdown and Send back are gone. A note is optional.
+- **Clicking the picture opens the same review viewer as Spell**: frame by frame, speeds, timecode,
+  drawing on a frame, notes. Approve and Retake are in the viewer's top bar too.
+- **Images can go with a review written in the viewer**, in Spell as well: Attach files, paste a
+  screenshot into the box, or drop files on it, with the same thumbnails as Spell's panel.
+- A show with no "Retake" (or no "Complete" / "Ready for review") gets a warning and that button is
+  off there.
 
 ## 2026-10-29 — Budget pool: used days come only from logged time *(no migration)*
 

@@ -95,7 +95,14 @@
 
   // --- open and close ---------------------------------------------------------
 
-  function open(pane, versionId) {
+  /**
+   * opts.actions, optional: verdict buttons for the top bar, each
+   * { label, cls, title, run }. The Reviews screen passes Approve and Retake
+   * (David, 2026-10-29), so a verdict can be given without leaving the
+   * picture; Spell passes none. run() is the caller's: this file only says
+   * when a review is still being written, and closes before it runs.
+   */
+  function open(pane, versionId, opts) {
     if (S) close(true);
     var versions = readVersions(pane);
     if (!versions.length) return;
@@ -114,7 +121,8 @@
       who: reviewForm, media: null, w: 0, h: 0, scale: 1, fitted: true,
       strokes: [], live: null, drawFrame: null,
       color: COLORS[0], size: SIZES[1].px, pen: !!reviewForm,
-      fps: savedRate(), speed: 1, loop: true
+      fps: savedRate(), speed: 1, loop: true,
+      actions: (opts && opts.actions) || []
     };
     build();
     document.body.classList.add('rv-open');
@@ -123,14 +131,28 @@
 
   function close(force) {
     if (!S) return;
-    if (!force && S.strokes.length
-        && !window.confirm('Close the viewer? The drawing has not been posted and will be lost.')) return;
+    if (!force && unposted()
+        && !window.confirm('Close the viewer? The review has not been posted and will be lost.')) return;
     stopMedia();
     S.root.remove();
     document.body.classList.remove('rv-open');
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onResize);
     S = null;
+  }
+
+  /** Is a review half written: a drawing, text in the box, or files waiting? */
+  function unposted() {
+    if (!S) return false;
+    return S.strokes.length > 0 || (S.box && S.box.value.trim() !== '') || pickedFiles().length > 0;
+  }
+
+  /** The files going with the review, kept by assets/review-files.js. */
+  function pickedFiles() {
+    if (!S || !S.form) return [];
+    if (window.animaReviewFiles) return window.animaReviewFiles.files(S.form);
+    var input = S.form.querySelector('input[type="file"]');
+    return input ? Array.prototype.slice.call(input.files || []) : [];
   }
 
   /** Let go of the video, so it stops downloading as well as playing. */
@@ -181,6 +203,19 @@
     zoom.appendChild(btn('rv-btn rv-fit', 'Fit', 'Fit to the window (0)', function () { S.fitted = true; layout(); }));
     zoom.appendChild(btn('rv-btn rv-fit', '100%', 'Actual size (1)', function () { setScale(1); }));
     top.appendChild(zoom);
+
+    if (S.actions.length) {
+      var verdict = el('div', 'rv-verdict');
+      S.actions.forEach(function (a) {
+        verdict.appendChild(btn('rv-verdict-btn ' + (a.cls || ''), a.label, a.title || '', function () {
+          if (unposted() && !window.confirm('The review you are writing has not been posted and will be lost. '
+              + a.label + ' anyway?')) return;
+          close(true);
+          a.run();
+        }));
+      });
+      top.appendChild(verdict);
+    }
 
     root.appendChild(top);
 
@@ -345,30 +380,42 @@
   }
 
   function buildCompose() {
-    var f = el('form', 'rv-compose');
-    S.box = el('textarea', 'rv-box');
+    // ⚠ board-review-form / board-review-box / board-review-thumbs ARE
+    // assets/review-files.js's hooks: pasting an image into the box, picking
+    // or dropping files on the form, and the thumbnails with an ×, exactly as
+    // the "Make a review" form in the panel does it (David, 2026-10-29: "the
+    // option to attach images the same way the side panel works in spell").
+    var f = el('form', 'rv-compose board-review-form');
+    S.form = f;
+    S.box = el('textarea', 'rv-box board-review-box');
     S.box.rows = 2;
-    S.box.placeholder = 'Write your review… type @ to name somebody';
+    S.box.placeholder = 'Write your review… paste an image straight in, type @ to name somebody';
     f.appendChild(S.box);
 
+    var thumbs = el('div', 'board-review-thumbs');
+    thumbs.hidden = true;
+    f.appendChild(thumbs);
+
     var row = el('div', 'rv-compose-row');
+    var attach = el('label', 'rv-attach', 'Attach files');
+    attach.title = 'Pictures or files to go with the review. You can also paste or drop them here.';
+    var input = el('input');
+    input.type = 'file';
+    input.name = 'attachments[]';
+    input.multiple = true;
+    input.setAttribute('data-no-drop', '');   // review-files.js keeps the list, not dropzone.js
+    attach.appendChild(input);
+    row.appendChild(attach);
     S.drawSay = el('span', 'muted small rv-draw-say', '');
     row.appendChild(S.drawSay);
     S.err = el('span', 'err small rv-err', '');
     row.appendChild(S.err);
-    // APPROVE / SEND BACK (David, 2026-10-29: "include the approve or retake
-    // buttons here for supervisors and production"). Only when the pane carries
-    // the marker includes/board.php draws for a reviewer whose turn it is
-    // (board_verdict_html()); the server checks it all again on the way in.
-    S.verdict = el('span', 'rv-verdict');
-    row.appendChild(S.verdict);
     S.post = el('button', 'primary rv-post', 'Post review');
     S.post.type = 'submit';
     row.appendChild(S.post);
     f.appendChild(row);
-    drawVerdict();
 
-    f.addEventListener('submit', function (e) { e.preventDefault(); post(''); });
+    f.addEventListener('submit', function (e) { e.preventDefault(); post(); });
 
     // The same @ picker as every other box on the task, offered the same people.
     var json = S.pane.querySelector('.board-comment-people');
@@ -378,29 +425,6 @@
       window.animaMentions.attach(S.box, people);
     }
     return f;
-  }
-
-  /** The Approve and Send back buttons, from the pane's marker; none without one. */
-  function drawVerdict() {
-    if (!S || !S.verdict) return;
-    S.verdict.innerHTML = '';
-    var mark = S.pane.querySelector('.board-verdict');
-    if (!mark || !S.who) return;
-    var to = mark.getAttribute('data-to') || '';
-    S.verdictTo = to;
-    var back = mark.querySelector('.board-verdict-back');
-    if (back && back.options.length) {
-      S.backPick = back.cloneNode(true);
-      S.backPick.className = 'rv-back-pick';
-      var backBtn = btn('rv-btn rv-back', 'Send back', 'Send it back with your note, to the status picked beside it',
-        function () { post('back'); });
-      S.verdict.appendChild(backBtn);
-      S.verdict.appendChild(S.backPick);
-    }
-    if (to) {
-      S.verdict.appendChild(btn('rv-btn rv-approve', 'Approve', 'Approve: moves the task to ' + to
-        + '. Anything written or drawn is posted with it.', function () { post('approve'); }));
-    }
   }
 
   // --- the version on screen ----------------------------------------------------
@@ -807,16 +831,17 @@
     m.currentTime = (S.drawFrame + 0.5) / S.fps;
   }
 
-  function post(verdict) {
+  function post() {
     if (!S || !S.who) return;
     var text = S.box.value.trim();
     var drawn = S.strokes.length > 0;
+    var files = pickedFiles();
     S.err.textContent = '';
-    if (verdict === 'back' && !text) {
-      S.box.focus(); S.err.textContent = 'Say what needs changing: sending work back needs a note.'; return;
+    if (!text && !drawn && !files.length) {
+      S.box.focus();
+      S.err.textContent = 'Write something, attach a file or draw on the version first.';
+      return;
     }
-    if (verdict === 'approve' && !window.confirm('Approve this task and move it to ' + S.verdictTo + '?')) return;
-    if (!verdict && !text && !drawn) { S.box.focus(); S.err.textContent = 'Write something or draw on the version first.'; return; }
 
     S.post.disabled = true;
     S.post.textContent = 'Posting…';
@@ -836,10 +861,7 @@
       data.append('project_id', S.who.getAttribute('data-project'));
       data.append('step_id', S.who.getAttribute('data-step'));
       data.append('item_key', S.who.getAttribute('data-item'));
-      if (verdict) {
-        data.append('verdict', verdict);
-        if (verdict === 'back' && S.backPick) data.append('back_status', S.backPick.value);
-      }
+      files.forEach(function (file) { data.append('attachments[]', file, file.name); });
       if (blob) {
         var base = v.name.replace(/\.[^.]+$/, '') || v.label;
         if (frame !== null) base += '_f' + String(frame + 1).padStart(4, '0');
@@ -894,15 +916,12 @@
     S.versions = readVersions(pane);
     S.versions.forEach(function (x, i) { if (x.id === String(versionId)) S.idx = i; });
     S.box.value = '';
+    if (window.animaReviewFiles) window.animaReviewFiles.clear(S.form);
+    else S.form.reset();
     S.post.disabled = false;
     S.post.textContent = 'Post review';
     clearDrawing();
     showNotes();
-    // After a verdict the task has moved on, so the marker is gone and so are
-    // the buttons; the sentence the server sent back says where it went.
-    drawVerdict();
-    var ok = pane.querySelector(':scope > p.ok');
-    if (ok && S.drawSay) S.drawSay.textContent = ok.textContent;
   }
 
   // --- keys -------------------------------------------------------------------------
@@ -954,8 +973,50 @@
     var pane = t.closest('[data-pane]');
     if (!pane) return;
     e.preventDefault();
-    open(pane, t.getAttribute('data-review-open'));
+    open(pane, t.getAttribute('data-review-open'), { actions: paneVerdicts(pane) });
   });
+
+  /**
+   * APPROVE AND RETAKE WHEN OPENED FROM A TASK (David, 2026-10-29), not only
+   * from the Reviews screen: built from the marker includes/board.php puts in
+   * the Versions pane for the reviewer whose turn it is (board_verdict_html()).
+   * Each posts the verdict to board_version.php, the same rules as the Reviews
+   * screen, and puts the pane it sends back in place.
+   */
+  function paneVerdicts(pane) {
+    var mark = pane.querySelector('.board-verdict');
+    if (!mark) return [];
+    var out = [];
+    var give = function (verdict) {
+      var data = new FormData();
+      data.append('add_review', '1');
+      data.append('verdict', verdict);
+      data.append('project_id', mark.getAttribute('data-project'));
+      data.append('step_id', mark.getAttribute('data-step'));
+      data.append('item_key', mark.getAttribute('data-item'));
+      fetch('board_version.php', { method: 'POST', body: data, credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          pane.innerHTML = html;
+          if (window.animaBoard) {
+            window.animaBoard.paneReady('versions');
+            window.animaBoard.timelineRefresh();
+          }
+          var said = pane.querySelector(':scope > p.err, :scope > p.ok');
+          if (said) said.scrollIntoView({ block: 'nearest' });
+        })
+        .catch(function () {
+          window.alert('That did not go through. Check your connection and try again.');
+        });
+    };
+    var to = mark.getAttribute('data-to');
+    var retake = mark.getAttribute('data-retake');
+    if (to) out.push({ label: 'Approve', cls: 'primary', title: 'Approve: moves the task to ' + to,
+                       run: function () { give('approve'); } });
+    if (retake) out.push({ label: 'Retake', cls: 'secondary danger', title: 'Send it to ' + retake,
+                           run: function () { give('retake'); } });
+    return out;
+  }
 
   window.animaReviewViewer = { open: open, close: close };
 }());

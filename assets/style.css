@@ -4136,7 +4136,7 @@ a.version-shot:hover { border-color: var(--border-strong); }
 .board-version-form .board-version-title { font-size: 1.2em; font-weight: 600; }
 
 /* What is going with a review, as small thumbnails, each with an × in the
-   corner (David, 2026-10-22). Drawn by assets/board-screen.js. */
+   corner (David, 2026-10-22). Drawn by assets/review-files.js. */
 .board-review-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 12px; }
 .board-review-thumbs[hidden] { display: none; }
 .review-thumb {
@@ -4416,33 +4416,54 @@ tr.invoice-edit td { background: var(--surface-2); padding: 12px 14px; }
 .row-actions { white-space: nowrap; }
 .row-actions form { display: inline; }
 
-/* Reviews (2026-10-27): the queue of work waiting on a supervisor or on
-   Production, one card per task with its current version beside the verdict. */
+/* Reviews (2026-10-27; a grid of cards 2026-10-29, David: "a grid of cards
+   instead of one item per line/box"). The picture is the way into the review
+   viewer; the two verdicts sit under it. ⚠ rq-, not review-: .review-thumb is
+   the thumbnail of a file going with a review (above). */
 .review-shows { margin: 4px 0 12px; }
-.review-queue { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
-.review-item {
-  display: flex; gap: 14px; padding: 12px; border: 1px solid var(--border);
-  border-radius: 8px; background: var(--surface);
-}
-.review-thumb { flex: 0 0 180px; display: flex; align-items: center; justify-content: center;
-  min-height: 100px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
-.review-thumb img { display: block; max-width: 100%; max-height: 140px; }
-.review-thumb .review-file { padding: 8px; font-size: 13px; word-break: break-all; text-align: center; }
-.review-body { flex: 1; min-width: 0; }
-.review-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.rq-grid { list-style: none; margin: 12px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.rq-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.rq-media { position: relative; display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 16 / 9; width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0;
+  background: #000; color: var(--muted); overflow: hidden; }
+button.rq-media { cursor: zoom-in; }
+button.rq-media:hover { background: #000; }
+button.rq-media:hover img, button.rq-media:hover video { opacity: .85; }
+.rq-media img, .rq-media video { display: block; width: 100%; height: 100%; object-fit: contain;
+  pointer-events: none; transition: opacity var(--ease); }
+.rq-media.is-empty { background: var(--surface-2); font-size: 13px; }
+.rq-media.is-file { background: var(--surface-2); padding: 12px; font-size: 13px;
+  word-break: break-all; text-align: center; }
+.rq-play { position: absolute; width: 44px; height: 44px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; padding-left: 3px;
+  background: rgba(0, 0, 0, .6); color: #fff; font-size: 18px; pointer-events: none; }
+.rq-media .version-tag { position: absolute; top: 8px; left: 8px; }
+.rq-media .review-notes-count { position: absolute; top: 8px; right: 8px; }
 .review-notes-count { background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn-border);
   border-radius: 9px; padding: 0 7px; font-size: 12px; }
-.review-verdict { margin-top: 8px; }
-.review-verdict textarea { min-height: 2.6em; resize: vertical; }
-.review-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-.review-actions button, .review-actions .button { margin: 0; }
-.review-back { display: inline-flex; gap: 6px; align-items: center; }
-.review-back select { width: auto; }
-@media (max-width: 640px) {
-  .review-item { flex-direction: column; }
-  .review-thumb { flex-basis: auto; }
-}
+.rq-info { padding: 10px 12px 0; min-width: 0; }
+.rq-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rq-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq-title .rq-show { margin-left: auto; flex-shrink: 0; }
+.rq-meta { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq-verdict { margin: auto 0 0; padding: 10px 12px 12px; }
+.rq-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rq-buttons button { margin: 0; width: 100%; }
+.rq-links { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; }
+.rq-links button { margin: 0; padding: 2px 8px; font-size: 12px; }
 
+/* The verdicts in the review viewer's top bar, when Reviews opened it. */
+.rv-verdict { display: flex; gap: 8px; padding-left: 12px; border-left: 1px solid var(--border); }
+.rv-verdict button { height: 32px; margin: 0; padding: 0 14px; }
+/* Files going with a review written in the viewer (2026-10-29). */
+.rv-compose .board-review-thumbs { margin: 8px 0 0; }
+.rv-attach { position: relative; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-2);
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.rv-attach:hover { color: var(--text); border-color: var(--border-strong); }
+.rv-attach input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.rv-compose.is-drop-over { outline: 2px dashed var(--primary); outline-offset: -4px; }
 
 /* --- The review viewer (assets/review-viewer.js) ---------------------------
    David, 2026-10-27: "a very basic image editor to review new versions
@@ -4616,10 +4637,3 @@ body.rv-open { overflow: hidden; }
 .mytask-open { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
 .mytask-open:hover { text-decoration: underline; filter: none; }
 .mytask-details { margin-left: 8px; font-size: 11.5px; padding: 1px 8px; }
-
-/* Approve / Send back in the review viewer (2026-10-29). */
-.rv-verdict { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
-.rv-verdict:empty { display: none; }
-.rv-back-pick { max-width: 160px; }
-.rv-approve { background: var(--ok); color: var(--on-ok, #101010); border-color: var(--ok); }
-.rv-back { border-color: var(--warn); color: var(--warn); }

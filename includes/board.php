@@ -1748,7 +1748,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
         } else {
             $form = $upload;
         }
-        if ($reviewer && $progressId) $form .= board_verdict_html($pdo, $projectId, (int)$progressId);
+        if ($reviewer && $progressId) $form .= board_verdict_html($pdo, $projectId, $stepId, $itemKey, (int)$progressId);
         $form .= '<script type="application/json" class="board-comment-people">'
                . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
                              JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
@@ -1758,18 +1758,19 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
 }
 
 /**
- * APPROVE OR SEND BACK, FROM THE REVIEW VIEWER (David, 2026-10-29: "let's also
- * include the approve or retake buttons here for supervisors and production").
+ * APPROVE OR RETAKE, IN THE VIEWER OPENED FROM A TASK (David, 2026-10-29: "let's
+ * also include the approve or retake buttons here for supervisors and
+ * production"). The Reviews screen hands the viewer its own two buttons; Spell's
+ * panel and My tasks open it from the Versions pane, so the pane carries this
+ * hidden marker for assets/review-viewer.js to build the same two from.
  *
- * A hidden marker in the Versions pane, read by assets/review-viewer.js, drawn
- * only when this account may give a verdict on this task NOW: a reviewer whose
- * stage (REVIEW_STAGES) starts from the status the task is in, on a show they
- * review. It carries where Approve goes and the statuses Send back may pick,
- * worked out by the same functions review.php uses — so the buttons in the
- * viewer offer exactly what the Reviews page offers, and review_apply() checks
- * all of it again when one is pressed.
+ * Drawn only when this account may give a verdict on this task NOW: a reviewer
+ * whose stage (REVIEW_STAGES) starts from the status the task is in, on a show
+ * they review. data-to and data-retake are the show's own statuses, empty when
+ * the show has none, which leaves that button off. review_apply() checks all of
+ * it again when one is pressed.
  */
-function board_verdict_html(PDO $pdo, int $projectId, int $progressId): string {
+function board_verdict_html(PDO $pdo, int $projectId, int $stepId, string $itemKey, int $progressId): string {
     require_once __DIR__ . '/review.php';
     $stage = review_stage();
     if (!$stage) return '';
@@ -1779,14 +1780,11 @@ function board_verdict_html(PDO $pdo, int $projectId, int $progressId): string {
     $q->execute([$progressId]);
     if (review_norm((string)$q->fetchColumn()) !== $cfg['from']) return '';
     $to = review_status_named($pdo, $projectId, $cfg['to']);
-    $opts = '';
-    foreach (review_back_statuses($pdo, $projectId, $stage) as $s) {
-        $opts .= '<option value="' . (int)$s['id'] . '">' . e((string)$s['name']) . '</option>';
-    }
-    return '<div class="board-verdict" hidden data-progress="' . $progressId . '"'
+    $retake = review_status_named($pdo, $projectId, REVIEW_RETAKE);
+    return '<div class="board-verdict" hidden data-project="' . $projectId . '" data-step="' . $stepId . '"'
+         . ' data-item="' . e($itemKey) . '"'
          . ' data-to="' . e($to ? (string)$to['name'] : '') . '"'
-         . ' data-label="' . e($cfg['label']) . '">'
-         . '<select class="board-verdict-back" aria-label="Send back to">' . $opts . '</select></div>';
+         . ' data-retake="' . e($retake ? (string)$retake['name'] : '') . '"></div>';
 }
 
 /* ---------------------------------------------------------------------------
