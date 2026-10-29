@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Reviews follow the studio's approval rules; admins see both stages *(no migration)*
+
+- The rules (David): a new version → **Pending review**; Production or a supervisor approves →
+  **Ready for review**; Jorik / Tim approve → **Complete**; the client approves → **Final**, set
+  by hand for now.
+- **Production now reviews the first stage**, beside the supervisors (it used to give the final
+  approval).
+- **Admins see Pending review as well as Ready for review**, so work on a show with no supervisor
+  is not waiting on nobody. Each card says which status it is in, and **Approve moves it one step
+  on**. The top-bar count includes both. The Approve / Retake buttons in Spell's viewer follow the
+  same rule.
+
 ## 2026-10-29 — Approve and Retake in the viewer from Spell and My tasks too *(no migration)*
 
 - **The review viewer opened from a task** (Spell's panel, or My tasks) now shows the same

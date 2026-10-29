@@ -4746,3 +4746,17 @@ line/box ... Once a supervisor clicks the image, they will see the same review v
   (`board_task.php?pane=versions`) and opens `assets/review-viewer.js` on it, passing the card's
   verdicts for its top bar. The paste/pick/drop code for files on a review moved from
   `board-screen.js` to `assets/review-files.js` so the viewer's box uses the same one.
+
+## 2026-10-29 — Who approves what: Production with the supervisors, admins both stages
+
+**Asked by David,** after a Pending review version did not show on his Reviews (admins saw only
+Ready for review): *"let's do that and show both"*, with the rules restated:
+1. new version up → Pending review; 2. approved by Production or supervisors → Ready for review;
+3. Jorik / Tim approve → Complete; 4. the client approves → Final, by hand for now.
+
+**Decided:** Production (editors) moves from the final stage to the first, beside supervisors;
+the final stage is admins'. `review_stages()` in `includes/review_badge.php` is every stage an
+account reviews: both for admins, the first only for Production and supervisors. The queue and the count take
+every "from" status of those stages; `review_apply()` works out the stage from the task's status
+at the moment of the click, so Approve always moves a task one step on, and a supervisor still
+cannot act on Ready for review. Cards say which status they are in when both show.

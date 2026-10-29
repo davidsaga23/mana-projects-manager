@@ -6,9 +6,10 @@
 // version to bring the conversation to slack". Reached from the Reviews button
 // in the top bar, beside My tasks, which carries the count.
 //
-// Supervisors see Pending review and approve to Ready for review; admins and
-// Production see Ready for review and approve to Complete. Either may send it
-// to Retake instead. The rules are in includes/review.php.
+// Supervisors and Production see Pending review and approve to Ready for
+// review; admins (Jorik, Tim) see both stages (2026-10-29), each card saying
+// which, and approve each to its next status. Anyone may send it to Retake instead. The rules are
+// in includes/review.php.
 //
 // A GRID OF CARDS, AND THE PICTURE OPENS SPELL'S VIEWER (David, 2026-10-29: "a
 // grid of cards instead of one item per line/box ... Once a supervisor clicks
@@ -28,13 +29,12 @@ require_once __DIR__ . '/includes/uploads.php';   // version_label(), attachment
 require_once __DIR__ . '/includes/mailer.php';    // notify_mentioned_task(), for @ in a note
 require_login();
 
-$stage = review_stage();
-if (!$stage) {
+$stages = review_stages();
+if (!$stages) {
     flash('err', 'Reviews are for supervisors, Production and admins.');
     header('Location: index.php');
     exit;
 }
-$cfg = REVIEW_STAGES[$stage];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$queue = review_queue($pdo, $stage);
+$queue = review_queue($pdo);
 
 // One chip per show that has something waiting, so a long queue can be cut down
 // to the show you are on today. All of them by default.
@@ -67,28 +67,42 @@ $shown = $only ? array_values(array_filter($queue, fn($t) => (int)$t['project_id
 // The two statuses the verdicts move to, per show, worked out once rather than
 // per card. A show missing one gets a warning and that button off, rather than
 // a button that is only refused after the click.
+// Approve is per stage: keyed [stage][show].
 $noApprove = [];
 $noRetake = [];
-foreach (array_keys($shows) as $pid) {
-    if (!review_status_named($pdo, $pid, $cfg['to'])) $noApprove[$pid] = $shows[$pid]['code'];
-    if (!review_status_named($pdo, $pid, REVIEW_RETAKE)) $noRetake[$pid] = $shows[$pid]['code'];
+foreach ($queue as $t) {
+    $pid = (int)$t['project_id'];
+    $to = REVIEW_STAGES[$t['stage']]['to'];
+    if (!isset($noApprove[$t['stage']][$pid]) && !review_status_named($pdo, $pid, $to)) {
+        $noApprove[$t['stage']][$pid] = $shows[$pid]['code'];
+    }
+    if (!isset($noRetake[$pid]) && !review_status_named($pdo, $pid, REVIEW_RETAKE)) {
+        $noRetake[$pid] = $shows[$pid]['code'];
+    }
 }
+// How the stages read in the sentences below: "Pending review → Ready For Review".
+$stageLine = fn(string $k) => '<strong>' . e(ucwords(REVIEW_STAGES[$k]['from'])) . '</strong> → <strong>'
+                            . e(ucwords(REVIEW_STAGES[$k]['to'])) . '</strong>';
 
 $pageTitle = 'Reviews';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<h2 class="wizard-title"><?= e($cfg['label']) ?>
+<h2 class="wizard-title"><?= count($stages) > 1 ? 'Reviews' : e(REVIEW_STAGES[$stages[0]]['label']) ?>
   <span class="muted">· <?= count($queue) ?> waiting on you</span></h2>
 <p class="lead">
-  Everything in <strong><?= e(ucwords($cfg['from'])) ?></strong> on the shows you can see, newest version
-  first. Click the picture to open it in the review viewer, the same one as in Spell: step through it, draw on
-  it, write notes and attach images. <strong>Approve</strong> moves it to
-  <strong><?= e(ucwords($cfg['to'])) ?></strong>; <strong>Retake</strong> moves it to <strong>Retake</strong>.
-  Both are also at the top of the viewer.
+  Everything waiting for your review on the shows you can see, newest version first.
+  <strong>Approve</strong> moves it on: <?= implode('; ', array_map($stageLine, $stages)) ?>.
+  <strong>Retake</strong> moves it to <strong>Retake</strong>. Click the picture to open it in the review
+  viewer, the same one as in Spell: step through it, draw on it, write notes and attach images. Approve and
+  Retake are also at the top of the viewer.
 </p>
 
-<?php foreach ([[$noApprove, ucwords($cfg['to']), 'Approve'], [$noRetake, 'Retake', 'Retake']] as [$missing, $named, $button]):
+<?php
+$warnings = [];
+foreach ($noApprove as $k => $missing) $warnings[] = [$missing, ucwords(REVIEW_STAGES[$k]['to']), 'Approve'];
+$warnings[] = [$noRetake, 'Retake', 'Retake'];
+foreach ($warnings as [$missing, $named, $button]):
     if (!$missing) continue; ?>
   <p class="flash flash-warn">
     <?= e(implode(', ', $missing)) ?> <?= count($missing) === 1 ? 'has' : 'have' ?> no status called
@@ -108,11 +122,13 @@ require __DIR__ . '/includes/header.php';
 
 <?php if (!$shown): ?>
   <div class="empty-state"><p>Nothing is waiting for your review. Tasks arrive here when they are set to
-    <strong><?= e(ucwords($cfg['from'])) ?></strong>.</p></div>
+    <?= implode(' or ', array_map(fn($k) => '<strong>' . e(ucwords(REVIEW_STAGES[$k]['from'])) . '</strong>', $stages)) ?>.</p></div>
 <?php else: ?>
   <ul class="rq-grid">
   <?php foreach ($shown as $t):
       $pid = (int)$t['project_id'];
+      $to = ucwords(REVIEW_STAGES[$t['stage']]['to']);
+      $offApprove = isset($noApprove[$t['stage']][$pid]);
       $v = $t['version'];
       $openPath = board_task_path($pid, (int)$t['step_id'], (string)$t['item_key'], 'versions', $v ? 'v' . (int)$v['id'] : '');
       $mime = $v ? (string)($v['mime_type'] ?? '') : '';
@@ -156,6 +172,10 @@ require __DIR__ . '/includes/header.php';
           <strong title="<?= e($t['item_name'] . ' · ' . $t['step_name']) ?>"><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong>
           <span class="muted small rq-show" title="<?= e((string)$t['project_name']) ?>"><?= e($t['project_code']) ?></span>
         </div>
+        <?php if (count($stages) > 1): ?>
+          <?php // Which stage, when this page shows both: the status it is in now. ?>
+          <span class="rq-stage is-<?= e($t['stage']) ?>"><?= e((string)$t['status_name']) ?></span>
+        <?php endif; ?>
         <div class="muted small rq-meta">
           <?= $t['crew_name'] ? e($t['crew_name']) : 'Nobody assigned' ?>
           <?php if ($v): ?>· put up <?= e(date('j M · H:i', strtotime((string)$v['created_at']))) ?><?php endif; ?>
@@ -173,9 +193,8 @@ require __DIR__ . '/includes/header.php';
         <input type="hidden" name="project" value="<?= $only ?: '' ?>">
         <div class="rq-buttons">
           <button type="submit" name="action" value="approve"
-                  title="<?= isset($noApprove[$pid]) ? e($t['project_code'] . ' has no ' . ucwords($cfg['to']) . ' status')
-                                                     : 'Moves it to ' . e(ucwords($cfg['to'])) ?>"
-                  <?= isset($noApprove[$pid]) ? 'disabled' : '' ?>>Approve</button>
+                  title="<?= $offApprove ? e($t['project_code'] . ' has no ' . $to . ' status') : 'Moves it to ' . e($to) ?>"
+                  <?= $offApprove ? 'disabled' : '' ?>>Approve</button>
           <button type="submit" name="action" value="retake" class="secondary danger"
                   title="<?= isset($noRetake[$pid]) ? e($t['project_code'] . ' has no Retake status') : 'Moves it to Retake' ?>"
                   <?= isset($noRetake[$pid]) ? 'disabled' : '' ?>>Retake</button>

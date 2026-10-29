@@ -1772,13 +1772,15 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
  */
 function board_verdict_html(PDO $pdo, int $projectId, int $stepId, string $itemKey, int $progressId): string {
     require_once __DIR__ . '/review.php';
-    $stage = review_stage();
-    if (!$stage) return '';
-    $cfg = REVIEW_STAGES[$stage];
+    if (!review_stages()) return '';
     if (!in_array($projectId, review_project_ids($pdo), true)) return '';
     $q = $pdo->prepare('SELECT st.name FROM progress pr LEFT JOIN statuses st ON st.id = pr.status_id WHERE pr.id = ?');
     $q->execute([$progressId]);
-    if (review_norm((string)$q->fetchColumn()) !== $cfg['from']) return '';
+    // Admins and Production review both stages (2026-10-29), so the stage is
+    // the one the task's status puts it in, as review_apply() works it out.
+    $stage = review_stage_of((string)$q->fetchColumn());
+    if (!$stage) return '';
+    $cfg = REVIEW_STAGES[$stage];
     $to = review_status_named($pdo, $projectId, $cfg['to']);
     $retake = review_status_named($pdo, $projectId, REVIEW_RETAKE);
     return '<div class="board-verdict" hidden data-project="' . $projectId . '" data-step="' . $stepId . '"'

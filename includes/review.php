@@ -43,13 +43,25 @@ function review_status_named(PDO $pdo, int $projectId, string $name): ?array {
     return null;
 }
 
+/** Which of this account's stages a status name puts a task in, or null. */
+function review_stage_of(string $statusName): ?string {
+    $name = review_norm($statusName);
+    foreach (review_stages() as $k) {
+        if (REVIEW_STAGES[$k]['from'] === $name) return $k;
+    }
+    return null;
+}
+
 /**
- * The queue: every task in this account's "from" status, on the shows it can
- * see, with its current version. Newest version first, because the thing that
+ * The queue: every task in one of this account's "from" statuses (both stages
+ * for admins, review_stages()), on the shows it can see, with
+ * its current version. Each row carries 'stage', the REVIEW_STAGES key its
+ * status puts it in. Newest version first, because the thing that
  * just arrived is the thing somebody is waiting to hear about.
  */
-function review_queue(PDO $pdo, string $stage): array {
-    $ids = review_project_ids($pdo);
+function review_queue(PDO $pdo): array {
+    $from = review_from_names();
+    $ids = $from ? review_project_ids($pdo) : [];
     if (!$ids) return [];
     $q = $pdo->prepare(
         'SELECT pr.id, pr.project_id, pr.step_id, pr.item_key, pr.status_id, pr.updated_at,
@@ -65,14 +77,15 @@ function review_queue(PDO $pdo, string $stage): array {
            LEFT JOIN assets a     ON a.id  = pr.asset_id
            LEFT JOIN crew c       ON c.id  = pr.crew_id
           WHERE pr.project_id IN (' . implode(',', $ids) . ')
-            AND LOWER(TRIM(st.name)) = ?'
+            AND LOWER(TRIM(st.name)) IN (' . implode(',', array_fill(0, count($from), '?')) . ')'
     );
-    $q->execute([REVIEW_STAGES[$stage]['from']]);
+    $q->execute($from);
     $rows = [];
     foreach ($q as $r) {
         $r['item_name'] = $r['shot_code'] !== null
             ? (trim((string)$r['episode']) !== '' ? $r['episode'] . ' ' : '') . $r['shot_code']
             : ($r['asset_name'] !== null ? (string)$r['asset_name'] : 'Whole project');
+        $r['stage'] = review_stage_of((string)$r['status_name']);
         $r['version'] = null;
         $r['notes'] = 0;
         $rows[(int)$r['id']] = $r;
@@ -131,9 +144,7 @@ const REVIEW_RETAKE = 'retake';
  * status is the show's own.
  */
 function review_apply(PDO $pdo, int $progressId, string $verdict, string $note = ''): string {
-    $stage = review_stage();
-    if (!$stage) throw new RuntimeException('Your account does not review work.');
-    $cfg = REVIEW_STAGES[$stage];
+    if (!review_stages()) throw new RuntimeException('Your account does not review work.');
 
     $q = $pdo->prepare('SELECT pr.*, st.name AS status_name FROM progress pr
                           LEFT JOIN statuses st ON st.id = pr.status_id WHERE pr.id = ?');
@@ -142,9 +153,14 @@ function review_apply(PDO $pdo, int $progressId, string $verdict, string $note =
     if (!$task || !in_array((int)$task['project_id'], review_project_ids($pdo), true)) {
         throw new RuntimeException('That task is not one you can review.');
     }
-    if (review_norm((string)$task['status_name']) !== $cfg['from']) {
+    // The stage is the one the task is in NOW, among those this account
+    // reviews: a supervisor's list has only the first, so this is also what
+    // keeps a supervisor off the final stage.
+    $stage = review_stage_of((string)$task['status_name']);
+    if (!$stage) {
         throw new RuntimeException('That task is no longer waiting for your review, somebody has already moved it.');
     }
+    $cfg = REVIEW_STAGES[$stage];
     $projectId = (int)$task['project_id'];
     $stepId = (int)$task['step_id'];
     $itemKey = (string)$task['item_key'];

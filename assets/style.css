@@ -4448,6 +4448,11 @@ button.rq-media:hover img, button.rq-media:hover video { opacity: .85; }
 .rq-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rq-title .rq-show { margin-left: auto; flex-shrink: 0; }
 .rq-meta { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Which stage a card is in, when admins see both (2026-10-29). */
+.rq-stage { display: inline-block; margin-top: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; border: 1px solid; }
+.rq-stage.is-supervisor { color: var(--warn); background: var(--warn-tint); border-color: var(--warn-border); }
+.rq-stage.is-final { color: var(--primary); background: var(--primary-tint); border-color: var(--primary-border); }
 .rq-verdict { margin: auto 0 0; padding: 10px 12px 12px; }
 .rq-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rq-buttons button { margin: 0; width: 100%; }
