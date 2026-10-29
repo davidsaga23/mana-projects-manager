@@ -388,6 +388,8 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
             $out['lines'][] = [
                 'project'    => $show['project'],
                 'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Step') : 'Other work on the show',
+                // For Finance → Monthly invoices, which prefills its lines from these.
+                'step_id'    => $sid > 0 ? $sid : null,
                 'unit'       => $unit,
                 'rate'       => $rate,
                 'rate_phrase'=> home_rate_phrase($rate, $unit, $cur, $usdRate),
@@ -400,6 +402,44 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
                 'own_currency' => $cur,
             ];
         }
+    }
+    return $out;
+}
+
+/**
+ * Their invoices as THEY sent them. A monthly invoice (IN4) is one invoice
+ * whose lines are invoice rows on several projects (invoices.header_id), so
+ * its rows are folded back into one, under its number, month, dates and
+ * status. A row with no header is a one-project invoice and stays as it was.
+ * Each row gets 'projects' [id => code] and 'amounts' [currency => amount].
+ */
+function home_group_invoices(int $crewId, array $rows): array {
+    $headerIds = [];
+    foreach ($rows as $r) if (!empty($r['header_id'])) $headerIds[] = (int)$r['header_id'];
+    $headers = $headerIds ? own_invoice_headers($crewId, $headerIds) : [];
+
+    $out = []; $at = [];
+    foreach ($rows as $r) {
+        $hid = (int)($r['header_id'] ?? 0);
+        $h = $headers[$hid] ?? null;
+        $cur = (string)($r['currency'] ?? 'USD');
+        if (!$h) {
+            $out[] = $r + ['projects' => [(int)$r['project_id'] => (string)($r['project_code'] ?? '')],
+                           'amounts' => [$cur => (float)$r['amount']]];
+            continue;
+        }
+        if (!isset($at[$hid])) {
+            [$from, $to] = [$h['month'] . '-01', date('Y-m-t', strtotime($h['month'] . '-01'))];
+            $at[$hid] = count($out);
+            $out[] = ['invoice_ref' => $h['invoice_ref'], 'period_start' => $from, 'period_end' => $to,
+                      'status' => $h['status'], 'issued_date' => $h['received_date'],
+                      'paid_date' => $h['paid_date'], 'projects' => [],
+                      'amounts' => []];
+        }
+        $o = &$out[$at[$hid]];
+        $o['projects'][(int)$r['project_id']] = (string)($r['project_code'] ?? '');
+        $o['amounts'][$cur] = round(($o['amounts'][$cur] ?? 0) + (float)$r['amount'], 2);
+        unset($o);
     }
     return $out;
 }

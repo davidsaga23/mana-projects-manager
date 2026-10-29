@@ -1882,6 +1882,11 @@ if ($retakePct <= 0):
           <?php if (!empty($iv['document_url'])): ?>
             <a href="<?= e($iv['document_url']) ?>" target="_blank" rel="noopener"><?= e($iv['invoice_ref'] ?: 'document') ?></a>
           <?php else: ?><?= e($iv['invoice_ref'] ?: '—') ?><?php endif; ?>
+          <?php // A line of a monthly invoice (IN4): its number, dates and status
+                // are the invoice's, so they are changed there, for every project. ?>
+          <?php if (!empty($iv['header_id'])): ?>
+            <br><a href="finance_invoice.php?id=<?= (int)$iv['header_id'] ?>" title="One line of a monthly invoice that covers other projects too">monthly invoice →</a>
+          <?php endif; ?>
         </td>
         <td class="muted small"><?= e(($iv['period_start'] ?: '—') . ' → ' . ($iv['period_end'] ?: '—')) ?></td>
         <?php // Both amounts when the project's fixed rate converts it, dollars

@@ -4620,6 +4620,34 @@ platform? I really liked the way Spell UI works".
 - **Three PRs:** (a) tokens and shared components, (b) project screens, (c) finance, people and
   admin screens, each checked by David on the live site before the next.
 
+## 2026-10-29 — One invoice split across projects: a header over the invoice rows we have (IN4)
+
+**Asked for** by Tim and Jorik's rule (2026-10-28): one invoice per freelancer per month, a line per
+project and position, paid once by Jorik, split by Anima across the projects. Built from the agreed
+brief (David, 2026-10-29: "Build from the brief").
+
+**Decided:**
+- **The lines ARE the existing `invoices` rows**, grouped by a new `invoice_headers` row through
+  `invoices.header_id` (finance_install_12). Chosen over a separate lines table because every
+  reader of invoices (project Invoices tab and totals, actual cost per position, statements, Final
+  balance, stop cost, the hub) keeps working untouched, and old invoices (header_id NULL) need no
+  migration. The other way meant moving each of those readers over and keeping two kinds of
+  invoice in step.
+- **The header owns the invoice-wide facts** (number, received date, status, paid date, PDF link)
+  and copies them onto its lines on every save; a line's "issued" date is the received date.
+  Changing those on a project's Invoices tab is still possible but is overwritten the next time the
+  monthly invoice is saved, so the row links to it.
+- **Lines carry days/hours, unit and rate** (`quantity`, `quantity_unit`, `unit_rate`, nullable).
+  A blank amount is days × rate; a typed amount wins, being what is printed on the invoice.
+- **Prefilled from `home_invoice_lines()`**, the artist Home's own figures, over every show the
+  person logged on that month (wrapped ones too: October's invoice arrives in November). A line is
+  in USD when the show has a fixed rate for a foreign contract, as Home tells the artist.
+- **One per person per month is kept by the screen, not a unique key,** so a people merge or a rare
+  second invoice can never make an import or a merge fail.
+- **Room for the email intake:** `source` ('manual' / 'email'), `needs_review` + `review_reason`
+  for David, `document_url` for Drive. Its "received" is status `pending` with a received date.
+- **Paying is one transaction** over the header and every line.
+
 ## 2026-10-29 — Aesthetic pass (b) and (c) as one stylesheet change
 
 **Asked by David:** to go ahead with both (b) and (c) after (a) went live.
