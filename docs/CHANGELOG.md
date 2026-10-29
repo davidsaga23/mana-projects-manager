@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Budget pool: used days come only from logged time *(no migration)*
+
+- **Used days on the Budget pool are now always logged time**, never worked out from the step
+  dates. Before, a show with nothing logged at all counted each person's share across their
+  step's window up to today.
+- A step nobody has logged on reads 0 used and says "no time logged on this step yet"; the
+  headline counts those steps. The same goes for each person in "Who is on it".
+
 ## 2026-10-29 — The Budget pool is the expense projection's days *(no migration)*
 
 - **The Day pool now equals the days on the Expense projection** (MSD: 219, not 269). It used to be
