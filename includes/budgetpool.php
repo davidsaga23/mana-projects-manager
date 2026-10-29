@@ -131,7 +131,7 @@ function pool_logged_days(PDO $pdo, int $projectId, float $hoursPerDay): array {
  *
  * @return array{
  *   days: array, seconds: array, work: array, source: string,
- *   undated: array, has_money: bool, currency: string
+ *   unlogged: string[], undated: array, has_money: bool, currency: string
  * }
  */
 function budget_pool(PDO $pdo, array $project): array {
@@ -226,6 +226,7 @@ function budget_pool(PDO $pdo, array $project): array {
     $poolTotal = $usedTotal = 0.0;
     $workDone = $workTotal = 0.0;
     $currency = '';
+    $unloggedNames = [];   // steps reading 0 used because nobody logged on them
 
     foreach ($acc as $stepId => $r) {
         $st = $byId[$stepId] ?? null;
@@ -233,11 +234,24 @@ function budget_pool(PDO $pdo, array $project): array {
         $approved = $st ? (float)$st['approved_v'] : 0.0;
         $tracksSeconds = $st ? !empty($st['tracks_seconds']) : false;
 
-        $used = $logged[$stepId] ?? $r['used_plan'];
+        // ⚠ ONCE THE SHOW LOGS TIME, A STEP WITH NONE HAS USED NOTHING ON RECORD.
+        // This used to fall back to the calendar step by step, so MSD's headline
+        // read "180.4 days used, from logged hours" when only about 6 of them had
+        // been logged (David, 2026-10-29): two sources summed under one label,
+        // which is exactly what DECISIONS 2026-10-16 says is not acceptable.
+        // pool_step_people() already read it this way, so the card and its own
+        // "Who is on it" table disagreed as well. A zero that says "nothing
+        // logged" is the honest figure: artists log every day, and the gap is
+        // the thing to chase.
+        $unlogged = $source === 'logged' && !isset($logged[$stepId]);
+        $used = $source === 'logged' ? ($logged[$stepId] ?? 0.0) : $r['used_plan'];
         $pctUsed = $r['pool'] > 0 ? $used / $r['pool'] * 100 : 0.0;
         $pctDone = $target > 0 ? $approved / $target * 100 : 0.0;
 
-        [$cls, $text] = pool_pace($pctUsed, $pctDone, $tracksSeconds ? 99 : $target);
+        [$cls, $text] = $unlogged
+            ? ['muted', 'no time logged on this step yet']
+            : pool_pace($pctUsed, $pctDone, $tracksSeconds ? 99 : $target);
+        if ($unlogged) $unloggedNames[] = (string)$r['name'];
 
         // One rate, or a spread. David, 2026-10-16: "at some point all the day
         // rates can be standardized per pipeline step... so all the slots for CH
@@ -256,6 +270,7 @@ function budget_pool(PDO $pdo, array $project): array {
             'unit'      => $st ? (string)$st['unit'] : 'items',
             'pace_class' => $cls,
             'pace_text'  => $text,
+            'unlogged'  => $unlogged,
             'rate_min'  => $rates ? $rates[0] : null,
             'rate_max'  => $rates ? $rates[count($rates) - 1] : null,
             'rate_same' => count($rates) === 1,
@@ -326,6 +341,7 @@ function budget_pool(PDO $pdo, array $project): array {
         ],
         'work'     => ['done' => $workDone, 'total' => $workTotal, 'pct' => $pctDoneAll],
         'source'   => $source,
+        'unlogged' => $unloggedNames,
         'undated'  => $undated,
         'hours_per_day' => $hpd,
         'currency' => $currency ?: 'USD',

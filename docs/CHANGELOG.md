@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Budget pool: "Used, from logged hours" is only logged hours *(no migration)*
+
+- **Fix.** Once anyone on a show had logged time, the Budget pool headline said "from logged
+  hours", but every step with nothing logged still counted the calendar days its window had run.
+  On MSD that made 180.4 days "used" when about 6 had actually been logged.
+- Now a step with no logged time counts **0 used**, its card says "no time logged on this step
+  yet" instead of a pace verdict, and the headline says how many steps have none. The step's
+  "Who is on it" table already worked this way, so the card and the table now agree.
+- A show with no logged time at all still uses the plan up to today, labelled as before.
+
 ## 2026-10-29 — A new version from the artist sends the task to Pending review *(no migration)*
 
 - **When the person assigned to a task puts up a new version, the task moves to the show's
