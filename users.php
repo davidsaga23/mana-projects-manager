@@ -391,6 +391,12 @@ require __DIR__ . '/includes/header.php';
       // only ever be STARTED by an administrator. It is left from the banner
       // that then follows you across every page — necessarily, since the
       // borrowed role cannot open this screen to find its way back. ?>
+<?php // The two previews side by side (David, 2026-10-29: "let's move this
+      // section to the side in a 2 column layout"): they are the same idea at two
+      // grains, a role or a person, and read best next to each other. One column
+      // again on a narrow screen. ?>
+<div class="preview-cols">
+<div>
 <h3>See the app as they see it</h3>
 <p class="muted small">
   Borrow one of these roles for a moment. The menu, the screens you can open and the
@@ -411,6 +417,8 @@ require __DIR__ . '/includes/header.php';
   </label>
   <button class="button secondary" type="submit">Start preview</button>
 </form>
+</div>
+<div>
 
 <?php // ---- see it as a specific person -----------------------------------------
       // David, 2026-10-21: "can we admins see anima as specific users instead of
@@ -452,6 +460,8 @@ require __DIR__ . '/includes/header.php';
   <button class="button secondary" type="submit">View as this person</button>
 </form>
 <?php endif; ?>
+</div>
+</div>
 
 <h3>Add someone</h3>
 <form method="post" class="stack">
