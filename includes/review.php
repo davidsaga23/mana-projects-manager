@@ -141,7 +141,8 @@ function review_back_statuses(PDO $pdo, int $projectId, string $stage): array {
  * stale page cannot approve something somebody already moved), and the target
  * status is the show's own.
  */
-function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, int $backStatusId): string {
+function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, int $backStatusId,
+                      bool $postNote = true): string {
     $stage = review_stage();
     if (!$stage) throw new RuntimeException('Your account does not review work.');
     $cfg = REVIEW_STAGES[$stage];
@@ -183,7 +184,9 @@ function review_apply(PDO $pdo, int $progressId, string $verdict, string $note, 
 
     // The note first: it is the part that matters to the artist, and the same
     // review comment the task panel shows, on the current version.
-    if ($note !== '' && board_comments_available($pdo)) {
+    // $postNote false: the caller posts the note itself, on the version it was
+    // made on and with its drawing (the review viewer, board_version.php).
+    if ($postNote && $note !== '' && board_comments_available($pdo)) {
         $versionId = null;
         if (board_reviews_available($pdo) && board_versions_available($pdo)) {
             $vq = $pdo->prepare('SELECT id FROM progress_versions WHERE progress_id = ?

@@ -1748,12 +1748,45 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
         } else {
             $form = $upload;
         }
+        if ($reviewer && $progressId) $form .= board_verdict_html($pdo, $projectId, (int)$progressId);
         $form .= '<script type="application/json" class="board-comment-people">'
                . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
                              JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
                . '</script>';
     }
     return $form . $out;
+}
+
+/**
+ * APPROVE OR SEND BACK, FROM THE REVIEW VIEWER (David, 2026-10-29: "let's also
+ * include the approve or retake buttons here for supervisors and production").
+ *
+ * A hidden marker in the Versions pane, read by assets/review-viewer.js, drawn
+ * only when this account may give a verdict on this task NOW: a reviewer whose
+ * stage (REVIEW_STAGES) starts from the status the task is in, on a show they
+ * review. It carries where Approve goes and the statuses Send back may pick,
+ * worked out by the same functions review.php uses — so the buttons in the
+ * viewer offer exactly what the Reviews page offers, and review_apply() checks
+ * all of it again when one is pressed.
+ */
+function board_verdict_html(PDO $pdo, int $projectId, int $progressId): string {
+    require_once __DIR__ . '/review.php';
+    $stage = review_stage();
+    if (!$stage) return '';
+    $cfg = REVIEW_STAGES[$stage];
+    if (!in_array($projectId, review_project_ids($pdo), true)) return '';
+    $q = $pdo->prepare('SELECT st.name FROM progress pr LEFT JOIN statuses st ON st.id = pr.status_id WHERE pr.id = ?');
+    $q->execute([$progressId]);
+    if (review_norm((string)$q->fetchColumn()) !== $cfg['from']) return '';
+    $to = review_status_named($pdo, $projectId, $cfg['to']);
+    $opts = '';
+    foreach (review_back_statuses($pdo, $projectId, $stage) as $s) {
+        $opts .= '<option value="' . (int)$s['id'] . '">' . e((string)$s['name']) . '</option>';
+    }
+    return '<div class="board-verdict" hidden data-progress="' . $progressId . '"'
+         . ' data-to="' . e($to ? (string)$to['name'] : '') . '"'
+         . ' data-label="' . e($cfg['label']) . '">'
+         . '<select class="board-verdict-back" aria-label="Send back to">' . $opts . '</select></div>';
 }
 
 /* ---------------------------------------------------------------------------

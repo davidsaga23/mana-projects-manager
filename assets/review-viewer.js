@@ -356,12 +356,19 @@
     row.appendChild(S.drawSay);
     S.err = el('span', 'err small rv-err', '');
     row.appendChild(S.err);
+    // APPROVE / SEND BACK (David, 2026-10-29: "include the approve or retake
+    // buttons here for supervisors and production"). Only when the pane carries
+    // the marker includes/board.php draws for a reviewer whose turn it is
+    // (board_verdict_html()); the server checks it all again on the way in.
+    S.verdict = el('span', 'rv-verdict');
+    row.appendChild(S.verdict);
     S.post = el('button', 'primary rv-post', 'Post review');
     S.post.type = 'submit';
     row.appendChild(S.post);
     f.appendChild(row);
+    drawVerdict();
 
-    f.addEventListener('submit', function (e) { e.preventDefault(); post(); });
+    f.addEventListener('submit', function (e) { e.preventDefault(); post(''); });
 
     // The same @ picker as every other box on the task, offered the same people.
     var json = S.pane.querySelector('.board-comment-people');
@@ -371,6 +378,29 @@
       window.animaMentions.attach(S.box, people);
     }
     return f;
+  }
+
+  /** The Approve and Send back buttons, from the pane's marker; none without one. */
+  function drawVerdict() {
+    if (!S || !S.verdict) return;
+    S.verdict.innerHTML = '';
+    var mark = S.pane.querySelector('.board-verdict');
+    if (!mark || !S.who) return;
+    var to = mark.getAttribute('data-to') || '';
+    S.verdictTo = to;
+    var back = mark.querySelector('.board-verdict-back');
+    if (back && back.options.length) {
+      S.backPick = back.cloneNode(true);
+      S.backPick.className = 'rv-back-pick';
+      var backBtn = btn('rv-btn rv-back', 'Send back', 'Send it back with your note, to the status picked beside it',
+        function () { post('back'); });
+      S.verdict.appendChild(backBtn);
+      S.verdict.appendChild(S.backPick);
+    }
+    if (to) {
+      S.verdict.appendChild(btn('rv-btn rv-approve', 'Approve', 'Approve: moves the task to ' + to
+        + '. Anything written or drawn is posted with it.', function () { post('approve'); }));
+    }
   }
 
   // --- the version on screen ----------------------------------------------------
@@ -777,12 +807,16 @@
     m.currentTime = (S.drawFrame + 0.5) / S.fps;
   }
 
-  function post() {
+  function post(verdict) {
     if (!S || !S.who) return;
     var text = S.box.value.trim();
     var drawn = S.strokes.length > 0;
     S.err.textContent = '';
-    if (!text && !drawn) { S.box.focus(); S.err.textContent = 'Write something or draw on the version first.'; return; }
+    if (verdict === 'back' && !text) {
+      S.box.focus(); S.err.textContent = 'Say what needs changing: sending work back needs a note.'; return;
+    }
+    if (verdict === 'approve' && !window.confirm('Approve this task and move it to ' + S.verdictTo + '?')) return;
+    if (!verdict && !text && !drawn) { S.box.focus(); S.err.textContent = 'Write something or draw on the version first.'; return; }
 
     S.post.disabled = true;
     S.post.textContent = 'Posting…';
@@ -802,6 +836,10 @@
       data.append('project_id', S.who.getAttribute('data-project'));
       data.append('step_id', S.who.getAttribute('data-step'));
       data.append('item_key', S.who.getAttribute('data-item'));
+      if (verdict) {
+        data.append('verdict', verdict);
+        if (verdict === 'back' && S.backPick) data.append('back_status', S.backPick.value);
+      }
       if (blob) {
         var base = v.name.replace(/\.[^.]+$/, '') || v.label;
         if (frame !== null) base += '_f' + String(frame + 1).padStart(4, '0');
@@ -860,6 +898,11 @@
     S.post.textContent = 'Post review';
     clearDrawing();
     showNotes();
+    // After a verdict the task has moved on, so the marker is gone and so are
+    // the buttons; the sentence the server sent back says where it went.
+    drawVerdict();
+    var ok = pane.querySelector(':scope > p.ok');
+    if (ok && S.drawSay) S.drawSay.textContent = ok.textContent;
   }
 
   // --- keys -------------------------------------------------------------------------
