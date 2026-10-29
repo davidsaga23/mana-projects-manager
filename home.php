@@ -96,7 +96,8 @@ if (!$salaried) {
     // [project id][step id] => row, their own only.
     $posTerms = own_position_terms($crewId);
     $invoiceInfo = home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo, $posTerms);
-    $invoices = own_invoices_all($crewId);
+    // One row per invoice they sent: a monthly invoice's lines folded together.
+    $invoices = home_group_invoices($crewId, own_invoices_all($crewId));
 }
 
 // The supervisor's extra panel: a supervisor login, or anybody holding a
@@ -413,10 +414,12 @@ $anyNext = $next['overdue'] || $next['week'] || $next['later'];
       <tbody>
         <?php foreach ($invoices as $inv): ?>
           <tr>
-            <td><?= e($projectNames[(int)$inv['project_id']] ?? (string)($inv['project_code'] ?? '') ?: '—') ?></td>
+            <td><?= e(implode(', ', array_map(fn($pid, $code) => $projectNames[$pid] ?? ($code !== '' ? $code : '—'),
+                    array_keys($inv['projects']), $inv['projects'])) ?: '—') ?></td>
             <td><?= e((string)($inv['invoice_ref'] ?? '') ?: '—') ?></td>
             <td class="muted small"><?= e($dateFmt($inv['period_start'] ?? null)) ?> – <?= e($dateFmt($inv['period_end'] ?? null)) ?></td>
-            <td class="num"><?= e(home_money((float)$inv['amount'], (string)($inv['currency'] ?? 'USD'))) ?></td>
+            <td class="num"><?= e(implode(' + ', array_map(fn($c, $a) => home_money((float)$a, (string)$c),
+                    array_keys($inv['amounts']), $inv['amounts']))) ?></td>
             <td class="<?= ($inv['status'] ?? '') === 'paid' ? '' : 'muted' ?>"><?= e(home_invoice_status($inv)) ?></td>
             <td class="muted small"><?= e($dateFmt($inv['issued_date'] ?? null)) ?></td>
             <td class="small"><?= e($dateFmt($inv['paid_date'] ?? null)) ?></td>

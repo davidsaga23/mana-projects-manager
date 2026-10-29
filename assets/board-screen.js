@@ -19,8 +19,12 @@
 (function () {
   'use strict';
 
+  // Spell's grid, OR a page that borrows its task panel: My tasks opens the
+  // same panel from its own rows (David, 2026-10-29), so artists upload versions
+  // and read notes without leaving their list. Everything below already checks
+  // for the board's own controls before touching them.
   var root = document.querySelector('.board-grid-head');
-  if (!root) return;
+  if (!root && !document.getElementById('boardPanel')) return;
 
   // --- saying what happened -------------------------------------------------
   var note = document.createElement('div');

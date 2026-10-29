@@ -363,6 +363,30 @@ function remove_position_terms(int $crewId, string $crewName, int $projectId, in
 }
 
 /**
+ * A person's own monthly invoices (IN4, finance_install_12), keyed by id; empty
+ * for anybody else's. Home groups the invoice rows that point at one of these
+ * (invoices.header_id) into a single invoice with its projects listed. Same
+ * door as own_invoices(), so the same narrow rule, and the crew id is checked
+ * again in the query so an id list can never reach somebody else's.
+ */
+function own_invoice_headers(int $crewId, array $ids): array {
+    $ids = array_values(array_filter(array_map('intval', $ids)));
+    if (!$ids) return [];
+    $db = money_own_db($crewId);
+    if (!$db) return [];
+    try {
+        $q = $db->prepare('SELECT * FROM invoice_headers WHERE crew_id = ? AND id IN ('
+                          . implode(',', $ids) . ')');
+        $q->execute([$crewId]);
+    } catch (PDOException $e) {
+        return [];      // before finance_install_12
+    }
+    $out = [];
+    foreach ($q as $h) $out[(int)$h['id']] = $h;
+    return $out;
+}
+
+/**
  * Save one person's terms into the finance database.
  *
  * @return string a sentence for the flash message
