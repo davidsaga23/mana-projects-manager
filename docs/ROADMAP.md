@@ -964,6 +964,7 @@ the machine this was written on, and nothing here has been executed against real
 | A CBB status | — | 046 |
 | Create a card from Studio Tasks, through one shared `create_ticket()` | `alltasks.php`, `includes/tickets.php` | — |
 | Budget pool — the show in days, derived from the plan (the projection's days since 2026-10-29) | `includes/budgetpool.php` | none needed |
+| Finance Overview: each step against its sign-off plan; locked in / expected / reserve | `includes/step_variance.php` | none needed |
 
 ### Revenue was added and removed in the same week
 

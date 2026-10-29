@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Finance Overview: is the money on track, step by step *(no migration)*
+
+- **A new block at the top of Finance management → Overview** judges every step against its own
+  plan from the kick-off sign-off, so an animatic that went over shows red the day it does, even
+  while later steps have not spent their money yet.
+- **Three figures, never netted:** *Overrun locked in* (finished steps over their plan),
+  *Overrun expected* (running steps heading over at the pace they are really going), and
+  *Reserve left* (approved budget less the plan, plus what finished, fully invoiced steps saved),
+  with one sentence on top that sums them up.
+- **A row per step:** plan, spent so far, work done, a bar of spent against plan, the forecast at
+  the end, and the result. Spent is invoices plus logged days not invoiced yet at the person's
+  rate; work done is approved items; the forecast is spent ÷ done once a step is 15% in.
+- **Warns when a step has people on it but nobody has logged time** for 4 working days, since
+  spent comes from the logs.
+- A show not signed off yet is judged against today's projection, and says so.
+
 ## 2026-10-29 — Reviews follow the studio's approval rules; admins see both stages *(no migration)*
 
 - The rules (David): a new version → **Pending review**; Production or a supervisor approves →
