@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Approve and Send back in the review viewer *(no migration)*
+
+- **The full-screen review viewer now has Approve and Send back** beside Post review, for the
+  reviewer whose turn it is: a supervisor on a task in Pending review, Production and admins on one
+  in Ready for review (the same stages as the Reviews page).
+- **Approve** moves the task on (to Ready for review, or Complete). Anything written or drawn is
+  posted with it as the review on the version on screen.
+- **Send back** needs a note and goes to the status picked beside it (a retake status first). The
+  note and the drawing are posted as the review.
+- The buttons only show while the task is waiting on you; after a verdict they go and the viewer
+  says where the task went.
+
 ## 2026-10-29 — Budget pool: used days come only from logged time *(no migration)*
 
 - **Used days on the Budget pool are now always logged time**, never worked out from the step
