@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — My tasks opens Spell's task panel *(no migration)*
+
+- **Clicking a production task on My tasks opens Spell's side panel** over the list: details,
+  versions (upload yours, see the review notes), comments and timeline, exactly as in Spell.
+- **"Show details"** beside each task goes to the item page, where the click used to go.
+- The list reloads when you close the panel after changing something in it, so the row's status
+  and versions are current.
+
 ## 2026-10-29 — Copy link beside Resend link on the person page *(no migration)*
 
 - **Copy link** makes a fresh one-time login link and shows it on the page, with a Copy button,
