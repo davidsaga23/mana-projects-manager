@@ -14,7 +14,6 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-
 ## 2026-10-29 — A new version from the artist sends the task to Pending review *(no migration)*
 
 - **When the person assigned to a task puts up a new version, the task moves to the show's
