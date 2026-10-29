@@ -137,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
 // POST from anyone else, and may_send_invite_for() is the second lock, on the
 // login's own role.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
-    && (isset($_POST['create_login']) || isset($_POST['resend_link']))) {
+    && (isset($_POST['create_login']) || isset($_POST['resend_link']) || isset($_POST['copy_link']))) {
     try {
         if (!invites_available($pdo)) {
             throw new RuntimeException('Logins from this page need migration 071, run it on the Migrations screen first.');
@@ -153,6 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
             flash('ok', 'Created the artist login "' . $login['username'] . '" for ' . $person['name'] . '.');
             $kind = 'create'; $reactivated = false;
         } else {
+            // Resend link and Copy link both land here: the same login, the
+            // same rules, the only difference is whether the link is emailed.
             $login = crew_login($pdo, $crewId);
             if ($login === null) throw new RuntimeException('This person has no login yet, use Create user instead.');
             if (!may_send_invite_for((string)$login['role'])) {
@@ -179,9 +181,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
         }
 
         $email = invite_address($pdo, (int)$login['id'], (string)($person['email'] ?? ''));
-        [$sent, $said, $link] = invite_issue($pdo, $login, $email, $kind, $project, $by, $reactivated);
+        // Copy link (David, 2026-10-29): the same fresh link, handed back for
+        // the screen instead of emailed. Only on an existing login; a new one
+        // is always emailed by Create user.
+        $copy = isset($_POST['copy_link']) && $kind === 'resend';
+        [$sent, $said, $link] = invite_issue($pdo, $login, $email, $kind, $project, $by, $reactivated, !$copy);
         flash($sent ? 'ok' : 'warn', $said);
-        if ($link !== '') $_SESSION['invite_link'] = $link;
+        if ($link !== '') {
+            $_SESSION['invite_link'] = $link;
+            $_SESSION['invite_link_copied'] = $copy;
+        }
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -293,7 +302,7 @@ if (column_exists($pdo, 'tickets', 'id')) {
 // Their Anima login, for the panel under Details. Production and admins only,
 // and never for a slot or a team, which are not anybody who could log in.
 $loginPanel = can_edit() && !$isSlot && (int)$person['is_team'] !== 1;
-$login = null; $lastInvite = null; $onShow = true; $inviteLink = '';
+$login = null; $lastInvite = null; $onShow = true; $inviteLink = ''; $inviteCopied = false;
 if ($loginPanel && invites_available($pdo)) {
     $login = crew_login($pdo, $crewId);
     if ($login) $lastInvite = last_invite($pdo, (int)$login['id']);
@@ -306,7 +315,8 @@ if ($loginPanel && invites_available($pdo)) {
     }
     // Shown once, only when the email did not go out (invite_issue()).
     $inviteLink = (string)($_SESSION['invite_link'] ?? '');
-    unset($_SESSION['invite_link']);
+    $inviteCopied = !empty($_SESSION['invite_link_copied']);
+    unset($_SESSION['invite_link'], $_SESSION['invite_link_copied']);
 }
 
 $pageTitle = $person['name'] . ' · ' . $project['name'];
@@ -547,11 +557,24 @@ require __DIR__ . '/includes/header.php';
     </p>
   <?php else: ?>
     <?php if ($inviteLink !== ''): ?>
-      <div class="flash flash-warn">
-        <strong>The link was not emailed.</strong> Copy it and send it to <?= e($person['name']) ?>
-        privately. It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
-        <input type="text" readonly value="<?= e($inviteLink) ?>" onclick="this.select()"
-               style="width:100%;margin-top:6px;">
+      <div class="flash <?= $inviteCopied ? 'flash-ok' : 'flash-warn' ?>">
+        <?php if ($inviteCopied): ?>
+          <strong>Here is the link.</strong> Send it to <?= e($person['name']) ?> privately (WhatsApp,
+          Slack). It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
+        <?php else: ?>
+          <strong>The link was not emailed.</strong> Copy it and send it to <?= e($person['name']) ?>
+          privately. It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
+        <?php endif; ?>
+        <span class="invite-copy">
+          <input type="text" readonly value="<?= e($inviteLink) ?>" onclick="this.select()" id="inviteLinkBox">
+          <button type="button" class="secondary" onclick="(function (b) {
+              var box = document.getElementById('inviteLinkBox');
+              var done = function (ok) { b.textContent = ok ? 'Copied' : 'Select and copy it'; };
+              if (navigator.clipboard &amp;&amp; window.isSecureContext) {
+                navigator.clipboard.writeText(box.value).then(function () { done(true); }, function () { done(false); });
+              } else { box.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} done(ok); }
+            })(this)">Copy link</button>
+        </span>
       </div>
     <?php endif; ?>
 
@@ -601,7 +624,8 @@ require __DIR__ . '/includes/header.php';
           <?php elseif (strtotime((string)$lastInvite['expires_at']) < time()): ?>
             never used, and it has expired.
           <?php else: ?>
-            not used yet<?= (int)$lastInvite['email_sent'] === 1 ? '' : ' (the email did not go out)' ?>.
+            not used yet<?= (int)$lastInvite['email_sent'] === 1 ? ''
+                : (empty($lastInvite['sent_to']) ? ' (copied by hand, not emailed)' : ' (the email did not go out)') ?>.
           <?php endif; ?>
           <?php if ((int)$lastInvite['reactivated'] === 1): ?>It switched the login back on.<?php endif; ?>
         </p>
@@ -610,8 +634,9 @@ require __DIR__ . '/includes/header.php';
       <?php if (may_send_invite_for($role)): ?>
         <p class="muted small">
           <strong>Resend link</strong> emails them a fresh one-time link to set a new password and
-          log in, for someone coming back on a new show or who has forgotten it. Their current
-          password stops working only once they use it; any earlier link stops working at once.
+          log in, for someone coming back on a new show or who has forgotten it. <strong>Copy link</strong>
+          makes the same fresh link without emailing it, for you to send on WhatsApp or Slack. Their
+          current password stops working only once they use it; any earlier link stops working at once.
           <?php if ((int)$login['active'] !== 1): ?>
             <strong>The login is switched off, sending the link switches it back on.</strong>
           <?php endif; ?>
@@ -623,7 +648,11 @@ require __DIR__ . '/includes/header.php';
             <label class="inline"><input type="checkbox" name="give_access" value="1" checked>
               Let them see <?= e($project['name']) ?> (they are not staffed on it yet, so they would not see it)</label>
           <?php endif; ?>
-          <div class="actions"><button type="submit" class="secondary">Resend link</button></div>
+          <div class="actions">
+            <button type="submit" class="secondary">Resend link</button>
+            <button type="submit" name="copy_link" value="1" class="secondary"
+                    title="Makes a fresh one-time link and shows it here instead of emailing it">Copy link</button>
+          </div>
         </form>
       <?php elseif ($role === 'admin'): ?>
         <p class="muted small">An administrator's password is not reset from here; that is done on Users.</p>

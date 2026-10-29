@@ -4594,3 +4594,10 @@ body.rv-open { overflow: hidden; }
 .person-panel .row { flex-wrap: wrap; }
 .person-panel .row > label { flex: 1 1 180px; min-width: 0; }
 .person-panel table { width: 100%; }
+
+/* A one-time login link shown on the person page, with its Copy button
+   (2026-10-29). The box takes the width, the button sits at its end. */
+.invite-copy { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.invite-copy input { flex: 1; min-width: 0; }
+.invite-copy button { margin: 0; white-space: nowrap; }
+

@@ -162,10 +162,17 @@ function create_login_for_crew(PDO $pdo, int $crewId, string $displayName, strin
  * may_send_invite_for() refuses anyone more powerful than the sender.
  *
  * @param string $kind 'create' or 'resend', recorded in the log
+ * @param bool $sendEmail false for "Copy link" (David, 2026-10-29): the link is
+ *        made and handed back to be pasted into WhatsApp or Slack, and NOT emailed.
+ *        The real link exists nowhere else (the table keeps only its hash), which is
+ *        why copying means making a fresh one rather than reading the last one back.
+ *        It retires the older unused links exactly as a resend does, and the log
+ *        records it with no address, so the person page says it was copied.
  */
 function invite_issue(PDO $pdo, array $user, string $email, string $kind,
-                      array $project, string $byWho, bool $reactivated): array {
+                      array $project, string $byWho, bool $reactivated, bool $sendEmail = true): array {
     global $config;
+    if (!$sendEmail) $email = '';
     $token   = bin2hex(random_bytes(32));
     $now     = date('Y-m-d H:i:s');
     $expires = date('Y-m-d H:i:s', time() + INVITE_DAYS * 86400);
@@ -182,6 +189,10 @@ function invite_issue(PDO $pdo, array $user, string $email, string $kind,
     $inviteId = (int)$pdo->lastInsertId();
     $url = invite_url($token);
 
+    if (!$sendEmail) {
+        return [true, 'A fresh link is below, nothing was emailed. Copy it and send it to them privately; '
+                     . 'it works once, for ' . INVITE_DAYS . ' days, and any earlier link has stopped working.', $url];
+    }
     if ($email === '') {
         return [false, 'There is no email address for them, so nothing was sent. Copy the link below '
                      . 'and send it to them privately; it works once, for ' . INVITE_DAYS . ' days.', $url];
