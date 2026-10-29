@@ -110,6 +110,7 @@
   --radius-lg: 14px;   /* a panel: Spell's group of rows */
   --shadow-pop: 0 12px 34px rgba(0, 0, 0, .55);   /* only what floats: menus, modals */
   --ease: .12s ease;
+  --row-hover: rgba(255, 255, 255, .03);   /* a row under the pointer: Spell's lift */
 
   /* ⚠ THE ONE LINE THAT IS NOT OURS TO DRAW. A date picker, the list a
      <select> drops down, scrollbars and the yellow of an autofilled field are
@@ -186,6 +187,15 @@ th {
   box-shadow: inset 0 -1px 0 var(--border);
 }
 /* Above the rows, below the step filter panel (40) and the task editor (100). */
+
+/* A row lifts under the pointer, as Spell's do (2026-10-29), so a long row can
+   be followed across the screen. ⚠ A BACKGROUND-IMAGE, NOT A BACKGROUND: a
+   gradient paints OVER a cell's own colour instead of replacing it, so the
+   tinted rows (late in red, filled in green, a migration's state, a heat-map
+   cell) keep their meaning and only get a shade lighter. */
+tbody > tr:hover > td { background-image: linear-gradient(var(--row-hover), var(--row-hover)); }
+/* Figures in a number column line up digit under digit, Spell's habit. */
+td.num, th.num { font-variant-numeric: tabular-nums; }
 
 .empty-state {
   background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
@@ -356,7 +366,7 @@ details.kickoff-resend summary { cursor: pointer; }
 .kickoff-chg { color: var(--warn-strong); white-space: nowrap; font-size: .9em; }
 .kickoff-list { margin: 12px 0; }
 .kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
-.kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: 6px; }
+.kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: var(--radius-md); }
 .kickoff-text-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 700px) { .kickoff-text-pair { grid-template-columns: 1fr; } .kickoff-figures { min-width: 0; } }
 label.inline { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-weight: 400; }
@@ -416,8 +426,8 @@ label.inline input { width: auto; }
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
   width: max-content; max-width: min(560px, calc(100vw - 40px));
   display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
-  padding: 12px 14px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; box-shadow: var(--shadow-pop);
   font-weight: 400;
 }
 /* width:auto, or the global `input, select { width: 100% }` gives each control
@@ -442,7 +452,7 @@ label.inline input { width: auto; }
    them, the step each lands on, and what days per item becomes. Fixed layout so
    the colgroup binds and the step pickers share their column. */
 .ideals-match input[type=file] { width: auto; max-width: 100%; padding: 4px; font-size: 13px; }
-.match-preview { margin: 18px 0 26px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.match-preview { margin: 18px 0 26px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
 .match-preview h3 { margin-top: 0; }
 .match-table { width: 100%; table-layout: fixed; }
 .match-table th, .match-table td { padding: 6px; vertical-align: top; word-break: break-word; }
@@ -468,7 +478,7 @@ label.inline input { width: auto; }
    changes every figure below it, and walking back to step 1 to try 5% instead
    of 10% is enough friction that nobody does it. */
 .retake-bar {
-  background: var(--warn-tint); border: 1px solid var(--warn-border); border-radius: 4px;
+  background: var(--warn-tint); border: 1px solid var(--warn-border); border-radius: var(--radius);
   padding: 9px 12px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
   flex-wrap: wrap;
 }
@@ -527,7 +537,7 @@ label.inline input { width: auto; }
 }
 .money-form .row-save { flex: 0 0 auto; }
 .money-form .row-save button { margin: 0; }
-.summary-line { background: var(--surface-3); padding: 8px 12px; border-radius: 4px; }
+.summary-line { background: var(--surface-3); padding: 8px 12px; border-radius: var(--radius); }
 
 /* Flash messages — every save says what it did */
 .flash { padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; border-left: 3px solid; }
@@ -586,7 +596,7 @@ p.crumb a { white-space: normal; }
 /* Pipeline templates */
 .template-grid { display: flex; gap: 12px; flex-wrap: wrap; }
 .template-card {
-  flex: 1 1 210px; border: 1px solid var(--border-strong); border-radius: 6px; padding: 14px;
+  flex: 1 1 210px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 14px;
   cursor: pointer; font-weight: 400; margin: 0; display: block;
 }
 .template-card:hover { border-color: var(--primary); background: var(--primary-tint); }
@@ -707,7 +717,7 @@ p.crumb a { white-space: normal; }
 .cat-row.cat-project td:first-child { border-left-color: var(--chip-orange-ink); }
 .step-filter {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 8px 12px; margin-bottom: 10px;
 }
 .step-filter select { width: auto; }
@@ -716,7 +726,7 @@ p.crumb a { white-space: normal; }
 /* Workflow diagram */
 .wf-diagram-wrap {
   overflow-x: auto; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 8px; margin-bottom: 6px;
+  border-radius: var(--radius-lg); padding: 8px; margin-bottom: 6px;
 }
 .wf-diagram { display: block; }
 /* The heading and its download sit on one line, the link pushed to the right so
@@ -769,8 +779,8 @@ p.crumb a { white-space: normal; }
    own scrolling box cannot clip it at the edge. */
 .wf-hint {
   position: fixed; z-index: 250; pointer-events: none; max-width: 320px;
-  padding: 5px 9px; border-radius: 4px; font-size: 12.5px; line-height: 1.35;
-  background: var(--tooltip); color: var(--on-accent); box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  padding: 5px 9px; border-radius: var(--radius); font-size: 12.5px; line-height: 1.35;
+  background: var(--tooltip); color: var(--on-accent); box-shadow: var(--shadow-pop);
 }
 .wf-hint.is-ok  { background: var(--ok); }
 .wf-hint.is-bad { background: var(--danger); }
@@ -821,7 +831,7 @@ p.crumb a { white-space: normal; }
 .check-all { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 8px; }
 .retype-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 10px 14px; margin-top: 16px;
 }
 .asset-table input[type=text], .asset-table input:not([type]) { width: 100%; padding: 5px 7px; font-size: 14px; }
@@ -838,11 +848,11 @@ p.crumb a { white-space: normal; }
 .tool-grid { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 22px; }
 .tool {
   flex: 1 1 300px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 14px;
+  border-radius: var(--radius-md); padding: 14px;
 }
 .tool strong { display: block; margin-bottom: 8px; }
 .tool textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
   font-family: ui-monospace, Consolas, monospace; font-size: 13px;
 }
 .tool button { margin-top: 12px; }
@@ -856,7 +866,7 @@ p.crumb a { white-space: normal; }
 /* Project hub */
 .hub-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0 26px; }
 .hub-card {
-  flex: 1 1 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  flex: 1 1 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 14px; color: inherit; text-decoration: none;
 }
 .hub-card:hover { border-color: var(--primary); background: var(--primary-tint); text-decoration: none; }
@@ -913,7 +923,7 @@ p.crumb a { white-space: normal; }
 }
 
 /* Import */
-.unit-choice { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin: 16px 0; background: var(--surface-2); }
+.unit-choice { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; margin: 16px 0; background: var(--surface-2); }
 .unit-choice legend { font-weight: 600; padding: 0 6px; }
 .unit-choice label.inline { margin-right: 16px; }
 .checkbox-note { display: inline-flex; margin: 12px 0 2px; }
@@ -936,7 +946,7 @@ input[type=file] { padding: 6px; background: var(--surface); }
 .review-grid { display: flex; gap: 16px; flex-wrap: wrap; }
 .review-card {
   flex: 1 1 240px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 14px;
+  border-radius: var(--radius-md); padding: 14px;
 }
 .review-card h4 { margin: 0 0 8px; font-size: 14px; }
 .review-card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
@@ -985,7 +995,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 /* Timeline — Frappe Gantt plus the bits it doesn't do (step colours, the
    assignee label glued to the left of each bar, the lock outline). */
 .tl-section {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 12px 14px; margin: 16px 0;
 }
 .tl-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -999,7 +1009,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 /* An <a> that has to sit in a row of <button>s without looking like an outsider. */
 .tl-linkbtn {
   display: inline-block; padding: 5px 10px; font-size: 13px; font-weight: 600;
-  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); border-radius: 4px;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); border-radius: var(--radius-sm);
 }
 .tl-linkbtn:hover { background: var(--primary-tint); border-color: var(--primary); text-decoration: none; }
 .tl-chart { overflow: auto; max-height: 420px; }
@@ -1012,14 +1022,14 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 /* Step multi-select */
 .multiselect { position: relative; display: inline-flex; align-items: center; gap: 5px; }
 .multiselect-toggle {
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
   padding: 4px 9px; font-size: 13px; color: var(--text); cursor: pointer; margin: 0;
 }
 .multiselect-toggle:hover { background: var(--primary-tint); border-color: var(--primary); }
 .multiselect-panel {
   position: absolute; top: 100%; left: 0; z-index: 40; margin-top: 4px;
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 8px; min-width: 230px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); padding: 8px; min-width: 230px;
   max-height: 300px; overflow: auto;
 }
 .multiselect-opt { display: flex; align-items: center; gap: 7px; padding: 3px 4px; font-weight: 400; margin: 0; }
@@ -1045,7 +1055,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .gantt .tl-sticky .lower-text { fill: var(--text-2); }
 .tl-popup {
   background: var(--tooltip); color: var(--on-accent); padding: 8px 10px;
-  border-radius: 5px; font-size: 12.5px; line-height: 1.45;
+  border-radius: var(--radius-md); font-size: 12.5px; line-height: 1.45;
 }
 .tl-popup .muted { color: var(--on-accent-2); }
 /* The two warnings the hover box can carry. Classes rather than colours written
@@ -1059,8 +1069,8 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
   display: flex; align-items: center; justify-content: center; z-index: 100;
 }
 .tl-modal-box {
-  background: var(--surface); border-radius: 8px; padding: 22px 24px;
-  width: 380px; max-width: 92vw; box-shadow: 0 6px 26px rgba(0,0,0,.22);
+  background: var(--surface); border-radius: var(--radius-lg); padding: 22px 24px;
+  width: 380px; max-width: 92vw; box-shadow: var(--shadow-pop);
 }
 .tl-modal-box h3 { margin-top: 0; }
 
@@ -1122,7 +1132,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .proj-switch {
   width: auto; margin: 0; padding: 1px 4px; font-size: inherit; font-weight: 700;
   color: var(--text); background: none; border: 1px solid transparent;
-  border-radius: 4px; cursor: pointer; max-width: 42ch;
+  border-radius: var(--radius-sm); cursor: pointer; max-width: 42ch;
 }
 .proj-switch:hover, .proj-switch:focus-visible {
   border-color: var(--border-strong); background: var(--surface-2);
@@ -1366,12 +1376,12 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
   margin: 14px 0 18px; overflow-x: auto; padding-bottom: 6px;
 }
 .board-col {
-  background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
   display: flex; flex-direction: column; min-height: 180px;
 }
 .board-col-head {
   display: flex; align-items: center; gap: 7px;
-  padding: 10px 12px 8px; border-bottom: 1px solid var(--border);
+  padding: 10px 12px 8px; border-bottom: 1px solid var(--border-soft);
 }
 .board-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .board-col-name { font-size: 13px; font-weight: 600; flex: 1; }
@@ -1388,18 +1398,18 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
   padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 7px;
   min-height: 70px; transition: background .15s;
 }
-.board-cards.drag-over { background: var(--primary-tint); border-radius: 0 0 8px 8px; }
+.board-cards.drag-over { background: var(--primary-tint); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 
 /* --- cards --- */
 .board-card {
-  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
-  border-radius: 6px; padding: 9px 11px; cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius); padding: 9px 11px; cursor: pointer;
+  box-shadow: none;
   transition: box-shadow .15s, border-color .15s;
 }
 .board-card[draggable="true"] { cursor: grab; }
 .board-card[draggable="true"]:active { cursor: grabbing; }
-.board-card:hover { border-color: var(--primary-border); box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+.board-card:hover { border-color: var(--primary-border); }
 .board-card.overdue { background: var(--danger-tint); }
 .board-card.filtered-out { display: none; }
 
@@ -1479,7 +1489,7 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
 .comment-head { display: flex; align-items: baseline; gap: 8px; }
 .reply-banner {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-left: 3px solid var(--primary); border-radius: 4px;
+  border-left: 3px solid var(--primary); border-radius: var(--radius);
   padding: 6px 10px; margin-bottom: 8px; font-size: 13px;
 }
 .reply-banner[hidden] { display: none; }
@@ -1493,12 +1503,12 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
 .mention-panel {
   position: fixed; z-index: 90; width: 260px;
   background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.38);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
   padding: 4px; font-size: 13px;
 }
 .mention-panel[hidden] { display: none; }
 .mention-list { max-height: 40vh; overflow-y: auto; }
-.mention-row { padding: 5px 8px; border-radius: 4px; cursor: pointer; }
+.mention-row { padding: 5px 8px; border-radius: var(--radius-sm); cursor: pointer; }
 .mention-row:hover { background: var(--surface-2); }
 /* The row Enter would take. Stronger than :hover, because the keyboard and
    the mouse can disagree about which row is live and the keyboard is the
@@ -1510,7 +1520,7 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
    do on purpose, not a thing to be warned off. */
 .move-zone {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
-  border: 1px solid var(--border-strong); border-radius: 6px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
   background: var(--surface-2); padding: 12px 14px; margin-top: 18px; flex-wrap: wrap;
 }
 .move-zone form { margin: 0; flex: none; }
@@ -1555,7 +1565,7 @@ tr.row-overdue td { background: var(--danger-tint); }
 }
 .form-error {
   background: var(--danger-tint); border-left: 4px solid var(--danger); color: var(--danger-strong);
-  padding: 9px 12px; border-radius: 4px; margin: 12px 0 0; font-size: 14px;
+  padding: 9px 12px; border-radius: var(--radius); margin: 12px 0 0; font-size: 14px;
 }
 .req-mark { color: var(--danger); font-weight: 700; }
 
@@ -1567,18 +1577,18 @@ tr.row-overdue td { background: var(--danger-tint); }
 .panel > h2:first-child { margin-top: 0; }
 .ticket-ref-lg { font-size: 14px; font-weight: 700; letter-spacing: .04em; margin-right: 6px; }
 .ticket-body {
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 12px 14px; margin-top: 14px; line-height: 1.55; white-space: pre-wrap;
 }
 .detail-form textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 
 .attachment-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .attachment {
   width: 190px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; overflow: hidden;
+  border-radius: var(--radius); overflow: hidden;
 }
 .attachment img, .attachment video {
   display: block; width: 100%; height: 118px; object-fit: cover; background: var(--tooltip);
@@ -1606,7 +1616,7 @@ tr.row-overdue td { background: var(--danger-tint); }
 }
 .comment-form { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
 .comment-form textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius);
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 .comment-form input[type=file] { padding: 6px 0; border: 0; }
@@ -1639,14 +1649,14 @@ tr.row-overdue td { background: var(--danger-tint); }
 .danger-zone {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   flex-wrap: wrap; margin-top: 22px; padding: 14px 16px;
-  border: 1px solid var(--danger-border); border-radius: 6px; background: var(--danger-tint);
+  border: 1px solid var(--danger-border); border-radius: var(--radius-md); background: var(--danger-tint);
 }
 .danger-zone form { margin: 0; }
 .danger-zone button { margin-top: 0; }
 
 .share-url {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 8px 12px; margin-bottom: 16px;
 }
 .share-url-label {
@@ -1762,7 +1772,7 @@ button.cell-chip.is-editable:hover { outline: 2px solid var(--primary); outline-
 .track-table { min-width: 100%; }
 .track-table th.track-step, .track-table td.track-cell { text-align: center; width: 74px; }
 /* Trend chart on the step page. Hand-rolled SVG — no chart library. */
-.trend-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+.trend-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
 .trend { display: block; }
 /* ⚠ CLASS COLLISION, fixed for the chart only. `.trend` is ALSO the "on track /
    behind" indicator beside a pace figure, and that rule, much further up, gives
@@ -1819,7 +1829,7 @@ svg.trend { margin: 0; }
 .timer-btn {
   margin-top: 0; padding: 4px 9px; font-size: 13px; white-space: nowrap;
   background: var(--surface-2); border: 1px solid var(--border-strong);
-  color: var(--muted); border-radius: 4px; cursor: pointer;
+  color: var(--muted); border-radius: var(--radius-sm); cursor: pointer;
 }
 .timer-btn:hover:not(:disabled) { color: var(--text); border-color: var(--primary); }
 .timer-btn.running {
@@ -1915,7 +1925,7 @@ svg.trend { margin: 0; }
 .item-table .ver-input { width: 90px; padding: 5px 7px; font-size: 14px; }
 .item-table .notes-input {
   width: 100%; min-width: 180px; padding: 5px 7px; font-size: 14px;
-  border: 1px solid var(--border-strong); border-radius: 4px; font-family: inherit; resize: vertical;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; resize: vertical;
 }
 .item-table tr.is-done td { background: var(--ok-tint); }
 .item-table tr.is-na td { opacity: .6; }
@@ -1962,13 +1972,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
    inside its own container. */
 .status-menu {
   position: absolute; z-index: 120; background: var(--surface);
-  border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.16);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
   padding: 4px; min-width: 210px; max-height: 60vh; overflow-y: auto;
 }
 .status-opt {
   display: flex; align-items: center; gap: 8px; width: 100%;
   background: none; border: 0; color: var(--text); text-align: left;
-  padding: 6px 8px; margin: 0; border-radius: 4px; font-size: 14px; cursor: pointer;
+  padding: 6px 8px; margin: 0; border-radius: var(--radius-sm); font-size: 14px; cursor: pointer;
 }
 .status-opt:hover { background: var(--primary-tint); }
 .status-opt.is-current { background: var(--primary-tint); font-weight: 600; }
@@ -2031,7 +2041,7 @@ body.lightbox-lock { overflow: hidden; }
 /* Project brief — prose, so the fields are wide and the measure stays readable. */
 .brief-form { max-width: 92ch; }
 .brief-form textarea {
-  width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: var(--radius);
   font-family: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
 }
 .brief-form small { margin-top: 4px; }
@@ -2119,7 +2129,7 @@ body.lightbox-lock { overflow: hidden; }
 .pct-cap {
   --fill: 0%;
   display: inline-block; box-sizing: border-box;
-  min-width: 54px; padding: 4px 8px; border-radius: 4px;
+  min-width: 54px; padding: 4px 8px; border-radius: var(--radius-sm);
   font-size: 13px; font-weight: 600; text-align: right; white-space: nowrap;
   color: var(--text); border: 1px solid var(--border);
   background: linear-gradient(to right, var(--primary-fill) 0 var(--fill), var(--surface-3) var(--fill) 100%);
@@ -2390,7 +2400,7 @@ body.lightbox-lock { overflow: hidden; }
 .se-dates { display: flex; gap: 12px; }
 .se-dates label { flex: 1 1 0; margin-top: 0; }
 .se-need {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 10px 12px; margin: 14px 0 2px; line-height: 1.5;
 }
 .se-need small { margin-top: 4px; }
@@ -2434,7 +2444,7 @@ body.lightbox-lock { overflow: hidden; }
 .bk-clash-text { color: var(--danger); }
 .bk-chart-wrap {
   overflow: auto; max-height: 72vh; margin-bottom: 10px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
 }
 .bk-chart { position: relative; width: max-content; min-width: 100%; }
 .bk-row { display: flex; border-bottom: 1px solid var(--border-soft); }
@@ -2560,7 +2570,7 @@ body.lightbox-lock { overflow: hidden; }
    it needs to lay out in columns. */
 .pos-filter {
   flex: 1 1 100%; width: 100%; box-sizing: border-box;
-  border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; margin: 10px 0;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin: 10px 0;
 }
 .pos-filter legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
 .pos-all { display: block; margin-bottom: 8px; }
@@ -2686,7 +2696,7 @@ tr.col-hidden { display: none; }
    and `a.button`, both element-qualified. Neither reaches it, so the look is
    spelled out here rather than borrowed. */
 .slot-btn {
-  display: inline-block; padding: 9px 18px; border-radius: 4px; font-size: 15px;
+  display: inline-block; padding: 9px 18px; border-radius: var(--radius-sm); font-size: 15px;
   background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); font-weight: 600;
   cursor: pointer; user-select: none; list-style: none;
 }
@@ -2713,8 +2723,8 @@ tr.col-hidden { display: none; }
      under the picker instead of beside it, which is the one thing this bar has
      to get right. */
   margin: 0; gap: 8px; display: flex; align-items: center; flex-wrap: nowrap;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
-  padding: 8px 10px; box-shadow: 0 3px 10px rgba(0, 0, 0, .12);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 10px; box-shadow: var(--shadow-pop);
 }
 /* width:auto is load-bearing: the global `input, select { width: 100% }` would
    fill the popover and push Save beneath the picker. */
@@ -2917,7 +2927,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 /* --- the Deadline card on a step's page -----------------------------------
    Sits directly above the daily quota, which is worked back from it. */
 .deadline-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 12px 16px 6px; margin: 16px 0 8px;
 }
 .deadline-card h3 { margin: 0 0 8px; }
@@ -2943,9 +2953,9 @@ button.secondary.danger:hover { background: var(--danger-border); }
   max-width: min(440px, calc(100vw - 32px));
 }
 .keepplace-toast {
-  position: relative; padding: 10px 34px 10px 14px; border-radius: 5px;
+  position: relative; padding: 10px 34px 10px 14px; border-radius: var(--radius);
   font-size: 13.5px; line-height: 1.45; cursor: pointer;
-  box-shadow: 0 3px 14px rgba(15, 22, 30, .18);
+  box-shadow: var(--shadow-pop);
   border-left: 4px solid;
 }
 .keepplace-toast.is-ok  { background: var(--ok-tint); border-color: var(--ok); color: var(--ok-strong); }
@@ -3050,7 +3060,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
    in the middle of it, so here they are the largest thing on the row. */
 .glance {
   display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 18px 20px; margin: 16px 0;
 }
 .glance-dates { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -3192,7 +3202,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bd-picker {
   position: fixed; z-index: 60; width: 260px;
   background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.38);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
   /* A literal black, NOT var(--shade): that token is #ffffff on the dark
      theme (it is a fill for low-opacity overlays), and it drew a white
      glow around the panel. Every other shadow in this file is an rgba
@@ -3239,7 +3249,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bd-picker-list { max-height: 46vh; overflow-y: auto; }
 .bd-picker-row {
   display: flex; align-items: center; gap: 6px;
-  padding: 3px 4px; border-radius: 4px; cursor: pointer; line-height: 1.3;
+  padding: 3px 4px; border-radius: var(--radius-sm); cursor: pointer; line-height: 1.3;
 }
 .bd-picker-row[hidden] { display: none; }
 .bd-picker-row:hover { background: var(--surface-2); }
@@ -3274,7 +3284,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bulk-rates {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
   margin: 8px 0; padding: 8px 12px; position: sticky; top: 0; z-index: 3;
-  background: var(--surface-3); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--radius-md);
 }
 .bulk-rates label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
 /* width:auto throughout, or the global `input, select { width: 100% }` stretches
