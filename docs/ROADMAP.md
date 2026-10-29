@@ -1241,6 +1241,25 @@ sent to the client and what came back*. Building this well makes that one smalle
 David, 2026-10-27: *"we won't develop this one anymore"*. The naming check stays a gate on version
 uploads, as built in PR #76 and fixed in PR #81.
 
+## Asked for on 2026-10-28
+
+### Artist Home — BUILT 2026-10-28, waiting for David's go-ahead
+
+✅ `home.php`, rules and queries in `includes/home.php`. One page per person across every show:
+shows with dates, days left and supervisors; logged time and missing log days; what's next; notes
+waiting; latest versions; and for freelancers the contract, the month's invoice information and
+invoice status. Supervisors get a team panel; salaried staff see no money at all.
+
+**Still open:**
+- ✅ **Who is salaried** is the Salaried tick on the Users page (migration 072). The blended internal
+  day rate work can read the same `users.is_salaried`.
+- **Per-second and flat-fee contracts** get no monthly line total: what they are paid on is approved
+  footage or a fee once, not logged time. Their line points to the show's statement.
+- **One invoice split across projects (IN4).** Invoice status lists each invoice row as Finance holds
+  it, one project per row, until IN4 lets one invoice carry lines from several shows.
+- **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
+  invoices it is for David to say.
+
 ## The "sell the app to customers" exploration (not part of the internal app)
 
 A separate, **planning-only** workstream (its chat thread since deleted) explored turning the

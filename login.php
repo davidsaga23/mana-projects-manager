@@ -50,6 +50,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $second = $next[1] ?? '';
             if ($next === '' || $next[0] !== '/' || $second === '/' || $second === chr(92)) {
                 $next = 'index.php';
+                // ARTISTS AND SUPERVISORS LAND ON HOME (2026-10-28): their own
+                // shows, logs, notes and invoice information, rather than the
+                // list of every project. Only with a crew link, since Home is a
+                // person's; Production and admins keep the project list. Read
+                // straight from the row: current_user() may already have
+                // cached "nobody" for this request.
+                try {
+                    $lq = $pdo->prepare('SELECT role, crew_id FROM users WHERE id = ?');
+                    $lq->execute([$user['id']]);
+                    $lr = $lq->fetch() ?: [];
+                    if (in_array((string)($lr['role'] ?? ''), ['artist', 'viewer', 'supervisor'], true)
+                        && (int)($lr['crew_id'] ?? 0) > 0) {
+                        $next = 'home.php';
+                    }
+                } catch (PDOException $e) {
+                    // roles (005) or the crew link (017) not there yet: the project list
+                }
             }
             $_SESSION['user_id']      = $user['id'];
             $_SESSION['username']     = $user['username'];

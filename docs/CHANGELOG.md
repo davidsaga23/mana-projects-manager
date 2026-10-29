@@ -14,6 +14,37 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-28 — Home: an artist's shows, logs, notes and invoice information on one page *(no migration)*
+
+- **New Home page (`home.php`)**, a **Home** button in the top bar for anybody whose login is linked
+  to a person. **Artists and supervisors now land on it after signing in**; Production and admins
+  still land on the project list.
+- **Your shows:** each show you're on, your position, your start and end dates, working days left,
+  the show's supervisor(s) (from supervision positions), the time you've logged on it, and links to
+  Spell, the Brief, Standards and (freelancers) your statement.
+- **Missing log days:** "You haven't logged Tuesday or Wednesday", for last week and this week up to
+  yesterday, leaving out weekends, studio holidays, your days off and days outside your dates. Links
+  to My tasks to log.
+- **What's next:** overdue, due this week, then what's lined up after (tasks and cards). Editing
+  stays on My tasks and Spell.
+- **Notes waiting on you:** notes on your Spell tasks that you haven't answered with a reply or a new
+  version, and tasks sent back (a retake status) with no note yet.
+- **Your latest versions** put up in Spell.
+- **Freelancers only:** your contract rate ("$520/day (£400)" once a show has a fixed exchange rate),
+  **invoice information** for the month (one line per project and step: rate, days or hours, line
+  total, month total, with a link to the previous month), and **your invoices** with their status
+  (not received yet / received, not paid yet / paid) and dates. Information to put on your own
+  invoice, not a ready-made invoice. The panel says plainly how to send it (Tim, 2026-10-28): one
+  invoice a month, one line per project, to accounting@mana.tv and nowhere else (not to producers
+  or supervisors); Jorik pays it once.
+- **Supervisors** also get **Your team**: each person on the shows they supervise, the days they
+  haven't logged this week and how many notes are waiting on them. No money.
+- **Salaried staff** see no invoice information, amounts or invoice status. **A new Salaried tick on
+  the Users page** says who they are (migration 072, `users.is_salaried`). Until 072 runs, admin and
+  Production logins count as salaried.
+- Always your own: there is no way to ask for somebody else's Home. No budgets, other people's
+  rates, forecasts or comparisons appear anywhere on it.
+
 ## 2026-10-28 — A contract in another currency is converted at one rate fixed per project *(finance DB: finance_install_11)*
 
 - **USD stays the default for everything.** A rare contract in another currency (Lewis in £) is

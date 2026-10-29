@@ -202,6 +202,27 @@ function own_invoices(int $crewId, int $projectId): array {
 }
 
 /**
+ * A person's own invoices on EVERY project, newest first; empty for anybody
+ * else's. For the artist Home page (David, 2026-10-28: "which past invoices
+ * were received and which paid"), which lists them across the shows instead of
+ * one show at a time. Same door as own_invoices(), so the same narrow rule.
+ */
+function own_invoices_all(int $crewId, int $limit = 24): array {
+    $db = money_own_db($crewId);
+    if (!$db) return [];
+    $limit = max(1, min(200, $limit));
+    try {
+        $q = $db->prepare("SELECT * FROM invoices WHERE crew_id = ?
+                            ORDER BY COALESCE(issued_date, period_end, period_start) DESC, id DESC
+                            LIMIT {$limit}");
+        $q->execute([$crewId]);
+        return $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];      // before finance_install_02
+    }
+}
+
+/**
  * Save one person's terms into the finance database.
  *
  * @return string a sentence for the flash message

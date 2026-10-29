@@ -72,7 +72,7 @@ if ($admin && $project) {
   <?php if ($admin && $project): ?>
     <a href="finance_project.php?project=<?= $projectId ?>&amp;tab=statements">← All artist statements</a>
   <?php else: ?>
-    <a href="mytasks.php">← My tasks</a>
+    <a href="home.php">← Home</a>
   <?php endif; ?>
 </p>
 

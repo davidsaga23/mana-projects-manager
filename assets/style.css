@@ -4481,3 +4481,9 @@ body.rv-open { overflow: hidden; }
   .rv-side { display: none; }
   .rv-top { flex-wrap: wrap; }
 }
+
+/* Home (home.php, 2026-10-28): one person's shows, logs, notes and invoice information. */
+.home-missing a { margin-left: 8px; }
+.home-shows td { vertical-align: top; }
+.home-refs { white-space: nowrap; }
+.home-invoice tfoot th { text-align: right; }
