@@ -4487,3 +4487,41 @@ body.rv-open { overflow: hidden; }
 .home-shows td { vertical-align: top; }
 .home-refs { white-space: nowrap; }
 .home-invoice tfoot th { text-align: right; }
+
+/* --- the person / slot page, in two columns (David, 2026-10-29) ---------- */
+/* "let's use 2 columns so you can better distribute all the contend of the slot
+   profile detailed page". Four panels of fields stacked in one narrow column
+   left the right half of a wide screen empty and the page four screens deep.
+   The wide tables above — pace per step, open tickets — stay full width, because
+   a half-width table of five columns is worse than a long page.
+
+   ⚠ TWO, AND EXACTLY TWO. repeat(auto-fit, minmax(420px, 1fr)) was tried
+   first and gave THREE columns on a 1600px screen — which is not what was
+   asked for and leaves each form too narrow for a pair of date fields. One
+   column below 900px, where two genuinely do not fit. align-items:start so a
+   short panel sits at the top of its row rather than stretching to match a
+   tall one beside it. */
+.person-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  align-items: start;
+  margin-top: 4px;
+}
+@media (min-width: 900px) {
+  .person-grid { grid-template-columns: 1fr 1fr; }
+}
+/* A card each, so the uneven heights a grid gives read as deliberate spacing
+   rather than as something that failed to line up. */
+.person-panel {
+  padding: 16px 18px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  min-width: 0;
+}
+.person-panel > h3:first-child { margin-top: 0; }
+/* Inside half the width, a .row of two fields has to be able to stack. */
+.person-panel .row { flex-wrap: wrap; }
+.person-panel .row > label { flex: 1 1 180px; min-width: 0; }
+.person-panel table { width: 100%; }
