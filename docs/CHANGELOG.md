@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Reviews: admins and Production see both stages *(no migration)*
+
+- **Admins and Production now see Pending review as well as Ready for review** on Reviews, so
+  work on a show with no supervisor is not waiting on nobody. Each card says which status it is
+  in, and **Approve moves it one step on**: Pending review → Ready for review, Ready for review →
+  Complete. The top-bar count includes both.
+- Supervisors are unchanged: Pending review only.
+
 ## 2026-10-29 — Reviews: a grid of cards, Approve / Retake, and Spell's viewer *(no migration)*
 
 - **The Reviews screen is a grid of cards**: the newest version's picture (or a video's first
