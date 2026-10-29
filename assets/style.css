@@ -4642,3 +4642,10 @@ body.rv-open { overflow: hidden; }
 .mytask-open { background: none; border: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; }
 .mytask-open:hover { text-decoration: underline; filter: none; }
 .mytask-details { margin-left: 8px; font-size: 11.5px; padding: 1px 8px; }
+
+/* Users: "see it as a role" and "see it as a person", side by side (2026-10-29). */
+.preview-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; align-items: start; }
+.preview-cols .filter-bar { flex-wrap: wrap; }
+.preview-cols select { max-width: 100%; }
+@media (max-width: 900px) { .preview-cols { grid-template-columns: 1fr; } }
+
