@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Monthly invoices: one freelancer invoice split across projects (IN4) *(finance_install_12, imported by hand)*
+
+- **Finance → Monthly invoices** (`finance_invoice.php`, linked from Studio finances): pick a month
+  and see everybody who logged time on a show, what the log says they should invoice, and whether
+  their invoice is in. Salaried people are listed apart: they send none.
+- **One person's invoice** has its number, received date, status, paid date, the total printed on
+  it, a PDF link, notes and a "needs a look" flag with a reason. Its **lines** (project + position +
+  days or hours + rate + amount) come **filled in from the days logged that month**, the same
+  figures the artist's Home tells them to invoice; untick, correct or add lines before saving.
+- **Each line is an ordinary invoice on its own project's Invoices tab**, so project totals, actual
+  cost, statements and Final balance count it with nothing else changed. The row shows a "monthly
+  invoice →" link back to it.
+- **Mark paid** pays the invoice and every line on every project at once.
+- **The artist's Home** shows a monthly invoice as one row with its projects listed.
+- **Invoices recorded before this** are untouched: one-project invoices, as before.
+- Until `finance_install_12.sql` is imported, the page shows the log figures and saves nothing.
+
 ## 2026-10-29 — Copy link beside Resend link on the person page *(no migration)*
 
 - **Copy link** makes a fresh one-time login link and shows it on the page, with a Copy button,
