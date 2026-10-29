@@ -146,6 +146,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_09 | ⏳ **Invoice status becomes Expected / Pending / Paid.** Received, approved and disputed become pending; a disputed one keeps "Disputed." at the front of its note. Until it is imported, the dropdown offers the old four. |
 | finance_install_10 | ⏳ **The history of a budget changed after kick-off sign-off** (`budget_changes`: old and new amount, who, when, reason). Import with migration 070. Until it is imported, nobody can change a signed-off budget. |
 | finance_install_11 | ✅ One exchange rate per project per foreign currency (`project_fx_rates`, `project_fx_rates_log`). Imported by David 2026-10-28. |
+| finance_install_13 | ⏳ **A contract per position** (`position_terms`, `position_terms_log`): one position on one show paid on its own rate and contract, the person's terms staying the default. Import by hand in phpMyAdmin. Until it is, every position is paid on the person's one rate, as before. *(12 is taken by the invoice-split work.)* |
 
 ---
 

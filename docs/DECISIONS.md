@@ -4619,3 +4619,26 @@ platform? I really liked the way Spell UI works".
   keep their own hover.
 - **Three PRs:** (a) tokens and shared components, (b) project screens, (c) finance, people and
   admin screens, each checked by David on the live site before the next.
+
+## 2026-10-29 — A contract per position, with the person's terms as the default
+
+**Asked by David,** looking at Angelys Brunetti's Home: she *"should be able to see two different
+contracts one for CH layout and other for the rest"*. Until now `crew_terms` was keyed on the person
+alone, so one rate priced every position she held on every show.
+
+**Decided:**
+- **`crew_terms` stays the person's default contract.** A new finance table, `position_terms`
+  (`finance_install_13`), holds an exception for one position on one show, keyed (crew, project,
+  step). The step id follows the invoices convention: a pipeline step, or minus a supervision
+  position's id.
+- **One rule, read everywhere:** a position's own contract if it has one, otherwise the default.
+  The projection, bulk rates, budget pool, stop cost, Staffing's contract line, the statement and
+  Home all follow it, so a person with no exceptions is priced exactly as before.
+- **The statement splits by contract.** Time and approved seconds on a position's step are paid at
+  its rate; the rest at the default, or at the person's own supervision contract when they have one
+  (a supervisor logs no production steps).
+- **Set on the person page, admins only**, like every pay term. The projection's rate box edits the
+  position's contract when the row has one, and bulk rates do the same; a position contract changes
+  that show only, so it needs no "every show" confirmation.
+- **Not changed:** historic fees (`includes/history.php`) still read each person's default rate, as
+  they span several shows.

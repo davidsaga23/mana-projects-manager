@@ -1241,6 +1241,15 @@ sent to the client and what came back*. Building this well makes that one smalle
 David, 2026-10-27: *"we won't develop this one anymore"*. The naming check stays a gate on version
 uploads, as built in PR #76 and fixed in PR #81.
 
+## Asked for on 2026-10-29
+
+### A contract per position — BUILT 2026-10-29, waiting for David's go-ahead
+
+✅ `position_terms` (finance_install_13), set on the person page; read by the projection, budget
+pool, stop cost, Staffing, the statement and Home. **Still open:** historic fees still use each
+person's default rate; and Home's monthly invoice lines are not totalled for per-second and
+flat-fee contracts (the statement is).
+
 ## Asked for on 2026-10-28
 
 ### Artist Home — BUILT 2026-10-28, waiting for David's go-ahead
