@@ -1038,7 +1038,18 @@ require __DIR__ . '/includes/header.php';
       ?>
         <tr class="<?= $late ? 'row-overdue' : '' ?>">
           <td>
-            <a href="item.php?project=<?= $pid ?>&amp;item=<?= e(urlencode($row['item_key'])) ?>"><?= e($item) ?></a>
+            <?php // OPENS SPELL'S TASK PANEL, here (David, 2026-10-29): "the side
+                  // panel should open, the same way it opens in spell, so they can
+                  // upload their versions and see notes". The same button class
+                  // and three data attributes Spell's rows carry, so
+                  // assets/board-screen.js opens it through board_task.php, which
+                  // applies Spell's own rules. The item page it used to go to is
+                  // "Show details" beside it. ?>
+            <button type="button" class="board-open-task mytask-open"
+                    data-project="<?= $pid ?>" data-step="<?= (int)$row['step_id'] ?>"
+                    data-item="<?= e($row['item_key']) ?>"
+                    aria-label="Open <?= e($row['step_name']) ?> on <?= e($item) ?>"><?= e($item) ?></button>
+            <a class="row-btn mytask-details" href="item.php?project=<?= $pid ?>&amp;item=<?= e(urlencode($row['item_key'])) ?>">Show details</a>
             <small class="muted"><span class="dot" style="background:<?= e($row['step_color'] ?: '#ccc') ?>"></span><?= e($row['step_name']) ?></small>
           </td>
           <td class="muted small"><?= e($row['project_code']) ?></td>
@@ -1706,6 +1717,44 @@ require __DIR__ . '/includes/header.php';
     });
   }());
 </script>
+<?php // SPELL'S TASK PANEL, borrowed (David, 2026-10-29). The same markup spell.php
+      // draws and the same scripts, so versions, review notes and comments work
+      // here exactly as they do there. Only when there are tasks to open. ?>
+<?php if ($tasks): ?>
+<div class="board-panel-veil" id="boardVeil" hidden></div>
+<aside class="board-panel" id="boardPanel" role="dialog" aria-modal="true"
+       aria-label="Task details" hidden>
+  <button type="button" class="board-panel-close" id="boardPanelClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="board-panel-inner" id="boardPanelInner"></div>
+</aside>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<?php endif; ?>
 <script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
 <script>if (window.animaDropzone) window.animaDropzone.attachAll(document);</script>
+<?php if ($tasks): ?>
+<?php // tickets.js for its lightbox (version thumbnails); its uploader only wakes
+      // for form[data-ticket-form], which this page does not have. ?>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
+<script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
+<script>
+  // A status changed or a version put up in the panel is not on this list's own
+  // row (its status picker is My tasks' form, not Spell's), so the list is
+  // reloaded when the panel closes after anything was saved in it.
+  (function () {
+    var panel = document.getElementById('boardPanel');
+    if (!panel || !window.MutationObserver) return;
+    var touched = false;
+    ['change', 'submit'].forEach(function (ev) {
+      panel.addEventListener(ev, function () { touched = true; }, true);
+    });
+    new MutationObserver(function () {
+      if (panel.hidden && touched) location.reload();
+    }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  }());
+</script>
+<?php endif; ?>
 </body></html>
