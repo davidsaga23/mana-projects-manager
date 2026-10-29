@@ -1914,6 +1914,57 @@ svg.trend { margin: 0; }
 .dash-strip > .tile-pending,
 .dash-strip > .tile-final { padding: 6px 10px; border-radius: 5px; margin: -6px 0; }
 
+/* Finance Overview, "Is the money on track" (includes/step_variance.php,
+   2026-10-29). Each step's bar is scaled to ITS OWN plan: the plan line sits at
+   62.5%, so a step can run to 160% of its plan before the bar runs out. */
+.sv-verdict { margin: 10px 0 0; padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-soft); background: var(--surface-2); }
+.sv-verdict strong { font-size: 16px; }
+.sv-verdict p { margin: 4px 0 0; color: var(--text-2); }
+.sv-verdict.sv-ok   { background: var(--ok-tint); border-color: var(--ok-border); }
+.sv-verdict.sv-warn { background: var(--warn-tint); border-color: var(--warn-border); }
+.sv-verdict.sv-err  { background: var(--danger-tint); border-color: var(--danger-border); }
+.sv-heads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0; }
+.sv-head { display: flex; flex-direction: column; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 14px; }
+.sv-head ul { margin: 6px 0 0; padding-left: 16px; color: var(--text-2); font-size: 13px; }
+.sv-lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.sv-big { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.sv-head.sv-locked { background: var(--danger-tint); border-color: var(--danger-border); }
+.sv-head.sv-locked .sv-big { color: var(--danger); }
+.sv-head.sv-risk { background: var(--warn-tint); border-color: var(--warn-border); }
+.sv-head.sv-risk .sv-big { color: var(--warn); }
+.sv-reserve { display: flex; height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; margin: 8px 0 4px; }
+.sv-reserve i { display: block; height: 100%; }
+.sv-r-locked { background: var(--danger); } .sv-r-risk { background: var(--warn); } .sv-r-left { background: var(--ok); }
+.sv-table { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: var(--radius-md); }
+.sv-table table { min-width: 900px; }
+.sv-table td { vertical-align: top; }
+.sv-table td.num { white-space: nowrap; }
+.sv-group td { background: var(--surface-2); color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; padding: 5px 12px; }
+.sv-table tfoot td { background: var(--surface-2); font-weight: 600; }
+.sv-sub { display: block; font-size: 12px; color: var(--faint); margin-top: 1px; }
+.sv-chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 20px; white-space: nowrap; background: var(--chip-grey-bg); color: var(--chip-grey-ink); }
+.sv-chip-locked { background: var(--danger-tint); color: var(--danger-strong); border: 1px solid var(--danger-border); }
+.sv-chip-saved  { background: var(--ok-tint); color: var(--ok); border: 1px solid var(--ok-border); }
+.sv-chip-risk   { background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn-border); }
+.sv-chip-early  { background: none; color: var(--faint); border: 1px dashed var(--border-strong); }
+.sv-donebar { height: 5px; width: 90px; background: var(--surface-3); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.sv-donebar i { display: block; height: 100%; background: var(--ok); }
+.sv-bar { position: relative; height: 14px; width: 200px; background: var(--surface-3); border-radius: 4px; margin-top: 3px; }
+.sv-bar > span { position: absolute; top: 0; bottom: 0; }
+.sv-spent { left: 0; background: var(--primary); border-radius: 4px 0 0 4px; }
+.sv-over  { background: var(--danger); }
+.sv-fc, .sv-k-fc { background: repeating-linear-gradient(45deg, rgba(255,255,255,.2) 0 3px, transparent 3px 6px); }
+.sv-fc-bad, .sv-k-fc-bad { background: repeating-linear-gradient(45deg, var(--warn-border) 0 3px, transparent 3px 6px); }
+.sv-bar > .sv-plan { left: 62.5%; top: -4px; bottom: -4px; width: 2px; background: var(--text); }
+.sv-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0; }
+.sv-legend i { display: inline-block; width: 14px; height: 9px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.sv-k-spent { background: var(--primary); } .sv-k-over { background: var(--danger); }
+.sv-legend i.sv-k-plan { width: 2px; background: var(--text); }
+.sv-how { margin: 8px 0 18px; }
+.sv-how > summary { cursor: pointer; font-size: 13px; color: var(--primary); }
+.sv-how ul { color: var(--text-2); font-size: 13px; max-width: 100ch; }
+@media (max-width: 760px) { .sv-heads { grid-template-columns: 1fr; } }
+
 /* Status-change log on the dashboard. */
 .phase-head { margin: 18px 0 6px; font-size: 14px; }
 .activity-table td { vertical-align: middle; }
