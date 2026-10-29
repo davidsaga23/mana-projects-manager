@@ -317,7 +317,7 @@ if (can_edit() && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'
             'priority'         => $_POST['priority'] ?? 'medium',
             'assigned_crew_id' => $owner,
             'due_date'         => $_POST['due_date'] ?? null,
-        ], [], $userId);
+        ], !empty($_FILES['attachments']) ? normalize_files_array($_FILES['attachments']) : [], $userId);
         flash('ok', ucfirst($made['type']) . ' ' . $made['ref'] . ' created. '
                   . trim(implode(' ', $made['notes'])));
     } catch (Throwable $e) {
@@ -1332,7 +1332,7 @@ require __DIR__ . '/includes/header.php';
   <div id="myTaskCreate" class="modal" style="display:none;">
     <div class="modal-box">
       <h3 id="myTaskCreateHeading">New task</h3>
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="create" value="1">
 
         <label>Title
@@ -1392,6 +1392,17 @@ require __DIR__ . '/includes/header.php';
             <input type="date" name="due_date">
           </label>
         </div>
+
+        <?php // Files on a new card (David, 2026-10-29: "let's make attaching files or in
+              // line paste images for tickets"). The drop zone (assets/dropzone.js)
+              // takes a pick, a drop, or a screenshot pasted anywhere in this form;
+              // create_ticket() saves them through the same checks as the board's form. ?>
+        <label>Attachments
+          <input type="file" name="attachments[]" multiple data-drop="Drop files here"
+                 accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf">
+          <small>Up to <?= (int)($config['upload_max_files'] ?? 5) ?> files · images, video or PDF ·
+                 max <?= human_size((int)($config['upload_max_bytes'] ?? 26214400)) ?> each</small>
+        </label>
 
         <p class="muted small" id="myTaskCreateHint">
           A task starts in the first column of whichever show you picked, assigned to you unless you
@@ -1695,4 +1706,6 @@ require __DIR__ . '/includes/header.php';
     });
   }());
 </script>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
+<script>if (window.animaDropzone) window.animaDropzone.attachAll(document);</script>
 </body></html>
