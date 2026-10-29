@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+
+## 2026-10-29 — A new version from the artist sends the task to Pending review *(no migration)*
+
+- **When the person assigned to a task puts up a new version, the task moves to the show's
+  "Pending review" status**, from Spell's panel or from My tasks. The reviewer's queue picks it up
+  straight away.
+- Only the task's own artist triggers it (the main assignee or a second name on the task); a
+  supervisor or producer uploading a file leaves the status alone.
+- **Approved work is never moved back.** Uploading on an approved task says so and leaves the
+  status as it is.
+- It is saved like any status change: the bell for everyone following the task, and a line in the
+  status history (source "version").
+- A show with no status called "Pending review" is left as it is.
 ## 2026-10-29 — A contract per position *(finance DB: finance_install_13)*
 
 - **A position can have its own contract.** On the person page, under Terms and contract, a new
