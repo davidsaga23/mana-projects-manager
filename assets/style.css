@@ -98,12 +98,29 @@
   /* shading drawn OVER something: light on a dark ground, dark on a light one */
   --shade: #ffffff;
 
+  /* SHAPE AND DEPTH, taken from Spell (David, 2026-10-29: "without changing the
+     content, can we do an aesthetic pass on the whole platform? I really liked
+     the way Spell UI works"). Spell reads as calm because it uses the SAME few
+     radii everywhere, hairline rules instead of boxes, and shadows only on what
+     floats. These are those numbers, so the rest of the app can borrow them
+     instead of each screen inventing its own 4px, 6px or 8px. */
+  --radius-sm: 7px;    /* a small button in a row, a chip */
+  --radius: 9px;       /* a control: button, field, tab, flash */
+  --radius-md: 11px;   /* a tile or card inside a page */
+  --radius-lg: 14px;   /* a panel: Spell's group of rows */
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, .55);   /* only what floats: menus, modals */
+  --ease: .12s ease;
+
   /* ⚠ THE ONE LINE THAT IS NOT OURS TO DRAW. A date picker, the list a
      <select> drops down, scrollbars and the yellow of an autofilled field are
      the browser's own, and no rule here reaches them. This tells it which way
      round the page is, and it dresses them to match. */
   color-scheme: dark;
+  /* Thin dark scrollbars, as Spell's panels have, instead of the browser's
+     grey slab beside every wide table. */
+  scrollbar-color: var(--border-strong) transparent;
 }
+::selection { background: var(--primary-fill); color: var(--text); }
 
 * { box-sizing: border-box; }
 body {
@@ -112,10 +129,11 @@ body {
   font-size: 15px;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
-code { background: var(--surface-3); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; }
+code { background: var(--surface-3); padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }
 
 /* Full width — the dense screens (18 pipeline steps, the dependency grid, the
    planning table) all benefit, and none of them are prose. */
@@ -129,15 +147,23 @@ code { background: var(--surface-3); padding: 1px 5px; border-radius: 3px; font-
 .topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .topbar h1 { font-size: 22px; margin: 0 0 16px; }
 .topbar-right { color: var(--muted); }
+/* The plain links in the top bar read as quiet ink, the way Spell's show chips
+   do, so the buttons beside them (Home, Spell, My tasks) are the only blue up
+   there (2026-10-29). Direct children only: the bell's list keeps its own
+   colours. Placed BEFORE .needs-action, which ties on weight and so still turns
+   Migrations amber. */
+.topbar-right > a:not(.nav-board) { color: var(--text-2); transition: color var(--ease); }
+.topbar-right > a:not(.nav-board):hover { color: var(--text); text-decoration: none; }
 
-h1 { font-size: 22px; }
-h2 { font-size: 18px; }
+h1 { font-size: 22px; letter-spacing: -.02em; }
+h2 { font-size: 18px; letter-spacing: -.02em; }
+h3, h4 { letter-spacing: -.012em; }
 
 .ok  { color: var(--ok); }
 .err { color: var(--danger); }
 
-table { border-collapse: collapse; width: 100%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+table { border-collapse: collapse; width: 100%; background: var(--surface); }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border-soft); }
 /* Sticky header row on EVERY table.
    Applied globally rather than table by table: there are thirty-odd tables
    across the app and every one of them can grow past a screen — the planning
@@ -149,19 +175,24 @@ th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bor
    The dividing line is an inset shadow, not the border below: with
    border-collapse: collapse a sticky cell leaves its border behind when it
    detaches, so the heading floats over the rows with nothing under it. */
+/* The heading is Spell's column head (2026-10-29): small capitals in a quiet
+   ink, so the eye goes to the rows and not to the labels over them. Form
+   controls in a heading (the column filters) keep their own case and size: the
+   browser gives input, select and button text-transform:none of their own. */
 th {
-  background: var(--surface-3); font-weight: 600;
+  background: var(--surface-2); font-weight: 600;
+  font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
   position: sticky; top: 0; z-index: 5;
-  box-shadow: inset 0 -1px 0 var(--border-strong);
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 /* Above the rows, below the step filter panel (40) and the task editor (100). */
 
 .empty-state {
-  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 8px;
+  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
   padding: 40px; text-align: center; color: var(--muted); margin-top: 24px;
 }
 
-.status { padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.status { padding: 2px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; }
 .status-setup   { background: var(--chip-indigo-bg); color: var(--chip-indigo-ink); }
 .status-active  { background: var(--ok-tint); color: var(--ok); }
 .status-on_hold { background: var(--warn-tint); color: var(--warn); }
@@ -242,8 +273,9 @@ th {
 small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 3px; }
 
 a.button, .page-actions .button {
-  display: inline-block; padding: 9px 18px; border-radius: 4px;
+  display: inline-block; padding: 9px 18px; border-radius: var(--radius);
   background: var(--primary); color: var(--on-primary); text-decoration: none;
+  transition: background-color var(--ease), border-color var(--ease);
 }
 a.button:hover { background: var(--primary-hover); text-decoration: none; }
 /* Bordered rather than flat grey — a low-contrast filled button reads as
@@ -288,7 +320,7 @@ button.danger:hover { background: var(--danger-strong); }
 .actions .hint { color: var(--muted); font-size: 12.5px; }
 .inline-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
 .toggle-form {
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 10px 14px;
 }
 .toggle-form small { flex: 1 1 100%; margin-top: 0; }
 .inline-form button { margin-top: 0; }
@@ -491,13 +523,14 @@ label.inline input { width: auto; }
   display: block;
   width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
   font-family: inherit; font-size: 15px; height: 35px; resize: vertical;
+  border-color: var(--border); border-radius: var(--radius);
 }
 .money-form .row-save { flex: 0 0 auto; }
 .money-form .row-save button { margin: 0; }
 .summary-line { background: var(--surface-3); padding: 8px 12px; border-radius: 4px; }
 
 /* Flash messages — every save says what it did */
-.flash { padding: 10px 14px; border-radius: 4px; margin: 12px 0; border-left: 4px solid; }
+.flash { padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; border-left: 3px solid; }
 .flash-ok   { background: var(--ok-tint); border-color: var(--ok); color: var(--ok-strong); }
 .flash-warn { background: var(--warn-tint); border-color: var(--warn-strong); color: var(--warn); }
 .flash-err  { background: var(--danger-tint); border-color: var(--danger); color: var(--danger-strong); }
@@ -526,7 +559,7 @@ p.crumb a { white-space: normal; }
   padding: 0; margin: 0 0 20px;
 }
 .wizard-nav li {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
   font-size: 13px; color: var(--muted);
 }
 /* Only the wrapper gets block styling — naming it explicitly keeps the rule off
@@ -544,7 +577,7 @@ p.crumb a { white-space: normal; }
 }
 .wizard-nav li.current .num { background: rgba(255,255,255,.25); color: var(--on-accent); }
 .wizard-body {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 22px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 22px;
 }
 .wizard-body h3 { margin: 24px 0 8px; font-size: 16px; }
 .wizard-body h3:first-child { margin-top: 0; }
@@ -916,7 +949,7 @@ input[type=file] { padding: 6px; background: var(--surface); }
 /* Scheduler */
 .sched-headline {
   display: flex; gap: 28px; flex-wrap: wrap;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
   padding: 12px 16px; margin: 16px 0;
 }
 .sched-headline > div { display: flex; flex-direction: column; gap: 2px; }
@@ -1075,7 +1108,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 
 /* Project tab bar — on every screen belonging to a project */
 .proj-bar {
-  border-bottom: 1px solid var(--border); margin: 0 0 18px; padding-bottom: 0;
+  border-bottom: 1px solid var(--border-soft); margin: 0 0 18px; padding-bottom: 0;
 }
 .proj-bar-title { font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .proj-bar-title a { color: inherit; }
@@ -1101,11 +1134,16 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .proj-bar-finance .proj-switch:focus-visible { border-color: var(--danger-border); }
 .proj-tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .proj-tab {
-  display: inline-block; padding: 7px 12px; font-size: 13.5px;
-  color: var(--text-2); border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0;
+  display: inline-block; padding: 7px 12px; margin-bottom: -1px; font-size: 13.5px;
+  color: var(--text-2); border-bottom: 2px solid transparent; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: background-color var(--ease), color var(--ease);
 }
-.proj-tab:hover { background: var(--primary-tint); color: var(--primary); text-decoration: none; }
-.proj-tab.current { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); background: var(--surface-2); }
+/* Spell's tabs (2026-10-29): the one you are on is told by ink and the
+   underline alone, not by a filled box, and pointing at one lifts it gently
+   rather than turning it blue. margin-bottom -1px sits the underline ON the
+   bar's hairline instead of a pixel above it. */
+.proj-tab:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.proj-tab.current { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); background: transparent; }
 /* The set-up-and-fix screens read one notch quieter than the daily ones. */
 .proj-tab.tab-data { color: var(--muted); font-size: 13px; }
 .proj-tab-sep { width: 1px; height: 18px; background: var(--border); margin: 0 8px; }
@@ -1118,14 +1156,15 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
    visible frame and exactly one filled cell says "two modes, you are in this
    one" before a word of it is read. */
 .proj-sections {
-  display: inline-flex; gap: 2px; margin-bottom: 10px; padding: 2px;
-  background: var(--primary-tint); border: 1px solid var(--border); border-radius: 5px;
+  display: inline-flex; gap: 2px; margin-bottom: 10px; padding: 3px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius);
 }
 .proj-section {
   display: inline-block; padding: 5px 16px; font-size: 13px; font-weight: 600;
-  color: var(--muted); border-radius: 3px; line-height: 1.5; white-space: nowrap;
+  color: var(--muted); border-radius: var(--radius-sm); line-height: 1.5; white-space: nowrap;
+  transition: background-color var(--ease), color var(--ease);
 }
-.proj-section:hover { background: var(--primary-tint); color: var(--primary); text-decoration: none; }
+.proj-section:hover { background: var(--surface-3); color: var(--text); text-decoration: none; }
 .proj-section.current { background: var(--primary); color: var(--on-primary); }
 .proj-section.current:hover { background: var(--primary); color: var(--on-primary); }
 /* Money wears the administrators-only red, so the finance side of a project is
@@ -1148,7 +1187,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .dash-hero .wizard-title { margin-bottom: 4px; }
 
 .dash-primary {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
   padding: 18px 20px; margin: 16px 0;
 }
 .dash-primary-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
@@ -1176,8 +1215,8 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 18px; }
 .kpi-grid-6 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 16px 0; }
-.kpi-grid > div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 13px; }
-.kpi-label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 5px; }
+.kpi-grid > div { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 10px 13px; }
+.kpi-label { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
 .kpi-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .kpi-value .unit { font-size: 12px; font-weight: 400; color: var(--muted); }
 .kpi-value.ok, .status-ontrack { color: var(--ok); }
@@ -1188,7 +1227,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 .trend { font-size: 11.5px; font-weight: 600; margin-left: 5px; }
 
 .step-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
-.step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+.step-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 12px 14px; }
 .step-card.overdue { border-color: var(--danger-border); background: var(--danger-tint); }
 /* Finished: everything that applies to the step is approved (David, 2026-09-22).
    The same green the rest of the app means "done" with, and quiet enough that a
@@ -1209,7 +1248,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
    sticky heading inside it anchors to THIS box rather than the page. Giving it
    a height makes that behaviour deliberate: the heading row stays put while the
    episodes scroll under it, and short tables never hit the limit at all. */
-.table-scroll { overflow: auto; max-height: 70vh; }
+.table-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); }
 .grid-table td.num, .grid-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .health-green   { background: var(--ok-tint); color: var(--ok); }
 .health-amber   { background: var(--warn-tint); color: var(--warn); }
@@ -1223,7 +1262,7 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 
 .dash-strip, .dash-pace {
   display: flex; gap: 28px; flex-wrap: wrap;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
   padding: 12px 16px; margin: 16px 0;
 }
 .dash-strip > div, .dash-pace > div { display: flex; flex-direction: column; gap: 2px; }
@@ -1263,16 +1302,24 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
 /* Login / installer */
 .login-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; }
 .login-box {
-  background: var(--surface); padding: 32px; border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.08); width: 360px; max-width: 92vw;
+  background: var(--surface); padding: 32px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-soft); width: 360px; max-width: 92vw;
 }
 .login-box h1 { font-size: 18px; margin-top: 0; }
-label { display: block; margin: 12px 0 4px; font-weight: 600; }
+label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px; color: var(--text-2); }
+/* Spell's fields (2026-10-29): a soft fill and a hairline that firms up under
+   the pointer. Padding and font size are unchanged, so every field keeps its
+   height and the rows lined up against one (the budget form, the filter bars)
+   stay lined up. */
 input, select, textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
   font-size: 15px;
   background: var(--surface-2); color: var(--text);
+  transition: border-color var(--ease);
 }
+/* :where() so it weighs nothing: a control drawn flat on purpose (Spell's status
+   and due boxes, the project switcher) keeps its own hover. */
+:where(input, select, textarea):hover { border-color: var(--border-strong); }
 /* The ones the browser draws itself: a swatch, a tick, a slider. Giving them
    a background paints over the control. */
 input[type=checkbox], input[type=radio], input[type=color], input[type=range] {
@@ -1283,10 +1330,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--primary); outline-offset: 1px;
 }
 button {
-  margin-top: 16px; padding: 9px 18px; border: 0; border-radius: 4px;
+  margin-top: 16px; padding: 9px 18px; border: 0; border-radius: var(--radius);
   background: var(--primary); color: var(--on-primary); font-size: 15px; cursor: pointer;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
 }
 button:hover { background: var(--primary-hover); }
+/* One focus ring for everything you can press, the one the fields already had. */
+button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 2px;
+}
 
 /* ==========================================================================
    TASKS AND TICKETS (Phase 7)
@@ -1486,19 +1538,19 @@ tr.row-overdue td { background: var(--danger-tint); }
 
 /* --- modals --- */
 .modal {
-  position: fixed; inset: 0; background: rgba(20,30,40,.45);
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .45);
   align-items: center; justify-content: center; z-index: 100; overflow-y: auto;
   padding: 24px 16px;
 }
 .modal-box {
-  background: var(--surface); border-radius: 8px; padding: 22px 26px;
-  width: 540px; max-width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,.18);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 22px 26px;
+  width: 540px; max-width: 100%; box-shadow: var(--shadow-pop);
   margin: auto;
 }
 .modal-box h3 { margin: 0 0 4px; font-size: 17px; }
 .modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .modal-box textarea {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
   font-family: inherit; font-size: 15px; resize: vertical;
 }
 .form-error {
@@ -1509,8 +1561,8 @@ tr.row-overdue td { background: var(--danger-tint); }
 
 /* --- ticket detail --- */
 .panel {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+  padding: 18px 20px; margin-bottom: 18px;
 }
 .panel > h2:first-child { margin-top: 0; }
 .ticket-ref-lg { font-size: 14px; font-weight: 700; letter-spacing: .04em; margin-right: 6px; }
@@ -2039,7 +2091,8 @@ body.lightbox-lock { overflow: hidden; }
    transparent one they match exactly. */
 .cell-btns button { border: 1px solid transparent; margin-top: 0; }
 .row-btn, .crumb a {
-  display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px;
+  display: inline-block; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 13px;
+  transition: background-color var(--ease), border-color var(--ease);
   background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); font-weight: 600;
   text-decoration: none; white-space: nowrap; cursor: pointer;
   user-select: none; list-style: none;

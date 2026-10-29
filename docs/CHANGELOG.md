@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Aesthetic pass, phase (a): every screen borrows Spell's look *(no migration)*
+
+- **Nothing about content or behaviour changed**: the same words, fields, columns and buttons in
+  the same order. Only the look moved, in `assets/style.css`.
+- **The same few rounded corners everywhere**, the ones Spell uses: buttons, fields, tabs and
+  messages slightly rounder; panels, tiles and cards rounder still. Hairline rules instead of
+  boxes, and a shadow only on what floats (pop-ups).
+- **Table headings read like Spell's column heads**: small capitals in a quieter ink, so the eye
+  goes to the rows. Row dividers are a shade softer.
+- **Project tabs**: the tab you are on is shown by its underline alone, and pointing at one no
+  longer turns it blue. The Project / Finance switcher sits on a neutral strip.
+- **Top bar**: the plain links (Studio Tasks, Artists, …) are quiet ink, so Home, Spell, My tasks
+  and Reviews are the only blue up there. Migrations still turns amber when one is waiting.
+- Fields have a softer outline that firms up under the pointer; thin dark scrollbars.
+- Phases (b) project screens and (c) finance, people and admin screens follow as their own PRs.
+
 ## 2026-10-29 — Files on a new task or ticket, from Studio Tasks and My tasks *(no migration)*
 
 - **The New task / New ticket dialog on Studio Tasks and My tasks takes attachments**: pick them,
