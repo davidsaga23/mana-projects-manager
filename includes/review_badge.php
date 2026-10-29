@@ -30,6 +30,23 @@ function review_stage(): ?string {
 }
 
 /**
+ * Every stage this account reviews, in pipeline order. Admins and Production
+ * see BOTH (David, 2026-10-29, finding a Pending review version missing from
+ * his Reviews: "let's do that and show both"), so work on a show with no
+ * supervisor is never waiting on nobody. A supervisor has the first only.
+ */
+function review_stages(): array {
+    $stage = review_stage();
+    if ($stage === 'final') return ['supervisor', 'final'];
+    return $stage ? [$stage] : [];
+}
+
+/** The statuses ("from") that put a task in this account's queue. */
+function review_from_names(): array {
+    return array_map(fn($k) => REVIEW_STAGES[$k]['from'], review_stages());
+}
+
+/**
  * The shows this account can review on: the same set Spell offers
  * (board_projects()), written here so the top bar need not load Spell.
  */
@@ -57,16 +74,16 @@ function review_project_ids(PDO $pdo): array {
 function review_count(PDO $pdo): int {
     static $n = null;
     if ($n !== null) return $n;
-    $stage = review_stage();
-    $ids = $stage ? review_project_ids($pdo) : [];
+    $from = review_from_names();
+    $ids = $from ? review_project_ids($pdo) : [];
     if (!$ids) return $n = 0;
     try {
         $q = $pdo->prepare(
             'SELECT COUNT(*) FROM progress pr JOIN statuses st ON st.id = pr.status_id
               WHERE pr.project_id IN (' . implode(',', $ids) . ')
-                AND LOWER(TRIM(st.name)) = ?'
+                AND LOWER(TRIM(st.name)) IN (' . implode(',', array_fill(0, count($from), '?')) . ')'
         );
-        $q->execute([REVIEW_STAGES[$stage]['from']]);
+        $q->execute($from);
         return $n = (int)$q->fetchColumn();
     } catch (PDOException $e) {
         return $n = 0;
