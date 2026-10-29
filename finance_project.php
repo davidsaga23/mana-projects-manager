@@ -2316,12 +2316,13 @@ function invAddRows() {
         // pool at all, and "nothing here" would send somebody hunting through
         // four screens to find out which. ?>
   <div class="flash flash-warn">
-    <p><strong>There is no pool to show yet.</strong> It is worked out from each step's
-      headcount and its dates, so it needs both:</p>
+    <p><strong>There is no pool to show yet.</strong> It is the days in the
+      <a href="?project=<?= $projectId ?>&amp;tab=projection">expense projection</a>, so it needs:</p>
     <ul class="small">
+      <li>pipeline steps with work in them — shots or assets, and days per item;</li>
       <li>somebody standing in each step — set on
         <a href="crew.php?project=<?= $projectId ?>">Staffing</a>, slots count as well as people;</li>
-      <li>a start date and a deadline on the step — set on
+      <li>and, to check the work fits, a start date and a deadline on each step — set on
         <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>.</li>
     </ul>
     <p class="small">Nothing is typed in here. Fix those and this screen fills itself in.</p>
@@ -2331,7 +2332,19 @@ function invAddRows() {
 <div class="dash-strip">
   <div><span class="muted small">Day pool</span>
     <strong><?= e(fmt_num($pool['days']['pool'], 1)) ?> days</strong>
-    <span class="muted small">headcount &times; each step's window</span></div>
+    <span class="muted small">the work in the
+      <a href="?project=<?= $projectId ?>&amp;tab=projection">expense projection</a></span></div>
+  <?php // CAPACITY, BESIDE THE POOL (2026-10-29). The pool is the work; this is
+        // what the dates allow for it. The figure that matters is which steps
+        // need more than their dates give, so it is named in the same cell. ?>
+  <div><span class="muted small">Dates allow</span>
+    <strong><?= e(fmt_num($pool['days']['window'], 1)) ?> days</strong>
+    <?php if ($pool['days']['short']): ?>
+      <span class="warn-text small"><?= count($pool['days']['short']) ?>
+        step<?= count($pool['days']['short']) === 1 ? ' does' : 's do' ?> not fit their dates</span>
+    <?php else: ?>
+      <span class="muted small">slots &times; each step's window</span>
+    <?php endif; ?></div>
   <div><span class="muted small">Used</span>
     <strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days</strong>
     <?php // ⚠ THE SOURCE IS ON THE FIGURE, not in a footnote. Two very
@@ -2377,15 +2390,17 @@ function invAddRows() {
 
 <p class="muted small">
   Every figure above is in <strong>days</strong>; money appears only inside a step, next to the
-  rate that converts it. The pool is <em>not typed in</em> — it is each step's headcount
-  multiplied by the working days between its start date and its deadline, so a date changed on
-  <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a> moves this screen
-  with it.
+  rate that converts it. The pool is <em>not typed in</em> — it is the Days column of the
+  <a href="?project=<?= $projectId ?>&amp;tab=projection">expense projection</a>, the work each
+  step needs (its items &times; days per item &times; the retake allowance, a whole day per
+  person), so the two screens always agree. <strong>Dates allow</strong> is each step's slots
+  multiplied by the working days between its start date and its deadline on
+  <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>: a step that
+  needs more than that will not fit its dates as they stand.
   <?php if ($pool['source'] === 'plan'): ?>
-    Used days come from that same window up to today, because nothing has been logged yet:
-    a slot that started three weeks ago has consumed those person-days whether or not anybody
-    recorded them, which is just as true of the money. The moment hours are logged — by hand or
-    with the timer on <a href="mytasks.php">My tasks</a> — this switches to them and says so.
+    Used days are each person's share of the work spread evenly across the step's window up to
+    today, because nothing has been logged yet. The moment hours are logged — by hand or with the
+    timer on <a href="mytasks.php">My tasks</a> — this switches to them and says so.
   <?php else: ?>
     Used days are real logged hours divided by this project's
     <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day.
@@ -2397,17 +2412,18 @@ function invAddRows() {
 </p>
 
 <?php if ($pool['undated']): ?>
-  <?php // ⚠ NAMED, NOT DROPPED. A step with people on it but no dates cannot be
-        // measured, and leaving it out silently makes the show look smaller and
-        // healthier than it is — the exact shape of failure Lesson 11 records. ?>
+  <?php // ⚠ NAMED, NOT DROPPED. A step with no dates is in the pool (its work needs
+        // no dates) but cannot be checked against them, and leaving that unsaid
+        // would make "Dates allow" look like it covers the whole show — the
+        // exact shape of failure Lesson 11 records. ?>
   <div class="flash flash-warn">
     <strong><?= count($pool['undated']) ?>
-      step<?= count($pool['undated']) === 1 ? '' : 's' ?> could not be counted</strong>
-    because <?= count($pool['undated']) === 1 ? 'it has' : 'they have' ?> people assigned but no
-    start date or deadline: <?= e(implode(', ', $pool['undated'])) ?>.
-    The totals above are missing <?= count($pool['undated']) === 1 ? 'it' : 'them' ?>.
-    <a href="production.php?project=<?= $projectId ?>">Set the dates</a> and
-    <?= count($pool['undated']) === 1 ? 'it joins' : 'they join' ?> the pool.
+      step<?= count($pool['undated']) === 1 ? ' has' : 's have' ?> no dates</strong>,
+    so <?= count($pool['undated']) === 1 ? 'its' : 'their' ?> work is in the pool but nothing says
+    whether it fits: <?= e(implode(', ', $pool['undated'])) ?>. "Dates allow" leaves
+    <?= count($pool['undated']) === 1 ? 'it' : 'them' ?> out, and before any time is logged
+    <?= count($pool['undated']) === 1 ? 'it uses' : 'they use' ?> nothing.
+    <a href="production.php?project=<?= $projectId ?>">Set the dates</a>.
   </div>
 <?php endif; ?>
 
@@ -2439,6 +2455,15 @@ function invAddRows() {
                 : e(fmt_money_plain($r['rate_min'], $pcur)) . '—' . e(fmt_money_plain($r['rate_max'], $pcur)) . ' a day' ?>
         <?php endif; ?>
       </div>
+      <?php // Does the work fit the dates? Said on every card, in words. ?>
+      <?php if ($r['short'] === null): ?>
+        <div class="warn-text small">no dates, so nothing checks it fits</div>
+      <?php elseif ($r['short'] > 0): ?>
+        <div class="warn-text small">needs <?= e(fmt_num($r['pool'], 1)) ?>, dates allow
+          <?= e(fmt_num($r['window'], 1)) ?> — <?= e(fmt_num($r['short'], 1)) ?> days short</div>
+      <?php else: ?>
+        <div class="muted small">dates allow <?= e(fmt_num($r['window'], 1)) ?> days</div>
+      <?php endif; ?>
       <div class="mini-pace">
         <div><strong><?= e(fmt_unit($r['done'], $r['unit'])) ?></strong>
           of <?= e(fmt_unit($r['total'], $r['unit'])) ?> done</div>
@@ -2523,7 +2548,12 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <?php endif; ?></div>
     <div><span class="muted small">Pool in days</span>
       <strong><?= e(fmt_num($open['pool'], 1)) ?> days</strong>
-      <span class="muted small"><?= (int)$open['slots'] ?> slot<?= $open['slots'] === 1 ? '' : 's' ?> across its window</span></div>
+      <span class="muted small">projected work for <?= (int)$open['slots'] ?> slot<?= $open['slots'] === 1 ? '' : 's' ?></span></div>
+    <div><span class="muted small">Dates allow</span>
+      <strong><?= $open['window'] === null ? '—' : e(fmt_num($open['window'], 1)) . ' days' ?></strong>
+      <span class="<?= $open['short'] ? 'warn-text' : 'muted' ?> small">
+        <?= $open['window'] === null ? 'no start date or deadline'
+            : ($open['short'] ? e(fmt_num($open['short'], 1)) . ' days short' : 'the work fits') ?></span></div>
     <div><span class="muted small">Pool in money</span>
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['pool'] * $open['rate_min'], $pcur)) ?></strong>
@@ -2589,7 +2619,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         // budget, so management can spot who is over/under budget at a glance").
         // Worst first; the reading column carries the verdict in words and colour.
         // pool_step_people() says where every figure comes from. ?>
-  <?php $who = pool_step_people($pdo, $project, (int)$open['id'], $pool['source']);
+  <?php $who = pool_step_people($pdo, $project, (int)$open['id'], $pool['source'], (float)$open['lane_days']);
         $wcur = $who['currency']; ?>
   <h4>Who is on it <span class="muted small">— each person against their share of the pool</span></h4>
   <?php if (!$who['rows']): ?>
@@ -2638,8 +2668,9 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
     </table>
     </div>
     <p class="muted small">
-      Budget is each person's slot window in working days, times their day rate. Used is
-      <?= $pool['source'] === 'plan' ? 'the plan up to today, because no time has been logged on this show yet'
+      Budget is each person's share of the projected work in days (their Days on the expense
+      projection), times their day rate. Used is
+      <?= $pool['source'] === 'plan' ? 'that share spread over the step\'s window up to today, because no time has been logged on this show yet'
                                     : 'the days they logged on this step' ?>.
       Invoiced is what they have billed against this position.
       <?php if (!$tt['priced']): ?>A "+" on a total means somebody here has no day rate, so money is missing from it.<?php endif; ?>

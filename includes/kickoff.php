@@ -510,7 +510,7 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'status' => (string)$i['status'],
         ];
     }
-    $pool = budget_pool($pdo, $project);
+    $pool = budget_pool($pdo, $project, $proj);
     $poolRows = [];
     foreach ($pool['days']['rows'] ?? [] as $r) {
         $poolRows[kickoff_unique_key($poolRows, (string)($r['name'] ?? 'Step'))] = [
