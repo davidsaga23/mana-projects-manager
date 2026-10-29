@@ -1748,12 +1748,43 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
         } else {
             $form = $upload;
         }
+        if ($reviewer && $progressId) $form .= board_verdict_html($pdo, $projectId, $stepId, $itemKey, (int)$progressId);
         $form .= '<script type="application/json" class="board-comment-people">'
                . json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
                              JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)
                . '</script>';
     }
     return $form . $out;
+}
+
+/**
+ * APPROVE OR RETAKE, IN THE VIEWER OPENED FROM A TASK (David, 2026-10-29: "let's
+ * also include the approve or retake buttons here for supervisors and
+ * production"). The Reviews screen hands the viewer its own two buttons; Spell's
+ * panel and My tasks open it from the Versions pane, so the pane carries this
+ * hidden marker for assets/review-viewer.js to build the same two from.
+ *
+ * Drawn only when this account may give a verdict on this task NOW: a reviewer
+ * whose stage (REVIEW_STAGES) starts from the status the task is in, on a show
+ * they review. data-to and data-retake are the show's own statuses, empty when
+ * the show has none, which leaves that button off. review_apply() checks all of
+ * it again when one is pressed.
+ */
+function board_verdict_html(PDO $pdo, int $projectId, int $stepId, string $itemKey, int $progressId): string {
+    require_once __DIR__ . '/review.php';
+    $stage = review_stage();
+    if (!$stage) return '';
+    $cfg = REVIEW_STAGES[$stage];
+    if (!in_array($projectId, review_project_ids($pdo), true)) return '';
+    $q = $pdo->prepare('SELECT st.name FROM progress pr LEFT JOIN statuses st ON st.id = pr.status_id WHERE pr.id = ?');
+    $q->execute([$progressId]);
+    if (review_norm((string)$q->fetchColumn()) !== $cfg['from']) return '';
+    $to = review_status_named($pdo, $projectId, $cfg['to']);
+    $retake = review_status_named($pdo, $projectId, REVIEW_RETAKE);
+    return '<div class="board-verdict" hidden data-project="' . $projectId . '" data-step="' . $stepId . '"'
+         . ' data-item="' . e($itemKey) . '"'
+         . ' data-to="' . e($to ? (string)$to['name'] : '') . '"'
+         . ' data-retake="' . e($retake ? (string)$retake['name'] : '') . '"></div>';
 }
 
 /* ---------------------------------------------------------------------------

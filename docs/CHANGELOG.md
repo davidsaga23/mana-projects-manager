@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Approve and Retake in the viewer from Spell and My tasks too *(no migration)*
+
+- **The review viewer opened from a task** (Spell's panel, or My tasks) now shows the same
+  **Approve** and **Retake** buttons in its top bar as it does from the Reviews screen, for the
+  reviewer whose turn it is: a supervisor on a task in Pending review, Production and admins on one
+  in Ready for review.
+- They give the verdict through the same rules as the Reviews screen, then the Versions pane is
+  redrawn so the task shows where it went. Nothing is posted with them; notes and drawings are
+  posted with Post review as before.
+- They only show while the task is waiting on you.
+
 ## 2026-10-29 — Reviews: a grid of cards, Approve / Retake, and Spell's viewer *(no migration)*
 
 - **The Reviews screen is a grid of cards**: the newest version's picture (or a video's first

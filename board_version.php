@@ -23,6 +23,7 @@ require_once __DIR__ . '/includes/board.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
 require_once __DIR__ . '/includes/naming.php';   // the show's file naming convention (067)
+require_once __DIR__ . '/includes/review.php';   // review_apply(), for Approve / Send back in the viewer
 require_once __DIR__ . '/includes/activity.php'; // log_status_change_by_id(), for the move to Pending review
 require_login();
 
@@ -141,8 +142,33 @@ $bad  = '';
 // (migration 065), so board_comment_add() does the saving, the mentions, the
 // bell and the email, and save_ticket_attachments() takes the pictures — pasted
 // or picked, they arrive as the same files[] field.
+//
+// APPROVE / RETAKE from the viewer opened on a task (David, 2026-10-29) arrive
+// here as add_review with a `verdict`: the status moves through review_apply(),
+// the same rules and checks as the Reviews screen, and the Versions pane comes
+// back redrawn. A note or drawing sent with it is posted as the review on the
+// version being looked at; the viewer's buttons send none.
 if (isset($_POST['add_review'])) {
-    if (!board_is_reviewer()) {
+    $verdict = (string)($_POST['verdict'] ?? '');
+    $verdictSaid = '';
+    if ($verdict !== '') {
+        try {
+            if (!in_array($verdict, ['approve', 'retake'], true)) throw new RuntimeException('Approve or Retake, nothing else.');
+            $vpid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+            // No note here: any text is posted below, on the version on screen.
+            $verdictSaid = review_apply($pdo, $vpid, $verdict, '');
+        } catch (Throwable $e) {
+            $bad = $e->getMessage();
+        }
+    }
+    $files0 = isset($_FILES['attachments']) ? normalize_files_array($_FILES['attachments']) : [];
+    $hasAny = trim((string)($_POST['body'] ?? '')) !== ''
+           || (bool)array_filter($files0, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+    if ($bad !== '') {
+        // the verdict was refused: nothing else is posted
+    } elseif ($verdict !== '' && !$hasAny) {
+        $said = $verdictSaid;
+    } elseif (!board_is_reviewer()) {
         $bad = 'Reviews are made by supervisors, Production and admins.';
     } elseif (!board_reviews_available($pdo)) {
         $bad = 'Reviews need database update 065.';
@@ -168,6 +194,7 @@ if (isset($_POST['add_review'])) {
                 if ($res['saved'])  $said .= ' ' . $res['saved'] . ' file(s) attached.';
                 if ($res['errors']) $said .= ' ' . implode(' ', $res['errors']);
             }
+            if ($verdictSaid !== '') $said = $verdictSaid . ' ' . $said;
         } catch (Throwable $e) {
             $bad = $e->getMessage();
         }
