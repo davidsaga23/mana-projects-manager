@@ -28,6 +28,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - A show with no "Retake" (or no "Complete" / "Ready for review") gets a warning and that button is
   off there.
 
+## 2026-10-29 — The Budget pool is the expense projection's days *(no migration)*
+
+- **The Day pool now equals the days on the Expense projection** (MSD: 219, not 269). It used to be
+  each step's slots times its dated window, which is the time the dates allow, not the work.
+- **"Dates allow"** sits beside it: slots times each step's window. Every card says whether its
+  work fits ("needs 48, dates allow 36 — 12 days short"), and the headline counts the steps that
+  do not.
+- A step without dates is now in the pool and flagged as unchecked, instead of left out.
+- Before any time is logged, used days are each person's share spread evenly over the window.
+- "Who is on it": each person's budget is their Days on the projection.
+- A card's rate range shows day rates only (a flat fee was shown as "a day").
+
 ## 2026-10-29 — Budget pool: "Used, from logged hours" is only logged hours *(no migration)*
 
 - **Fix.** Once anyone on a show had logged time, the Budget pool headline said "from logged
