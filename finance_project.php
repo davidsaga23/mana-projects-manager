@@ -2352,8 +2352,7 @@ function invAddRows() {
           // consumed, and what somebody actually recorded — and a reader who
           // does not know which is looking at is worse off than one who has no
           // number at all. ?>
-    <span class="<?= $pool['source'] === 'plan' ? 'warn-text' : 'muted' ?> small">
-      <?= $pool['source'] === 'plan' ? 'from the plan, not logged hours' : 'from logged hours' ?></span>
+    <span class="muted small">from logged hours</span>
     <?php if ($pool['unlogged']): ?>
       <span class="warn-text small"><?= count($pool['unlogged']) ?>
         step<?= count($pool['unlogged']) === 1 ? ' has' : 's have' ?> none logged</span>
@@ -2397,17 +2396,11 @@ function invAddRows() {
   multiplied by the working days between its start date and its deadline on
   <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>: a step that
   needs more than that will not fit its dates as they stand.
-  <?php if ($pool['source'] === 'plan'): ?>
-    Used days are each person's share of the work spread evenly across the step's window up to
-    today, because nothing has been logged yet. The moment hours are logged — by hand or with the
-    timer on <a href="mytasks.php">My tasks</a> — this switches to them and says so.
-  <?php else: ?>
-    Used days are real logged hours divided by this project's
-    <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day.
-    <?php if ($pool['unlogged']): ?>
-      A step nobody has logged time on counts as 0 used, not as the days its window has
-      run, so the two are never mixed: <?= e(implode(', ', $pool['unlogged'])) ?>.
-    <?php endif; ?>
+  Used days are only what has been logged — by hand or with the timer on
+  <a href="mytasks.php">My tasks</a> — divided by this project's
+  <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day. The dates are never used to guess it.
+  <?php if ($pool['unlogged']): ?>
+    A step nobody has logged time on counts as 0 used: <?= e(implode(', ', $pool['unlogged'])) ?>.
   <?php endif; ?>
 </p>
 
@@ -2560,7 +2553,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <span class="muted small">at the rate beside it</span></div>
     <div><span class="muted small">Used</span>
       <strong><?= e(fmt_num($open['used'], 1)) ?> days</strong>
-      <span class="muted small"><?= $pool['source'] === 'plan' ? 'from the plan' : 'from logged hours' ?></span></div>
+      <span class="muted small">from logged hours</span></div>
     <div><span class="muted small">Used in money</span>
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['used'] * $open['rate_min'], $pcur)) ?></strong>
@@ -2669,9 +2662,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
     </div>
     <p class="muted small">
       Budget is each person's share of the projected work in days (their Days on the expense
-      projection), times their day rate. Used is
-      <?= $pool['source'] === 'plan' ? 'that share spread over the step\'s window up to today, because no time has been logged on this show yet'
-                                    : 'the days they logged on this step' ?>.
+      projection), times their day rate. Used is the days they logged on this step.
       Invoiced is what they have billed against this position.
       <?php if (!$tt['priced']): ?>A "+" on a total means somebody here has no day rate, so money is missing from it.<?php endif; ?>
       People paid by the second are left out, because they have no day budget.
