@@ -490,6 +490,10 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
         $projRows[kickoff_unique_key($projRows, $key)] = [
             'rate' => $r['rate_usd'] ?? $r['rate'], 'unit' => (string)($r['rate_unit'] ?? ''),
             'days' => round((float)$r['days'], 2), 'cost' => $r['cost'],
+            // Which step the row belongs to, so the Overview can judge each step
+            // against its own plan from sign-off even after a rename. Not one of
+            // the list's columns, so the kick-off page never draws it.
+            'step_id' => (int)$r['step']['id'],
         ];
     }
     $otherRows = [];

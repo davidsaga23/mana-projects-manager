@@ -4760,3 +4760,25 @@ account reviews: both for admins, the first only for Production and supervisors.
 every "from" status of those stages; `review_apply()` works out the stage from the task's status
 at the moment of the click, so Approve always moves a task one step on, and a supervisor still
 cannot act on Ready for review. Cards say which status they are in when both show.
+
+## 2026-10-29 — The Finance Overview judges each step against its own plan, never the total
+
+**Asked by David,** against a single "budget left" headline: *"I might be overbudget from the
+animatic (like with FCM) but I'm technically underbudget overall."* Money not yet spent on later
+steps hides the steps that already went over. He picked the per-step table, the forecast at the
+real pace, and locked-in / expected / reserve (options A, C and D), and asked how spent is measured.
+
+**Decided** (`includes/step_variance.php`):
+- **Plan** is each step's cost in the kick-off finance snapshot. Older snapshots are matched by
+  role ("Animation (Shot)"); a role that no longer matches a step is reported, never guessed.
+  Snapshots now also carry `step_id`. A show not signed off is judged against today's projection.
+- **Spent** is per person per step: invoiced, plus logged days not yet invoiced at the rate
+  (invoiced days from the line's quantity, or amount ÷ rate). Per-second and flat fees count
+  the share earned by approved work; supervision counts its dates. **Never start date to today.**
+- **Done** is approved items (seconds on footage steps), from `dashboard_steps()`.
+- **Forecast** is spent ÷ done once 15% done, 3+ items and something spent; otherwise today's
+  projection for the step.
+- **Locked in / expected / reserve are never netted.** An overrun counts at once; a saving
+  reaches the reserve only when the step is finished and all its spend is invoiced.
+- **Not yet:** the "Ask Jorik for more money" action (a second ticket), and the old *Budget
+  variance* tile still compares the budget with the plan, below the new block.

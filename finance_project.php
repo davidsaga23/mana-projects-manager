@@ -18,6 +18,7 @@ require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/stopcost.php';
 require_once __DIR__ . '/includes/budgetpool.php';
 require_once __DIR__ . '/includes/budget_lock.php';
+require_once __DIR__ . '/includes/step_variance.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -530,7 +531,22 @@ try {
     // projection stopped the whole table drawing.
     $progress = null;
 }
+
+// IS THE MONEY ON TRACK, step by step, never netted (David, 2026-10-29: "I might
+// be overbudget from the animatic (like with FCM) but I'm technically
+// underbudget overall"). See includes/step_variance.php. Never fatal: a block
+// that cannot be worked out must not take the rest of the Overview with it.
+$stepVar = null;
+if ($configured && $dbError === null) {
+    try {
+        $stepVar = step_variance($pdo, $project, $proj, $budgetAmount, $dashSteps);
+    } catch (Throwable $e) {
+        $stepVar = null;
+    }
+}
 ?>
+
+<?php if ($stepVar) render_step_variance($stepVar); ?>
 
 <?php if ($progress && $progress['applicable'] > 0): ?>
   <h3>Where the show is</h3>
