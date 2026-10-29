@@ -140,7 +140,7 @@ function statement_approved_seconds(PDO $pdo, int $projectId, int $crewId): floa
 /**
  * Approved seconds per STEP, for one person: [step id => seconds]. The same
  * count as statement_approved_seconds(), split by step so a position with its
- * own contract (finance_install_12) can be paid on its own footage.
+ * own contract (finance_install_13) can be paid on its own footage.
  */
 function statement_approved_seconds_by_step(PDO $pdo, int $projectId, int $crewId): array {
     $hasCrew = column_exists($pdo, 'progress_crew', 'crew_id');
@@ -262,7 +262,7 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     $dueOwn = null;
     if ($fxRow && $due !== null) { $dueOwn = $due; $due = fx_to_usd($due, $cur, $fx); }
 
-    // ⚠ A POSITION WITH ITS OWN CONTRACT (finance_install_12, David 2026-10-29)
+    // ⚠ A POSITION WITH ITS OWN CONTRACT (finance_install_13, David 2026-10-29)
     // is paid on ITS time and footage at ITS rate; everything else is paid on
     // the default. $positionTerms is [step id => position_terms row]. With none
     // the figures above stand exactly as they always did.
@@ -370,7 +370,7 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         'invoices'        => $invoices,
         'invoiced_other_currency' => $otherCurrency,
         'left'            => $due !== null ? round($due - $invoiced, 2) : null,
-        // One line per contract when a position has its own (finance_install_12).
+        // One line per contract when a position has its own (finance_install_13).
         // Empty when everything is paid on the one set of terms.
         'lines'           => $lines,
     ];

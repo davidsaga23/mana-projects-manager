@@ -354,7 +354,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
         if (empty($minutes[$pid])) continue;
         $fx = home_fx($crewId, (int)$pid);
         $hpd = (float)$show['hours_per_day'];
-        // ⚠ THE CONTRACT EACH LINE IS PAID ON (finance_install_12, 2026-10-29):
+        // ⚠ THE CONTRACT EACH LINE IS PAID ON (finance_install_13, 2026-10-29):
         // a position's own when it has one, else — as on the statement — the
         // show's supervision contract when they hold one with its own terms,
         // else their default. $posTerms is [project id][step id] => row.

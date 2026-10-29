@@ -219,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
     exit;
 }
 
-// --- a contract for ONE position (admin only; finance_install_12) -----------
+// --- a contract for ONE position (admin only; finance_install_13) -----------
 // David, 2026-10-29: Angelys "should be able to see two different contracts one
 // for CH layout and other for the rest". The terms above stay the default; this
 // saves (or removes) an exception for one position she holds on THIS show.
@@ -263,7 +263,7 @@ $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
 
 // The positions this person holds on this show, and which have a contract of
-// their own (finance_install_12). Admin only, like everything about money here.
+// their own (finance_install_13). Admin only, like everything about money here.
 $myPositions = []; $myPosTerms = [];
 if (can_see_money()) {
     foreach (project_positions($pdo, $projectId) as $l) {
@@ -868,7 +868,7 @@ require __DIR__ . '/includes/header.php';
       </div>
     </form>
 
-    <?php // ---- A CONTRACT PER POSITION (David, 2026-10-29; finance_install_12).
+    <?php // ---- A CONTRACT PER POSITION (David, 2026-10-29; finance_install_13).
           // The form above is the DEFAULT, used by every position that has none
           // of its own. A position given its own contract here is priced, counted
           // on the statement and shown on the person's Home at that one. ---- ?>
@@ -876,7 +876,7 @@ require __DIR__ . '/includes/header.php';
       <h4 id="position-terms" style="margin:22px 0 6px;">A contract per position</h4>
       <?php if (!position_terms_available()): ?>
         <p class="muted small warn-text">Giving one position its own contract needs
-          <code>finance_install_12.sql</code>, imported by hand into the finance database. Until then every
+          <code>finance_install_13.sql</code>, imported by hand into the finance database. Until then every
           position below is paid on the terms above.</p>
       <?php else: ?>
         <p class="muted small">Every position <?= e($person['name']) ?> holds on this show is paid on the terms

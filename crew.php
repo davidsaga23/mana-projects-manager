@@ -504,7 +504,7 @@ if ($schemaReady && can_see_money()) {
         } elseif ($ids) {
             $laneTerms = crew_terms(array_values(array_unique($ids)));
         }
-        // A position's own contract (finance_install_12, 2026-10-29) is the one
+        // A position's own contract (finance_install_13, 2026-10-29) is the one
         // its contract line reports; the person's default covers the rest.
         if ($ids && finance_configured()) {
             $lanePosTerms = position_terms_for(array_values(array_unique($ids)), (int)$projectId);

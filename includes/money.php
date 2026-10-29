@@ -223,7 +223,7 @@ function own_invoices_all(int $crewId, int $limit = 24): array {
 }
 
 /* ---------------------------------------------------------------------------
- * A CONTRACT PER POSITION (David, 2026-10-29; finance_install_12).
+ * A CONTRACT PER POSITION (David, 2026-10-29; finance_install_13).
  *
  * "For Angelys she should be able to see two different contracts one for CH
  * layout and other for the rest." crew_terms stays the person's DEFAULT
@@ -236,14 +236,14 @@ function own_invoices_all(int $crewId, int $limit = 24): array {
  * exactly as before, and nothing has to know the table exists to keep working.
  * ------------------------------------------------------------------------ */
 
-/** Has finance_install_12 been imported? Admin view only (finance_column_exists() is). */
+/** Has finance_install_13 been imported? Admin view only (finance_column_exists() is). */
 function position_terms_available(): bool {
     return finance_column_exists('position_terms', 'step_id');
 }
 
 /**
  * Every position contract on one project for a set of people, keyed
- * "crewId|stepId". Empty for a non-admin, and before finance_install_12.
+ * "crewId|stepId". Empty for a non-admin, and before finance_install_13.
  *
  * @param int[] $crewIds
  */
@@ -256,7 +256,7 @@ function position_terms_for(array $crewIds, int $projectId): array {
         $q = $db->prepare("SELECT * FROM position_terms WHERE project_id = ? AND crew_id IN ({$ids})");
         $q->execute([$projectId]);
     } catch (PDOException $e) {
-        return [];      // before finance_install_12
+        return [];      // before finance_install_13
     }
     $out = [];
     foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = $r;
@@ -276,7 +276,7 @@ function own_position_terms(int $crewId, ?int $projectId = null): array {
         $q = $db->prepare($sql);
         $q->execute($projectId ? [$crewId, $projectId] : [$crewId]);
     } catch (PDOException $e) {
-        return [];      // before finance_install_12
+        return [];      // before finance_install_13
     }
     $out = [];
     foreach ($q as $r) $out[(int)$r['project_id']][(int)$r['step_id']] = $r;
@@ -308,7 +308,7 @@ function save_position_terms(int $crewId, string $crewName, int $projectId, int 
     $db = finance_db();
     if (!$db) throw new RuntimeException('The finance database is not set up yet, so there is nowhere to save this.');
     if (!position_terms_available()) {
-        throw new RuntimeException('A contract per position needs finance_install_12.sql, imported by hand into '
+        throw new RuntimeException('A contract per position needs finance_install_13.sql, imported by hand into '
             . 'the finance database. Nothing was saved.');
     }
     if ($crewId <= 0 || $projectId <= 0 || $stepId === 0) {
@@ -381,7 +381,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
     }
 
     // The rate and the contract are read the same way for a person's default
-    // terms and for one position's own (position_terms, finance_install_12):
+    // terms and for one position's own (position_terms, finance_install_13):
     // terms_input() and contract_input() below, so the two cannot drift.
     [$rateVal, $unit, $cur, $url] = terms_input($in);
 

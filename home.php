@@ -92,7 +92,7 @@ $versions = home_versions($pdo, $userIds);
 $terms = null; $posTerms = []; $invoiceInfo = ['lines' => [], 'totals' => [], 'outside' => 0]; $invoices = [];
 if (!$salaried) {
     $terms = own_crew_term($crewId);
-    // Their positions with a contract of their own (finance_install_12):
+    // Their positions with a contract of their own (finance_install_13):
     // [project id][step id] => row, their own only.
     $posTerms = own_position_terms($crewId);
     $invoiceInfo = home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo, $posTerms);
@@ -197,7 +197,7 @@ require __DIR__ . '/includes/header.php';
 <?php // ---- Contract: a freelancer's own terms, never anybody else's. ---- ?>
 <?php if (!$salaried): ?>
   <?php // ONE ROW PER CONTRACT (David, 2026-10-29): a position with its own
-        // contract on a show (finance_install_12) on a row of its own, and the
+        // contract on a show (finance_install_13) on a row of its own, and the
         // person's default for everything else. Their own only, by construction. ?>
   <?php
   $contracts = [];

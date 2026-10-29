@@ -150,7 +150,7 @@ function budget_pool(PDO $pdo, array $project): array {
     $crewIds = array_values(array_unique(array_map(fn($l) => (int)$l['crew_id'], $lanes)));
     $terms   = $crewIds ? crew_terms($crewIds) : [];
     // A position's own contract wins over the person's default
-    // (finance_install_12, 2026-10-29), as in expense_projection().
+    // (finance_install_13, 2026-10-29), as in expense_projection().
     $posTerms = $crewIds ? position_terms_for($crewIds, (int)$projectId) : [];
 
     $logged  = pool_logged_days($pdo, $projectId, $hpd);
@@ -527,7 +527,7 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source)
     $crewIds = array_values(array_unique(array_map(fn($l) => (int)$l['crew_id'], $lanes)));
     $terms   = $crewIds ? crew_terms($crewIds) : [];
     // A position's own contract wins over the person's default
-    // (finance_install_12, 2026-10-29), as in expense_projection().
+    // (finance_install_13, 2026-10-29), as in expense_projection().
     $posTerms = $crewIds ? position_terms_for($crewIds, (int)$projectId) : [];
     $billed  = function_exists('invoiced_by_position') ? invoiced_by_position($projectId) : [];
 

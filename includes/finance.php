@@ -249,7 +249,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
     }
     $terms = crew_terms(array_values(array_unique($crewIds)));
     // A POSITION'S OWN CONTRACT wins over the person's default (David,
-    // 2026-10-29; finance_install_12): Angelys on CH Layout at one rate and
+    // 2026-10-29; finance_install_13): Angelys on CH Layout at one rate and
     // on Cleanup, Color and Lighting at another. Keyed "crewId|stepId"; empty
     // before the file is imported, and then every row prices as it always did.
     $posTerms = position_terms_for(array_values(array_unique($crewIds)), (int)$projectId);

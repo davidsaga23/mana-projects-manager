@@ -53,7 +53,7 @@ if ($project) {
     $terms = own_crew_term($crewId);
     $invoices = own_invoices($crewId, $projectId);
     $sFx = own_project_fx_rates($crewId, $projectId);
-    // A position with its own contract (finance_install_12, 2026-10-29) is
+    // A position with its own contract (finance_install_13, 2026-10-29) is
     // paid on its own line; read through the same own-or-admin door.
     $sPos = own_position_terms($crewId, $projectId)[$projectId] ?? [];
     $s = artist_statement($pdo, $projectId, $crewId, $terms, $invoices, null, $sFx, $sPos);

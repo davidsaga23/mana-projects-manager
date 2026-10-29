@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // is overwritten. The unit and currency are NOT posted at all: this
             // column edits one number, and a hidden field carrying the other two
             // would be a second copy of them, free to drift.
-            // A ROW ON A POSITION'S OWN CONTRACT (finance_install_12, David
+            // A ROW ON A POSITION'S OWN CONTRACT (finance_install_13, David
             // 2026-10-29) saves to that contract, not to the person's default:
             // the box shows the position's rate, so that is what it edits. The
             // step must be one this person holds here, same check as the crew.
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // A ticked row on a POSITION'S OWN CONTRACT posts "crewId:stepId"
             // and is set on that contract; every other row posts the crew id and
-            // sets the person's default, as before (finance_install_12).
+            // sets the person's default, as before (finance_install_13).
             $ids = []; $posPicks = [];
             foreach ((array)($_POST['crew_ids'] ?? []) as $v) {
                 $parts = explode(':', (string)$v);
@@ -1520,7 +1520,7 @@ if ($retakePct <= 0):
                 // crew_terms is keyed on crew_id alone — so setting it here sets
                 // it everywhere that person appears, on this project and every
                 // other. The exception is a position with its OWN contract
-                // (finance_install_12, 2026-10-29): its box edits that contract,
+                // (finance_install_13, 2026-10-29): its box edits that contract,
                 // on this show only, and says "own contract". The note under the table says so, because two rows for
                 // the same artist changing together would otherwise look like a
                 // bug.
@@ -2214,7 +2214,7 @@ function invAddRows() {
     require_once __DIR__ . '/includes/statements.php';
     $stPeople = statement_people($pdo, $projectId);
     $stTerms = crew_terms(array_keys($stPeople));
-    // Positions with a contract of their own (finance_install_12), per person:
+    // Positions with a contract of their own (finance_install_13), per person:
     // [crew id][step id] => row, the shape artist_statement() takes.
     $stPos = [];
     foreach (position_terms_for(array_keys($stPeople), $projectId) as $row) {

@@ -1,4 +1,4 @@
--- finance_install_12 — a contract per POSITION, not only per person.
+-- finance_install_13 — a contract per POSITION, not only per person.
 --
 -- ⚠ IMPORT THIS BY HAND, THROUGH phpMyAdmin, INTO THE FINANCE DATABASE.
 -- migrate.php does not and must not touch this database. Run it ONCE.

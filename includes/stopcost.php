@@ -192,7 +192,7 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
     $laneIds = array_values(array_unique(array_map(fn($r) => (int)$r['id'], $lanes)));
     $laneTerms = $laneIds ? crew_terms($laneIds) : [];
     // A position's own contract wins over the person's default
-    // (finance_install_12, 2026-10-29), as in expense_projection().
+    // (finance_install_13, 2026-10-29), as in expense_projection().
     $lanePos = $laneIds ? position_terms_for($laneIds, (int)$projectId) : [];
 
     foreach ($lanes as $r) {
