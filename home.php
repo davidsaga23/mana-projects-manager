@@ -89,10 +89,13 @@ $notes = home_notes_waiting($pdo, $crewId, $userIds);
 $versions = home_versions($pdo, $userIds);
 
 // Money, for a freelancer only, and only their own.
-$terms = null; $invoiceInfo = ['lines' => [], 'totals' => [], 'outside' => 0]; $invoices = [];
+$terms = null; $posTerms = []; $invoiceInfo = ['lines' => [], 'totals' => [], 'outside' => 0]; $invoices = [];
 if (!$salaried) {
     $terms = own_crew_term($crewId);
-    $invoiceInfo = home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo);
+    // Their positions with a contract of their own (finance_install_13):
+    // [project id][step id] => row, their own only.
+    $posTerms = own_position_terms($crewId);
+    $invoiceInfo = home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo, $posTerms);
     // One row per invoice they sent: a monthly invoice's lines folded together.
     $invoices = home_group_invoices($crewId, own_invoices_all($crewId));
 }
@@ -194,31 +197,59 @@ require __DIR__ . '/includes/header.php';
 
 <?php // ---- Contract: a freelancer's own terms, never anybody else's. ---- ?>
 <?php if (!$salaried): ?>
-  <h3>Your contract</h3>
-  <?php if (!$terms || $terms['day_rate'] === null): ?>
+  <?php // ONE ROW PER CONTRACT (David, 2026-10-29): a position with its own
+        // contract on a show (finance_install_13) on a row of its own, and the
+        // person's default for everything else. Their own only, by construction. ?>
+  <?php
+  $contracts = [];
+  foreach ($posTerms as $cpid => $bySid) {
+      if (!isset($shows[$cpid])) continue;           // a finished show
+      foreach ($bySid as $csid => $pt) {
+          $contracts[] = ['label' => $shows[$cpid]['project']['name'] . ' · ' . ($pt['position_name'] ?: 'Position'),
+                          'term' => $pt, 'pids' => [(int)$cpid]];
+      }
+  }
+  if ($terms) {
+      $contracts[] = ['label' => $contracts ? 'All your other positions' : 'All your positions',
+                      'term' => $terms, 'pids' => array_keys($shows)];
+  }
+  ?>
+  <h3><?= count($contracts) > 1 ? 'Your contracts' : 'Your contract' ?></h3>
+  <?php if (!$contracts): ?>
     <p class="muted">No rate is on file for you yet. Production will add it.</p>
-  <?php else:
-    $tUnit = (string)($terms['rate_unit'] ?? 'day');
-    $tCur = strtoupper((string)($terms['rate_currency'] ?? 'USD')) ?: 'USD';
-    ?>
+  <?php else: ?>
     <table class="review-table statement-due">
+      <thead><tr><th>For</th><th>Rate</th><th>Contract</th></tr></thead>
       <tbody>
-        <tr><th>Rate</th><td><strong><?= e(home_rate_phrase((float)$terms['day_rate'], $tUnit, $tCur)) ?></strong>
-          <?php // A contract in another currency is converted at ONE rate fixed per
-                // show (2026-10-28), so its dollar figure is per show. ?>
-          <?php if ($tCur !== 'USD'): ?>
-            <?php foreach ($shows as $pid => $s):
-              $fx = home_fx($crewId, (int)$pid);
-              $usd = function_exists('fx_to_usd') ? fx_to_usd((float)$terms['day_rate'], $tCur, $fx) : null; ?>
-              <div class="muted small"><?= e($s['project']['name']) ?>:
-                <?= $usd !== null ? e(home_rate_phrase((float)$terms['day_rate'], $tUnit, $tCur, $usd))
-                                  : 'no exchange rate fixed for this show yet' ?></div>
-            <?php endforeach; ?>
-          <?php endif; ?></td></tr>
-        <?php if (function_exists('contract_state_phrase') && !empty($terms['contract_status'])): ?>
-          <tr><th>Contract</th><td><?= e(contract_state_phrase($terms['contract_status'] ?? null,
-                $terms['contract_sent_date'] ?? null, $terms['contract_signed_date'] ?? null)) ?></td></tr>
-        <?php endif; ?>
+        <?php foreach ($contracts as $c):
+          $ct = $c['term'];
+          $cUnit = (string)($ct['rate_unit'] ?? 'day');
+          $cCur = strtoupper((string)($ct['rate_currency'] ?? 'USD')) ?: 'USD'; ?>
+          <tr>
+            <td><?= e($c['label']) ?></td>
+            <td>
+              <?php if ($ct['day_rate'] === null): ?>
+                <span class="muted">no rate yet</span>
+              <?php else: ?>
+                <strong><?= e(home_rate_phrase((float)$ct['day_rate'], $cUnit, $cCur)) ?></strong>
+                <?php // A contract in another currency is converted at ONE rate fixed
+                      // per show (2026-10-28), so its dollar figure is per show. ?>
+                <?php if ($cCur !== 'USD'): ?>
+                  <?php foreach ($c['pids'] as $pid):
+                    $fx = home_fx($crewId, (int)$pid);
+                    $usd = function_exists('fx_to_usd') ? fx_to_usd((float)$ct['day_rate'], $cCur, $fx) : null; ?>
+                    <div class="muted small"><?= e($shows[$pid]['project']['name']) ?>:
+                      <?= $usd !== null ? e(home_rate_phrase((float)$ct['day_rate'], $cUnit, $cCur, $usd))
+                                        : 'no exchange rate fixed for this show yet' ?></div>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              <?php endif; ?>
+            </td>
+            <td class="small"><?= !empty($ct['contract_status']) && $ct['contract_status'] !== 'none'
+                ? e(contract_state_phrase($ct['contract_status'], $ct['contract_sent_date'] ?? null, $ct['contract_signed_date'] ?? null))
+                : '<span class="muted">—</span>' ?></td>
+          </tr>
+        <?php endforeach; ?>
       </tbody>
     </table>
   <?php endif; ?>
@@ -335,7 +366,7 @@ $anyNext = $next['overdue'] || $next['week'] || $next['later'];
         <?php foreach ($invoiceInfo['lines'] as $l): ?>
           <tr>
             <td><?= e($l['project']['name']) ?></td>
-            <td><?= e($l['step']) ?></td>
+            <td><?= e($l['step']) ?><?= !empty($l['own_contract']) ? ' <span class="muted small">· own contract</span>' : '' ?></td>
             <td><?= e($l['rate_phrase']) ?></td>
             <td class="num"><?= e($l['qty_label']) ?></td>
             <td class="num">

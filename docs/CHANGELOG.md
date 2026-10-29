@@ -14,6 +14,27 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — A contract per position *(finance DB: finance_install_13)*
+
+- **A position can have its own contract.** On the person page, under Terms and contract, a new
+  **A contract per position** table lists every position the person holds on that show. "Give it its
+  own contract" sets a rate, unit, currency, contract link and status for that one position. The
+  terms above it stay the person's **default**, used by every position without its own.
+  Example: Angelys on FC Mobile, CH Layout per second and Cleanup, Color and Lighting per day.
+- **Everything that prices a person uses it:** the expense projection (its rate box edits that
+  position's contract and says "own contract"), bulk rates, the budget pool, the stop-cost figure,
+  the contract line on Staffing, the artist statement and the Finance statements tab.
+- **The statement** shows one line per contract (position, rate, what it is counted on, due) when a
+  position has its own. Time and approved seconds on that position's step go on its line, and
+  everything else on the default. A supervisor's own supervision contract covers time not logged
+  on a production step.
+- **Home** lists each contract ("FC Mobile · CH Layout", then "All your other positions"), and the
+  month's invoice lines use the right rate for each step.
+- "Back to the default terms" removes a position's own contract. Every change is kept in
+  `position_terms_log`.
+- **Needs `finance_install_13.sql` imported by hand into the finance database.** Until then nothing
+  changes and the person page says the file is needed.
+
 ## 2026-10-29 — Aesthetic pass, phases (b) and (c): project, finance, people and admin screens *(no migration)*
 
 - **Still nothing about content or behaviour**, and still only `assets/style.css`: no screen's PHP

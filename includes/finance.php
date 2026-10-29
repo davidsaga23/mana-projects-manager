@@ -248,6 +248,11 @@ function expense_projection(PDO $pdo, int $projectId): array {
         foreach ($laneRows as $l) if (!empty($l['crew_id'])) $crewIds[] = (int)$l['crew_id'];
     }
     $terms = crew_terms(array_values(array_unique($crewIds)));
+    // A POSITION'S OWN CONTRACT wins over the person's default (David,
+    // 2026-10-29; finance_install_13): Angelys on CH Layout at one rate and
+    // on Cleanup, Color and Lighting at another. Keyed "crewId|stepId"; empty
+    // before the file is imported, and then every row prices as it always did.
+    $posTerms = position_terms_for(array_values(array_unique($crewIds)), (int)$projectId);
     $actual = actual_days_by_crew_step($pdo, $projectId, $hoursPerDay);
     // ACTUAL COST COMES FROM INVOICES, not from days times a rate. That product
     // is a second estimate wearing an actual's clothes; only an invoice records
@@ -344,7 +349,8 @@ function expense_projection(PDO $pdo, int $projectId): array {
 
         foreach ($stepLanes as $lane) {
             $cid = $lane ? (int)($lane['crew_id'] ?? 0) : 0;
-            $t = $cid ? ($terms[$cid] ?? null) : null;
+            $ownPos = $cid && isset($posTerms[$cid . '|' . $stepId]);
+            $t = $cid ? ($ownPos ? $posTerms[$cid . '|' . $stepId] : ($terms[$cid] ?? null)) : null;
             $rate = ($t && $t['day_rate'] !== null) ? (float)$t['day_rate'] : null;
             $unit = $t['rate_unit'] ?? 'day';
             $cur  = $t['rate_currency'] ?? 'USD';
@@ -426,6 +432,9 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'artist'      => $lane ? ($lane['name'] ?? null) : null,
                 'is_slot'     => $lane ? (int)($lane['is_placeholder'] ?? 0) === 1 : false,
                 'rate'        => $rate,
+                // The rate is this position's own contract, not the person's
+                // default — so the rate box on the projection saves it there.
+                'own_position' => $ownPos,
                 'rate_unit'   => $rate !== null ? $unit : null,
                 'currency'    => $rate !== null ? $cur : null,
                 // The cost's own currency: USD when a fixed rate converted it.
@@ -475,13 +484,15 @@ function expense_projection(PDO $pdo, int $projectId): array {
     // measured in seconds. See includes/supervision.php.
     require_once __DIR__ . '/supervision.php';
     $supervision = supervision_positions($pdo, $projectId);
-    $supTerms = $supervision
-        ? crew_terms(array_values(array_unique(array_map(fn($p) => (int)$p['crew_id'], $supervision))))
-        : [];
+    $supIds = array_values(array_unique(array_map(fn($p) => (int)$p['crew_id'], $supervision)));
+    $supTerms = $supervision ? crew_terms($supIds) : [];
+    $supPosTerms = $supervision ? position_terms_for($supIds, (int)$projectId) : [];
     foreach ($supervision as $p) {
         $cid  = (int)$p['crew_id'];
         $days = (float)supervision_days($p);
-        $t    = $supTerms[$cid] ?? null;
+        // A position's own contract first, as on the lanes above.
+        $supOwn = isset($supPosTerms[$cid . '|' . -(int)$p['id']]);
+        $t    = $supOwn ? $supPosTerms[$cid . '|' . -(int)$p['id']] : ($supTerms[$cid] ?? null);
         $rate = ($t && $t['day_rate'] !== null) ? (float)$t['day_rate'] : null;
         $unit = $t['rate_unit'] ?? 'day';
         $cur  = $t['rate_currency'] ?? 'USD';
@@ -518,6 +529,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
             'artist'         => $p['name'],
             'is_slot'        => (int)$p['is_placeholder'] === 1,
             'rate'           => $rate,
+            'own_position'   => $supOwn,
             'rate_unit'      => $rate !== null ? $unit : null,
             'currency'       => $rate !== null ? $cur : null,
             'cost_currency'  => $costCur,

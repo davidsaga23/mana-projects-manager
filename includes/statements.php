@@ -138,6 +138,84 @@ function statement_approved_seconds(PDO $pdo, int $projectId, int $crewId): floa
 }
 
 /**
+ * Approved seconds per STEP, for one person: [step id => seconds]. The same
+ * count as statement_approved_seconds(), split by step so a position with its
+ * own contract (finance_install_13) can be paid on its own footage.
+ */
+function statement_approved_seconds_by_step(PDO $pdo, int $projectId, int $crewId): array {
+    $hasCrew = column_exists($pdo, 'progress_crew', 'crew_id');
+    $sql = 'SELECT pr.id, pr.step_id, sh.placeholder_seconds AS secs'
+         . ($hasCrew ? ', (SELECT COUNT(*) FROM progress_crew pc2 WHERE pc2.progress_id = pr.id) AS sharers' : ', 1 AS sharers')
+         . ' FROM progress pr
+             JOIN pipeline_steps ps ON ps.id = pr.step_id
+             JOIN shots sh ON sh.id = pr.shot_id
+            WHERE pr.project_id = ? AND pr.is_approved = 1 AND COALESCE(ps.tracks_seconds, 0) = 1
+              AND (pr.crew_id = ?'
+         . ($hasCrew ? ' OR EXISTS (SELECT 1 FROM progress_crew pc WHERE pc.progress_id = pr.id AND pc.crew_id = ?)' : '')
+         . ')';
+    $args = $hasCrew ? [$projectId, $crewId, $crewId] : [$projectId, $crewId];
+    try {
+        $q = $pdo->prepare($sql);
+        $q->execute($args);
+    } catch (PDOException $e) {
+        return [];
+    }
+    $out = [];
+    foreach ($q as $r) {
+        $sid = (int)$r['step_id'];
+        $out[$sid] = ($out[$sid] ?? 0.0) + (float)$r['secs'] / max(1, (int)$r['sharers']);
+    }
+    return array_map(fn($v) => round($v, 3), $out);
+}
+
+/**
+ * Minutes one person logged on a show per STEP, inside a window: [step id =>
+ * minutes]. Time on a production task counts for its step; time on a card
+ * counts for the card's step when it has one; anything else is step 0.
+ */
+function statement_minutes_by_step(PDO $pdo, int $projectId, int $crewId, ?string $from, ?string $to): array {
+    if (!time_logs_available($pdo)) return [];
+    $stepExpr = column_exists($pdo, 'tickets', 'step_id') ? 'COALESCE(pr.step_id, t.step_id, 0)' : 'COALESCE(pr.step_id, 0)';
+    $sql = "SELECT {$stepExpr} AS sid, SUM(tl.minutes) AS m
+              FROM time_logs tl
+              LEFT JOIN progress pr ON pr.id = tl.progress_id
+              LEFT JOIN tickets t ON t.id = tl.ticket_id
+             WHERE tl.crew_id = ? AND tl.project_id = ?";
+    $args = [$crewId, $projectId];
+    if ($from) { $sql .= ' AND tl.log_date >= ?'; $args[] = $from; }
+    if ($to)   { $sql .= ' AND tl.log_date <= ?'; $args[] = $to; }
+    $sql .= ' GROUP BY sid';
+    try {
+        $q = $pdo->prepare($sql);
+        $q->execute($args);
+    } catch (PDOException $e) {
+        return [];
+    }
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['sid']] = (int)$r['m'];
+    return $out;
+}
+
+/**
+ * What one set of terms makes due, in the unit its rate is a price of.
+ * [rate, unit, currency, basis, basis label, due]. The one place the switch
+ * below is written, for the whole show and for one position alike.
+ */
+function statement_price(?array $terms, float $hours, float $days, float $seconds): array {
+    $rate = ($terms && $terms['day_rate'] !== null) ? (float)$terms['day_rate'] : null;
+    $unit = (string)($terms['rate_unit'] ?? 'day');
+    $cur  = fx_code($terms['rate_currency'] ?? 'USD') ?? 'USD';
+    switch ($unit) {
+        case 'hour':   $basis = $hours;   $label = 'logged hours'; break;
+        case 'second': $basis = $seconds; $label = 'approved seconds'; break;
+        case 'flat':   $basis = 1.0;      $label = 'flat fee'; break;
+        default:       $basis = $days;    $label = 'days logged'; $unit = 'day';
+    }
+    $due = $rate !== null ? round($rate * $basis, 2) : null;
+    return [$rate, $unit, $cur, $basis, $label, $due];
+}
+
+/**
  * One person's statement on one show.
  *
  * $terms and $invoices are passed in, not read here, so the admin tab can read
@@ -145,7 +223,7 @@ function statement_approved_seconds(PDO $pdo, int $projectId, int $crewId): floa
  * own_*() doors. Either may be empty: the figures still stand without a rate.
  */
 function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, array $invoices,
-                          ?array $projection = null, array $fx = []): array {
+                          ?array $projection = null, array $fx = [], array $positionTerms = []): array {
     $hpd = hours_per_day($pdo, $projectId);
     $win = statement_window($pdo, $projectId, $crewId);
 
@@ -171,17 +249,7 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     $approvedSecs = statement_approved_seconds($pdo, $projectId, $crewId);
 
     // What is due, in the unit the rate is a price of.
-    $rate = ($terms && $terms['day_rate'] !== null) ? (float)$terms['day_rate'] : null;
-    $unit = (string)($terms['rate_unit'] ?? 'day');
-    $cur  = fx_code($terms['rate_currency'] ?? 'USD') ?? 'USD';
-    $basis = null; $basisLabel = '';
-    switch ($unit) {
-        case 'hour':   $basis = $hours;        $basisLabel = 'logged hours'; break;
-        case 'second': $basis = $approvedSecs; $basisLabel = 'approved seconds'; break;
-        case 'flat':   $basis = 1.0;           $basisLabel = 'flat fee'; break;
-        default:       $basis = $days;         $basisLabel = 'days logged'; $unit = 'day';
-    }
-    $due = $rate !== null ? round($rate * $basis, 2) : null;
+    [$rate, $unit, $cur, $basis, $basisLabel, $due] = statement_price($terms, $hours, $days, $approvedSecs);
 
     // ⚠ A CONTRACT IN ANOTHER CURRENCY, WITH A RATE FIXED FOR THE PROJECT
     // ($fx, from project_fx_rates() or own_project_fx_rates()), is stated in
@@ -193,6 +261,75 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     $money = $fxRow ? 'USD' : $cur;
     $dueOwn = null;
     if ($fxRow && $due !== null) { $dueOwn = $due; $due = fx_to_usd($due, $cur, $fx); }
+
+    // ⚠ A POSITION WITH ITS OWN CONTRACT (finance_install_13, David 2026-10-29)
+    // is paid on ITS time and footage at ITS rate; everything else is paid on
+    // the default. $positionTerms is [step id => position_terms row]. With none
+    // the figures above stand exactly as they always did.
+    //
+    // The rest is time on any other step, and time on no step at all (cards,
+    // general). When the person holds a SUPERVISION position with its own
+    // contract (step id below zero), the rest is paid on that one instead: a
+    // supervisor logs no production steps, so the rest IS their supervision.
+    $lines = [];
+    if ($positionTerms) {
+        $minByStep = statement_minutes_by_step($pdo, $projectId, $crewId, $win['from'], $win['to']);
+        $secsByStep = statement_approved_seconds_by_step($pdo, $projectId, $crewId);
+        $restTerms = $terms; $restName = 'Everything else'; $restOwn = false;
+        foreach ($positionTerms as $sid => $pt) {
+            if ((int)$sid < 0) {
+                $restTerms = $pt; $restOwn = true;
+                $restName = (string)($pt['position_name'] ?? 'Supervision');
+                break;
+            }
+        }
+        $restMin = $minutesIn; $restSecs = $approvedSecs;
+        $buckets = [];
+        foreach ($positionTerms as $sid => $pt) {
+            if ((int)$sid <= 0) continue;
+            $m = (int)($minByStep[(int)$sid] ?? 0);
+            $sc = (float)($secsByStep[(int)$sid] ?? 0.0);
+            $restMin -= $m; $restSecs -= $sc;
+            $buckets[] = [(string)($pt['position_name'] ?? 'Position'), $pt, $m, $sc, true];
+        }
+        $buckets[] = [$restName, $restTerms, max(0, $restMin), max(0.0, $restSecs), $restOwn];
+
+        $moneys = [];
+        foreach ($buckets as [$name, $bt, $m, $sc, $own]) {
+            $h = $m / 60;
+            $d = $hpd > 0 ? $h / $hpd : 0.0;
+            [$lr, $lu, $lc, $lb, $ll, $ld] = statement_price($bt, $h, $d, $sc);
+            // A position nobody has worked on yet, on a rate that is not a
+            // flat fee, has nothing to say; it stays off the list.
+            if ($lu !== 'flat' && $m <= 0 && $sc <= 0) continue;
+            $lFx = ($lc !== 'USD' && isset($fx[$lc])) ? $fx[$lc] : null;
+            $lMoney = $lFx ? 'USD' : $lc;
+            $lDueOwn = null;
+            if ($lFx && $ld !== null) { $lDueOwn = $ld; $ld = fx_to_usd($ld, $lc, $fx); }
+            $moneys[$lMoney] = true;
+            $lines[] = ['position' => $name, 'own_contract' => $own, 'rate' => $lr, 'unit' => $lu,
+                        'rate_currency' => $lc, 'currency' => $lMoney, 'hours' => $h, 'days' => $d,
+                        'seconds' => $sc, 'basis' => $lb, 'basis_label' => $ll, 'due' => $ld,
+                        'due_own' => $lDueOwn,
+                        'rate_usd' => ($lFx && $lr !== null) ? $lr * (float)$lFx['usd_per_unit'] : null];
+        }
+        // One line on the default is the statement as it always was (the own
+        // contract has nothing logged against it yet): drawn the usual way.
+        if (count($lines) === 1 && !$lines[0]['own_contract']) $lines = [];
+
+        // The show's due is the sum of its lines, in one currency, or nothing
+        // when the lines are in two that no fixed rate brings together.
+        if ($lines) {
+            $unpriced = false; $sum = 0.0;
+            foreach ($lines as $l) { if ($l['due'] === null) $unpriced = true; else $sum += $l['due']; }
+            $oneMoney = count($moneys) === 1;
+            $money = $oneMoney ? (string)array_key_first($moneys) : 'USD';
+            $due = ($oneMoney && !$unpriced) ? round($sum, 2) : null;
+            $fxRow = null; $dueOwn = null;
+            $rate = $lines[0]['rate']; $unit = $lines[0]['unit']; $cur = $lines[0]['rate_currency'];
+            $basis = $lines[0]['basis']; $basisLabel = $lines[0]['basis_label'];
+        }
+    }
 
     $invoiced = 0.0; $otherCurrency = false;
     foreach ($invoices as $inv) {
@@ -233,6 +370,9 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         'invoices'        => $invoices,
         'invoiced_other_currency' => $otherCurrency,
         'left'            => $due !== null ? round($due - $invoiced, 2) : null,
+        // One line per contract when a position has its own (finance_install_13).
+        // Empty when everything is paid on the one set of terms.
+        'lines'           => $lines,
     ];
 }
 

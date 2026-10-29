@@ -148,7 +148,15 @@ function invoice_split_prefill(PDO $pdo, int $crewId, string $month): array {
     } catch (PDOException $e) {
         $shows = [];
     }
-    $info = home_invoice_lines($pdo, $crewId, $shows, $terms, $from, $to);
+    // A position with its own contract (finance_install_13) is expected at its
+    // own rate, exactly as the person's Home tells them to invoice it.
+    $posTerms = [];
+    foreach (array_keys($shows) as $pid) {
+        foreach (position_terms_for([$crewId], (int)$pid) as $row) {
+            $posTerms[(int)$pid][(int)$row['step_id']] = $row;
+        }
+    }
+    $info = home_invoice_lines($pdo, $crewId, $shows, $terms, $from, $to, $posTerms);
     return ['lines' => $info['lines'], 'outside' => $info['outside'], 'terms' => $terms];
 }
 

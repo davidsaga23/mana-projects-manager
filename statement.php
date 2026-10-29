@@ -53,7 +53,10 @@ if ($project) {
     $terms = own_crew_term($crewId);
     $invoices = own_invoices($crewId, $projectId);
     $sFx = own_project_fx_rates($crewId, $projectId);
-    $s = artist_statement($pdo, $projectId, $crewId, $terms, $invoices, null, $sFx);
+    // A position with its own contract (finance_install_13, 2026-10-29) is
+    // paid on its own line; read through the same own-or-admin door.
+    $sPos = own_position_terms($crewId, $projectId)[$projectId] ?? [];
+    $s = artist_statement($pdo, $projectId, $crewId, $terms, $invoices, null, $sFx, $sPos);
 }
 
 $money = fn(?float $v) => $v === null ? '—' : fmt_money_plain($v, $s['currency'] ?? 'USD');
@@ -121,12 +124,40 @@ if ($admin && $project) {
   </div>
 
   <h3>What to invoice</h3>
-  <?php if ($s['rate'] === null): ?>
+  <?php if ($s['rate'] === null && empty($s['lines'])): ?>
     <p class="muted">No rate is on file<?= $admin ? '' : ' for you' ?> on this show yet, so the figures above
       stand without an amount. <?= $admin ? 'Set it on the person page under Terms and contract.' : 'Production will add it.' ?></p>
   <?php else: ?>
+    <?php // ONE LINE PER CONTRACT when a position has its own (2026-10-29):
+          // Angelys's CH Layout on its rate, the rest on her default. ?>
+    <?php if (!empty($s['lines'])): ?>
+      <table class="review-table">
+        <thead><tr><th>Position</th><th>Rate</th><th>Counted on</th><th class="num">Due so far</th></tr></thead>
+        <tbody>
+          <?php foreach ($s['lines'] as $l): ?>
+            <tr>
+              <td><?= e($l['position']) ?><?= $l['own_contract'] ? ' <span class="muted small">· own contract</span>' : '' ?></td>
+              <td><?= $l['rate'] !== null ? e(fmt_money($l['rate'], $l['unit'], $l['rate_currency'])) : '<span class="muted">no rate yet</span>' ?>
+                <?php if ($l['rate_usd'] !== null): ?><div class="muted small">= <?= e(number_format($l['rate_usd'], 2)) ?> USD</div><?php endif; ?></td>
+              <td class="small">
+                <?php if ($l['unit'] === 'flat'): ?>The flat fee
+                <?php elseif ($l['unit'] === 'second'): ?><?= e(statement_secs($l['seconds'])) ?> of approved footage
+                <?php elseif ($l['unit'] === 'hour'): ?><?= e(fmt_num($l['hours'], 2)) ?> logged hours
+                <?php else: ?><?= e(fmt_num($l['days'], 2)) ?> days logged<?php endif; ?>
+              </td>
+              <td class="num"><?= e($l['due'] === null ? '—' : fmt_money_plain($l['due'], $l['currency'])) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php if ($s['due'] === null): ?>
+        <p class="warn-text small">These lines cannot be added into one amount yet: one has no rate, or they are
+          in currencies with no exchange rate fixed for this show.</p>
+      <?php endif; ?>
+    <?php endif; ?>
     <table class="review-table statement-due">
       <tbody>
+        <?php if (empty($s['lines'])): ?>
         <tr><th>Rate</th>
           <td><?= e(fmt_money($s['rate'], $s['unit'], $s['rate_currency'])) ?>
             <?php // A contract in another currency, converted at the one rate
@@ -147,6 +178,7 @@ if ($admin && $project) {
               <?= e(fmt_num($s['days'], 2)) ?> days logged
             <?php endif; ?>
           </td></tr>
+        <?php endif; ?>
         <tr><th>Due so far</th><td><strong><?= e($s['due_own'] !== null
               ? fmt_money_both($s['due'], $s['due_own'], $s['rate_currency']) : $money($s['due'])) ?></strong></td></tr>
         <tr><th>Invoiced</th><td><?= e($money($s['invoiced'])) ?></td></tr>

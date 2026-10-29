@@ -485,7 +485,7 @@ if ($schemaReady) {
 // and is exactly the comment hiring.php already carries three hundred lines
 // away. David reported the line missing on 2026-10-05 and there was nothing on
 // screen to tell him which of the three it was.
-$laneTerms = [];
+$laneTerms = []; $lanePosTerms = [];
 $contractsOff = null;          // a sentence when the state cannot be shown at all
 if ($schemaReady && can_see_money()) {
     $ids = [];
@@ -503,6 +503,11 @@ if ($schemaReady && can_see_money()) {
                           . 'not been imported yet. Contract links still show; the state does not.';
         } elseif ($ids) {
             $laneTerms = crew_terms(array_values(array_unique($ids)));
+        }
+        // A position's own contract (finance_install_13, 2026-10-29) is the one
+        // its contract line reports; the person's default covers the rest.
+        if ($ids && finance_configured()) {
+            $lanePosTerms = position_terms_for(array_values(array_unique($ids)), (int)$projectId);
         }
         // The link lives on crew_terms whether or not 04 has run, so it is still
         // worth fetching when only the STATE is unavailable.
@@ -969,7 +974,8 @@ require __DIR__ . '/includes/header.php';
                   // must not stay silent about. ?>
             <?php if (!$isPh):
               $money = can_see_money();
-              $ct = $money ? ($laneTerms[(int)$l['crew_id']] ?? []) : [];
+              $ct = $money ? ($lanePosTerms[(int)$l['crew_id'] . '|' . (int)$l['step_id']]
+                             ?? ($laneTerms[(int)$l['crew_id']] ?? [])) : [];
               $cUrl = trim((string)($ct['contract_url'] ?? ''));
               // No state while $contractsOff explains why on the line at the top
               // of the page — but a LINK still shows, because contract_url lives
