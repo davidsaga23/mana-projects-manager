@@ -973,8 +973,50 @@
     var pane = t.closest('[data-pane]');
     if (!pane) return;
     e.preventDefault();
-    open(pane, t.getAttribute('data-review-open'));
+    open(pane, t.getAttribute('data-review-open'), { actions: paneVerdicts(pane) });
   });
+
+  /**
+   * APPROVE AND RETAKE WHEN OPENED FROM A TASK (David, 2026-10-29), not only
+   * from the Reviews screen: built from the marker includes/board.php puts in
+   * the Versions pane for the reviewer whose turn it is (board_verdict_html()).
+   * Each posts the verdict to board_version.php, the same rules as the Reviews
+   * screen, and puts the pane it sends back in place.
+   */
+  function paneVerdicts(pane) {
+    var mark = pane.querySelector('.board-verdict');
+    if (!mark) return [];
+    var out = [];
+    var give = function (verdict) {
+      var data = new FormData();
+      data.append('add_review', '1');
+      data.append('verdict', verdict);
+      data.append('project_id', mark.getAttribute('data-project'));
+      data.append('step_id', mark.getAttribute('data-step'));
+      data.append('item_key', mark.getAttribute('data-item'));
+      fetch('board_version.php', { method: 'POST', body: data, credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          pane.innerHTML = html;
+          if (window.animaBoard) {
+            window.animaBoard.paneReady('versions');
+            window.animaBoard.timelineRefresh();
+          }
+          var said = pane.querySelector(':scope > p.err, :scope > p.ok');
+          if (said) said.scrollIntoView({ block: 'nearest' });
+        })
+        .catch(function () {
+          window.alert('That did not go through. Check your connection and try again.');
+        });
+    };
+    var to = mark.getAttribute('data-to');
+    var retake = mark.getAttribute('data-retake');
+    if (to) out.push({ label: 'Approve', cls: 'primary', title: 'Approve: moves the task to ' + to,
+                       run: function () { give('approve'); } });
+    if (retake) out.push({ label: 'Retake', cls: 'secondary danger', title: 'Send it to ' + retake,
+                           run: function () { give('retake'); } });
+    return out;
+  }
 
   window.animaReviewViewer = { open: open, close: close };
 }());
