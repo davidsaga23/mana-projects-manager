@@ -54,7 +54,7 @@ function review_stage_of(string $statusName): ?string {
 
 /**
  * The queue: every task in one of this account's "from" statuses (both stages
- * for admins and Production, review_stages()), on the shows it can see, with
+ * for admins, review_stages()), on the shows it can see, with
  * its current version. Each row carries 'stage', the REVIEW_STAGES key its
  * status puts it in. Newest version first, because the thing that
  * just arrived is the thing somebody is waiting to hear about.

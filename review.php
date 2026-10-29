@@ -6,9 +6,9 @@
 // version to bring the conversation to slack". Reached from the Reviews button
 // in the top bar, beside My tasks, which carries the count.
 //
-// Supervisors see Pending review and approve to Ready for review; admins and
-// Production see both stages (2026-10-29), each card saying which, and approve
-// each to its next status. Anyone may send it to Retake instead. The rules are
+// Supervisors and Production see Pending review and approve to Ready for
+// review; admins (Jorik, Tim) see both stages (2026-10-29), each card saying
+// which, and approve each to its next status. Anyone may send it to Retake instead. The rules are
 // in includes/review.php.
 //
 // A GRID OF CARDS, AND THE PICTURE OPENS SPELL'S VIEWER (David, 2026-10-29: "a
