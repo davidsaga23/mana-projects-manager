@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Aesthetic pass, phases (b) and (c): project, finance, people and admin screens *(no migration)*
+
+- **Still nothing about content or behaviour**, and still only `assets/style.css`: no screen's PHP
+  was edited, the finance screens included.
+- **Every panel, card, pop-up and small control** on those screens now uses the same rounded corners
+  as Spell, instead of each screen's own. Pop-ups (step filter, status menu, @ picker, shot
+  picker, hire popover, saved-place toast) float with Spell's shadow.
+- **Tasks, Studio Tasks and My tasks boards**: columns are Spell panels with hairline dividers;
+  cards are flat, with the priority stripe and crew bar unchanged.
+- **Every table row lifts slightly under the pointer**, like Spell's rows. A tinted row (late,
+  short, filled, a heat-map cell) keeps its colour and only gets a shade lighter.
+- **Number columns line up digit under digit.**
+
 ## 2026-10-29 — Copy link beside Resend link on the person page *(no migration)*
 
 - **Copy link** makes a fresh one-time login link and shows it on the page, with a Copy button,
