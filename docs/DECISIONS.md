@@ -4683,3 +4683,23 @@ alone, so one rate priced every position she held on every show.
   that show only, so it needs no "every show" confirmation.
 - **Not changed:** historic fees (`includes/history.php`) still read each person's default rate, as
   they span several shows.
+
+## 2026-10-29 — Reviews give two verdicts, Approve and Retake, from cards and from Spell's viewer
+
+**Asked by David,** looking at the Reviews screen: *"just have two buttons: 1. Approve ... 2.
+Retake ... Not sure what the send back is for"*, and *"a grid of cards instead of one item per
+line/box ... Once a supervisor clicks the image, they will see the same review view as in spell"*.
+
+**Decided:**
+- **Retake is a named status, like the two stages.** `REVIEW_RETAKE = 'retake'` in
+  `includes/review.php`, matched by name; a show without it gets a warning and the button off.
+  The dropdown of every other status ("Send back") is gone.
+- **Approve keeps both stages** (supervisors → Ready for review, admins/Production → Complete),
+  pending David's confirmation: his words describe the supervisor stage, his screenshot showed
+  the admin one.
+- **A note is optional for Retake**, pending David's confirmation: notes are now written in the
+  viewer, on the version, before the verdict.
+- **The viewer is Spell's, not a copy.** Reviews fetches the task's Versions pane
+  (`board_task.php?pane=versions`) and opens `assets/review-viewer.js` on it, passing the card's
+  verdicts for its top bar. The paste/pick/drop code for files on a review moved from
+  `board-screen.js` to `assets/review-files.js` so the viewer's box uses the same one.
