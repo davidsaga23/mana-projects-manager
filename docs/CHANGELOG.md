@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Reviews: a grid of cards, Approve / Retake, and Spell's viewer *(no migration)*
+
+- **The Reviews screen is a grid of cards**: the newest version's picture (or a video's first
+  frame), the shot or asset and step, the show, the artist, and two buttons.
+- **Two verdicts: Approve and Retake.** Approve moves the task on as before (supervisors: Pending
+  review → Ready for review; admins and Production: Ready for review → Complete). Retake moves it
+  to the show's **Retake** status. The status dropdown and Send back are gone. A note is optional.
+- **Clicking the picture opens the same review viewer as Spell**: frame by frame, speeds, timecode,
+  drawing on a frame, notes. Approve and Retake are in the viewer's top bar too.
+- **Images can go with a review written in the viewer**, in Spell as well: Attach files, paste a
+  screenshot into the box, or drop files on it, with the same thumbnails as Spell's panel.
+- A show with no "Retake" (or no "Complete" / "Ready for review") gets a warning and that button is
+  off there.
+
 ## 2026-10-29 — Budget pool: used days come only from logged time *(no migration)*
 
 - **Used days on the Budget pool are now always logged time**, never worked out from the step

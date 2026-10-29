@@ -1164,8 +1164,10 @@ conversation doesn't propose them again:
 ✅ `review.php`, reached from the **Reviews** button in the top bar (count of what waits on you).
 Decided with David on 2026-10-27: approving IS the status move (no second sign-off table); two
 stages by status name, Pending review → Ready for review for supervisors and Ready for review →
-Complete for admins and Production; Send back needs a note. Rules in `includes/review.php`. The
-brief as written before the build:
+Complete for admins and Production; Send back needs a note. Rules in `includes/review.php`.
+**Reworked 2026-10-29:** a grid of cards with two verdicts, Approve and Retake (the show's
+"Retake" status), and the picture opens Spell's review viewer with notes, drawing and attached
+images. The brief as written before the build:
 
 
 David: *"add to the roadmap to have a feature for final internal reviews in Spell for Jorik so he

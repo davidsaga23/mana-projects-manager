@@ -384,10 +384,10 @@ const SUPERVISOR_SCRIPTS = [
  */
 const SUPERVISOR_ACTIONS = [
     'crew.php' => '/^hire:\d+$/',
-    // Approve or send back from the review queue (2026-10-27). review_apply()
+    // Approve or Retake from the review queue (2026-10-27, Retake 2026-10-29). review_apply()
     // is the second lock: a supervisor may only move a task that is in
-    // Pending review on a show they can see, to Ready for review or back.
-    'review.php' => '/^(approve|back)$/',
+    // Pending review on a show they can see, to Ready for review or Retake.
+    'review.php' => '/^(approve|retake)$/',
 ];
 
 /** May the current account change things in this area ('timeline', 'staffing', 'shots')? */

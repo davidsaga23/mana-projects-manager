@@ -95,7 +95,14 @@
 
   // --- open and close ---------------------------------------------------------
 
-  function open(pane, versionId) {
+  /**
+   * opts.actions, optional: verdict buttons for the top bar, each
+   * { label, cls, title, run }. The Reviews screen passes Approve and Retake
+   * (David, 2026-10-29), so a verdict can be given without leaving the
+   * picture; Spell passes none. run() is the caller's: this file only says
+   * when a review is still being written, and closes before it runs.
+   */
+  function open(pane, versionId, opts) {
     if (S) close(true);
     var versions = readVersions(pane);
     if (!versions.length) return;
@@ -114,7 +121,8 @@
       who: reviewForm, media: null, w: 0, h: 0, scale: 1, fitted: true,
       strokes: [], live: null, drawFrame: null,
       color: COLORS[0], size: SIZES[1].px, pen: !!reviewForm,
-      fps: savedRate(), speed: 1, loop: true
+      fps: savedRate(), speed: 1, loop: true,
+      actions: (opts && opts.actions) || []
     };
     build();
     document.body.classList.add('rv-open');
@@ -123,14 +131,28 @@
 
   function close(force) {
     if (!S) return;
-    if (!force && S.strokes.length
-        && !window.confirm('Close the viewer? The drawing has not been posted and will be lost.')) return;
+    if (!force && unposted()
+        && !window.confirm('Close the viewer? The review has not been posted and will be lost.')) return;
     stopMedia();
     S.root.remove();
     document.body.classList.remove('rv-open');
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onResize);
     S = null;
+  }
+
+  /** Is a review half written: a drawing, text in the box, or files waiting? */
+  function unposted() {
+    if (!S) return false;
+    return S.strokes.length > 0 || (S.box && S.box.value.trim() !== '') || pickedFiles().length > 0;
+  }
+
+  /** The files going with the review, kept by assets/review-files.js. */
+  function pickedFiles() {
+    if (!S || !S.form) return [];
+    if (window.animaReviewFiles) return window.animaReviewFiles.files(S.form);
+    var input = S.form.querySelector('input[type="file"]');
+    return input ? Array.prototype.slice.call(input.files || []) : [];
   }
 
   /** Let go of the video, so it stops downloading as well as playing. */
@@ -181,6 +203,19 @@
     zoom.appendChild(btn('rv-btn rv-fit', 'Fit', 'Fit to the window (0)', function () { S.fitted = true; layout(); }));
     zoom.appendChild(btn('rv-btn rv-fit', '100%', 'Actual size (1)', function () { setScale(1); }));
     top.appendChild(zoom);
+
+    if (S.actions.length) {
+      var verdict = el('div', 'rv-verdict');
+      S.actions.forEach(function (a) {
+        verdict.appendChild(btn('rv-verdict-btn ' + (a.cls || ''), a.label, a.title || '', function () {
+          if (unposted() && !window.confirm('The review you are writing has not been posted and will be lost. '
+              + a.label + ' anyway?')) return;
+          close(true);
+          a.run();
+        }));
+      });
+      top.appendChild(verdict);
+    }
 
     root.appendChild(top);
 
@@ -345,13 +380,32 @@
   }
 
   function buildCompose() {
-    var f = el('form', 'rv-compose');
-    S.box = el('textarea', 'rv-box');
+    // ⚠ board-review-form / board-review-box / board-review-thumbs ARE
+    // assets/review-files.js's hooks: pasting an image into the box, picking
+    // or dropping files on the form, and the thumbnails with an ×, exactly as
+    // the "Make a review" form in the panel does it (David, 2026-10-29: "the
+    // option to attach images the same way the side panel works in spell").
+    var f = el('form', 'rv-compose board-review-form');
+    S.form = f;
+    S.box = el('textarea', 'rv-box board-review-box');
     S.box.rows = 2;
-    S.box.placeholder = 'Write your review… type @ to name somebody';
+    S.box.placeholder = 'Write your review… paste an image straight in, type @ to name somebody';
     f.appendChild(S.box);
 
+    var thumbs = el('div', 'board-review-thumbs');
+    thumbs.hidden = true;
+    f.appendChild(thumbs);
+
     var row = el('div', 'rv-compose-row');
+    var attach = el('label', 'rv-attach', 'Attach files');
+    attach.title = 'Pictures or files to go with the review. You can also paste or drop them here.';
+    var input = el('input');
+    input.type = 'file';
+    input.name = 'attachments[]';
+    input.multiple = true;
+    input.setAttribute('data-no-drop', '');   // review-files.js keeps the list, not dropzone.js
+    attach.appendChild(input);
+    row.appendChild(attach);
     S.drawSay = el('span', 'muted small rv-draw-say', '');
     row.appendChild(S.drawSay);
     S.err = el('span', 'err small rv-err', '');
@@ -781,8 +835,13 @@
     if (!S || !S.who) return;
     var text = S.box.value.trim();
     var drawn = S.strokes.length > 0;
+    var files = pickedFiles();
     S.err.textContent = '';
-    if (!text && !drawn) { S.box.focus(); S.err.textContent = 'Write something or draw on the version first.'; return; }
+    if (!text && !drawn && !files.length) {
+      S.box.focus();
+      S.err.textContent = 'Write something, attach a file or draw on the version first.';
+      return;
+    }
 
     S.post.disabled = true;
     S.post.textContent = 'Posting…';
@@ -802,6 +861,7 @@
       data.append('project_id', S.who.getAttribute('data-project'));
       data.append('step_id', S.who.getAttribute('data-step'));
       data.append('item_key', S.who.getAttribute('data-item'));
+      files.forEach(function (file) { data.append('attachments[]', file, file.name); });
       if (blob) {
         var base = v.name.replace(/\.[^.]+$/, '') || v.label;
         if (frame !== null) base += '_f' + String(frame + 1).padStart(4, '0');
@@ -856,6 +916,8 @@
     S.versions = readVersions(pane);
     S.versions.forEach(function (x, i) { if (x.id === String(versionId)) S.idx = i; });
     S.box.value = '';
+    if (window.animaReviewFiles) window.animaReviewFiles.clear(S.form);
+    else S.form.reset();
     S.post.disabled = false;
     S.post.textContent = 'Post review';
     clearDrawing();

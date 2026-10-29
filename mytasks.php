@@ -1739,6 +1739,7 @@ require __DIR__ . '/includes/header.php';
       // for form[data-ticket-form], which this page does not have. ?>
 <script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
 <script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
+<script src="assets/review-files.js<?= asset_ver('review-files.js') ?>"></script>
 <script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
 <script>
   // A status changed or a version put up in the panel is not on this list's own

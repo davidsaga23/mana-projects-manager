@@ -51,6 +51,18 @@ if (($_GET['pane'] ?? '') === 'timeline') {
     exit;
 }
 
+// ?pane=versions: the Versions pane alone, for the Reviews screen (David,
+// 2026-10-29: "Once a supervisor clicks the image, they will see the same
+// review view as in spell"). assets/review-viewer.js is built from this pane,
+// so Reviews borrows it rather than drawing a second one. Same checks as above,
+// and the same rule as the panel's own tab for who may post.
+if (($_GET['pane'] ?? '') === 'versions') {
+    echo '<div class="panel-body" data-pane="versions">'
+       . board_versions_html($pdo, $projectId, $stepId, $itemKey, !preview_blocks_saving())
+       . '</div>';
+    exit;
+}
+
 $t     = $detail['task'];
 $item  = $detail['item'];
 $crew  = board_assignees($pdo, $projectId);
