@@ -23,6 +23,7 @@ require_once __DIR__ . '/includes/board.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
 require_once __DIR__ . '/includes/naming.php';   // the show's file naming convention (067)
+require_once __DIR__ . '/includes/activity.php'; // log_status_change_by_id(), for the move to Pending review
 require_login();
 
 header('Content-Type: text/html; charset=utf-8');
@@ -36,6 +37,86 @@ $userId    = (int)($_SESSION['user_id'] ?? 0);
 function board_version_fail(string $why): void {
     echo '<p class="err">' . e($why) . '</p>';
     exit;
+}
+
+/**
+ * AN ASSIGNEE'S NEW VERSION SENDS THE TASK TO PENDING REVIEW (David, 2026-10-29:
+ * "when a new version is uploaded by the artist assign to that task, let's
+ * automatically change the status to pending review").
+ *
+ * Only when the uploader is named on the task (the primary assignee or a second
+ * name in progress_crew), so a supervisor or producer putting a file up does
+ * not move somebody else's work. The status is the show's own row called
+ * "Pending review", matched by name as REVIEW_STAGES and the self-serve list
+ * match it, because statuses are each show's data.
+ *
+ * ⚠ NEVER OUT OF AN APPROVED STATUS. Approved work is what seconds and
+ * statements are paid on; a file put up afterwards is left for a person to
+ * decide about rather than quietly un-approving it.
+ *
+ * Saved, logged and notified exactly as a status change on the board is
+ * (board_api.php): the same flags, the same bell, the same progress_log row.
+ *
+ * @return string a sentence to add to the upload's confirmation, or ''
+ */
+function board_version_to_review(PDO $pdo, int $projectId, array $step, string $itemKey,
+                                 int $progressId, string $taskName): string {
+    $me = (int)(effective_crew_id($pdo) ?? 0);
+    if ($me <= 0 || $progressId <= 0) return '';
+    $q = $pdo->prepare('SELECT id, crew_id, status_id FROM progress WHERE id = ?');
+    $q->execute([$progressId]);
+    $row = $q->fetch();
+    if (!$row) return '';
+    $mine = (int)$row['crew_id'] === $me;
+    if (!$mine) {
+        try {
+            $c = $pdo->prepare('SELECT 1 FROM progress_crew WHERE progress_id = ? AND crew_id = ?');
+            $c->execute([$progressId, $me]);
+            $mine = (bool)$c->fetchColumn();
+        } catch (PDOException $e) {
+            $mine = false;      // progress_crew is optional
+        }
+    }
+    if (!$mine) return '';
+
+    $map = statuses_by_id($pdo, $projectId);
+    $target = null;
+    foreach ($map as $st) {
+        if (strtolower(trim(preg_replace('/\s+/', ' ', (string)$st['name']))) === 'pending review') { $target = $st; break; }
+    }
+    if (!$target) return '';
+
+    $was = $row['status_id'] !== null ? (int)$row['status_id'] : null;
+    if ($was === (int)$target['id']) return '';
+    $cur = $was !== null ? ($map[$was] ?? null) : null;
+    if ($cur && status_flags($cur)['is_approved'] === 1) {
+        return 'The task stays ' . $cur['name'] . ': it is approved, so its status was not changed.';
+    }
+
+    $flags = status_flags($target);
+    $pdo->prepare('UPDATE progress SET status_id = ?, is_delivered = ?, is_approved = ? WHERE id = ?')
+        ->execute([(int)$target['id'], $flags['is_delivered'], $flags['is_approved'], $progressId]);
+
+    notify_add($pdo, notify_subscribers($pdo, $progressId), [
+        'kind'        => 'status',
+        'actor'       => current_user_display(),
+        'summary'     => $taskName . ' → ' . $target['name'],
+        'project_id'  => $projectId,
+        'step_id'     => (int)$step['id'],
+        'item_key'    => $itemKey,
+        'progress_id' => $progressId,
+    ], $me);
+
+    $kind = substr($itemKey, 0, 1);
+    $itemId = (int)substr($itemKey, 1);
+    log_status_change_by_id($pdo, $projectId, $step, $itemKey, $was, (int)$target['id'], [
+        'item_name'  => null,
+        'shot_id'    => $kind === 's' ? $itemId : null,
+        'asset_id'   => $kind === 'a' ? $itemId : null,
+        'source'     => 'version',
+        'changed_by' => current_user_display(),
+    ]);
+    return 'Status set to ' . $target['name'] . '.';
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') board_version_fail('This endpoint only accepts POST.');
@@ -184,6 +265,11 @@ if (isset($_POST['add_review'])) {
             $said = $res['saved'] === 1
                 ? ($label . ' sent for review.')
                 : ($res['saved'] . ' versions sent for review, now at ' . $label . '.');
+
+            // The assignee's upload moves the task to Pending review (2026-10-29).
+            $moved = board_version_to_review($pdo, $projectId, $detail['step'], $itemKey, $pid,
+                trim((string)$detail['step']['name'] . ' on ' . (string)$detail['item']['name'], ' on'));
+            if ($moved !== '') $said .= ' ' . $moved;
 
             // --- tell anybody the note named -------------------------------
             //
