@@ -1671,6 +1671,22 @@ tr.row-overdue td { background: var(--danger-tint); }
    ========================================================================== */
 
 .legend-panel { padding: 12px 16px; }
+/* THE KEY STAYS ON SCREEN (David, 2026-10-29: "let's make sticky header for
+   the color codes too"). Eleven colours are not memorised, and the key used to
+   scroll away the moment you went looking for a shot. It pins to the top of the
+   window; the grid below scrolls in its own box (.grid-scroll), which is cut to
+   what is left of the window under the key, so the grid's own sticky column
+   headings and the key are both visible at once instead of the box running off
+   the bottom of the screen. */
+.legend-panel {
+  position: sticky; top: 0; z-index: 20;
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+}
+.legend-panel + .panel .grid-scroll { max-height: max(300px, calc(100vh - 230px)); }
+@media print {
+  .legend-panel { position: static; box-shadow: none; }
+  .legend-panel + .panel .grid-scroll { max-height: none; overflow: visible; }
+}
 .legend-title { display: block; font-size: 13px; margin-bottom: 8px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

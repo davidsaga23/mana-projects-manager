@@ -30,6 +30,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Fields have a softer outline that firms up under the pointer; thin dark scrollbars.
 - Phases (b) project screens and (c) finance, people and admin screens follow as their own PRs.
 
+## 2026-10-29 — Files on a new task or ticket, from Studio Tasks and My tasks *(no migration)*
+
+- **The New task / New ticket dialog on Studio Tasks and My tasks takes attachments**: pick them,
+  drop them on the zone, or paste a screenshot anywhere in the form. Images, video or PDF, within
+  the usual upload limits; saved through `create_ticket()` like the project board's form.
+
 ## 2026-10-29 — Person / slot page in two columns *(no migration)*
 
 - The four panels on a person's page — **Details**, **Anima login**, **Days off** and **Terms and
