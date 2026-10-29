@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Copy link beside Resend link on the person page *(no migration)*
+
+- **Copy link** makes a fresh one-time login link and shows it on the page, with a Copy button,
+  instead of emailing it, for sending on WhatsApp or Slack. Same rules as Resend link: who may press
+  it, older unused links stop working, and it is logged ("copied by hand, not emailed"). A link that
+  was already emailed cannot be shown again, because Anima only stores a hash of it.
+
 ## 2026-10-29 — Aesthetic pass, phase (a): every screen borrows Spell's look *(no migration)*
 
 - **Nothing about content or behaviour changed**: the same words, fields, columns and buttons in
