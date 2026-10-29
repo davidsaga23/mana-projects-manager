@@ -4648,6 +4648,19 @@ brief (David, 2026-10-29: "Build from the brief").
   for David, `document_url` for Drive. Its "received" is status `pending` with a received date.
 - **Paying is one transaction** over the header and every line.
 
+## 2026-10-29 — Aesthetic pass (b) and (c) as one stylesheet change
+
+**Asked by David:** to go ahead with both (b) and (c) after (a) went live.
+
+**Decided:**
+- **One PR for both**, because neither needed any PHP: the screen-specific rules took Spell's tokens
+  in place, so the finance screens could be done without waiting for IN4 (which edits their
+  markup, not their styles).
+- **Which radius:** a panel or section `--radius-lg`, a card, tile or pop-up `--radius-md`, a field,
+  bar or banner `--radius`, a small button `--radius-sm`. Pills and tiny tags keep their own.
+- **Row hover is a `background-image` gradient** (`--row-hover`), never a background colour, so a
+  cell's own tint survives being pointed at.
+
 ## 2026-10-29 — A contract per position, with the person's terms as the default
 
 **Asked by David,** looking at Angelys Brunetti's Home: she *"should be able to see two different
