@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Person / slot page in two columns *(no migration)*
+
+- The four panels on a person's page — **Details**, **Anima login**, **Days off** and **Terms and
+  contract** — now sit in **two columns** instead of one, so the page is about one screen instead
+  of four and the right half of a wide screen is no longer empty.
+- **The tables above stay full width.** Pace step-by-step and Open tickets are five columns wide;
+  halving them would be worse than a long page.
+- Each panel is a card, and a panel somebody does not get (Terms is administrators-only, Days off
+  is hidden on a planning slot) leaves **no empty box** where it would have been.
+- One column again below 900px, where two genuinely do not fit.
+
 ## 2026-10-28 — Home: an artist's shows, logs, notes and invoice information on one page *(no migration)*
 
 - **New Home page (`home.php`)**, a **Home** button in the top bar for anybody whose login is linked
