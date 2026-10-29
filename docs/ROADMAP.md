@@ -963,7 +963,7 @@ the machine this was written on, and nothing here has been executed against real
 | The Studio: one project row that is not a show | `includes/studio.php` | 045 |
 | A CBB status | — | 046 |
 | Create a card from Studio Tasks, through one shared `create_ticket()` | `alltasks.php`, `includes/tickets.php` | — |
-| Budget pool — the show in days, derived from the plan | `includes/budgetpool.php` | none needed |
+| Budget pool — the show in days, derived from the plan (the projection's days since 2026-10-29) | `includes/budgetpool.php` | none needed |
 
 ### Revenue was added and removed in the same week
 
@@ -1019,7 +1019,10 @@ were deliberately left out:
 1. **Logged hours.** Used days currently come from the plan — each step's dated window measured
    to today, counting only slots with a real person in them — because nothing has been logged yet.
    `budget_pool()` already prefers `time_logs` whenever it holds anything, so this turns itself on;
-   what is untested is whether the switchover reads sensibly mid-show.
+   what is untested is whether the switchover reads sensibly mid-show. **2026-10-29:** it did
+   not — steps with no logs still counted the calendar under a "logged hours" label (fixed, #130).
+   The same day the pool itself changed meaning: it is now the expense projection's days, with
+   each step's dates shown beside it as capacity ("needs 48, dates allow 36").
 2. **A standard rate card per pipeline step.** David, 2026-10-16: "at some point all the day rates
    can be standardized per pipeline step... so all the slots for CH layout will be 200 each."
    Today the detail view reports one rate where the slots agree and a spread where they do not,

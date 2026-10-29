@@ -4683,3 +4683,35 @@ alone, so one rate priced every position she held on every show.
   that show only, so it needs no "every show" confirmation.
 - **Not changed:** historic fees (`includes/history.php`) still read each person's default rate, as
   they span several shows.
+
+## 2026-10-29 — The budget pool is the projection's days; the dates are capacity beside it
+
+**Asked by David,** on MSD: the Expense projection's days add up to 219, the Budget pool says 269.
+Why?
+
+**Why they differed:** they measured different things. The pool was each step's slots times the
+working days between its start date and deadline: the time the **dates allow**. The projection is
+items x days per item x the retake allowance, split across the people and rounded up to a whole
+day: the **work there is**. Steps with roomy windows (Animation 30 vs 12, File prep 28 vs 12)
+made the pool bigger; steps whose work does not fit (BG Color 48 vs 36) made it smaller. No step
+was counted twice; the gap was 50 days of slack net of 15 days of overload.
+
+**Decided (David chose "projection drives"):**
+- **The pool is the expense projection's Days**, read row for row in `budget_pool()`, so the two
+  screens cannot disagree. Freelancers are paid for the days they work, so the projection is what
+  the show costs. Supervision rows and per-second lanes stay out, as before.
+- **The window is kept as capacity**: "Dates allow" in the headline, and on every card either
+  "dates allow N days" or "needs X, dates allow Y — Z days short". A step without dates is still
+  in the pool (its work needs none) and is named as unchecked.
+- **Before time is logged, used days spread each person's share evenly over the window** to today,
+  rather than counting every calendar day, which would overdraw a roomy step on its first day.
+- **A person's budget in "Who is on it" is their Days on the projection**, times their day rate.
+- **The rate range on a card counts day rates only.** Grafiart's 1,500 flat fee was printed as
+  "180—1,500 a day".
+
+**Consequence:** the kick-off snapshot's "Budget pool, days" now records the projected days. Older
+snapshots keep what they recorded.
+
+**Fixed the same day (#130, a bug):** once any hour was logged on a show, steps with none still
+counted calendar days under a "from logged hours" label (MSD: 180.4 "used", about 6 logged). A
+step with nothing logged now counts 0 and says so.
