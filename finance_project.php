@@ -2340,7 +2340,11 @@ function invAddRows() {
           // does not know which is looking at is worse off than one who has no
           // number at all. ?>
     <span class="<?= $pool['source'] === 'plan' ? 'warn-text' : 'muted' ?> small">
-      <?= $pool['source'] === 'plan' ? 'from the plan, not logged hours' : 'from logged hours' ?></span></div>
+      <?= $pool['source'] === 'plan' ? 'from the plan, not logged hours' : 'from logged hours' ?></span>
+    <?php if ($pool['unlogged']): ?>
+      <span class="warn-text small"><?= count($pool['unlogged']) ?>
+        step<?= count($pool['unlogged']) === 1 ? ' has' : 's have' ?> none logged</span>
+    <?php endif; ?></div>
   <div><span class="muted small">Unused</span>
     <strong class="<?= $pool['days']['left'] < 0 ? 'err' : '' ?>">
       <?= e(fmt_num(abs($pool['days']['left']), 1)) ?> days</strong>
@@ -2385,6 +2389,10 @@ function invAddRows() {
   <?php else: ?>
     Used days are real logged hours divided by this project's
     <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day.
+    <?php if ($pool['unlogged']): ?>
+      A step nobody has logged time on counts as 0 used, not as the days its window has
+      run, so the two are never mixed: <?= e(implode(', ', $pool['unlogged'])) ?>.
+    <?php endif; ?>
   <?php endif; ?>
 </p>
 
