@@ -472,7 +472,22 @@ require __DIR__ . '/includes/header.php';
   </table>
 <?php endif; ?>
 
+<?php // ⚠ TWO COLUMNS FROM HERE DOWN (David, 2026-10-29: "let's use 2
+      // columns so you can better distribute all the contend of the slot
+      // profile detailed page"). Everything above is a WIDE TABLE — pace
+      // per step, open tickets — which a half-width column would make
+      // unreadable. Everything below is a panel of fields, and four of
+      // those stacked left the right-hand half of a 1800px screen empty
+      // while the page ran four screens deep.
+      //
+      // ⚠ auto-fit, NOT a fixed two columns: below about 880px there is no
+      // room for two, and the same rule drops them to one rather than
+      // squeezing a date pair into 200px. align-items:start so a short
+      // panel sits at the top of its row instead of stretching to match a
+      // tall one beside it. ?>
+<div class="person-grid">
 <?php if (can_edit()): ?>
+  <div class="person-panel">
 <h3>Details</h3>
 <form method="post" class="stack">
   <input type="hidden" name="save_details" value="1">
@@ -519,9 +534,11 @@ require __DIR__ . '/includes/header.php';
   <?php endif; ?>
   <div class="actions"><button type="submit">Save details</button></div>
 </form>
+  </div>
 <?php endif; ?>
 
 <?php if ($loginPanel): ?>
+  <div class="person-panel">
   <h3 id="login">Anima login</h3>
   <?php if (!invites_available($pdo)): ?>
     <p class="muted small">
@@ -615,9 +632,11 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
     <?php endif; ?>
   <?php endif; ?>
+  </div>
 <?php endif; ?>
 
 <?php if (absences_available($pdo) && !$isSlot): ?>
+  <div class="person-panel">
   <h3 id="days-off">Days off</h3>
   <p class="muted small">
     Holidays, leave, a course, any day <?= e($person['name']) ?> is away while the studio works.
@@ -666,6 +685,7 @@ require __DIR__ . '/includes/header.php';
       <div class="actions"><button type="submit">Add days off</button></div>
     </form>
   <?php endif; ?>
+  </div>
 <?php endif; ?>
 
 <?php // ---- ADMIN ONLY. money.php returns nothing at all for anyone else, so a
@@ -675,6 +695,7 @@ require __DIR__ . '/includes/header.php';
       // returns nothing at all for a non-admin — so a missing check here would
       // render an empty box rather than leak. ---- ?>
 <?php if (can_see_money()): ?>
+  <div class="person-panel">
   <h3>Terms and contract <span class="admin-only-tag">administrators only</span></h3>
 
   <?php if ($termsError !== null): ?>
@@ -866,7 +887,9 @@ require __DIR__ . '/includes/header.php';
       </details>
     <?php endif; ?>
   <?php endif; ?>
+  </div>
 <?php endif; ?>
+</div><!-- .person-grid -->
 
 </div>
 </body></html>
