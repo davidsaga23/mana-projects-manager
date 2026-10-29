@@ -303,14 +303,9 @@ function home_fx(int $crewId, int $projectId): array {
  * Returns ['lines' => [...], 'totals' => [currency => amount], 'outside' => minutes]
  */
 function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
-                            string $monthFrom, string $monthTo): array {
+                            string $monthFrom, string $monthTo, array $posTerms = []): array {
     $out = ['lines' => [], 'totals' => [], 'outside' => 0];
     if (!$shows || !time_logs_available($pdo)) return $out;
-
-    $rate = ($terms && $terms['day_rate'] !== null) ? (float)$terms['day_rate'] : null;
-    $unit = (string)($terms['rate_unit'] ?? 'day');
-    if (!in_array($unit, ['day', 'hour', 'second', 'flat'], true)) $unit = 'day';
-    $cur  = strtoupper((string)($terms['rate_currency'] ?? 'USD')) ?: 'USD';
 
     $in = implode(',', array_map('intval', array_keys($shows)));
     $hasTicketStep = column_exists($pdo, 'tickets', 'step_id');
@@ -358,12 +353,25 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
     foreach ($shows as $pid => $show) {
         if (empty($minutes[$pid])) continue;
         $fx = home_fx($crewId, (int)$pid);
-        $usdRate = null;
-        if ($rate !== null && $cur !== 'USD' && function_exists('fx_to_usd')) {
-            $usdRate = fx_to_usd($rate, $cur, $fx);
-        }
         $hpd = (float)$show['hours_per_day'];
+        // ⚠ THE CONTRACT EACH LINE IS PAID ON (finance_install_12, 2026-10-29):
+        // a position's own when it has one, else — as on the statement — the
+        // show's supervision contract when they hold one with its own terms,
+        // else their default. $posTerms is [project id][step id] => row.
+        $showPos = $posTerms[(int)$pid] ?? [];
+        $restTerms = $terms;
+        foreach ($showPos as $psid => $pt) if ((int)$psid < 0) { $restTerms = $pt; break; }
         foreach ($minutes[$pid] as $sid => $m) {
+            $lt = ($sid > 0 && isset($showPos[$sid])) ? $showPos[$sid] : $restTerms;
+            $ownContract = $lt !== $terms;
+            $rate = ($lt && $lt['day_rate'] !== null) ? (float)$lt['day_rate'] : null;
+            $unit = (string)($lt['rate_unit'] ?? 'day');
+            if (!in_array($unit, ['day', 'hour', 'second', 'flat'], true)) $unit = 'day';
+            $cur  = strtoupper((string)($lt['rate_currency'] ?? 'USD')) ?: 'USD';
+            $usdRate = null;
+            if ($rate !== null && $cur !== 'USD' && function_exists('fx_to_usd')) {
+                $usdRate = fx_to_usd($rate, $cur, $fx);
+            }
             $hours = $m / 60;
             $qty = null; $qtyLabel = '';
             if ($unit === 'day') {
@@ -388,6 +396,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
             $out['lines'][] = [
                 'project'    => $show['project'],
                 'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Step') : 'Other work on the show',
+                'own_contract' => $ownContract,
                 'unit'       => $unit,
                 'rate'       => $rate,
                 'rate_phrase'=> home_rate_phrase($rate, $unit, $cur, $usdRate),

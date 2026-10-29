@@ -103,9 +103,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // is overwritten. The unit and currency are NOT posted at all: this
             // column edits one number, and a hidden field carrying the other two
             // would be a second copy of them, free to drift.
-            $existing = crew_term($crewId) ?? [];
-            $merged = array_merge($existing, ['day_rate' => $_POST['day_rate'] ?? '']);
-            flash('ok', save_crew_terms($crewId, $name, $merged, $who));
+            // A ROW ON A POSITION'S OWN CONTRACT (finance_install_12, David
+            // 2026-10-29) saves to that contract, not to the person's default:
+            // the box shows the position's rate, so that is what it edits. The
+            // step must be one this person holds here, same check as the crew.
+            $stepId = (int)($_POST['step_id'] ?? 0);
+            if ($stepId !== 0) {
+                $posName = '';
+                foreach (project_positions($pdo, $projectId) as $l) {
+                    if ($l['crew_id'] === $crewId && $l['step_id'] === $stepId) { $posName = $l['step_name']; break; }
+                }
+                $own = position_terms_for([$crewId], $projectId)[$crewId . '|' . $stepId] ?? null;
+                if ($posName === '' || !$own) {
+                    throw new RuntimeException('That position has no contract of its own on this project, so no rate was saved.');
+                }
+                flash('ok', save_position_terms($crewId, $name, $projectId, $stepId, $posName,
+                    array_merge($own, ['day_rate' => $_POST['day_rate'] ?? '']), $who));
+            } else {
+                $existing = crew_term($crewId) ?? [];
+                $merged = array_merge($existing, ['day_rate' => $_POST['day_rate'] ?? '']);
+                flash('ok', save_crew_terms($crewId, $name, $merged, $who));
+            }
 
         } elseif (isset($_POST['bulk_rates'])) {
             // ONE RATE, MANY ROWS. Ticked in the projection table, applied here
@@ -115,13 +133,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             //
             // Everybody is checked against this project's lanes, same as the
             // single box: an id the table did not draw cannot be written to.
-            $onShow = [];
+            $onShow = []; $posNames = [];
             foreach (project_positions($pdo, $projectId) as $l) {
                 $onShow[$l['crew_id']] = ['name' => $l['crew_name'], 'slot' => $l['is_placeholder']];
+                $posNames[$l['crew_id'] . '|' . $l['step_id']] = $l['step_name'];
             }
-            $ids = array_unique(array_map('intval', (array)($_POST['crew_ids'] ?? [])));
-            $ids = array_values(array_filter($ids, fn($id) => isset($onShow[$id])));
-            if (!$ids) {
+            // A ticked row on a POSITION'S OWN CONTRACT posts "crewId:stepId"
+            // and is set on that contract; every other row posts the crew id and
+            // sets the person's default, as before (finance_install_12).
+            $ids = []; $posPicks = [];
+            foreach ((array)($_POST['crew_ids'] ?? []) as $v) {
+                $parts = explode(':', (string)$v);
+                $cid = (int)$parts[0];
+                if (!isset($onShow[$cid])) continue;
+                if (isset($parts[1]) && (int)$parts[1] !== 0) {
+                    $sid = (int)$parts[1];
+                    if (isset($posNames[$cid . '|' . $sid])) $posPicks[$cid . '|' . $sid] = [$cid, $sid];
+                } else {
+                    $ids[$cid] = $cid;
+                }
+            }
+            $ids = array_values($ids);
+            if (!$ids && !$posPicks) {
                 throw new RuntimeException('No ticked row is on this project, so no rate was saved.');
             }
 
@@ -155,7 +188,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 save_crew_terms($id, $onShow[$id]['name'],
                     array_merge($existing, ['day_rate' => $rate]), $who);
             }
-            $n = count($ids);
+            if ($posPicks) {
+                $ownAll = position_terms_for(array_values(array_unique(array_map(fn($p) => $p[0], $posPicks))), $projectId);
+                foreach ($posPicks as $key => [$cid, $sid]) {
+                    if (!isset($ownAll[$key])) continue;
+                    save_position_terms($cid, $onShow[$cid]['name'], $projectId, $sid, $posNames[$key],
+                        array_merge($ownAll[$key], ['day_rate' => $rate]), $who);
+                }
+            }
+            $n = count($ids) + count($posPicks);
             $said = sprintf('Rate %s applied to %d row%s.', $clean, $n, $n === 1 ? '' : 's');
             if ($people) {
                 $said .= ' Changed on every show for: ' . implode(', ', $people) . '.';
@@ -1459,7 +1500,8 @@ if ($retakePct <= 0):
           <td class="wf-name">
             <?php if ($r['crew_id']): ?>
               <input type="checkbox" class="bulk-row" form="bulk-rates" name="crew_ids[]"
-                     value="<?= (int)$r['crew_id'] ?>" data-dept="<?= e($dept) ?>"
+                     value="<?= (int)$r['crew_id'] ?><?= !empty($r['own_position']) ? ':' . (int)$r['step']['id'] : '' ?>"
+                     data-own="<?= !empty($r['own_position']) ? '1' : '0' ?>" data-dept="<?= e($dept) ?>"
                      data-role="<?= e((string)$r['role']) ?>" data-slot="<?= $r['is_slot'] ? '1' : '0' ?>"
                      data-name="<?= e((string)$r['artist']) ?>"
                      aria-label="Tick <?= e((string)$r['artist']) ?> for a bulk rate">
@@ -1477,7 +1519,9 @@ if ($retakePct <= 0):
           <?php // EDITABLE HERE. A rate belongs to a PERSON, not to this row —
                 // crew_terms is keyed on crew_id alone — so setting it here sets
                 // it everywhere that person appears, on this project and every
-                // other. The note under the table says so, because two rows for
+                // other. The exception is a position with its OWN contract
+                // (finance_install_12, 2026-10-29): its box edits that contract,
+                // on this show only, and says "own contract". The note under the table says so, because two rows for
                 // the same artist changing together would otherwise look like a
                 // bug.
                 //
@@ -1492,6 +1536,9 @@ if ($retakePct <= 0):
               <form method="post" class="rate-edit">
                 <input type="hidden" name="set_rate" value="1">
                 <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">
+                <?php if (!empty($r['own_position'])): ?>
+                  <input type="hidden" name="step_id" value="<?= (int)$r['step']['id'] ?>">
+                <?php endif; ?>
                 <?php // Saves on leaving the field, the same submit-on-change the
                       // role picker and the status dropdown use. ?>
                 <input name="day_rate" inputmode="decimal" size="6" onchange="this.form.submit()"
@@ -1499,6 +1546,9 @@ if ($retakePct <= 0):
                        placeholder="set" aria-label="Day rate for <?= e((string)$r['artist']) ?>"
                        class="<?= $r['rate'] === null ? 'rate-unset' : '' ?>">
                 <span class="muted"><?= e($r['currency'] ?: 'USD') ?> / <?= e($r['rate_unit'] ?: 'day') ?></span>
+                <?php if (!empty($r['own_position'])): ?>
+                  <div class="muted small" title="This position has its own contract on this show; the box changes it here only">own contract</div>
+                <?php endif; ?>
                 <?php // The box is the CONTRACT's rate, in its own currency; the
                       // dollars it is costed at sit beside it (2026-10-28). ?>
                 <?php if (!empty($r['fx']) && $r['rate_usd'] !== null): ?>
@@ -1620,7 +1670,8 @@ if ($retakePct <= 0):
       if (form.day_rate.value.trim() === '') { ev.preventDefault(); alert('Type the rate to apply.'); return; }
       var people = [];
       picked.forEach(function (b) {
-        if (b.dataset.slot !== '1' && people.indexOf(b.dataset.name) < 0) { people.push(b.dataset.name); }
+        // A position with its own contract changes on this show only.
+        if (b.dataset.slot !== '1' && b.dataset.own !== '1' && people.indexOf(b.dataset.name) < 0) { people.push(b.dataset.name); }
       });
       form.confirm_people.value = '0';
       if (people.length) {
@@ -2163,6 +2214,12 @@ function invAddRows() {
     require_once __DIR__ . '/includes/statements.php';
     $stPeople = statement_people($pdo, $projectId);
     $stTerms = crew_terms(array_keys($stPeople));
+    // Positions with a contract of their own (finance_install_12), per person:
+    // [crew id][step id] => row, the shape artist_statement() takes.
+    $stPos = [];
+    foreach (position_terms_for(array_keys($stPeople), $projectId) as $row) {
+        $stPos[(int)$row['crew_id']][(int)$row['step_id']] = $row;
+    }
     $stInv = [];
     foreach (project_invoices($projectId) as $inv) $stInv[(int)$inv['crew_id']][] = $inv;
     $stProj = expense_projection($pdo, $projectId);
@@ -2195,7 +2252,7 @@ function invAddRows() {
       $stTot = ['planned_days' => 0.0, 'hours' => 0.0, 'days' => 0.0, 'approved_seconds' => 0.0];
       $stMoney = [];   // currency => ['due' =>, 'invoiced' =>, 'left' =>]
       foreach ($stPeople as $cid => $name):
-          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj, $fxRates);
+          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj, $fxRates, $stPos[$cid] ?? []);
           $w = $st['window'];
           $cur = $st['currency'];
           foreach ($stTot as $k => $v) $stTot[$k] = $v + (float)$st[$k];
@@ -2211,7 +2268,7 @@ function invAddRows() {
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
             <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their steps">steps</span><?php endif; ?>
           </td>
-          <td class="small"><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?>
+          <td class="small"><?php if (count($st['lines']) > 1): ?><?= count($st['lines']) ?> contracts<br><span class="muted">see the statement</span><?php else: ?><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?><?php endif; ?>
             <?php if ($st['fx'] && $st['rate_usd'] !== null): ?><br><span class="muted">= <?= e(number_format($st['rate_usd'], 2)) ?> USD</span><?php endif; ?></td>
           <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
           <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h<br><span class="muted small"><?= e(fmt_num($st['days'], 2)) ?> d</span></td>

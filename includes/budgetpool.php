@@ -149,6 +149,9 @@ function budget_pool(PDO $pdo, array $project): array {
     $lanes = project_lanes($pdo, $projectId);
     $crewIds = array_values(array_unique(array_map(fn($l) => (int)$l['crew_id'], $lanes)));
     $terms   = $crewIds ? crew_terms($crewIds) : [];
+    // A position's own contract wins over the person's default
+    // (finance_install_12, 2026-10-29), as in expense_projection().
+    $posTerms = $crewIds ? position_terms_for($crewIds, (int)$projectId) : [];
 
     $logged  = pool_logged_days($pdo, $projectId, $hpd);
     $source  = $logged ? 'logged' : 'plan';
@@ -162,7 +165,7 @@ function budget_pool(PDO $pdo, array $project): array {
         $stepId = (int)$l['step_id'];
         $start  = (string)($l['step_start'] ?? '');
         $end    = (string)($l['step_deadline'] ?? '');
-        $t      = $terms[(int)$l['crew_id']] ?? null;
+        $t      = $posTerms[(int)$l['crew_id'] . '|' . $stepId] ?? ($terms[(int)$l['crew_id']] ?? null);
         $unit   = strtolower(trim((string)($t['rate_unit'] ?? 'day')));
         $perSec = str_contains($unit, 'sec');
 
@@ -284,7 +287,7 @@ function budget_pool(PDO $pdo, array $project): array {
         $rate = null;
         foreach ($lanes as $l) {
             if ((int)$l['step_id'] !== $stepId) continue;
-            $t = $terms[(int)$l['crew_id']] ?? null;
+            $t = $posTerms[(int)$l['crew_id'] . '|' . $stepId] ?? ($terms[(int)$l['crew_id']] ?? null);
             if ($t && $t['day_rate'] !== null
                 && str_contains(strtolower((string)($t['rate_unit'] ?? '')), 'sec')) {
                 $rate = (float)$t['day_rate'];
@@ -523,6 +526,9 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source)
         fn($l) => (int)$l['step_id'] === $stepId));
     $crewIds = array_values(array_unique(array_map(fn($l) => (int)$l['crew_id'], $lanes)));
     $terms   = $crewIds ? crew_terms($crewIds) : [];
+    // A position's own contract wins over the person's default
+    // (finance_install_12, 2026-10-29), as in expense_projection().
+    $posTerms = $crewIds ? position_terms_for($crewIds, (int)$projectId) : [];
     $billed  = function_exists('invoiced_by_position') ? invoiced_by_position($projectId) : [];
 
     // Logged days per person on this step, through the progress row the time
@@ -576,7 +582,7 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source)
     $currency = '';
     foreach ($lanes as $l) {
         $cid  = (int)$l['crew_id'];
-        $t    = $terms[$cid] ?? null;
+        $t    = $posTerms[$cid . '|' . $stepId] ?? ($terms[$cid] ?? null);
         $unit = strtolower(trim((string)($t['rate_unit'] ?? 'day')));
         if (str_contains($unit, 'sec')) continue;     // no day budget to be over
         $start = (string)($l['step_start'] ?? '');

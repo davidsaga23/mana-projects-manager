@@ -222,6 +222,146 @@ function own_invoices_all(int $crewId, int $limit = 24): array {
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * A CONTRACT PER POSITION (David, 2026-10-29; finance_install_12).
+ *
+ * "For Angelys she should be able to see two different contracts one for CH
+ * layout and other for the rest." crew_terms stays the person's DEFAULT
+ * contract; a position_terms row is an exception for ONE position on ONE show,
+ * keyed (crew_id, project_id, step_id), step_id being a pipeline step or MINUS
+ * a supervision position (the invoices convention, DECISIONS 2026-10-26).
+ *
+ * Every reader asks term_for_position(): the position's own row when there is
+ * one, otherwise the person's default. So a person with no exceptions is priced
+ * exactly as before, and nothing has to know the table exists to keep working.
+ * ------------------------------------------------------------------------ */
+
+/** Has finance_install_12 been imported? Admin view only (finance_column_exists() is). */
+function position_terms_available(): bool {
+    return finance_column_exists('position_terms', 'step_id');
+}
+
+/**
+ * Every position contract on one project for a set of people, keyed
+ * "crewId|stepId". Empty for a non-admin, and before finance_install_12.
+ *
+ * @param int[] $crewIds
+ */
+function position_terms_for(array $crewIds, int $projectId): array {
+    if (!can_see_money() || !$crewIds) return [];
+    $db = finance_db();
+    if (!$db) return [];
+    $ids = implode(',', array_map('intval', $crewIds));
+    try {
+        $q = $db->prepare("SELECT * FROM position_terms WHERE project_id = ? AND crew_id IN ({$ids})");
+        $q->execute([$projectId]);
+    } catch (PDOException $e) {
+        return [];      // before finance_install_12
+    }
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = $r;
+    return $out;
+}
+
+/**
+ * A person's OWN position contracts, [project id][step id] => row; empty for
+ * anybody else's (unless admin). Same door as own_crew_term(). Optionally one
+ * project only.
+ */
+function own_position_terms(int $crewId, ?int $projectId = null): array {
+    $db = money_own_db($crewId);
+    if (!$db) return [];
+    try {
+        $sql = 'SELECT * FROM position_terms WHERE crew_id = ?' . ($projectId ? ' AND project_id = ?' : '');
+        $q = $db->prepare($sql);
+        $q->execute($projectId ? [$crewId, $projectId] : [$crewId]);
+    } catch (PDOException $e) {
+        return [];      // before finance_install_12
+    }
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['project_id']][(int)$r['step_id']] = $r;
+    return $out;
+}
+
+/**
+ * The terms one position is paid on: its own contract when it has one,
+ * otherwise the person's default. The row that comes back carries
+ * `own_position` (true / false) so a screen can say which it is showing.
+ *
+ * @param array $byStep [step id => position_terms row] for this person and show
+ */
+function term_for_position(?array $default, array $byStep, int $stepId): ?array {
+    if (isset($byStep[$stepId])) return $byStep[$stepId] + ['own_position' => true];
+    return $default ? $default + ['own_position' => false] : null;
+}
+
+/**
+ * Save one position's own contract. Admin only, like every write in this file.
+ * The caller checks the position is this person's on this show; this checks
+ * who is asking and what is being stored.
+ */
+function save_position_terms(int $crewId, string $crewName, int $projectId, int $stepId,
+                             string $positionName, array $in, string $who = ''): string {
+    if (!can_see_money()) {
+        throw new RuntimeException('Only an administrator can change pay terms.');
+    }
+    $db = finance_db();
+    if (!$db) throw new RuntimeException('The finance database is not set up yet, so there is nowhere to save this.');
+    if (!position_terms_available()) {
+        throw new RuntimeException('A contract per position needs finance_install_12.sql, imported by hand into '
+            . 'the finance database. Nothing was saved.');
+    }
+    if ($crewId <= 0 || $projectId <= 0 || $stepId === 0) {
+        throw new RuntimeException('That position could not be found, nothing was saved.');
+    }
+
+    [$rateVal, $unit, $cur, $url] = terms_input($in);
+    [$cStatus, $cSent, $cSigned] = contract_input($in);
+    $args = [$crewId, $crewName, $projectId, $stepId, mb_substr($positionName, 0, 150), $rateVal, $unit, $cur,
+             $url !== '' ? $url : null, $cStatus, $cSent, $cSigned];
+
+    $db->prepare(
+        'INSERT INTO position_terms (crew_id, crew_name, project_id, step_id, position_name, day_rate,
+                rate_unit, rate_currency, contract_url, contract_status, contract_sent_date,
+                contract_signed_date, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE crew_name = VALUES(crew_name), position_name = VALUES(position_name),
+                day_rate = VALUES(day_rate), rate_unit = VALUES(rate_unit),
+                rate_currency = VALUES(rate_currency), contract_url = VALUES(contract_url),
+                contract_status = VALUES(contract_status), contract_sent_date = VALUES(contract_sent_date),
+                contract_signed_date = VALUES(contract_signed_date), updated_by = VALUES(updated_by)'
+    )->execute(array_merge($args, [$who]));
+
+    $db->prepare(
+        'INSERT INTO position_terms_log (crew_id, crew_name, project_id, step_id, position_name, day_rate,
+                rate_unit, rate_currency, contract_url, contract_status, contract_sent_date,
+                contract_signed_date, removed, changed_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)'
+    )->execute(array_merge($args, [$who]));
+
+    $said = $positionName . ' has its own contract: '
+          . ($rateVal === null ? 'no rate recorded' : fmt_money($rateVal, $unit, $cur)) . '.';
+    if ($cStatus !== 'none') $said .= ' Contract ' . contract_state_phrase($cStatus, $cSent, $cSigned) . '.';
+    return $said;
+}
+
+/** Take a position's own contract away, so it is paid on the person's default again. */
+function remove_position_terms(int $crewId, string $crewName, int $projectId, int $stepId,
+                               string $positionName, string $who = ''): string {
+    if (!can_see_money()) {
+        throw new RuntimeException('Only an administrator can change pay terms.');
+    }
+    $db = finance_db();
+    if (!$db || !position_terms_available()) throw new RuntimeException('There is no position contract to remove.');
+    $db->prepare('DELETE FROM position_terms WHERE crew_id = ? AND project_id = ? AND step_id = ?')
+       ->execute([$crewId, $projectId, $stepId]);
+    $db->prepare(
+        'INSERT INTO position_terms_log (crew_id, crew_name, project_id, step_id, position_name, removed, changed_by)
+         VALUES (?, ?, ?, ?, ?, 1, ?)'
+    )->execute([$crewId, $crewName, $projectId, $stepId, mb_substr($positionName, 0, 150), $who]);
+    return $positionName . ' is paid on ' . $crewName . "'s default contract again.";
+}
+
 /**
  * Save one person's terms into the finance database.
  *
@@ -240,34 +380,10 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         );
     }
 
-    $rate = trim((string)($in['day_rate'] ?? ''));
-    if ($rate === '') {
-        $rateVal = null;
-    } else {
-        // Accept "1,200.00" and "$1200" — people paste from a spreadsheet.
-        $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rate));
-        if ($clean === '' || !is_numeric($clean)) {
-            throw new RuntimeException('"' . $rate . '" is not a number, nothing was saved.');
-        }
-        $rateVal = round((float)$clean, 2);
-        if ($rateVal < 0) throw new RuntimeException('A rate cannot be negative.');
-    }
-
-    $unit = in_array($in['rate_unit'] ?? '', RATE_UNITS, true) ? $in['rate_unit'] : 'day';
-
-    $cur = strtoupper(trim((string)($in['rate_currency'] ?? 'USD')));
-    if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
-
-    $url = trim((string)($in['contract_url'] ?? ''));
-    if ($url !== '') {
-        // http/https only. A javascript: or data: URL here is a link an admin
-        // clicks from a page that already trusts them.
-        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
-        if (!in_array($scheme, ['http', 'https'], true)) {
-            throw new RuntimeException('A contract link must start with http:// or https://, nothing was saved.');
-        }
-        if (mb_strlen($url) > 500) throw new RuntimeException('That link is too long to store.');
-    }
+    // The rate and the contract are read the same way for a person's default
+    // terms and for one position's own (position_terms, finance_install_12):
+    // terms_input() and contract_input() below, so the two cannot drift.
+    [$rateVal, $unit, $cur, $url] = terms_input($in);
 
     // Contract state, added by finance_install_04.sql. Guarded rather than
     // assumed: this app has to keep working against a finance database one file
@@ -275,24 +391,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
     // that takes the whole page down — which is exactly how the Finance hub fell
     // over on invoices.step_id.
     $hasContract = finance_column_exists('crew_terms', 'contract_status');
-    $cStatus = $cSent = $cSigned = null;
-    if ($hasContract) {
-        $cStatus = in_array($in['contract_status'] ?? '', CONTRACT_STATES, true)
-            ? $in['contract_status'] : 'none';
-        $asDate = function ($v) {
-            $v = trim((string)$v);
-            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
-        };
-        $cSent   = $asDate($in['contract_sent_date'] ?? '');
-        $cSigned = $asDate($in['contract_signed_date'] ?? '');
-
-        // "Signed" with no date is a fact nobody can check later, and a date
-        // with a contradicting status is worse than either alone. The same rule
-        // save_invoice() applies to paid_date, for the same reason.
-        if ($cStatus === 'signed' && $cSigned === null) $cSigned = date('Y-m-d');
-        if ($cSigned !== null && $cStatus !== 'signed') $cStatus = 'signed';
-        if ($cStatus === 'sent' && $cSent === null)     $cSent = date('Y-m-d');
-    }
+    [$cStatus, $cSent, $cSigned] = $hasContract ? contract_input($in) : [null, null, null];
 
     // The column list is built rather than written out twice, because the
     // alternative is splicing placeholders into a SQL string by offset — which
@@ -339,6 +438,63 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         $said .= ' Contract ' . contract_state_phrase($cStatus, $cSent, $cSigned) . '.';
     }
     return $said;
+}
+
+/**
+ * The rate, unit, currency and contract link from a terms form, checked.
+ * [rate or null, unit, currency, link ('' for none)]. Throws on anything that
+ * would store a number nobody meant.
+ */
+function terms_input(array $in): array {
+    $rate = trim((string)($in['day_rate'] ?? ''));
+    if ($rate === '') {
+        $rateVal = null;
+    } else {
+        // Accept "1,200.00" and "$1200" — people paste from a spreadsheet.
+        $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $rate));
+        if ($clean === '' || !is_numeric($clean)) {
+            throw new RuntimeException('"' . $rate . '" is not a number, nothing was saved.');
+        }
+        $rateVal = round((float)$clean, 2);
+        if ($rateVal < 0) throw new RuntimeException('A rate cannot be negative.');
+    }
+
+    $unit = in_array($in['rate_unit'] ?? '', RATE_UNITS, true) ? $in['rate_unit'] : 'day';
+
+    $cur = strtoupper(trim((string)($in['rate_currency'] ?? 'USD')));
+    if (!preg_match('/^[A-Z]{3}$/', $cur)) $cur = 'USD';
+
+    $url = trim((string)($in['contract_url'] ?? ''));
+    if ($url !== '') {
+        // http/https only. A javascript: or data: URL here is a link an admin
+        // clicks from a page that already trusts them.
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            throw new RuntimeException('A contract link must start with http:// or https://, nothing was saved.');
+        }
+        if (mb_strlen($url) > 500) throw new RuntimeException('That link is too long to store.');
+    }
+    return [$rateVal, $unit, $cur, $url];
+}
+
+/** The contract status and its two dates from a terms form. [status, sent, signed] */
+function contract_input(array $in): array {
+    $cStatus = in_array($in['contract_status'] ?? '', CONTRACT_STATES, true)
+        ? $in['contract_status'] : 'none';
+    $asDate = function ($v) {
+        $v = trim((string)$v);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
+    };
+    $cSent   = $asDate($in['contract_sent_date'] ?? '');
+    $cSigned = $asDate($in['contract_signed_date'] ?? '');
+
+    // "Signed" with no date is a fact nobody can check later, and a date
+    // with a contradicting status is worse than either alone. The same rule
+    // save_invoice() applies to paid_date, for the same reason.
+    if ($cStatus === 'signed' && $cSigned === null) $cSigned = date('Y-m-d');
+    if ($cSigned !== null && $cStatus !== 'signed') $cStatus = 'signed';
+    if ($cStatus === 'sent' && $cSent === null)     $cSent = date('Y-m-d');
+    return [$cStatus, $cSent, $cSigned];
 }
 
 /**

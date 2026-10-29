@@ -219,6 +219,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_terms'])) {
     exit;
 }
 
+// --- a contract for ONE position (admin only; finance_install_12) -----------
+// David, 2026-10-29: Angelys "should be able to see two different contracts one
+// for CH layout and other for the rest". The terms above stay the default; this
+// saves (or removes) an exception for one position she holds on THIS show.
+// The position is checked against project_positions() — the same list the
+// projection is drawn from — so a posted step id that is not hers here, on this
+// show, cannot be written to. money.php checks who is asking.
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && (isset($_POST['save_position_terms']) || isset($_POST['remove_position_terms']))) {
+    try {
+        $stepId = (int)($_POST['step_id'] ?? 0);
+        $posName = '';
+        foreach (project_positions($pdo, $projectId) as $l) {
+            if ($l['crew_id'] === $crewId && $l['step_id'] === $stepId) { $posName = $l['step_name']; break; }
+        }
+        if ($stepId === 0 || $posName === '') {
+            throw new RuntimeException($person['name'] . ' does not hold that position on this show, nothing was saved.');
+        }
+        flash('ok', isset($_POST['remove_position_terms'])
+            ? remove_position_terms($crewId, (string)$person['name'], $projectId, $stepId, $posName, current_user_display())
+            : save_position_terms($crewId, (string)$person['name'], $projectId, $stepId, $posName, $_POST,
+                                  current_user_display()));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: ' . $selfUrl . '#position-terms');
+    exit;
+}
+
 $summary = person_summary($pdo, $projectId, $crewId);
 $pace    = person_pace($pdo, $projectId, $crewId, $summary['steps']);
 // Reads the finance database. Null for a non-admin, for an unconfigured
@@ -232,6 +261,16 @@ try {
 }
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
+
+// The positions this person holds on this show, and which have a contract of
+// their own (finance_install_12). Admin only, like everything about money here.
+$myPositions = []; $myPosTerms = [];
+if (can_see_money()) {
+    foreach (project_positions($pdo, $projectId) as $l) {
+        if ($l['crew_id'] === $crewId) $myPositions[$l['step_id']] = $l['step_name'];
+    }
+    foreach (position_terms_for([$crewId], $projectId) as $row) $myPosTerms[(int)$row['step_id']] = $row;
+}
 
 // When they are on this show, and whether the plan agrees. The scheduler plans
 // around these dates since 2026-10-22, but only when it is RE-RUN — a saved
@@ -829,6 +868,90 @@ require __DIR__ . '/includes/header.php';
       </div>
     </form>
 
+    <?php // ---- A CONTRACT PER POSITION (David, 2026-10-29; finance_install_12).
+          // The form above is the DEFAULT, used by every position that has none
+          // of its own. A position given its own contract here is priced, counted
+          // on the statement and shown on the person's Home at that one. ---- ?>
+    <?php if ($myPositions && !$isSlot): ?>
+      <h4 id="position-terms" style="margin:22px 0 6px;">A contract per position</h4>
+      <?php if (!position_terms_available()): ?>
+        <p class="muted small warn-text">Giving one position its own contract needs
+          <code>finance_install_12.sql</code>, imported by hand into the finance database. Until then every
+          position below is paid on the terms above.</p>
+      <?php else: ?>
+        <p class="muted small">Every position <?= e($person['name']) ?> holds on this show is paid on the terms
+          above unless it has its own contract here. Use this when one position is a different deal, for
+          example CH Layout per second and the rest per day.</p>
+        <table class="review-table">
+          <thead><tr><th>Position</th><th>Paid on</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach ($myPositions as $sid => $pname): $pt = $myPosTerms[$sid] ?? null; ?>
+            <tr>
+              <td><?= e($pname) ?><?= $sid < 0 ? ' <span class="muted small">(supervision)</span>' : '' ?></td>
+              <td>
+                <?php if ($pt): ?>
+                  <strong><?= e(fmt_money($pt['day_rate'] === null ? null : (float)$pt['day_rate'],
+                                          (string)$pt['rate_unit'], (string)$pt['rate_currency'])) ?></strong>
+                  <span class="muted small">· own contract<?= !empty($pt['contract_status']) && $pt['contract_status'] !== 'none'
+                      ? ', ' . e(contract_state_phrase($pt['contract_status'], $pt['contract_sent_date'], $pt['contract_signed_date'])) : '' ?></span>
+                <?php else: ?>
+                  <span class="muted">The default terms above</span>
+                <?php endif; ?>
+              </td>
+              <td>
+                <details class="inline-actions">
+                  <summary class="row-btn"><?= $pt ? 'Edit' : 'Give it its own contract' ?></summary>
+                  <form method="post" class="stack">
+                    <input type="hidden" name="save_position_terms" value="1">
+                    <input type="hidden" name="step_id" value="<?= (int)$sid ?>">
+                    <div class="row">
+                      <label>Rate
+                        <input name="day_rate" inputmode="decimal" placeholder="e.g. 350.00"
+                               value="<?= e($pt && $pt['day_rate'] !== null ? fmt_num((float)$pt['day_rate'], 2) : '') ?>"></label>
+                      <label>Per
+                        <select name="rate_unit">
+                          <?php foreach (['day' => 'per day', 'hour' => 'per hour', 'second' => 'per second of footage',
+                                          'flat' => 'flat fee'] as $k => $lbl): ?>
+                            <option value="<?= $k ?>" <?= ($pt['rate_unit'] ?? ($terms['rate_unit'] ?? 'day')) === $k ? 'selected' : '' ?>><?= $lbl ?></option>
+                          <?php endforeach; ?>
+                        </select></label>
+                      <label>Currency
+                        <input name="rate_currency" maxlength="3" style="text-transform:uppercase"
+                               value="<?= e($pt['rate_currency'] ?? ($terms['rate_currency'] ?? 'USD')) ?>"></label>
+                    </div>
+                    <label>Contract link <span class="muted small">(Google Drive)</span>
+                      <input type="url" name="contract_url" placeholder="https://drive.google.com/…"
+                             value="<?= e($pt['contract_url'] ?? '') ?>"></label>
+                    <div class="row">
+                      <label>Contract status
+                        <select name="contract_status">
+                          <?php foreach (CONTRACT_STATES as $cs): ?>
+                            <option value="<?= e($cs) ?>" <?= ($pt['contract_status'] ?? 'none') === $cs ? 'selected' : '' ?>>
+                              <?= e($cs === 'none' ? 'No contract yet' : ucfirst($cs)) ?></option>
+                          <?php endforeach; ?>
+                        </select></label>
+                      <label>Sent <input type="date" name="contract_sent_date" value="<?= e($pt['contract_sent_date'] ?? '') ?>"></label>
+                      <label>Signed <input type="date" name="contract_signed_date" value="<?= e($pt['contract_signed_date'] ?? '') ?>"></label>
+                    </div>
+                    <div class="actions"><button type="submit">Save <?= e($pname) ?>'s contract</button></div>
+                  </form>
+                  <?php if ($pt): ?>
+                    <form method="post" class="inline-form"
+                          onsubmit="return confirm('Pay <?= e(addslashes($pname)) ?> on the default terms again?');">
+                      <input type="hidden" name="remove_position_terms" value="1">
+                      <input type="hidden" name="step_id" value="<?= (int)$sid ?>">
+                      <button type="submit" class="secondary">Back to the default terms</button>
+                    </form>
+                  <?php endif; ?>
+                </details>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+    <?php endif; ?>
+
     <?php if ($myRows): ?>
       <h4 style="margin:22px 0 6px;">Projected cost on this project</h4>
       <p class="muted small">
@@ -843,6 +966,7 @@ require __DIR__ . '/includes/header.php';
           <tr>
             <td class="wf-name">
               <span class="dot" style="background:<?= e($r['step']['color'] ?: '#ccc') ?>"></span><?= e($r['role']) ?>
+              <?php if (!empty($r['own_position'])): ?><span class="muted small">· own contract</span><?php endif; ?>
             </td>
             <td class="num"><?= e(fmt_num($r['days'], 2)) ?></td>
             <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>

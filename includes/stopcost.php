@@ -173,7 +173,7 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
     $today = date('Y-m-d');
     try {
         $q = $pdo->prepare(
-            'SELECT c.id, c.name, ps.name AS step_name, ps.start_date, ps.deadline
+            'SELECT c.id, c.name, ps.id AS step_id, ps.name AS step_name, ps.start_date, ps.deadline
                FROM crew_lanes cl
                JOIN crew c ON c.id = cl.crew_id
                JOIN pipeline_steps ps ON ps.id = cl.step_id
@@ -191,6 +191,9 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
 
     $laneIds = array_values(array_unique(array_map(fn($r) => (int)$r['id'], $lanes)));
     $laneTerms = $laneIds ? crew_terms($laneIds) : [];
+    // A position's own contract wins over the person's default
+    // (finance_install_12, 2026-10-29), as in expense_projection().
+    $lanePos = $laneIds ? position_terms_for($laneIds, (int)$projectId) : [];
 
     foreach ($lanes as $r) {
         $from = max($today, (string)$r['start_date']);
@@ -200,7 +203,7 @@ function project_stop_cost(PDO $pdo, int $projectId, array $invoices): array {
         if ($days <= 0) continue;
         $out['booked']['days'] += $days;
 
-        $t = $laneTerms[(int)$r['id']] ?? null;
+        $t = $lanePos[(int)$r['id'] . '|' . (int)$r['step_id']] ?? ($laneTerms[(int)$r['id']] ?? null);
         $rate = $t && $t['day_rate'] !== null ? (float)$t['day_rate'] : null;
         $unit = $t['rate_unit'] ?? 'day';
         $c    = strtoupper(trim((string)($t['rate_currency'] ?? 'USD'))) ?: 'USD';
