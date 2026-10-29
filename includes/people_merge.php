@@ -216,7 +216,10 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
                 $up = $db->prepare('UPDATE crew_terms SET crew_id = ? WHERE crew_id = ?');
                 foreach ($moveTerms as $id) { $up->execute([$keepId, $id]); $moved['terms']++; }
             }
-            foreach (['crew_terms_log' => 'log', 'invoices' => 'invoices'] as $table => $key) {
+            // invoice_headers (finance_install_12): a monthly invoice follows its
+            // lines to the person kept; counted with the invoices.
+            foreach (['crew_terms_log' => 'log', 'invoices' => 'invoices',
+                      'invoice_headers' => 'invoices'] as $table => $key) {
                 if (!finance_column_exists($table, 'crew_id')) continue;
                 $up = $db->prepare('UPDATE ' . $table . ' SET crew_id = ? WHERE crew_id = ?');
                 foreach ($loseIds as $id) { $up->execute([$keepId, $id]); $moved[$key] += $up->rowCount(); }

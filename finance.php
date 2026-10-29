@@ -68,6 +68,11 @@ require __DIR__ . '/includes/header.php';
   reads better from inside it, by opening the project and switching to Finance management.
 </p>
 
+<?php // Freelancers send one invoice a month covering every show (IN4), so it is
+      // entered across projects, here, rather than on any one of them. ?>
+<p><a class="button" href="finance_invoice.php">Monthly invoices</a>
+  <span class="muted small">one freelancer invoice per month, split across the projects it covers</span></p>
+
 <?php if (function_exists('invoices_need_upgrade') && invoices_need_upgrade()): ?>
   <div class="flash flash-warn">
     <strong>The finance database needs <code>finance_install_03.sql</code>.</strong>
