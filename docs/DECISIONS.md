@@ -4716,6 +4716,17 @@ snapshots keep what they recorded.
 counted calendar days under a "from logged hours" label (MSD: 180.4 "used", about 6 logged). A
 step with nothing logged now counts 0 and says so.
 
+## 2026-10-29 — Budget pool: used days are logged time only
+
+**Asked by David:** "let's start using logged time to subtract from the total budget pool instead
+of using the start dates."
+
+**Decided:** `budget_pool()` and `pool_step_people()` take used days from `time_logs` alone. The
+plan-based fallback (the 2026-10-16 "spend comes from the plan until somebody logs an hour",
+spread evenly over the window earlier today) is gone. A step or person with nothing logged reads
+0, labelled as such. **Why:** artists log every day, so the logs are the record, and a guess from
+the dates hides exactly the missing logging that needs chasing.
+
 ## 2026-10-29 — Reviews give two verdicts, Approve and Retake, from cards and from Spell's viewer
 
 **Asked by David,** looking at the Reviews screen: *"just have two buttons: 1. Approve ... 2.
