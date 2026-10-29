@@ -1251,9 +1251,8 @@ waiting; latest versions; and for freelancers the contract, the month's invoice 
 invoice status. Supervisors get a team panel; salaried staff see no money at all.
 
 **Still open:**
-- **The salaried flag.** `home_is_salaried()` is the one place that decides it. Today: admin and
-  Production logins, plus `$config['salaried_crew_ids']`. When the "salaried staff cost one blended
-  internal day rate" work adds a real flag, switch that function to read it.
+- ✅ **Who is salaried** is the Salaried tick on the Users page (migration 072). The blended internal
+  day rate work can read the same `users.is_salaried`.
 - **Per-second and flat-fee contracts** get no monthly line total: what they are paid on is approved
   footage or a fee once, not logged time. Their line points to the show's statement.
 - **One invoice split across projects (IN4).** Invoice status lists each invoice row as Finance holds

@@ -127,6 +127,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 069 | hire_supervision | ⏳ **Candidates for a supervision position** (`hires.supervision_id`): line people up for Anim Sup / CG Sup on Staffing and hire them. Until it runs, those rows say they need it; the rest of supervision (068) works without it. |
 | 070 | budget_changer | ⏳ **Who may change a signed-off budget** (`users.changes_budget`), ticked on Kick-off → Who signs off. Until it runs, a show whose kick-off is signed off has its budget locked for everybody. **Also needs `finance_install_10.sql` imported by hand** (the change history). |
 | 071 | user_invites | ⏳ **Create user / Resend link** on the person page (`user_invites`): one-time set-your-password links and the log of who sent them. Until it runs, the person page says it needs this and logins are made on Users by hand. |
+| 072 | user_salaried | ⏳ **Who is salaried staff** (`users.is_salaried`), ticked on the Users page. Home shows them no invoice information, amounts or invoice status. Until it runs, the tick is hidden and admin and Production logins count as salaried. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

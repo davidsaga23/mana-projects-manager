@@ -39,8 +39,9 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   or supervisors); Jorik pays it once.
 - **Supervisors** also get **Your team**: each person on the shows they supervise, the days they
   haven't logged this week and how many notes are waiting on them. No money.
-- **Salaried staff** (no invoice information, amounts or invoice status): admins and Production
-  logins, plus any crew ids listed in `$config['salaried_crew_ids']`, until a salaried flag exists.
+- **Salaried staff** see no invoice information, amounts or invoice status. **A new Salaried tick on
+  the Users page** says who they are (migration 072, `users.is_salaried`). Until 072 runs, admin and
+  Production logins count as salaried.
 - Always your own: there is no way to ask for somebody else's Home. No budgets, other people's
   rates, forecasts or comparisons appear anywhere on it.
 

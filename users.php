@@ -38,6 +38,12 @@ $hasCrewLink = column_exists($pdo, 'users', 'crew_id');
 // keeps the login date as a fallback until the first activity touch upgrades it.
 $hasLastSeen = column_exists($pdo, 'users', 'last_seen');
 
+// SALARIED STAFF (David, 2026-10-28: "let's add that attribute in the users
+// tab"). Salaried people cost one blended day rate and never invoice, so Home
+// shows them no invoice information (includes/home.php, home_is_salaried()).
+// Migration 072; the column is hidden until it has run.
+$hasSalaried = column_exists($pdo, 'users', 'is_salaried');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? '';
@@ -85,6 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $pdo->prepare('UPDATE users SET role = ? WHERE id = ?')->execute([$role, $id]);
             flash('ok', 'Role updated. It applies on their next page view.');
+        }
+
+        if ($action === 'set_salaried') {
+            if (!$hasSalaried) {
+                throw new RuntimeException('Salaried needs migration 072, run it on the Migrations screen first.');
+            }
+            $id = (int)($_POST['user_id'] ?? 0);
+            $on = !empty($_POST['salaried']) ? 1 : 0;
+            $pdo->prepare('UPDATE users SET is_salaried = ? WHERE id = ?')->execute([$on, $id]);
+            flash('ok', $on ? 'Marked as salaried staff: their Home shows no invoice information.'
+                            : 'Marked as a freelancer: their Home shows their invoice information.');
         }
 
         if ($action === 'set_active') {
@@ -189,6 +206,7 @@ $users = $pdo->query(
     'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, '
     . ($hasLastSeen ? 'COALESCE(u.last_seen, u.last_login)' : 'u.last_login') . ' AS last_seen'
     . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name, c.email AS crew_email' : '')
+    . ($hasSalaried ? ', u.is_salaried' : '')
     . ' FROM users u'
     . ($hasCrewLink ? ' LEFT JOIN crew c ON c.id = u.crew_id' : '')
     . ' ORDER BY u.active DESC, u.created_at ASC'
@@ -228,7 +246,7 @@ require __DIR__ . '/includes/header.php';
 
 <table class="review-table users-table">
   <thead>
-    <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><th>Email for notifications</th><?php endif; ?><th>Role</th><th>Active</th><th>Last seen</th><th></th></tr>
+    <tr><th>Username</th><th>Name</th><?php if ($hasCrewLink): ?><th>Is which person</th><th>Email for notifications</th><?php endif; ?><th>Role</th><?php if ($hasSalaried): ?><th title="Salaried staff never invoice: their Home shows no invoice information">Salaried</th><?php endif; ?><th>Active</th><th>Last seen</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($users as $u): $id = (int)$u['id']; $isSelf = $id === $currentUserId; ?>
@@ -285,6 +303,17 @@ require __DIR__ . '/includes/header.php';
           </select>
         </form>
       </td>
+      <?php if ($hasSalaried): ?>
+      <td>
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="set_salaried">
+          <input type="hidden" name="user_id" value="<?= $id ?>">
+          <input type="hidden" name="salaried" value="0">
+          <input type="checkbox" name="salaried" value="1" onchange="this.form.submit()"
+                 aria-label="Salaried" <?= !empty($u['is_salaried']) ? 'checked' : '' ?>>
+        </form>
+      </td>
+      <?php endif; ?>
       <td>
         <?php if ($isSelf): ?>
           <span class="muted">—</span>

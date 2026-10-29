@@ -4585,6 +4585,8 @@ across every show, instead of My tasks plus `statement.php` one show at a time.
 - **A note is "waiting" until the person replies on the task or puts up a new version.**
 - **A missing log day** is a working day, not a day off, inside their dates on at least one show,
   with nothing logged. Last week and this week, up to yesterday.
-- **Salaried, until a flag exists:** admin and Production logins, and `$config['salaried_crew_ids']`,
-  in `home_is_salaried()` only. They see no invoice information, amounts or invoice status.
+- **Salaried is a tick on the Users page** (David, 2026-10-28: "let's add that attribute in the users
+  tab"): `users.is_salaried`, migration 072, read only by `home_is_salaried()`. A person is salaried
+  when any login linked to them is ticked; their role does not decide it. Until 072 runs, admin and
+  Production logins count as salaried.
 - **Terminology:** "invoice", never "bill", on this page and in its code.

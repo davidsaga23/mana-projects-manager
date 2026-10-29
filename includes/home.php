@@ -45,19 +45,15 @@ function home_user_ids(PDO $pdo, int $crewId): array {
 /**
  * Is this person salaried staff rather than a freelancer?
  *
- * ⚠ THERE IS NO SALARIED FLAG ON MASTER YET (2026-10-28). A parallel piece of
- * work ("salaried staff cost one blended internal day rate") is expected to add
- * one. Until it lands this is a small guarded check, in one place, so switching
- * it over is a change to this function and nothing else:
+ * THE "SALARIED" TICK ON THE USERS PAGE decides it (David, 2026-10-28: "let's
+ * add that attribute in the users tab"; users.is_salaried, migration 072). A
+ * person is salaried when any login linked to them is ticked. It is explicit on
+ * purpose: nobody is salaried because of their role, so an admin who also
+ * freelances on a show is simply left unticked.
  *
- *   1. A flag on the person, if a later migration adds one under either of the
- *      names it is likely to get. Guarded with column_exists(), so naming a
- *      column that is not there costs nothing.
- *   2. $config['salaried_crew_ids'] in config.php: a list of crew ids. Not a
- *      list of NAMES in the code, because a name is not a stable key (people are
- *      renamed and merged) and config.php is where per-install facts live.
- *   3. Admin and Production logins (users.role admin / editor): the people who
- *      run the studio are staff, never freelancers invoicing it.
+ * Until migration 072 has run there is no tick to read, and the people who run
+ * the studio (admin and Production logins) are taken as salaried, which is
+ * what this page did before the tick existed.
  *
  * Getting this wrong in the safe direction matters more than in the other: a
  * salaried person shown invoice lines is confusing, but nothing is leaked,
@@ -65,32 +61,11 @@ function home_user_ids(PDO $pdo, int $crewId): array {
  */
 function home_is_salaried(PDO $pdo, int $crewId): bool {
     if ($crewId <= 0) return false;
-    foreach (['is_salaried', 'salaried'] as $col) {
-        if (column_exists($pdo, 'crew', $col)) {
-            try {
-                $q = $pdo->prepare("SELECT `{$col}` FROM crew WHERE id = ?");
-                $q->execute([$crewId]);
-                if ((int)$q->fetchColumn() === 1) return true;
-            } catch (PDOException $e) {
-                // fall through to the other checks
-            }
-        }
-    }
-    if (column_exists($pdo, 'crew', 'employment_type')) {
-        try {
-            $q = $pdo->prepare('SELECT employment_type FROM crew WHERE id = ?');
-            $q->execute([$crewId]);
-            if (in_array((string)$q->fetchColumn(), ['salaried', 'staff'], true)) return true;
-        } catch (PDOException $e) {
-            // fall through
-        }
-    }
-    global $config;
-    $ids = $config['salaried_crew_ids'] ?? [];
-    if (is_array($ids) && in_array($crewId, array_map('intval', $ids), true)) return true;
-
+    $sql = column_exists($pdo, 'users', 'is_salaried')
+        ? 'SELECT COUNT(*) FROM users WHERE crew_id = ? AND is_salaried = 1'
+        : "SELECT COUNT(*) FROM users WHERE crew_id = ? AND role IN ('admin','editor')";
     try {
-        $q = $pdo->prepare("SELECT COUNT(*) FROM users WHERE crew_id = ? AND role IN ('admin','editor')");
+        $q = $pdo->prepare($sql);
         $q->execute([$crewId]);
         return (int)$q->fetchColumn() > 0;
     } catch (PDOException $e) {
