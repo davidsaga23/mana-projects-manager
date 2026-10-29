@@ -1255,8 +1255,8 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
   day rate work can read the same `users.is_salaried`.
 - **Per-second and flat-fee contracts** get no monthly line total: what they are paid on is approved
   footage or a fee once, not logged time. Their line points to the show's statement.
-- **One invoice split across projects (IN4).** Invoice status lists each invoice row as Finance holds
-  it, one project per row, until IN4 lets one invoice carry lines from several shows.
+- ✅ **One invoice split across projects (IN4)**, built 2026-10-29: Finance → Monthly invoices.
+  Home's invoice status now shows a monthly invoice as one row with its projects.
 - **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
   invoices it is for David to say.
 
