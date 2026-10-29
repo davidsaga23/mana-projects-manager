@@ -26,6 +26,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - It is saved like any status change: the bell for everyone following the task, and a line in the
   status history (source "version").
 - A show with no status called "Pending review" is left as it is.
+
 ## 2026-10-29 — A contract per position *(finance DB: finance_install_13)*
 
 - **A position can have its own contract.** On the person page, under Terms and contract, a new
