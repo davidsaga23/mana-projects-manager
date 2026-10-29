@@ -4590,3 +4590,32 @@ across every show, instead of My tasks plus `statement.php` one show at a time.
   when any login linked to them is ticked; their role does not decide it. Until 072 runs, admin and
   Production logins count as salaried.
 - **Terminology:** "invoice", never "bill", on this page and in its code.
+
+## 2026-10-29 — One look for the whole app, taken from Spell
+
+**Asked by David:** "without changing the content, can we do an aesthetic pass on the whole
+platform? I really liked the way Spell UI works".
+
+**What makes Spell look the way it does** (written down so the next screen copies it, not guesses):
+- **Few radii, used consistently:** 7px small buttons and chips, 8–9px controls, 14px panels.
+- **Panels, not boxes:** a group of rows is one `--surface` panel with a `--border-soft` hairline
+  and a 14px radius; inside it, rows are divided by hairlines, never by boxes.
+- **Labels whisper:** column heads and field labels are 11–11.5px, weight 600, uppercase,
+  `letter-spacing: .04em`, in `--faint`/`--muted`. Headings are tightened (`-.02em`).
+- **Controls sit flat until used:** `--surface-2` fill, transparent or hairline border, firmer on
+  hover; the row lifts to `--surface-2` on hover.
+- **Colour only where it means something:** blue for the one thing to press or the current item;
+  status colours as tints. Navigation is neutral ink.
+- **Depth only on what floats:** `0 12px 34px rgba(0,0,0,.55)` on menus, pop-ups and the panel.
+- **Numbers in tabular figures**, so columns of them line up.
+
+**Decided:**
+- **Tokens in `:root`** (`--radius-sm/--radius/--radius-md/--radius-lg`, `--shadow-pop`, `--ease`)
+  and the shared rules changed **in place**, not overridden in a block at the end: an override
+  after `.row-btn` would have beaten `.row-btn-danger` and turned every red Remove button blue.
+- **Control padding and font sizes stay as they were.** Several rows (the budget form, filter bars)
+  were lined up to a field's measured height; a pass about looks must not move them.
+- **Hover on fields uses `:where()`**, so it weighs nothing and Spell's deliberately flat controls
+  keep their own hover.
+- **Three PRs:** (a) tokens and shared components, (b) project screens, (c) finance, people and
+  admin screens, each checked by David on the live site before the next.
