@@ -167,8 +167,14 @@ function budget_pool(PDO $pdo, array $project, ?array $proj = null): array {
     // (finance_install_13, 2026-10-29), as in expense_projection().
     $posTerms = $crewIds ? position_terms_for($crewIds, (int)$projectId) : [];
 
+    // ⚠ USED IS LOGGED TIME, AND NOTHING ELSE (David, 2026-10-29: "let's start
+    // using logged time to subtract from the total budget pool instead of using
+    // the start dates"). Before this a show with no logs at all read its used
+    // days off the calendar, as if everybody had worked from the day their step
+    // opened. Artists log every day, so a step with nothing logged has used
+    // nothing on record, and the screen says so rather than guessing.
     $logged  = pool_logged_days($pdo, $projectId, $hpd);
-    $source  = $logged ? 'logged' : 'plan';
+    $source  = 'logged';
 
     // step id => accumulating row
     $acc = [];
@@ -209,7 +215,6 @@ function budget_pool(PDO $pdo, array $project, ?array $proj = null): array {
                 'color' => (string)($pr['step']['color'] ?? ''),
                 'slots' => 0, 'filled' => 0,
                 'pool' => 0.0, 'window' => $dated ? 0.0 : null, 'lane_days' => 0.0,
-                'used_plan' => 0.0,
                 'rates' => [], 'currency' => '',
             ];
         }
@@ -230,19 +235,7 @@ function budget_pool(PDO $pdo, array $project, ?array $proj = null): array {
         // budget when it is actually heading for late — which is why the card
         // says "1 of 2 slots filled" whenever these two disagree. Without that
         // line the screen would quietly reward understaffing.
-        //
-        // Before anybody logs time, a person is taken to work through their
-        // share EVENLY across the step's window: 6 days of work in a 15-day
-        // window is 2 days used after 5. Counting every calendar day instead
-        // would overdraw a step whose window is roomier than its work on the
-        // day it opened.
-        if ($pr['crew_id'] && empty($pr['is_slot'])) {
-            $row['filled']++;
-            $upTo = min($today, $end);
-            if ($dated && $window > 0 && $upTo >= $start) {
-                $row['used_plan'] += $laneDays * working_days_between($start, $upTo) / $window;
-            }
-        }
+        if ($pr['crew_id'] && empty($pr['is_slot'])) $row['filled']++;
 
         // A DAY RATE ONLY. A flat fee or an hourly rate is not "a day", and the
         // card used to print Grafiart's 1,500 flat as "180—1,500 a day".
@@ -268,17 +261,13 @@ function budget_pool(PDO $pdo, array $project, ?array $proj = null): array {
         $approved = $st ? (float)$st['approved_v'] : 0.0;
         $tracksSeconds = $st ? !empty($st['tracks_seconds']) : false;
 
-        // ⚠ ONCE THE SHOW LOGS TIME, A STEP WITH NONE HAS USED NOTHING ON RECORD.
-        // This used to fall back to the calendar step by step, so MSD's headline
-        // read "180.4 days used, from logged hours" when only about 6 of them had
-        // been logged (David, 2026-10-29): two sources summed under one label,
-        // which is exactly what DECISIONS 2026-10-16 says is not acceptable.
-        // pool_step_people() already read it this way, so the card and its own
-        // "Who is on it" table disagreed as well. A zero that says "nothing
-        // logged" is the honest figure: artists log every day, and the gap is
-        // the thing to chase.
-        $unlogged = $source === 'logged' && !isset($logged[$stepId]);
-        $used = $source === 'logged' ? ($logged[$stepId] ?? 0.0) : $r['used_plan'];
+        // ⚠ A STEP WITH NOTHING LOGGED HAS USED NOTHING ON RECORD, and says so.
+        // It once fell back to the calendar step by step, so MSD's headline read
+        // "180.4 days used, from logged hours" when only about 6 had been logged
+        // (David, 2026-10-29). A zero that says "nothing logged" is the honest
+        // figure: artists log every day, and the gap is the thing to chase.
+        $unlogged = !isset($logged[$stepId]);
+        $used = $logged[$stepId] ?? 0.0;
         $pctUsed = $r['pool'] > 0 ? $used / $r['pool'] * 100 : 0.0;
         $pctDone = $target > 0 ? $approved / $target * 100 : 0.0;
 
@@ -566,9 +555,8 @@ function pool_status_slices(PDO $pdo, int $projectId, int $stepId): array {
  *            card's lane_days; the expense projection's Days column), and that
  *            times their day rate. Without $laneDays, the old measure: their
  *            slot's window in working days
- *   used     their logged days on this step once the project has any logged
- *            time at all, otherwise their share spread evenly over the window up
- *            to today; the same switch budget_pool() makes for the whole step
+ *   used     their logged days on this step, and nothing else: no logs is 0
+ *            (2026-10-29), as on the card
  *   invoiced what they have actually billed against this position (invoices)
  *   work     the step's items assigned to them, and how many are approved
  *
@@ -579,7 +567,7 @@ function pool_status_slices(PDO $pdo, int $projectId, int $stepId): array {
  * Per-second lanes are left out, as they are from the day pool: they have no
  * day budget to be over. Two slots held by one person are one row.
  *
- * @param string $source 'logged' or 'plan', from budget_pool()
+ * @param string $source from budget_pool(); always 'logged' since 2026-10-29
  * @return array ['rows' => [...], 'totals' => [...], 'currency' => string]
  */
 function pool_step_people(PDO $pdo, array $project, int $stepId, string $source,
@@ -600,7 +588,7 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source,
     // Logged days per person on this step, through the progress row the time
     // was logged against (the same link pool_logged_days() follows).
     $logged = [];
-    if ($source === 'logged' && $hpd > 0) {
+    if ($hpd > 0) {
         try {
             $q = $pdo->prepare(
                 'SELECT tl.crew_id, COALESCE(SUM(tl.minutes), 0) AS mins
@@ -676,22 +664,14 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source,
         // Their share of the projected work, as the card counts it (2026-10-29).
         $share = $laneDays ?? (float)$window;
         $people[$key]['budget_days'] += $share;
-        // An unfilled slot burns nothing; a person works through their share
-        // evenly across the window up to today, unless the project logs time,
-        // when their logged days are the answer.
-        if (!$slot && $source !== 'logged' && $dated && $window > 0) {
-            $upTo = min($today, $end);
-            if ($upTo >= $start) {
-                $people[$key]['used_days'] += $share * working_days_between($start, $upTo) / $window;
-            }
-        }
     }
 
     $rows = [];
     $tot = ['budget_days' => 0.0, 'used_days' => 0.0, 'budget_money' => 0.0, 'used_money' => 0.0,
             'invoiced' => 0.0, 'priced' => true];
     foreach ($people as $p) {
-        if ($source === 'logged' && !$p['is_slot']) $p['used_days'] = $logged[$p['crew_id']] ?? 0.0;
+        // An unfilled slot burns nothing; a person has used what they logged.
+        if (!$p['is_slot']) $p['used_days'] = $logged[$p['crew_id']] ?? 0.0;
         $p['left_days']    = $p['budget_days'] - $p['used_days'];
         $p['budget_money'] = $p['rate'] !== null ? round($p['budget_days'] * $p['rate'], 2) : null;
         $p['used_money']   = $p['rate'] !== null ? round($p['used_days'] * $p['rate'], 2) : null;
