@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Bookings: Timeline and Calendar tabs *(no migration)*
+
+- **Feature.** Bookings has two tabs. **Timeline** is the page as it was (By person / By show,
+  zoom, the clash list). **Calendar** shows the same bookings as a month, Monday first, with
+  previous / next / today: each working day lists who is booked, in their show's colour
+  ("Giselle · MSD · CH layout"), **red** when they are needed on two shows that day, and
+  **struck through** with the reason when they are off. Weekends and studio holidays are dimmed
+  and list nobody.
+- A busy day shows six names and folds the rest into "+N more", which opens the whole day, show by
+  show. The show chips and "Only people on two shows at once" work on both tabs; the calendar also
+  has a Person picker for one person's month. Clicking a name opens that show's timeline.
+- The tab you chose is remembered in your browser.
+
 ## 2026-10-30 — Naming somebody with @ works in the review viewer *(no migration)*
 
 - **Fix.** Typing @ in the review viewer's box (on Spell, My tasks and Reviews) opened the list of
