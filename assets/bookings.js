@@ -154,6 +154,13 @@
     return '<div class="bk-band" title="' + escapeHtml(title) + '" style="left:'
          + xOf(r, c.from, w) + 'px;width:' + widthOf({ start: c.from, end: c.to }, w) + 'px"></div>';
   }
+  /** One stretch of days off, drawn over the person's bars so it can't hide behind one. */
+  function offHtml(r, w, a, name) {
+    var title = name + ' is off, ' + (a.from === a.to ? shortDate(a.from) : shortDate(a.from) + ' to ' + shortDate(a.to))
+              + (a.reason ? ' (' + a.reason + ')' : '');
+    return '<div class="bk-off" title="' + escapeHtml(title) + '" style="left:'
+         + xOf(r, a.from, w) + 'px;width:' + widthOf({ start: a.from, end: a.to }, w) + 'px"></div>';
+  }
   function timelineHref(pid) { return 'timeline.php?project=' + encodeURIComponent(pid); }
 
   // --- BY PERSON ----------------------------------------------------------------------
@@ -219,6 +226,7 @@
                         stepLabel(b), lines.join('\n'), timelineHref(b.project_id),
                         inClash[b.lane_id] ? 'is-clash' : '');
       });
+      ((BK.absences || {})[p.id] || []).forEach(function (a) { html += offHtml(r, w, a, p.name); });
       html += todayHtml(r, w) + '</div></div>';
     });
     return { html: html, range: r, w: w };

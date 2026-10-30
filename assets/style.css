@@ -2535,6 +2535,13 @@ body.lightbox-lock { overflow: hidden; }
   background: var(--clash-band);
   border-left: 1px dashed var(--danger); border-right: 1px dashed var(--danger);
 }
+/* A person's days off (crew_absences), striped over their bars: the bar says
+   "booked on this step", the stripes say "but not on these days". */
+.bk-off {
+  position: absolute; top: 0; bottom: 0; z-index: 1;
+  background: repeating-linear-gradient(135deg, rgba(0,0,0,.55) 0 4px, rgba(255,255,255,.14) 4px 8px);
+  border-left: 1px solid var(--border-strong); border-right: 1px solid var(--border-strong);
+}
 .bk-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--danger); opacity: .5; pointer-events: none; }
 .bk-group .bk-label { background: var(--surface-2); }
 .bk-group .bk-track { background-color: var(--surface-2); }

@@ -23,6 +23,7 @@ $positions  = bookings_positions($pdo, $projectIds);
 $bookings   = $positions['bookings'];
 $steps      = bookings_steps($pdo, $projectIds);
 $clashes    = bookings_clashes($bookings);
+$absences   = bookings_absences($pdo, $bookings);
 
 $projectById = [];
 foreach ($projects as $p) $projectById[(int)$p['id']] = $p;
@@ -37,7 +38,7 @@ require __DIR__ . '/includes/header.php';
   somebody holding a position on a step is booked from that step's start to its deadline.
   <strong class="bk-clash-text">Red</strong> marks the same person needed on two shows on the
   same working days. Shows in setup, active or on hold are included; wrapped and archived ones
-  are not.
+  are not. <strong>Stripes</strong> are a person's days off, entered on their person page.
 </p>
 
 <?php if (!$projects): ?>
@@ -106,6 +107,7 @@ window.BK = <?= json_encode([
     'bookings' => $bookings,
     'unfilled' => (object)$positions['unfilled'],
     'clashes'  => $clashes,
+    'absences' => (object)$absences,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 </script>
 <script src="assets/bookings.js<?= asset_ver('bookings.js') ?>"></script>

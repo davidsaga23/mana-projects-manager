@@ -138,6 +138,44 @@ function bookings_steps(PDO $pdo, array $projectIds): array {
  * Returns a list of ['person_id', 'a' => lane id, 'b' => lane id, 'from', 'to',
  * 'days'], by person and then by date.
  */
+/**
+ * Each booked person's days off, keyed by crew id, for the chart to draw.
+ *
+ * David, 2026-10-30: "Giselle should have a day off today and it's not showing".
+ * Days off already live in crew_absences (migration 060, entered on the person
+ * page) and the scheduler plans around them, but Bookings drew a person as
+ * needed for every day from a step's start to its deadline and never asked.
+ * Only drawn here; a clash is still worked out from the steps' dates, because a
+ * day off inside two overlapping bookings does not make the overlap go away.
+ *
+ * Empty until migration 060 has run, and on any read failure: the chart is
+ * worth more without the days off than not at all.
+ */
+function bookings_absences(PDO $pdo, array $bookings): array {
+    $ids = array_values(array_unique(array_map(function ($b) { return (int)$b['person_id']; }, $bookings)));
+    if (!$ids) return [];
+    try {
+        if (!column_exists($pdo, 'crew_absences', 'crew_id')) return [];
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT crew_id, from_date, to_date, reason FROM crew_absences
+              WHERE crew_id IN ($in) ORDER BY from_date"
+        );
+        $stmt->execute($ids);
+    } catch (Throwable $e) {
+        return [];
+    }
+    $out = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $out[(int)$r['crew_id']][] = [
+            'from'   => $r['from_date'],
+            'to'     => $r['to_date'] ?: $r['from_date'],
+            'reason' => $r['reason'] !== null ? (string)$r['reason'] : '',
+        ];
+    }
+    return $out;
+}
+
 function bookings_clashes(array $bookings): array {
     $byPerson = [];
     foreach ($bookings as $b) $byPerson[$b['person_id']][] = $b;
