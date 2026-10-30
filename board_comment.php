@@ -65,6 +65,58 @@ $userId = (int)($_SESSION['user_id'] ?? 0);
 $said = '';
 $bad  = '';
 
+// --- delete a comment ---------------------------------------------------------
+//
+// David, 2026-10-29: "let's add a delete button for comments, only who posted
+// and admin can delete those". Scoped exactly like a file below: the comment
+// must hang on THIS task, which the request already proved is on a show you
+// can see.
+//
+// ⚠ REPLIES GO WITH IT, by the foreign key (migration 039: "orphaned replies to
+// a question nobody can read are worse than losing both"). So a reply written
+// by SOMEBODY ELSE stops the author: deleting your own question must not take
+// their answer. An admin may, and is told how many replies go with it. Its
+// files are removed from the server first, while their stored names are still
+// readable; the rows, mentions and bell entries go by cascade.
+if (isset($_POST['delete_comment'])) {
+    $cid = (int)$_POST['delete_comment'];
+    $pid = board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+    $q = $pdo->prepare('SELECT id, user_id FROM ticket_comments WHERE id = ? AND progress_id = ?');
+    $q->execute([$cid, (int)$pid]);
+    $com = $q->fetch();
+    if (!$com || !$pid) {
+        $bad = 'That comment is already gone.';
+    } elseif (!is_admin() && ((int)$com['user_id'] !== $userId || $userId <= 0)) {
+        $bad = 'You can only delete comments you wrote yourself.';
+    } else {
+        $rq = $pdo->prepare('SELECT id, user_id FROM ticket_comments WHERE parent_id = ?');
+        $rq->execute([$cid]);
+        $replies = $rq->fetchAll();
+        $others = array_filter($replies, fn($r) => (int)$r['user_id'] !== $userId);
+        if ($others && !is_admin()) {
+            $bad = 'Somebody has replied to this, so it can only be deleted by an administrator.';
+        } else {
+            $ids = array_merge([$cid], array_map(fn($r) => (int)$r['id'], $replies));
+            $fq = $pdo->prepare('SELECT stored_name FROM ticket_attachments WHERE comment_id IN ('
+                . implode(',', array_fill(0, count($ids), '?')) . ')');
+            $fq->execute($ids);
+            foreach ($fq->fetchAll(PDO::FETCH_COLUMN) as $stored) {
+                @unlink(upload_dir_path() . '/' . basename((string)$stored));
+            }
+            $pdo->prepare('DELETE FROM ticket_comments WHERE id = ?')->execute([$cid]);
+            $said = $replies
+                ? 'Comment deleted, with ' . count($replies) . ' repl' . (count($replies) === 1 ? 'y' : 'ies') . '.'
+                : 'Comment deleted.';
+        }
+    }
+    ?>
+    <?php if ($bad !== ''): ?><p class="err"><?= e($bad) ?></p><?php endif; ?>
+    <?php if ($said !== ''): ?><p class="ok small"><?= e($said) ?></p><?php endif; ?>
+    <?= board_comments_html($pdo, $projectId, $stepId, $itemKey, $mayPost, $crew) ?>
+    <?php
+    exit;
+}
+
 // --- take one file off a comment -------------------------------------------
 //
 // Scoped by the COMMENT it hangs on, and that comment by the task this request

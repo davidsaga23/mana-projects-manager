@@ -815,11 +815,14 @@
 
     // Taking a file back — a comment's attachment, or the latest version.
     // Asked first, because both delete the file from the server, not just a row.
-    var del = e.target.closest('.board-att-del, .board-version-del');
+    var del = e.target.closest('.board-att-del, .board-version-del, .board-comment-del');
     if (del && panelInner && panelInner.contains(del)) {
       e.preventDefault();
       var isVersion = del.classList.contains('board-version-del');
-      if (!window.confirm(isVersion
+      var isComment = del.classList.contains('board-comment-del');
+      if (!window.confirm(isComment
+            ? 'Delete this comment? Its replies and attached files go with it, and it cannot be undone.'
+            : isVersion
             ? 'Remove this version? The file is deleted from the server.'
             : 'Remove this file? It is deleted from the server.')) return;
 
@@ -832,8 +835,9 @@
       del.disabled = true;
 
       var gone = new FormData();
-      gone.append(isVersion ? 'delete_version' : 'delete_attachment',
-                  del.getAttribute(isVersion ? 'data-version' : 'data-att'));
+      if (isComment) gone.append('delete_comment', del.getAttribute('data-comment'));
+      else gone.append(isVersion ? 'delete_version' : 'delete_attachment',
+                       del.getAttribute(isVersion ? 'data-version' : 'data-att'));
       gone.append('project_id', host.getAttribute('data-project'));
       gone.append('step_id', host.getAttribute('data-step'));
       gone.append('item_key', host.getAttribute('data-item'));

@@ -482,7 +482,9 @@ function artist_may_post(): bool {
         // attached (board_comment.php checks uploaded_by, and an admin may
         // remove any). Without it the × would draw and then be refused, which
         // is worse than no × at all.
-        'board_comment.php' => ['add_comment', 'delete_attachment'],
+        // delete_comment (2026-10-29): their own comment; board_comment.php
+        // checks it is theirs, and refuses one somebody else has replied to.
+        'board_comment.php' => ['add_comment', 'delete_attachment', 'delete_comment'],
         // add_version / delete_version: putting work up for review, and taking
         // back the one you just put up (2026-10-22). ⚠ ALSO WIDER THAN "your
         // own row", and for the same reason comments are: the artist doing the

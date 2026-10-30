@@ -1285,6 +1285,13 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
             board_task_path($cProject, $cStep, $cItem, 'comments', 'bc' . $cid),
             'this comment', true
         );
+        // DELETE, for whoever wrote it and for admins (David, 2026-10-29: "only
+        // who posted and admin can delete those"). board_comment.php checks the
+        // same rule again; this only decides whether the button is drawn.
+        if ($mayPost && (is_admin() || ((int)($c['user_id'] ?? 0) === $myUserId && $myUserId > 0))) {
+            $h .= '<button type="button" class="link-danger board-comment-del" data-comment="' . $cid . '"'
+                . ' title="Delete this ' . ($depth > 0 ? 'reply' : 'comment') . ' and its files">Delete</button>';
+        }
         $h .= '</div>';
         // "(attachment)" is what a comment that is only a file is saved as;
         // the picture says it, so the panel does not draw the word (David,
