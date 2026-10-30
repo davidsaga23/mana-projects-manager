@@ -26,6 +26,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - The words are all at the top of `assets/tour.js`, one list per role.
 - Migration 074 adds `users.tour_seen_at`. Until it runs, the browser remembers "seen" instead.
 
+## 2026-10-29 — Spell: "On hold" and a wider Status column *(migration 073)*
+
+- "On Hold" is renamed "On hold" on every show and in the list new shows copy from, once David runs
+  migration 073 in `migrate.php`. Until then it still reads "On Hold".
+- The Status column is wider (175px) so "Pending review" is no longer cut off in the dropdown.
+
 ## 2026-10-29 — Spell: the Assignee list grouped by Staffing; New ticket Owner shows people *(no migration)*
 
 - A task's Assignee dropdown opens on the people with a slot on that step in Staffing, then the
