@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Spell board: header counts match the bar *(no migration)*
+
+- The line under a show's name ("N shots and assets · N tasks · N finished") now agrees with the
+  green bar's hover. On MSD it read 23 · 144 · 73 above a bar saying 75 of 146: the header skipped
+  whole-show deliverables' tasks (Animatic, Color Script) and counted those deliverables as shots
+  and assets. It now reads 21 · 146 · 75, and the task and finished counts come from the bar itself,
+  so the two can't drift apart again.
+
 ## 2026-10-29 — Finance Overview: Committed and Spent are two figures *(no migration)*
 
 - **"Spent so far" is now only money that has actually left:** invoices marked paid, plus other
