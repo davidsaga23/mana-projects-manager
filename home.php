@@ -137,20 +137,40 @@ if ($tab === 'work') {
 // Money, for a freelancer only, and only their own.
 $terms = null; $posTerms = []; $invoiceInfo = ['lines' => [], 'totals' => [], 'outside' => 0];
 $invoices = []; $byTask = []; $statements = [];
+// ⚠ EACH PART IS READ ON ITS OWN, AND A FAILURE STAYS IN ITS PART (David,
+// 2026-10-30: the tab answered HTTP 500 on the live site). One part that cannot
+// be read — a finance table one import behind, a show whose statement throws —
+// must not take the whole tab down with it. The part says so on the page, an
+// admin sees why, and the server log gets the full message.
+$invoiceErrors = [];
+$tryPart = function (string $part, callable $fn, $fallback) use (&$invoiceErrors) {
+    try {
+        return $fn();
+    } catch (Throwable $e) {
+        error_log('[Anima home invoice: ' . $part . '] ' . $e->getMessage() . ' in '
+                  . $e->getFile() . ':' . $e->getLine());
+        $invoiceErrors[$part] = $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')';
+        return $fallback;
+    }
+};
 if ($tab === 'invoice') {
-    $terms = own_crew_term($crewId);
+    if (function_exists('set_time_limit')) @set_time_limit(90);   // a statement per show adds up
+    $terms = $tryPart('your contract', fn() => own_crew_term($crewId), null);
     // Their positions with a contract of their own (finance_install_13):
     // [project id][step id] => row, their own only.
-    $posTerms = own_position_terms($crewId);
-    $invoiceInfo = home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo, $posTerms);
+    $posTerms = $tryPart('your position contracts', fn() => own_position_terms($crewId), []);
+    $invoiceInfo = $tryPart('the invoice lines',
+        fn() => home_invoice_lines($pdo, $crewId, $shows, $terms, $monthFrom, $monthTo, $posTerms), $invoiceInfo);
     // One row per invoice they sent: a monthly invoice's lines folded together.
-    $invoices = home_group_invoices($crewId, own_invoices_all($crewId));
-    $byTask = home_logged_by_task($pdo, $crewId, $monthFrom, $monthTo);
+    $invoices = $tryPart('your invoices', fn() => home_group_invoices($crewId, own_invoices_all($crewId)), []);
+    $byTask = $tryPart('logged time per task', fn() => home_logged_by_task($pdo, $crewId, $monthFrom, $monthTo), []);
     // Each show's statement, the figures statement.php shows, read through the
     // same own-or-admin doors.
-    foreach ($shows as $pid => $s) {
-        $statements[$pid] = artist_statement($pdo, (int)$pid, $crewId, $terms, own_invoices($crewId, (int)$pid),
-            null, home_fx($crewId, (int)$pid), $posTerms[$pid] ?? []);
+    foreach ($shows as $pid => $show) {
+        $st = $tryPart('the statement for ' . $show['project']['name'],
+            fn() => artist_statement($pdo, (int)$pid, $crewId, $terms, own_invoices($crewId, (int)$pid),
+                                     null, home_fx($crewId, (int)$pid), $posTerms[$pid] ?? []), null);
+        if ($st) $statements[$pid] = $st;
     }
 }
 
@@ -425,6 +445,7 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
   <?php endif; ?>
 
 <?php elseif ($tab === 'invoice'): ?>
+<?php ob_start(); try { ?>
   <?php // ================================ INVOICE AND BILLING ======================== ?>
   <p class="small home-month">
     <a href="home.php?tab=invoice&amp;month=<?= e($prevMonth) ?>">← <?= e(date('F', strtotime($prevMonth . '-01'))) ?></a>
@@ -433,6 +454,16 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
       · <a href="home.php?tab=invoice&amp;month=<?= e($nextMonth) ?>"><?= e(date('F', strtotime($nextMonth . '-01'))) ?> →</a>
     <?php endif; ?>
   </p>
+
+  <?php if ($invoiceErrors): ?>
+    <div class="flash flash-err">
+      Part of this page could not be read: <?= e(implode(', ', array_keys($invoiceErrors))) ?>.
+      The rest is below. <?= is_admin() || in_preview() ? '' : 'Production has been told in the server log.' ?>
+      <?php if (is_admin() || in_preview()): ?>
+        <ul class="small"><?php foreach ($invoiceErrors as $part => $why): ?><li><strong><?= e($part) ?>:</strong> <?= e($why) ?></li><?php endforeach; ?></ul>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
 
   <?php // INSTRUCTIONS FOR THE INVOICE, and where it goes (David, 2026-10-30). ?>
   <div class="flash flash-ok home-howto">
@@ -679,6 +710,17 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
       }
     });
   </script>
+<?php
+    echo ob_get_clean();
+  } catch (Throwable $e) {
+    // Drawing the tab failed part-way: what was drawn is thrown away rather
+    // than left half on screen, and the reason is said (2026-10-30).
+    ob_end_clean();
+    error_log('[Anima home invoice: drawing] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    echo '<div class="flash flash-err">This tab could not be drawn.'
+       . ((is_admin() || in_preview()) ? ' ' . e($e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')') : '')
+       . '</div>';
+  } ?>
 <?php endif; ?>
 
 </div></body></html>
