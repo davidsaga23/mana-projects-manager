@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Delete a comment in Spell *(no migration)*
+
+- **Delete** beside Reply and Copy URL on a task's comments, for whoever wrote it and for admins.
+  Its attached files are removed from the server, and its replies go with it. A comment somebody
+  ELSE has replied to can only be deleted by an admin, so nobody deletes another person's answer.
+
 ## 2026-10-29 — Spell: plainer filter and footer wording *(no migration)*
 
 - The second filter reads "All tasks" / "Ready to start" (was "Started or not" / "Ready to pick
