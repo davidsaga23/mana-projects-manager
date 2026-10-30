@@ -430,7 +430,7 @@ function board_data(PDO $pdo, int $projectId): array {
     };
 
     $groups = [];
-    $counts = ['items' => 0, 'tasks' => 0, 'done' => 0];
+    $counts = ['items' => 0, 'tasks' => 0, 'done' => 0];   // tasks/done filled from the bar, below
     $allTasks = [];                      // every task on the show, for the top bar
 
     /** Fold one built item into its group, making the group when first seen. */
@@ -448,18 +448,16 @@ function board_data(PDO $pdo, int $projectId): array {
             ];
         }
         $groups[$key]['items'][] = $item;
-        $counts['items']++;
+        // The header says "N shots and assets", so a whole-show deliverable
+        // (Animatic, Color Script) is not one of them, though its task still
+        // counts below (David, 2026-10-29: "shots should be 21 not 23" on MSD).
+        if ($item['kind'] !== 'project') $counts['items']++;
         // A whole-show deliverable IS one task, so it contributes itself; a shot
         // contributes the tasks under it. Either way the group's bar is made of
         // exactly the work the group holds.
         foreach ($item['tasks'] ?: array_filter([$item['self']]) as $t) {
             $groups[$key]['_tasks'][] = $t;
             $allTasks[] = $t;
-        }
-        foreach ($item['tasks'] as $t) {
-            if ($t['is_excluded']) continue;
-            $counts['tasks']++;
-            if ($t['is_approved']) $counts['done']++;
         }
     };
 
@@ -565,6 +563,16 @@ function board_data(PDO $pdo, int $projectId): array {
         return [$a['rank'], $a['detail']] <=> [$b['rank'], $b['detail']];
     });
 
+    // ⚠ THE HEADER'S "N TASKS · N FINISHED" IS READ OFF THE SHOW'S BAR, never
+    // counted a second time. It used to be counted separately, from each item's
+    // `tasks` list, and that list is empty for a whole-show deliverable (its one
+    // task is `self`), so Animatic and Color Script were in the bar and missing
+    // from the header: David, 2026-10-29, on MSD, "144 tasks · 73 finished" above
+    // a bar saying "75 of 146 tasks finished". One reckoning, one answer.
+    $bar = board_item_bar($allTasks, $statusMap);
+    $counts['tasks'] = $bar['total'];
+    $counts['done']  = $bar['done'];
+
     return [
         'groups'   => $groups,
         'statuses' => array_values($statusMap),
@@ -574,7 +582,7 @@ function board_data(PDO $pdo, int $projectId): array {
         'counts'   => $counts,
         // The whole show in one bar, over every task on it — the same reckoning
         // a group's bar makes, one level up.
-        'bar'      => board_item_bar($allTasks, $statusMap),
+        'bar'      => $bar,
     ];
 }
 
