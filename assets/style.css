@@ -1507,6 +1507,10 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
   padding: 4px; font-size: 13px;
 }
 .mention-panel[hidden] { display: none; }
+/* And above the review viewer (.rv, z-index 150), which covers the whole page:
+   typing @ in its box drew the names underneath it (David, 2026-10-30: "we
+   can't mention people in this context"). */
+.rv-open .mention-panel { z-index: 160; }
 .mention-list { max-height: 40vh; overflow-y: auto; }
 .mention-row { padding: 5px 8px; border-radius: var(--radius-sm); cursor: pointer; }
 .mention-row:hover { background: var(--surface-2); }
