@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — First-time tour, per role *(migration 074)*
+
+- A short guided tour opens by itself the first time somebody logs in: a card beside the real
+  button, tab or panel, with **Next / Back / Skip**. Artists, supervisors, Production and admins
+  each get their own 7 or 8 steps; freelancers get an invoice step, salaried staff do not.
+- It crosses screens (Home → My tasks → Spell, or Projects → a project → Staffing). Where a step's
+  element is not on the page (no tasks yet, no project), the card shows in the middle instead.
+- **Tour** in the top bar, beside Log out, opens it again at any time. While viewing as somebody,
+  Tour shows that person's tour, which is how to check each role's copy.
+- The words are all at the top of `assets/tour.js`, one list per role.
+- Migration 074 adds `users.tour_seen_at`. Until it runs, the browser remembers "seen" instead.
+
 ## 2026-10-29 — Spell: the Assignee list grouped by Staffing; New ticket Owner shows people *(no migration)*
 
 - A task's Assignee dropdown opens on the people with a slot on that step in Staffing, then the
