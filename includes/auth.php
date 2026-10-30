@@ -503,6 +503,11 @@ function artist_may_post(): bool {
         // under their own name by bugs.php. Closing a report is admin-only and
         // checked there, so set_status is deliberately not in this list.
         'bugs.php' => ['report_bug'],
+        // save_profile: their own phone, bio and picture on Home (2026-10-30,
+        // migration 075). ⚠ THERE IS NO ID TO FORGE: home.php writes to
+        // effective_crew_id() and nothing the form sends can name another
+        // person. Name and email are not in that form at all.
+        'home.php' => ['save_profile'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

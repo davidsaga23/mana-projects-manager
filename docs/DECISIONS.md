@@ -4811,3 +4811,27 @@ first project link on the current page. A step whose element is missing shows it
 middle rather than stopping. The header loads the script only while the tour runs, and decides
 once per session, so it costs at most one small query per login.
 
+## 2026-10-30 — Home has three tabs, and the person writes their own profile
+
+**Asked by David:** General info (name, email, phone, picture, bio, shows), Work (current tasks, what's
+next, lined up after, notes waiting, my versions, my notes, time logged), and Invoice and billing
+(logged time, statement, copyable invoice lines, instructions, the email with a copy to David or Tim,
+invoice status).
+
+**Decided:**
+- **Tabs by `?tab=`, Work first**, because it is the one opened every day. Salaried staff have no
+  Invoice tab.
+- **The person edits their own phone, bio and picture** (migration 075, on `crew`). Saved only to
+  `effective_crew_id()`; `home.php` → `save_profile` is in the artist allow-list and has no id to
+  forge. Name and email stay with an admin, because notifications and logins hang off them.
+- **The picture is served by `avatar.php`** behind the login, like every other upload.
+- **"Current" means picked up** (a status reading in progress, review, retake and the like); what is
+  not started goes under What's next when due this week or late, and under Lined up after otherwise.
+- **The invoice email** goes to accounting@mana.tv, copied to David and Tim (`$config['invoice_cc']`
+  overrides it); the PDF is still the artist's to attach.
+- **What the invoice must carry is David's wording:** addressed to Mana Animation Studio / Saga
+  Productions LLC (contact, address, EIN, with a Copy button), the artist's bank and address details
+  (Anima does not store them), the lines in the description, and the breakdown of days worked, which
+  each line now lists.
+- **Invoice status reads Expected / Received · pending payment / Paid**, Finance's three statuses.
+

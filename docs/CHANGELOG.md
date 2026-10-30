@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Home in three tabs: General info, Work, Invoice and billing *(migration 075)*
+
+- **General info:** your name and email, and a phone, a bio and a profile picture you add yourself
+  ("Edit your profile"), then the shows you are on with dates, days left, supervisor and links.
+- **Work:** time logged at the top; **Current tasks** (in progress, waiting for review, sent back),
+  **What's next** (not started, due this week or late), **Lined up after**; notes waiting on you;
+  **My versions**, the latest version of each task you are on as picture cards; **My notes**, the
+  latest note somebody left on each of your tasks. Supervisors' team panel is here too.
+- **Invoice and billing** (freelancers): the month's lines with a **Copy** button each and **Copy
+  every line**, each line listing the days worked; how to invoice; the studio's details to address
+  it to (with a Copy button) and the bank and address details the artist must include; a **Write the
+  email** button to accounting@mana.tv, copied to David and Tim, with the lines already in it; your invoices as Expected / Received · pending payment / Paid with
+  dates; logged time this month per task; each show's statement figures; your contracts.
+- Salaried staff see General info and Work only.
+- **Migration 075** adds phone, bio and picture to the person. Until it runs, General info shows
+  name and email only.
+
 ## 2026-10-30 — First-time tour, per role *(migration 074)*
 
 - A short guided tour opens by itself the first time somebody logs in: a card beside the real

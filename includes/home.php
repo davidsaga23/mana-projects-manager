@@ -30,6 +30,7 @@ require_once __DIR__ . '/statements.php';   // statement_window(), statement_peo
 require_once __DIR__ . '/supervision.php';  // supervision_positions()
 require_once __DIR__ . '/absences.php';     // crew_absences()
 require_once __DIR__ . '/studio.php';       // studio_exclude_sql()
+require_once __DIR__ . '/uploads.php';      // accept_upload(), for the profile picture
 
 /** The logins linked to a person. Usually one; a person can have two accounts. */
 function home_user_ids(PDO $pdo, int $crewId): array {
@@ -326,7 +327,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
     }
 
     // Minutes per show and step, inside each show's window.
-    $minutes = [];
+    $minutes = []; $days = [];
     foreach ($rows as $r) {
         $pid = (int)$r['project_id'];
         $w = $shows[$pid]['window'] ?? ['from' => null, 'to' => null];
@@ -337,6 +338,8 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
         }
         $sid = (int)($r['sid'] ?? 0);
         $minutes[$pid][$sid] = ($minutes[$pid][$sid] ?? 0) + (int)$r['m'];
+        // The days behind the line, for the invoice's breakdown of days worked.
+        $days[$pid][$sid][$d] = ($days[$pid][$sid][$d] ?? 0) + (int)$r['m'];
     }
     if (!$minutes) return $out;
 
@@ -397,6 +400,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
                 'project'    => $show['project'],
                 'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Step') : 'Other work on the show',
                 'own_contract' => $ownContract,
+                'dates'      => $days[$pid][$sid] ?? [],
                 // For Finance → Monthly invoices, which prefills its lines from these.
                 'step_id'    => $sid > 0 ? $sid : null,
                 'unit'       => $unit,
@@ -723,4 +727,286 @@ function home_team(PDO $pdo, int $crewId, array $shows, bool $roleIsSupervisor,
     }
     usort($out, fn($a, $b) => strcasecmp($a['name'], $b['name']));
     return $out;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE TABS (David, 2026-10-30): General info, Work, Invoice and billing.
+ * What each tab needs beyond what the page already read above.
+ * ------------------------------------------------------------------------ */
+
+/** Has migration 075 run? The profile's own fields: phone, bio and picture. */
+function home_profile_available(PDO $pdo): bool {
+    return column_exists($pdo, 'crew', 'photo_stored');
+}
+
+/** A person's profile: name and email always; phone, bio and picture after 075. */
+function home_profile(PDO $pdo, int $crewId): array {
+    $cols = 'id, name, email' . (home_profile_available($pdo) ? ', phone, bio, photo_stored, photo_mime' : '');
+    $q = $pdo->prepare("SELECT {$cols} FROM crew WHERE id = ?");
+    $q->execute([$crewId]);
+    return ($q->fetch() ?: []) + ['name' => '', 'email' => '', 'phone' => null, 'bio' => null,
+                                   'photo_stored' => null, 'photo_mime' => null];
+}
+
+/**
+ * Save a person's OWN phone, bio and picture. The crew id is the caller's
+ * effective_crew_id(), never anything the form sent (see the allow-list entry
+ * for home.php in includes/auth.php). Name and email are not written here: they
+ * are what notifications and logins hang off, so they stay with an admin.
+ *
+ * @return string a sentence for the flash message
+ */
+function home_save_profile(PDO $pdo, int $crewId, array $in, ?array $photo, bool $removePhoto): string {
+    if (!home_profile_available($pdo)) {
+        throw new RuntimeException('Your profile needs database update 075, which has not been applied yet.');
+    }
+    $phone = trim((string)($in['phone'] ?? ''));
+    if (mb_strlen($phone) > 50) throw new RuntimeException('That phone number is too long.');
+    if ($phone !== '' && !preg_match('/^[0-9+()\-.\s\/ext]+$/i', $phone)) {
+        throw new RuntimeException('A phone number can only have digits, spaces and + ( ) - . characters.');
+    }
+    $bio = trim((string)($in['bio'] ?? ''));
+    if (mb_strlen($bio) > 2000) throw new RuntimeException('Keep the bio under 2,000 characters.');
+
+    $old = home_profile($pdo, $crewId);
+    $stored = $old['photo_stored'] ?: null;
+    $mime = $old['photo_mime'] ?: null;
+    $said = 'Profile saved.';
+
+    if ($photo && ($photo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        // A picture, and only a picture: the upload rules every file goes
+        // through, then a check that what arrived is an image.
+        $errors = [];
+        $got = accept_upload($photo, ensure_upload_dir(), $errors);
+        if (!$got) throw new RuntimeException(implode(' ', $errors) ?: 'The picture could not be saved.');
+        if (!attachment_is_image($got['mime'])) {
+            @unlink(upload_dir_path() . '/' . $got['stored']);
+            throw new RuntimeException('A profile picture has to be an image (JPG, PNG, GIF or WebP).');
+        }
+        $removePhoto = true;                 // the old one goes
+        $newStored = $got['stored']; $newMime = $got['mime'];
+    }
+    if ($removePhoto && $stored) {
+        @unlink(upload_dir_path() . '/' . basename($stored));
+        $stored = null; $mime = null;
+        $said = isset($newStored) ? 'Profile and picture saved.' : 'Profile saved, picture removed.';
+    }
+    if (isset($newStored)) { $stored = $newStored; $mime = $newMime; $said = 'Profile and picture saved.'; }
+
+    $pdo->prepare('UPDATE crew SET phone = ?, bio = ?, photo_stored = ?, photo_mime = ? WHERE id = ?')
+        ->execute([$phone !== '' ? $phone : null, $bio !== '' ? $bio : null, $stored, $mime, $crewId]);
+    return $said;
+}
+
+/**
+ * The work groups on the Work tab: what is CURRENT (picked up: in progress,
+ * waiting for review, sent back), what is NEXT (not picked up yet, overdue or
+ * due this week) and what is LINED UP AFTER (the rest, undated last). A row is
+ * the same shape home_whats_next() makes.
+ */
+function home_work_groups(array $tasks, array $tickets, string $today): array {
+    $all = home_whats_next($tasks, $tickets, $today);
+    $out = ['current' => [], 'next' => [], 'later' => []];
+    $picked = fn(array $r) => preg_match('/progress|review|retake|wip|revis|fix|change|redo/i', (string)$r['status']) === 1;
+    foreach (['overdue', 'week', 'later'] as $g) {
+        foreach ($all[$g] as $r) {
+            if ($picked($r))        $out['current'][] = $r + ['late' => $g === 'overdue'];
+            elseif ($g !== 'later') $out['next'][] = $r + ['late' => $g === 'overdue'];
+            else                    $out['later'][] = $r + ['late' => false];
+        }
+    }
+    return $out;
+}
+
+/** The open tasks a person is named on, on live shows: [progress id => row]. */
+function home_assigned_progress_ids(PDO $pdo, int $crewId): array {
+    $ids = [];
+    foreach (home_tasks($pdo, $crewId) as $t) $ids[(int)$t['progress_id']] = $t;
+    return $ids;
+}
+
+/**
+ * MY VERSIONS (David, 2026-10-30): "a collection of the most up to date
+ * versions per assigned task". The latest version on each open task they are
+ * named on, newest first, whoever put it up.
+ */
+function home_latest_versions(PDO $pdo, int $crewId): array {
+    $tasks = home_assigned_progress_ids($pdo, $crewId);
+    if (!$tasks || !column_exists($pdo, 'progress_versions', 'version_no')) return [];
+    $in = implode(',', array_map('intval', array_keys($tasks)));
+    try {
+        $rows = $pdo->query(
+            "SELECT v.id, v.progress_id, v.version_no, v.original_name, v.mime_type, v.created_at
+               FROM progress_versions v
+               JOIN (SELECT progress_id, MAX(version_no) AS n FROM progress_versions
+                      WHERE progress_id IN ($in) GROUP BY progress_id) m
+                 ON m.progress_id = v.progress_id AND m.n = v.version_no
+              ORDER BY v.created_at DESC, v.id DESC"
+        )->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+    foreach ($rows as $i => $r) $rows[$i] += $tasks[(int)$r['progress_id']];
+    return $rows;
+}
+
+/**
+ * MY NOTES (David, 2026-10-30, "same as my versions"): the latest note somebody
+ * else left on each open task they are named on, newest first. Review notes on
+ * a version and plain comments alike; their own words are left out.
+ */
+function home_latest_notes(PDO $pdo, int $crewId, array $userIds): array {
+    $tasks = home_assigned_progress_ids($pdo, $crewId);
+    if (!$tasks || !column_exists($pdo, 'ticket_comments', 'progress_id')) return [];
+    $in = implode(',', array_map('intval', array_keys($tasks)));
+    $mine = $userIds ? implode(',', array_map('intval', $userIds)) : '0';
+    $hasReview = column_exists($pdo, 'ticket_comments', 'version_id');
+    try {
+        $rows = $pdo->query(
+            "SELECT c.id, c.progress_id, c.body, c.created_at, u.display_name AS author"
+          . ($hasReview ? ', c.version_id' : ', NULL AS version_id') . "
+               FROM ticket_comments c
+               LEFT JOIN users u ON u.id = c.user_id
+              WHERE c.progress_id IN ($in) AND c.kind = 'user'
+                AND (c.user_id IS NULL OR c.user_id NOT IN ($mine))
+                AND c.id = (SELECT MAX(c2.id) FROM ticket_comments c2
+                             WHERE c2.progress_id = c.progress_id AND c2.kind = 'user'
+                               AND (c2.user_id IS NULL OR c2.user_id NOT IN ($mine)))
+              ORDER BY c.created_at DESC, c.id DESC"
+        )->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+    foreach ($rows as $i => $r) $rows[$i] += $tasks[(int)$r['progress_id']];
+    return $rows;
+}
+
+/**
+ * Logged time per TASK in a window, most first: what each entry was against
+ * (a production task, a card, or general time on a show), with its show.
+ * Their own only, by the crew id.
+ */
+function home_logged_by_task(PDO $pdo, int $crewId, string $from, string $to): array {
+    if (!time_logs_available($pdo)) return [];
+    try {
+        $q = $pdo->prepare(
+            "SELECT tl.project_id, tl.progress_id, tl.ticket_id, SUM(tl.minutes) AS minutes,
+                    MAX(tl.log_date) AS last_day,
+                    p.name AS project_name, p.code AS project_code,
+                    ps.name AS step_name, s.episode, s.shot_code, a.name AS asset_name,
+                    t.seq AS ticket_seq, t.title AS ticket_title
+               FROM time_logs tl
+               LEFT JOIN projects p ON p.id = tl.project_id
+               LEFT JOIN progress pr ON pr.id = tl.progress_id
+               LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+               LEFT JOIN shots s ON s.id = pr.shot_id
+               LEFT JOIN assets a ON a.id = pr.asset_id
+               LEFT JOIN tickets t ON t.id = tl.ticket_id
+              WHERE tl.crew_id = ? AND tl.log_date BETWEEN ? AND ?
+              GROUP BY tl.project_id, tl.progress_id, tl.ticket_id, p.name, p.code, ps.name,
+                       s.episode, s.shot_code, a.name, t.seq, t.title
+              ORDER BY minutes DESC"
+        );
+        $q->execute([$crewId, $from, $to]);
+        return $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+/**
+ * One invoice line as text to paste into an invoice: "FC Mobile · CH Layout ·
+ * 5.00 days × $100/day = $500.00". What the Copy button puts on the clipboard.
+ */
+function home_invoice_line_text(array $l): string {
+    $parts = [(string)$l['project']['name'], (string)$l['step']];
+    $calc = (string)$l['qty_label'];
+    if ($l['rate'] !== null) $calc .= ' × ' . $l['rate_phrase'];
+    if ($l['total'] !== null) $calc .= ' = ' . home_money($l['total'], $l['currency']);
+    $parts[] = $calc;
+    $text = implode(' · ', $parts);
+    if (!empty($l['dates'])) $text .= ' · Days worked: ' . home_days_worked($l['dates']);
+    return $text;
+}
+
+/** "1, 2, 5 and 6 Oct" — the dates of a line, as an invoice's breakdown of days worked. */
+function home_days_worked(array $dates): string {
+    $keys = array_keys($dates);
+    sort($keys);
+    $byMonth = [];
+    foreach ($keys as $d) $byMonth[date('M Y', strtotime($d))][] = (int)date('j', strtotime($d));
+    $out = [];
+    foreach ($byMonth as $m => $ns) $out[] = implode(', ', $ns) . ' ' . substr($m, 0, 3);
+    return implode('; ', $out);
+}
+
+/** "Expected", "Received · pending payment", "Paid": Finance's three, as the artist reads them. */
+function home_invoice_status_short(array $inv): string {
+    switch ((string)($inv['status'] ?? '')) {
+        case 'expected': return 'Expected';
+        case 'paid':     return 'Paid';
+        case 'pending':
+        case 'received':
+        case 'approved':
+        case 'disputed': return 'Received · pending payment';
+        default:         return ucfirst((string)($inv['status'] ?? ''));
+    }
+}
+
+/**
+ * WHERE THE INVOICE GOES (Tim, 2026-10-28: "Send one invoice a month to
+ * accounting@mana.tv ... Nowhere else. Jorik pays it once."), copied to David
+ * and Tim (David, 2026-10-30: "email to send the invoice to (with cc to David or Tim)").
+ * The copy list is $config['invoice_cc'] when config.php sets one, so Tim can be
+ * added there without a release.
+ */
+const HOME_INVOICE_TO = 'accounting@mana.tv';
+
+function home_invoice_cc(): array {
+    global $config;
+    $cc = $config['invoice_cc'] ?? ['david@mana.tv', 'tim@mana.tv'];
+    if (!is_array($cc)) $cc = [$cc];
+    return array_values(array_filter(array_map('trim', array_map('strval', $cc)),
+        fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL) !== false));
+}
+
+/**
+ * WHAT THE INVOICE MUST SAY (David, 2026-10-30, the studio's own wording): who
+ * it is addressed to, then the artist's payment details, then what goes in the
+ * description and the breakdown. Shown on Home's Invoice tab; the company block
+ * has a Copy button so it is typed exactly once, by us.
+ */
+function home_invoice_company(): array {
+    return [
+        'Client'  => 'Mana Animation Studio / Saga Productions LLC',
+        'Contact' => 'Jorik Feskens',
+        'Address' => '811W 7th Street, CA, 90017 / Los Angeles',
+        'EIN'     => '37-1957052',
+    ];
+}
+
+/** The artist's own details every invoice must carry. */
+function home_invoice_artist_fields(): array {
+    return [
+        'Bank name',
+        'Account Holder Name',
+        'Account Number',
+        'Routing Number',
+        'SWIFT/IBAN Number',
+        'CLABE (Mexico)',
+        'CPF (Brazil)',
+        'Address of Account Holder: street name and number, city, region, country, postal code',
+    ];
+}
+
+/** The rules for sending it, agreed with Tim and Jorik (2026-10-28). */
+function home_invoice_instructions(): array {
+    return [
+        'Send one invoice a month, for the month the work was done in.',
+        'In the description, put one line per project and step: the lines below, copied as they are.',
+        'Include the breakdown of the days worked (or of the seconds billed): each line below lists its dates.',
+        'Send it to ' . HOME_INVOICE_TO . ' and nowhere else, not to producers or supervisors.',
+        'Amounts are in US dollars unless your contract says another currency.',
+        'Jorik pays each invoice once. Its status below changes when it is received and when it is paid.',
+    ];
 }

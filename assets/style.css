@@ -4721,3 +4721,22 @@ body.rv-open { overflow: hidden; }
 .preview-cols select { max-width: 100%; }
 @media (max-width: 900px) { .preview-cols { grid-template-columns: 1fr; } }
 
+
+/* Home tabs (home.php, 2026-10-30): the picture beside the title, the tab bar,
+   the latest versions as a grid of cards, and the invoice instructions. */
+.home-head { display: flex; align-items: center; gap: 12px; }
+.home-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; }
+.home-avatar-blank { display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--muted); font-weight: 600; }
+.home-tabs { margin: 4px 0 14px; border-bottom: 1px solid var(--border); }
+.home-profile { max-width: 640px; }
+.home-versions { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.home-version { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius, 9px); overflow: hidden; color: inherit; background: var(--surface-2); }
+.home-version:hover { border-color: var(--primary); text-decoration: none; }
+.home-version img, .home-version-file { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--surface-3); }
+.home-version-file { display: flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 600; }
+.home-version-cap { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; font-size: 13px; }
+.home-howto ul { margin: 6px 0 0 18px; padding: 0; }
+.home-send { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.home-invoice-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin: 12px 0 6px; }
+.home-invoice-details h4 { margin: 0 0 6px; }
+.home-checklist { margin: 0 0 6px 18px; padding: 0; }
