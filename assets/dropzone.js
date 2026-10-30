@@ -63,13 +63,15 @@
       '<ul class="dropzone-list"></ul>';
     zone.querySelector('strong').textContent = says;
     // data-drop-paste="no": a zone for something no clipboard holds (a Plaky
-    // CSV) does not offer to take a pasted screenshot.
+    // CSV) does not offer to take a pasted screenshot. data-drop-pick names the
+    // link instead of "choose from your computer" (Spell's version zone,
+    // David 2026-10-29: "or choose a file").
     if (input.getAttribute('data-drop-paste') === 'no') {
       var sub = zone.querySelector('.dropzone-say .muted');
       sub.textContent = 'or ';
       var pick = document.createElement('span');
       pick.className = 'dropzone-link';
-      pick.textContent = 'choose from your computer';
+      pick.textContent = input.getAttribute('data-drop-pick') || 'choose from your computer';
       sub.appendChild(pick);
     }
 

@@ -1285,8 +1285,15 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
             board_task_path($cProject, $cStep, $cItem, 'comments', 'bc' . $cid),
             'this comment', true
         );
-        $h .= '</div><div class="comment-body">'
-            . ticket_render_body((string)$c['body'], $named) . '</div>';
+        $h .= '</div>';
+        // "(attachment)" is what a comment that is only a file is saved as;
+        // the picture says it, so the panel does not draw the word (David,
+        // 2026-10-29). The saved text is unchanged, so the bell still has
+        // something to say.
+        if ((string)$c['body'] !== '(attachment)') {
+            $h .= '<div class="comment-body">'
+                . ticket_render_body((string)$c['body'], $named) . '</div>';
+        }
 
         // The files, drawn by the renderer the ticket screen uses — moved into
         // includes/uploads.php when this screen needed it too, rather than
@@ -1343,7 +1350,7 @@ function board_comments_html(PDO $pdo, int $projectId, int $stepId, string $item
               . '<input type="file" name="attachments[]" multiple'
               . ' data-drop="Drop files here">'
               . '</label>'
-              . '<p class="muted small">Naming somebody rings their bell and emails them.</p>'
+              . '<p class="muted small">Type @ and a name to notify someone (bell).</p>'
               . '<button type="submit" class="primary board-comment-post">Post</button>'
               . '</form>'
               // The picker reads this, exactly as ticket.php feeds assets/mentions.js:
@@ -1528,7 +1535,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                       . '</button>';
             } elseif ($reviewer) {
                 $out .= '<button type="button" class="version-reviews-btn" data-review-version="' . $vid
-                      . '">Make a review</button>';
+                      . '">Review this version</button>';
             }
 
             // THE VIEWER, BESIDE THE NOTES (David, 2026-10-27: "add the review &
@@ -1670,15 +1677,19 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
 
         // "Upload new version", not "Put up v02" (David, 2026-10-22): the
         // number is the app's business, and the version list says what it was.
+        // Folded under its own "Upload a new version" summary for reviewers,
+        // so the form does not repeat the title right under it (David,
+        // 2026-10-29).
+        $uploadFolded = $reviewer && $versions;
         $upload = '<form class="comment-form board-version-form" method="post"'
               . ' enctype="multipart/form-data"'
               . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
               . ' data-item="' . e($itemKey) . '"' . $namingAttr . '>'
               . '<input type="hidden" name="add_version" value="1">'
-              . '<label><span class="board-version-title">Upload new version</span>'
+              . '<label>' . ($uploadFolded ? '' : '<span class="board-version-title">Upload new version</span>')
               . $namingHint
               . '<input type="file" name="versions[]" accept="image/*,video/*,.pdf" multiple'
-              . ' data-drop="Drop the new version here">'
+              . ' data-drop="Drop your video or image here" data-drop-paste="no" data-drop-pick="choose a file">'
               . '</label>'
               . ($rule ? '<div class="naming-check" hidden></div>' : '')
               // ⚠ REQUIRED (David, 2026-10-22: "so people describe what they
@@ -1696,12 +1707,13 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   ? '<label>Link to the final files <small class="muted">(Drive or LucidLink, optional)</small>'
                     . '<input type="url" name="link" maxlength="500" placeholder="https://…"></label>'
                   : '')
-              . '<p class="muted small">Each file is its own version, in the order you pick them. '
-              . 'Naming somebody rings their bell and emails them.</p>'
+              . '<p class="muted small">Several files? Each one becomes the next version ('
+              . e(version_label($nextNo)) . ', ' . e(version_label($nextNo + 1)) . '...). '
+              . 'Type @ and a name to notify someone (bell).</p>'
               . '<button type="submit" class="primary board-version-post">Send for review</button>'
               . '</form>';
 
-        if ($reviewer && $versions) {
+        if ($uploadFolded) {
             // MAKE A REVIEW, for the people who review (David, 2026-10-22): which
             // version it is about, what to change, and pictures pasted straight
             // into the text or picked from disk. Uploading a version stays one
@@ -1723,7 +1735,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             // <select> inside a <summary> is a trap, because clicking it
             // collapses the thing you were about to fill in.
             $form = '<details class="board-expand board-review-expand">'
-                  . '<summary><span class="board-version-title">Make a review</span></summary>'
+                  . '<summary><span class="board-version-title">Review this version</span></summary>'
                   . '<form class="comment-form board-version-form board-review-form" method="post"'
                   . ' enctype="multipart/form-data"'
                   . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
@@ -1746,8 +1758,8 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   // Pasted, picked and dropped files as small thumbnails, each
                   // with an × (David, 2026-10-22). Drawn by assets/board-screen.js.
                   . '<div class="board-review-thumbs" hidden></div>'
-                  . '<p class="muted small">Pasted images and picked files go with the review. '
-                  . 'Naming somebody rings their bell and emails them.</p>'
+                  . '<p class="muted small">Images you paste or attach are added to your review. '
+                  . 'Type @ and a name to notify someone (bell).</p>'
                   . '<button type="submit" class="primary board-version-post">Post review</button>'
                   . '</form></details>'
                   . '<details class="board-expand board-upload-instead">'

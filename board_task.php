@@ -145,7 +145,7 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
   <label class="panel-field">
     <span>Due date</span>
     <?= board_due_cell($t, $projectId, $mayEdit) ?>
-    <small class="muted">The date the timeline draws. Changing it moves that bar and marks the task hand-planned.</small>
+    <small class="muted">Changing this date moves the task on the Timeline.</small>
   </label>
   <label class="panel-field">
     <span>Link</span>
@@ -165,8 +165,7 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
     <?php else: ?>
       <p class="panel-read muted">Nothing up yet</p>
     <?php endif; ?>
-    <small class="muted">Counted from what is on the <button type="button"
-      class="linkish panel-tab-link" data-tab="versions">Versions and notes</button> tab.</small>
+    <small class="muted">The latest version uploaded.</small>
   </label>
   <label class="panel-field">
     <span>Notes</span>
