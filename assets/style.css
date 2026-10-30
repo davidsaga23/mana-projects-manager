@@ -3438,12 +3438,28 @@ button.secondary.danger:hover { background: var(--danger-border); }
   grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
   align-items: center;
 }
+/* ⚠ EACH TITLE OVER ITS OWN COLUMN (David, 2026-10-29: "FRAMESLINK", and
+   "some titles do not sit above their column"). The head is laid out exactly
+   like a row: no padding of its own, the 1px transparent border that mirrors
+   .board-rows, and each title padded like the .board-cell under it. It used
+   to pad the whole head 14px a side and not the titles, which gave the two
+   flexible columns 26px less to share, and with no padding a right-aligned
+   Frames ran straight into Link and Version sat off its centred column. */
 .board-grid-head {
-  padding: 0 14px 8px;
+  padding: 0 0 8px;
+  border-left: 1px solid transparent; border-right: 1px solid transparent;
+  align-items: end;
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--faint);
 }
+.board-grid-head > div { padding: 0 14px; min-width: 0; }
 .board-grid-head .num { text-align: right; }
+/* Version and Review notes: centred like their cells, with the same 4px
+   sides. A flex box so a title wider than its 56px column spills evenly
+   both ways instead of off to the right; "Review notes" wraps to two lines. */
+.board-grid-head > .board-head-center {
+  padding: 0 4px; display: flex; justify-content: center; text-align: center;
+}
 
 .board-group { margin-bottom: 22px; }
 .board-group-head {
