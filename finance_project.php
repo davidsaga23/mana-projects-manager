@@ -269,12 +269,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // from the page, so an id posted from another show would be MOVED
             // here rather than refused.
             $id = (int)$_POST['update_invoice'];
-            $mine = false;
-            foreach (project_invoices($projectId) as $iv) if ((int)$iv['id'] === $id) $mine = true;
+            $mine = null;
+            foreach (project_invoices($projectId) as $iv) if ((int)$iv['id'] === $id) $mine = $iv;
             if (!$mine) throw new RuntimeException('That invoice is not on this show, so nothing was changed.');
 
             $in = $_POST;
             $in['invoice_id'] = $id;
+            // ⚠ TAKING AN INVOICE BACK OUT OF PAID. The edit form shows its paid
+            // date, and save_invoice() reads any paid date as "paid", so picking
+            // Pending on a paid invoice was silently turned back into Paid (David,
+            // 2026-10-29: "I can't change the status of this invoice to pending
+            // anymore"). When the status is moved off Paid and the date is the
+            // one it already had, the status is the change somebody meant, so the
+            // date goes. Typing a NEW paid date still marks it paid.
+            if (!empty($mine['paid_date']) && (string)($in['status'] ?? '') !== 'paid'
+                && trim((string)($in['paid_date'] ?? '')) === (string)$mine['paid_date']) {
+                $in['paid_date'] = '';
+            }
             // The position picker sends "crewId:stepId"; resolved from this
             // show's own lanes, never trusted from the browser.
             $in['crew_id'] = null; $in['step_id'] = null; $in['step_name'] = null;
@@ -2036,7 +2047,8 @@ if ($retakePct <= 0):
             <div class="invoice-edit-actions">
               <button type="submit">Save</button>
               <button type="button" class="secondary invoice-edit-cancel" data-invoice="<?= (int)$iv['id'] ?>">Cancel</button>
-              <span class="muted small">Setting a paid date marks it paid; Paid with no date fills in today.</span>
+              <span class="muted small">Setting a paid date marks it paid; Paid with no date fills in today;
+                another status on a paid invoice clears its paid date.</span>
             </div>
           </form>
         </td>
