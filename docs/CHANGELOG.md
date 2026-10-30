@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Naming somebody with @ works in the review viewer *(no migration)*
+
+- **Fix.** Typing @ in the review viewer's box (on Spell, My tasks and Reviews) opened the list of
+  names behind the full-screen viewer, so nobody could be picked. It now opens on top.
+
 ## 2026-10-30 — Fix: Bookings shows days off *(no migration; uses 060)*
 
 - A person's days off (entered on their person page, `crew_absences`) are now drawn as stripes over
