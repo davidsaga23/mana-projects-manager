@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Spell task panel: plainer wording *(no migration)*
+
+- Details: the Due date help now reads "Changing this date moves the task on the Timeline.", and
+  Current version reads "The latest version uploaded."
+- Versions and notes: "Make a review" is now "Review this version"; the upload form no longer repeats
+  its title under "Upload a new version"; the drop zone says "Drop your video or image here, or
+  choose a file"; the help lines say "Several files? Each one becomes the next version (v09,
+  v10...)" with the task's real next numbers, "Images you paste or attach are added to your
+  review.", and "Type @ and a name to notify someone (bell)." (David asked to mention only the bell).
+- Comments: a comment that is only an image shows just the image, not "(attachment)". The saved
+  text is unchanged, so notifications still read the same.
+
 ## 2026-10-29 — Fix: a paid invoice can be set back to Pending *(no migration)*
 
 - Editing a paid invoice and choosing another status was turned straight back into Paid, because
