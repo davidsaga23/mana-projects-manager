@@ -24,14 +24,20 @@
 // time? Is it through the start date until now? Is it by how many assets we've
 // finished?"):
 //
-//   spent      per person per step: what has been invoiced, plus the logged
+//   committed  per person per step: what has been invoiced, plus the logged
 //              days not invoiced yet at that person's rate. Never "start date
 //              until today": the calendar measures time passing, not money.
 //              People paid per second or per job have no days to price, so
 //              theirs is the share of their fee the approved work has earned.
+//              (Kept under the key 'spent' in the arrays below; the screen
+//              calls it Committed.)
+//   spent      invoices marked PAID, and nothing else (David, 2026-10-29:
+//              "Spent so far sounds like money we've actually paid, can we add
+//              a commited cost that sums the invoices and the logged time and
+//              leave spent so far as only paid invoices?"). Kept as 'paid'.
 //   done       approved out of the step's items (seconds on a footage step),
 //              the same count the production dashboard draws.
-//   forecast   spent ÷ done, once a step is far enough in to mean something;
+//   forecast   committed ÷ done, once a step is far enough in to mean something;
 //              before that, the step's cost in today's projection.
 //
 // COMPUTED, NEVER STORED, like the projection it reads. Everything comes out of
@@ -125,7 +131,9 @@ function sv_signed_off_plan(PDO $pdo, int $projectId, array $proj): array {
 }
 
 /**
- * Invoiced amount and invoiced DAYS per position, keyed "crewId|stepId".
+ * Invoiced amount, the PAID part of it, and invoiced DAYS per position, keyed
+ * "crewId|stepId". Paid means a paid date is set: marking an invoice paid
+ * always fills one in (finance.php), so the date is the one test.
  *
  * The days are what stop logged time being counted twice: a person who has
  * invoiced 10 days and logged 14 has 4 days of work nobody has billed yet.
@@ -140,7 +148,7 @@ function sv_invoiced_by_position(int $projectId, float $hoursPerDay): array {
     $hasQty = finance_column_exists('invoices', 'quantity') && finance_column_exists('invoices', 'quantity_unit');
     try {
         $q = $db->prepare(
-            'SELECT crew_id, step_id, currency, amount'
+            'SELECT crew_id, step_id, currency, amount, paid_date'
             . ($hasQty ? ', quantity, quantity_unit' : '')
             . ' FROM invoices WHERE project_id = ? AND crew_id IS NOT NULL AND step_id IS NOT NULL'
         );
@@ -152,9 +160,10 @@ function sv_invoiced_by_position(int $projectId, float $hoursPerDay): array {
     $out = [];
     foreach ($q as $r) {
         $k = (int)$r['crew_id'] . '|' . (int)$r['step_id'];
-        $o = $out[$k] ?? ['amount' => 0.0, 'days' => 0.0, 'amount_no_qty' => 0.0];
+        $o = $out[$k] ?? ['amount' => 0.0, 'paid' => 0.0, 'days' => 0.0, 'amount_no_qty' => 0.0];
         $usd = fx_usd_or_own((float)$r['amount'], $r['currency'], $fx)[0];
         $o['amount'] += $usd;
+        if (!empty($r['paid_date'])) $o['paid'] += $usd;
         $unit = $hasQty ? (string)($r['quantity_unit'] ?? '') : '';
         $qty  = $hasQty && $r['quantity'] !== null ? (float)$r['quantity'] : null;
         if ($qty !== null && $unit === 'day') {
@@ -220,7 +229,7 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
                 'supervision' => $isSup,
                 'start' => (string)($isSup ? $r['start_date'] : ($r['step']['start_date'] ?? '')),
                 'end'   => (string)($isSup ? $r['end_date'] : ($r['step']['deadline'] ?? '')),
-                'cost_now' => 0.0, 'spent' => 0.0, 'invoiced' => 0.0, 'logged_value' => 0.0,
+                'cost_now' => 0.0, 'spent' => 0.0, 'invoiced' => 0.0, 'paid' => 0.0, 'logged_value' => 0.0,
                 'people' => 0, 'unpriced_logged' => 0.0,
             ];
         }
@@ -230,7 +239,7 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
         if ($r['crew_id'] && empty($r['is_slot'])) $s['people']++;
 
         $k = ($r['crew_id'] ? (int)$r['crew_id'] : 0) . '|' . $sid;
-        $inv = $billed[$k] ?? ['amount' => 0.0, 'days' => 0.0, 'amount_no_qty' => 0.0];
+        $inv = $billed[$k] ?? ['amount' => 0.0, 'paid' => 0.0, 'days' => 0.0, 'amount_no_qty' => 0.0];
         $unit = (string)($r['rate_unit'] ?? '');
         $rate = $r['rate'] !== null ? (float)($r['rate_usd'] ?? $r['rate']) : null;
         $dayRate = $rate === null ? null : ($unit === 'hour' ? $rate * $hpd : ($unit === 'day' ? $rate : null));
@@ -264,6 +273,7 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
             $s['unpriced_logged'] += (float)$r['actual_days'];
         }
         $s['invoiced'] += $inv['amount'];
+        $s['paid'] += $inv['paid'];
         $s['spent'] += $spent;
         unset($s);
     }
@@ -272,11 +282,11 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
     $rows = [];
     $locked = 0.0; $expected = 0.0; $saved = 0.0;
     $lockedSteps = []; $expectedSteps = []; $savedSteps = [];
-    $spentTotal = 0.0; $invoicedTotal = 0.0; $forecastTotal = 0.0; $planTotal = 0.0;
+    $spentTotal = 0.0; $invoicedTotal = 0.0; $paidTotal = 0.0; $forecastTotal = 0.0; $planTotal = 0.0;
     $earnedPlan = 0.0;
     $logGaps = [];
     foreach ($steps as $sid => $s) {
-        foreach (['cost_now', 'spent', 'invoiced', 'logged_value'] as $f) $s[$f] = round($s[$f], 2);
+        foreach (['cost_now', 'spent', 'invoiced', 'paid', 'logged_value'] as $f) $s[$f] = round($s[$f], 2);
         $p = $plan['source'] === 'kickoff' ? ($plan['steps'][$sid] ?? null) : $s['cost_now'];
         $s['plan'] = $p;
         $s['new_since_signoff'] = $plan['source'] === 'kickoff' && $p === null;
@@ -361,7 +371,7 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
             }
         }
 
-        $spentTotal += $s['spent']; $invoicedTotal += $s['invoiced'];
+        $spentTotal += $s['spent']; $invoicedTotal += $s['invoiced']; $paidTotal += $s['paid'];
         $forecastTotal += $forecast; $planTotal += $p;
         $earnedPlan += $p * $frac;
         $rows[$sid] = $s;
@@ -371,6 +381,7 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
     // No items and no pace, so entered is spent and spent is the forecast. Kept
     // as its own line so an overrun on it is still never netted against a step.
     $otherNow  = round((float)($proj['other_total'] ?? 0), 2);
+    $otherPaid = round((float)($proj['other_paid'] ?? 0), 2);
     $otherPlan = $plan['source'] === 'kickoff' ? (float)$plan['other'] : $otherNow;
     if ($otherNow > SV_CENT || $otherPlan > SV_CENT) {
         $diff = round($otherNow - $otherPlan, 2);
@@ -378,13 +389,13 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
             'id' => 0, 'name' => 'Other expenses', 'role' => '', 'department' => 'Other',
             'order' => 9999, 'supervision' => false, 'start' => '', 'end' => '',
             'plan' => $otherPlan, 'new_since_signoff' => false, 'cost_now' => $otherNow,
-            'spent' => $otherNow, 'invoiced' => 0.0, 'logged_value' => 0.0, 'people' => 0,
+            'spent' => $otherNow, 'invoiced' => 0.0, 'paid' => $otherPaid, 'logged_value' => 0.0, 'people' => 0,
             'unpriced_logged' => 0.0, 'done' => null, 'done_text' => 'software, travel, services',
             'state' => 'running', 'readable' => true, 'why_unreadable' => '', 'saving_pending' => false,
             'forecast' => $otherNow, 'diff' => $diff,
         ];
         if ($diff > SV_CENT) { $expected += $diff; $expectedSteps[] = ['Other expenses', $diff]; }
-        $spentTotal += $otherNow; $forecastTotal += $otherNow; $planTotal += $otherPlan;
+        $spentTotal += $otherNow; $paidTotal += $otherPaid; $forecastTotal += $otherNow; $planTotal += $otherPlan;
         $earnedPlan += $otherPlan;   // counted as done: it is already entered
     }
 
@@ -411,6 +422,9 @@ function step_variance(PDO $pdo, array $project, array $proj, ?float $budget, ar
         'left'        => $left,
         'spent'       => round($spentTotal, 2),
         'invoiced'    => round($invoicedTotal, 2),
+        // Invoices marked paid, plus other expenses with a paid date: money
+        // that has actually left. 'spent' above is the commitment.
+        'paid'        => round($paidTotal, 2),
         'forecast'    => round($forecastTotal + array_sum($plan['unmatched']), 2),
         'pct_done'    => $planTotal > 0 ? $earnedPlan / $planTotal : null,
         'log_gaps'    => $logGaps,
@@ -537,9 +551,19 @@ function render_step_variance(array $v): void {
   <div><span class="muted small">Plan <?= $v['plan_source'] === 'kickoff' ? 'at sign-off' : 'today' ?></span>
     <strong><?= e($m($v['plan_total'])) ?></strong>
     <?php if ($v['plan_date']): ?><span class="muted small">signed off <?= e($v['plan_date']) ?></span><?php endif; ?></div>
-  <div><span class="muted small">Spent so far</span>
+  <?php // TWO FIGURES, KEPT APART (David, 2026-10-29). "Spent" is money that has
+        // actually left: paid invoices and paid expenses. "Committed" is what the
+        // show owes for the work done so far, paid or not: every invoice plus
+        // logged days nobody has invoiced yet. The forecast and the results below
+        // are built on Committed, because an unpaid invoice is still a cost. ?>
+  <div><span class="muted small">Committed so far</span>
     <strong><?= e($m($v['spent'])) ?></strong>
-    <span class="muted small"><?= e($m($v['invoiced'])) ?> of it invoiced, the rest logged and not invoiced yet</span></div>
+    <span class="muted small"><?= e($m($v['invoiced'])) ?> invoiced, the rest logged and not invoiced yet</span></div>
+  <div><span class="muted small">Spent so far</span>
+    <strong><?= e($m($v['paid'])) ?></strong>
+    <span class="muted small">invoices paid<?php
+      $unpaid = (float)$v['invoiced'] - (float)$v['paid'];
+      if ($unpaid > SV_CENT): ?>; <?= e($m($unpaid)) ?> invoiced, not paid yet<?php endif; ?></span></div>
   <div><span class="muted small">Forecast at the real pace</span>
     <strong class="<?= $v['budget'] !== null && $v['forecast'] > $v['budget'] + SV_CENT ? 'err' : '' ?>"><?= e($m($v['forecast'])) ?></strong>
     <?php if ($v['pct_done'] !== null): ?><span class="muted small"><?= e(fmt_num($v['pct_done'] * 100, 0)) ?>% of the work done, weighted by plan</span><?php endif; ?></div>
@@ -548,8 +572,8 @@ function render_step_variance(array $v): void {
 <div class="sv-table">
 <table>
   <thead><tr>
-    <th>Step</th><th class="num">Plan</th><th class="num">Spent so far</th><th>Work done</th>
-    <th>Spent against plan</th><th class="num">Forecast at the end</th><th>Result</th>
+    <th>Step</th><th class="num">Plan</th><th class="num">Committed</th><th>Work done</th>
+    <th>Committed against plan</th><th class="num">Forecast at the end</th><th>Result</th>
   </tr></thead>
   <tbody>
   <?php foreach ($groups as $g => $label): if (!$v['groups'][$g]) continue; ?>
@@ -573,6 +597,7 @@ function render_step_variance(array $v): void {
           <span class="sv-sub"><?= e($m($r['invoiced'])) ?> invoiced + <?= e($m($r['logged_value'])) ?> not yet</span>
         <?php elseif ($r['logged_value'] > SV_CENT): ?><span class="sv-sub">not invoiced yet</span>
         <?php elseif ($r['invoiced'] > SV_CENT): ?><span class="sv-sub">invoiced</span><?php endif; ?>
+        <?php if ($r['paid'] > SV_CENT): ?><span class="sv-sub"><?= e($m($r['paid'])) ?> paid</span><?php endif; ?>
         <?php if ($r['unpriced_logged'] > 0.05): ?><span class="sv-sub warn-text"><?= e(fmt_num($r['unpriced_logged'], 1)) ?> logged days with no rate</span><?php endif; ?></td>
       <td><?= e($r['done_text']) ?><?php if ($r['done'] !== null): ?> · <?= e(fmt_num($r['done'] * 100, 0)) ?>%
         <div class="sv-donebar"><i style="width:<?= e(fmt_num($r['done'] * 100, 1)) ?>%"></i></div><?php endif; ?></td>
@@ -599,7 +624,7 @@ function render_step_variance(array $v): void {
         <?php elseif ($r['diff'] > SV_CENT): ?>
           <span class="sv-chip sv-chip-risk">+<?= e($m($r['diff'])) ?> expected</span>
           <?php if ($r['readable'] && $plan > SV_CENT && $r['done'] !== null): ?><span class="sv-sub"><?=
-            e(fmt_num($r['spent'] / $plan * 100, 0)) ?>% of plan spent, <?= e(fmt_num($r['done'] * 100, 0)) ?>% done</span><?php endif; ?>
+            e(fmt_num($r['spent'] / $plan * 100, 0)) ?>% of plan committed, <?= e(fmt_num($r['done'] * 100, 0)) ?>% done</span><?php endif; ?>
         <?php elseif (!$r['readable']): ?>
           <span class="sv-chip sv-chip-early"><?= e($r['why_unreadable']) ?></span>
         <?php else: ?>
@@ -620,9 +645,9 @@ function render_step_variance(array $v): void {
 </table>
 </div>
 <div class="sv-legend muted small">
-  <span><i class="sv-k-spent"></i>spent so far</span>
-  <span><i class="sv-k-over"></i>spent beyond the plan</span>
-  <span><i class="sv-k-fc"></i>still to spend (forecast)</span>
+  <span><i class="sv-k-spent"></i>committed so far</span>
+  <span><i class="sv-k-over"></i>committed beyond the plan</span>
+  <span><i class="sv-k-fc"></i>still to commit (forecast)</span>
   <span><i class="sv-k-fc-bad"></i>forecast past the plan</span>
   <span><i class="sv-k-plan"></i>the plan</span>
 </div>
@@ -632,7 +657,7 @@ function render_step_variance(array $v): void {
     <?= (int)$gp['people'] ?> <?= $gp['people'] === 1 ? 'person is' : 'people are' ?> on it,
     <?= $gp['last'] === null ? 'and nobody has logged any time on it yet'
           : 'but nobody has logged time on it for ' . (int)$gp['gap'] . ' working days' ?>.
-    Spent so far may be too low until they log.</div>
+    Committed may be too low until they log.</div>
 <?php endforeach; ?>
 
 <?php if ($v['unmatched']): ?>
@@ -648,15 +673,17 @@ function render_step_variance(array $v): void {
   <ul>
     <li><strong>Plan:</strong> each step's cost in the expense projection signed off at kick-off. It does not move
       afterwards; a step added later has no plan, so all of its cost counts as over.</li>
-    <li><strong>Spent so far:</strong> for each person on each step, what they have invoiced, plus the days they have
-      logged and not invoiced yet at their rate. Never "start date until today": the calendar measures time, not
+    <li><strong>Spent so far:</strong> invoices marked paid, and other expenses with a paid date: money that has
+      actually left, nothing else.</li>
+    <li><strong>Committed:</strong> for each person on each step, what they have invoiced (paid or not), plus the days
+      they have logged and not invoiced yet at their rate. Never "start date until today": the calendar measures time, not
       money. People paid per second or per job count the share of their fee the approved work has earned.
       Supervision counts its dates.</li>
     <li><strong>Work done:</strong> approved items out of the step's items (seconds on a footage step), the same count
       as the production dashboard.</li>
-    <li><strong>Forecast at the end:</strong> spent ÷ work done. Below 15% done, or with fewer than 3 items, the step
+    <li><strong>Forecast at the end:</strong> committed ÷ work done. Below 15% done, or with fewer than 3 items, the step
       shows today's projection instead, because the first items through a step carry its set-up.</li>
-    <li><strong>Locked in</strong> is a finished step's spend above its plan; <strong>expected</strong> is a running
+    <li><strong>Locked in</strong> is a finished step's committed cost above its plan; <strong>expected</strong> is a running
       step's forecast above its plan. <strong>Reserve</strong> is the approved budget less the plan, plus what finished
       steps saved. A saving reaches the reserve only once the step is finished and all of it is invoiced; a running
       step that looks cheap adds nothing. None of these are netted against each other.</li>
