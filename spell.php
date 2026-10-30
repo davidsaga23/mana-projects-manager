@@ -186,9 +186,19 @@ require __DIR__ . '/includes/header.php';
       <select id="fCrew" aria-label="Filter by who it is assigned to">
         <option value="">Anybody</option>
         <option value="__none">Nobody yet</option>
-        <?php foreach ($crew as $c): ?>
+        <?php // The show's crew, then "Other people": only those holding a task
+              // here, since filtering by somebody with none shows an empty board. ?>
+        <?php foreach ($crew as $c): if (!$c['on_show']) continue; ?>
           <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
         <?php endforeach; ?>
+        <?php $others = array_filter($crew, fn($c) => !$c['on_show'] && $c['has_task']); ?>
+        <?php if ($others): ?>
+          <optgroup label="Other people">
+            <?php foreach ($others as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endif; ?>
       </select>
     </div>
     <div class="board-due-filter">

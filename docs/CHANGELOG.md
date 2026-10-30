@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Spell: the Assignee list grouped by Staffing; New ticket Owner shows people *(no migration)*
+
+- A task's Assignee dropdown opens on the people with a slot on that step in Staffing, then the
+  rest of the show's crew, then "Other people" (everybody else in the studio). It used to be the
+  same A-Z list of 23 on every task, including people not on the show's Staffing.
+- The "Anybody" filter lists the show's crew, then "Other people" who hold a task on the show.
+- A crew name that is a username ("Julia_tolstova") shows the full name from that person's login.
+- The Assignee column is wider (220px) so full names are not cut off.
+- The Owner list when creating a ticket (Studio board, My tasks, a show's Tickets) no longer lists
+  unfilled slots, and a name that exists twice shows once. Teams are still listed.
+
 ## 2026-10-29 — Delete a comment in Spell *(no migration)*
 
 - **Delete** beside Reply and Copy URL on a task's comments, for whoever wrote it and for admins.

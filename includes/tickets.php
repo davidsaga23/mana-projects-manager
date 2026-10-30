@@ -854,6 +854,36 @@ function ticket_assignees(PDO $pdo, int $projectId): array {
     return $stmt->fetchAll();
 }
 
+/**
+ * The Owner list of a NEW ticket: people, each once (David, 2026-10-29: "100+
+ * '(unfilled slot)' lines and some names twice. Show people only").
+ *
+ * Unfilled slots are dropped: a new ticket is handed to somebody, and the
+ * slots of every show at once buried the people. Teams stay, labelled, because
+ * a ticket can belong to one. Two crew rows with the same name (Agustin Scavino
+ * has two) show once, keeping the row a login belongs to, since that is the one
+ * whose My tasks the ticket lands in; then $keepId, the one already chosen.
+ *
+ * Only for creating. An existing ticket may be owned by a slot or the other
+ * duplicate, and an edit list without its owner would quietly unassign it.
+ */
+function new_ticket_owners(PDO $pdo, iterable $rows, int $keepId = 0): array {
+    $loggedIn = [];
+    if (column_exists($pdo, 'users', 'crew_id')) {
+        foreach ($pdo->query('SELECT crew_id FROM users WHERE active = 1 AND crew_id IS NOT NULL') as $u) {
+            $loggedIn[(int)$u['crew_id']] = true;
+        }
+    }
+    $rank = fn($c) => ((int)$c['id'] === $keepId ? 2 : 0) + (isset($loggedIn[(int)$c['id']]) ? 1 : 0);
+    $byName = [];
+    foreach ($rows as $c) {
+        if ((int)($c['is_placeholder'] ?? 0) === 1) continue;
+        $key = mb_strtolower(trim((string)$c['name'])) . '|' . (int)($c['is_team'] ?? 0);
+        if (!isset($byName[$key]) || $rank($c) > $rank($byName[$key])) $byName[$key] = $c;
+    }
+    return array_values($byName);
+}
+
 /** How an assignee should read in a dropdown: "Animation 02 (unfilled slot)". */
 function assignee_label(array $crew): string {
     if ((int)($crew['is_team'] ?? 0) === 1)        return $crew['name'] . ' (team)';

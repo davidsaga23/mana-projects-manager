@@ -521,8 +521,8 @@ require __DIR__ . '/includes/header.php';
         <label>Owner
           <select name="assigned_crew_id" id="studioCreateOwner">
             <option value="">nobody</option>
-            <?php foreach ($pdo->query('SELECT id, name, role, email, is_team, is_placeholder
-                                          FROM crew WHERE active = 1 ORDER BY name') as $c): ?>
+            <?php foreach (new_ticket_owners($pdo, $pdo->query('SELECT id, name, role, email, is_team, is_placeholder
+                                          FROM crew WHERE active = 1 ORDER BY name')) as $c): ?>
               <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
             <?php endforeach; ?>
           </select>

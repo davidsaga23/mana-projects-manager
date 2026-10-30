@@ -656,22 +656,38 @@ function board_status_cell(array $t, array $statuses, int $projectId,
 
 /** Who the task belongs to. Production only: an artist cannot hand work about. */
 function board_crew_cell(array $t, array $crew, int $projectId, bool $mayEdit): string {
+    $byId = [];
+    foreach ($crew as $c) $byId[(int)$c['id']] = $c;
     if (!$mayEdit) {
-        $name = $t['person'];
+        $name = $t['crew_id'] !== null && isset($byId[(int)$t['crew_id']])
+              ? $byId[(int)$t['crew_id']]['name'] : $t['person'];
         return '<div class="board-cell">' . ($name
             ? '<span class="board-who"><span class="board-avatar">' . e(board_initials($name))
               . '</span>' . e($name) . '</span>'
             : '<span class="muted">—</span>') . '</div>';
     }
+    // This step's people, the rest of the show, everybody else (see
+    // board_assignees()). An empty group is not drawn.
+    $stepId = (int)($t['step_id'] ?? 0);
+    $groups = [[(string)($t['step'] ?? 'This step'), []], ['Rest of the crew', []], ['Other people', []]];
+    foreach ($crew as $c) {
+        $g = in_array($stepId, $c['steps'], true) ? 0 : ($c['on_show'] ? 1 : 2);
+        $groups[$g][1][] = $c;
+    }
     $out = '<div class="board-cell"><select class="board-crew"' . board_cell_attrs($t, $projectId)
          . ' aria-label="Who is on ' . e($t['step']) . '">'
          . '<option value="">Nobody yet</option>';
     $seen = false;
-    foreach ($crew as $c) {
-        $id = (int)$c['id'];
-        $on = $t['crew_id'] === $id;
-        if ($on) $seen = true;
-        $out .= '<option value="' . $id . '"' . ($on ? ' selected' : '') . '>' . e($c['name']) . '</option>';
+    foreach ($groups as [$label, $people]) {
+        if (!$people) continue;
+        $out .= '<optgroup label="' . e($label) . '">';
+        foreach ($people as $c) {
+            $id = (int)$c['id'];
+            $on = $t['crew_id'] === $id;
+            if ($on) $seen = true;
+            $out .= '<option value="' . $id . '"' . ($on ? ' selected' : '') . '>' . e($c['name']) . '</option>';
+        }
+        $out .= '</optgroup>';
     }
     // Somebody named on the row who is no longer on the crew list still has to
     // appear, or opening this dropdown would quietly unassign them.
@@ -979,25 +995,73 @@ function board_task_logged(PDO $pdo, int $projectId, int $stepId, string $itemKe
 }
 
 /**
- * The crew this show's tasks can be handed to: real people on the project,
- * plus anybody already named on one of its rows.
+ * Everybody a task on this show can be handed to, each with where they stand
+ * on it: the Assignee dropdown and the "Anybody" filter both group by that.
+ *
+ * ⚠ GROUPED BY STAFFING, NOT ONE A-Z LIST (David, 2026-10-29). Every task
+ * offered the same 23 names, people on no slot of the show among them. Now a
+ * task's own step comes first (its slots on Staffing: a BG Layout task opens on
+ * the BG Layout artists), then the rest of the show's crew, then "Other people"
+ * — still everybody, because a task can go to somebody not on Staffing yet.
+ * "On the show" means a slot on Staffing (crew_lanes), not crew_projects: that
+ * one keeps everybody who ever touched the show, which is how people not on
+ * MSD's Staffing ended up in the list.
  *
  * Placeholder slots are left out — "Animation 02" is a position, not somebody
  * who can be told a task is theirs. A team row is left out for the same reason.
+ * Somebody who has left the studio stays only while they still hold a task here.
+ *
+ * Rows of id, name (board_person_name()), steps (the step ids they fill a slot
+ * on here), on_show and has_task, sorted by name.
  */
 function board_assignees(PDO $pdo, int $projectId): array {
+    $login = column_exists($pdo, 'users', 'crew_id')
+        ? '(SELECT u.display_name FROM users u WHERE u.crew_id = c.id AND u.active = 1
+              ORDER BY u.id LIMIT 1)'
+        : 'NULL';
     $q = $pdo->prepare(
-        'SELECT DISTINCT c.id, c.name
+        'SELECT c.id, c.name, ' . $login . ' AS login_name,
+                EXISTS (SELECT 1 FROM progress pr
+                         WHERE pr.crew_id = c.id AND pr.project_id = ?) AS has_task
            FROM crew c
-           LEFT JOIN crew_projects cp ON cp.crew_id = c.id AND cp.project_id = ?
-           LEFT JOIN progress pr ON pr.crew_id = c.id AND pr.project_id = ?
           WHERE COALESCE(c.is_placeholder, 0) = 0
             AND COALESCE(c.is_team, 0) = 0
-            AND (cp.crew_id IS NOT NULL OR pr.crew_id IS NOT NULL)
-          ORDER BY c.name'
+            AND (c.active = 1 OR EXISTS (SELECT 1 FROM progress pr2
+                                          WHERE pr2.crew_id = c.id AND pr2.project_id = ?))'
     );
     $q->execute([$projectId, $projectId]);
-    return $q->fetchAll();
+    $steps = [];
+    $l = $pdo->prepare('SELECT crew_id, step_id FROM crew_lanes WHERE project_id = ?');
+    $l->execute([$projectId]);
+    foreach ($l->fetchAll() as $r) $steps[(int)$r['crew_id']][(int)$r['step_id']] = true;
+
+    $out = [];
+    foreach ($q->fetchAll() as $c) {
+        $id = (int)$c['id'];
+        $out[] = [
+            'id'       => $id,
+            'name'     => board_person_name((string)$c['name'], $c['login_name']),
+            'steps'    => array_keys($steps[$id] ?? []),
+            'on_show'  => isset($steps[$id]),
+            'has_task' => (bool)$c['has_task'],
+        ];
+    }
+    usort($out, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+    return $out;
+}
+
+/**
+ * A person's full name, never their username (David, 2026-10-29: the list read
+ * "Julia_tolstova" and "The.real.elemental.artist"). Some crew rows were made
+ * from a login and carry its username as their name; the login's display name
+ * is the real one. Only swapped when the crew name looks like a username (no
+ * space) and the display name looks like a name (has one), so a crew name
+ * somebody typed properly is never overridden.
+ */
+function board_person_name(string $crewName, $loginName): string {
+    $login = trim((string)$loginName);
+    if ($login !== '' && !str_contains(trim($crewName), ' ') && str_contains($login, ' ')) return $login;
+    return $crewName;
 }
 
 /**

@@ -3434,8 +3434,12 @@ button.secondary.danger:hover { background: var(--danger-border); }
      minimum is now about 1356px rather than 1296px, so a 1280 laptop scrolls a
      little. The cheapest thing to drop if that ever matters is Frames: 70px
      that reads "—" on every task row and carries a number only on the shot
-     above them. */
-  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
+     above them.
+
+     ⚠ ASSIGNEE IS 220px, NOT 170 (David, 2026-10-29: "Onderson Prates R..."),
+     so a full name fits in the closed dropdown. That put the minimum near
+     1406px. */
+  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 220px 118px 70px 92px minmax(100px, .9fr);
   align-items: center;
 }
 /* ⚠ EACH TITLE OVER ITS OWN COLUMN (David, 2026-10-29: "FRAMESLINK", and
@@ -3684,7 +3688,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-filters {
   display: grid;
-  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 170px 118px 70px 92px minmax(100px, .9fr);
+  grid-template-columns: minmax(452px, 1.6fr) 84px 56px 64px 150px 220px 118px 70px 92px minmax(100px, .9fr);
   align-items: center; gap: 0; padding: 0 14px 9px;
 }
 .board-filters > div { padding-right: 8px; min-width: 0; }

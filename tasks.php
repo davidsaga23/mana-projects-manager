@@ -500,7 +500,7 @@ foreach ($cards as $sid => $list) {
         <label>Owner <span class="req-mark ticket-only" style="display:none;">*</span>
           <select name="assigned_crew_id" id="createCrew">
             <option value="">nobody</option>
-            <?php foreach ($assignees as $c): ?>
+            <?php foreach (new_ticket_owners($pdo, $assignees) as $c): ?>
               <option value="<?= (int)$c['id'] ?>"><?= e(assignee_label($c)) ?></option>
             <?php endforeach; ?>
           </select>
