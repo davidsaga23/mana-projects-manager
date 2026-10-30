@@ -53,6 +53,9 @@ $openBugs = 0;
 if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
     $openBugs = (int)$pdo->query("SELECT COUNT(*) FROM bug_reports WHERE status = 'open'")->fetchColumn();
 }
+// The first-time tour (2026-10-30): null unless it runs on this page. See includes/tour.php.
+require_once __DIR__ . '/tour.php';
+$tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
@@ -229,6 +232,7 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
         · <a href="bugs.php">Bugs<?php if ($openBugs > 0): ?><span class="pending-badge"
              title="Open bug reports"><?= $openBugs ?></span><?php endif; ?></a>
       <?php endif; ?>
+      · <a href="<?= e(tour_link()) ?>" title="Show the guided tour again">Tour</a>
       · <a href="logout.php">Log out</a>
     </div>
   </div>
@@ -301,3 +305,7 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
       // it needs nothing from the DOM until DOMContentLoaded anyway. ?>
 <script defer src="assets/keepplace.js<?= asset_ver('keepplace.js') ?>"></script>
 <?php if (isset($pdo) && $pdo instanceof PDO) render_bug_button($pdo); ?>
+<?php if ($tourBoot): ?>
+<link rel="stylesheet" href="assets/tour.css<?= asset_ver('tour.css') ?>">
+<script defer src="assets/tour.js<?= asset_ver('tour.js') ?>" id="tourScript"<?= tour_attrs($pdo, $tourBoot) ?>></script>
+<?php endif; ?>
