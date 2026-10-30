@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Fix: a paid invoice can be set back to Pending *(no migration)*
+
+- Editing a paid invoice and choosing another status was turned straight back into Paid, because
+  its paid date was still in the form. Moving a paid invoice to another status now clears its paid
+  date; typing a new paid date still marks it paid.
+
 ## 2026-10-29 — Spell board: header counts match the bar *(no migration)*
 
 - The line under a show's name ("N shots and assets · N tasks · N finished") now agrees with the
