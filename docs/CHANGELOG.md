@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Fix: Bookings shows days off *(no migration; uses 060)*
+
+- A person's days off (entered on their person page, `crew_absences`) are now drawn as stripes over
+  their bars on Bookings, By person, with the dates and reason on hover. Before, Bookings showed
+  somebody as needed on every day from a step's start to its deadline, even on a day off.
+- Clashes are still worked out from the steps' dates: a day off inside two overlapping bookings does
+  not remove the overlap.
+
 ## 2026-10-30 — Fix: Home's Invoice tab could not read a show's statement *(no migration)*
 
 - "Call to undefined function pipeline_steps()": the statement code needed a file the statement
