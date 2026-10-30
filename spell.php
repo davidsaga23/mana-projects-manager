@@ -162,8 +162,8 @@ require __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
       </select>
       <select id="fReady" aria-label="Filter by whether the work can start">
-        <option value="">Started or not</option>
-        <option value="1">Ready to pick up</option>
+        <option value="">All tasks</option>
+        <option value="1">Ready to start</option>
       </select>
     </div>
     <?php // Copy URL, Version and Notes have nothing to filter. ?>
@@ -423,10 +423,8 @@ require __DIR__ . '/includes/header.php';
 </aside>
 
 <p class="muted small board-foot">
-  Shots, tasks and statuses are the same rows the rest of Anima reads. Frames come from the
-  <a href="shots.php?project=<?= $projectId ?>">breakdown</a>, a shot's own status is worked out
-  from the tasks under it, and a due date typed here is the date the
-  <a href="timeline.php?project=<?= $projectId ?>">timeline</a> draws.
+  A shot's status comes from its tasks. Due dates set here also move the
+  <a href="timeline.php?project=<?= $projectId ?>">Timeline</a>.
 </p>
 
 <?php endif; ?>

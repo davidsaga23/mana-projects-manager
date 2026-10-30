@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Spell: plainer filter and footer wording *(no migration)*
+
+- The second filter reads "All tasks" / "Ready to start" (was "Started or not" / "Ready to pick
+  up"), and the note under the board is now "A shot's status comes from its tasks. Due dates set
+  here also move the Timeline."
+
 ## 2026-10-29 — Spell task panel: plainer wording *(no migration)*
 
 - Details: the Due date help now reads "Changing this date moves the task on the Timeline.", and
