@@ -4795,6 +4795,22 @@ locked-in/expected stay on Committed, because an invoice nobody has paid yet is 
 show has taken on. Internally `step_variance()` keeps the key `spent` for the committed figure and
 adds `paid`.
 
+## 2026-10-30 — A first-time tour, role-aware, shown once
+
+**Asked by David:** "can you create a FTU for new users on how to use the platform and where to
+find stuff?"
+
+**Decided:** an overlay that highlights the real element (no screenshots to keep up to date), one
+list of steps per role in `assets/tour.js`. It is shown by itself **once**: `users.tour_seen_at` is
+stamped when it opens, not when it is finished, so closing the tab half way does not bring it back
+on every login. **Existing logins see it once too** (the column starts empty for everybody), since
+Home, Reviews and Spell are new this month; `UPDATE users SET tour_seen_at = NOW()` right after
+migration 074 would spare them. Not shown by itself while an admin is viewing as somebody.
+Steps cross screens through `?tour=N` in the address; a screen that needs a project borrows the
+first project link on the current page. A step whose element is missing shows its card in the
+middle rather than stopping. The header loads the script only while the tour runs, and decides
+once per session, so it costs at most one small query per login.
+
 ## 2026-10-30 — Home has three tabs, and the person writes their own profile
 
 **Asked by David:** General info (name, email, phone, picture, bio, shows), Work (current tasks, what's
