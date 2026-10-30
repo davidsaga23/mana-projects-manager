@@ -4794,3 +4794,25 @@ which is what the old "Spent so far" summed. The step table, the forecast (commi
 locked-in/expected stay on Committed, because an invoice nobody has paid yet is still a cost the
 show has taken on. Internally `step_variance()` keeps the key `spent` for the committed figure and
 adds `paid`.
+
+## 2026-10-30 — Home has three tabs, and the person writes their own profile
+
+**Asked by David:** General info (name, email, phone, picture, bio, shows), Work (current tasks, what's
+next, lined up after, notes waiting, my versions, my notes, time logged), and Invoice and billing
+(logged time, statement, copyable invoice lines, instructions, the email with a copy to David or Tim,
+invoice status).
+
+**Decided:**
+- **Tabs by `?tab=`, Work first**, because it is the one opened every day. Salaried staff have no
+  Invoice tab.
+- **The person edits their own phone, bio and picture** (migration 074, on `crew`). Saved only to
+  `effective_crew_id()`; `home.php` → `save_profile` is in the artist allow-list and has no id to
+  forge. Name and email stay with an admin, because notifications and logins hang off them.
+- **The picture is served by `avatar.php`** behind the login, like every other upload.
+- **"Current" means picked up** (a status reading in progress, review, retake and the like); what is
+  not started goes under What's next when due this week or late, and under Lined up after otherwise.
+- **The invoice email** goes to accounting@mana.tv, copied to `$config['invoice_cc']`, David by
+  default; the PDF is still the artist's to attach. The instructions are the rules agreed with Tim
+  and Jorik until David sends the studio's own wording.
+- **Invoice status reads Expected / Received · pending payment / Paid**, Finance's three statuses.
+
