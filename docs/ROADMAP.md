@@ -1247,6 +1247,14 @@ sent to the client and what came back*. Building this well makes that one smalle
 David, 2026-10-27: *"we won't develop this one anymore"*. The naming check stays a gate on version
 uploads, as built in PR #76 and fixed in PR #81.
 
+## Asked for on 2026-10-30
+
+### First-time tour — BUILT 2026-10-30, waiting for David's go-ahead
+
+✅ A guided overlay per role (`assets/tour.js`, `includes/tour.php`), shown once on first login and
+from **Tour** in the top bar; migration 074. **Still open:** David to edit the copy; the steps were
+checked on static mock pages only, not on the live screens.
+
 ## Asked for on 2026-10-29
 
 ### A contract per position — BUILT 2026-10-29, waiting for David's go-ahead

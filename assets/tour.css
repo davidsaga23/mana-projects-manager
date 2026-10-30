@@ -1,0 +1,36 @@
+/* THE FIRST-TIME TOUR (2026-10-30), drawn by assets/tour.js.
+   Its own file rather than a block in style.css: it is loaded only while the
+   tour runs, and style.css is the file every session edits at once.
+   Spell's look (#121): the shared radii, --shadow-pop for what floats, the
+   surface tokens. Above everything, the Spell side panel (71) and the
+   🐞 button (90) included. */
+
+/* Takes every click while the tour is open, so a stray one cannot leave the
+   page half way through a step. Transparent: the shade is the spot's shadow. */
+.tour-catch { position: fixed; inset: 0; z-index: 1000; }
+
+/* The spotlight: a hole in a dark veil, made of one huge shadow, so the real
+   element shows through untouched and nothing on the page is moved. */
+.tour-spot {
+  position: fixed; z-index: 1001; pointer-events: none;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 2px var(--primary), 0 0 0 9999px rgba(0, 0, 0, .62);
+}
+.tour-spot[hidden] { display: none; }
+
+.tour-card {
+  position: fixed; z-index: 1002; box-sizing: border-box;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 16px 18px 14px;
+}
+/* No element to point at: the card alone, over the same dark veil. */
+.tour-card.is-centred { box-shadow: var(--shadow-pop), 0 0 0 9999px rgba(0, 0, 0, .62); }
+.tour-count { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .04em; font-size: 11.5px; }
+.tour-title { margin: 0 0 6px; font-size: 17px; }
+.tour-body { margin: 0 0 14px; line-height: 1.5; color: var(--text-2); }
+.tour-actions { display: flex; align-items: center; gap: 8px; }
+.tour-gap { flex: 1; }
+.tour-actions button[hidden] { display: none; }

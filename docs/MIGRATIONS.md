@@ -129,6 +129,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 071 | user_invites | ⏳ **Create user / Resend link** on the person page (`user_invites`): one-time set-your-password links and the log of who sent them. Until it runs, the person page says it needs this and logins are made on Users by hand. |
 | 072 | user_salaried | ⏳ **Who is salaried staff** (`users.is_salaried`), ticked on the Users page. Home shows them no invoice information, amounts or invoice status. Until it runs, the tick is hidden and admin and Production logins count as salaried. |
 | 073 | status_on_hold_lowercase | ⏳ **"On Hold" becomes "On hold"** on every show's statuses and in the template new shows copy from (David, 2026-10-29). Data only, re-runnable. Until it runs, Spell still reads "On Hold". |
+| 074 | user_tour_seen | ⏳ **The first-time tour has been shown** (`users.tour_seen_at`). Until it runs, the browser remembers it instead (once per browser). Optional afterwards: `UPDATE users SET tour_seen_at = NOW();` to spare existing users the tour. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |
