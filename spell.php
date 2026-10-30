@@ -129,8 +129,11 @@ require __DIR__ . '/includes/header.php';
     <?php // Unlabelled on purpose: the button says what it does, and "URL" over
           // a column of buttons reading "Copy URL" is the same word twice. ?>
     <div></div>
-    <div>Version</div>
-    <div class="board-head-center">Notes</div>
+    <?php // "Review notes", not "Notes" (David, 2026-10-29): the yellow number
+          // is the review notes on the latest version, and "Notes" twice in one
+          // row of titles read as the same column. ?>
+    <div class="board-head-center">Version</div>
+    <div class="board-head-center">Review notes</div>
     <div>Status</div>
     <div>Assignee</div>
     <div>Due</div>
