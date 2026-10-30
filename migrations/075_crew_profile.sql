@@ -1,4 +1,4 @@
--- 074 — A person's own profile: phone, a short bio and a picture.
+-- 075 — A person's own profile: phone, a short bio and a picture.
 --
 -- David, 2026-10-30, the Home page's General info tab: "Name, email, phone (in
 -- case they want to add it), profile picture, bio (let them write it)". The

@@ -4821,7 +4821,7 @@ invoice status).
 **Decided:**
 - **Tabs by `?tab=`, Work first**, because it is the one opened every day. Salaried staff have no
   Invoice tab.
-- **The person edits their own phone, bio and picture** (migration 074, on `crew`). Saved only to
+- **The person edits their own phone, bio and picture** (migration 075, on `crew`). Saved only to
   `effective_crew_id()`; `home.php` → `save_profile` is in the artist allow-list and has no id to
   forge. Name and email stay with an admin, because notifications and logins hang off them.
 - **The picture is served by `avatar.php`** behind the login, like every other upload.

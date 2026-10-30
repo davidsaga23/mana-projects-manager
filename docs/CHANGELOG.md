@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-10-30 — Home in three tabs: General info, Work, Invoice and billing *(migration 074)*
+## 2026-10-30 — Home in three tabs: General info, Work, Invoice and billing *(migration 075)*
 
 - **General info:** your name and email, and a phone, a bio and a profile picture you add yourself
   ("Edit your profile"), then the shows you are on with dates, days left, supervisor and links.
@@ -28,7 +28,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   email** button to accounting@mana.tv, copied to David and Tim, with the lines already in it; your invoices as Expected / Received · pending payment / Paid with
   dates; logged time this month per task; each show's statement figures; your contracts.
 - Salaried staff see General info and Work only.
-- **Migration 074** adds phone, bio and picture to the person. Until it runs, General info shows
+- **Migration 075** adds phone, bio and picture to the person. Until it runs, General info shows
   name and email only.
 
 ## 2026-10-30 — First-time tour, per role *(migration 074)*

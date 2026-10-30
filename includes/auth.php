@@ -504,7 +504,7 @@ function artist_may_post(): bool {
         // checked there, so set_status is deliberately not in this list.
         'bugs.php' => ['report_bug'],
         // save_profile: their own phone, bio and picture on Home (2026-10-30,
-        // migration 074). ⚠ THERE IS NO ID TO FORGE: home.php writes to
+        // migration 075). ⚠ THERE IS NO ID TO FORGE: home.php writes to
         // effective_crew_id() and nothing the form sends can name another
         // person. Name and email are not in that form at all.
         'home.php' => ['save_profile'],
