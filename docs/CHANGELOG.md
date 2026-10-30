@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Spell: each column title over its own column *(no migration)*
+
+- The yellow-number column is titled "Review notes" (it said "Notes", like the free-text column at
+  the end). "Frames" and "Link" no longer run together, and Version and Review notes are centred
+  over their columns like the cells under them. The filters did not move.
+
 ## 2026-10-29 — Spell: plainer filter and footer wording *(no migration)*
 
 - The second filter reads "All tasks" / "Ready to start" (was "Started or not" / "Ready to pick
