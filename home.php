@@ -188,17 +188,35 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
 <?php if ($tab === 'general'): ?>
   <?php // =================================== GENERAL INFO ============================ ?>
   <div class="home-profile">
-    <table class="review-table statement-due">
-      <tbody>
-        <tr><th>Name</th><td><?= e($personName) ?></td></tr>
-        <tr><th>Email</th><td><?= $profile['email'] ? e((string)$profile['email']) : '<span class="muted">none on file</span>' ?></td></tr>
-        <?php if (home_profile_available($pdo)): ?>
-          <tr><th>Phone</th><td><?= $profile['phone'] ? e((string)$profile['phone']) : '<span class="muted">not added</span>' ?></td></tr>
-          <tr><th>Bio</th><td><?= $profile['bio'] ? nl2br(e((string)$profile['bio'])) : '<span class="muted">not written yet</span>' ?></td></tr>
+    <?php // THREE COLUMNS (David, 2026-10-30): the picture in a square on the far
+          // left, the details in the middle, the bio to the right of them. ?>
+    <div class="home-profile-grid">
+      <div class="home-photo">
+        <?php if (!empty($profile['photo_stored'])): ?>
+          <img src="avatar.php?crew=<?= $crewId ?>" alt="<?= e($personName) ?>">
+        <?php else: ?>
+          <span class="home-photo-blank"><?= e(mb_strtoupper(mb_substr($personName, 0, 1))) ?></span>
         <?php endif; ?>
-      </tbody>
-    </table>
-    <p class="muted small">Your name and email are what Anima uses to reach you; to change them, ask Production.</p>
+      </div>
+      <div>
+        <table class="review-table statement-due">
+          <tbody>
+            <tr><th>Name</th><td><?= e($personName) ?></td></tr>
+            <tr><th>Email</th><td><?= $profile['email'] ? e((string)$profile['email']) : '<span class="muted">none on file</span>' ?></td></tr>
+            <?php if (home_profile_available($pdo)): ?>
+              <tr><th>Phone</th><td><?= $profile['phone'] ? e((string)$profile['phone']) : '<span class="muted">not added</span>' ?></td></tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+        <p class="muted small">Your name and email are what Anima uses to reach you; to change them, ask Production.</p>
+      </div>
+      <?php if (home_profile_available($pdo)): ?>
+        <div class="home-bio">
+          <h4>Bio</h4>
+          <?= $profile['bio'] ? '<p>' . nl2br(e((string)$profile['bio'])) . '</p>' : '<p class="muted">Not written yet.</p>' ?>
+        </div>
+      <?php endif; ?>
+    </div>
 
     <?php if (!home_profile_available($pdo)): ?>
       <p class="muted small">Adding a phone, a bio and a picture needs database update 075.</p>

@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Home's General info in three columns *(no migration)*
+
+- The profile picture in a square on the far left, name, email and phone in the middle, and the bio
+  in its own column on the right. On a narrow screen the bio drops below.
+
 ## 2026-10-30 — Home in three tabs: General info, Work, Invoice and billing *(migration 075)*
 
 - **General info:** your name and email, and a phone, a bio and a profile picture you add yourself
