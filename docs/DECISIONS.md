@@ -4782,3 +4782,15 @@ real pace, and locked-in / expected / reserve (options A, C and D), and asked ho
   reaches the reserve only when the step is finished and all its spend is invoiced.
 - **Not yet:** the "Ask Jorik for more money" action (a second ticket), and the old *Budget
   variance* tile still compares the budget with the plan, below the new block.
+
+## 2026-10-29 — Finance Overview: "spent" means paid; "committed" is the rest
+
+**Asked by David:** "Spent so far sounds like money we've actually paid, can we add a commited cost
+that sums the invoices and the logged time and leave spent so far as only paid invoices?"
+
+**Decided:** the Overview shows both. **Spent so far** = invoices with a paid date plus other
+expenses with a paid date. **Committed so far** = every invoice plus logged days not invoiced yet,
+which is what the old "Spent so far" summed. The step table, the forecast (committed ÷ done) and
+locked-in/expected stay on Committed, because an invoice nobody has paid yet is still a cost the
+show has taken on. Internally `step_variance()` keeps the key `spent` for the committed figure and
+adds `paid`.

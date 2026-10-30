@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-29 — Finance Overview: Committed and Spent are two figures *(no migration)*
+
+- **"Spent so far" is now only money that has actually left:** invoices marked paid, plus other
+  expenses with a paid date. It says how much is invoiced and not paid yet.
+- **"Committed so far"** is the old figure: every invoice, paid or not, plus logged days nobody has
+  invoiced yet at the person's rate.
+- The step table's column, its bar and the forecast are about Committed and say so; each step also
+  shows how much of it is paid.
+
 ## 2026-10-29 — Finance Overview: is the money on track, step by step *(no migration)*
 
 - **A new block at the top of Finance management → Overview** judges every step against its own
