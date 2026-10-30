@@ -1,6 +1,6 @@
 <?php
 /**
- * A person's profile picture, to logged-in users only (migration 073).
+ * A person's profile picture, to logged-in users only (migration 074).
  *
  * David, 2026-10-30: a profile picture on Home's General info tab. The uploads
  * directory denies direct web access (see includes/uploads.php), so this is the

@@ -15,7 +15,7 @@
 // the one opened every day.
 //
 // ⚠ THE ONE THING THAT POSTS IS THE PERSON'S OWN PROFILE (phone, bio,
-// picture; migration 073). Statuses and time stay on My tasks and Spell, which
+// picture; migration 074). Statuses and time stay on My tasks and Spell, which
 // this links to: two screens that both change a status can disagree.
 //
 // ⚠ THE CREW ID IS NOT A PARAMETER, FOR ANYBODY. Unlike statement.php there
@@ -201,7 +201,7 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
     <p class="muted small">Your name and email are what Anima uses to reach you; to change them, ask Production.</p>
 
     <?php if (!home_profile_available($pdo)): ?>
-      <p class="muted small">Adding a phone, a bio and a picture needs database update 073.</p>
+      <p class="muted small">Adding a phone, a bio and a picture needs database update 074.</p>
     <?php else: ?>
       <details class="board-expand home-profile-edit" <?= (!$profile['phone'] && !$profile['bio'] && !$profile['photo_stored']) ? 'open' : '' ?>>
         <summary><span class="board-version-title">Edit your profile</span></summary>

@@ -731,12 +731,12 @@ function home_team(PDO $pdo, int $crewId, array $shows, bool $roleIsSupervisor,
  * What each tab needs beyond what the page already read above.
  * ------------------------------------------------------------------------ */
 
-/** Has migration 073 run? The profile's own fields: phone, bio and picture. */
+/** Has migration 074 run? The profile's own fields: phone, bio and picture. */
 function home_profile_available(PDO $pdo): bool {
     return column_exists($pdo, 'crew', 'photo_stored');
 }
 
-/** A person's profile: name and email always; phone, bio and picture after 073. */
+/** A person's profile: name and email always; phone, bio and picture after 074. */
 function home_profile(PDO $pdo, int $crewId): array {
     $cols = 'id, name, email' . (home_profile_available($pdo) ? ', phone, bio, photo_stored, photo_mime' : '');
     $q = $pdo->prepare("SELECT {$cols} FROM crew WHERE id = ?");
@@ -755,7 +755,7 @@ function home_profile(PDO $pdo, int $crewId): array {
  */
 function home_save_profile(PDO $pdo, int $crewId, array $in, ?array $photo, bool $removePhoto): string {
     if (!home_profile_available($pdo)) {
-        throw new RuntimeException('Your profile needs database update 073, which has not been applied yet.');
+        throw new RuntimeException('Your profile needs database update 074, which has not been applied yet.');
     }
     $phone = trim((string)($in['phone'] ?? ''));
     if (mb_strlen($phone) > 50) throw new RuntimeException('That phone number is too long.');
