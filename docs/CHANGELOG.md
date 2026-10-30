@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-10-30 — Fix: Home's Invoice tab could not read a show's statement *(no migration)*
+
+- "Call to undefined function pipeline_steps()": the statement code needed a file the statement
+  page always loaded and Home did not. It now loads it itself, so each show's statement figures
+  appear on the Invoice and billing tab.
+
 ## 2026-10-30 — Fix: Home's Invoice and billing tab answered HTTP 500 *(no migration)*
 
 - Each part of the tab (contract, invoice lines, invoices, logged time, each show's statement) is now

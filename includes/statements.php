@@ -26,6 +26,12 @@
 // time_logs, progress, shots, the projection, and the finance database.
 
 require_once __DIR__ . '/functions.php';
+// pipeline_steps(), which expense_projection() calls but finance.php does not
+// load: statement.php always required it itself, and Home did not, so a
+// statement read on Home stopped with "undefined function pipeline_steps()"
+// (2026-10-30). require_once, and only from here: thirteen pages load
+// pipeline.php with a plain require, and none of them reach this file.
+require_once __DIR__ . '/pipeline.php';
 require_once __DIR__ . '/finance.php';      // expense_projection()
 require_once __DIR__ . '/fx.php';           // the project's fixed exchange rates
 require_once __DIR__ . '/money.php';        // own_crew_term(), own_invoices()
