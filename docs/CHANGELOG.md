@@ -23,8 +23,9 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   **My versions**, the latest version of each task you are on as picture cards; **My notes**, the
   latest note somebody left on each of your tasks. Supervisors' team panel is here too.
 - **Invoice and billing** (freelancers): the month's lines with a **Copy** button each and **Copy
-  every line**; how to invoice; a **Write the email** button to accounting@mana.tv, copied to David,
-  with the lines already in it; your invoices as Expected / Received · pending payment / Paid with
+  every line**, each line listing the days worked; how to invoice; the studio's details to address
+  it to (with a Copy button) and the bank and address details the artist must include; a **Write the
+  email** button to accounting@mana.tv, copied to David and Tim, with the lines already in it; your invoices as Expected / Received · pending payment / Paid with
   dates; logged time this month per task; each show's statement figures; your contracts.
 - Salaried staff see General info and Work only.
 - **Migration 074** adds phone, bio and picture to the person. Until it runs, General info shows

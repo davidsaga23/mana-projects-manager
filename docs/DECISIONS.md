@@ -4811,8 +4811,11 @@ invoice status).
 - **The picture is served by `avatar.php`** behind the login, like every other upload.
 - **"Current" means picked up** (a status reading in progress, review, retake and the like); what is
   not started goes under What's next when due this week or late, and under Lined up after otherwise.
-- **The invoice email** goes to accounting@mana.tv, copied to `$config['invoice_cc']`, David by
-  default; the PDF is still the artist's to attach. The instructions are the rules agreed with Tim
-  and Jorik until David sends the studio's own wording.
+- **The invoice email** goes to accounting@mana.tv, copied to David and Tim (`$config['invoice_cc']`
+  overrides it); the PDF is still the artist's to attach.
+- **What the invoice must carry is David's wording:** addressed to Mana Animation Studio / Saga
+  Productions LLC (contact, address, EIN, with a Copy button), the artist's bank and address details
+  (Anima does not store them), the lines in the description, and the breakdown of days worked, which
+  each line now lists.
 - **Invoice status reads Expected / Received · pending payment / Paid**, Finance's three statuses.
 

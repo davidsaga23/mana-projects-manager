@@ -424,6 +424,28 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
     </ul>
   </div>
 
+  <?php // THE STUDIO'S DETAILS AND THE ARTIST'S (David, 2026-10-30). ?>
+  <div class="home-invoice-details">
+    <div>
+      <h4>Address the invoice to</h4>
+      <?php $company = home_invoice_company();
+            $companyText = implode("\n", array_map(fn($k, $v) => $k . ': ' . $v, array_keys($company), $company)); ?>
+      <table class="review-table statement-due">
+        <tbody>
+          <?php foreach ($company as $k => $v): ?><tr><th><?= e($k) ?></th><td><?= e($v) ?></td></tr><?php endforeach; ?>
+        </tbody>
+      </table>
+      <button type="button" class="row-btn home-copy" data-copy="<?= e($companyText) ?>">Copy the company details</button>
+    </div>
+    <div>
+      <h4>Your details, on every invoice</h4>
+      <ul class="home-checklist">
+        <?php foreach (home_invoice_artist_fields() as $f): ?><li><?= e($f) ?></li><?php endforeach; ?>
+      </ul>
+      <p class="muted small">Only the ones that apply to your bank and country. Anima does not keep your bank details.</p>
+    </div>
+  </div>
+
   <?php
   // The email: to accounting, copied to the people $config['invoice_cc'] names
   // (David by default), with the month's lines already written in. The PDF is
@@ -456,7 +478,8 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
         <?php foreach ($invoiceInfo['lines'] as $i => $l): ?>
           <tr>
             <td><?= e($l['project']['name']) ?></td>
-            <td><?= e($l['step']) ?><?= !empty($l['own_contract']) ? ' <span class="muted small">· own contract</span>' : '' ?></td>
+            <td><?= e($l['step']) ?><?= !empty($l['own_contract']) ? ' <span class="muted small">· own contract</span>' : '' ?>
+              <?php if (!empty($l['dates'])): ?><div class="muted small">Days worked: <?= e(home_days_worked($l['dates'])) ?></div><?php endif; ?></td>
             <td><?= e($l['rate_phrase']) ?></td>
             <td class="num"><?= e($l['qty_label']) ?></td>
             <td class="num">

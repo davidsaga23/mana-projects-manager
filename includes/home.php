@@ -327,7 +327,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
     }
 
     // Minutes per show and step, inside each show's window.
-    $minutes = [];
+    $minutes = []; $days = [];
     foreach ($rows as $r) {
         $pid = (int)$r['project_id'];
         $w = $shows[$pid]['window'] ?? ['from' => null, 'to' => null];
@@ -338,6 +338,8 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
         }
         $sid = (int)($r['sid'] ?? 0);
         $minutes[$pid][$sid] = ($minutes[$pid][$sid] ?? 0) + (int)$r['m'];
+        // The days behind the line, for the invoice's breakdown of days worked.
+        $days[$pid][$sid][$d] = ($days[$pid][$sid][$d] ?? 0) + (int)$r['m'];
     }
     if (!$minutes) return $out;
 
@@ -398,6 +400,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
                 'project'    => $show['project'],
                 'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Step') : 'Other work on the show',
                 'own_contract' => $ownContract,
+                'dates'      => $days[$pid][$sid] ?? [],
                 // For Finance → Monthly invoices, which prefills its lines from these.
                 'step_id'    => $sid > 0 ? $sid : null,
                 'unit'       => $unit,
@@ -921,7 +924,20 @@ function home_invoice_line_text(array $l): string {
     if ($l['rate'] !== null) $calc .= ' × ' . $l['rate_phrase'];
     if ($l['total'] !== null) $calc .= ' = ' . home_money($l['total'], $l['currency']);
     $parts[] = $calc;
-    return implode(' · ', $parts);
+    $text = implode(' · ', $parts);
+    if (!empty($l['dates'])) $text .= ' · Days worked: ' . home_days_worked($l['dates']);
+    return $text;
+}
+
+/** "1, 2, 5 and 6 Oct" — the dates of a line, as an invoice's breakdown of days worked. */
+function home_days_worked(array $dates): string {
+    $keys = array_keys($dates);
+    sort($keys);
+    $byMonth = [];
+    foreach ($keys as $d) $byMonth[date('M Y', strtotime($d))][] = (int)date('j', strtotime($d));
+    $out = [];
+    foreach ($byMonth as $m => $ns) $out[] = implode(', ', $ns) . ' ' . substr($m, 0, 3);
+    return implode('; ', $out);
 }
 
 /** "Expected", "Received · pending payment", "Paid": Finance's three, as the artist reads them. */
@@ -940,7 +956,7 @@ function home_invoice_status_short(array $inv): string {
 /**
  * WHERE THE INVOICE GOES (Tim, 2026-10-28: "Send one invoice a month to
  * accounting@mana.tv ... Nowhere else. Jorik pays it once."), copied to David
- * (David, 2026-10-30: "email to send the invoice to (with cc to David or Tim)").
+ * and Tim (David, 2026-10-30: "email to send the invoice to (with cc to David or Tim)").
  * The copy list is $config['invoice_cc'] when config.php sets one, so Tim can be
  * added there without a release.
  */
@@ -948,21 +964,47 @@ const HOME_INVOICE_TO = 'accounting@mana.tv';
 
 function home_invoice_cc(): array {
     global $config;
-    $cc = $config['invoice_cc'] ?? ['david@mana.tv'];
+    $cc = $config['invoice_cc'] ?? ['david@mana.tv', 'tim@mana.tv'];
     if (!is_array($cc)) $cc = [$cc];
     return array_values(array_filter(array_map('trim', array_map('strval', $cc)),
         fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL) !== false));
 }
 
 /**
- * The instructions shown above the invoice lines, one sentence a bullet.
- * ⚠ DAVID IS SENDING THE STUDIO'S OWN WORDING (2026-10-30, "I'll paste it
- * below"); until then these are the rules already agreed with Tim and Jorik.
+ * WHAT THE INVOICE MUST SAY (David, 2026-10-30, the studio's own wording): who
+ * it is addressed to, then the artist's payment details, then what goes in the
+ * description and the breakdown. Shown on Home's Invoice tab; the company block
+ * has a Copy button so it is typed exactly once, by us.
  */
+function home_invoice_company(): array {
+    return [
+        'Client'  => 'Mana Animation Studio / Saga Productions LLC',
+        'Contact' => 'Jorik Feskens',
+        'Address' => '811W 7th Street, CA, 90017 / Los Angeles',
+        'EIN'     => '37-1957052',
+    ];
+}
+
+/** The artist's own details every invoice must carry. */
+function home_invoice_artist_fields(): array {
+    return [
+        'Bank name',
+        'Account Holder Name',
+        'Account Number',
+        'Routing Number',
+        'SWIFT/IBAN Number',
+        'CLABE (Mexico)',
+        'CPF (Brazil)',
+        'Address of Account Holder: street name and number, city, region, country, postal code',
+    ];
+}
+
+/** The rules for sending it, agreed with Tim and Jorik (2026-10-28). */
 function home_invoice_instructions(): array {
     return [
         'Send one invoice a month, for the month the work was done in.',
-        'Put one line per project and step: the lines below, copied as they are.',
+        'In the description, put one line per project and step: the lines below, copied as they are.',
+        'Include the breakdown of the days worked (or of the seconds billed): each line below lists its dates.',
         'Send it to ' . HOME_INVOICE_TO . ' and nowhere else, not to producers or supervisors.',
         'Amounts are in US dollars unless your contract says another currency.',
         'Jorik pays each invoice once. Its status below changes when it is received and when it is paid.',
