@@ -1618,14 +1618,18 @@ if ($retakePct <= 0):
           <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
                 e(fmt_num($r['units'], 1)) ?></td>
           <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
-          <?php // A supervisor logs no days on a step, so their invoiced cost
-                // shows without any; a lane's still waits for logged days. ?>
-          <?php $hasActual = $r['actual_days'] > 0 || !empty($r['supervision']); ?>
-          <td class="num"><?= $r['actual_cost'] === null || !$hasActual
+          <?php // ⚠ AN INVOICE SHOWS WHETHER OR NOT ANY TIME WAS LOGGED (2026-11-02).
+                // This cell used to wait for logged days: a leftover from 2026-08-17,
+                // when actual cost WAS logged days x rate and had nothing to show
+                // without them. Since 2026-08-18 it is the invoices, which do not
+                // depend on the time log, so the wait only hid them. On MSD every
+                // Pre-production row showed a dash under a subtotal of 12,575,
+                // because the subtotal (and the export) never waited. ?>
+          <td class="num"><?= $r['actual_cost'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['actual_cost'], 2)) ?></td>
-          <td class="num <?= $r['variance'] !== null && $hasActual
+          <td class="num <?= $r['variance'] !== null
                 ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
-            <?= $r['variance'] === null || !$hasActual
+            <?= $r['variance'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
           </td>
         </tr>
@@ -1722,6 +1726,8 @@ if ($retakePct <= 0):
     times a rate, which would be a second estimate rather than a fact. A dash in either means
     nothing was recorded, which is not the same as it having been free.
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
+    On a subtotal it is the whole department's projection minus what has been invoiced so far, so
+    it also counts the rows nobody has invoiced yet.
     <?php if ($unattached > 0): ?>
       The actual total here counts only invoices attached to a position, so it is
       <?= e(fmt_money_plain($unattached, $cur)) ?> lower than the <em>Invoiced</em> figure at the
