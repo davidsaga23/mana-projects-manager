@@ -259,7 +259,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
     // what was really billed (David, 2026-08-18).
     $billedBy = invoiced_by_position($projectId);
 
-    $rows = []; $total = 0.0; $actualTotal = 0.0;
+    $rows = []; $total = 0.0; $actualTotal = 0.0; $loggedTotal = 0.0;
     $unpricedDays = 0.0; $currency = null; $mixed = false;
 
     // ---- a contract in another currency ------------------------------------
@@ -416,6 +416,20 @@ function expense_projection(PDO $pdo, int $projectId): array {
             }
 
             $actDays = $cid ? ($actual[$cid . '|' . $stepId] ?? 0.0) : 0.0;
+            // ---- LOGGED x RATE: a second figure, never the actual ------------
+            // David, 2026-11-02, asked for it beside Actual after asking whether
+            // Actual was invoices or "time logged x the daily rate". It is the
+            // second: what the logged days are worth at the row's rate, in
+            // dollars like the cost. An estimate of work done, not money billed,
+            // so it never feeds Actual or Difference (DECISIONS, 2026-08-18).
+            // Only a day or hour rate has days to price; a flat fee or a
+            // per-second rate gets null, as does a row nobody logged on.
+            $loggedValue = null;
+            if ($actDays > 0 && $rate !== null && ($unit === 'day' || $unit === 'hour')) {
+                $lv = round($unit === 'hour' ? $rate * $hoursPerDay * $actDays : $rate * $actDays, 2);
+                $loggedValue = $inDollars($lv, $cur)[0];
+                $loggedTotal += $loggedValue;
+            }
             // Null means nothing has been invoiced against this position — which
             // is not the same as it having cost nothing, so the screen shows a
             // dash rather than a zero.
@@ -468,6 +482,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'units'       => $units,
                 'unit_label'  => $quota['unit_label'] ?? 'items',
                 'actual_days' => $actDays,
+                'logged_value' => $loggedValue,
                 'actual_cost' => $actCost,
                 'variance'    => ($cost !== null && $actCost !== null) ? $cost - $actCost : null,
             ];
@@ -555,6 +570,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
             // Actual cost is what has been invoiced against the position, as
             // for a lane. No actual days: a supervisor logs no time on a step.
             'actual_days'    => 0.0,
+            'logged_value'   => null,
             'actual_cost'    => $supBilled,
             'variance'       => ($cost !== null && $supBilled !== null) ? $cost - $supBilled : null,
         ];
@@ -577,11 +593,12 @@ function expense_projection(PDO $pdo, int $projectId): array {
     $byDept = [];
     foreach ($rows as $r) {
         $d = $r['department'];
-        $byDept[$d] = $byDept[$d] ?? ['rows' => [], 'cost' => 0.0, 'days' => 0.0, 'actual' => 0.0];
+        $byDept[$d] = $byDept[$d] ?? ['rows' => [], 'cost' => 0.0, 'days' => 0.0, 'actual' => 0.0, 'logged' => 0.0];
         $byDept[$d]['rows'][] = $r;
         $byDept[$d]['cost']   += (float)($r['cost'] ?? 0);
         $byDept[$d]['days']   += (float)$r['days'];
         $byDept[$d]['actual'] += (float)($r['actual_cost'] ?? 0);
+        $byDept[$d]['logged'] += (float)($r['logged_value'] ?? 0);
     }
 
     // Costs that are not somebody's day rate — software, render time, licences,
@@ -623,6 +640,8 @@ function expense_projection(PDO $pdo, int $projectId): array {
         // of quietly-wrong figure this file exists to avoid.
         'total'          => $total,
         'actual_total'   => $actualTotal,
+        // Logged days at each row's rate: a second figure, not the actual.
+        'logged_total'   => $loggedTotal,
         // Everything that is not a person on a step.
         'other'          => $other,
         'by_category'    => $byCategory,

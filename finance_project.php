@@ -1511,13 +1511,16 @@ if ($retakePct <= 0):
               // every animator for all of the footage. ?>
         <th class="num" title="The step's total. Days, Months and Projected are one person's share of it.">Units
           <span class="muted">(step)</span></th>
-        <th class="num">Actual days</th><th class="num">Actual</th>
+        <th class="num">Actual days</th>
+        <th class="num" title="The days logged, at this row's rate. What the work done is worth, not what was invoiced.">Logged
+          <span class="muted">× rate</span></th>
+        <th class="num">Actual</th>
         <th class="num">Difference</th>
       </tr>
     </thead>
     <tbody>
     <?php foreach ($proj['by_department'] as $dept => $group): ?>
-      <tr class="track-group"><td colspan="10">
+      <tr class="track-group"><td colspan="11">
         <label class="bulk-tick" title="Tick every row in <?= e($dept) ?>">
           <input type="checkbox" class="bulk-dept-all" data-dept="<?= e($dept) ?>"
                  aria-label="Tick every row in <?= e($dept) ?>"></label>
@@ -1622,6 +1625,15 @@ if ($retakePct <= 0):
           <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
                 e(fmt_num($r['units'], 1)) ?></td>
           <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
+          <?php // Muted and apart from Actual: an estimate of the work done, never
+                // the money billed (David, 2026-11-02). A flat or per-second rate
+                // has no days to price, and says so rather than showing a dash
+                // that reads as "nothing logged". ?>
+          <td class="num muted"><?php if (($r['logged_value'] ?? null) !== null): ?><?=
+                e(number_format($r['logged_value'], 2)) ?><?php
+              elseif ($r['actual_days'] > 0 && in_array($r['rate_unit'], ['flat', 'second'], true)): ?><span
+                class="small" title="This rate is not by the day, so logged days cannot be priced">not by day</span><?php
+              else: ?>—<?php endif; ?></td>
           <?php // ⚠ AN INVOICE SHOWS WHETHER OR NOT ANY TIME WAS LOGGED (2026-11-02).
                 // This cell used to wait for logged days: a leftover from 2026-08-17,
                 // when actual cost WAS logged days x rate and had nothing to show
@@ -1643,6 +1655,7 @@ if ($retakePct <= 0):
         <td colspan="5"><?= e($dept) ?> subtotal</td>
         <td class="num"><strong><?= e(number_format($group['cost'], 2)) ?></strong></td>
         <td></td><td></td>
+        <td class="num muted"><?= $group['logged'] > 0 ? e(number_format($group['logged'], 2)) : '—' ?></td>
         <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['actual'], 2)) : '—' ?></td>
         <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?></td>
       </tr>
@@ -1653,6 +1666,7 @@ if ($retakePct <= 0):
         <th colspan="5">Total projected, people</th>
         <th class="num"><?= e(fmt_money_plain($proj['total'], $proj['currency'])) ?></th>
         <th></th><th></th>
+        <th class="num muted"><?= ($proj['logged_total'] ?? 0) > 0 ? e(number_format($proj['logged_total'], 2)) : '—' ?></th>
         <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
         <th class="num"><?= $proj['actual_total'] > 0
               ? e(number_format($proj['total'] - $proj['actual_total'], 2)) : '—' ?></th>
@@ -1726,6 +1740,9 @@ if ($retakePct <= 0):
   <p class="muted small">
     <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
     <strong>Actual days</strong> comes from time logged against that person on that step.
+    <strong>Logged × rate</strong> is those days at the row's rate: what the work done so far is
+    worth, an estimate beside the invoices, never counted in Actual or Difference. A flat fee or a
+    per-second rate has no days to price.
     <strong>Actual cost comes from the invoices</strong> attached to that position, not from days
     times a rate, which would be a second estimate rather than a fact. A dash in either means
     nothing was recorded, which is not the same as it having been free.
