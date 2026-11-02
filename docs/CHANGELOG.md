@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — Finance Overview: "The money" at the top *(no migration)*
+
+- **Change.** On Finance management → Overview, the **"The money"** strip (approved budget, current
+  forecast cost, variance, invoiced, paid, unpaid and the two final balances) is now the first thing
+  on the tab, above "Is the money on track" and "Where the show is". David: "let's add this at the
+  top of the screen".
+- Moved, not copied: its explanation and any mixed-currency warning move with it, and "set it ↓"
+  still jumps to the budget form. Admin-only, as before.
+
 ## 2026-11-02 — Bookings calendar: days off first, crew on request *(no migration)*
 
 - **Change.** The Calendar tab showed every booked person on every day, which was a lot. Each week
