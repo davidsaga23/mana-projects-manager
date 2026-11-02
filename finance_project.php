@@ -557,44 +557,11 @@ if ($configured && $dbError === null) {
 }
 ?>
 
-<?php if ($stepVar) render_step_variance($stepVar); ?>
-
-<?php if ($progress && $progress['applicable'] > 0): ?>
-  <h3>Where the show is</h3>
-  <div class="dash-strip">
-    <div><span class="muted small">Approved</span>
-      <strong><?= e(fmt_num($progress['approved'], 0)) ?></strong>
-      <span class="muted small">of <?= e(fmt_num($progress['applicable'], 0)) ?></span></div>
-    <div><span class="muted small">Delivered</span>
-      <strong><?= e(fmt_num($progress['delivered'], 0)) ?></strong>
-      <span class="muted small"><?= $progress['pct_delivered'] !== null
-            ? e(fmt_num($progress['pct_delivered'], 0)) . '%' : '' ?></span></div>
-    <div><span class="muted small">Remaining</span>
-      <strong><?= e(fmt_num($progress['remaining'], 0)) ?></strong></div>
-    <div><span class="muted small">Blocked</span>
-      <strong class="<?= $progress['blocked'] ? 'warn-text' : '' ?>"><?= e(fmt_num($progress['blocked'], 0)) ?></strong></div>
-    <div><span class="muted small">Working days left</span>
-      <strong class="<?= !empty($progress['overdue']) ? 'err' : '' ?>">
-        <?= $progress['days_left'] !== null ? (int)$progress['days_left'] : '—' ?></strong>
-      <?php if (!empty($progress['overdue'])): ?><span class="err small">past delivery</span><?php endif; ?></div>
-    <div><span class="muted small">Delivery</span>
-      <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
-  </div>
-  <p class="muted small">
-    A <strong>task</strong> is one item through one step, every shot and every asset multiplied by
-    the steps that apply to it, so <?= (int)$progress['applicable'] ?> is the whole show as a
-    count of things to finish, not a count of shots. The same figures the
-    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> draws, from the same
-    calculation, so the two screens cannot disagree about how far along the show is.
-    <?php // Worth saying here because the projection above can legitimately show a
-          // bigger unit count: step_quota() falls back to project_settings.estimated_*
-          // when a step has no real items yet, and labels those "est." — this panel
-          // only ever counts rows that exist. ?>
-    Where the expense projection shows more units than this, those are <em>estimates</em> standing
-    in for a breakdown that has not been entered yet.
-  </p>
-<?php endif; ?>
-
+<?php // THE MONEY FIRST (David, 2026-11-02, of this strip: "let's add this at the top
+      // of the screen"). Budget, forecast, invoiced, paid and the two final
+      // balances are what an admin opens this tab for; the step-by-step check and
+      // the show's progress below explain them rather than lead. Moved, not
+      // copied — one strip, so the figures can only ever come out one way. ?>
 <h3>The money</h3>
 <div class="dash-strip">
   <?php // SEVEN FIGURES, IN THE ORDER DAVID LISTED THEM on 2026-10-12, and they
@@ -710,7 +677,6 @@ if ($configured && $dbError === null) {
   <?php endif; ?>
 </p>
 
-
 <?php foreach ($fxNotes as $n): ?>
   <div class="flash <?= strpos($n, 'Could not') === 0 || strpos($n, 'could not') !== false ? 'flash-warn' : 'flash-ok' ?>"><?= e($n) ?></div>
 <?php endforeach; ?>
@@ -725,6 +691,44 @@ if ($configured && $dbError === null) {
     <?= fx_available() ? 'fix a rate under Exchange rates below.'
                        : 'import <code>finance_install_11.sql</code> into the finance database to fix one.' ?>
   </div>
+<?php endif; ?>
+
+<?php if ($stepVar) render_step_variance($stepVar); ?>
+
+<?php if ($progress && $progress['applicable'] > 0): ?>
+  <h3>Where the show is</h3>
+  <div class="dash-strip">
+    <div><span class="muted small">Approved</span>
+      <strong><?= e(fmt_num($progress['approved'], 0)) ?></strong>
+      <span class="muted small">of <?= e(fmt_num($progress['applicable'], 0)) ?></span></div>
+    <div><span class="muted small">Delivered</span>
+      <strong><?= e(fmt_num($progress['delivered'], 0)) ?></strong>
+      <span class="muted small"><?= $progress['pct_delivered'] !== null
+            ? e(fmt_num($progress['pct_delivered'], 0)) . '%' : '' ?></span></div>
+    <div><span class="muted small">Remaining</span>
+      <strong><?= e(fmt_num($progress['remaining'], 0)) ?></strong></div>
+    <div><span class="muted small">Blocked</span>
+      <strong class="<?= $progress['blocked'] ? 'warn-text' : '' ?>"><?= e(fmt_num($progress['blocked'], 0)) ?></strong></div>
+    <div><span class="muted small">Working days left</span>
+      <strong class="<?= !empty($progress['overdue']) ? 'err' : '' ?>">
+        <?= $progress['days_left'] !== null ? (int)$progress['days_left'] : '—' ?></strong>
+      <?php if (!empty($progress['overdue'])): ?><span class="err small">past delivery</span><?php endif; ?></div>
+    <div><span class="muted small">Delivery</span>
+      <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
+  </div>
+  <p class="muted small">
+    A <strong>task</strong> is one item through one step, every shot and every asset multiplied by
+    the steps that apply to it, so <?= (int)$progress['applicable'] ?> is the whole show as a
+    count of things to finish, not a count of shots. The same figures the
+    <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> draws, from the same
+    calculation, so the two screens cannot disagree about how far along the show is.
+    <?php // Worth saying here because the projection above can legitimately show a
+          // bigger unit count: step_quota() falls back to project_settings.estimated_*
+          // when a step has no real items yet, and labels those "est." — this panel
+          // only ever counts rows that exist. ?>
+    Where the expense projection shows more units than this, those are <em>estimates</em> standing
+    in for a breakdown that has not been entered yet.
+  </p>
 <?php endif; ?>
 
 <?php // ---- EXCHANGE RATES ----------------------------------------------
