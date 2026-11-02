@@ -108,7 +108,7 @@ $put(array_map(function ($h) { return ['v' => $h, 's' => XLSX_HEAD]; }, $header)
 
 $subtotalRows = [];
 $firstDataRow = null; $lastDataRow = null;
-$grandCost = 0.0; $grandDays = 0.0; $grandActual = 0.0; $people = 0;
+$grandCost = 0.0; $grandDays = 0.0; $grandActual = 0.0; $people = [];
 
 // --- one block per department ----------------------------------------------
 foreach ($proj['by_department'] as $dept => $group) {
@@ -281,7 +281,8 @@ foreach ($proj['by_department'] as $dept => $group) {
         if ($firstDataRow === null) $firstDataRow = $landed;
         $lastDataRow = $landed;
 
-        $people++;
+        // Keyed by crew id, so a person on three steps is one head, not three.
+        if ($row['crew_id']) $people[(int)$row['crew_id']] = true;
         $grandDays += (float)$row['days'];
     }
 
@@ -391,15 +392,23 @@ $grandRow = $put($grand);
 $put([]);
 $put([['v' => 'Summary', 's' => XLSX_SUB_LABEL]]);
 
+// ⚠ NEITHER FIGURE IS A RANGE OVER THE DATA ROWS (fixed 2026-11-02, found in
+// an FCM export). SUM(F first:last) ran straight through the department
+// subtotal rows sitting between the blocks, so every day was counted twice;
+// the person-days now read the grand total's own days cell, which adds the
+// subtotals once. COUNTA over the artist column counted ROWS: one person on
+// three steps was three heads, and the vendors under Other expenses were
+// heads too. Headcount is each person or slot once, by crew id, written as a
+// number, because no formula over names can tell two rows of one person
+// from two people.
 if ($firstDataRow !== null) {
-    $put([['v' => 'Total headcount (artists + slots)', 's' => XLSX_TEXT],
-          ['f' => 'COUNTA(C' . $firstDataRow . ':C' . $lastDataRow . ')',
-           'v' => $people, 's' => XLSX_NUM_CALC]]);
+    $put([['v' => 'Total headcount (artists + slots, each once)', 's' => XLSX_TEXT],
+          ['v' => count($people), 's' => XLSX_NUM]]);
     $put([['v' => 'Total projected person-days', 's' => XLSX_TEXT],
-          ['f' => 'SUM(F' . $firstDataRow . ':F' . $lastDataRow . ')',
+          ['f' => 'F' . $grandRow,
            'v' => round($grandDays, 2), 's' => XLSX_NUM_CALC]]);
     $put([['v' => 'Total projected person-months', 's' => XLSX_TEXT],
-          ['f' => 'IFERROR(SUM(F' . $firstDataRow . ':F' . $lastDataRow . ')/' . (int)DAYS_PER_MONTH . ',0)',
+          ['f' => 'IFERROR(F' . $grandRow . '/' . (int)DAYS_PER_MONTH . ',0)',
            'v' => round($grandDays / DAYS_PER_MONTH, 2), 's' => XLSX_NUM_CALC]]);
 }
 $put([['v' => 'Projected cost', 's' => XLSX_TEXT],
