@@ -137,8 +137,10 @@ if ($admin && $project) {
           <?php foreach ($s['lines'] as $l): ?>
             <tr>
               <td><?= e($l['position']) ?><?= $l['own_contract'] ? ' <span class="muted small">· own contract</span>' : '' ?></td>
-              <td><?= $l['rate'] !== null ? e(fmt_money($l['rate'], $l['unit'], $l['rate_currency'])) : '<span class="muted">no rate yet</span>' ?>
-                <?php if ($l['rate_usd'] !== null): ?><div class="muted small">= <?= e(number_format($l['rate_usd'], 2)) ?> USD</div><?php endif; ?></td>
+              <?php // Dollars first, the contract's own currency under it (David, 2026-11-02). ?>
+              <td><?php if ($l['rate'] !== null && $l['rate_usd'] !== null): ?><?= e(fmt_money($l['rate_usd'], $l['unit'], 'USD')) ?>
+                  <div class="muted small">(<?= e(number_format($l['rate'], 2) . ' ' . $l['rate_currency']) ?>)</div>
+                <?php else: ?><?= $l['rate'] !== null ? e(fmt_money($l['rate'], $l['unit'], $l['rate_currency'])) : '<span class="muted">no rate yet</span>' ?><?php endif; ?></td>
               <td class="small">
                 <?php if ($l['unit'] === 'flat'): ?>The flat fee
                 <?php elseif ($l['unit'] === 'second'): ?><?= e(statement_secs($l['seconds'])) ?> of approved footage
@@ -159,13 +161,14 @@ if ($admin && $project) {
       <tbody>
         <?php if (empty($s['lines'])): ?>
         <tr><th>Rate</th>
-          <td><?= e(fmt_money($s['rate'], $s['unit'], $s['rate_currency'])) ?>
-            <?php // A contract in another currency, converted at the one rate
-                  // fixed for the show (2026-10-28): both, and where it came from. ?>
-            <?php if ($s['fx'] && $s['rate_usd'] !== null): ?>
-              <div class="muted small">= <?= e(number_format($s['rate_usd'], 2)) ?> USD, at the show's fixed
-                rate (<?= e(fx_describe($s['fx'])) ?>). The amounts below are in US dollars.</div>
-            <?php endif; ?></td></tr>
+          <?php // A contract in another currency, converted at the one rate fixed
+                // for the show: dollars first, its own currency under it, and
+                // where the rate came from (2026-10-28, order 2026-11-02). ?>
+          <td><?php if ($s['fx'] && $s['rate_usd'] !== null): ?>
+              <?= e(fmt_money($s['rate_usd'], $s['unit'], 'USD')) ?>
+              <div class="muted small">(<?= e(number_format($s['rate'], 2) . ' ' . $s['rate_currency']) ?>) at the show's
+                fixed rate (<?= e(fx_describe($s['fx'])) ?>). The amounts below are in US dollars.</div>
+            <?php else: ?><?= e(fmt_money($s['rate'], $s['unit'], $s['rate_currency'])) ?><?php endif; ?></td></tr>
         <tr><th>Counted on</th>
           <td>
             <?php if ($s['unit'] === 'flat'): ?>

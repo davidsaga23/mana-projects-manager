@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — A non-USD rate shows dollars first *(no migration)*
+
+- On the expense projection, the rate box of a contract in another currency now shows the **USD**
+  rate, like the Projected column, with the contract's own currency under it: `535.96 USD / day
+  (400.00 GBP)`. Typing a dollar rate saves the contract in its own currency at the project's fixed
+  exchange rate (535.96 USD saves 400.00 GBP). The *Set a rate for many rows* box is in dollars too.
+- The artist statements tab and the statement page show the rate the same way.
+
 ## 2026-11-02 — Expense projection: a "Logged × rate" column *(no migration)*
 
 - **Feature.** Beside **Actual days**, a new column shows those days at the row's rate: what the
