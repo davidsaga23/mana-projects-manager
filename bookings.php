@@ -8,6 +8,12 @@
 // side, red where two cross) and BY SHOW (every show's general timeline stacked,
 // the people on each step, red where one of them is needed elsewhere).
 //
+// David, 2026-10-30: "in Bookings let's create 2 tabs, timeline view (keep as it
+// currently is) and a new one in calendar view/display". The TIMELINE tab is the
+// page as it was; the CALENDAR tab draws the same facts as a month, a day at a
+// time: who is booked that day, in their show's colour, red when they are on two
+// shows at once, struck through when they are off.
+//
 // Read only, and for everybody who can log in: positions and dates are
 // production facts, and no rate is anywhere near this page.
 
@@ -48,20 +54,37 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php else: ?>
 
+  <?php // The two tabs (David, 2026-10-30), in the board panel's tab look. The
+        // script remembers the chosen one per browser, as it does the view. ?>
+  <div class="panel-tabs bk-tabs" role="tablist" aria-label="Display">
+    <button type="button" class="panel-tab is-on" role="tab" aria-selected="true" data-tab="timeline">Timeline</button>
+    <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="calendar">Calendar</button>
+  </div>
+
   <div class="bk-toolbar">
     <?php // Two views of the same facts. Buttons, as David prefers, and the
           // chosen one is remembered by the script for next time. ?>
-    <span class="bk-views" role="group" aria-label="View">
+    <span class="bk-views" role="group" aria-label="View" data-tab-only="timeline">
       <button type="button" class="secondary" data-view="person">By person</button>
       <button type="button" class="secondary" data-view="show">By show</button>
     </span>
+    <?php // The calendar's own controls: a month at a time, and one person's
+          // month when that is the question. Hidden on the timeline tab. ?>
+    <span class="bk-cal-nav" data-tab-only="calendar" hidden>
+      <button type="button" class="secondary zoom-btn" id="bkCalPrev" title="Previous month">‹</button>
+      <button type="button" class="secondary" id="bkCalToday">Today</button>
+      <button type="button" class="secondary zoom-btn" id="bkCalNext" title="Next month">›</button>
+      <strong class="bk-cal-month" id="bkCalMonth"></strong>
+    </span>
     <label class="inline"><input type="checkbox" id="bkOnlyClashes">
       <span id="bkOnlyLabel">Only people on two shows at once</span></label>
-    <span class="zoom-controls">
+    <span class="zoom-controls" data-tab-only="timeline">
       <button type="button" class="secondary zoom-btn" id="bkZoomOut" title="Zoom out">−</button>
       <span class="zoom-label" id="bkZoomLabel">Weeks</span>
       <button type="button" class="secondary zoom-btn" id="bkZoomIn" title="Zoom in">+</button>
     </span>
+    <label class="inline bk-cal-who" data-tab-only="calendar" hidden>Person
+      <select id="bkCalPerson"><option value="">Everybody</option></select></label>
   </div>
 
   <?php // One chip per show: its colour on the By person chart, and a switch to
@@ -70,8 +93,12 @@ require __DIR__ . '/includes/header.php';
 
   <div id="bkSummary" class="bk-summary"></div>
 
-  <div class="bk-chart-wrap">
+  <div class="bk-chart-wrap" data-tab-only="timeline">
     <div id="bkChart" class="bk-chart"></div>
+  </div>
+
+  <div class="bk-cal-wrap" data-tab-only="calendar" hidden>
+    <div id="bkCal" class="bk-cal"></div>
   </div>
 
   <?php if ($positions['undated']): ?>
@@ -91,7 +118,8 @@ require __DIR__ . '/includes/header.php';
 
   <p class="muted small">
     People appear here once they are hired into positions on a show's <strong>Staffing</strong>
-    screen; a position nobody holds yet books nobody. Click a bar to open that show's timeline.
+    screen; a position nobody holds yet books nobody. Click a bar, or a name on the calendar, to
+    open that show's timeline.
   </p>
 
 <script>
@@ -108,6 +136,10 @@ window.BK = <?= json_encode([
     'unfilled' => (object)$positions['unfilled'],
     'clashes'  => $clashes,
     'absences' => (object)$absences,
+    // Weekends and these are dimmed on the calendar tab, and nobody is listed
+    // on them: the studio is shut. (includes/calendar.php, through
+    // functions.php; an empty set before migration 010.)
+    'holidays' => (object)non_working_days($pdo),
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 </script>
 <script src="assets/bookings.js<?= asset_ver('bookings.js') ?>"></script>

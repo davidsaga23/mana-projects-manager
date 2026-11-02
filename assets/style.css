@@ -2558,6 +2558,89 @@ body.lightbox-lock { overflow: hidden; }
 @media (max-width: 640px) {
   .bk-label { flex-basis: 140px; width: 140px; }
 }
+/* The Timeline and Calendar tabs (2026-10-30): the board panel's tabs, and
+   whatever belongs to the other tab is hidden by the script. The attribute
+   rule beats each control's own display. */
+.bk-tabs { margin: 6px 0 12px; }
+[data-tab-only][hidden] { display: none; }
+.bk-cal-nav { display: inline-flex; align-items: center; gap: 6px; }
+.bk-cal-month { margin-left: 6px; font-size: 15px; letter-spacing: -.01em; min-width: 9.5em; }
+.bk-cal-who select { width: auto; margin: 0 0 0 6px; padding: 5px 8px; font-size: 13.5px; }
+/* A month, Monday first, in one Spell panel. A day is a cell of names; the
+   names are links in their show's colour (--bk-c, set per name). */
+.bk-cal-wrap {
+  position: relative; margin-bottom: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.bk-cal-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, .55fr)); }
+.bk-cal-dow {
+  padding: 8px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--border);
+}
+.bk-cal-dow:first-child { border-top-left-radius: var(--radius-lg); }
+.bk-cal-dow:nth-child(7) { border-top-right-radius: var(--radius-lg); }
+.bk-cal-day {
+  min-height: 96px; padding: 6px 6px 8px; min-width: 0;
+  border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft);
+}
+.bk-cal-day:nth-child(7n) { border-right: none; }
+.bk-cal-day.is-shut { background: var(--surface-2); }
+.bk-cal-day.is-other > * { opacity: .45; }
+.bk-cal-date { display: flex; align-items: center; gap: 6px; margin: 0 2px 4px; min-height: 22px; }
+.bk-cal-num { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.bk-cal-day.is-shut .bk-cal-num { color: var(--faint); }
+.bk-cal-day.is-today .bk-cal-num {
+  display: inline-block; min-width: 22px; padding: 0 5px; border-radius: 11px; text-align: center;
+  line-height: 22px; background: var(--primary); color: var(--on-primary);
+}
+.bk-cal-holiday {
+  flex: 1 1 auto; min-width: 0; font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bk-cal-count {
+  margin-left: auto; padding: 0 6px; border-radius: 8px; font-size: 11px; line-height: 16px;
+  background: var(--surface-3); color: var(--muted);
+}
+.bk-cal-count.is-clash { background: var(--danger); color: var(--on-danger); font-weight: 600; }
+.bk-cal-item {
+  display: block; margin: 0 0 2px; padding: 2px 6px 2px 7px; border-radius: 5px;
+  border-left: 3px solid var(--bk-c); background: var(--surface-2);
+  font-size: 12px; line-height: 17px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background-color var(--ease);
+}
+.bk-cal-item:hover { background: var(--surface-3); color: var(--text); text-decoration: none; }
+.bk-cal-name { font-weight: 600; }
+.bk-cal-step { color: var(--muted); }
+.bk-cal-why { color: var(--warn-strong); font-weight: 600; }
+.bk-cal-item.is-clash { background: var(--danger-tint-2); box-shadow: inset 0 0 0 1px var(--danger-border); }
+.bk-cal-item.is-clash .bk-cal-name { color: var(--danger-strong); }
+/* Off that day: struck through over the same stripes the timeline uses. */
+.bk-cal-item.is-off {
+  background: repeating-linear-gradient(135deg, var(--surface-3) 0 4px, var(--surface-2) 4px 8px);
+}
+.bk-cal-item.is-off .bk-cal-name, .bk-cal-item.is-off .bk-cal-step { text-decoration: line-through; opacity: .7; }
+.bk-cal-more {
+  display: block; width: 100%; margin: 2px 0 0; padding: 2px 6px; text-align: left;
+  background: transparent; border: none; border-radius: 5px;
+  font-size: 12px; font-weight: 600; color: var(--primary); cursor: pointer;
+}
+.bk-cal-more:hover { background: var(--primary-tint); }
+.bk-cal-pop {
+  position: absolute; z-index: 20; width: 300px; max-height: 360px; overflow-y: auto; padding: 8px 10px 10px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}
+.bk-cal-pop-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 13.5px; }
+.bk-cal-pop-x {
+  margin: 0 0 0 auto; padding: 0 6px; background: transparent; border: none;
+  font-size: 18px; line-height: 1; color: var(--muted); cursor: pointer;
+}
+.bk-cal-pop-show { margin: 8px 0 4px; font-size: 12.5px; }
+@media (max-width: 760px) {
+  .bk-cal-wrap { overflow-x: auto; }
+  .bk-cal-grid { min-width: 720px; }
+}
 /* The studio-wide artist list. Wide by nature — a dozen columns about a person
    — so it scrolls sideways inside its own box rather than pushing the page. */
 .artist-table { min-width: 1100px; }
