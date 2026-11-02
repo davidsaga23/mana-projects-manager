@@ -83,6 +83,10 @@ require __DIR__ . '/includes/header.php';
       <span class="zoom-label" id="bkZoomLabel">Weeks</span>
       <button type="button" class="secondary zoom-btn" id="bkZoomIn" title="Zoom in">+</button>
     </span>
+    <?php // The calendar shows only days off until a week is opened (David,
+          // 2026-11-02); this opens every week, and is remembered. ?>
+    <label class="inline" data-tab-only="calendar" hidden><input type="checkbox" id="bkCalAllCrew">
+      <span>Show crew every week</span></label>
     <label class="inline bk-cal-who" data-tab-only="calendar" hidden>Person
       <select id="bkCalPerson"><option value="">Everybody</option></select></label>
   </div>
