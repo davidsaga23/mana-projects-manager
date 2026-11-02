@@ -2580,10 +2580,10 @@ body.lightbox-lock { overflow: hidden; }
 .bk-cal-dow:first-child { border-top-left-radius: var(--radius-lg); }
 .bk-cal-dow:nth-child(7) { border-top-right-radius: var(--radius-lg); }
 .bk-cal-day {
-  min-height: 96px; padding: 6px 6px 8px; min-width: 0;
+  min-height: 64px; padding: 6px 6px 8px; min-width: 0;
   border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft);
 }
-.bk-cal-day:nth-child(7n) { border-right: none; }
+.bk-cal-day.is-sun { border-right: none; }
 .bk-cal-day.is-shut { background: var(--surface-2); }
 .bk-cal-day.is-other > * { opacity: .45; }
 .bk-cal-date { display: flex; align-items: center; gap: 6px; margin: 0 2px 4px; min-height: 22px; }
@@ -2620,6 +2620,22 @@ body.lightbox-lock { overflow: hidden; }
   background: repeating-linear-gradient(135deg, var(--surface-3) 0 4px, var(--surface-2) 4px 8px);
 }
 .bk-cal-item.is-off .bk-cal-name, .bk-cal-item.is-off .bk-cal-step { text-decoration: line-through; opacity: .7; }
+/* Somebody off who is not on the list that day: the stripes alone, nothing
+   struck, and not a link (it belongs to no show). */
+.bk-cal-away {
+  border-left-color: var(--warn);
+  background: repeating-linear-gradient(135deg, var(--surface-3) 0 4px, var(--surface-2) 4px 8px);
+}
+.bk-cal-away:hover { background: repeating-linear-gradient(135deg, var(--surface-3) 0 4px, var(--surface-2) 4px 8px); }
+/* Under each week (David, 2026-11-02): open or fold the crew booked on it. */
+.bk-cal-week {
+  grid-column: 1 / -1; margin: 0; padding: 5px 12px; text-align: left;
+  background: var(--surface); border: none; border-bottom: 1px solid var(--border);
+  font-size: 12.5px; color: var(--primary); cursor: pointer;
+  transition: background-color var(--ease);
+}
+.bk-cal-week:hover { background: var(--primary-tint); }
+.bk-cal-week:last-child { border-bottom: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .bk-cal-more {
   display: block; width: 100%; margin: 2px 0 0; padding: 2px 6px; text-align: left;
   background: transparent; border: none; border-radius: 5px;

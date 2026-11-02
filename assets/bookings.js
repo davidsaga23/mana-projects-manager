@@ -368,6 +368,17 @@
   //
   // A show with fifteen people on it fills a day, so a day shows CAL_MAX names
   // and folds the rest into "+N more", which opens the whole day in a popover.
+  //
+  // David, 2026-11-02: "in the calendar view I feel like there's a lot of
+  // information ... only leave the days off and people's days off in there with
+  // the option to expand the list of crew active that week". So a week starts
+  // FOLDED: the studio's days off (dimmed, with the holiday's name) and the
+  // people who are off, nothing else, plus a quiet count of who is booked each
+  // day, red when one of them is on two shows. "Show crew" under a week lists
+  // everybody booked on it; "Show crew every week" in the toolbar opens them all
+  // and is remembered. Two questions open the lists by themselves, because the
+  // names ARE the answer: "Only people on two shows at once" and one person's
+  // month.
   var CAL_MAX = 6;
   var WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   var MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -376,6 +387,8 @@
   var calMonth = (function () { var d = parseYmd(BK.today); return new Date(d.getFullYear(), d.getMonth(), 1); })();
   var calPerson = '';           // a crew id as text, or '' for everybody
   var calDays = {};             // 'YYYY-MM-DD' -> that day's entries, for the popover
+  var calOpenWeeks = {};        // a week's Monday -> true while its crew is shown
+  var calAllCrew = load('calcrew', '0') === '1';
 
   function isWorkingDay(d) {
     var dow = d.getDay();
@@ -403,17 +416,47 @@
       if (onlyClashes && !hits.length) return;
       out.push({ b: b, clashes: hits, off: offOn(b.person_id, day) });
     });
-    // Clashes first, they are what to act on; then show by show, in the order
-    // the chips list them, and by name inside a show.
+    // Who is off first, as a folded week shows them (David, 2026-11-02), so
+    // opening it never hides them behind "+N more"; then clashes, they are what
+    // to act on; then show by show, in the order the chips list them, and by
+    // name inside a show.
     var showOrder = {};
     BK.projects.forEach(function (p, i) { showOrder[p.id] = i; });
     out.sort(function (x, y) {
-      return (y.clashes.length ? 1 : 0) - (x.clashes.length ? 1 : 0)
+      return (y.off ? 1 : 0) - (x.off ? 1 : 0)
+          || (y.clashes.length ? 1 : 0) - (x.clashes.length ? 1 : 0)
           || showOrder[x.b.project_id] - showOrder[y.b.project_id]
           || x.b.person.localeCompare(y.b.person)
           || (x.b.step < y.b.step ? -1 : (x.b.step > y.b.step ? 1 : 0));
     });
     return out;
+  }
+
+  /**
+   * Everybody off on one working day: anyone with a booking on a show that is
+   * switched on, whether or not that booking covers the day (a day off is worth
+   * knowing about either side of a step). By name.
+   */
+  function awayOn(day) {
+    var who = {}, out = [];
+    BK.bookings.forEach(function (b) {
+      if (!shown(b.project_id) || who[b.person_id]) return;
+      if (calPerson && String(b.person_id) !== calPerson) return;
+      who[b.person_id] = true;
+      var a = offOn(b.person_id, day);
+      if (a) out.push({ id: b.person_id, name: b.person, off: a });
+    });
+    return out.sort(function (x, y) { return x.name.localeCompare(y.name); });
+  }
+
+  /** "Giselle off (dentist)": a day off, striped like the timeline's. */
+  function calAwayHtml(p) {
+    var a = p.off;
+    var title = p.name + ' is off, ' + (a.from === a.to ? shortDate(a.from) : shortDate(a.from) + ' to ' + shortDate(a.to))
+              + (a.reason ? ' (' + a.reason + ')' : '');
+    return '<span class="bk-cal-item bk-cal-away" title="' + escapeHtml(title) + '">'
+         + '<span class="bk-cal-name">' + escapeHtml(p.name) + '</span>'
+         + '<span class="bk-cal-why"> off' + (a.reason ? ' (' + escapeHtml(a.reason) + ')' : '') + '</span></span>';
   }
 
   // A day's count is of PEOPLE: somebody on two steps of one show is two lines
@@ -482,31 +525,54 @@
     WEEKDAYS.forEach(function (w, i) {
       html += '<div class="bk-cal-dow' + (i >= 5 ? ' is-weekend' : '') + '">' + w + '</div>';
     });
-    for (; d <= last; d.setDate(d.getDate() + 1)) {
-      var day = fmtDate(d);
-      var holiday = (BK.holidays || {})[day] || '';
-      var working = isWorkingDay(d);
-      var list = working ? entriesOn(day, clashes, onlyClashes) : [];
-      if (list.length && d.getMonth() === m) anyone = true;
-      calDays[day] = list;
-      var nPeople = peopleIn(list), nClash = peopleIn(list.filter(function (en) { return en.clashes.length; }));
+    // The filters that ask for names open every week; so does the toolbar box.
+    var forced = onlyClashes || !!calPerson;
+    while (d <= last) {
+      var monday = fmtDate(d);
+      var open = forced || calAllCrew || !!calOpenWeeks[monday];
+      var weekPeople = {};
+      for (var k = 0; k < 7; k++, d.setDate(d.getDate() + 1)) {
+        var day = fmtDate(d);
+        var holiday = (BK.holidays || {})[day] || '';
+        var working = isWorkingDay(d);
+        var list = working ? entriesOn(day, clashes, onlyClashes) : [];
+        var away = working && !onlyClashes ? awayOn(day) : [];
+        if ((list.length || away.length) && d.getMonth() === m) anyone = true;
+        list.forEach(function (en) { weekPeople[en.b.person_id] = true; });
+        calDays[day] = list;
+        var nPeople = peopleIn(list), nClash = peopleIn(list.filter(function (en) { return en.clashes.length; }));
 
-      html += '<div class="bk-cal-day' + (working ? '' : ' is-shut') + (d.getMonth() !== m ? ' is-other' : '')
-            + (day === BK.today ? ' is-today' : '') + '">'
-            + '<div class="bk-cal-date"><span class="bk-cal-num">' + d.getDate() + '</span>'
-            + (holiday ? '<span class="bk-cal-holiday" title="' + escapeHtml(holiday) + '">' + escapeHtml(holiday) + '</span>' : '')
-            + (list.length ? '<span class="bk-cal-count' + (nClash ? ' is-clash' : '') + '" title="'
-                + peopleText(nPeople) + ' booked' + (nClash ? ', ' + nClash + ' on two shows at once' : '') + '">'
-                + nPeople + '</span>' : '')
-            + '</div>';
-      // Fold only when it saves at least two lines: "+1 more" hides one name
-      // behind a button the same height as the name.
-      var cut = list.length > CAL_MAX ? CAL_MAX - 1 : list.length;
-      for (var i = 0; i < cut; i++) html += calItemHtml(list[i]);
-      if (cut < list.length) {
-        html += '<button type="button" class="bk-cal-more" data-day="' + day + '">+' + (list.length - cut) + ' more</button>';
+        html += '<div class="bk-cal-day' + (working ? '' : ' is-shut') + (d.getMonth() !== m ? ' is-other' : '')
+              + (k === 6 ? ' is-sun' : '') + (day === BK.today ? ' is-today' : '') + '">'
+              + '<div class="bk-cal-date"><span class="bk-cal-num">' + d.getDate() + '</span>'
+              + (holiday ? '<span class="bk-cal-holiday" title="' + escapeHtml(holiday) + '">' + escapeHtml(holiday) + '</span>' : '')
+              + (list.length ? '<span class="bk-cal-count' + (nClash ? ' is-clash' : '') + '" title="'
+                  + peopleText(nPeople) + ' booked' + (nClash ? ', ' + nClash + ' on two shows at once' : '') + '">'
+                  + nPeople + '</span>' : '')
+              + '</div>';
+        if (open) {
+          // Somebody off who is booked that day is in the list, struck through;
+          // only the others need a line of their own.
+          var booked = {};
+          list.forEach(function (en) { booked[en.b.person_id] = true; });
+          away.forEach(function (p) { if (!booked[p.id]) html += calAwayHtml(p); });
+          // Fold only when it saves at least two lines: "+1 more" hides one
+          // name behind a button the same height as the name.
+          var cut = list.length > CAL_MAX ? CAL_MAX - 1 : list.length;
+          for (var i = 0; i < cut; i++) html += calItemHtml(list[i]);
+          if (cut < list.length) {
+            html += '<button type="button" class="bk-cal-more" data-day="' + day + '">+' + (list.length - cut) + ' more</button>';
+          }
+        } else {
+          away.forEach(function (p) { html += calAwayHtml(p); });
+        }
+        html += '</div>';
       }
-      html += '</div>';
+      var nWeek = Object.keys(weekPeople).length;
+      if (nWeek && !forced && !calAllCrew) {
+        html += '<button type="button" class="bk-cal-week" data-week="' + monday + '" aria-expanded="' + open + '">'
+              + (open ? '▾ Hide crew' : '▸ Show crew this week · ' + peopleText(nWeek)) + '</button>';
+      }
     }
     html += '</div>';
     if (!anyone) {
@@ -557,7 +623,13 @@
   if ($('bkCal')) {
     $('bkCal').addEventListener('click', function (e) {
       var more = e.target.closest ? e.target.closest('.bk-cal-more') : null;
-      if (more) { e.preventDefault(); openPop(more); }
+      if (more) { e.preventDefault(); openPop(more); return; }
+      var week = e.target.closest ? e.target.closest('.bk-cal-week') : null;
+      if (week) {
+        var w = week.getAttribute('data-week');
+        if (calOpenWeeks[w]) delete calOpenWeeks[w]; else calOpenWeeks[w] = true;
+        render();
+      }
     });
   }
   document.addEventListener('click', function (e) {
@@ -665,6 +737,14 @@
     $('bkCalToday').addEventListener('click', function () {
       var d = parseYmd(BK.today);
       calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+      render();
+    });
+  }
+  if ($('bkCalAllCrew')) {
+    $('bkCalAllCrew').checked = calAllCrew;
+    $('bkCalAllCrew').addEventListener('change', function () {
+      calAllCrew = this.checked;
+      save('calcrew', calAllCrew ? '1' : '0');
       render();
     });
   }

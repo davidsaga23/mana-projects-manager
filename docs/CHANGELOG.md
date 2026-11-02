@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — Bookings calendar: days off first, crew on request *(no migration)*
+
+- **Change.** The Calendar tab showed every booked person on every day, which was a lot. Each week
+  now starts folded: only the studio's days off (dimmed, with the holiday's name) and the **people
+  who are off**, with a small count of how many are booked each day (red when one of them is on two
+  shows). **"Show crew this week"** under a week lists everybody booked on it; **"Show crew every
+  week"** in the toolbar opens them all and is remembered in your browser.
+- "Only people on two shows at once" and the Person picker still list the names, since they are the
+  answer. In an opened day, the people who are off come first.
+
 ## 2026-10-30 — Bookings: Timeline and Calendar tabs *(no migration)*
 
 - **Feature.** Bookings has two tabs. **Timeline** is the page as it was (By person / By show,
