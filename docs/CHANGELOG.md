@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — Expense projection download: summary totals fixed *(no migration)*
+
+- **Fix.** In the Excel download's Summary, **Total projected person-days** (and person-months)
+  added the department subtotal rows on top of the rows they total, so every day counted twice
+  (found in an FCM export). It now reads the grand total's days. **Total headcount** counted rows,
+  so a person on three steps was three people, and Other expenses vendors counted too; it now
+  counts each person or slot once.
+
 ## 2026-11-02 — A month is 21 working days, not 22 *(no migration)*
 
 - **Months** on the expense projection, the person page and both Excel exports are now days ÷ 21
