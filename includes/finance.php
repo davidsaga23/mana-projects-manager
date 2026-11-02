@@ -204,7 +204,7 @@ function save_project_budget(int $projectId, array $project, array $in, string $
  *   Rate type/Rate  crew_terms, from the finance database
  *   Total days      that lane's share of the step's person-days, rounded UP to a
  *                   whole day (2026-10-21)
- *   Total months    days / 22, the sheet's own divisor
+ *   Total months    days / DAYS_PER_MONTH (21 since 2026-11-02)
  *   Projected cost  rate x days
  *   Units           how many items the step covers
  *   Actual days     from time_logs, converted at the project's hours per day
@@ -212,8 +212,14 @@ function save_project_budget(int $projectId, array $project, array $in, string $
  * COMPUTED, NEVER STORED — see the file header.
  */
 
-/** Working days in a month, matching the sheet's own divisor (4 / 0.1818 = 22). */
-const DAYS_PER_MONTH = 22.0;
+/**
+ * Working days in a month. 21 since 2026-11-02 (David: "standardize the day
+ * count per month to 21 instead of 22"); it was 22, the old reference sheet's
+ * divisor (4 / 0.1818 = 22). Only MONTHS read this: every cost is rate x days,
+ * so changing it moves no money. The Excel export writes it into its formulas
+ * from here too.
+ */
+const DAYS_PER_MONTH = 21.0;
 
 function expense_projection(PDO $pdo, int $projectId): array {
     $steps = pipeline_steps($pdo, $projectId);

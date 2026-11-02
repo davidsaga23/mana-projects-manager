@@ -187,7 +187,7 @@ foreach ($proj['by_department'] as $dept => $group) {
         $cells[COL_RATE]     = ['v' => $rate !== null ? (float)$rate : '',
                                 's' => xlsx_alt(XLSX_MONEY, $shade)];
         $cells[COL_DAYS]     = ['v' => $days, 's' => xlsx_alt(XLSX_NUM, $shade)];
-        $cells[COL_MONTHS]   = ['f' => 'IFERROR(' . $F . '/22,0)',
+        $cells[COL_MONTHS]   = ['f' => 'IFERROR(' . $F . '/' . (int)DAYS_PER_MONTH . ',0)',
                                 'v' => round((float)$row['months'], 4),
                                 's' => xlsx_alt(XLSX_NUM_CALC, $shade)];
 
@@ -237,7 +237,7 @@ foreach ($proj['by_department'] as $dept => $group) {
                              'v' => round((float)($row['cost'] ?? 0) - (float)($row['actual_cost'] ?? 0), 2),
                              's' => xlsx_alt(XLSX_MONEY_CALC, $shade)];
         $cells[COL_MONTHLY] = $liveCost
-            ? ['f' => 'IFERROR(' . $E . '*22,0)', 'v' => round((float)$rate * 22, 2),
+            ? ['f' => 'IFERROR(' . $E . '*' . (int)DAYS_PER_MONTH . ',0)', 'v' => round((float)$rate * DAYS_PER_MONTH, 2),
                's' => xlsx_alt(XLSX_MONEY_CALC, $shade)]
             : ['v' => '', 's' => xlsx_alt(XLSX_MONEY, $shade)];
         $note = '';
@@ -399,7 +399,7 @@ if ($firstDataRow !== null) {
           ['f' => 'SUM(F' . $firstDataRow . ':F' . $lastDataRow . ')',
            'v' => round($grandDays, 2), 's' => XLSX_NUM_CALC]]);
     $put([['v' => 'Total projected person-months', 's' => XLSX_TEXT],
-          ['f' => 'IFERROR(SUM(F' . $firstDataRow . ':F' . $lastDataRow . ')/22,0)',
+          ['f' => 'IFERROR(SUM(F' . $firstDataRow . ':F' . $lastDataRow . ')/' . (int)DAYS_PER_MONTH . ',0)',
            'v' => round($grandDays / DAYS_PER_MONTH, 2), 's' => XLSX_NUM_CALC]]);
 }
 $put([['v' => 'Projected cost', 's' => XLSX_TEXT],
@@ -434,7 +434,7 @@ foreach ($proj['fx'] ?? [] as $fxRow) {
 $put([['v' => 'A day is', 's' => XLSX_TEXT],
       ['v' => round($hoursDay, 2), 's' => XLSX_NUM],
       ['v' => 'hours on this project. Months are days / ' . (int)DAYS_PER_MONTH
-            . ', the divisor the reference sheet uses.', 's' => XLSX_NOTE]]);
+            . ', working days in a month (21 since 2026-11-02).', 's' => XLSX_NOTE]]);
 
 $widths = [0 => 20, 1 => 26, 2 => 24, 3 => 10, 4 => 13, 5 => 11, 6 => 13, 7 => 17,
            8 => 16, 9 => 14, 10 => 12, 11 => 16, 12 => 20, 13 => 17, 14 => 46];

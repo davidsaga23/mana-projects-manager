@@ -1003,7 +1003,7 @@ require __DIR__ . '/includes/header.php';
         </p>
       <?php endif; ?>
       <p class="muted small">
-        Months is days ÷ <?= (int)DAYS_PER_MONTH ?>, the divisor the expense sheet uses.
+        Months is days ÷ <?= (int)DAYS_PER_MONTH ?>, the working days in a month.
         These are <strong>planned</strong> days from the pipeline, not hours logged, actual cost
         comes from the invoices attached to each position.
       </p>

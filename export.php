@@ -100,9 +100,9 @@ if (in_array($what, ['items', 'shots', 'assets'], true)) {
 $steps = pipeline_steps($pdo, $projectId);
 $quotas = project_quotas($pdo, $projectId, $steps);
 
-// A working month, so "total months" can be worked out the same way the
-// reference sheet does it.
-const WORKING_DAYS_PER_MONTH = 22;
+// A working month, so "total months" can be worked out. 21 since 2026-11-02
+// (David), the same as DAYS_PER_MONTH in includes/finance.php.
+const WORKING_DAYS_PER_MONTH = 21;
 
 $retakePct = project_retake_pct($pdo, $projectId);
 $retake    = retake_factor($retakePct);
