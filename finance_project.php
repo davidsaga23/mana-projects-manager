@@ -1762,7 +1762,7 @@ if ($retakePct <= 0):
   </script>
 
   <p class="muted small">
-    <strong>Months</strong> is days ÷ 22, the divisor your own sheet uses.
+    <strong>Months</strong> is days ÷ <?= (int)DAYS_PER_MONTH ?>, the working days in a month.
     <strong>Actual days</strong> comes from time logged against that person on that step.
     <strong>Logged × rate</strong> is those days at the row's rate: what the work done so far is
     worth, an estimate beside the invoices, never counted in Actual or Difference. A flat fee or a

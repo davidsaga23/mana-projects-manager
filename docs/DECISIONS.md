@@ -4844,3 +4844,11 @@ product is an estimate of the work done, and putting it into Actual would undo t
 It is deliberately the plain product, not the Overview's "Committed so far" (invoices plus logged
 days not invoiced yet). A flat or per-second rate has no days to price and says so instead of
 showing a figure. The export keeps the sheet's fifteen columns and does not carry it.
+
+## 2026-11-02 — A working month is 21 days
+
+**Asked by David:** "standardize the day count per month to 21 instead of 22."
+
+**Decided:** `DAYS_PER_MONTH` is 21 (it was 22, the old reference sheet's divisor). It only turns
+days into months; no cost uses it. A spreadsheet outside Anima that still divides by 22 will show
+different months from Anima, though the same costs.
