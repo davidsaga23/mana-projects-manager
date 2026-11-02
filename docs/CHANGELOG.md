@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — A month is 21 working days, not 22 *(no migration)*
+
+- **Months** on the expense projection, the person page and both Excel exports are now days ÷ 21
+  (David). Every row's months reads about 5% higher; 11 days is 0.52 months instead of 0.50.
+- **No money changes:** costs are rate × days, so budgets, projected cost, invoices and statements
+  are the same. The export's *Monthly cost (ref)* column is now rate × 21.
+
 ## 2026-11-02 — A non-USD rate shows dollars first *(no migration)*
 
 - On the expense projection, the rate box of a contract in another currency now shows the **USD**
