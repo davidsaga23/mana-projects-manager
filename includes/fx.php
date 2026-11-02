@@ -118,6 +118,41 @@ function fx_usd_or_own(float $amount, $currency, array $rates): array {
     return $usd === null ? [$amount, $c] : [$usd, 'USD'];
 }
 
+/**
+ * The other way: a dollar amount typed on screen, back into the contract's own
+ * currency at the project's fixed rate, rounded to cents. Null when there is no
+ * fixed rate. For the projection's rate box, which shows dollars first (David,
+ * 2026-11-02) but saves the contract, which stays in its own currency.
+ */
+function fx_from_usd(float $usd, $currency, array $rates): ?float {
+    $c = fx_code($currency) ?? 'USD';
+    if ($c === 'USD') return $usd;
+    if (!isset($rates[$c]) || (float)$rates[$c]['usd_per_unit'] <= 0) return null;
+    return round($usd / (float)$rates[$c]['usd_per_unit'], 2);
+}
+
+/**
+ * What a rate box typed in dollars saves, as the string save_crew_terms() reads.
+ * A blank stays blank (it clears the rate, as it always did). With $keepIfNoRate
+ * a contract whose currency has no fixed rate keeps the number as typed, in its
+ * own currency (the bulk box); without it, that is refused, because a box drawn
+ * in dollars for a rate that has since gone would otherwise save dollars as
+ * pounds.
+ */
+function rate_from_usd_box(string $typed, $currency, array $rates, bool $keepIfNoRate = false): string {
+    $t = trim($typed);
+    if ($t === '') return '';
+    $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $t));
+    if ($clean === '' || !is_numeric($clean)) return $t;   // save_crew_terms() says why
+    $own = fx_from_usd((float)$clean, $currency, $rates);
+    if ($own === null) {
+        if ($keepIfNoRate) return $clean;
+        throw new RuntimeException('This contract is in ' . (fx_code($currency) ?? '?') . ' and the project has no '
+            . 'exchange rate for it, so a dollar rate cannot be converted. Nothing was saved.');
+    }
+    return number_format($own, 2, '.', '');
+}
+
 /** "520.00 USD (400.00 GBP)": both amounts, dollars first. */
 function fmt_money_both(float $usd, ?float $own, ?string $ownCurrency): string {
     $s = number_format($usd, 2) . ' USD';

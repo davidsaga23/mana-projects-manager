@@ -108,7 +108,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 2026-10-29) saves to that contract, not to the person's default:
             // the box shows the position's rate, so that is what it edits. The
             // step must be one this person holds here, same check as the crew.
+            // A BOX SHOWN IN DOLLARS (in_usd, David 2026-11-02: "USD first and
+            // then a secondary conversion in the other currency"). The contract
+            // stays in its own currency, so the typed dollars go back into it at
+            // the project's fixed rate before saving: 535.96 USD at 1 GBP =
+            // 1.3399 USD saves 400.00 GBP. Which currency the contract is in
+            // comes from the stored terms, never the browser.
             $stepId = (int)($_POST['step_id'] ?? 0);
+            if (($_POST['in_usd'] ?? '') === '1') {
+                $termsNow = $stepId !== 0
+                    ? (position_terms_for([$crewId], $projectId)[$crewId . '|' . $stepId] ?? null)
+                    : crew_term($crewId);
+                $_POST['day_rate'] = rate_from_usd_box((string)($_POST['day_rate'] ?? ''),
+                    $termsNow['rate_currency'] ?? 'USD', project_fx_rates($projectId));
+            }
             if ($stepId !== 0) {
                 $posName = '';
                 foreach (project_positions($pdo, $projectId) as $l) {
@@ -184,17 +197,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . 'Nothing was saved; apply again and confirm.');
             }
 
+            // THE RATE IS IN DOLLARS (2026-11-02). A ticked row whose contract
+            // is in another currency with a fixed rate gets the dollars converted
+            // into its own currency; one with no fixed rate keeps the number as
+            // typed, in its own currency, as before.
+            $fxNow = project_fx_rates($projectId);
+            $inOwn = fn(?array $t) => rate_from_usd_box($clean, $t['rate_currency'] ?? 'USD', $fxNow, true);
             foreach ($ids as $id) {
                 $existing = crew_term($id) ?? [];
                 save_crew_terms($id, $onShow[$id]['name'],
-                    array_merge($existing, ['day_rate' => $rate]), $who);
+                    array_merge($existing, ['day_rate' => $inOwn($existing)]), $who);
             }
             if ($posPicks) {
                 $ownAll = position_terms_for(array_values(array_unique(array_map(fn($p) => $p[0], $posPicks))), $projectId);
                 foreach ($posPicks as $key => [$cid, $sid]) {
                     if (!isset($ownAll[$key])) continue;
                     save_position_terms($cid, $onShow[$cid]['name'], $projectId, $sid, $posNames[$key],
-                        array_merge($ownAll[$key], ['day_rate' => $rate]), $who);
+                        array_merge($ownAll[$key], ['day_rate' => $inOwn($ownAll[$key])]), $who);
                 }
             }
             $n = count($ids) + count($posPicks);
@@ -1496,7 +1515,8 @@ if ($retakePct <= 0):
       <input name="day_rate" inputmode="decimal" size="6" placeholder="rate" aria-label="Rate for the selected rows">
       <button type="submit">Apply to selection</button>
     </span>
-    <span class="muted small">Each row keeps its own currency and unit (day or second).</span>
+    <span class="muted small">The rate is in USD. Each row keeps its unit (day or second); a contract in another
+      currency is converted at this project's fixed rate.</span>
   </form>
 
   <div class="grid-scroll">
@@ -1575,18 +1595,22 @@ if ($retakePct <= 0):
                 <?php endif; ?>
                 <?php // Saves on leaving the field, the same submit-on-change the
                       // role picker and the status dropdown use. ?>
+                <?php // DOLLARS FIRST (David, 2026-11-02): a contract in another
+                      // currency with a fixed rate shows its dollar rate in the
+                      // box, like the Projected column, and its own currency
+                      // under it. in_usd tells the save to convert back. ?>
+                <?php $boxUsd = !empty($r['fx']) && $r['rate_usd'] !== null; ?>
+                <?php if ($boxUsd): ?><input type="hidden" name="in_usd" value="1"><?php endif; ?>
                 <input name="day_rate" inputmode="decimal" size="6" onchange="this.form.submit()"
-                       value="<?= $r['rate'] !== null ? e(fmt_num((float)$r['rate'], 2)) : '' ?>"
+                       value="<?= $r['rate'] !== null ? e(fmt_num(round((float)($boxUsd ? $r['rate_usd'] : $r['rate']), 2), 2)) : '' ?>"
                        placeholder="set" aria-label="Day rate for <?= e((string)$r['artist']) ?>"
                        class="<?= $r['rate'] === null ? 'rate-unset' : '' ?>">
-                <span class="muted"><?= e($r['currency'] ?: 'USD') ?> / <?= e($r['rate_unit'] ?: 'day') ?></span>
+                <span class="muted"><?= e($boxUsd ? 'USD' : ($r['currency'] ?: 'USD')) ?> / <?= e($r['rate_unit'] ?: 'day') ?></span>
                 <?php if (!empty($r['own_position'])): ?>
                   <div class="muted small" title="This position has its own contract on this show; the box changes it here only">own contract</div>
                 <?php endif; ?>
-                <?php // The box is the CONTRACT's rate, in its own currency; the
-                      // dollars it is costed at sit beside it (2026-10-28). ?>
-                <?php if (!empty($r['fx']) && $r['rate_usd'] !== null): ?>
-                  <div class="muted small" title="<?= e(fx_describe($r['fx'])) ?>">= <?= e(number_format($r['rate_usd'], 2)) ?> USD</div>
+                <?php if ($boxUsd): ?>
+                  <div class="muted small" title="<?= e(fx_describe($r['fx'])) ?>">(<?= e(number_format((float)$r['rate'], 2) . ' ' . $r['currency']) ?>)</div>
                 <?php endif; ?>
               </form>
             <?php else: ?><span class="muted">—</span><?php endif; ?>
@@ -2328,8 +2352,7 @@ function invAddRows() {
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
             <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their steps">steps</span><?php endif; ?>
           </td>
-          <td class="small"><?php if (count($st['lines']) > 1): ?><?= count($st['lines']) ?> contracts<br><span class="muted">see the statement</span><?php else: ?><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?><?php endif; ?>
-            <?php if ($st['fx'] && $st['rate_usd'] !== null): ?><br><span class="muted">= <?= e(number_format($st['rate_usd'], 2)) ?> USD</span><?php endif; ?></td>
+          <td class="small"><?php if (count($st['lines']) > 1): ?><?= count($st['lines']) ?> contracts<br><span class="muted">see the statement</span><?php else: ?><?php if ($st['rate'] !== null && $st['fx'] && $st['rate_usd'] !== null): // dollars first (2026-11-02) ?><?= e(fmt_money($st['rate_usd'], $st['unit'], 'USD')) ?><br><span class="muted">(<?= e(number_format($st['rate'], 2) . ' ' . $st['rate_currency']) ?>)</span><?php else: ?><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?><?php endif; ?><?php endif; ?></td>
           <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
           <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h<br><span class="muted small"><?= e(fmt_num($st['days'], 2)) ?> d</span></td>
           <td class="num"><?= $st['approved_seconds'] > 0 ? e(statement_secs($st['approved_seconds'])) : '<span class="muted">—</span>' ?></td>
