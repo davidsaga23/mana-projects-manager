@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — Expense projection: a "Logged × rate" column *(no migration)*
+
+- **Feature.** Beside **Actual days**, a new column shows those days at the row's rate: what the
+  work logged so far is worth. Department subtotals and the total add it up. It is an estimate,
+  shown muted, and it never changes **Actual** or **Difference**, which stay the invoices. A flat
+  fee or a per-second rate has no days to price, so the cell says "not by day". Supervision rows
+  log no days and show a dash. The Excel export is unchanged.
+
 ## 2026-11-02 — Expense projection: invoices show on their row without logged time *(no migration)*
 
 - **Fix.** On the Expense projection, a row's **Actual** and **Difference** stayed a dash until the

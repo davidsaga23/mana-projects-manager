@@ -4835,3 +4835,12 @@ invoice status).
   each line now lists.
 - **Invoice status reads Expected / Received · pending payment / Paid**, Finance's three statuses.
 
+## 2026-11-02 — "Logged × rate" sits beside Actual, never inside it
+**Decision (David, 2026-11-02).** Asked whether Actual on the Expense projection was the invoices
+or "the time logged x the daily rate", David asked for the second as well, as its own column. It is
+added as **Logged × rate**: the row's logged days at its day or hour rate, in dollars at the
+project's fixed rate like the cost. **Actual and Difference stay the invoices** (2026-08-18): the
+product is an estimate of the work done, and putting it into Actual would undo that decision.
+It is deliberately the plain product, not the Overview's "Committed so far" (invoices plus logged
+days not invoiced yet). A flat or per-second rate has no days to price and says so instead of
+showing a figure. The export keeps the sheet's fifteen columns and does not carry it.
