@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-02 — Expense projection: invoices show on their row without logged time *(no migration)*
+
+- **Fix.** On the Expense projection, a row's **Actual** and **Difference** stayed a dash until the
+  person had logged time on that step, even when an invoice was attached to the position. The
+  department subtotal and the Excel export counted those invoices, so on MSD every Pre-production
+  row showed a dash under a subtotal of 12,575. The wait was left over from the first version, when
+  actual cost was logged days × rate; since 2026-08-18 it is the invoices. Rows now show them.
+- The footnote also says what a subtotal's Difference is: the department's whole projection minus
+  what has been invoiced so far.
+
 ## 2026-11-02 — Bookings calendar: days off first, crew on request *(no migration)*
 
 - **Change.** The Calendar tab showed every booked person on every day, which was a lot. Each week
