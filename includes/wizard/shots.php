@@ -87,6 +87,25 @@ function wizard_save_shots(PDO $pdo, ?array $project): string {
         return wizard_url($projectId, 4);
     }
 
+    // Clear the whole list, so a wrong paste or a generate with the wrong
+    // numbering can be redone without 238 clicks on ✕ (David, 2026-11-03).
+    //
+    // Only while the project is still in set-up. Deleting a shot cascades to
+    // its task progress, so on a running show this would wipe logged work;
+    // there the ✕ on each shot stays the way to remove one deliberately.
+    if ($action === 'delete_all') {
+        if (($project['status'] ?? '') !== 'setup') {
+            throw new RuntimeException('This project is past set-up, so its shots can only be removed ' .
+                                       'one at a time. Deleting them all would also erase the work logged on them.');
+        }
+        $del = $pdo->prepare('DELETE FROM shots WHERE project_id = ?');
+        $del->execute([$projectId]);
+        $n = $del->rowCount();
+        flash('ok', $n ? "Deleted all $n shot" . ($n === 1 ? '' : 's') . '. Paste or generate a new list below.'
+                       : 'There were no shots to delete.');
+        return wizard_url($projectId, 4);
+    }
+
     if ($action === 'paste') {
         $defaultEpisode = $episodic ? trim($_POST['paste_episode'] ?? '') : '';
         $lines = preg_split('/\R/', $_POST['paste'] ?? '');
@@ -200,6 +219,14 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
           · <?= count($byEpisode) ?> episodes
         <?php endif; ?>
       </p>
+
+      <?php if ($project['status'] === 'setup'): ?>
+        <form method="post" class="inline-form"
+              onsubmit="return confirm('Delete all <?= count($shots) ?> shots? This cannot be undone.');">
+          <input type="hidden" name="action" value="delete_all">
+          <button type="submit" class="secondary danger">Delete all <?= count($shots) ?> shots</button>
+        </form>
+      <?php endif; ?>
 
       <?php if ($episodic && count($byEpisode) > 1): ?>
       <div class="step-filter">
