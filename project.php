@@ -150,6 +150,44 @@ require __DIR__ . '/includes/header.php';
 </h2>
 
 <?php
+// THE WAY TO SIGN-OFF FROM THE PROJECT'S OWN PAGE (David, 2026-11-03: "there
+// should be a button in project home to ask for sign off"). Until now it was
+// reached only by Finish on the last wizard screen, or by picking Active on the
+// project list, and neither is where you are when you look a set-up project
+// over. The button lands on kickoff.php with send=1, the same place Finish goes,
+// so the warning, the freeze and the choice of signers are all unchanged.
+//
+// Setup is finished when it has pipeline steps, the one thing Finish insists
+// on; without them the button sends you back to the wizard instead.
+if ($project['status'] === 'setup' && can_edit()):
+    require_once __DIR__ . '/includes/kickoff.php';
+    $kick = kickoff_ready($pdo) ? kickoff_current($pdo, $projectId) : null;
+    $kickState = $kick['state'] ?? '';
+    $hasSteps = (bool)pipeline_steps($pdo, $projectId);
+?>
+  <div class="flash flash-warn setup-signoff">
+    <?php if (!kickoff_ready($pdo)): ?>
+      This project is still in set-up. <a href="wizard.php?project=<?= $projectId ?>&amp;step=7">Finish setup</a>
+      to make it active.
+    <?php elseif ($kickState === 'pending'): ?>
+      Waiting for sign-off. The set-up is frozen until everyone asked has approved.
+      <a class="button secondary" href="kickoff.php?project=<?= $projectId ?>">See the sign-off</a>
+    <?php elseif (!$hasSteps): ?>
+      This project is still in set-up. Add its pipeline steps before asking for sign-off.
+      <a class="button secondary" href="wizard.php?project=<?= $projectId ?>&amp;step=2">Resume setup</a>
+    <?php else: ?>
+      <?= $kickState === 'changes_requested'
+          ? 'Changes were asked for at sign-off. Once they are made, ask again.'
+          : 'This project is still in set-up. When the set-up is finished, ask for it to be signed off.' ?>
+      <?php if ($kickState === 'changes_requested'): ?>
+        <a href="kickoff.php?project=<?= $projectId ?>">Read the note</a>
+      <?php endif; ?>
+      <a class="button" href="kickoff.php?project=<?= $projectId ?>&amp;send=1">Ask for sign-off</a>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<?php
 // The glance. This replaced a single grey sentence carrying the same four facts
 // at the same weight — "2D · 45 shots · 26 assets · 2026-08-31 → 2026-10-16" —
 // where the dates were the thing people came for and read like punctuation.

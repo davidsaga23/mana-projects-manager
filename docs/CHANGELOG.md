@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-03 — Ask for sign-off from the project's Overview *(no migration)*
+
+- A project still in set-up shows a bar on its **Overview** with an **Ask for sign-off** button,
+  which opens the same freeze-and-send pop-up as **Finish setup**. While the request waits it says so
+  and links to it; after *Ask for changes* it links to the note and offers to ask again; with no
+  pipeline steps yet it sends you back to the wizard instead. Editors only.
+- **Setup wizard:** *Start empty* on the Pipeline step now opens the empty step list with its Add box
+  (it used to land back on the template picker, #162), and the Shots step can **delete all shots** at
+  once while a project is in set-up (#163).
+
 ## 2026-11-02 — Expense projection download: summary totals fixed *(no migration)*
 
 - **Fix.** In the Excel download's Summary, **Total projected person-days** (and person-months)
