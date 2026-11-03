@@ -95,7 +95,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         } else {
             flash('ok', 'Starting with an empty pipeline, add your steps below.');
         }
-        return wizard_url($projectId, 2);
+        return wizard_pipeline_url($pdo, $projectId);
     }
 
     if ($action === 'add') {
@@ -115,7 +115,12 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         wizard_pipeline_apply_edits($pdo, $projectId);
 
         $name = trim($_POST['new_name'] ?? '');
-        if ($name === '') throw new RuntimeException('Give the new step a name.');
+        if ($name === '') {
+            // Not a throw: the error path goes back to the plain step URL, which
+            // on an empty pipeline is the template picker again, not this list.
+            flash('err', 'Give the new step a name.');
+            return wizard_pipeline_url($pdo, $projectId);
+        }
         [$appliesTo, $assetType] = parse_applies_to($_POST['new_applies_to'] ?? 'shot');
         $tracks = !empty($_POST['new_tracks_seconds']) ? 1 : 0;
         $hasDeptCol = column_exists($pdo, 'pipeline_steps', 'department');
@@ -270,7 +275,20 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         flash('ok', 'No changes to save.');
     }
     if ($action === 'continue') return wizard_next_url($projectId, 2);
-    return wizard_url($projectId, 2);
+    return wizard_pipeline_url($pdo, $projectId);
+}
+
+/**
+ * Back to this screen, staying on the step list even while it is empty.
+ *
+ * An empty pipeline normally shows the template picker, and "Start empty" adds
+ * nothing, so it used to land straight back on the picker: press Use this and
+ * nothing seemed to happen, with no Add box anywhere (David, 2026-11-03).
+ * `blank=1` asks for the list itself, empty table and Add box included.
+ */
+function wizard_pipeline_url(PDO $pdo, int $projectId): string {
+    $url = wizard_url($projectId, 2);
+    return pipeline_steps($pdo, $projectId) ? $url : $url . '&blank=1';
 }
 
 function wizard_render_pipeline(PDO $pdo, ?array $project): void {
@@ -281,7 +299,9 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     // screen on an install that hasn't caught up.
     $hasDept = column_exists($pdo, 'pipeline_steps', 'department');
 
-    if (!$steps) {
+    // `blank` = the person chose "Start empty", so show the list and its Add box
+    // rather than offering the templates again (see wizard_pipeline_url()).
+    if (!$steps && empty($_GET['blank'])) {
         $tpl = $pdo->prepare(
             'SELECT t.*, (SELECT COUNT(*) FROM pipeline_template_steps s WHERE s.template_id = t.id) AS step_count
                FROM pipeline_templates t ORDER BY t.project_type = ? DESC, t.name'
@@ -448,6 +468,10 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         <?php endforeach; ?>
         </tbody>
       </table>
+      <?php if (!$steps): ?>
+        <p class="muted small">No steps yet. Add the first one below, or
+          <a href="<?= e(wizard_url($projectId, 2)) ?>">pick a template instead</a>.</p>
+      <?php endif; ?>
 
       <div class="actions">
         <button type="submit" name="action" value="save" class="secondary">Save and stay here</button>
