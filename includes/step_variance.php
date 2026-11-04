@@ -147,10 +147,14 @@ function sv_invoiced_by_position(int $projectId, float $hoursPerDay): array {
     if (!$db || !finance_column_exists('invoices', 'step_id')) return [];
     $hasQty = finance_column_exists('invoices', 'quantity') && finance_column_exists('invoices', 'quantity_unit');
     try {
+        // On whoever's POSITION it counts against, not who sent it (2026-11-04,
+        // invoice_holder_sql()). A step-level invoice (holder 0) is left out
+        // here, as it was before: this reader works per position.
+        $h = invoice_holder_sql();
         $q = $db->prepare(
-            'SELECT crew_id, step_id, currency, amount, paid_date'
+            "SELECT {$h} AS crew_id, step_id, currency, amount, paid_date"
             . ($hasQty ? ', quantity, quantity_unit' : '')
-            . ' FROM invoices WHERE project_id = ? AND crew_id IS NOT NULL AND step_id IS NOT NULL'
+            . " FROM invoices WHERE project_id = ? AND step_id IS NOT NULL AND {$h} > 0"
         );
         $q->execute([$projectId]);
     } catch (PDOException $e) {

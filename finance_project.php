@@ -259,16 +259,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // The picker sends "crewId:stepId"; the map turns that back into the
             // four fields an invoice stores. Rebuilt here rather than trusted
             // from the browser — see save_invoices_bulk().
-            $posMap = [];
-            foreach (project_positions($pdo, $projectId) as $l) {
-                $posMap[$l['crew_id'] . ':' . $l['step_id']] = [
-                    'crew_id'   => $l['crew_id'],
-                    'step_id'   => $l['step_id'],
-                    'crew_name' => $l['crew_name'],
-                    'step_name' => $l['step_name'],
-                ];
-            }
+            //
+            // Since 2026-11-04 each row has two pickers, what it pays for and
+            // who sent it, resolved here by resolve_invoice_target(). A row it
+            // refuses is left without a position and reported, never guessed.
+            $ivPositions = project_positions($pdo, $projectId);
+            $ivSteps = pipeline_steps($pdo, $projectId);
+            $ivPeople = project_people($pdo, $projectId);
             $rows = is_array($_POST['rows'] ?? null) ? $_POST['rows'] : [];
+            $posMap = [];
+            foreach ($rows as $i => $row) {
+                if (trim((string)($row['amount'] ?? '')) === '') continue;
+                try {
+                    $t = resolve_invoice_target(trim((string)($row['position'] ?? '')), trim((string)($row['payee'] ?? '')),
+                                                $ivPositions, $ivSteps, $ivPeople);
+                } catch (Throwable $e) {
+                    flash('err', sprintf('Row %d was not recorded: %s', $i + 1, $e->getMessage()));
+                    unset($rows[$i]);
+                    continue;
+                }
+                // A typed name wins, as it always did; the picker fills an empty one.
+                if (trim((string)($row['crew_name'] ?? '')) !== '') unset($t['crew_name']);
+                $rows[$i] = array_merge($row, $t);
+                unset($rows[$i]['position']);   // resolved; nothing left for the map to do
+            }
             $r = save_invoices_bulk($rows, $project, $posMap, $who);
             if ($r['added']) {
                 flash('ok', sprintf('Recorded %d invoice%s.', $r['added'], $r['added'] === 1 ? '' : 's'));
@@ -307,15 +321,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // The position picker sends "crewId:stepId"; resolved from this
             // show's own lanes, never trusted from the browser.
-            $in['crew_id'] = null; $in['step_id'] = null; $in['step_name'] = null;
-            $pos = (string)($_POST['position'] ?? '');
-            foreach (project_positions($pdo, $projectId) as $l) {
-                if ($l['crew_id'] . ':' . $l['step_id'] !== $pos) continue;
-                $in['crew_id'] = $l['crew_id'];
-                $in['step_id'] = $l['step_id'];
-                $in['step_name'] = $l['step_name'];
-                if (trim((string)($in['crew_name'] ?? '')) === '') $in['crew_name'] = $l['crew_name'];
-            }
+            // Since 2026-11-04 also "0:stepId" (the step, no position), and a
+            // second picker for who sent it; see resolve_invoice_target().
+            $t = resolve_invoice_target(trim((string)($_POST['position'] ?? '')), trim((string)($_POST['payee'] ?? '')),
+                                        project_positions($pdo, $projectId), pipeline_steps($pdo, $projectId),
+                                        project_people($pdo, $projectId));
+            // The name box keeps what it says unless emptied, so an edit to
+            // something else never renames the invoice; a new SENDER does.
+            $sameSender = (int)($t['crew_id'] ?? 0) === (int)($mine['crew_id'] ?? 0);
+            if (trim((string)($in['crew_name'] ?? '')) !== '' && $sameSender) unset($t['crew_name']);
+            $in = array_merge($in, $t);
             flash('ok', save_invoice($in, $project, $who));
         } elseif (isset($_POST['save_invoice'])) {
             flash('ok', save_invoice($_POST, $project, $who));
@@ -371,6 +386,15 @@ if ($configured && $dbError === null && $_SERVER['REQUEST_METHOD'] === 'GET' && 
 // filled, and nobody can invoice for work that was never done.
 $positions = project_positions($pdo, $projectId);
 $people  = project_people($pdo, $projectId);
+// For the invoice pickers (David, 2026-11-04): every step, so an invoice can
+// name a step with no position, and the real people on the show, so an invoice
+// can be from somebody other than the position's holder. Whose position an
+// invoice is on is "holderId|stepId" ($ivPosLabel), 0 for the step itself.
+$ivSteps = pipeline_steps($pdo, $projectId);
+$ivPayees = array_values(array_filter($people, fn($pp) => (int)($pp['is_placeholder'] ?? 0) !== 1));
+$ivHolderReady = invoice_holder_available();
+$ivPosLabel = [];
+foreach ($positions as $ps) $ivPosLabel[(int)$ps['crew_id'] . '|' . (int)$ps['step_id']] = $ps['crew_name'];
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
 
@@ -458,9 +482,9 @@ $finalVsPaid     = $budgetAmount !== null ? $budgetAmount - $paid   : null;
 // staffed.
 $invoicedSlots = [];
 foreach ($invoices as $iv) {
-    if (!empty($iv['crew_id']) && !empty($iv['step_id'])) {
-        $invoicedSlots[(int)$iv['crew_id'] . '|' . (int)$iv['step_id']] = true;
-    }
+    // On whoever's position it counts against, not who sent it (2026-11-04).
+    $h = invoice_holder($iv);
+    if ($h) $invoicedSlots[$h . '|' . (int)$iv['step_id']] = true;
 }
 $slotsAwaiting = 0;
 foreach ($positions as $pos) {
@@ -497,7 +521,9 @@ $stop = project_stop_cost($pdo, $projectId, $invoices);
 // on a projection row. Reported rather than quietly dropped.
 $unattached = 0.0;
 foreach ($invoices as $iv) {
-    if (empty($iv['step_id']) || empty($iv['crew_id'])) {
+    // A step with no position is a line on the projection now (2026-11-04);
+    // only an invoice with no step at all is on no row.
+    if (empty($iv['step_id'])) {
         $unattached += fx_usd_or_own((float)$iv['amount'], $iv['currency'] ?? 'USD', $fxRates)[0];
     }
 }
@@ -1000,7 +1026,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
         <strong><?= e(number_format($group['cost'], 2)) ?></strong>
         <span class="muted small">
           <?= e(fmt_num($pct, 0)) ?>% · <?= e(fmt_num($group['days'], 1)) ?> days
-          · <?= count($group['rows']) ?> <?= count($group['rows']) === 1 ? 'person' : 'people' ?>
+          · <?= (int)($group['people'] ?? count($group['rows'])) ?> <?= (int)($group['people'] ?? count($group['rows'])) === 1 ? 'person' : 'people' ?>
         </span>
       </div>
     <?php endforeach; ?>
@@ -1545,7 +1571,7 @@ if ($retakePct <= 0):
           <input type="checkbox" class="bulk-dept-all" data-dept="<?= e($dept) ?>"
                  aria-label="Tick every row in <?= e($dept) ?>"></label>
         <span class="group-badge"><?= e(strtoupper($dept)) ?></span>
-        <span class="muted small"><?= count($group['rows']) ?> people ·
+        <span class="muted small"><?= (int)($group['people'] ?? count($group['rows'])) ?> people ·
           <?= e(fmt_num($group['days'], 1)) ?> days</span>
       </td></tr>
 
@@ -1562,10 +1588,24 @@ if ($retakePct <= 0):
             <?php endif; ?>
             <span class="dot" style="background:<?= e($r['step']['color'] ?: '#ccc') ?>"></span><?= e($r['role']) ?>
           </td>
+          <?php // WHO INVOICED IT (David, 2026-11-04). A position can be invoiced
+                // by artists other than the one holding it ("Luka + 2 others"),
+                // and a step-level line lists everybody who invoiced the step.
+                // The amounts are in the tooltip, in dollars like Actual. ?>
+          <?php $others = array_values(array_filter($r['payees'] ?? [],
+                    fn($pp) => !$r['crew_id'] || (int)($pp['crew_id'] ?? 0) !== (int)$r['crew_id']));
+                $othersTip = implode("\n", array_map(fn($pp) => $pp['name'] . ': ' . number_format($pp['amount'], 2), $r['payees'] ?? [])); ?>
           <td>
-            <?php if ($r['crew_id']): ?>
+            <?php if (!empty($r['step_level'])): ?>
+              <span class="muted small" title="<?= e($othersTip) ?>">invoiced to the step:
+                <?= e(implode(', ', array_map(fn($pp) => $pp['name'], $others))) ?></span>
+            <?php elseif ($r['crew_id']): ?>
               <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>&amp;from=finance"><?= e($r['artist']) ?></a>
               <?php if ($r['is_slot']): ?><span class="slot-tag">slot</span><?php endif; ?>
+              <?php if ($others): ?>
+                <div class="muted small" title="<?= e($othersTip) ?>">+ <?= count($others) === 1
+                    ? e($others[0]['name']) : count($others) . ' others' ?></div>
+              <?php endif; ?>
             <?php else: ?>
               <span class="warn-text small">nobody assigned</span>
             <?php endif; ?>
@@ -1615,7 +1655,7 @@ if ($retakePct <= 0):
               </form>
             <?php else: ?><span class="muted">—</span><?php endif; ?>
           </td>
-          <td class="num" title="Rounded up to whole days, from <?= e(fmt_num((float)($r['days_exact'] ?? $r['days']), 2)) ?>"><?= e(fmt_num($r['days'], 2)) ?>
+          <td class="num" title="Rounded up to whole days, from <?= e(fmt_num((float)($r['days_exact'] ?? $r['days']), 2)) ?>"><?= !empty($r['step_level']) ? '<span class="muted">—</span>' : e(fmt_num($r['days'], 2)) ?>
             <?php // Which number produced these days. An unmarked row rests on a
                   // studio decision; an "est." row rests on one project's guess,
                   // and the difference matters the moment a budget is queried. ?>
@@ -1637,7 +1677,7 @@ if ($retakePct <= 0):
               <span class="est-tag" title="No studio standard for this step, so this row is costed from the project's own estimate">est.</span>
             <?php endif; ?>
           </td>
-          <td class="num muted"><?= e(fmt_num($r['months'], 2)) ?></td>
+          <td class="num muted"><?= !empty($r['step_level']) ? '—' : e(fmt_num($r['months'], 2)) ?></td>
           <td class="num"><?= $r['cost'] === null ? '<span class="muted">—</span>' : e(number_format($r['cost'], 2)) ?>
             <?php if (($r['cost_own'] ?? null) !== null): ?>
               <div class="muted small"><?= e(number_format($r['cost_own'], 2) . ' ' . $r['currency']) ?></div>
@@ -1647,7 +1687,7 @@ if ($retakePct <= 0):
                 // rendering as "41" — overstating the show and disagreeing with
                 // the export, which writes the column at full precision. ?>
           <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
-                e(fmt_num($r['units'], 1)) ?></td>
+                (!empty($r['step_level']) ? '—' : e(fmt_num($r['units'], 1))) ?></td>
           <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
           <?php // Muted and apart from Actual: an estimate of the work done, never
                 // the money billed (David, 2026-11-02). A flat or per-second rate
@@ -2009,7 +2049,23 @@ if ($retakePct <= 0):
       $late = !$iv['paid_date'] && $iv['due_date'] && $iv['due_date'] < $todayStr; ?>
       <tr class="<?= $late ? 'row-overdue' : '' ?>">
         <td><?= e($iv['crew_name'] ?: '—') ?></td>
-        <td class="muted small"><?= e($iv['step_name'] ?: '') ?: '<span class="warn-text">unattached</span>' ?></td>
+        <?php // WHAT IT PAYS FOR, which since 2026-11-04 may be the step with no
+              // position, or somebody else's position. "unattached" opens the
+              // edit row, whose first picker is where it gets attached. ?>
+        <?php $ivH = invoice_holder($iv); ?>
+        <td class="muted small">
+          <?php if ($ivH === null): ?>
+            <button type="button" class="linkish warn-text invoice-attach-btn" data-invoice="<?= (int)$iv['id'] ?>"
+                    title="Choose the position or step this invoice pays for">unattached</button>
+          <?php else: ?>
+            <?= e($iv['step_name'] ?: '') ?>
+            <?php if ($ivH === 0): ?>
+              <br><em>whole step, no position</em>
+            <?php elseif ((int)($iv['crew_id'] ?? 0) !== $ivH): ?>
+              <br><em>on <?= e($ivPosLabel[$ivH . '|' . (int)$iv['step_id']] ?? 'another') ?>'s position</em>
+            <?php endif; ?>
+          <?php endif; ?>
+        </td>
         <td class="muted small">
           <?php if (!empty($iv['document_url'])): ?>
             <a href="<?= e($iv['document_url']) ?>" target="_blank" rel="noopener"><?= e($iv['invoice_ref'] ?: 'document') ?></a>
@@ -2068,14 +2124,32 @@ if ($retakePct <= 0):
         <td colspan="10">
           <form method="post" class="invoice-edit-form">
             <input type="hidden" name="update_invoice" value="<?= (int)$iv['id'] ?>">
-            <label>Position
+            <?php $ivSel = $ivH === null ? '' : $ivH . ':' . (int)$iv['step_id'];
+                  $ivPay = ($iv['crew_id'] ?? null) === null ? 'other'
+                         : ((int)$iv['crew_id'] === (int)$ivH ? '' : (string)(int)$iv['crew_id']); ?>
+            <label>Pays for
               <select name="position">
-                <option value="">no particular position</option>
-                <?php foreach ($positions as $ps):
-                  $v = (int)$ps['crew_id'] . ':' . (int)$ps['step_id']; ?>
-                  <option value="<?= e($v) ?>" <?= ((int)($iv['crew_id'] ?? 0) === (int)$ps['crew_id']
-                      && (int)($iv['step_id'] ?? 0) === (int)$ps['step_id']) ? 'selected' : '' ?>><?= e($ps['label']) ?></option>
+                <option value="">no particular position (unattached)</option>
+                <optgroup label="A position">
+                  <?php foreach ($positions as $ps):
+                    $v = (int)$ps['crew_id'] . ':' . (int)$ps['step_id']; ?>
+                    <option value="<?= e($v) ?>" <?= $ivSel === $v ? 'selected' : '' ?>><?= e($ps['label']) ?></option>
+                  <?php endforeach; ?>
+                </optgroup>
+                <optgroup label="A whole step, no position">
+                  <?php foreach ($ivSteps as $st): $v = '0:' . (int)$st['id']; ?>
+                    <option value="<?= e($v) ?>" <?= $ivSel === $v ? 'selected' : '' ?>><?= e($st['name']) ?>, whole step</option>
+                  <?php endforeach; ?>
+                </optgroup>
+              </select>
+            </label>
+            <label>Sent by
+              <select name="payee">
+                <option value="" <?= $ivPay === '' ? 'selected' : '' ?>>the person on the position</option>
+                <?php foreach ($ivPayees as $pp): ?>
+                  <option value="<?= (int)$pp['id'] ?>" <?= $ivPay === (string)(int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['name']) ?></option>
                 <?php endforeach; ?>
+                <option value="other" <?= $ivPay === 'other' ? 'selected' : '' ?>>somebody not on the crew (the name typed)</option>
               </select>
             </label>
             <label>Name on the invoice <input name="crew_name" value="<?= e($iv['crew_name'] ?? '') ?>" size="16"></label>
@@ -2156,6 +2230,7 @@ if ($retakePct <= 0):
       <thead>
         <tr>
           <th>Position <span class="muted small">(what it pays for)</span></th>
+          <th>Sent by</th>
           <th>Name on the invoice</th>
           <th>Their reference</th>
           <th>Amount</th>
@@ -2176,10 +2251,26 @@ if ($retakePct <= 0):
             <td>
               <select name="<?= $n ?>[position]" onchange="invPosition(this)">
                 <option value="">no particular position</option>
-                <?php foreach ($positions as $ps): ?>
-                  <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
-                          data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
+                <optgroup label="A position">
+                  <?php foreach ($positions as $ps): ?>
+                    <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
+                            data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
+                  <?php endforeach; ?>
+                </optgroup>
+                <optgroup label="A whole step, no position">
+                  <?php foreach ($ivSteps as $st): ?>
+                    <option value="0:<?= (int)$st['id'] ?>" data-crewname=""><?= e($st['name']) ?>, whole step</option>
+                  <?php endforeach; ?>
+                </optgroup>
+              </select>
+            </td>
+            <td>
+              <select name="<?= $n ?>[payee]" onchange="invPayee(this)">
+                <option value="">the person on the position</option>
+                <?php foreach ($ivPayees as $pp): ?>
+                  <option value="<?= (int)$pp['id'] ?>" data-crewname="<?= e($pp['name']) ?>"><?= e($pp['name']) ?></option>
                 <?php endforeach; ?>
+                <option value="other">somebody not on the crew</option>
               </select>
             </td>
             <td><input name="<?= $n ?>[crew_name]" size="16" placeholder="Filled in by the picker"></td>
@@ -2214,6 +2305,13 @@ if ($retakePct <= 0):
     <button type="button" class="secondary" onclick="invAddRows()">Add 5 more rows</button>
   </div>
   <p class="muted small">
+    <strong>Pays for</strong> a whole step puts the invoice on a line of its own under that step on the
+    projection, counted in the step's department. <strong>Sent by</strong> somebody other than the
+    person on the position keeps it on that position's row, and lists it on the sender's statement.
+    <?php if (!$ivHolderReady): ?>
+      <span class="warn-text">Sending an invoice from somebody other than the position's holder needs
+      <code>finance_install_15.sql</code> imported into the finance database first.</span>
+    <?php endif; ?>
     Choosing a <strong>position</strong> puts that invoice on that row of the projection above,
     crew and step together are the lane, which is why "who" alone cannot say what a payment was
     for. Leaving it blank is a real answer: a kill fee or a one-off counts in the project total and
@@ -2226,7 +2324,8 @@ if ($retakePct <= 0):
 // "edit" on a recorded invoice opens its row of fields underneath; Cancel or a
 // second "edit" shuts it again. Nothing saves until Save.
 document.addEventListener('click', function (e) {
-  var b = e.target.closest ? e.target.closest('.invoice-edit-btn, .invoice-edit-cancel') : null;
+  // "unattached" in the Position column opens the same row, at its picker.
+  var b = e.target.closest ? e.target.closest('.invoice-edit-btn, .invoice-edit-cancel, .invoice-attach-btn') : null;
   if (!b) return;
   var row = document.getElementById('invoiceEdit' + b.getAttribute('data-invoice'));
   if (!row) return;
@@ -2234,7 +2333,10 @@ document.addEventListener('click', function (e) {
   row.hidden = !open;
   var btn = document.querySelector('.invoice-edit-btn[data-invoice="' + b.getAttribute('data-invoice') + '"]');
   if (btn) { btn.setAttribute('aria-expanded', open ? 'true' : 'false'); btn.textContent = open ? 'close' : 'edit'; }
-  if (open) { var f = row.querySelector('input[name="amount"]'); if (f) f.focus(); }
+  if (open) {
+    var f = row.querySelector(b.classList.contains('invoice-attach-btn') ? 'select[name="position"]' : 'input[name="amount"]');
+    if (f) f.focus();
+  }
 });
 
 // Fill the visible name from the position picker, within THIS row only.
@@ -2251,6 +2353,19 @@ function invPosition(sel) {
   var picked = sel.options[sel.selectedIndex];
   if (name && picked && (name.value === '' || name.dataset.auto === '1')) {
     name.value = picked.dataset.crewname || '';
+    name.dataset.auto = '1';
+  }
+}
+
+// "Sent by" a person fills the name box the same way; the server names the
+// invoice from the person anyway, so this is only what you see while typing.
+function invPayee(sel) {
+  var row = sel.closest('tr');
+  if (!row) { return; }
+  var name = row.querySelector('[name$="[crew_name]"]');
+  var picked = sel.options[sel.selectedIndex];
+  if (name && picked && picked.dataset.crewname && (name.value === '' || name.dataset.auto === '1')) {
+    name.value = picked.dataset.crewname;
     name.dataset.auto = '1';
   }
 }

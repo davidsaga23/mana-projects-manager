@@ -272,6 +272,13 @@ foreach ($proj['by_department'] as $dept => $group) {
                 : 'Supervision, no dates set yet';
             $note = $note === '' ? $span : $span . '. ' . $note;
         }
+        // Invoiced to the step with no position (2026-11-04): no projection of
+        // its own, so its difference is minus what was invoiced, and the
+        // department subtotal above it adds up with it.
+        if (!empty($row['step_level'])) {
+            $note = 'Invoiced to the step, not to a position: '
+                  . implode(', ', array_map(fn($pp) => $pp['name'], $row['payees'] ?? []));
+        }
         $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];
 
         ksort($cells);

@@ -263,7 +263,11 @@ function expense_projection(PDO $pdo, int $projectId): array {
     // ACTUAL COST COMES FROM INVOICES, not from days times a rate. That product
     // is a second estimate wearing an actual's clothes; only an invoice records
     // what was really billed (David, 2026-08-18).
-    $billedBy = invoiced_by_position($projectId);
+    // Per position AND per sender (2026-11-04): one position can be invoiced by
+    // several artists, and a step can be invoiced with no position at all.
+    $payeesBy = invoice_payees_by_position($projectId);
+    $billedBy = [];
+    foreach ($payeesBy as $k => $ps) foreach ($ps as $p) $billedBy[$k] = round(($billedBy[$k] ?? 0.0) + $p['amount'], 2);
 
     $rows = []; $total = 0.0; $actualTotal = 0.0; $loggedTotal = 0.0;
     $unpricedDays = 0.0; $currency = null; $mixed = false;
@@ -490,6 +494,9 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 'actual_days' => $actDays,
                 'logged_value' => $loggedValue,
                 'actual_cost' => $actCost,
+                // Who invoiced it: the holder, and anybody else who did work on
+                // this one position (David, 2026-11-04).
+                'payees'      => $cid ? ($payeesBy[$cid . '|' . $stepId] ?? []) : [],
                 'variance'    => ($cost !== null && $actCost !== null) ? $cost - $actCost : null,
             ];
         }
@@ -578,6 +585,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
             'actual_days'    => 0.0,
             'logged_value'   => null,
             'actual_cost'    => $supBilled,
+            'payees'         => $payeesBy[$cid . '|' . -(int)$p['id']] ?? [],
             'variance'       => ($cost !== null && $supBilled !== null) ? $cost - $supBilled : null,
         ];
         if ($supBilled !== null) $actualTotal += $supBilled;
@@ -605,6 +613,51 @@ function expense_projection(PDO $pdo, int $projectId): array {
         $byDept[$d]['days']   += (float)$r['days'];
         $byDept[$d]['actual'] += (float)($r['actual_cost'] ?? 0);
         $byDept[$d]['logged'] += (float)($r['logged_value'] ?? 0);
+    }
+
+    // ---- INVOICED TO A STEP, NOT TO A POSITION (David, 2026-11-04) -----------
+    // "make sure we can add it to the department (not the person)". One line
+    // per step, under its department, after the step's own rows: it counts in
+    // the department's actual and difference, and has no projection of its own.
+    //
+    // ⚠ IN by_department ONLY, NEVER IN $rows. $rows is read as "the positions"
+    // by the sign-off snapshot, the budget pool, statements and the person
+    // page; a line that is nobody's position does not belong in any of them.
+    $stepById = [];
+    foreach ($steps as $st) $stepById[(int)$st['id']] = $st;
+    foreach ($payeesBy as $k => $ps) {
+        [$holder, $sid] = array_map('intval', explode('|', $k));
+        if ($holder !== 0) continue;
+        $st = $stepById[$sid] ?? ['id' => $sid, 'name' => 'Step no longer on the show', 'color' => '#8a8f98',
+                                  'step_order' => 9999, 'applies_to' => 'project', 'applies_to_asset_type' => null,
+                                  'tracks_seconds' => 0, 'department' => ''];
+        $d = trim((string)($st['department'] ?? '')) ?: 'Unassigned';
+        $amt = $billedBy[$k] ?? 0.0;
+        $line = [
+            'department' => $d, 'step' => $st, 'step_level' => true,
+            'role' => $st['name'] . ', not on a position',
+            'crew_id' => null, 'artist' => null, 'is_slot' => false,
+            'rate' => null, 'own_position' => false, 'rate_unit' => null, 'currency' => null,
+            'cost_currency' => null, 'cost_own' => null, 'fx' => null, 'rate_usd' => null,
+            'days' => 0.0, 'days_exact' => 0.0, 'months' => 0.0, 'days_source' => 'none',
+            'tracks_seconds' => false, 'units_per_lane' => 0, 'lane_count' => 1, 'rate_mismatch' => false,
+            'ideal_days' => null, 'estimate_days' => null, 'cost' => null, 'units' => 0, 'unit_label' => '',
+            'actual_days' => 0.0, 'logged_value' => null, 'actual_cost' => $amt, 'payees' => $ps,
+            'variance' => null,
+        ];
+        $byDept[$d] = $byDept[$d] ?? ['rows' => [], 'cost' => 0.0, 'days' => 0.0, 'actual' => 0.0, 'logged' => 0.0];
+        // After the last row of the same step, or at the end of the department.
+        $at = count($byDept[$d]['rows']);
+        foreach ($byDept[$d]['rows'] as $i => $r) {
+            if ((int)$r['step']['id'] === $sid) $at = $i + 1;
+        }
+        array_splice($byDept[$d]['rows'], $at, 0, [$line]);
+        $byDept[$d]['actual'] += $amt;
+        $actualTotal += $amt;
+    }
+    // People on each department, not lines: a step-level line is nobody.
+    foreach ($byDept as $d => $g) {
+        $byDept[$d]['people'] = count(array_filter($g['rows'], fn($r) => empty($r['step_level'])));
     }
 
     // Costs that are not somebody's day rate — software, render time, licences,
@@ -971,6 +1024,58 @@ function project_positions(PDO $pdo, int $projectId): array {
  * and the screen says how much is unattached rather than losing it quietly.
  */
 function invoiced_by_position(int $projectId): array {
+    $out = [];
+    foreach (invoice_payees_by_position($projectId) as $k => $payees) {
+        foreach ($payees as $p) $out[$k] = round(($out[$k] ?? 0.0) + $p['amount'], 2);
+    }
+    return $out;
+}
+
+/* --------------------------------------------------------------------------
+ * WHAT AN INVOICE PAYS FOR, AND WHO SENT IT, ARE TWO THINGS (David, 2026-11-04:
+ * "for those unattached positions let's make sure we can add it to the
+ * department (not the person) but it happens sometimes we need to work with
+ * different artists but only one position is there").
+ *
+ *   crew_id           WHO SENT IT. Their statement and Home list it. Null for
+ *                     somebody not on the crew (a vendor), named in crew_name.
+ *   step_id           the step (or MINUS a supervision position) it pays for;
+ *                     null = unattached, as before.
+ *   position_crew_id  WHOSE POSITION on that step it counts against
+ *                     (finance_install_15). Null = the sender's own, which is
+ *                     every invoice recorded before. 0 = the step itself, no
+ *                     position: a line "not on a position" under the step.
+ *
+ * So the position an invoice lands on is COALESCE(position_crew_id, crew_id, 0)
+ * with its step_id, and 0 is the step-level line. Before 15 is imported there
+ * is no third column, and an invoice with a step but no sender is step-level.
+ * ------------------------------------------------------------------------ */
+
+/** Has finance_install_15 been imported? */
+function invoice_holder_available(): bool {
+    return finance_column_exists('invoices', 'position_crew_id');
+}
+
+/** SQL for whose position an invoice counts against, 0 for the step itself. */
+function invoice_holder_sql(): string {
+    return invoice_holder_available() ? 'COALESCE(position_crew_id, crew_id, 0)' : 'COALESCE(crew_id, 0)';
+}
+
+/** Whose position one invoice row counts against: crew id, 0 for the step, null unattached. */
+function invoice_holder(array $iv): ?int {
+    if (empty($iv['step_id'])) return null;
+    if (array_key_exists('position_crew_id', $iv) && $iv['position_crew_id'] !== null) return (int)$iv['position_crew_id'];
+    return (int)($iv['crew_id'] ?? 0);
+}
+
+/**
+ * Invoiced per position, broken down by who sent it: "holderId|stepId" =>
+ * [['crew_id', 'name', 'amount'], ...], amounts in dollars at the project's
+ * fixed rate (2026-10-28; a currency with none is added as it is, as always).
+ * Key "0|stepId" is the step-level line. Unattached invoices are left out, as
+ * they always were: they belong to no row.
+ */
+function invoice_payees_by_position(int $projectId): array {
     if (!can_see_money()) return [];
     $db = finance_db();
     if (!$db) return [];
@@ -978,23 +1083,81 @@ function invoiced_by_position(int $projectId): array {
     // no position on an invoice, so nothing can attach — reported by
     // invoices_need_upgrade() rather than crashing the page.
     if (!finance_column_exists('invoices', 'step_id')) return [];
-    // Per currency, then into dollars at the project's fixed rate (2026-10-28),
-    // because the projection row it lands on is costed in dollars. A currency
-    // with no fixed rate is added as it is, which is what this always did; the
-    // projection's mixed-currency warning covers that case.
+    $h = invoice_holder_sql();
     $q = $db->prepare(
-        'SELECT crew_id, step_id, currency, SUM(amount) AS billed
+        "SELECT {$h} AS holder, step_id, crew_id, crew_name, currency, SUM(amount) AS billed
            FROM invoices
-          WHERE project_id = ? AND crew_id IS NOT NULL AND step_id IS NOT NULL
-          GROUP BY crew_id, step_id, currency'
+          WHERE project_id = ? AND step_id IS NOT NULL
+          GROUP BY {$h}, step_id, crew_id, crew_name, currency"
     );
     $q->execute([$projectId]);
     $fx = project_fx_rates($projectId);
     $out = [];
     foreach ($q as $r) {
-        $k = (int)$r['crew_id'] . '|' . (int)$r['step_id'];
-        $out[$k] = round(($out[$k] ?? 0.0) + fx_usd_or_own((float)$r['billed'], $r['currency'], $fx)[0], 2);
+        $k = (int)$r['holder'] . '|' . (int)$r['step_id'];
+        $cid = $r['crew_id'] !== null ? (int)$r['crew_id'] : null;
+        $name = trim((string)($r['crew_name'] ?? '')) ?: '(no name)';
+        $who = $cid ? 'c' . $cid : 'n' . strtolower($name);
+        $usd = fx_usd_or_own((float)$r['billed'], $r['currency'], $fx)[0];
+        if (!isset($out[$k][$who])) $out[$k][$who] = ['crew_id' => $cid, 'name' => $name, 'amount' => 0.0];
+        $out[$k][$who]['amount'] = round($out[$k][$who]['amount'] + $usd, 2);
     }
+    foreach ($out as $k => $p) $out[$k] = array_values($p);
+    return $out;
+}
+
+/**
+ * Turn the two pickers on an invoice form into the columns it stores.
+ *
+ * $position is "holderId:stepId" — a position on the show, or "0:stepId" for a
+ * step with no position — or '' for unattached. $payee is '' for "the person on
+ * the position", a crew id from $people, or 'other' for somebody not on the
+ * crew (the typed name). Everything is resolved against this show's own lists,
+ * never trusted from the browser.
+ *
+ * @return array ['crew_id','step_id','step_name','position_crew_id', and 'crew_name' when known]
+ */
+function resolve_invoice_target(string $position, string $payee, array $positions, array $steps, array $people): array {
+    $holder = null; $stepId = null; $stepName = null; $holderName = '';
+    if ($position !== '') {
+        if (!preg_match('/^(-?\d+):(-?\d+)$/', $position, $m)) {
+            throw new RuntimeException('That position is not on this show, so nothing was saved.');
+        }
+        $a = (int)$m[1]; $b = (int)$m[2];
+        if ($a > 0) {
+            foreach ($positions as $ps) {
+                if ((int)$ps['crew_id'] === $a && (int)$ps['step_id'] === $b) {
+                    $holder = $a; $stepId = $b; $stepName = (string)$ps['step_name']; $holderName = (string)$ps['crew_name'];
+                }
+            }
+        } elseif ($a === 0 && $b > 0) {
+            foreach ($steps as $st) {
+                if ((int)$st['id'] === $b) { $holder = 0; $stepId = $b; $stepName = (string)$st['name']; }
+            }
+        }
+        if ($stepId === null) throw new RuntimeException('That position is not on this show, so nothing was saved.');
+    }
+
+    // Who sent it.
+    $crewId = null; $crewName = null;
+    if ($payee === '') {
+        if ($holder) { $crewId = $holder; $crewName = $holderName; }
+    } elseif ($payee !== 'other') {
+        foreach ($people as $pp) {
+            if ((int)$pp['id'] === (int)$payee) { $crewId = (int)$pp['id']; $crewName = (string)$pp['name']; }
+        }
+        if ($crewId === null) throw new RuntimeException('That person is not on this show, so nothing was saved.');
+    }
+
+    // Stored only when it differs from the sender, so every invoice whose
+    // sender IS the position holder reads exactly as it always did.
+    $posCrew = ($stepId !== null && $holder !== $crewId) ? $holder : null;
+    if ($posCrew !== null && !invoice_holder_available() && !($posCrew === 0 && $crewId === null)) {
+        throw new RuntimeException("Putting an invoice on somebody else's position, or on a whole step with a "
+            . 'person as the sender, needs finance_install_15.sql imported into the finance database. Nothing was saved.');
+    }
+    $out = ['crew_id' => $crewId, 'step_id' => $stepId, 'step_name' => $stepName, 'position_crew_id' => $posCrew];
+    if ($crewName !== null) $out['crew_name'] = $crewName;
     return $out;
 }
 
@@ -1152,17 +1315,25 @@ function save_invoice(array $in, array $project, string $who = ''): string {
         $who,
     ];
 
+    $hasHolder = $hasPosition && invoice_holder_available();
     if ($hasPosition) {
         // Positioned after crew_name, matching the column order below.
-        array_splice($args, 4, 0, [
+        $posArgs = [
             !empty($in['step_id']) ? (int)$in['step_id'] : null,
             trim((string)($in['step_name'] ?? '')) ?: null,
-        ]);
+        ];
+        // Whose position (finance_install_15): null = the sender's own, which
+        // is what an invoice without the key (an older form) always meant.
+        if ($hasHolder) {
+            $posArgs[] = (!empty($in['step_id']) && isset($in['position_crew_id']) && $in['position_crew_id'] !== '')
+                ? (int)$in['position_crew_id'] : null;
+        }
+        array_splice($args, 4, 0, $posArgs);
     }
 
-    $posCols = $hasPosition ? 'step_id = ?, step_name = ?,' : '';
-    $posIns  = $hasPosition ? 'step_id, step_name,' : '';
-    $posVals = $hasPosition ? '?, ?,' : '';
+    $posCols = $hasPosition ? 'step_id = ?, step_name = ?,' . ($hasHolder ? ' position_crew_id = ?,' : '') : '';
+    $posIns  = $hasPosition ? 'step_id, step_name,' . ($hasHolder ? ' position_crew_id,' : '') : '';
+    $posVals = $hasPosition ? '?, ?,' . ($hasHolder ? ' ?,' : '') : '';
 
     if ($id > 0) {
         $args[] = $id;
