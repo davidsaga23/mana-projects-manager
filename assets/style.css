@@ -2107,6 +2107,9 @@ body.lightbox-lock { overflow: hidden; }
 .proj-table tr.subtotal td { background: var(--surface-2); font-weight: 600; border-top: 1px solid var(--border); }
 .proj-table tfoot th { background: var(--surface-3); font-size: 14px; }
 .proj-table .small { font-size: 12.5px; }
+/* Done tick (finance_install_14, 2026-11-04). */
+.proj-table .pos-done-cell { text-align: center; }
+.proj-table .pos-done-cell form { margin: 0; }
 
 /* --- The project list's inline editing ------------------------------------
    Status stays a BADGE even though it became a control. The list is read down
