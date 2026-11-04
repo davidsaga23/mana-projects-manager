@@ -151,6 +151,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_11 | ✅ One exchange rate per project per foreign currency (`project_fx_rates`, `project_fx_rates_log`). Imported by David 2026-10-28. |
 | finance_install_12 | ⏳ **Monthly invoices split across projects (IN4)**: `invoice_headers`, and `header_id`, `quantity`, `quantity_unit`, `unit_rate` on `invoices`. Until it is imported, Finance → Monthly invoices shows the log figures but saves nothing; every other invoice screen works as before. |
 | finance_install_13 | ⏳ **A contract per position** (`position_terms`, `position_terms_log`): one position on one show paid on its own rate and contract, the person's terms staying the default. Import by hand in phpMyAdmin. Until it is, every position is paid on the person's one rate, as before. *(12 is taken by the invoice-split work.)* |
+| finance_install_14 | ⏳ **Done tick per position** (`position_done`, `position_done_log`): marks a position finished on the Expense projection so its Difference reads *final*. Import by hand in phpMyAdmin. Until it is, the ticks are greyed out. |
 | finance_install_15 | ⏳ **Invoice position separate from its sender** (`position_crew_id` on `invoices`): an invoice on a whole step, or on a position somebody else holds. Import by hand in phpMyAdmin. Until it is, only a whole step with no crew sender can be chosen. *(14 is the Done tick, PR #167.)* |
 
 ---

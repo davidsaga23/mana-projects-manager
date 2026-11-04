@@ -69,6 +69,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $date = (string)($_POST['rate_date'] ?? '') ?: date('Y-m-d');
                 flash('ok', fx_save($projectId, $c, (float)$raw, $date, 'manual', $who, $reason));
             }
+        } elseif (isset($_POST['set_done'])) {
+            // FINISHED tick on the Expense projection (finance_install_14). The
+            // position is checked against project_positions(), like set_rate, so
+            // only a row that is on screen can be ticked.
+            $crewId = (int)($_POST['crew_id'] ?? 0);
+            $stepId = (int)($_POST['step_id'] ?? 0);
+            $hit = null;
+            foreach (project_positions($pdo, $projectId) as $l) {
+                if ($l['crew_id'] === $crewId && $l['step_id'] === $stepId) { $hit = $l; break; }
+            }
+            if (!$hit) throw new RuntimeException('That position is not on this project, so nothing was saved.');
+            flash('ok', set_position_done($crewId, $hit['crew_name'], $projectId, $stepId, $hit['step_name'],
+                ($_POST['done'] ?? '') === '1', $who));
         } elseif (isset($_POST['set_rate'])) {
             // A DAY RATE, SET FROM THE PROJECTION. Previously this meant leaving
             // for person.php and coming back for each one — a dozen round trips
@@ -361,6 +374,9 @@ if ($configured) {
 }
 
 $proj    = expense_projection($pdo, $projectId);
+// Which positions are marked finished (finance_install_14), "crewId|stepId".
+$doneMap = position_done_for($projectId);
+$doneReady = position_done_available();
 
 // ⚠ THE RATE IS FIXED AT SET-UP: the first time this page meets a foreign
 // currency with no rate for this project, it fetches the day's rate and saves
@@ -385,6 +401,15 @@ if ($configured && $dbError === null && $_SERVER['REQUEST_METHOD'] === 'GET' && 
 // carried for the Final balance test below: a PLACEHOLDER is a position nobody
 // filled, and nobody can invoice for work that was never done.
 $positions = project_positions($pdo, $projectId);
+// Each position's dates on the timeline, "crewId|stepId" => [start, end]. An
+// invoice with no period of its own shows these (David, 2026-11-04: "can we get
+// these dates from the timeline, with the option to override manually"). Only
+// SHOWN, never written: a period typed on the invoice always wins, and moving a
+// step on the timeline moves what an untyped invoice shows with it.
+$posDates = [];
+foreach ($positions as $ps) {
+    $posDates[(int)$ps['crew_id'] . '|' . (int)$ps['step_id']] = [$ps['start'] ?? null, $ps['end'] ?? null];
+}
 $people  = project_people($pdo, $projectId);
 // For the invoice pickers (David, 2026-11-04): every step, so an invoice can
 // name a step with no position, and the real people on the show, so an invoice
@@ -395,6 +420,10 @@ $ivPayees = array_values(array_filter($people, fn($pp) => (int)($pp['is_placehol
 $ivHolderReady = invoice_holder_available();
 $ivPosLabel = [];
 foreach ($positions as $ps) $ivPosLabel[(int)$ps['crew_id'] . '|' . (int)$ps['step_id']] = $ps['crew_name'];
+// A whole-step invoice's period defaults to the step's dates on the timeline.
+foreach ($ivSteps as $st) {
+    $posDates['0|' . (int)$st['id']] = [($st['start_date'] ?? '') ?: null, ($st['deadline'] ?? '') ?: null];
+}
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
 
@@ -1562,11 +1591,15 @@ if ($retakePct <= 0):
           <span class="muted">× rate</span></th>
         <th class="num">Actual</th>
         <th class="num">Difference</th>
+        <?php // David, 2026-11-04: "a check mark to state if the artist or account
+              // has already finished worked and so we can say the difference
+              // between actual vs projected is final". ?>
+        <th title="Tick when this person has finished on this position: no more invoices are expected, so its Difference is final.">Done</th>
       </tr>
     </thead>
     <tbody>
     <?php foreach ($proj['by_department'] as $dept => $group): ?>
-      <tr class="track-group"><td colspan="11">
+      <tr class="track-group"><td colspan="12">
         <label class="bulk-tick" title="Tick every row in <?= e($dept) ?>">
           <input type="checkbox" class="bulk-dept-all" data-dept="<?= e($dept) ?>"
                  aria-label="Tick every row in <?= e($dept) ?>"></label>
@@ -1575,8 +1608,12 @@ if ($retakePct <= 0):
           <?= e(fmt_num($group['days'], 1)) ?> days</span>
       </td></tr>
 
-      <?php foreach ($group['rows'] as $r): ?>
-        <tr>
+      <?php $groupOpen = 0; // rows with a person still not marked finished
+            foreach ($group['rows'] as $r):
+              $rKey = (int)$r['crew_id'] . '|' . (int)$r['step']['id'];
+              $rDone = $r['crew_id'] && isset($doneMap[$rKey]);
+              if ($r['crew_id'] && !$rDone) $groupOpen++; ?>
+        <tr<?= $rDone ? ' class="pos-done"' : '' ?>>
           <td class="wf-name">
             <?php if ($r['crew_id']): ?>
               <input type="checkbox" class="bulk-row" form="bulk-rates" name="crew_ids[]"
@@ -1714,6 +1751,26 @@ if ($retakePct <= 0):
                 ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
             <?= $r['variance'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
+            <?php if ($rDone && $r['variance'] !== null): ?><br><span class="muted small">final</span><?php endif; ?>
+          </td>
+          <?php // Ticks and posts at once, like the rate box. Admin-only page. ?>
+          <td class="pos-done-cell">
+            <?php if ($r['crew_id']): ?>
+              <form method="post">
+                <input type="hidden" name="set_done" value="1">
+                <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">
+                <input type="hidden" name="step_id" value="<?= (int)$r['step']['id'] ?>">
+                <input type="hidden" name="done" value="<?= $rDone ? '0' : '1' ?>">
+                <input type="checkbox" <?= $rDone ? 'checked' : '' ?> onchange="this.form.submit()"
+                       <?= $doneReady ? '' : 'disabled' ?>
+                       title="<?= e(!$doneReady
+                           ? 'Needs finance_install_14.sql imported into the finance database'
+                           : ($rDone ? 'Finished (' . ($doneMap[$rKey]['done_by'] ?? '') . ', '
+                               . substr((string)($doneMap[$rKey]['done_at'] ?? ''), 0, 10) . '). Untick if more work comes.'
+                               : 'Tick when ' . $r['artist'] . ' has finished here: the Difference is then final')) ?>"
+                       aria-label="<?= e($r['artist'] . ' finished on ' . $r['role']) ?>">
+              </form>
+            <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -1724,7 +1781,9 @@ if ($retakePct <= 0):
         <td></td><td></td>
         <td class="num muted"><?= $group['logged'] > 0 ? e(number_format($group['logged'], 2)) : '—' ?></td>
         <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['actual'], 2)) : '—' ?></td>
-        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?></td>
+        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?>
+          <?php if ($group['actual'] > 0 && $groupOpen === 0): ?><br><span class="muted small">final</span><?php endif; ?></td>
+        <td class="muted small"><?= $groupOpen === 0 ? 'all done' : '' ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
@@ -1737,6 +1796,7 @@ if ($retakePct <= 0):
         <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
         <th class="num"><?= $proj['actual_total'] > 0
               ? e(number_format($proj['total'] - $proj['actual_total'], 2)) : '—' ?></th>
+        <th></th>
       </tr>
     </tfoot>
   </table>
@@ -1816,6 +1876,12 @@ if ($retakePct <= 0):
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
     On a subtotal it is the whole department's projection minus what has been invoiced so far, so
     it also counts the rows nobody has invoiced yet.
+    Tick <strong>Done</strong> when somebody has finished on a position: its Difference is then
+    marked <em>final</em>, and a subtotal is final once every row in it is done.
+    <?php if (!$doneReady): ?>
+      <span class="warn-text">The Done ticks need <code>finance_install_14.sql</code> imported into the
+      finance database first.</span>
+    <?php endif; ?>
     <?php if ($unattached > 0): ?>
       The actual total here counts only invoices attached to a position, so it is
       <?= e(fmt_money_plain($unattached, $cur)) ?> lower than the <em>Invoiced</em> figure at the
@@ -2076,7 +2142,19 @@ if ($retakePct <= 0):
             <br><a href="finance_invoice.php?id=<?= (int)$iv['header_id'] ?>" title="One line of a monthly invoice that covers other projects too">monthly invoice →</a>
           <?php endif; ?>
         </td>
-        <td class="muted small"><?= e(($iv['period_start'] ?: '—') . ' → ' . ($iv['period_end'] ?: '—')) ?></td>
+        <?php // Typed period first; a blank end falls back to the timeline's,
+              // marked so a default is never mistaken for what the invoice says. ?>
+        <?php // The position it pays for, or the step itself (2026-11-04), not the sender's. ?>
+        <?php $tl = $ivH === null ? [null, null] : ($posDates[$ivH . '|' . (int)$iv['step_id']] ?? [null, null]);
+              $pFrom = $iv['period_start'] ?: $tl[0];
+              $pTo   = $iv['period_end'] ?: $tl[1];
+              $pFromTl = !$iv['period_start'] && $tl[0];
+              $pToTl   = !$iv['period_end'] && $tl[1]; ?>
+        <td class="muted small"><?= e($pFrom ?: '—') . ' → ' . e($pTo ?: '—') ?>
+          <?php if ($pFromTl || $pToTl): ?>
+            <br><em title="Not typed on this invoice: the position's dates on the timeline. Edit the invoice to set its own.">from timeline</em>
+          <?php endif; ?>
+        </td>
         <?php // Both amounts when the project's fixed rate converts it, dollars
               // first (2026-10-28). The invoice itself stays in its own money. ?>
         <?php $ivUsd = ($iv['currency'] ?? 'USD') !== 'USD'
@@ -2167,6 +2245,13 @@ if ($retakePct <= 0):
             </label>
             <label>Period from <input type="date" name="period_start" value="<?= e($iv['period_start'] ?? '') ?>"></label>
             <label>Period to <input type="date" name="period_end" value="<?= e($iv['period_end'] ?? '') ?>"></label>
+            <?php // Copies the timeline's dates into the boxes, to keep or change.
+                  // Left blank, the list shows the timeline's anyway. ?>
+            <?php if ($tl[0] || $tl[1]): ?>
+              <button type="button" class="secondary invoice-period-tl"
+                      data-start="<?= e($tl[0] ?? '') ?>" data-end="<?= e($tl[1] ?? '') ?>"
+                      title="Timeline: <?= e(($tl[0] ?: '—') . ' → ' . ($tl[1] ?: '—')) ?>">use timeline dates</button>
+            <?php endif; ?>
             <label>Issued <input type="date" name="issued_date" value="<?= e($iv['issued_date'] ?? '') ?>"></label>
             <label>Due <input type="date" name="due_date" value="<?= e($iv['due_date'] ?? '') ?>"></label>
             <label>Paid on <input type="date" name="paid_date" value="<?= e($iv['paid_date'] ?? '') ?>"></label>
@@ -2254,12 +2339,14 @@ if ($retakePct <= 0):
                 <optgroup label="A position">
                   <?php foreach ($positions as $ps): ?>
                     <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
-                            data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
+                            data-crewname="<?= e($ps['crew_name']) ?>"
+                            data-start="<?= e($ps['start'] ?? '') ?>" data-end="<?= e($ps['end'] ?? '') ?>"><?= e($ps['label']) ?></option>
                   <?php endforeach; ?>
                 </optgroup>
                 <optgroup label="A whole step, no position">
                   <?php foreach ($ivSteps as $st): ?>
-                    <option value="0:<?= (int)$st['id'] ?>" data-crewname=""><?= e($st['name']) ?>, whole step</option>
+                    <option value="0:<?= (int)$st['id'] ?>" data-crewname=""
+                            data-start="<?= e($st['start_date'] ?? '') ?>" data-end="<?= e($st['deadline'] ?? '') ?>"><?= e($st['name']) ?>, whole step</option>
                   <?php endforeach; ?>
                 </optgroup>
               </select>
@@ -2355,7 +2442,35 @@ function invPosition(sel) {
     name.value = picked.dataset.crewname || '';
     name.dataset.auto = '1';
   }
+  // The period comes from the position's dates on the timeline (David,
+  // 2026-11-04), the same way: filled while empty or still the picker's own,
+  // never over a date somebody typed. Change the boxes to override.
+  [['period_start', 'start'], ['period_end', 'end']].forEach(function (p) {
+    var f = row.querySelector('[name$="[' + p[0] + ']"]');
+    if (f && picked && (f.value === '' || f.dataset.auto === '1')) {
+      f.value = picked.dataset[p[1]] || '';
+      f.dataset.auto = '1';
+    }
+  });
 }
+// A typed date is the user's, so a later pick of position leaves it alone.
+document.addEventListener('input', function (e) {
+  var t = e.target;
+  if (t && t.dataset && t.dataset.auto === '1' && /\[(crew_name|period_start|period_end)\]$/.test(t.name || '')) {
+    delete t.dataset.auto;
+  }
+});
+
+// "use timeline dates" on an invoice being edited: copies the position's dates
+// into its period boxes, to keep or change before Save.
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('.invoice-period-tl') : null;
+  if (!b) return;
+  var form = b.closest('form');
+  if (!form) return;
+  form.querySelector('[name="period_start"]').value = b.getAttribute('data-start') || '';
+  form.querySelector('[name="period_end"]').value = b.getAttribute('data-end') || '';
+});
 
 // "Sent by" a person fills the name box the same way; the server names the
 // invoice from the person anyway, so this is only what you see while typing.
