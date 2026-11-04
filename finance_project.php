@@ -69,6 +69,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $date = (string)($_POST['rate_date'] ?? '') ?: date('Y-m-d');
                 flash('ok', fx_save($projectId, $c, (float)$raw, $date, 'manual', $who, $reason));
             }
+        } elseif (isset($_POST['set_done'])) {
+            // FINISHED tick on the Expense projection (finance_install_14). The
+            // position is checked against project_positions(), like set_rate, so
+            // only a row that is on screen can be ticked.
+            $crewId = (int)($_POST['crew_id'] ?? 0);
+            $stepId = (int)($_POST['step_id'] ?? 0);
+            $hit = null;
+            foreach (project_positions($pdo, $projectId) as $l) {
+                if ($l['crew_id'] === $crewId && $l['step_id'] === $stepId) { $hit = $l; break; }
+            }
+            if (!$hit) throw new RuntimeException('That position is not on this project, so nothing was saved.');
+            flash('ok', set_position_done($crewId, $hit['crew_name'], $projectId, $stepId, $hit['step_name'],
+                ($_POST['done'] ?? '') === '1', $who));
         } elseif (isset($_POST['set_rate'])) {
             // A DAY RATE, SET FROM THE PROJECTION. Previously this meant leaving
             // for person.php and coming back for each one — a dozen round trips
@@ -346,6 +359,9 @@ if ($configured) {
 }
 
 $proj    = expense_projection($pdo, $projectId);
+// Which positions are marked finished (finance_install_14), "crewId|stepId".
+$doneMap = position_done_for($projectId);
+$doneReady = position_done_available();
 
 // ⚠ THE RATE IS FIXED AT SET-UP: the first time this page meets a foreign
 // currency with no rate for this project, it fetches the day's rate and saves
@@ -1545,11 +1561,15 @@ if ($retakePct <= 0):
           <span class="muted">× rate</span></th>
         <th class="num">Actual</th>
         <th class="num">Difference</th>
+        <?php // David, 2026-11-04: "a check mark to state if the artist or account
+              // has already finished worked and so we can say the difference
+              // between actual vs projected is final". ?>
+        <th title="Tick when this person has finished on this position: no more invoices are expected, so its Difference is final.">Done</th>
       </tr>
     </thead>
     <tbody>
     <?php foreach ($proj['by_department'] as $dept => $group): ?>
-      <tr class="track-group"><td colspan="11">
+      <tr class="track-group"><td colspan="12">
         <label class="bulk-tick" title="Tick every row in <?= e($dept) ?>">
           <input type="checkbox" class="bulk-dept-all" data-dept="<?= e($dept) ?>"
                  aria-label="Tick every row in <?= e($dept) ?>"></label>
@@ -1558,8 +1578,12 @@ if ($retakePct <= 0):
           <?= e(fmt_num($group['days'], 1)) ?> days</span>
       </td></tr>
 
-      <?php foreach ($group['rows'] as $r): ?>
-        <tr>
+      <?php $groupOpen = 0; // rows with a person still not marked finished
+            foreach ($group['rows'] as $r):
+              $rKey = (int)$r['crew_id'] . '|' . (int)$r['step']['id'];
+              $rDone = $r['crew_id'] && isset($doneMap[$rKey]);
+              if ($r['crew_id'] && !$rDone) $groupOpen++; ?>
+        <tr<?= $rDone ? ' class="pos-done"' : '' ?>>
           <td class="wf-name">
             <?php if ($r['crew_id']): ?>
               <input type="checkbox" class="bulk-row" form="bulk-rates" name="crew_ids[]"
@@ -1683,6 +1707,26 @@ if ($retakePct <= 0):
                 ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
             <?= $r['variance'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
+            <?php if ($rDone && $r['variance'] !== null): ?><br><span class="muted small">final</span><?php endif; ?>
+          </td>
+          <?php // Ticks and posts at once, like the rate box. Admin-only page. ?>
+          <td class="pos-done-cell">
+            <?php if ($r['crew_id']): ?>
+              <form method="post">
+                <input type="hidden" name="set_done" value="1">
+                <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">
+                <input type="hidden" name="step_id" value="<?= (int)$r['step']['id'] ?>">
+                <input type="hidden" name="done" value="<?= $rDone ? '0' : '1' ?>">
+                <input type="checkbox" <?= $rDone ? 'checked' : '' ?> onchange="this.form.submit()"
+                       <?= $doneReady ? '' : 'disabled' ?>
+                       title="<?= e(!$doneReady
+                           ? 'Needs finance_install_14.sql imported into the finance database'
+                           : ($rDone ? 'Finished (' . ($doneMap[$rKey]['done_by'] ?? '') . ', '
+                               . substr((string)($doneMap[$rKey]['done_at'] ?? ''), 0, 10) . '). Untick if more work comes.'
+                               : 'Tick when ' . $r['artist'] . ' has finished here: the Difference is then final')) ?>"
+                       aria-label="<?= e($r['artist'] . ' finished on ' . $r['role']) ?>">
+              </form>
+            <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -1693,7 +1737,9 @@ if ($retakePct <= 0):
         <td></td><td></td>
         <td class="num muted"><?= $group['logged'] > 0 ? e(number_format($group['logged'], 2)) : '—' ?></td>
         <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['actual'], 2)) : '—' ?></td>
-        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?></td>
+        <td class="num"><?= $group['actual'] > 0 ? e(number_format($group['cost'] - $group['actual'], 2)) : '—' ?>
+          <?php if ($group['actual'] > 0 && $groupOpen === 0): ?><br><span class="muted small">final</span><?php endif; ?></td>
+        <td class="muted small"><?= $groupOpen === 0 ? 'all done' : '' ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
@@ -1706,6 +1752,7 @@ if ($retakePct <= 0):
         <th class="num"><?= $proj['actual_total'] > 0 ? e(number_format($proj['actual_total'], 2)) : '—' ?></th>
         <th class="num"><?= $proj['actual_total'] > 0
               ? e(number_format($proj['total'] - $proj['actual_total'], 2)) : '—' ?></th>
+        <th></th>
       </tr>
     </tfoot>
   </table>
@@ -1785,6 +1832,12 @@ if ($retakePct <= 0):
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
     On a subtotal it is the whole department's projection minus what has been invoiced so far, so
     it also counts the rows nobody has invoiced yet.
+    Tick <strong>Done</strong> when somebody has finished on a position: its Difference is then
+    marked <em>final</em>, and a subtotal is final once every row in it is done.
+    <?php if (!$doneReady): ?>
+      <span class="warn-text">The Done ticks need <code>finance_install_14.sql</code> imported into the
+      finance database first.</span>
+    <?php endif; ?>
     <?php if ($unattached > 0): ?>
       The actual total here counts only invoices attached to a position, so it is
       <?= e(fmt_money_plain($unattached, $cur)) ?> lower than the <em>Invoiced</em> figure at the

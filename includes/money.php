@@ -236,6 +236,64 @@ function own_invoices_all(int $crewId, int $limit = 24): array {
  * exactly as before, and nothing has to know the table exists to keep working.
  * ------------------------------------------------------------------------ */
 
+/* --------------------------------------------------------------------------
+ * FINISHED POSITIONS (finance_install_14, David 2026-11-04): "a check mark to
+ * state if the artist or account has already finished worked and so we can say
+ * the difference between actual vs projected is final". A row means finished.
+ * ------------------------------------------------------------------------ */
+
+/** Has finance_install_14 been imported? */
+function position_done_available(): bool {
+    return finance_column_exists('position_done', 'step_id');
+}
+
+/** "crewId|stepId" => ['done_by', 'done_at'] for one project; empty before 14. */
+function position_done_for(int $projectId): array {
+    if (!can_see_money()) return [];
+    $db = finance_db();
+    if (!$db) return [];
+    try {
+        $q = $db->prepare('SELECT crew_id, step_id, done_by, done_at FROM position_done WHERE project_id = ?');
+        $q->execute([$projectId]);
+    } catch (PDOException $e) {
+        return [];      // before finance_install_14
+    }
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']] = $r;
+    return $out;
+}
+
+/** Tick or untick one position, with a line in the log. Returns what to tell the user. */
+function set_position_done(int $crewId, string $crewName, int $projectId, int $stepId,
+                           string $posName, bool $done, string $who): string {
+    if (!can_see_money()) throw new RuntimeException('Only admins can mark a position finished.');
+    $db = finance_db();
+    if (!$db || !position_done_available()) {
+        throw new RuntimeException('Marking a position finished needs finance_install_14.sql, which has not '
+            . 'been imported into the finance database yet. Nothing was saved.');
+    }
+    $db->beginTransaction();
+    try {
+        if ($done) {
+            $db->prepare('INSERT INTO position_done (crew_id, crew_name, project_id, step_id, position_name, done_by)
+                          VALUES (?, ?, ?, ?, ?, ?)
+                          ON DUPLICATE KEY UPDATE crew_name = VALUES(crew_name), position_name = VALUES(position_name)')
+               ->execute([$crewId, $crewName, $projectId, $stepId, $posName, $who]);
+        } else {
+            $db->prepare('DELETE FROM position_done WHERE crew_id = ? AND project_id = ? AND step_id = ?')
+               ->execute([$crewId, $projectId, $stepId]);
+        }
+        $db->prepare('INSERT INTO position_done_log (crew_id, crew_name, project_id, step_id, position_name, done, changed_by)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)')
+           ->execute([$crewId, $crewName, $projectId, $stepId, $posName, $done ? 1 : 0, $who]);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+    return $crewName . ', ' . $posName . ($done ? ' marked finished: its difference is final.' : ' is no longer marked finished.');
+}
+
 /** Has finance_install_13 been imported? Admin view only (finance_column_exists() is). */
 function position_terms_available(): bool {
     return finance_column_exists('position_terms', 'step_id');

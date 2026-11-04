@@ -4862,3 +4862,14 @@ timeline, labelled *from timeline*. Shown, never saved, so moving a step moves w
 invoice shows and a real period is never overwritten. The timeline's dates are the whole position's
 span, so for a monthly invoice the month should still be typed. Only the Invoices tab uses the
 default; the artist statement and home page show the typed period only.
+
+## 2026-11-04 — A position can be marked finished
+
+**Asked by David:** "add another column with a check mark to state if the artist or account has
+already finished worked and so we can say the difference between actual vs projected is final".
+
+**Decided:** a per-position tick (crew + step, supervision as minus its id, like invoices) stored in
+the finance database (`position_done`, `position_done_log`, finance_install_14). It is a statement
+by a person, not worked out from invoices: only somebody who knows can say no more invoices are
+coming. It labels the Difference *final*; it does not change any figure, and the Overview's "Final
+balance" test is unchanged. The Excel export does not carry it yet.
