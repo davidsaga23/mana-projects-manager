@@ -4873,3 +4873,19 @@ the finance database (`position_done`, `position_done_log`, finance_install_14).
 by a person, not worked out from invoices: only somebody who knows can say no more invoices are
 coming. It labels the Difference *final*; it does not change any figure, and the Overview's "Final
 balance" test is unchanged. The Excel export does not carry it yet.
+
+## 2026-11-04 — What an invoice pays for and who sent it are separate
+
+**Asked by David:** "for those unattached positions let's make sure we can add it to the department
+(not the person) but it happens sometimes we need to work with different artists but only one
+position is there". He chose both: invoices on a step with no position, and several artists on one
+position.
+
+**Decided:** `invoices.crew_id` stays the SENDER (statements and Home read it unchanged).
+`step_id` stays what it pays for. A new `position_crew_id` (finance_install_15) says whose position
+on that step it counts against: NULL = the sender's own (every older invoice), 0 = the step itself,
+N = crew member N's position. A position keeps its one projected budget whoever invoices it.
+Step-level invoices are lines in `by_department` only, never in `rows`, because `rows` is read as
+"the positions" by the sign-off snapshot, the budget pool and statements. Only an invoice with no
+step is still "unattached". Existing invoices are not moved; David re-attaches them himself.
+The step-variance block still counts per position and leaves step-level invoices out.
