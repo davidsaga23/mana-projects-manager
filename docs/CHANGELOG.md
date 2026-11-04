@@ -22,6 +22,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - **Needs `finance_install_14.sql` imported by hand into the finance database.** Until then the ticks
   are greyed out and the note under the table says so.
 
+## 2026-11-04 — Invoice period from the timeline *(no migration)*
+
+- **Finance → Invoices:** an invoice with no period typed now shows its position's dates from the
+  timeline (the step's start and deadline, or a supervision position's dates), marked *from
+  timeline*. A typed period always wins. Picking a position when recording invoices fills the
+  period boxes; **edit** on an invoice has a **use timeline dates** button. Nothing is written to
+  existing invoices; an unattached invoice has no timeline and still shows dashes.
+
 ## 2026-11-04 — Expense projection: a zero Difference is plain *(no migration)*
 
 - **Fix.** A row whose actual matches its projection exactly (Difference 0.00) is no longer green;

@@ -4853,6 +4853,16 @@ showing a figure. The export keeps the sheet's fifteen columns and does not carr
 days into months; no cost uses it. A spreadsheet outside Anima that still divides by 22 will show
 different months from Anima, though the same costs.
 
+## 2026-11-04 — An invoice's period defaults to the timeline
+
+**Asked by David:** "can we get these dates from the timeline and with the option to override manually?"
+
+**Decided:** the period shown is the typed one; where none is typed, the position's dates on the
+timeline, labelled *from timeline*. Shown, never saved, so moving a step moves what an untyped
+invoice shows and a real period is never overwritten. The timeline's dates are the whole position's
+span, so for a monthly invoice the month should still be typed. Only the Invoices tab uses the
+default; the artist statement and home page show the typed period only.
+
 ## 2026-11-04 — A position can be marked finished
 
 **Asked by David:** "add another column with a check mark to state if the artist or account has
@@ -4863,4 +4873,3 @@ the finance database (`position_done`, `position_done_log`, finance_install_14).
 by a person, not worked out from invoices: only somebody who knows can say no more invoices are
 coming. It labels the Difference *final*; it does not change any figure, and the Overview's "Final
 balance" test is unchanged. The Excel export does not carry it yet.
-
