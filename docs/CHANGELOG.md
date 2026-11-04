@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-04 — Expense projection: Done tick per position *(finance_install_14.sql)*
+
+- A **Done** column on the Expense projection: tick it when the person has finished on that position.
+  Its Difference is then marked *final*; a department subtotal is final once every row with a person
+  in it is ticked. Unticking is allowed; every tick and untick is logged with who and when.
+- **Needs `finance_install_14.sql` imported by hand into the finance database.** Until then the ticks
+  are greyed out and the note under the table says so.
+
 ## 2026-11-04 — Expense projection: a zero Difference is plain *(no migration)*
 
 - **Fix.** A row whose actual matches its projection exactly (Difference 0.00) is no longer green;

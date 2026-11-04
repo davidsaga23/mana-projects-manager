@@ -4852,3 +4852,15 @@ showing a figure. The export keeps the sheet's fifteen columns and does not carr
 **Decided:** `DAYS_PER_MONTH` is 21 (it was 22, the old reference sheet's divisor). It only turns
 days into months; no cost uses it. A spreadsheet outside Anima that still divides by 22 will show
 different months from Anima, though the same costs.
+
+## 2026-11-04 — A position can be marked finished
+
+**Asked by David:** "add another column with a check mark to state if the artist or account has
+already finished worked and so we can say the difference between actual vs projected is final".
+
+**Decided:** a per-position tick (crew + step, supervision as minus its id, like invoices) stored in
+the finance database (`position_done`, `position_done_log`, finance_install_14). It is a statement
+by a person, not worked out from invoices: only somebody who knows can say no more invoices are
+coming. It labels the Difference *final*; it does not change any figure, and the Overview's "Final
+balance" test is unchanged. The Excel export does not carry it yet.
+
