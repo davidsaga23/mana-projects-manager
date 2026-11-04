@@ -945,6 +945,10 @@ function project_positions(PDO $pdo, int $projectId): array {
             'step_name' => (string)$l['step_name'],
             'label'     => $l['name'] . ', ' . $l['step_name'],
             'is_placeholder' => !empty($l['is_placeholder']),
+            // The position's dates on the timeline, which an invoice's period
+            // defaults to (David, 2026-11-04). The step's span, null when unset.
+            'start'     => ($l['step_start'] ?? '') ?: null,
+            'end'       => ($l['step_deadline'] ?? '') ?: null,
         ];
     }
     require_once __DIR__ . '/supervision.php';
@@ -956,6 +960,8 @@ function project_positions(PDO $pdo, int $projectId): array {
             'step_name' => (string)$p['title'],
             'label'     => $p['name'] . ', ' . $p['title'] . ' (supervision)',
             'is_placeholder' => (int)$p['is_placeholder'] === 1,
+            'start'     => ($p['start_date'] ?? '') ?: null,
+            'end'       => ($p['end_date'] ?? '') ?: null,
         ];
     }
     return $out;

@@ -370,6 +370,15 @@ if ($configured && $dbError === null && $_SERVER['REQUEST_METHOD'] === 'GET' && 
 // carried for the Final balance test below: a PLACEHOLDER is a position nobody
 // filled, and nobody can invoice for work that was never done.
 $positions = project_positions($pdo, $projectId);
+// Each position's dates on the timeline, "crewId|stepId" => [start, end]. An
+// invoice with no period of its own shows these (David, 2026-11-04: "can we get
+// these dates from the timeline, with the option to override manually"). Only
+// SHOWN, never written: a period typed on the invoice always wins, and moving a
+// step on the timeline moves what an untyped invoice shows with it.
+$posDates = [];
+foreach ($positions as $ps) {
+    $posDates[(int)$ps['crew_id'] . '|' . (int)$ps['step_id']] = [$ps['start'] ?? null, $ps['end'] ?? null];
+}
 $people  = project_people($pdo, $projectId);
 $cur     = $budget['currency'] ?? 'USD';
 $budgetAmount = $budget && $budget['budget_amount'] !== null ? (float)$budget['budget_amount'] : null;
@@ -2017,7 +2026,18 @@ if ($retakePct <= 0):
             <br><a href="finance_invoice.php?id=<?= (int)$iv['header_id'] ?>" title="One line of a monthly invoice that covers other projects too">monthly invoice →</a>
           <?php endif; ?>
         </td>
-        <td class="muted small"><?= e(($iv['period_start'] ?: '—') . ' → ' . ($iv['period_end'] ?: '—')) ?></td>
+        <?php // Typed period first; a blank end falls back to the timeline's,
+              // marked so a default is never mistaken for what the invoice says. ?>
+        <?php $tl = $posDates[(int)($iv['crew_id'] ?? 0) . '|' . (int)($iv['step_id'] ?? 0)] ?? [null, null];
+              $pFrom = $iv['period_start'] ?: $tl[0];
+              $pTo   = $iv['period_end'] ?: $tl[1];
+              $pFromTl = !$iv['period_start'] && $tl[0];
+              $pToTl   = !$iv['period_end'] && $tl[1]; ?>
+        <td class="muted small"><?= e($pFrom ?: '—') . ' → ' . e($pTo ?: '—') ?>
+          <?php if ($pFromTl || $pToTl): ?>
+            <br><em title="Not typed on this invoice: the position's dates on the timeline. Edit the invoice to set its own.">from timeline</em>
+          <?php endif; ?>
+        </td>
         <?php // Both amounts when the project's fixed rate converts it, dollars
               // first (2026-10-28). The invoice itself stays in its own money. ?>
         <?php $ivUsd = ($iv['currency'] ?? 'USD') !== 'USD'
@@ -2090,6 +2110,13 @@ if ($retakePct <= 0):
             </label>
             <label>Period from <input type="date" name="period_start" value="<?= e($iv['period_start'] ?? '') ?>"></label>
             <label>Period to <input type="date" name="period_end" value="<?= e($iv['period_end'] ?? '') ?>"></label>
+            <?php // Copies the timeline's dates into the boxes, to keep or change.
+                  // Left blank, the list shows the timeline's anyway. ?>
+            <?php if ($tl[0] || $tl[1]): ?>
+              <button type="button" class="secondary invoice-period-tl"
+                      data-start="<?= e($tl[0] ?? '') ?>" data-end="<?= e($tl[1] ?? '') ?>"
+                      title="Timeline: <?= e(($tl[0] ?: '—') . ' → ' . ($tl[1] ?: '—')) ?>">use timeline dates</button>
+            <?php endif; ?>
             <label>Issued <input type="date" name="issued_date" value="<?= e($iv['issued_date'] ?? '') ?>"></label>
             <label>Due <input type="date" name="due_date" value="<?= e($iv['due_date'] ?? '') ?>"></label>
             <label>Paid on <input type="date" name="paid_date" value="<?= e($iv['paid_date'] ?? '') ?>"></label>
@@ -2175,7 +2202,8 @@ if ($retakePct <= 0):
                 <option value="">no particular position</option>
                 <?php foreach ($positions as $ps): ?>
                   <option value="<?= (int)$ps['crew_id'] ?>:<?= (int)$ps['step_id'] ?>"
-                          data-crewname="<?= e($ps['crew_name']) ?>"><?= e($ps['label']) ?></option>
+                          data-crewname="<?= e($ps['crew_name']) ?>"
+                          data-start="<?= e($ps['start'] ?? '') ?>" data-end="<?= e($ps['end'] ?? '') ?>"><?= e($ps['label']) ?></option>
                 <?php endforeach; ?>
               </select>
             </td>
@@ -2250,7 +2278,35 @@ function invPosition(sel) {
     name.value = picked.dataset.crewname || '';
     name.dataset.auto = '1';
   }
+  // The period comes from the position's dates on the timeline (David,
+  // 2026-11-04), the same way: filled while empty or still the picker's own,
+  // never over a date somebody typed. Change the boxes to override.
+  [['period_start', 'start'], ['period_end', 'end']].forEach(function (p) {
+    var f = row.querySelector('[name$="[' + p[0] + ']"]');
+    if (f && picked && (f.value === '' || f.dataset.auto === '1')) {
+      f.value = picked.dataset[p[1]] || '';
+      f.dataset.auto = '1';
+    }
+  });
 }
+// A typed date is the user's, so a later pick of position leaves it alone.
+document.addEventListener('input', function (e) {
+  var t = e.target;
+  if (t && t.dataset && t.dataset.auto === '1' && /\[(crew_name|period_start|period_end)\]$/.test(t.name || '')) {
+    delete t.dataset.auto;
+  }
+});
+
+// "use timeline dates" on an invoice being edited: copies the position's dates
+// into its period boxes, to keep or change before Save.
+document.addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('.invoice-period-tl') : null;
+  if (!b) return;
+  var form = b.closest('form');
+  if (!form) return;
+  form.querySelector('[name="period_start"]').value = b.getAttribute('data-start') || '';
+  form.querySelector('[name="period_end"]').value = b.getAttribute('data-end') || '';
+});
 
 function invAddRows() {
   var body = document.querySelector('#invoiceGrid tbody');
