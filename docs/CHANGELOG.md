@@ -22,6 +22,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   period boxes; **edit** on an invoice has a **use timeline dates** button. Nothing is written to
   existing invoices; an unattached invoice has no timeline and still shows dashes.
 
+## 2026-11-04 — Expense projection: a zero Difference is plain *(no migration)*
+
+- **Fix.** A row whose actual matches its projection exactly (Difference 0.00) is no longer green;
+  green is for under budget, red for over.
+
 ## 2026-11-03 — Ask for sign-off from the project's Overview *(no migration)*
 
 - A project still in set-up shows a bar on its **Overview** with an **Ask for sign-off** button,

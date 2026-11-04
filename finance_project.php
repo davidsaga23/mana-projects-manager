@@ -1676,7 +1676,10 @@ if ($retakePct <= 0):
                 // because the subtotal (and the export) never waited. ?>
           <td class="num"><?= $r['actual_cost'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['actual_cost'], 2)) ?></td>
-          <td class="num <?= $r['variance'] !== null
+          <?php // Red over, green under, and plain on exactly the plan (David,
+                // 2026-11-04: a 0.00 in green read as a saving). Half a cent,
+                // because a float sum of invoices does not land on 0.0. ?>
+          <td class="num <?= $r['variance'] !== null && abs($r['variance']) >= 0.005
                 ? ($r['variance'] < 0 ? 'err' : 'ok') : '' ?>">
             <?= $r['variance'] === null
                 ? '<span class="muted">—</span>' : e(number_format($r['variance'], 2)) ?>
