@@ -4852,3 +4852,13 @@ showing a figure. The export keeps the sheet's fifteen columns and does not carr
 **Decided:** `DAYS_PER_MONTH` is 21 (it was 22, the old reference sheet's divisor). It only turns
 days into months; no cost uses it. A spreadsheet outside Anima that still divides by 22 will show
 different months from Anima, though the same costs.
+
+## 2026-11-04 — An invoice's period defaults to the timeline
+
+**Asked by David:** "can we get these dates from the timeline and with the option to override manually?"
+
+**Decided:** the period shown is the typed one; where none is typed, the position's dates on the
+timeline, labelled *from timeline*. Shown, never saved, so moving a step moves what an untyped
+invoice shows and a real period is never overwritten. The timeline's dates are the whole position's
+span, so for a monthly invoice the month should still be typed. Only the Invoices tab uses the
+default; the artist statement and home page show the typed period only.
