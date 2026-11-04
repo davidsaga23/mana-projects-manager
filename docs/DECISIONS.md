@@ -4852,3 +4852,20 @@ showing a figure. The export keeps the sheet's fifteen columns and does not carr
 **Decided:** `DAYS_PER_MONTH` is 21 (it was 22, the old reference sheet's divisor). It only turns
 days into months; no cost uses it. A spreadsheet outside Anima that still divides by 22 will show
 different months from Anima, though the same costs.
+
+## 2026-11-04 — What an invoice pays for and who sent it are separate
+
+**Asked by David:** "for those unattached positions let's make sure we can add it to the department
+(not the person) but it happens sometimes we need to work with different artists but only one
+position is there". He chose both: invoices on a step with no position, and several artists on one
+position.
+
+**Decided:** `invoices.crew_id` stays the SENDER (statements and Home read it unchanged).
+`step_id` stays what it pays for. A new `position_crew_id` (finance_install_15) says whose position
+on that step it counts against: NULL = the sender's own (every older invoice), 0 = the step itself,
+N = crew member N's position. A position keeps its one projected budget whoever invoices it.
+Step-level invoices are lines in `by_department` only, never in `rows`, because `rows` is read as
+"the positions" by the sign-off snapshot, the budget pool and statements. Only an invoice with no
+step is still "unattached". Existing invoices are not moved; David re-attaches them himself.
+The step-variance block still counts per position and leaves step-level invoices out.
+

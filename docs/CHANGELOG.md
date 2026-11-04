@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-04 — Invoices: a whole step, or several artists on one position *(finance_install_15.sql)*
+
+- **Pays for** on an invoice can now be a **whole step, no position** as well as a position. Such
+  invoices get their own line under the step on the Expense projection ("CH Layout, not on a
+  position"), counted in the department's actual and difference and in the Excel download.
+- **Sent by** is a second picker: the person on the position, anyone on the show, or somebody not on
+  the crew (the typed name, for a vendor like Go Gap). An invoice from another artist stays on the
+  position it pays for; the row shows "+ James" or "+ 2 others", with the amounts on hover.
+- **Statements** still list every invoice by who sent it, so nobody's invoices go missing.
+- **"unattached"** in the Invoices list is now a button that opens the invoice at its picker.
+  Nothing existing is moved; each one is re-attached by hand.
+- **Needs `finance_install_15.sql` imported by hand into the finance database** for an invoice sent by
+  one crew member on another's position or on a whole step. A whole step with no crew sender works
+  before it.
+
 ## 2026-11-04 — Expense projection: a zero Difference is plain *(no migration)*
 
 - **Fix.** A row whose actual matches its projection exactly (Difference 0.00) is no longer green;
