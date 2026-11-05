@@ -27,7 +27,8 @@ function finance_nav_items(int $projectId, string $projectType = ''): array {
         // THE SAME SHOW IN DAYS (David, 2026-10-16), after the three money tabs
         // because it is read second: you come here once the money has raised a
         // question, to find out how many days that question is worth.
-        ['key' => 'pool',       'label' => 'Budget pool',
+        // Named "Days budget" (David, 2026-11-05): "It has no money in it."
+        ['key' => 'pool',       'label' => 'Days budget',
          'href' => 'finance_project.php' . $p . '&tab=pool'],
         // ARTIST STATEMENTS (David, 2026-10-26: "project and inform artists how
         // many days, logged time and seconds we need to pay/account for their

@@ -273,8 +273,10 @@ function budget_pool(PDO $pdo, array $project, ?array $proj = null): array {
         $pctUsed = $r['pool'] > 0 ? $used / $r['pool'] * 100 : 0.0;
         $pctDone = $target > 0 ? $approved / $target * 100 : 0.0;
 
+        // Amber, not grey (David, 2026-11-05: "When nothing is logged on a step:
+        // 'No time logged yet' in amber") — it is a gap to chase, not a quiet note.
         [$cls, $text] = $unlogged
-            ? ['muted', 'no time logged on this step yet']
+            ? ['warn-text', 'No time logged yet']
             : pool_pace($pctUsed, $pctDone, $tracksSeconds ? 99 : $target);
         if ($unlogged) $unloggedNames[] = (string)$r['name'];
 

@@ -2724,7 +2724,7 @@ function invAddRows() {
     <?php else: ?>
       <span class="muted small">slots &times; each step's window</span>
     <?php endif; ?></div>
-  <div><span class="muted small">Used</span>
+  <div><span class="muted small">Days worked</span>
     <strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days</strong>
     <?php // ⚠ THE SOURCE IS ON THE FIGURE, not in a footnote. Two very
           // different numbers can sit here — what the plan says has been
@@ -2932,7 +2932,11 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <span class="muted small">at the rate beside it</span></div>
     <div><span class="muted small">Used</span>
       <strong><?= e(fmt_num($open['used'], 1)) ?> days</strong>
-      <span class="muted small">from logged hours</span></div>
+      <?php if ($open['unlogged']): ?>
+        <span class="warn-text small">No time logged yet</span>
+      <?php else: ?>
+        <span class="muted small">from logged hours</span>
+      <?php endif; ?></div>
     <div><span class="muted small">Used in money</span>
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['used'] * $open['rate_min'], $pcur)) ?></strong>
