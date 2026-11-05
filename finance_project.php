@@ -2816,11 +2816,30 @@ function invAddRows() {
         <h4><a href="?project=<?= $projectId ?>&amp;tab=pool&amp;step=<?= (int)$r['id'] ?>#step-<?= (int)$r['id'] ?>"><?= e($r['name']) ?></a></h4>
         <span class="unit-badge"><?= (int)$r['slots'] ?> slot<?= $r['slots'] === 1 ? '' : 's' ?></span>
       </div>
-      <div class="mini-bar"><span style="width:<?= e(fmt_num(min(100, $r['pct_used']), 1)) ?>%;background:<?= e($bar) ?>"></span></div>
-      <div class="mini-num"><?= e(fmt_num($r['used'], 1)) ?><span class="mini-total">/<?= e(fmt_num($r['pool'], 1)) ?> days</span></div>
+      <?php // ⚠ OVER BUDGET IS SAID THREE TIMES ON THE CARD (David, 2026-11-05):
+            // the number and the note go red, and the bar runs past the budget
+            // instead of stopping at full. A bar capped at 100% made a step 30%
+            // over look exactly like one that had just finished on budget. When
+            // over, the track stands for the days worked: the budget part keeps
+            // the card's colour, a line marks where the budget ends, and the
+            // overrun after it is red. The pace colour is unchanged (David).
+            // 0.05 days of slack so rounding never reads "0.0 days over".
+            $over = $r['pool'] > 0 && $r['left'] < -0.05; ?>
+      <?php if ($over): ?>
+        <div class="mini-bar" style="display:flex" title="<?= e(fmt_num($r['used'], 1)) ?> days worked against a budget of <?= e(fmt_num($r['pool'], 1)) ?>">
+          <span style="width:<?= e(fmt_num($r['pool'] / $r['used'] * 100, 1)) ?>%;background:<?= e($bar) ?>;border-radius:3px 0 0 3px"></span>
+          <span style="flex:1;background:var(--danger);border-left:2px solid var(--text);border-radius:0 3px 3px 0"></span>
+        </div>
+      <?php else: ?>
+        <div class="mini-bar"><span style="width:<?= e(fmt_num(min(100, $r['pct_used']), 1)) ?>%;background:<?= e($bar) ?>"></span></div>
+      <?php endif; ?>
+      <div class="mini-num<?= $over ? ' err' : '' ?>"><?= e(fmt_num($r['used'], 1)) ?><span class="mini-total">/<?= e(fmt_num($r['pool'], 1)) ?> days</span></div>
       <div class="muted small">
-        <?= $r['left'] < 0 ? e(fmt_num(abs($r['left']), 1)) . ' days over'
-                           : e(fmt_num($r['left'], 1)) . ' days unused' ?>
+        <?php if ($over): ?>
+          <span class="err"><?= e(fmt_num(abs($r['left']), 1)) ?> days over budget</span>
+        <?php else: ?>
+          <?= e(fmt_num(max(0, $r['left']), 1)) ?> days unused
+        <?php endif; ?>
         <?php if ($r['rate_min'] !== null): ?>
           · <?= $r['rate_same']
                 ? e(fmt_money_plain($r['rate_min'], $pcur)) . ' a day'
