@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Expense projection: admins can log days in Actual days *(migration 076)*
+
+- Each position's **Actual days** cell has a **+ days** link: type a number of days and the day it
+  was worked, and it is saved as logged time for that person on that step, with no task. It adds to
+  what they logged themselves, never replaces it, and the cell says how much was typed from Finance.
+  Each typed entry can be removed from the same place.
+- It counts wherever their own logged time does: Actual days, Logged × rate, the artist's statement,
+  the budget pool and their hours on Home. No shot or task is touched.
+- **Needs migration 076** (open `migrate.php`). Until then the link says so and saves nothing.
+
 ## 2026-11-04 — Invoices: a whole step, or several artists on one position *(finance_install_15.sql)*
 
 - **Pays for** on an invoice can now be a **whole step, no position** as well as a position. Such
