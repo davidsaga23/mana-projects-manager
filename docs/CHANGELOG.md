@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Days budget says "worked", not "used"
+
+- Everywhere on the **Days budget** tab, days from logged time are now **worked**: the Pace line
+  ("5% of days worked, 64% done"), the donut ("of days worked", "X days worked"), the step detail
+  tiles (**Days worked**, **Days worked in money**), the per-person table column (**Worked**) and
+  its readings, and the footnote. "Unused" stays.
+- The kick-off sign-off snapshot keeps its saved field names ("Budget pool, days used"): they are
+  how a signed-off project is compared later, and renaming them would break that comparison.
+- Wording only; no figures change. No migration.
+
 ## 2026-11-05 — "Budget pool" tab renamed "Days budget"; "Days worked"; "No time logged yet"
 
 - Finance management: the **Budget pool** tab is now **Days budget** — it has no money in it.

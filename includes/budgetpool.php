@@ -90,18 +90,18 @@ function pool_pace(float $pctUsed, float $pctDone, float $items, string $noun = 
         return ['muted', 'too few items here to compare ' . $noun . ' against progress'];
     }
     if ($pctUsed < POOL_PACE_MIN_USED) {
-        return ['muted', sprintf('%d%% of %s used, %d%% done — too early to read',
+        return ['muted', sprintf('%d%% of %s worked, %d%% done — too early to read',
                                  round($pctUsed), $noun, round($pctDone))];
     }
     if ($pctDone >= $pctUsed + POOL_PACE_BAND) {
-        return ['ok', sprintf('%d%% of %s used, %d%% done — ahead',
+        return ['ok', sprintf('%d%% of %s worked, %d%% done — ahead',
                               round($pctUsed), $noun, round($pctDone))];
     }
     if ($pctUsed >= $pctDone + POOL_PACE_BAND) {
-        return ['err', sprintf('%d%% of %s used, only %d%% done',
+        return ['err', sprintf('%d%% of %s worked, only %d%% done',
                                round($pctUsed), $noun, round($pctDone))];
     }
-    return ['muted', sprintf('%d%% of %s used, %d%% done — level',
+    return ['muted', sprintf('%d%% of %s worked, %d%% done — level',
                              round($pctUsed), $noun, round($pctDone))];
 }
 
@@ -468,13 +468,13 @@ function pool_days_donut_svg(float $used, float $pool, int $size = 150): string 
     $slices = [
         ['value' => $pool > 0 ? min($used, $pool) : $used, 'color' => $col,
          'big'   => fmt_num($used, 1),
-         'small' => $over > 0 ? 'days used, ' . fmt_num($over, 1) . ' over' : 'days used',
-         'tip'   => $days($used) . ' used' . ($over > 0 ? ', ' . $days($over) . ' over the pool' : '')],
+         'small' => $over > 0 ? 'days worked, ' . fmt_num($over, 1) . ' over' : 'days worked',
+         'tip'   => $days($used) . ' worked' . ($over > 0 ? ', ' . $days($over) . ' over the pool' : '')],
         ['value' => $unused, 'color' => 'var(--border)',
          'big'   => fmt_num($unused, 1), 'small' => 'days unused',
          'tip'   => $days($unused) . ' still unused'],
     ];
-    return pool_donut_svg($slices, (int)round($pct) . '%', 'of days used', $size);
+    return pool_donut_svg($slices, (int)round($pct) . '%', 'of days worked', $size);
 }
 
 /**
@@ -685,14 +685,14 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source,
         $pctDone = $p['items'] > 0 ? $p['done'] / $p['items'] * 100 : 0.0;
 
         if ($p['is_slot']) {
-            [$cls, $text] = ['warn-text', 'nobody in this slot yet, so nothing is being used'];
+            [$cls, $text] = ['warn-text', 'nobody in this slot yet, so no days are being worked'];
         } elseif ($p['used_days'] > $p['budget_days'] + 0.05) {
             $cls  = 'err';
             $text = 'over budget by ' . fmt_num($p['used_days'] - $p['budget_days'], 1) . ' days';
         } elseif ($p['items'] > 0) {
             [$cls, $text] = pool_pace($pctUsed, $pctDone, (float)$p['items']);
         } else {
-            [$cls, $text] = ['muted', sprintf('%d%% of their days used, no items assigned to them yet',
+            [$cls, $text] = ['muted', sprintf('%d%% of their days worked, no items assigned to them yet',
                                               round($pctUsed))];
         }
         $p['pct_used'] = $pctUsed;
