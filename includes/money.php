@@ -172,6 +172,12 @@ function crew_term(int $crewId): ?array {
 /** The finance connection, for an admin or for the person the record belongs to. */
 function money_own_db(int $crewId): ?PDO {
     if (can_see_money()) return finance_db();
+    // ⚠ NOT THROUGH SOMEBODY ELSE'S EYES. While Production views the app as an
+    // artist (2026-11-05, migration 077), effective_crew_id() IS that artist, and
+    // without this their rate and invoices would show on Home and the statement.
+    // Only an administrator may see money through a preview. Admins already had
+    // this door through effective_crew_id(), so nothing changes for them.
+    if (function_exists('in_preview') && in_preview() && real_role() !== 'admin') return null;
     $pdo = $GLOBALS['pdo'] ?? null;
     if ($crewId <= 0 || !($pdo instanceof PDO)) return null;
     if (!function_exists('effective_crew_id') || effective_crew_id($pdo) !== $crewId) return null;

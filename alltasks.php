@@ -259,7 +259,7 @@ require __DIR__ . '/includes/header.php';
         // looking for it — and he was right: a meeting is rarely about one show,
         // so the natural place to drop its transcript is the screen that spans
         // them. Which project the cards land on is chosen after reading. ?>
-  <?php if (can_edit() && ai_configured()): ?>
+  <?php if (can_edit() && ai_configured() && (!function_exists('feature_on') || feature_on('transcript'))): ?>
     <a class="button secondary" href="transcript.php"
        title="Read a meeting transcript and turn its action items into cards">Tasks from transcript</a>
   <?php endif; ?>

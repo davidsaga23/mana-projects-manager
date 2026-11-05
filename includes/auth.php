@@ -130,6 +130,28 @@ function real_role(): string {
 }
 
 /**
+ * The roles the REAL login may view the app as: strictly below its own, so a
+ * preview can only ever take permissions away.
+ *
+ *   admin       → Production, supervisor, artist (since 2026-09-02)
+ *   Production  → supervisor, artist, and only while "View as" is switched on
+ *                 for them (David, 2026-11-05: "View as should also be
+ *                 available for production"; migration 077)
+ *   anyone else → nobody
+ *
+ * ⚠ real_role() and real_feature_on(), never the effective answers: a preview
+ * must not decide whether you may be in one.
+ */
+function preview_roles_allowed(): array {
+    $real = real_role();
+    if ($real === 'admin') return ['editor', 'supervisor', 'artist'];
+    if ($real === 'editor' && function_exists('real_feature_on') && real_feature_on('view_as')) {
+        return ['supervisor', 'artist'];
+    }
+    return [];
+}
+
+/**
  * The specific PERSON being previewed, or null when not previewing a person.
  *
  * David, 2026-10-21: "can we admins see anima as specific users instead of
@@ -156,7 +178,8 @@ function preview_user(): ?array {
     if ($loaded) return $u;
     $loaded = true;
 
-    if (real_role() !== 'admin') return $u = null;
+    $allowed = preview_roles_allowed();
+    if (!$allowed) return $u = null;
     $id = (int)($_SESSION['preview_user_id'] ?? 0);
     if ($id <= 0) return $u = null;
 
@@ -177,7 +200,8 @@ function preview_user(): ?array {
     if (!$row || (int)($row['active'] ?? 0) !== 1) return $u = null;
 
     $role = ((string)($row['role'] ?? '')) === 'viewer' ? 'artist' : (string)($row['role'] ?? '');
-    if (!in_array($role, ['editor', 'supervisor', 'artist'], true)) return $u = null;
+    // Strictly below the viewer's own role (Production never sees as Production).
+    if (!in_array($role, $allowed, true)) return $u = null;
     $row['role'] = $role;
     return $u = $row;
 }
@@ -198,14 +222,15 @@ function preview_role(): string {
     // all strictly less than admin — so this can take permissions away and has no
     // path to granting one. A tampered session value is either a lesser role or
     // nothing at all.
-    if (real_role() !== 'admin') return '';
+    $allowed = preview_roles_allowed();
+    if (!$allowed) return '';
     // Previewing a specific person wears THAT person's role; preview_user() has
     // already proved it is a lesser, active account.
     $pu = preview_user();
     if ($pu) return (string)$pu['role'];
     $p = (string)($_SESSION['preview_role'] ?? '');
     if ($p === 'viewer') $p = 'artist';        // a session started before 037
-    return in_array($p, ['editor', 'supervisor', 'artist'], true) ? $p : '';
+    return in_array($p, $allowed, true) ? $p : '';
 }
 
 /** "an artist", "a supervisor", "Production": a role named in a sentence. */
@@ -354,7 +379,11 @@ function is_supervisor(): bool {
  * are an admin). This gate only decides whether the controls are live at all.
  */
 function can_log_own_time(): bool {
-    return can_edit() || is_artist() || is_supervisor();
+    // ...and while "Timer and time logging" is switched on for them (migration
+    // 077). function_exists: features.php arrives with functions.php, which
+    // every screen loads after this file.
+    return (can_edit() || is_artist() || is_supervisor())
+        && (!function_exists('feature_on') || feature_on('time_log'));
 }
 
 /**
@@ -392,12 +421,17 @@ const SUPERVISOR_ACTIONS = [
 
 /** May the current account change things in this area ('timeline', 'staffing', 'shots')? */
 function can_edit_area(string $area): bool {
-    return can_edit() || (is_supervisor() && isset(SUPERVISOR_SCRIPTS[$area]));
+    $role = can_edit() || (is_supervisor() && isset(SUPERVISOR_SCRIPTS[$area]));
+    // The area's "Edit" switch (migration 077) can take this away, never give it:
+    // a role the screen was not built for is locked off in FEATURES.
+    $switch = ['shots' => 'shots_edit', 'timeline' => 'timeline_edit', 'staffing' => 'staffing_edit'][$area] ?? null;
+    return $role && ($switch === null || !function_exists('feature_on') || feature_on($switch));
 }
 
 /** May the current account press Hire on Staffing? Production, admins and supervisors. */
 function can_hire(): bool {
-    return can_edit_area('staffing') || is_supervisor();
+    return (can_edit() || is_supervisor())
+        && (!function_exists('feature_on') || feature_on('staffing_hire'));
 }
 
 /** Is this POST a supervisor saving through one of their areas, or one of their single actions? */
@@ -660,6 +694,28 @@ function require_login(): void {
         header('Location: ' . $back);
         exit;
     }
+
+    // THE ACCESS SWITCHES (migration 077, David 2026-11-04/05). A screen whose
+    // switch is off is CLOSED, not merely missing from the menu: typing its
+    // address gets this message instead of the page. The same for a project
+    // screen of a show this account is not on, which used to be checked on the
+    // Overview alone. features.php holds the lists; see feature_gate_request().
+    global $pdo;
+    if ($pdo instanceof PDO && function_exists('feature_gate_request')
+        && ($refused = feature_gate_request($pdo)) !== null) {
+        [$kind, $why] = $refused;
+        if (function_exists('flash')) flash('err', $why);
+        $back = 'index.php';
+        if ($kind === 'save') {
+            // The screen is theirs; only this save is not. Back to it, checked
+            // the way the read-only guard above checks REQUEST_URI.
+            $uri    = (string)($_SERVER['REQUEST_URI'] ?? '');
+            $second = $uri[1] ?? '';
+            if ($uri !== '' && $uri[0] === '/' && $second !== '/' && $second !== chr(92)) $back = $uri;
+        }
+        header('Location: ' . $back);
+        exit;
+    }
 }
 
 /**
@@ -840,6 +896,15 @@ function require_login_json(): void {
         http_response_code(403);
         header('Content-Type: application/json');
         echo json_encode(['ok' => false, 'error' => $why]);
+        exit;
+    }
+    // The access switches and the show check, as require_login() asks them.
+    global $pdo;
+    if ($pdo instanceof PDO && function_exists('feature_gate_request')
+        && ($refused = feature_gate_request($pdo)) !== null) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => $refused[1]]);
         exit;
     }
 }

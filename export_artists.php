@@ -104,7 +104,8 @@ foreach ($people as $p) {
         ['v' => $val($p, 'position'),       's' => XLSX_FL_TEXT],
         ['v' => $val($p, 'seniority'),      's' => XLSX_FL_TEXT],
         ['v' => $val($p, 'project_type'),   's' => XLSX_FL_TEXT],
-        ['v' => $val($p, 'email'),          's' => XLSX_FL_TEXT],
+        // Blank while "See contact details" is off for this account (migration 077).
+        ['v' => (!function_exists('feature_on') || feature_on('artists_contacts')) ? $val($p, 'email') : '', 's' => XLSX_FL_TEXT],
         // Blue and underlined like the original, but plain text rather than a
         // hyperlink: a real one needs a rels part per cell, and the address is
         // the useful half.

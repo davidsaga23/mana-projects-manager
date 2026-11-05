@@ -4870,3 +4870,68 @@ body.rv-open { overflow: hidden; }
   .home-photo { width: 120px; }
   .home-bio { grid-column: 1 / -1; }
 }
+
+/* ============================================================================
+   USERS → ACCESS (migration 077, 2026-11-05). The tabs, the role grid of
+   switches, one person's Role / On / Off choices, and the Access pill on the
+   People list. Every rule is scoped to .utabs, .acc-* or .users-table, so the
+   short class names inside (tg, seg, lock, pill) touch nothing else.
+   ========================================================================== */
+.utabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 0 0 16px; flex-wrap: wrap; }
+.utabs a { padding: 8px 14px; color: var(--muted); border-bottom: 2px solid transparent; }
+.utabs a:hover { color: var(--text); text-decoration: none; }
+.utabs a.current { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }
+
+.acc-legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 10px; }
+.acc-grid { width: 100%; border-collapse: separate; border-spacing: 0; }
+.acc-grid th, .acc-grid td { padding: 6px 12px; border-bottom: 1px solid var(--border-soft); text-align: center; vertical-align: middle; }
+.acc-grid th:first-child, .acc-grid td:first-child { text-align: left; }
+.acc-grid th .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.acc-grid th.newrole { color: var(--violet-strong); }
+.acc-grid .sub { display: block; color: var(--faint); font-size: 12px; }
+.acc-grid tr.grp td { background: var(--surface); color: var(--muted); font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .06em; text-align: left; padding-top: 12px; }
+.acc-grid tr.grp .grp-note { text-transform: none; letter-spacing: 0; }
+.acc-grid tr.child td:first-child { padding-left: 30px; color: var(--text-2); }
+.acc-grid tr.child td:first-child::before { content: "↳ "; color: var(--faint); }
+.acc-grid tr.ov td { background: var(--warn-tint); }
+.acc-grid form { display: inline; margin: 0; }
+.acc-grid .always, .acc-legend .always { color: var(--ok); }
+.acc-grid .lock, .acc-legend .lock { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; }
+.acc-grid .lock svg, .acc-legend .lock svg { width: 11px; height: 11px; }
+
+/* the switch: a button inside a one-field form, so it works without script */
+.acc-grid .tg { display: inline-block; width: 34px; height: 19px; padding: 0; margin: 0; border-radius: 99px;
+  background: var(--surface-3); border: 1px solid var(--border-strong); position: relative; vertical-align: middle;
+  cursor: pointer; box-shadow: none; }
+.acc-grid .tg::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--faint); transition: left var(--ease); }
+.acc-grid .tg.on { background: var(--primary-fill); border-color: var(--primary-border); }
+.acc-grid .tg.on::after { left: 17px; background: var(--primary); }
+.acc-grid .tg.ro { cursor: default; opacity: .45; }
+.acc-grid button.tg:hover { border-color: var(--primary); }
+
+/* Role / On / Off: three radios drawn as one segmented control */
+.acc-grid .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.acc-grid .seg label { margin: 0; cursor: pointer; }
+.acc-grid .seg label + label { border-left: 1px solid var(--border-strong); }
+.acc-grid .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.acc-grid .seg span { display: block; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.acc-grid .seg input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: -2px; }
+.acc-grid .seg input:checked + span { background: var(--surface-3); color: var(--text); font-weight: 600; }
+.acc-grid .seg .seg-on input:checked + span { background: var(--primary-tint); color: var(--primary); }
+.acc-grid .seg .seg-off input:checked + span { background: var(--danger-tint); color: var(--danger); }
+.acc-grid .seg label.is-off { cursor: not-allowed; opacity: .45; }
+
+.acc-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: start; }
+.acc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 14px 16px; margin-bottom: 14px; }
+.acc-card h3 { margin-top: 0; }
+.acc-why { display: block; margin-top: 10px; }
+.acc-why input { width: 100%; }
+@media (max-width: 900px) { .acc-cols { grid-template-columns: 1fr; } }
+
+.users-table .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px;
+  border: 1px solid var(--border-strong); color: var(--text-2); white-space: nowrap; }
+.users-table a.pill:hover { border-color: var(--primary); text-decoration: none; }
+.users-table .pill.chg { border-color: var(--warn-border); color: var(--warn); background: var(--warn-tint); }

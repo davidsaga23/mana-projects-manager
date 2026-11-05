@@ -346,7 +346,9 @@ require __DIR__ . '/includes/header.php';
               <?php if (can_see_money()): ?><th>Day rate</th><?php endif; ?>
               <?php if ($has('project_type')): ?><th>Type</th><?php endif; ?>
               <?php if ($has('rating')):    ?><th>Rating</th><?php endif; ?>
-              <th>Email</th><th>Phone</th><th>Reel</th>
+              <?php // "See contact details" (Users → Access, migration 077). ?>
+              <?php $showContacts = !function_exists('feature_on') || feature_on('artists_contacts'); ?>
+              <?php if ($showContacts): ?><th>Email</th><th>Phone</th><?php endif; ?><th>Reel</th>
               <?php if ($has('portfolio_password')): ?><th>Reel pw</th><?php endif; ?>
               <th>Where from</th><th>Notes</th>
               <?php if ($has('worked_with_us')): ?><th>Worked</th><?php endif; ?>
@@ -402,10 +404,12 @@ require __DIR__ . '/includes/header.php';
               <?php if ($has('rating')): ?>
                 <td><?= artists_rating_select($n . '[rating]', $p['rating'] ?? null) ?></td>
               <?php endif; ?>
+              <?php if ($showContacts): ?>
               <td><input type="email" name="<?= $n ?>[email]" value="<?= e($p['email'] ?? '') ?>"
                          size="20" maxlength="190"></td>
               <td><input name="<?= $n ?>[phone]" value="<?= e($p['phone'] ?? '') ?>"
                          size="12" maxlength="50"></td>
+              <?php endif; ?>
               <?php // A LINK YOU CAN CLICK, with the field behind it. Every other
                     // cell is an input because every other cell is only ever
                     // typed into; this one you mostly want to OPEN, and an input

@@ -368,6 +368,12 @@ require_once __DIR__ . '/snapshots.php';
 // this in — and it must NOT be required from auth.php, which runs before it.
 require_once __DIR__ . '/project_nav.php';
 
+// The access switches (migration 077): feature_on(), and the doors
+// require_login() asks. Loaded here, not from auth.php, for the reason above.
+// auth.php only ever calls into it through function_exists(), so a page that
+// never loads this file keeps working exactly as before.
+require_once __DIR__ . '/features.php';
+
 function working_days_list(string $from, string $to): array {
     $holidays = non_working_days();
     $f = new DateTime($from);

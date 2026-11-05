@@ -63,6 +63,8 @@ function crew_login(PDO $pdo, int $crewId): ?array {
 /** May the current account send a link for a login with this role? See the header. */
 function may_send_invite_for(string $role): bool {
     if ($role === 'admin') return false;
+    // "Person page: create a login" switched off (migration 077).
+    if (function_exists('feature_on') && !feature_on('invite')) return false;
     if ($role === 'editor') return is_admin();
     return can_edit();
 }
