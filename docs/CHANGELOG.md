@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Artist statements say "Earned so far", not "Due so far"
+
+- The column and row that showed what a person's logged time, approved footage or flat fee is worth
+  now read **"Earned so far"** (David's wording), on the Artist statements list, each statement and
+  the artist's Home. Same figure as before; label only, no migration.
+
 ## 2026-11-05 — Days budget cards: going over budget is red, and the bar runs past it
 
 - On a **Days budget** step card that has worked more days than its budget, the big number and the
