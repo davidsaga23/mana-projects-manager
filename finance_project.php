@@ -2628,7 +2628,7 @@ function invAddRows() {
       <thead><tr>
         <th>Artist</th><th>Dates</th><th>Rate</th>
         <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Approved sec</th>
-        <th class="num">Due so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
+        <th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
       <tbody>
       <?php

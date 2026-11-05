@@ -618,7 +618,7 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
     <p class="muted small">You are not on any show at the moment.</p>
   <?php else: ?>
     <table class="review-table">
-      <thead><tr><th>Show</th><th class="num">Logged</th><th class="num">Due so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th></tr></thead>
+      <thead><tr><th>Show</th><th class="num">Logged</th><th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th></tr></thead>
       <tbody>
         <?php foreach ($statements as $pid => $st): ?>
           <tr>

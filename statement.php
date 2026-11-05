@@ -132,7 +132,7 @@ if ($admin && $project) {
           // Angelys's CH Layout on its rate, the rest on her default. ?>
     <?php if (!empty($s['lines'])): ?>
       <table class="review-table">
-        <thead><tr><th>Position</th><th>Rate</th><th>Counted on</th><th class="num">Due so far</th></tr></thead>
+        <thead><tr><th>Position</th><th>Rate</th><th>Counted on</th><th class="num">Earned so far</th></tr></thead>
         <tbody>
           <?php foreach ($s['lines'] as $l): ?>
             <tr>
@@ -182,7 +182,7 @@ if ($admin && $project) {
             <?php endif; ?>
           </td></tr>
         <?php endif; ?>
-        <tr><th>Due so far</th><td><strong><?= e($s['due_own'] !== null
+        <tr><th>Earned so far</th><td><strong><?= e($s['due_own'] !== null
               ? fmt_money_both($s['due'], $s['due_own'], $s['rate_currency']) : $money($s['due'])) ?></strong></td></tr>
         <tr><th>Invoiced</th><td><?= e($money($s['invoiced'])) ?></td></tr>
         <tr class="statement-left"><th>Left to invoice</th>
