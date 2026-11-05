@@ -2756,7 +2756,7 @@ function invAddRows() {
 <div class="pool-detail pool-overall">
   <?= pool_days_donut_svg((float)$pool['days']['used'], (float)$pool['days']['pool']) ?>
   <div>
-    <p><strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days used</strong>
+    <p><strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days worked</strong>
       <span class="muted">of <?= e(fmt_num($pool['days']['pool'], 1)) ?></span></p>
     <p class="<?= $pool['days']['left'] < 0 ? 'err' : 'muted' ?>">
       <?= $pool['days']['left'] < 0
@@ -2775,11 +2775,11 @@ function invAddRows() {
   multiplied by the working days between its start date and its deadline on
   <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>: a step that
   needs more than that will not fit its dates as they stand.
-  Used days are only what has been logged — by hand or with the timer on
+  Days worked are only what has been logged — by hand or with the timer on
   <a href="mytasks.php">My tasks</a> — divided by this project's
   <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day. The dates are never used to guess it.
   <?php if ($pool['unlogged']): ?>
-    A step nobody has logged time on counts as 0 used: <?= e(implode(', ', $pool['unlogged'])) ?>.
+    A step nobody has logged time on counts as 0 days worked: <?= e(implode(', ', $pool['unlogged'])) ?>.
   <?php endif; ?>
 </p>
 
@@ -2930,14 +2930,14 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['pool'] * $open['rate_min'], $pcur)) ?></strong>
       <span class="muted small">at the rate beside it</span></div>
-    <div><span class="muted small">Used</span>
+    <div><span class="muted small">Days worked</span>
       <strong><?= e(fmt_num($open['used'], 1)) ?> days</strong>
       <?php if ($open['unlogged']): ?>
         <span class="warn-text small">No time logged yet</span>
       <?php else: ?>
         <span class="muted small">from logged hours</span>
       <?php endif; ?></div>
-    <div><span class="muted small">Used in money</span>
+    <div><span class="muted small">Days worked in money</span>
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['used'] * $open['rate_min'], $pcur)) ?></strong>
       <span class="muted small">same rate, so it tracks the days</span></div>
@@ -2956,7 +2956,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
   <div class="pool-detail pool-pair">
     <figure class="pool-fig">
       <?= pool_days_donut_svg((float)$open['used'], (float)$open['pool']) ?>
-      <figcaption class="muted small">Days, used and unused</figcaption>
+      <figcaption class="muted small">Days, worked and unused</figcaption>
     </figure>
     <div class="pool-pair-text">
       <p class="<?= e($open['pace_class']) ?>"><strong><?= e($open['pace_text']) ?></strong></p>
@@ -2965,7 +2965,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         <?= e(fmt_unit($open['total'], $open['unit'])) ?> approved.
         <?php if ($open['filled'] < $open['slots']): ?>
           Only <?= (int)$open['filled'] ?> of <?= (int)$open['slots'] ?> slots are filled, so the
-          days are being used more slowly than the plan assumes — this step is not under budget,
+          days are being worked more slowly than the plan assumes — this step is not under budget,
           it is under-staffed.
         <?php endif; ?>
       </p>
@@ -3005,7 +3005,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
     <table class="pool-people">
       <thead><tr>
         <th>Person</th><th class="num">Rate</th>
-        <th class="num">Budget</th><th class="num">Used</th><th class="num">Unused</th>
+        <th class="num">Budget</th><th class="num">Worked</th><th class="num">Unused</th>
         <th class="num">Invoiced</th><th class="num">Work done</th><th>Reading</th>
       </tr></thead>
       <tbody>
