@@ -162,7 +162,14 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
         if ($tracksSeconds) {
             $secApproved->execute([(int)$s['id']]);
             $secDelivered->execute([(int)$s['id']]);
-            $target    = $totalSeconds;
+            // ⚠ ONLY THE SHARE OF THE FOOTAGE THIS STEP COVERS. David, 2026-11-05: MSD's
+            // FX card read 0:26.17 of 0:55.50 when FX is set to 30% of the show, "It's
+            // supposed to be only 17 seconds". quota.php (step_units()) and the
+            // scheduler have always multiplied by coverage_pct; this card took the whole
+            // running time, so its total, its "to go" and the pace it demanded were all
+            // inflated by the same factor. Same rule as quota.php now, not a second one.
+            $coverage  = max(0.0, min(100.0, (float)($s['coverage_pct'] ?? 100))) / 100;
+            $target    = $totalSeconds * $coverage;
             $approved  = (float)$secApproved->fetchColumn();
             $delivered = (float)$secDelivered->fetchColumn();
             $unit = 'sec';
