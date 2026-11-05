@@ -36,6 +36,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - **Needs migration 077** to *change* a switch. The starting answers apply from the moment this is
   live, before the migration runs.
 
+## 2026-11-05 — Fix: dashboard seconds use the step's coverage % *(no migration)*
+
+- A step measured in seconds (e.g. FX) now has its share of the show as its total on the Dashboard
+  card and the step page: running time × the step's coverage %, the same rule as the quota and the
+  scheduler. MSD's FX, set to 30%, reads about 17 seconds instead of 55.5, and its "to go" and the
+  pace it asks for shrink with it.
+
 ## 2026-11-05 — Expense projection: admins can log days in Actual days *(migration 076)*
 
 - Each position's **Actual days** cell has a **+ days** link: type a number of days and the day it
