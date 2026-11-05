@@ -4889,3 +4889,17 @@ Step-level invoices are lines in `by_department` only, never in `rows`, because 
 "the positions" by the sign-off snapshot, the budget pool and statements. Only an invoice with no
 step is still "unattached". Existing invoices are not moved; David re-attaches them himself.
 The step-variance block still counts per position and leaves step-level invoices out.
+
+## 2026-11-05 — Days typed from Finance are time on a step, no task
+
+**Asked by David:** "make this column editable for admins so we can log their time manually if
+needed". Asked where that time should count, he first suggested Desk time; that lives under the
+Studio, not the show, so it would not reach the show's Actual days or statement. He then chose
+"On the step, no task".
+
+**Decided:** `time_logs.step_id` (migration 076), set only when an entry has no task and no card.
+Every reader that splits time by step takes the task's step or, failing that, the entry's own
+(`tl_step_expr()`). One entry per typing, in minutes at the show's hours per day, noted "Entered
+from Finance", with `entered_by` the admin; the 24-hour cap on a typed day does not apply to it.
+It adds to logged time and never replaces it. Shot-level figures do not see it.
+

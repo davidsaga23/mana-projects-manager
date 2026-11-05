@@ -1180,12 +1180,15 @@ function resolve_invoice_target(string $position, string $payee, array $position
  */
 function actual_days_by_crew_step(PDO $pdo, int $projectId, float $hoursPerDay): array {
     if (!time_logs_available($pdo) || $hoursPerDay <= 0) return [];
+    // A task's step, or since migration 076 an entry's own step: days typed by
+    // an admin on the projection, with no task (David, 2026-11-05).
+    $sx = tl_step_expr($pdo);
     $stmt = $pdo->prepare(
-        'SELECT tl.crew_id, pr.step_id, SUM(tl.minutes) AS m
+        "SELECT tl.crew_id, {$sx} AS step_id, SUM(tl.minutes) AS m
            FROM time_logs tl
-           JOIN progress pr ON pr.id = tl.progress_id
-          WHERE tl.project_id = ? AND tl.progress_id IS NOT NULL
-          GROUP BY tl.crew_id, pr.step_id'
+           LEFT JOIN progress pr ON pr.id = tl.progress_id
+          WHERE tl.project_id = ? AND {$sx} IS NOT NULL
+          GROUP BY tl.crew_id, {$sx}"
     );
     $stmt->execute([$projectId]);
     $out = [];

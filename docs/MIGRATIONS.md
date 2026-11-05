@@ -131,6 +131,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 073 | status_on_hold_lowercase | ⏳ **"On Hold" becomes "On hold"** on every show's statuses and in the template new shows copy from (David, 2026-10-29). Data only, re-runnable. Until it runs, Spell still reads "On Hold". |
 | 074 | user_tour_seen | ⏳ **The first-time tour has been shown** (`users.tour_seen_at`). Until it runs, the browser remembers it instead (once per browser). Optional afterwards: `UPDATE users SET tour_seen_at = NOW();` to spare existing users the tour. |
 | 075 | crew_profile | ⏳ **A person's own profile on Home** (`crew.phone`, `crew.bio`, `crew.photo_stored`, `crew.photo_mime`), written by the person on Home's General info tab. Until it runs, the tab shows name and email only. |
+| 076 | time_on_step | ⏳ **Days logged on a step with no task** (`time_logs.step_id`), typed by an admin in the Expense projection's Actual days cell. Until it runs, the cell is read-only and says so. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

@@ -311,7 +311,9 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
     $in = implode(',', array_map('intval', array_keys($shows)));
     $hasTicketStep = column_exists($pdo, 'tickets', 'step_id');
     $sql = 'SELECT tl.project_id, tl.log_date, '
-         . ($hasTicketStep ? 'COALESCE(pr.step_id, t.step_id)' : 'pr.step_id') . ' AS sid,
+         . (time_logs_have_step($pdo)
+              ? ($hasTicketStep ? 'COALESCE(pr.step_id, tl.step_id, t.step_id)' : 'COALESCE(pr.step_id, tl.step_id)')
+              : ($hasTicketStep ? 'COALESCE(pr.step_id, t.step_id)' : 'pr.step_id')) . ' AS sid,
                    SUM(tl.minutes) AS m
               FROM time_logs tl
               LEFT JOIN progress pr ON pr.id = tl.progress_id
@@ -898,12 +900,12 @@ function home_logged_by_task(PDO $pdo, int $crewId, string $from, string $to): a
                FROM time_logs tl
                LEFT JOIN projects p ON p.id = tl.project_id
                LEFT JOIN progress pr ON pr.id = tl.progress_id
-               LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+               LEFT JOIN pipeline_steps ps ON ps.id = " . tl_step_expr($pdo) . "
                LEFT JOIN shots s ON s.id = pr.shot_id
                LEFT JOIN assets a ON a.id = pr.asset_id
                LEFT JOIN tickets t ON t.id = tl.ticket_id
               WHERE tl.crew_id = ? AND tl.log_date BETWEEN ? AND ?
-              GROUP BY tl.project_id, tl.progress_id, tl.ticket_id, p.name, p.code, ps.name,
+              GROUP BY tl.project_id, tl.progress_id, tl.ticket_id, ps.id, p.name, p.code, ps.name,
                        s.episode, s.shot_code, a.name, t.seq, t.title
               ORDER BY minutes DESC"
         );

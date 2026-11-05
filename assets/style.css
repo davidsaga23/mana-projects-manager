@@ -2107,6 +2107,11 @@ body.lightbox-lock { overflow: hidden; }
 .proj-table tr.subtotal td { background: var(--surface-2); font-weight: 600; border-top: 1px solid var(--border); }
 .proj-table tfoot th { background: var(--surface-3); font-size: 14px; }
 .proj-table .small { font-size: 12.5px; }
+/* Days typed on a step from Actual days (migration 076, 2026-11-05). */
+.proj-table .days-edit { margin-top: 2px; text-align: left; }
+.proj-table .days-edit summary { cursor: pointer; font-size: 12px; color: var(--primary); text-align: right; }
+.proj-table .days-edit form { display: flex; gap: 4px; align-items: center; margin: 4px 0 0; justify-content: flex-end; }
+.proj-table .days-edit input, .proj-table .days-edit button { margin: 0; }
 /* Done tick (finance_install_14, 2026-11-04). */
 .proj-table .pos-done-cell { text-align: center; }
 .proj-table .pos-done-cell form { margin: 0; }

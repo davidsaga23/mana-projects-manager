@@ -117,12 +117,14 @@ function pool_pace(float $pctUsed, float $pctDone, float $items, string $noun = 
 function pool_logged_days(PDO $pdo, int $projectId, float $hoursPerDay): array {
     if (!time_logs_available($pdo) || $hoursPerDay <= 0) return [];
     try {
+        // Includes days typed on a step with no task (migration 076).
+        $sx = tl_step_expr($pdo);
         $q = $pdo->prepare(
-            'SELECT pr.step_id, COALESCE(SUM(tl.minutes), 0) AS mins
+            "SELECT {$sx} AS step_id, COALESCE(SUM(tl.minutes), 0) AS mins
                FROM time_logs tl
-               JOIN progress pr ON pr.id = tl.progress_id
-              WHERE pr.project_id = ?
-              GROUP BY pr.step_id'
+               LEFT JOIN progress pr ON pr.id = tl.progress_id
+              WHERE tl.project_id = ? AND {$sx} IS NOT NULL
+              GROUP BY {$sx}"
         );
         $q->execute([$projectId]);
     } catch (PDOException $e) {
@@ -590,11 +592,12 @@ function pool_step_people(PDO $pdo, array $project, int $stepId, string $source,
     $logged = [];
     if ($hpd > 0) {
         try {
+            $sx = tl_step_expr($pdo);
             $q = $pdo->prepare(
-                'SELECT tl.crew_id, COALESCE(SUM(tl.minutes), 0) AS mins
-                   FROM time_logs tl JOIN progress pr ON pr.id = tl.progress_id
-                  WHERE pr.project_id = ? AND pr.step_id = ?
-                  GROUP BY tl.crew_id'
+                "SELECT tl.crew_id, COALESCE(SUM(tl.minutes), 0) AS mins
+                   FROM time_logs tl LEFT JOIN progress pr ON pr.id = tl.progress_id
+                  WHERE tl.project_id = ? AND {$sx} = ?
+                  GROUP BY tl.crew_id"
             );
             $q->execute([$projectId, $stepId]);
             foreach ($q as $r) $logged[(int)$r['crew_id']] = ((float)$r['mins'] / 60) / $hpd;

@@ -69,6 +69,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $date = (string)($_POST['rate_date'] ?? '') ?: date('Y-m-d');
                 flash('ok', fx_save($projectId, $c, (float)$raw, $date, 'manual', $who, $reason));
             }
+        } elseif (isset($_POST['add_step_days'])) {
+            // DAYS TYPED IN THE ACTUAL DAYS CELL (David, 2026-11-05: "make this
+            // column editable for admins so we can log their time manually",
+            // "On the step, no task"). Saved as logged time for that person on
+            // that step, no task (migration 076), so it counts wherever their
+            // own logged time does. Admin-only page; the position is checked
+            // against this show's own lanes, never trusted from the browser.
+            $crewId = (int)($_POST['crew_id'] ?? 0);
+            $stepId = (int)($_POST['step_id'] ?? 0);
+            $ok = false;
+            foreach (project_positions($pdo, $projectId) as $l) {
+                if ($l['crew_id'] === $crewId && $l['step_id'] === $stepId && $stepId > 0) $ok = true;
+            }
+            if (!$ok) throw new RuntimeException('That position is not on this show, so nothing was logged.');
+            flash('ok', log_step_days($pdo, $projectId, $crewId, $stepId, (string)($_POST['days'] ?? ''),
+                (string)($_POST['log_date'] ?? ''), hours_per_day($pdo, $projectId), (int)($_SESSION['user_id'] ?? 0)));
+        } elseif (isset($_POST['remove_step_days'])) {
+            // Only a step-level entry on THIS show: an artist's own task time is
+            // removed where they logged it, not from here.
+            $id = (int)$_POST['remove_step_days'];
+            $q = $pdo->prepare('SELECT id FROM time_logs WHERE id = ? AND project_id = ? AND step_id IS NOT NULL AND progress_id IS NULL');
+            $q->execute([$id, $projectId]);
+            if (!$q->fetchColumn()) throw new RuntimeException('That entry is not a day typed from Finance on this show, so nothing was removed.');
+            flash('ok', delete_time_log($pdo, $id, (int)($_SESSION['user_id'] ?? 0), true));
         } elseif (isset($_POST['set_done'])) {
             // FINISHED tick on the Expense projection (finance_install_14). The
             // position is checked against project_positions(), like set_rate, so
@@ -377,6 +401,9 @@ $proj    = expense_projection($pdo, $projectId);
 // Which positions are marked finished (finance_install_14), "crewId|stepId".
 $doneMap = position_done_for($projectId);
 $doneReady = position_done_available();
+// Days typed on a step from the Actual days cell (migration 076), "crewId|stepId".
+$stepDays = step_day_entries($pdo, $projectId);
+$stepDaysReady = time_logs_available($pdo) && time_logs_have_step($pdo);
 
 // ⚠ THE RATE IS FIXED AT SET-UP: the first time this page meets a foreign
 // currency with no rate for this project, it fetches the day's rate and saves
@@ -1725,7 +1752,46 @@ if ($retakePct <= 0):
                 // the export, which writes the column at full precision. ?>
           <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
                 (!empty($r['step_level']) ? '—' : e(fmt_num($r['units'], 1))) ?></td>
-          <td class="num muted"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?></td>
+          <?php // EDITABLE FOR ADMINS (David, 2026-11-05). "+ days" logs time for
+                // this person on this step with no task (migration 076): it adds
+                // to what they logged, never replaces it, and each entry can be
+                // removed here. Not on supervision or step-level lines, which
+                // have no lane to log on. ?>
+          <?php $sdKey = (int)$r['crew_id'] . '|' . (int)$r['step']['id'];
+                $sdRows = $stepDays[$sdKey] ?? [];
+                $sdMins = array_sum(array_map(fn($x) => (int)$x['minutes'], $sdRows));
+                $sdEditable = $r['crew_id'] && (int)$r['step']['id'] > 0 && empty($r['supervision']) && empty($r['step_level']); ?>
+          <td class="num muted days-cell"><?= $r['actual_days'] > 0 ? e(fmt_num($r['actual_days'], 2)) : '—' ?>
+            <?php if ($sdMins > 0): ?>
+              <div class="small" title="Typed from Finance, not logged by the artist">incl. <?= e(fmt_hours($sdMins)) ?> typed</div>
+            <?php endif; ?>
+            <?php if ($sdEditable): ?>
+              <details class="days-edit">
+                <summary title="<?= $stepDaysReady ? 'Log days for this person on this step' : 'Needs migration 076 (migrate.php)' ?>">+ days</summary>
+                <?php if (!$stepDaysReady): ?>
+                  <p class="small warn-text">Needs migration 076. Open migrate.php to run it.</p>
+                <?php else: ?>
+                  <form method="post">
+                    <input type="hidden" name="add_step_days" value="1">
+                    <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">
+                    <input type="hidden" name="step_id" value="<?= (int)$r['step']['id'] ?>">
+                    <input name="days" inputmode="decimal" size="4" placeholder="days" required
+                           aria-label="Days to log for <?= e((string)$r['artist']) ?>">
+                    <input type="date" name="log_date" value="<?= e(date('Y-m-d')) ?>" max="<?= e(date('Y-m-d')) ?>"
+                           aria-label="The day it was worked">
+                    <button type="submit">Log</button>
+                  </form>
+                  <?php foreach ($sdRows as $sd): ?>
+                    <form method="post" class="days-entry" onsubmit="return confirm('Remove this entry?');">
+                      <span class="small"><?= e(fmt_hours((int)$sd['minutes'])) ?> · <?= e((string)$sd['log_date']) ?>
+                        <?= !empty($sd['entered_name']) ? '· ' . e((string)$sd['entered_name']) : '' ?></span>
+                      <button type="submit" name="remove_step_days" value="<?= (int)$sd['id'] ?>" class="link-danger">remove</button>
+                    </form>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </details>
+            <?php endif; ?>
+          </td>
           <?php // Muted and apart from Actual: an estimate of the work done, never
                 // the money billed (David, 2026-11-02). A flat or per-second rate
                 // has no days to price, and says so rather than showing a dash
@@ -1876,6 +1942,8 @@ if ($retakePct <= 0):
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
     On a subtotal it is the whole department's projection minus what has been invoiced so far, so
     it also counts the rows nobody has invoiced yet.
+    <strong>Actual days</strong> is what was logged; <em>+ days</em> logs days for that person on
+    that step from here, with no task, adding to what they logged (it counts on their statement too).
     Tick <strong>Done</strong> when somebody has finished on a position: its Difference is then
     marked <em>final</em>, and a subtotal is final once every row in it is done.
     <?php if (!$doneReady): ?>
