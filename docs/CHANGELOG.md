@@ -14,12 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-05 — Budget pool: "Used" tile renamed "Days worked"
+## 2026-11-05 — "Budget pool" tab renamed "Days budget"; "Days worked"; "No time logged yet"
 
-- Finance management → Budget pool, top strip: the tile that counts days from logged hours now
-  reads **Days worked** instead of "Used". Label only; the figure and everything else on the page
-  are unchanged (the Pace line, donut and per-step cards still say "used" until David decides).
-  No migration.
+- Finance management: the **Budget pool** tab is now **Days budget** — it has no money in it.
+- Top strip: the tile counting days from logged hours reads **Days worked** instead of "Used".
+- A step nobody has logged time on now says **No time logged yet** in amber, on its card and in
+  the step detail underneath (was a grey "no time logged on this step yet").
+- Labels only; no figure changes. The Pace line, donut and per-step "used" wording are unchanged
+  until David decides. No migration.
 
 ## 2026-11-05 — Access switches on Users: who can open what, per role and per person *(migration 077)*
 
