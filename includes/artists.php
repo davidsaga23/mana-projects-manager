@@ -265,6 +265,12 @@ function artists_values(array $in, array $extra): array {
 function artists_save_person(PDO $pdo, string $origName, array $in, array $extra): int {
     $v = artists_values($in, $extra);
     if ($v['candidate_name'] === '') throw new RuntimeException('An artist needs a name.');
+    // ⚠ CONTACTS NOT ON SCREEN ARE NOT SAVED. With "See contact details"
+    // switched off (migration 077) the row has no email or phone box, so the
+    // post carries none, and writing that absence would wipe everybody's.
+    if (function_exists('feature_on') && !feature_on('artists_contacts')) {
+        unset($v['email'], $v['phone']);
+    }
 
     $set = [];
     $args = [];

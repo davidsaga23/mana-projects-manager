@@ -57,10 +57,37 @@ const PROJECT_TABS_SHOWN_TO_SUPERVISORS = [
 require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
 
 function hidden_from_viewers(string $key): bool {
+    // SINCE MIGRATION 077 (2026-11-05) THE ACCESS SWITCHES ANSWER THIS, and the
+    // same switches close the page in require_login(), so this no longer only
+    // hides a tab: the comment above described the gap that closed. The two
+    // lists above are kept as the answer before features.php is loaded, and as
+    // the record of what David chose in September and October.
+    if (function_exists('feature_on') && isset(PROJECT_TAB_FEATURES[$key])) {
+        return !feature_on(PROJECT_TAB_FEATURES[$key]);
+    }
     if (can_edit()) return false;
     if (is_supervisor() && in_array($key, PROJECT_TABS_SHOWN_TO_SUPERVISORS, true)) return false;
     return in_array($key, PROJECT_TABS_HIDDEN_FROM_VIEWERS, true);
 }
+
+/** Which access switch (includes/features.php) each project tab answers to. */
+const PROJECT_TAB_FEATURES = [
+    'overview'   => 'overview',
+    'brief'      => 'brief',
+    'dashboard'  => 'dashboard',
+    'crew'       => 'staffing',
+    'schedule'   => 'schedule',
+    'timeline'   => 'timeline',
+    'shots'      => 'shots',
+    'production' => 'production',
+    'tasks'      => 'tasks',
+    'team'       => 'team',
+    'setup'      => 'setup',
+    'import'     => 'setup',
+    'statuses'   => 'setup',
+    'aliases'    => 'setup',
+    'export'     => 'export',
+];
 
 /**
  * The tabs, in the order they are used rather than the order they were built.
@@ -139,6 +166,11 @@ function project_nav_items(int $projectId): array {
 function switchable_projects(PDO $pdo): array {
     static $cache = null;
     if ($cache !== null) return $cache;
+    // ONLY THE SHOWS THIS ACCOUNT IS ON (2026-11-05). It listed every show to
+    // everybody, which was the easy way into a show you are not staffed on: pick
+    // it here while standing on Brief and the Brief opened. visible_projects_sql()
+    // is '' for Admin and Production, so their list is unchanged.
+    $vis = function_exists('visible_projects_sql') ? visible_projects_sql($pdo, 'id') : '';
     $cache = $pdo->query(
         // ⚠ The Studio is kept out of the switcher: it is not a show, and an
         // entry with no delivery date and no progress sitting among the shows is
@@ -146,6 +178,7 @@ function switchable_projects(PDO $pdo): array {
         // Its board is reached from Studio Tasks instead.
         "SELECT id, name, code, status FROM projects"
         . studio_where_sql($pdo, '')
+        . ($vis !== '' ? (stripos(studio_where_sql($pdo, ''), 'where') !== false ? ' AND ' : ' WHERE ') . $vis : '')
         . " ORDER BY FIELD(status, 'active','setup','on_hold','wrapped','postmortem','archived'), created_at DESC"
     )->fetchAll();
     return $cache;

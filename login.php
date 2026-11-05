@@ -60,8 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $lq = $pdo->prepare('SELECT role, crew_id FROM users WHERE id = ?');
                     $lq->execute([$user['id']]);
                     $lr = $lq->fetch() ?: [];
-                    if (in_array((string)($lr['role'] ?? ''), ['artist', 'viewer', 'supervisor'], true)
-                        && (int)($lr['crew_id'] ?? 0) > 0) {
+                    $lrole = (string)($lr['role'] ?? '');
+                    if ($lrole === 'viewer') $lrole = 'artist';
+                    // ...and only while Home is switched on for them (Users →
+                    // Access, migration 077); otherwise the first thing they
+                    // would see is "that screen isn't open to your account".
+                    if (in_array($lrole, ['artist', 'supervisor'], true)
+                        && (int)($lr['crew_id'] ?? 0) > 0
+                        && (!function_exists('feature_for_user') || feature_for_user('home', (int)$user['id'], $lrole))) {
                         $next = 'home.php';
                     }
                 } catch (PDOException $e) {

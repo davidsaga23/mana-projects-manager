@@ -340,7 +340,7 @@ if (column_exists($pdo, 'tickets', 'id')) {
 
 // Their Anima login, for the panel under Details. Production and admins only,
 // and never for a slot or a team, which are not anybody who could log in.
-$loginPanel = can_edit() && !$isSlot && (int)$person['is_team'] !== 1;
+$loginPanel = can_edit() && (!function_exists('feature_on') || feature_on('invite')) && !$isSlot && (int)$person['is_team'] !== 1;
 $login = null; $lastInvite = null; $onShow = true; $inviteLink = ''; $inviteCopied = false;
 if ($loginPanel && invites_available($pdo)) {
     $login = crew_login($pdo, $crewId);

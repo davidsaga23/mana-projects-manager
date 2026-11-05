@@ -18,8 +18,11 @@
 // session cookie was cleared by hand. So the checks it needs are done here,
 // explicitly, and they are the same two: logged in, and still active.
 //
-// Nothing here can raise a permission. Starting a preview only ever swaps in a
-// role BELOW admin (preview_role() whitelists editor and artist and re-checks
+// Nothing here can raise a permission. Since 2026-11-05 Production may preview
+// too (migration 077), and the same rule holds one step down: a role strictly
+// below the viewer's own, decided by preview_roles_allowed() in auth.php.
+//
+// Starting a preview only ever swaps in a role BELOW admin (preview_role() whitelists editor and artist and re-checks
 // the real role every time it is asked), and stopping one only puts back the
 // role the account already had.
 
@@ -63,11 +66,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // real_role(), not is_admin(): is_admin() reads the EFFECTIVE role, so an
         // admin already previewing as an artist would be refused permission to
         // switch to previewing as an editor.
-        if (real_role() !== 'admin') {
-            flash('err', 'Only an administrator can preview the app as another role.');
+        // Admins, and Production while "View as" is switched on for them
+        // (2026-11-05, migration 077); each only ever downward.
+        // preview_roles_allowed() reads the REAL role, for the same reason.
+        if (!preview_roles_allowed()) {
+            flash('err', 'Your account cannot view the app as somebody else.');
         } else {
             $want = (string)($_POST['role'] ?? '');
-            if (!in_array($want, ['editor', 'supervisor', 'artist'], true)) {
+            if (!in_array($want, preview_roles_allowed(), true)) {
                 flash('err', 'That is not a role you can preview.');
             } else {
                 // A role preview is generic, so it clears any person preview.
@@ -89,8 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // key is read: admin only, and only ever a lesser, active account. We
         // validate here as well so the admin gets a clear message rather than a
         // preview that silently refuses to take.
-        if (real_role() !== 'admin') {
-            flash('err', 'Only an administrator can view the app as someone else.');
+        if (!preview_roles_allowed()) {
+            flash('err', 'Your account cannot view the app as somebody else.');
         } else {
             $wantId = (int)($_POST['user_id'] ?? 0);
             $target = null;
@@ -107,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $role = $target ? (($target['role'] ?? '') === 'viewer' ? 'artist' : (string)$target['role']) : '';
             if (!$target || (int)($target['active'] ?? 0) !== 1
-                || !in_array($role, ['editor', 'supervisor', 'artist'], true)
+                || !in_array($role, preview_roles_allowed(), true)
                 || (int)$target['id'] === (int)$me['id']) {
                 // An admin, an inactive account, yourself, or an unknown id: none
                 // of these is a person you can borrow.
@@ -125,6 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $log->execute([(int)$me['id'], (int)$target['id'], date('Y-m-d H:i:s')]);
                 } catch (PDOException $e) {
                     // migration 056 pending — recorded nowhere, but the view still works.
+                }
+                // And in the access log on Users (migration 077), beside who
+                // changed whose access, so one place answers "who looked".
+                if (function_exists('access_log')) {
+                    access_log($pdo, 'view_as', null, (string)($target['display_name'] ?: $target['username']), (int)$target['id']);
                 }
                 flash('ok', 'Viewing as ' . ($target['display_name'] ?: $target['username'])
                           . '. Nothing will save until you leave the preview.');

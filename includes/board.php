@@ -1467,7 +1467,8 @@ function board_reviews_available(PDO $pdo): bool {
  * (David, 2026-10-22). Artists put work up; these people say what to change.
  */
 function board_is_reviewer(): bool {
-    return is_admin() || can_edit() || is_supervisor();
+    return is_admin()
+        || ((can_edit() || is_supervisor()) && (!function_exists('feature_on') || feature_on('reviews')));
 }
 
 /** Has migration 063 run? Until it has, the tab says so instead of failing. */

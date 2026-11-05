@@ -30,6 +30,9 @@ function review_norm(string $name): string {
  */
 function review_stage(): ?string {
     if (is_admin()) return 'final';
+    // "Reviews" switched off for this account (Users → Access, migration 077):
+    // no button, no queue, and review.php refuses the page.
+    if (function_exists('feature_on') && !feature_on('reviews')) return null;
     if (can_edit() || is_supervisor()) return 'supervisor';
     return null;
 }

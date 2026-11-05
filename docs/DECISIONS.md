@@ -4903,3 +4903,30 @@ Every reader that splits time by step takes the task's step or, failing that, th
 from Finance", with `entered_by` the admin; the 24-hour cap on a typed day does not apply to it.
 It adds to logged time and never replaces it. Shot-level figures do not see it.
 
+## 2026-11-05 — Access switches: role defaults plus per-person changes
+
+**Asked by David (2026-11-04):** "we should have a kind of feature toggle per user, like Reviews are
+active for supervisors and production, spell is not active for clients (we don't have those users
+yet) etc. ... I think the feature toggle should live in the users tab." On 2026-11-05 he chose the
+list, added Bookings (Admin, Production, Supervisors), Historic quotas, Users and Bugs (Admin,
+Production), Tour (everyone) and "View as should also be available for production", and said
+"let's build it".
+
+**Decided:** One switch per feature per role, editable on Users → Access by role; one person can be
+set On or Off against their role, with a reason. The feature list and starting answers live in code
+(`includes/features.php`, `FEATURES`); migration 077 stores only changes, plus `access_log`.
+`feature_on()` is the one question: the top bar, project tabs and buttons ask it, and
+`require_login()` asks it before a page opens or a save is taken, so hiding and closing cannot
+disagree again. Every project screen now checks the show is the account's own.
+
+**Rules that hold whatever a switch says:** admins keep everything (nobody can lock the studio
+out); money (Finance, Historic fees, rates) stays behind `can_see_money()`; Email and Migrations stay
+admin-only. Editing stays with the role that the screen was built for: a role the screen cannot
+serve is *locked* for that switch (e.g. Bookings: edit is Production-only), so a switch never offers
+a power that would draw broken. Production on Users changes Supervisor/Artist accounts only, can't
+give a role above Supervisor or a switch Production doesn't have, and leaves responsibilities to
+admins; otherwise Production could promote itself and reach money. View as for Production goes only
+downward, and `money_own_db()` refuses during any non-admin preview, so an artist's rate never shows
+through somebody else's eyes. Client is a column now and a role later: no login can hold it until
+client logins are tied to their own shows.
+

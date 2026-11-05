@@ -245,7 +245,8 @@ require __DIR__ . '/includes/header.php';
               // saying "no API key" is a button that teaches people to ignore
               // buttons; without a key this one simply is not there, and the
               // screen explains itself to anybody who reaches it by address. ?>
-        <?php if (function_exists('ai_configured') && ai_configured()): ?>
+        <?php if (function_exists('ai_configured') && ai_configured()
+                  && (!function_exists('feature_on') || feature_on('transcript'))): ?>
           <a class="button secondary" href="transcript.php?project=<?= $projectId ?>"
              title="Read a meeting transcript and turn the action items into cards">Tasks from transcript</a>
         <?php endif; ?>

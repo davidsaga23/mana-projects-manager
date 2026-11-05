@@ -18,7 +18,7 @@ $myTasksBadge = (isset($pdo) && $pdo instanceof PDO)
 // similar to the task button with a number of pending reviews"). Only for the
 // people who review: supervisors, Production and admins. See includes/review.php.
 require_once __DIR__ . '/review_badge.php';
-$reviewStage = review_stage();
+$reviewStage = review_stage();   // null while "Reviews" is switched off (migration 077)
 $reviewCount = ($reviewStage && isset($pdo) && $pdo instanceof PDO) ? review_count($pdo) : 0;
 
 // --- the bell (David, 2026-10-22), migration 060 -----------------------------
@@ -37,7 +37,10 @@ $reviewCount = ($reviewStage && isset($pdo) && $pdo instanceof PDO) ? review_cou
 // at the top of includes/notify.php. Chrome must not be able to take a page down.
 require_once __DIR__ . '/notify.php';
 $bell = ['on' => false, 'unseen' => 0, 'items' => []];
-if (isset($pdo) && $pdo instanceof PDO && notify_available($pdo)) {
+// fa(): is this switch on (migration 077)? True when features.php is not
+// loaded, so the bar draws as it always did rather than losing every link.
+$fa = fn(string $k): bool => !function_exists('feature_on') || feature_on($k);
+if (isset($pdo) && $pdo instanceof PDO && $fa('bell') && notify_available($pdo)) {
     $bellCrew = (int)(effective_crew_id($pdo) ?? 0);
     if ($bellCrew > 0) {
         $bell = [
@@ -55,7 +58,7 @@ if (isset($pdo) && $pdo instanceof PDO && is_admin() && bugs_available($pdo)) {
 }
 // The first-time tour (2026-10-30): null unless it runs on this page. See includes/tour.php.
 require_once __DIR__ . '/tour.php';
-$tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
+$tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null) : null;
 ?>
 <!doctype html>
 <html><head><meta charset="utf-8">
@@ -146,16 +149,23 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
             // invoice information. Only for a login linked to a person, because
             // that is whose Home it is; effective_crew_id() is cached and never
             // throws, so this costs the bar nothing. ?>
-      <?php if (isset($pdo) && $pdo instanceof PDO && (int)(effective_crew_id($pdo) ?? 0) > 0): ?>
+      <?php // Every link below is drawn only while its switch is on (Users →
+            // Access, migration 077), and the page itself refuses the same way,
+            // so the bar and the door cannot disagree. ?>
+      <?php if ($fa('home') && isset($pdo) && $pdo instanceof PDO && (int)(effective_crew_id($pdo) ?? 0) > 0): ?>
       <a href="home.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'home.php' ? ' is-on' : '' ?>">Home</a>
       <?php endif; ?>
+      <?php if ($fa('spell')): ?>
       <a href="spell.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'spell.php' ? ' is-on' : '' ?>">Spell</a>
+      <?php endif; ?>
       <?php // A button too, beside Spell (David, 2026-10-22): the two screens
             // people open first thing, so they are the two that stand out. ?>
+      <?php if ($fa('mytasks')): ?>
       <a href="mytasks.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'mytasks.php' ? ' is-on' : '' ?>">My tasks<?php if ($myTasksBadge['count'] > 0): ?><span
           class="mytasks-badge<?= $myTasksBadge['new'] ? ' is-new' : '' ?>"
           title="<?= $myTasksBadge['new']
               ? 'You have a new task' : 'Your active tasks' ?>"><?= (int)$myTasksBadge['count'] ?></span><?php endif; ?></a>
+      <?php endif; ?>
       <?php if ($reviewStage): ?>
       <a href="review.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'review.php' ? ' is-on' : '' ?>">Reviews<?php if ($reviewCount > 0): ?><span
           class="mytasks-badge is-new" title="Waiting for your review"><?= $reviewCount ?></span><?php endif; ?></a>
@@ -174,7 +184,7 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
             // had three ways to reach it and one of them was a word in a row of
             // four. Check the brand is still a link before adding a fourth item
             // back here. ?>
-      · <a href="alltasks.php">Studio Tasks</a>
+      <?php if ($fa('studio_tasks')): ?> · <a href="alltasks.php">Studio Tasks</a><?php endif; ?>
       <?php // ARTISTS is up here, not inside a project, because a freelancer is
             // not the property of the show that first spoke to them — the whole
             // value of writing them down is that the NEXT show can find them.
@@ -183,12 +193,12 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
             // A third link rather than a fourth: what is on my desk, the shows,
             // and the people. Everything about one show is still reached by
             // picking it from Projects. ?>
-      · <a href="artists.php">Artists</a>
+      <?php if ($fa('artists')): ?> · <a href="artists.php">Artists</a><?php endif; ?>
       <?php // BOOKINGS beside Artists (David, 2026-09-21): the same people, seen
             // across every show at once, who is needed where and when two shows
             // want the same person. Up here for the reason Artists is: it is
             // about no one show, so no show's tabs could hold it. ?>
-      · <a href="bookings.php">Bookings</a>
+      <?php if ($fa('bookings')): ?> · <a href="bookings.php">Bookings</a><?php endif; ?>
 
       <?php // THE RECORDS. David, 2026-09-01: "I'll need from time to time, to
             // check the records and see what we used to charge certain slots or
@@ -202,7 +212,7 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
             //
             // Fees are admin-only, like every other screen carrying a rate.
             // Quotas are not: days per item and headcount are production facts. ?>
-      · <a href="history_quotas.php">Historic quotas</a>
+      <?php if ($fa('quotas')): ?> · <a href="history_quotas.php">Historic quotas</a><?php endif; ?>
       <?php if (is_admin()): ?>
         · <a href="history_fees.php">Historic fees</a>
       <?php endif; ?>
@@ -218,21 +228,27 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
       // accounts, mail, the database.
       ?>
       <span class="nav-sep" aria-hidden="true">|</span>
-      <?php if (is_admin()): ?>
+      <?php // USERS for Production too (David, 2026-11-05), through its switch.
+            // Email and Migrations stay admin-only and are not switches. ?>
+      <?php if ($fa('users') && (is_admin() || can_edit())): ?>
         <a href="users.php">Users</a>
+      <?php endif; ?>
+      <?php if (is_admin()): ?>
         · <a href="smtp_test.php">Email</a>
         · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
              if ($pendingMigrations > 0): ?><span class="pending-badge"><?= $pendingMigrations ?></span><?php endif;
            ?></a>
       <?php endif; ?>
-      <?php // BUGS, for everyone: an admin reads every report here, anyone
-            // else the ones they filed. Filing one is the 🐞 button at the
-            // bottom right of every screen, not this link. ?>
-      <?php if (isset($pdo) && $pdo instanceof PDO && bugs_available($pdo)): ?>
+      <?php // BUGS: an admin reads every report here, anyone else the ones they
+            // filed. Admin and Production by default since 2026-11-05 (the
+            // "Bugs list" switch). Filing one is the 🐞 button at the bottom
+            // right of every screen, a switch of its own that stays on for
+            // everyone, not this link. ?>
+      <?php if ($fa('bugs_list') && isset($pdo) && $pdo instanceof PDO && bugs_available($pdo)): ?>
         · <a href="bugs.php">Bugs<?php if ($openBugs > 0): ?><span class="pending-badge"
              title="Open bug reports"><?= $openBugs ?></span><?php endif; ?></a>
       <?php endif; ?>
-      · <a href="<?= e(tour_link()) ?>" title="Show the guided tour again">Tour</a>
+      <?php if ($fa('tour')): ?>· <a href="<?= e(tour_link()) ?>" title="Show the guided tour again">Tour</a><?php endif; ?>
       · <a href="logout.php">Log out</a>
     </div>
   </div>
@@ -304,7 +320,7 @@ $tourBoot = tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : null);
       // defer, so it never blocks the page it is trying to make less annoying;
       // it needs nothing from the DOM until DOMContentLoaded anyway. ?>
 <script defer src="assets/keepplace.js<?= asset_ver('keepplace.js') ?>"></script>
-<?php if (isset($pdo) && $pdo instanceof PDO) render_bug_button($pdo); ?>
+<?php if ($fa('bug_report') && isset($pdo) && $pdo instanceof PDO) render_bug_button($pdo); ?>
 <?php if ($tourBoot): ?>
 <link rel="stylesheet" href="assets/tour.css<?= asset_ver('tour.css') ?>">
 <script defer src="assets/tour.js<?= asset_ver('tour.js') ?>" id="tourScript"<?= tour_attrs($pdo, $tourBoot) ?>></script>
