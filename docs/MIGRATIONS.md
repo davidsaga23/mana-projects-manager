@@ -132,6 +132,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 074 | user_tour_seen | ⏳ **The first-time tour has been shown** (`users.tour_seen_at`). Until it runs, the browser remembers it instead (once per browser). Optional afterwards: `UPDATE users SET tour_seen_at = NOW();` to spare existing users the tour. |
 | 075 | crew_profile | ⏳ **A person's own profile on Home** (`crew.phone`, `crew.bio`, `crew.photo_stored`, `crew.photo_mime`), written by the person on Home's General info tab. Until it runs, the tab shows name and email only. |
 | 076 | time_on_step | ⏳ **Days logged on a step with no task** (`time_logs.step_id`), typed by an admin in the Expense projection's Actual days cell. Until it runs, the cell is read-only and says so. |
+| 077 | feature_toggles | ⏳ **Access switches** (`role_features`, `user_features`, `access_log`): changing a switch on Users → Access by role or a person's own access, and the Access log. Until it runs, everybody gets the starting answers written in `includes/features.php` and the switches can't be changed. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

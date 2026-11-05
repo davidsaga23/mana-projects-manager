@@ -14,6 +14,28 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Access switches on Users: who can open what, per role and per person *(migration 077)*
+
+- **Users** has three tabs. **Access by role** is one switch per feature per role (Production,
+  Supervisor, Artist, and Client for when client logins exist). **People** gains an Access column;
+  click it to give one person their own On or Off for any feature, with a reason. **Access log**
+  records who changed whose role, account, switches or responsibilities, and every "view as".
+- **A switch that is off closes the screen, not just the link.** Typing its address shows "That
+  screen isn't open to your account". Before, an artist could open Dashboard, Schedule, Setup or
+  download Export by typing the address.
+- **Every project screen now checks the show is one of yours** (it was the Overview only), and the
+  project switcher lists only your shows. A card assigned to you still opens wherever it is.
+- **New answers from David:** Bookings for Admin, Production and Supervisors; Historic quotas and the
+  Bugs list for Admin and Production (the 🐞 button stays for everyone); Tour for everyone.
+- **Production can open Users and View as.** On Users they change Supervisor and Artist accounts
+  only and can't switch on anything Production doesn't have; responsibilities stay with admins. View
+  as goes only to roles below theirs and never shows money.
+- **Responsibilities** (Salaried, Signs off kick-offs, Changes a signed-off budget) are on the person
+  page too, admins only.
+- Admins keep everything; Finance, Historic fees, Email and Migrations are not switches.
+- **Needs migration 077** to *change* a switch. The starting answers apply from the moment this is
+  live, before the migration runs.
+
 ## 2026-11-05 — Expense projection: admins can log days in Actual days *(migration 076)*
 
 - Each position's **Actual days** cell has a **+ days** link: type a number of days and the day it

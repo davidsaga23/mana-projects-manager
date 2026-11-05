@@ -1283,6 +1283,16 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 - **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
   invoices it is for David to say.
 
+## Access switches — BUILT 2026-11-05 (migration 077)
+
+Users → Access by role / People / Access log; `includes/features.php`. What is left:
+- **Client logins.** The Client column exists; the role does not. It needs a way to tie a client to
+  their own shows (they are not crew, so `crew_projects` does not fit) before the role is offered.
+- **Edit switches for roles below Production** (e.g. Bookings: edit for a supervisor) are locked
+  until each screen draws its controls from the switch instead of `can_edit()`.
+- **Studio Tasks, Bookings and Artists are not limited to your own shows.** They are now switches
+  per role; scoping their contents is a separate decision.
+
 ## The "sell the app to customers" exploration (not part of the internal app)
 
 A separate, **planning-only** workstream (its chat thread since deleted) explored turning the
