@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Budget pool: "Used" tile renamed "Days worked"
+
+- Finance management → Budget pool, top strip: the tile that counts days from logged hours now
+  reads **Days worked** instead of "Used". Label only; the figure and everything else on the page
+  are unchanged (the Pace line, donut and per-step cards still say "used" until David decides).
+  No migration.
+
 ## 2026-11-05 — Access switches on Users: who can open what, per role and per person *(migration 077)*
 
 - **Users** has three tabs. **Access by role** is one switch per feature per role (Production,

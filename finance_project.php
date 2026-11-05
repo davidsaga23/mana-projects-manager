@@ -2724,7 +2724,7 @@ function invAddRows() {
     <?php else: ?>
       <span class="muted small">slots &times; each step's window</span>
     <?php endif; ?></div>
-  <div><span class="muted small">Used</span>
+  <div><span class="muted small">Days worked</span>
     <strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days</strong>
     <?php // ⚠ THE SOURCE IS ON THE FIGURE, not in a footnote. Two very
           // different numbers can sit here — what the plan says has been
