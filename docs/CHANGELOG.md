@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-05 — Days budget cards: going over budget is red, and the bar runs past it
+
+- On a **Days budget** step card that has worked more days than its budget, the big number and the
+  note (**"6 days over budget"**) are red, and the bar no longer stops at full: the budget part
+  keeps the step's colour, a line marks where the budget ends, and the overrun after it is red.
+- The pace colour (ahead / level / behind) is unchanged. Display only; no migration.
+
 ## 2026-11-05 — Days budget says "worked", not "used"
 
 - Everywhere on the **Days budget** tab, days from logged time are now **worked**: the Pace line
