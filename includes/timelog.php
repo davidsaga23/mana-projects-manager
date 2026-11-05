@@ -272,7 +272,7 @@ function time_logs_for_crew(PDO $pdo, int $crewId, ?int $projectId = null, int $
                    t.seq AS ticket_seq, t.title AS ticket_title, p.code AS project_code
               FROM time_logs tl
               LEFT JOIN progress pr ON pr.id = tl.progress_id
-              LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+              LEFT JOIN pipeline_steps ps ON ps.id = " . tl_step_expr($pdo) . "
               LEFT JOIN shots  s ON s.id = pr.shot_id
               LEFT JOIN assets a ON a.id = pr.asset_id
               LEFT JOIN tickets t ON t.id = tl.ticket_id
@@ -296,6 +296,74 @@ function logged_total_for_crew(PDO $pdo, int $crewId, ?int $projectId = null,
     $stmt = $pdo->prepare($sql);
     $stmt->execute($args);
     return (int)$stmt->fetchColumn();
+}
+
+/* --------------------------------------------------------------------------
+ * TIME ON A STEP, NO TASK (migration 076, David 2026-11-05: "make this column
+ * editable for admins so we can log their time manually if needed" — "On the
+ * step, no task"). Typed by an admin in the Actual days cell of the Expense
+ * projection. An entry with step_id set has no task and no card; every reader
+ * that splits time by step takes its step from tl_step_expr().
+ * ------------------------------------------------------------------------ */
+
+/** Has migration 076 run? */
+function time_logs_have_step(PDO $pdo): bool {
+    return column_exists($pdo, 'time_logs', 'step_id');
+}
+
+/**
+ * The step an entry belongs to, for a query that LEFT JOINs progress AS pr onto
+ * time_logs AS tl: the task's step, or the entry's own step (076).
+ */
+function tl_step_expr(PDO $pdo): string {
+    return time_logs_have_step($pdo) ? 'COALESCE(pr.step_id, tl.step_id)' : 'pr.step_id';
+}
+
+/**
+ * Log DAYS for a person on a step, with no task. Admin only (the caller checks).
+ * Stored in minutes at the show's hours per day, on one date, as ONE entry: the
+ * 24-hour cap in log_time() is for a day somebody typed, and this is a lump sum
+ * typed from Finance, labelled as such in its note.
+ */
+function log_step_days(PDO $pdo, int $projectId, int $crewId, int $stepId, string $daysRaw,
+                       string $day, float $hoursPerDay, int $userId): string {
+    if (!time_logs_available($pdo) || !time_logs_have_step($pdo)) {
+        throw new RuntimeException('Typing days on a step needs migration 076. Open migrate.php to run it; nothing was saved.');
+    }
+    if ($crewId <= 0 || $stepId <= 0) throw new RuntimeException('Days have to be logged against a person on a step.');
+    $clean = str_replace(',', '.', trim($daysRaw));
+    if ($clean === '' || !is_numeric($clean)) {
+        throw new RuntimeException('"' . $daysRaw . '" is not a number of days, nothing was logged.');
+    }
+    if ($hoursPerDay <= 0) throw new RuntimeException('This show has no hours per day set, so days cannot be turned into hours.');
+    $minutes = (int)round((float)$clean * $hoursPerDay * 60);
+    if ($minutes <= 0) throw new RuntimeException('That works out as zero, nothing was logged.');
+    if ($minutes > 366 * 24 * 60) throw new RuntimeException('That is more than a year of days, check the number.');
+    $day = trim($day) ?: date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) throw new RuntimeException('That date is not a real date, nothing was logged.');
+    if ($day > date('Y-m-d')) throw new RuntimeException('That day is in the future, time cannot be logged before it is worked.');
+
+    $pdo->prepare(
+        'INSERT INTO time_logs (project_id, progress_id, ticket_id, step_id, crew_id, log_date, minutes, notes, entered_by)
+         VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?)'
+    )->execute([$projectId, $stepId, $crewId, $day, $minutes, 'Entered from Finance (Actual days)', $userId ?: null]);
+    return 'Logged ' . fmt_num((float)$clean, 2) . ' days (' . fmt_hours($minutes) . ') on the step, dated '
+         . date('j M', strtotime($day)) . '.';
+}
+
+/** Step-level entries on one show, "crewId|stepId" => [rows], newest first. Empty before 076. */
+function step_day_entries(PDO $pdo, int $projectId): array {
+    if (!time_logs_available($pdo) || !time_logs_have_step($pdo)) return [];
+    $q = $pdo->prepare(
+        'SELECT tl.id, tl.crew_id, tl.step_id, tl.log_date, tl.minutes, u.display_name AS entered_name
+           FROM time_logs tl LEFT JOIN users u ON u.id = tl.entered_by
+          WHERE tl.project_id = ? AND tl.step_id IS NOT NULL
+          ORDER BY tl.log_date DESC, tl.id DESC'
+    );
+    $q->execute([$projectId]);
+    $out = [];
+    foreach ($q as $r) $out[(int)$r['crew_id'] . '|' . (int)$r['step_id']][] = $r;
+    return $out;
 }
 
 /** A readable label for what an entry was against. */

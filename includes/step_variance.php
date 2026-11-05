@@ -186,10 +186,11 @@ function sv_invoiced_by_position(int $projectId, float $hoursPerDay): array {
 function sv_last_log_by_step(PDO $pdo, int $projectId): array {
     if (!time_logs_available($pdo)) return [];
     try {
+        $sx = tl_step_expr($pdo);
         $q = $pdo->prepare(
-            'SELECT pr.step_id, MAX(tl.log_date) AS last_day
-               FROM time_logs tl JOIN progress pr ON pr.id = tl.progress_id
-              WHERE tl.project_id = ? GROUP BY pr.step_id'
+            "SELECT {$sx} AS step_id, MAX(tl.log_date) AS last_day
+               FROM time_logs tl LEFT JOIN progress pr ON pr.id = tl.progress_id
+              WHERE tl.project_id = ? AND {$sx} IS NOT NULL GROUP BY {$sx}"
         );
         $q->execute([$projectId]);
     } catch (PDOException $e) {

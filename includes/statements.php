@@ -181,7 +181,9 @@ function statement_approved_seconds_by_step(PDO $pdo, int $projectId, int $crewI
  */
 function statement_minutes_by_step(PDO $pdo, int $projectId, int $crewId, ?string $from, ?string $to): array {
     if (!time_logs_available($pdo)) return [];
-    $stepExpr = column_exists($pdo, 'tickets', 'step_id') ? 'COALESCE(pr.step_id, t.step_id, 0)' : 'COALESCE(pr.step_id, 0)';
+    // An entry on a step with no task (migration 076) counts for that step.
+    $own = time_logs_have_step($pdo) ? 'tl.step_id, ' : '';
+    $stepExpr = column_exists($pdo, 'tickets', 'step_id') ? "COALESCE(pr.step_id, {$own}t.step_id, 0)" : "COALESCE(pr.step_id, {$own}0)";
     $sql = "SELECT {$stepExpr} AS sid, SUM(tl.minutes) AS m
               FROM time_logs tl
               LEFT JOIN progress pr ON pr.id = tl.progress_id
