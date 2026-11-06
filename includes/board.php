@@ -1283,6 +1283,42 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
         ], (int)(effective_crew_id($pdo) ?? 0));
     }
 
+    // A REVIEW NOTE RINGS EVERYBODY ON THE TASK, not only whoever it names.
+    // David, 2026-11-06, asking whether an assignee hears about notes on a
+    // version somebody else put up: until now nobody heard unless @named, the
+    // assignee included. Now: the task's followers (notify_subscribers(): the
+    // assignee, second names, anybody who has spoken or been named on it) and
+    // whoever uploaded this version, minus the writer and minus anybody the
+    // note already named, who has just had their mention bell. Plain comments
+    // are unchanged: they ring only who they name.
+    if ($version !== null) {
+        $tell = array_flip(notify_subscribers($pdo, $progressId));
+        try {
+            $up = $pdo->prepare('SELECT u.crew_id FROM progress_versions v
+                                   JOIN users u ON u.id = v.uploaded_by
+                                  WHERE v.id = ? AND u.crew_id IS NOT NULL');
+            $up->execute([(int)$version]);
+            $uploader = (int)$up->fetchColumn();
+            if ($uploader > 0) $tell[$uploader] = true;
+        } catch (Throwable $e) {
+            error_log('[Anima bell] review uploader: ' . $e->getMessage());
+        }
+        foreach (array_keys($mentions) as $named) unset($tell[(int)$named]);
+        if ($tell) {
+            notify_add($pdo, array_keys($tell), [
+                'kind'        => 'review',
+                'actor'       => current_user_display(),
+                'summary'     => trim(trim((string)($ctx['step_name'] ?? '')) . ' on '
+                                    . trim((string)($ctx['item_name'] ?? '')), ' on '),
+                'project_id'  => $projectId,
+                'step_id'     => $stepId,
+                'item_key'    => $itemKey,
+                'progress_id' => $progressId,
+                'comment_id'  => $commentId,
+            ], (int)(effective_crew_id($pdo) ?? 0));
+        }
+    }
+
     $said = $version !== null ? 'Review posted.' : ($parent ? 'Reply posted.' : 'Comment posted.');
     if ($mentions && function_exists('notify_mentioned_task')) {
         // Naming somebody tells them, here as on a ticket — David settled that

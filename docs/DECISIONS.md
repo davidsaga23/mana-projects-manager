@@ -4945,6 +4945,19 @@ old and new amounts and the reason go only in the finance snapshot (money); the 
 just says it was a budget change. No migration. Older versions are never changed and stay
 readable. The per-step estimate baseline (Historic quotas) is not rewritten.
 
+## 2026-11-06 — A review note tells the whole task; any upload asks for review
+
+**Asked by David:** whether an assignee hears about notes on a version somebody else uploaded, then:
+*"yeah let's do that and also change the status to pending review whoever uploads a new version"*.
+
+**Decided:**
+- A review note (a comment on a version) rings `notify_subscribers()` plus the version's uploader,
+  minus the writer and minus anybody the note @names (they get the mention bell). Before, only
+  @named people heard, assignee included. Plain comments are unchanged.
+- `board_version_to_review()` no longer requires the uploader to be on the task (this replaces the
+  assignee-only rule of 2026-10-29). Never out of an approved status, as before.
+- New bell kind `review` (migration 079); until it runs those bells are written as `mention`.
+
 ## 2026-11-06 — Kick-off versions: re-plans and budget requests
 
 **Asked by David:** "Kick-offs have versions: v1, v2, v3. A new version is made when Jorik approves a

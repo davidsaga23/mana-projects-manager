@@ -41,13 +41,15 @@ function board_version_fail(string $why): void {
 }
 
 /**
- * AN ASSIGNEE'S NEW VERSION SENDS THE TASK TO PENDING REVIEW (David, 2026-10-29:
- * "when a new version is uploaded by the artist assign to that task, let's
- * automatically change the status to pending review").
+ * A NEW VERSION SENDS THE TASK TO PENDING REVIEW, WHOEVER PUT IT UP.
  *
- * Only when the uploader is named on the task (the primary assignee or a second
- * name in progress_crew), so a supervisor or producer putting a file up does
- * not move somebody else's work. The status is the show's own row called
+ * David, 2026-10-29: "when a new version is uploaded by the artist assign to
+ * that task, let's automatically change the status to pending review" - first
+ * built for the assignee only, so a producer's upload left the status alone.
+ * David, 2026-11-06, widened it: "change the status to pending review whoever
+ * uploads a new version". Production and admins put files up for artists too,
+ * and a version waiting in a status nobody reviews is a version nobody sees.
+ * The status is the show's own row called
  * "Pending review", matched by name as REVIEW_STAGES and the self-serve list
  * match it, because statuses are each show's data.
  *
@@ -62,23 +64,14 @@ function board_version_fail(string $why): void {
  */
 function board_version_to_review(PDO $pdo, int $projectId, array $step, string $itemKey,
                                  int $progressId, string $taskName): string {
+    // Who did it, only so their own bell stays quiet. An admin with no person
+    // linked is 0, which notify_add() reads as "tell everybody".
     $me = (int)(effective_crew_id($pdo) ?? 0);
-    if ($me <= 0 || $progressId <= 0) return '';
+    if ($progressId <= 0) return '';
     $q = $pdo->prepare('SELECT id, crew_id, status_id FROM progress WHERE id = ?');
     $q->execute([$progressId]);
     $row = $q->fetch();
     if (!$row) return '';
-    $mine = (int)$row['crew_id'] === $me;
-    if (!$mine) {
-        try {
-            $c = $pdo->prepare('SELECT 1 FROM progress_crew WHERE progress_id = ? AND crew_id = ?');
-            $c->execute([$progressId, $me]);
-            $mine = (bool)$c->fetchColumn();
-        } catch (PDOException $e) {
-            $mine = false;      // progress_crew is optional
-        }
-    }
-    if (!$mine) return '';
 
     $map = statuses_by_id($pdo, $projectId);
     $target = null;
@@ -293,7 +286,7 @@ if (isset($_POST['add_review'])) {
                 ? ($label . ' sent for review.')
                 : ($res['saved'] . ' versions sent for review, now at ' . $label . '.');
 
-            // The assignee's upload moves the task to Pending review (2026-10-29).
+            // Any upload moves the task to Pending review (2026-10-29, widened 2026-11-06).
             $moved = board_version_to_review($pdo, $projectId, $detail['step'], $itemKey, $pid,
                 trim((string)$detail['step']['name'] . ' on ' . (string)$detail['item']['name'], ' on'));
             if ($moved !== '') $said .= ' ' . $moved;
