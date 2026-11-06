@@ -164,15 +164,22 @@ foreach ($warnings as [$missing, $named, $button]):
         <a class="rq-media is-file" href="<?= $fileUrl ?>" target="_blank" rel="noopener"><?= $vName ?><?= $tags ?></a>
       <?php else: ?>
         <?php // David, 2026-11-06: "make these clickable to open that shot and task specifically
-              // in the side bar as the behavior in spell so we can quickly check if in fact there's
-              // no version". The same task panel "Open in Spell" opens, on its Versions tab. ?>
-        <a class="rq-media is-empty" href="<?= e($openPath) ?>" title="Open this task in Spell">No version uploaded yet</a>
+              // in the side bar as the behavior in spell", and then: open it HERE, "instead of
+              // staying in the review tab and only opening the side panel". Spell's own task
+              // panel, borrowed the way My tasks borrows it: the same button class and data
+              // attributes, opened by assets/board-screen.js on its Versions tab. ?>
+        <button type="button" class="rq-media is-empty board-open-task" data-tab="versions"
+                data-project="<?= $pid ?>" data-step="<?= (int)$t['step_id'] ?>"
+                data-item="<?= e((string)$t['item_key']) ?>" title="Open this task's panel">No version uploaded yet</button>
       <?php endif; ?>
 
       <div class="rq-info">
         <div class="rq-title">
           <span class="dot" style="background:<?= e($t['step_color'] ?: '#ccc') ?>"></span>
-          <a class="rq-task" href="<?= e($openPath) ?>" title="Open <?= e($t['item_name'] . ' · ' . $t['step_name']) ?> in Spell"><strong><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong></a>
+          <button type="button" class="rq-task board-open-task" data-tab="versions"
+                  data-project="<?= $pid ?>" data-step="<?= (int)$t['step_id'] ?>"
+                  data-item="<?= e((string)$t['item_key']) ?>"
+                  title="Open <?= e($t['item_name'] . ' · ' . $t['step_name']) ?>"><strong><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong></button>
           <span class="muted small rq-show" title="<?= e((string)$t['project_name']) ?>"><?= e($t['project_code']) ?></span>
         </div>
         <?php if (count($stages) > 1): ?>
@@ -216,39 +223,28 @@ foreach ($warnings as [$missing, $named, $button]):
 <?php // Where the clicked task's Versions pane is put for the viewer to read. ?>
 <div id="rqPane" hidden></div>
 
+<?php // SPELL'S TASK PANEL, borrowed as My tasks borrows it (David, 2026-11-06): the
+      // same markup spell.php draws, filled from board_task.php by board-screen.js, so
+      // versions, notes and comments work here exactly as they do in Spell. ?>
+<div class="board-panel-veil" id="boardVeil" hidden></div>
+<aside class="board-panel" id="boardPanel" role="dialog" aria-modal="true"
+       aria-label="Task details" hidden>
+  <button type="button" class="board-panel-close" id="boardPanelClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="board-panel-inner" id="boardPanelInner"></div>
+</aside>
 <?php // The @ picker in the viewer's box, the lightbox (tickets.js) for a picture
       // in somebody's note, the files going with a review, and the viewer. ?>
 <script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
 <script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<?php // Opens the panel, and handles Copy URL for the whole page. ?>
+<script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
 <script src="assets/review-files.js<?= asset_ver('review-files.js') ?>"></script>
 <script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
 <script>
-// Copy URL, the same as Spell's: a full address on the clipboard, with a
-// fallback for a studio on plain http where navigator.clipboard is refused.
-document.addEventListener('click', function (e) {
-  var btn = e.target.closest ? e.target.closest('.board-copy-url') : null;
-  if (!btn) return;
-  e.preventDefault();
-  var url = new URL(btn.getAttribute('data-copy') || '', window.location.href).href;
-  var done = function (ok) {
-    var was = btn.textContent;
-    btn.textContent = ok ? 'Copied' : 'Copy failed';
-    setTimeout(function () { btn.textContent = was; }, 1500);
-  };
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); });
-    return;
-  }
-  var box = document.createElement('textarea');
-  box.value = url;
-  box.style.cssText = 'position:fixed;top:-1000px;opacity:0';
-  document.body.appendChild(box);
-  box.select();
-  var ok = false;
-  try { ok = document.execCommand('copy'); } catch (err) {}
-  box.remove();
-  done(ok);
-});
 // A picture opens Spell's review viewer. The viewer is built from the task's
 // Versions pane, so that pane is fetched first (board_task.php?pane=versions,
 // the same checks as the task panel), and the card's own Approve and Retake
@@ -285,6 +281,20 @@ document.addEventListener('click', function (e) {
       if (spell) window.location.href = spell.href;
     });
 });
+// A status changed or a version put up in the panel moves the task on this
+// list (or off it), so the list is reloaded when the panel closes after
+// anything was saved in it. The same as My tasks.
+(function () {
+  var panel = document.getElementById('boardPanel');
+  if (!panel || !window.MutationObserver) return;
+  var touched = false;
+  ['change', 'submit'].forEach(function (ev) {
+    panel.addEventListener(ev, function () { touched = true; }, true);
+  });
+  new MutationObserver(function () {
+    if (panel.hidden && touched) location.reload();
+  }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+}());
 </script>
 
 </div>

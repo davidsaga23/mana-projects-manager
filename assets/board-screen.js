@@ -658,7 +658,9 @@
 
   document.addEventListener('click', function (e) {
     var open = e.target.closest ? e.target.closest('.board-open-task') : null;
-    if (open) { panelOpen(open); return; }
+    // data-tab: a page that borrows the panel may ask for a tab (Reviews opens
+    // on Versions, 2026-11-06). Spell's own rows carry none and open on Details.
+    if (open) { panelOpen(open, open.getAttribute('data-tab') || ''); return; }
     // The Notes column: straight to that version's review notes, shown.
     var notesBtn = e.target.closest ? e.target.closest('.board-notes-btn') : null;
     if (notesBtn) { panelOpen(notesBtn, 'versions', notesBtn.getAttribute('data-version')); return; }
