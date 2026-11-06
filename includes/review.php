@@ -37,8 +37,15 @@ require_once __DIR__ . '/review_badge.php';
 
 /** The show's status row called $name (already normalised), or null when it has none. */
 function review_status_named(PDO $pdo, int $projectId, string $name): ?array {
-    foreach (project_statuses($pdo, $projectId) as $s) {
-        if (review_norm((string)$s['name']) === $name) return $s;
+    // The default list has always called it "Completed" while the stages say
+    // "Complete" (David, 2026-11-06), so any spelling REQUIRED_STATUS_NAMES
+    // lists counts. An exact match still wins when a show has both.
+    $spellings = REQUIRED_STATUS_NAMES[$name] ?? [$name];
+    $statuses = project_statuses($pdo, $projectId);
+    foreach ($spellings as $want) {
+        foreach ($statuses as $s) {
+            if (review_norm((string)$s['name']) === $want) return $s;
+        }
     }
     return null;
 }
