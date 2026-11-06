@@ -718,6 +718,9 @@ unchanged. The postmortem's **Kick-off vs now** screen recomputes the same snaps
 the two. `kickoff.php`, `includes/kickoff.php`; DECISIONS 2026-10-16 says why. The text below is the
 6 October plan, kept for its reasoning.
 
+**2026-11-06: versions.** A change to the signed-off budget amount saves a new approved kick-off
+version; Kick-off vs now compares with the latest and lists the earlier ones (DECISIONS 2026-11-06).
+
 > *"A project should have a planning status until we get a sign off from the CEO and COO, once that
 > happens, everything from that project will have to be stored as a first entry. Things like overall
 > starting/end dates, pipeline steps, asset and shot count, head count, start/end dates per pipeline

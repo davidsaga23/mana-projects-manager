@@ -263,7 +263,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (isset($_POST['save_budget'])) {
             // Fixed once the kick-off is signed off (David, 2026-10-28); see
             // includes/budget_lock.php for who may still change it, and how.
-            flash('ok', save_project_budget($projectId, $project, $_POST, $who, budget_lock($pdo, $projectId)));
+            $lockBefore = budget_lock($pdo, $projectId);
+            flash('ok', save_project_budget($projectId, $project, $_POST, $who, $lockBefore));
+            // A NEW KICK-OFF VERSION when a signed-off amount moved (David,
+            // 2026-11-06); see kickoff_budget_version(). Separate from the save
+            // on purpose: the budget and its history are already committed, and
+            // a failure here must say so rather than undo a change Jorik made.
+            if ($lockBefore !== null) {
+                require_once __DIR__ . '/includes/kickoff.php';
+                try {
+                    if ($v = kickoff_budget_version($pdo, $project, (int)$lockBefore['kickoff_id'])) flash('ok', $v);
+                } catch (Throwable $e) {
+                    flash('warn', 'The budget change is saved and recorded, but it could not be saved as a new '
+                        . 'kick-off version, so Kick-off vs now still compares with the previous one: ' . $e->getMessage());
+                }
+            }
         } elseif (isset($_POST['save_departments'])) {
             // Writes pipeline_steps.department on the ORDINARY production
             // connection. It is a production fact, not a financial one — see

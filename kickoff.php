@@ -18,6 +18,8 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/kickoff.php';
 require_once __DIR__ . '/includes/budget_lock.php';
+// fmt_money_plain(), for the old and new amount of a budget version.
+require_once __DIR__ . '/includes/finance.php';
 // Reached from the Finance tabs as well as the production side since
 // 2026-10-23, and it draws whichever bar it was reached from. ⚠ REQUIRED, NOT
 // LEFT TO function_exists(): without this the finance branch below would fail
@@ -147,11 +149,15 @@ require __DIR__ . '/includes/header.php';
   <?php exit; ?>
 <?php endif; ?>
 
+<?php // Carried on every link inside the page, so moving between its views from
+      // the Finance tab keeps the Finance bar instead of dropping back to the
+      // production one. ?>
+<?php $sec = (($_GET['section'] ?? '') === 'finance' && is_admin()) ? '&section=finance' : ''; ?>
 <div class="kickoff-tabs">
-  <a class="button<?= $view === '' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl) ?>">Sign-off</a>
-  <a class="button<?= $view === 'compare' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl) ?>&amp;view=compare">Kick-off vs now</a>
+  <a class="button<?= $view === '' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl . $sec) ?>">Sign-off</a>
+  <a class="button<?= $view === 'compare' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl . $sec) ?>&amp;view=compare">Kick-off vs now</a>
   <?php if (is_admin()): ?>
-    <a class="button<?= $view === 'people' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl) ?>&amp;view=people">Who signs off</a>
+    <a class="button<?= $view === 'people' ? ' is-current' : ' secondary' ?>" href="<?= e($selfUrl . $sec) ?>&amp;view=people">Who signs off</a>
   <?php endif; ?>
 </div>
 
@@ -210,7 +216,13 @@ if ($view === 'people'):
 // KICK-OFF VS NOW
 // ===========================================================================
 elseif ($view === 'compare'):
-    $kick = kickoff_approved($pdo, $projectId);
+    // THE LATEST VERSION unless an older one is picked (David, 2026-11-06:
+    // "'Kick-off vs now' always compares with the latest one he approved").
+    // See kickoff_versions() in includes/kickoff.php.
+    $versions = kickoff_versions($pdo, $projectId);
+    $kick = $versions ? end($versions) : null;
+    $pick = (int)($_GET['version'] ?? 0);
+    foreach ($versions as $v) if ((int)$v['id'] === $pick) $kick = $v;
     if (!$kick): ?>
   <div class="empty-state">
     <p><strong>This project has no signed-off kick-off to compare with.</strong></p>
@@ -224,11 +236,38 @@ elseif ($view === 'compare'):
     $finWas = kickoff_finance_load((int)$kick['id']);
     $finNow = can_see_money() ? kickoff_finance_snapshot($pdo, $project) : null;
     $signs  = kickoff_signoffs($pdo, (int)$kick['id']); ?>
-  <p class="lead">How <?= e($project['name']) ?> was set up when it was signed off, against how it stands
-    today. Only what moved is listed first; whatever is unchanged is folded underneath.</p>
+  <?php $latest = (int)$kick['id'] === (int)end($versions)['id'];
+        $finV = is_array($finWas['version'] ?? null) ? $finWas['version'] : null; ?>
+  <p class="lead">How <?= e($project['name']) ?> stood in kick-off version <?= (int)$kick['n'] ?><?= $latest ? ', the latest one approved,' : '' ?>
+    against how it stands today. Only what moved is listed first; whatever is unchanged is folded underneath.</p>
+  <?php if (count($versions) > 1): ?>
+    <?php // Every approved version, oldest first: the original sign-off, then
+          // one per change to the signed-off budget. ?>
+    <ol class="kickoff-versions">
+      <?php foreach ($versions as $v): $isPick = (int)$v['id'] === (int)$kick['id']; ?>
+        <li<?= $isPick ? ' class="is-current"' : '' ?>>
+          <?php $label = 'Version ' . (int)$v['n'] . ', ' . date('j M Y', strtotime((string)$v['decided_at'])) . ': '
+                       . ($v['kind'] === 'budget_change'
+                           ? 'budget changed by ' . (string)$v['requested_by_name']
+                           : 'signed off'); ?>
+          <?php if ($isPick): ?><strong><?= e($label) ?></strong>
+          <?php else: ?><a href="<?= e($selfUrl . $sec . '&view=compare&version=' . (int)$v['id']) ?>"><?= e($label) ?></a><?php endif; ?>
+        </li>
+      <?php endforeach; ?>
+    </ol>
+  <?php endif; ?>
+  <?php if ($kick['kind'] === 'budget_change'): ?>
+    <p class="muted small">Saved <?= e(date('j M Y', strtotime((string)$kick['decided_at']))) ?> when
+      <?= e((string)$kick['requested_by_name']) ?> changed the signed-off budget<?php
+      if ($finV): ?> from <?= e($finV['old_amount'] === null ? 'none' : fmt_money_plain((float)$finV['old_amount'], (string)$finV['old_currency'])) ?>
+      to <?= e($finV['new_amount'] === null ? 'none' : fmt_money_plain((float)$finV['new_amount'], (string)$finV['new_currency'])) ?>:
+      “<?= e((string)$finV['reason']) ?>”<?php endif; ?>.
+      Everything on the show was saved again at that moment.</p>
+  <?php else: ?>
   <p class="muted small">Signed off <?= e(date('j M Y', strtotime((string)$kick['decided_at']))) ?> by
     <?= e(implode(' and ', array_map(fn($s) => $s['signer_name'], $signs))) ?>, as sent by
     <?= e((string)$kick['requested_by_name']) ?> on <?= e(date('j M Y', strtotime((string)$kick['requested_at']))) ?>.</p>
+  <?php endif; ?>
   <?php foreach (KICKOFF_SECTIONS as $key => $title):
       if ($key === 'finance'):
           if (!can_see_money()) continue;
@@ -325,9 +364,16 @@ else:
         'approved'          => 'Signed off',
         'changes_requested' => 'Changes asked for',
     ][$kick['state']] ?? $kick['state']; ?>
+    <?php $kickKind = (string)((json_decode((string)$kick['snapshot'], true) ?: [])['version']['kind'] ?? ''); ?>
     <p class="kickoff-state kickoff-state-<?= e($kick['state']) ?>"><strong><?= e($stateText) ?></strong>
-      <span class="muted">· sent by <?= e((string)$kick['requested_by_name']) ?>,
+      <span class="muted">· <?= $kickKind === 'budget_change' ? 'new version saved when the budget was changed by' : 'sent by' ?>
+        <?= e((string)$kick['requested_by_name']) ?>,
         <?= e(date('j M Y, H:i', strtotime((string)$kick['requested_at']))) ?></span></p>
+    <?php if ($kickKind === 'budget_change'): ?>
+      <p class="muted small">Each change to a signed-off budget saves the show as a new kick-off version, and
+        <a href="<?= e($selfUrl . $sec) ?>&amp;view=compare">Kick-off vs now</a> compares with the latest one.
+        Earlier versions, the original sign-off among them, are listed there.</p>
+    <?php endif; ?>
     <?php if ($kick['state'] === 'pending'): ?>
       <div class="flash flash-warn">The project is frozen until this is answered: its setup screens refuse
         every save. Asking for changes, or withdrawing, unfreezes it.</div>
@@ -414,7 +460,7 @@ else:
 
 
     <?php if ($kick['state'] === 'approved'): ?>
-      <p><a class="button" href="<?= e($selfUrl) ?>&amp;view=compare">Compare the kick-off with now →</a></p>
+      <p><a class="button" href="<?= e($selfUrl . $sec) ?>&amp;view=compare">Compare the kick-off with now →</a></p>
     <?php endif; ?>
 
     <h3>What was frozen</h3>

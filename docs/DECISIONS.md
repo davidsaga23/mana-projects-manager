@@ -4930,3 +4930,17 @@ downward, and `money_own_db()` refuses during any non-admin preview, so an artis
 through somebody else's eyes. Client is a column now and a role later: no login can hold it until
 client logins are tied to their own shows.
 
+## 2026-11-06 — A budget change after sign-off is a new kick-off version
+
+**Asked by David:** "Every project has a kick-off approved by Jorik. When Jorik approves more budget,
+a new kick-off version is saved, and 'Kick-off vs now' always compares with the latest one he
+approved." Asked whether the Overview's per-step plan should follow too: "Yes, latest version".
+
+**Decided:** a version is an ordinary approved `project_kickoffs` row (plus its
+`kickoff_finance_snapshots` row) written by `kickoff_budget_version()` straight after a signed-off
+budget save whose amount or currency moved. Every reader already takes the newest approved row, so
+nothing else had to change. The whole show is snapshotted again, not only the budget, so "vs now"
+means "since Jorik last approved it". The approver is recorded as the sign-off on that version. The
+old and new amounts and the reason go only in the finance snapshot (money); the production snapshot
+just says it was a budget change. No migration. Older versions are never changed and stay
+readable. The per-step estimate baseline (Historic quotas) is not rewritten.
