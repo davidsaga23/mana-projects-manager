@@ -106,7 +106,10 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review'], true)) return 0;
+    // 'review' arrives with migration 079 (the column is an ENUM). Until then a
+    // review note still rings, as a mention: late wording beats a silent bell.
+    if ($kind === 'review' && !notify_kind_review_ready($pdo)) $kind = 'mention';
 
     try {
         $ins = $pdo->prepare(
@@ -135,6 +138,19 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
         error_log('[Anima bell] write: ' . $e->getMessage());
         return 0;
     }
+}
+
+/** Has migration 079 added 'review' to notifications.kind? Asked once per request. */
+function notify_kind_review_ready(PDO $pdo): bool {
+    static $ready = null;
+    if ($ready !== null) return $ready;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM notifications LIKE 'kind'")->fetch();
+        $ready = $col && strpos((string)$col['Type'], "'review'") !== false;
+    } catch (Throwable $e) {
+        $ready = false;
+    }
+    return $ready;
 }
 
 /** How many are unread. 0 whenever anything is missing, so the chrome is safe. */
@@ -210,6 +226,7 @@ function notify_verb(string $kind): string {
         'mention'  => 'mentioned you on',
         'assigned' => 'assigned you',
         'status'   => 'moved',
+        'review'   => 'left review notes on',
     ];
     return $words[$kind] ?? 'changed';
 }
