@@ -744,7 +744,11 @@ function kickoff_frozen(): ?string {
     }
     if ($pid <= 0) return null;
     try {
-        $q = $pdo->prepare("SELECT 1 FROM project_kickoffs WHERE project_id = ? AND state = 'pending' LIMIT 1");
+        // A RE-PLAN waiting for sign-off does not freeze (David, 2026-11-06:
+        // "Stays active, not frozen"). Its snapshot begins with this marker;
+        // see kickoff_request() in includes/kickoff.php.
+        $q = $pdo->prepare("SELECT 1 FROM project_kickoffs WHERE project_id = ? AND state = 'pending'
+                               AND snapshot NOT LIKE '{\"version\":{\"kind\":\"replan\"%' LIMIT 1");
         $q->execute([$pid]);
         if (!$q->fetchColumn()) return null;
     } catch (PDOException $e) {
