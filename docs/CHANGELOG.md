@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Review notes ring the whole task; any upload goes to Pending review *(migration 079)*
+
+- A review note on a version now rings everybody on the task (the assignee, second names, anybody who
+  has commented or been named on it) and whoever uploaded that version, not only the people it
+  @names. The bell reads "left review notes on" once migration 079 has run; before that it reads as a
+  mention. Plain comments still ring only who they name.
+- Uploading a new version moves the task to Pending review whoever uploads it (Production and admins
+  too), not only the assignee. An approved task is still left alone.
+
 ## 2026-11-06 — Kick-off: no client revenue *(no migration)*
 
 - "Revenue (billed to the client)" is no longer saved in a kick-off's money snapshot, and is no longer

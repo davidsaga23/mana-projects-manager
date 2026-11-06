@@ -4150,6 +4150,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bell-mention  { background: var(--primary); }
 .bell-assigned { background: var(--warn); }
 .bell-status   { background: var(--ok); }
+.bell-review   { background: var(--warn, #F5B041); }
 
 .bell-what { line-height: 1.45; }
 .bell-when { white-space: nowrap; font-size: 11px; padding-top: 1px; }
