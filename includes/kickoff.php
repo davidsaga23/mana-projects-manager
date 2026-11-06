@@ -577,6 +577,132 @@ function kickoff_finance_load(int $kickoffId): ?array {
 }
 
 // ---------------------------------------------------------------------------
+// KICK-OFF VERSIONS
+//
+// David, 2026-11-06: "Every project has a kick-off approved by Jorik. When
+// Jorik approves more budget, a new kick-off version is saved, and 'Kick-off vs
+// now' always compares with the latest one he approved."
+//
+// So a project can have SEVERAL approved kick-offs. The first is the sign-off
+// (Tim and Jorik, setup to active); each later one is written when somebody
+// ticked "Changes budget" (Jorik) changes the signed-off budget amount. Every
+// reader that asks for "the kick-off" (kickoff_approved(): Kick-off vs now, the
+// budget lock, the per-step plan on the Overview) already takes the NEWEST
+// approved row, so a new row is all it takes to move the baseline. Older ones
+// are never touched, and stay readable on Kick-off vs now.
+//
+// NO MIGRATION: a budget version is an ordinary approved project_kickoffs row
+// plus its kickoff_finance_snapshots row. What tells it apart is a 'version'
+// key inside the two snapshots. The production one says only that it was a
+// budget change; the amounts and the reason go in the finance one, because
+// they are money and an editor can read the production snapshot.
+//
+// The whole show is snapshotted again, not just the budget: "vs now" has to
+// mean "since Jorik last approved it", and comparing a new budget with a
+// months-old schedule would mix the two moments.
+// ---------------------------------------------------------------------------
+
+/**
+ * Every approved kick-off of a project, oldest first, each with its version
+ * number ('n') and 'kind': 'signoff' for the original, 'budget_change' after.
+ */
+function kickoff_versions(PDO $pdo, int $projectId): array {
+    try {
+        $q = $pdo->prepare(
+            "SELECT * FROM project_kickoffs WHERE project_id = ? AND state = 'approved' ORDER BY id"
+        );
+        $q->execute([$projectId]);
+        $rows = $q->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+    $n = 0;
+    foreach ($rows as &$r) {
+        $snap = json_decode((string)$r['snapshot'], true);
+        $r['n'] = ++$n;
+        $r['kind'] = (string)($snap['version']['kind'] ?? 'signoff');
+    }
+    unset($r);
+    return $rows;
+}
+
+/**
+ * After a signed-off budget was changed, save the show as a new approved
+ * kick-off version. Called by finance_project.php straight after
+ * save_project_budget() succeeded, with the kick-off that locked the budget
+ * before the change.
+ *
+ * Only when the AMOUNT (or its currency) moved: a change to the terms or notes
+ * alone is recorded in the budget history as before, but it is not a new
+ * approved budget.
+ *
+ * @return string|null the sentence for the screen, or null when no version was due
+ */
+function kickoff_budget_version(PDO $pdo, array $project, int $previousKickoffId): ?string {
+    if (!kickoff_ready($pdo) || !can_see_money() || !finance_db()) return null;
+    require_once __DIR__ . '/finance.php';
+    $pid = (int)$project['id'];
+
+    // The change save_project_budget() has just written, newest first. Checked
+    // against the kick-off it was made under, so a double submit or a stale
+    // read cannot write the same version twice.
+    $c = project_budget_changes($pid)[0] ?? null;
+    if (!$c || (int)($c['kickoff_id'] ?? 0) !== $previousKickoffId) return null;
+    $amountMoved = (string)($c['old_amount'] ?? '') !== (string)($c['new_amount'] ?? '')
+                || (string)($c['old_currency'] ?? '') !== (string)($c['new_currency'] ?? '');
+    if (!$amountMoved) return null;
+
+    $snap = kickoff_snapshot($pdo, $project);
+    $snap['version'] = ['kind' => 'budget_change', 'previous' => $previousKickoffId];
+    $fin  = kickoff_finance_snapshot($pdo, $project);
+    if ($fin !== null && !empty($fin['configured'])) {
+        $fin['version'] = [
+            'kind'         => 'budget_change',
+            'change_id'    => (int)$c['id'],
+            'reason'       => (string)$c['reason'],
+            'old_amount'   => $c['old_amount'] !== null ? (float)$c['old_amount'] : null,
+            'new_amount'   => $c['new_amount'] !== null ? (float)$c['new_amount'] : null,
+            'old_currency' => (string)($c['old_currency'] ?: 'USD'),
+            'new_currency' => (string)($c['new_currency'] ?: 'USD'),
+        ];
+    }
+    $user = current_user();
+    $who  = mb_substr(current_user_display(), 0, 100);
+    $now  = date('Y-m-d H:i:s');
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('INSERT INTO project_kickoffs (project_id, state, requested_by, requested_by_name,
+                              requested_at, decided_at, snapshot)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$pid, 'approved', $user['id'] ?? null, $who, $now, $now,
+                       json_encode($snap, JSON_UNESCAPED_UNICODE)]);
+        $kid = (int)$pdo->lastInsertId();
+        // The person who changed it is the one who approved it: recorded as a
+        // sign-off so "signed off by" reads the same on every version. No
+        // reason here; it is money talk, and it is in the finance snapshot.
+        $pdo->prepare('INSERT INTO project_kickoff_signoffs (kickoff_id, user_id, signer_name, decision, note,
+                              decided_at, email_result)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$kid, $user['id'] ?? null, $who, 'approved', 'Approved a change to the budget.',
+                       $now, 'not emailed: saved by a budget change']);
+        if ($fin !== null && !empty($fin['configured'])) {
+            finance_db()->prepare(
+                'INSERT INTO kickoff_finance_snapshots (kickoff_id, project_id, project_code, snapshot, captured_at, captured_by)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            )->execute([$kid, $pid, $project['code'], json_encode($fin, JSON_UNESCAPED_UNICODE), $now, $who]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+
+    $n = count(kickoff_versions($pdo, $pid));
+    return 'Saved as kick-off version ' . $n . ': Kick-off vs now compares with this approved budget from now on.';
+}
+
+// ---------------------------------------------------------------------------
 // THE FLOW
 // ---------------------------------------------------------------------------
 

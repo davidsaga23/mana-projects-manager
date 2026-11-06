@@ -340,6 +340,9 @@ button.danger:hover { background: var(--danger-strong); }
    figure or row is tinted, so a long comparison is read by colour first. */
 .kickoff-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
 .kickoff-tabs .button.is-current { pointer-events: none; }
+/* Kick-off versions (2026-11-06): the original sign-off, then one per budget change. */
+.kickoff-versions { margin: 0 0 12px; padding-left: 1.4em; }
+.kickoff-versions li { margin: 2px 0; }
 .kickoff-warning p { margin: 0 0 8px; }
 .kickoff-signers { margin: 8px 0 12px; }
 .kickoff-dialog { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
