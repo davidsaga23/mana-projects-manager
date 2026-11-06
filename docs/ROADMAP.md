@@ -720,6 +720,8 @@ the two. `kickoff.php`, `includes/kickoff.php`; DECISIONS 2026-10-16 says why. T
 
 **2026-11-06: versions.** A change to the signed-off budget amount saves a new approved kick-off
 version; Kick-off vs now compares with the latest and lists the earlier ones (DECISIONS 2026-11-06).
+Later the same day: a re-plan sent for sign-off again (not frozen) and an approved budget request each
+make the next version, and a dropdown compares the original with any later version.
 
 > *"A project should have a planning status until we get a sign off from the CEO and COO, once that
 > happens, everything from that project will have to be stored as a first entry. Things like overall
