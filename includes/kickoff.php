@@ -526,7 +526,12 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
         'configured' => true,
         'currency'   => $cur,
         'figures' => [
-            'Revenue (billed to the client)' => [isset($budget['revenue_amount']) ? (float)$budget['revenue_amount'] : null, 'money'],
+            // ⚠ NO REVENUE (David, 2026-11-06: "Remove 'Revenue (billed to
+            // the client)' from the kick-off snapshot, Kick-off vs now, and
+            // anywhere else"). Anima tracks budget against cost, never profit;
+            // the Overview dropped revenue on 2026-10-12, and this was the last
+            // place still writing it. Older snapshots that hold it have it
+            // stripped as they are read, in kickoff_finance_load().
             'Approved production budget'     => [isset($budget['budget_amount']) ? (float)$budget['budget_amount'] : null, 'money'],
             'Projected labour cost'          => [(float)$proj['total'], 'money'],
             'Other expenses'                 => [(float)$proj['other_total'], 'money'],
@@ -573,7 +578,14 @@ function kickoff_finance_load(int $kickoffId): ?array {
     } catch (PDOException $e) {
         return null;
     }
-    return $raw ? (json_decode((string)$raw, true) ?: null) : null;
+    $snap = $raw ? (json_decode((string)$raw, true) ?: null) : null;
+    // Snapshots taken before 2026-11-06 still hold the client revenue figure.
+    // Dropped on the way out rather than rewritten in the database: the stored
+    // record stays as it was taken, and no screen shows the figure.
+    if (is_array($snap) && isset($snap['figures']) && is_array($snap['figures'])) {
+        unset($snap['figures']['Revenue (billed to the client)']);
+    }
+    return $snap;
 }
 
 // ---------------------------------------------------------------------------
