@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Kick-off: no client revenue *(no migration)*
+
+- "Revenue (billed to the client)" is no longer saved in a kick-off's money snapshot, and is no longer
+  shown on Kick-off vs now or the Sign-off page for older kick-offs that still hold it (dropped as
+  they are read; the stored records are not rewritten). Anima tracks budget against cost, never
+  profit; this was the last place the figure appeared.
+
 ## 2026-11-06 — Kick-off versions: a budget change saves a new approved kick-off *(no migration)*
 
 - When someone ticked "Changes budget" (Jorik) changes the amount of a signed-off budget, the whole
