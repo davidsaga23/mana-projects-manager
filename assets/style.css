@@ -2212,6 +2212,21 @@ body.lightbox-lock { overflow: hidden; }
 .row-btn-go { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .row-btn-go:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary); }
 
+/* The Projects list reads 20% bigger than the rest of the app (David,
+   2026-11-06: "make all the text 20% bigger"). Every size here is the general
+   rule's size × 1.2, scoped to .project-list so no other table moves. Spelled
+   out per element rather than `zoom`, which would also scale the padding and
+   the row height. The capsule's min-width grows with its digits so the buttons
+   after it still start at the same x on every row. */
+.project-list td { font-size: 18px; }
+.project-list th { font-size: 13.8px; }
+.project-list .status,
+.project-list .status-select { font-size: 14.4px; }
+.project-list .small,
+.project-list .row-btn,
+.project-list .pct-cap { font-size: 15.6px; }
+.project-list .pct-cap { min-width: 65px; }
+
 /* Rename and delete live behind a disclosure, and CLOSED it is just the third
    button on the line (David, 2026-09-02).
    white-space returns to normal because .row-actions is nowrap for every other
