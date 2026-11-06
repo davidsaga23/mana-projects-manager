@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Reviews: the task panel opens on the Reviews page *(no migration)*
+
+- A card's task name and its "No version uploaded yet" box now open Spell's task side panel right on
+  Reviews, on its Versions tab, instead of switching to Spell. It is the same panel My tasks borrows.
+  Closing it after a change reloads the list. "Open in Spell" still goes to Spell.
+
 ## 2026-11-06 — Reviews: a card's task name opens it in Spell *(no migration)*
 
 - The shot · step title on each Reviews card, and the "No version uploaded yet" box, now open that
