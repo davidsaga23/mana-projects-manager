@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Projects list: text 20% bigger *(no migration)*
+
+- Every piece of text on the Projects list (headings, names, figures, status pills, the progress
+  capsule and the Open / Finance / Edit buttons) is 20% bigger. Only that table changes; the rest of
+  the app keeps its sizes.
+
 ## 2026-11-06 — Review notes ring the whole task; any upload goes to Pending review *(migration 079)*
 
 - A review note on a version now rings everybody on the task (the assignee, second names, anybody who
