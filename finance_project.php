@@ -278,6 +278,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         . 'kick-off version, so Kick-off vs now still compares with the previous one: ' . $e->getMessage());
                 }
             }
+        } elseif (isset($_POST['budget_request'])) {
+            // BUDGET REQUESTS (David, 2026-11-06): ask, approve, decline or
+            // withdraw. The work is in includes/budget_requests.php.
+            require_once __DIR__ . '/includes/budget_requests.php';
+            $act = (string)$_POST['budget_request'];
+            $rid = (int)($_POST['request_id'] ?? 0);
+            if ($act === 'ask') {
+                $said = budget_request_create($pdo, $project, $_POST, budget_lock($pdo, $projectId));
+            } elseif ($act === 'approved' || $act === 'declined') {
+                $said = budget_request_decide($pdo, $project, $rid, $act, (string)($_POST['decision_note'] ?? ''),
+                                              budget_lock($pdo, $projectId), $who);
+            } elseif ($act === 'withdraw') {
+                budget_request_withdraw($projectId, $rid);
+                $said = ['Budget request withdrawn.'];
+            } else {
+                throw new RuntimeException('That is not something this form does.');
+            }
+            foreach ($said as $m) flash('ok', $m);
         } elseif (isset($_POST['save_departments'])) {
             // Writes pipeline_steps.department on the ORDINARY production
             // connection. It is a production fact, not a financial one — see
@@ -1206,6 +1224,13 @@ if ($budgetLock !== null): ?>
   <p class="muted small">Last changed <?= e(substr((string)$budget['updated_at'], 0, 16)) ?><?php
     if (!empty($budget['updated_by'])): ?> by <?= e($budget['updated_by']) ?><?php endif; ?>.</p>
 <?php endif; ?>
+<?php // BUDGET REQUESTS (David, 2026-11-06): ask Jorik for a change, and his
+      // answer. Drawn by includes/budget_requests.php; only on a signed-off
+      // budget, since before sign-off it is changed directly. ?>
+<?php if ($budgetLock !== null && $configured):
+    require_once __DIR__ . '/includes/budget_requests.php';
+    budget_requests_render($projectId, $budgetLock, $cur);
+endif; ?>
 <?php // THE HISTORY, under the box it is the history of: every change made
       // after sign-off, newest first, from finance_install_10.sql. ?>
 <?php if ($budgetChanges): ?>
