@@ -4636,6 +4636,11 @@ button.rq-media:hover img, button.rq-media:hover video { opacity: .85; }
 .rq-info { padding: 10px 12px 0; min-width: 0; }
 .rq-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .rq-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The task name opens it in Spell; it reads as the title, not as a blue link. */
+.rq-title .rq-task { color: inherit; min-width: 0; overflow: hidden; }
+.rq-title .rq-task:hover { color: var(--primary); text-decoration: none; }
+a.rq-media.is-empty { color: var(--muted); }
+a.rq-media.is-empty:hover { color: var(--text); text-decoration: none; background: var(--surface-3); }
 .rq-title .rq-show { margin-left: auto; flex-shrink: 0; }
 .rq-meta { margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Which stage a card is in, when admins see both (2026-10-29). */

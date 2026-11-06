@@ -163,13 +163,16 @@ foreach ($warnings as [$missing, $named, $button]):
         <?php // A PDF or anything else the viewer cannot show: the file itself. ?>
         <a class="rq-media is-file" href="<?= $fileUrl ?>" target="_blank" rel="noopener"><?= $vName ?><?= $tags ?></a>
       <?php else: ?>
-        <div class="rq-media is-empty">No version uploaded yet</div>
+        <?php // David, 2026-11-06: "make these clickable to open that shot and task specifically
+              // in the side bar as the behavior in spell so we can quickly check if in fact there's
+              // no version". The same task panel "Open in Spell" opens, on its Versions tab. ?>
+        <a class="rq-media is-empty" href="<?= e($openPath) ?>" title="Open this task in Spell">No version uploaded yet</a>
       <?php endif; ?>
 
       <div class="rq-info">
         <div class="rq-title">
           <span class="dot" style="background:<?= e($t['step_color'] ?: '#ccc') ?>"></span>
-          <strong title="<?= e($t['item_name'] . ' · ' . $t['step_name']) ?>"><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong>
+          <a class="rq-task" href="<?= e($openPath) ?>" title="Open <?= e($t['item_name'] . ' · ' . $t['step_name']) ?> in Spell"><strong><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong></a>
           <span class="muted small rq-show" title="<?= e((string)$t['project_name']) ?>"><?= e($t['project_code']) ?></span>
         </div>
         <?php if (count($stages) > 1): ?>

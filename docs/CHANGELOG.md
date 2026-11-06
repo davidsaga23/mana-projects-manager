@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Reviews: a card's task name opens it in Spell *(no migration)*
+
+- The shot · step title on each Reviews card, and the "No version uploaded yet" box, now open that
+  task's side panel in Spell on its Versions tab (the same place "Open in Spell" goes), so a task
+  with no version can be checked in one click.
+
 ## 2026-11-06 — Every show has every status Reviews needs *(migration 078)*
 
 - Migration 078 gives every show any default status it is missing (adds only; nothing renamed or
