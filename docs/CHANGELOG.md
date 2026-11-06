@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Kick-off versions: a budget change saves a new approved kick-off *(no migration)*
+
+- When someone ticked "Changes budget" (Jorik) changes the amount of a signed-off budget, the whole
+  show is saved again as a new approved kick-off version. **Kick-off vs now** compares with the
+  latest version, lists every version (the original sign-off first) and opens any earlier one. The
+  budget lock and the Overview's per-step "plan at sign-off" also follow the latest version. A change
+  to the terms or notes alone is recorded as before but makes no new version.
+- The links inside the Kick-off page (Sign-off, Kick-off vs now, Who signs off) keep the Finance
+  bar when the page was opened from the Finance tab.
+
 ## 2026-11-06 — Reviews: the task panel opens on the Reviews page *(no migration)*
 
 - A card's task name and its "No version uploaded yet" box now open Spell's task side panel right on
