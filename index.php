@@ -281,7 +281,8 @@ require __DIR__ . '/includes/header.php';
         ? 'Hide archived'
         : 'Show archived (' . (int)$archivedCount . ')' ?></a>
   <?php endif; ?>
-  <a class="button secondary" href="mytasks.php">My tasks</a>
+  <?php // No "My tasks" button here (David, 2026-11-06): it repeated the
+        // My tasks link in the top bar, which every page already has. ?>
   <?php if (is_admin()): ?>
     <a class="button secondary" href="finance.php">Studio finances</a>
   <?php endif; ?>

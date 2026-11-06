@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Projects list: no "My tasks" button *(no migration)*
+
+- The "My tasks" button above the Projects list is gone. My tasks is still one click away in the
+  top bar, on every page.
+
 ## 2026-11-06 — Projects list: text 20% bigger *(no migration)*
 
 - Every piece of text on the Projects list (headings, names, figures, status pills, the progress
