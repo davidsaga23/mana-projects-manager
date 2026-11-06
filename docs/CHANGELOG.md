@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — Every show has every status Reviews needs *(migration 078)*
+
+- Migration 078 gives every show any default status it is missing (adds only; nothing renamed or
+  removed). FCM gets its "Complete".
+- Reviews treats "Completed" (the default list's spelling) as "Complete", so a show that kept the
+  default can approve to it.
+- On a show's Statuses screen, the last Pending review, Ready for review, Complete/Completed, Retake
+  and In progress can no longer be deleted or renamed to something else; recolouring and reordering
+  still work.
+
 ## 2026-11-05 — Artist statements say "Earned so far", not "Due so far"
 
 - The column and row that showed what a person's logged time, approved footage or flat fee is worth

@@ -33,6 +33,48 @@ function seed_project_statuses(PDO $pdo, int $projectId): int {
     return $stmt->rowCount();
 }
 
+/**
+ * Statuses the platform itself relies on BY NAME, keyed by the name the code
+ * uses, each with the spellings that count as the same status.
+ *
+ * David, 2026-11-06: "let's make sure we always have complete status (all of
+ * them actually) for all the projects". FCM had no "Complete", so Reviews could
+ * not approve anything there. Two causes: the default list has always said
+ * "Completed" while the review code (REVIEW_STAGES) says "Complete", and a show
+ * created before a default was added never received it. Migration 078 gives
+ * every show the defaults it lacks; this list is what the Statuses screen will
+ * not let anybody delete or rename away, so the gap cannot reopen by hand.
+ * Matched like REVIEW_STAGES: case and spacing ignored.
+ */
+const REQUIRED_STATUS_NAMES = [
+    'in progress'      => ['in progress'],
+    'pending review'   => ['pending review'],
+    'ready for review' => ['ready for review'],
+    'retake'           => ['retake'],
+    'complete'         => ['complete', 'completed'],
+];
+
+function status_name_norm(string $name): string {
+    return strtolower(trim(preg_replace('/\s+/', ' ', $name)));
+}
+
+/** Which required status this name is (its key in REQUIRED_STATUS_NAMES), or null. */
+function status_required_key(string $name): ?string {
+    $n = status_name_norm($name);
+    foreach (REQUIRED_STATUS_NAMES as $key => $spellings) {
+        if (in_array($n, $spellings, true)) return $key;
+    }
+    return null;
+}
+
+/** Does any status in $statuses other than $exceptId still count as required $key? */
+function status_required_covered(array $statuses, string $key, int $exceptId): bool {
+    foreach ($statuses as $s) {
+        if ((int)$s['id'] !== $exceptId && status_required_key((string)$s['name']) === $key) return true;
+    }
+    return false;
+}
+
 /** A project's statuses, in display order. */
 function project_statuses(PDO $pdo, int $projectId): array {
     $stmt = $pdo->prepare('SELECT * FROM statuses WHERE project_id = ? ORDER BY sort_order, name');

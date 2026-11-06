@@ -103,6 +103,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nameStmt = $pdo->prepare('SELECT name FROM statuses WHERE id = ? AND project_id = ?');
             $nameStmt->execute([$id, $projectId]);
             $name = $nameStmt->fetchColumn();
+            // Reviews and artists' own status moves look these up by name. See
+            // REQUIRED_STATUS_NAMES: the last one of each kind stays.
+            $key = $name !== false ? status_required_key((string)$name) : null;
+            if ($key !== null && !status_required_covered(project_statuses($pdo, $projectId), $key, $id)) {
+                throw new RuntimeException('"' . $name . '" is needed by Reviews and My tasks, so it stays. '
+                    . 'Rename or recolour it instead, or add another status with the same name first.');
+            }
             $pdo->prepare('DELETE FROM statuses WHERE id = ? AND project_id = ?')->execute([$id, $projectId]);
             flash('ok', $name ? "Removed the status \"$name\"." : 'That status no longer exists.');
             header('Location: ' . $selfUrl);
@@ -129,6 +136,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($name === '') {
                 flash('warn', 'A status was left with a blank name, so its old name was kept.');
                 continue;
+            }
+            // Renaming the last "Pending review" (etc.) to something else would
+            // switch Reviews off for this show as surely as deleting it.
+            $oldKey = status_required_key((string)$existing[$id]['name']);
+            if ($oldKey !== null && status_required_key($name) !== $oldKey
+                && !status_required_covered(array_values($existing), $oldKey, $id)) {
+                flash('warn', '"' . $existing[$id]['name'] . '" is needed by Reviews and My tasks, so its name was kept.');
+                $name = (string)$existing[$id]['name'];
             }
             $mapsTo = in_array($_POST['maps_to'][$id] ?? '', ['none','delivered','approved'], true)
                     ? $_POST['maps_to'][$id] : 'none';
