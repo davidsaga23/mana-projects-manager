@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-06 — "Artists" is now "Artists pool" *(no migration)*
+
+- The top-bar link and the page title of the artist database read **Artists pool**. Same page,
+  label only.
+
 ## 2026-11-06 — Projects list: no "My tasks" button *(no migration)*
 
 - The "My tasks" button above the Projects list is gone. My tasks is still one click away in the
