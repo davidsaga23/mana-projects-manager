@@ -242,7 +242,7 @@ if ($people && can_see_money() && hire_quotes_available()) {
     $quotes = hire_quotes(array_map(function ($p) { return (int)$p['id']; }, $people));
 }
 
-$pageTitle = 'Artists';
+$pageTitle = 'Artists pool'; // David, 2026-11-06: "Artists pool", same as the top-bar link
 require __DIR__ . '/includes/header.php';
 ?>
 
