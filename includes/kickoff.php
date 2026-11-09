@@ -615,8 +615,30 @@ function kickoff_finance_load(int $kickoffId): ?array {
 // ---------------------------------------------------------------------------
 
 /**
+ * What made a kick-off row: 'signoff' (setup to active), 'replan' (sent again
+ * after a re-plan) or 'budget_change' (a budget request approved). Read from
+ * the 'version' key of its production snapshot; rows without one are
+ * sign-offs.
+ */
+function kickoff_kind(array $kickoff): string {
+    $snap = json_decode((string)($kickoff['snapshot'] ?? ''), true);
+    return (string)($snap['version']['kind'] ?? 'signoff');
+}
+
+/**
+ * The two column headings of a comparison: "At kick-off" and "Now" unless the
+ * page compares two stored versions. Set once by the page and read by the
+ * renderers below, so their signatures stay as every caller knows them.
+ */
+function kickoff_labels(?array $set = null): array {
+    static $labels = ['At kick-off', 'Now'];
+    if ($set !== null) $labels = $set;
+    return $labels;
+}
+
+/**
  * Every approved kick-off of a project, oldest first, each with its version
- * number ('n') and 'kind': 'signoff' for the original, 'budget_change' after.
+ * number ('n') and 'kind' (see kickoff_kind()).
  */
 function kickoff_versions(PDO $pdo, int $projectId): array {
     try {
@@ -630,9 +652,8 @@ function kickoff_versions(PDO $pdo, int $projectId): array {
     }
     $n = 0;
     foreach ($rows as &$r) {
-        $snap = json_decode((string)$r['snapshot'], true);
         $r['n'] = ++$n;
-        $r['kind'] = (string)($snap['version']['kind'] ?? 'signoff');
+        $r['kind'] = kickoff_kind($r);
     }
     unset($r);
     return $rows;
@@ -769,8 +790,14 @@ function kickoff_user_email(PDO $pdo, ?int $userId): ?array {
  */
 function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     $pid = (int)$project['id'];
-    if ($project['status'] !== 'setup') {
-        throw new RuntimeException('Only a project in setup is sent for sign-off.');
+    // A RE-PLAN (David, 2026-11-06: "A new version is made when Jorik approves
+    // a budget request, or when the project is sent for sign-off again after a
+    // re-plan"). A project that is already signed off can be sent again; it
+    // keeps its status and is NOT frozen while it waits (his choice that day:
+    // "Stays active, not frozen"). Approval makes it the next kick-off version.
+    $replan = $project['status'] !== 'setup';
+    if ($replan && kickoff_approved($pdo, $pid) === null) {
+        throw new RuntimeException('Only a project in setup, or one already signed off, is sent for sign-off.');
     }
     if ($why = kickoff_finance_problem()) throw new RuntimeException($why);
     // Chosen in the pop-up, and checked again here: only people who can save
@@ -801,6 +828,11 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     }
 
     $snap = kickoff_snapshot($pdo, $project);
+    // ⚠ FIRST KEY, ON PURPOSE: kickoff_frozen() in includes/auth.php tells a
+    // re-plan from a first sign-off by how the stored JSON BEGINS
+    // ('{"version":{"kind":"replan"'), so it can skip the freeze without
+    // reading the whole snapshot on every save.
+    if ($replan) $snap = ['version' => ['kind' => 'replan']] + $snap;
     $fin  = kickoff_finance_snapshot($pdo, $project);
     $user = current_user();
     $who  = current_user_display();
@@ -848,16 +880,18 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     ];
     $msgs = [];
     $upd = $pdo->prepare('UPDATE project_kickoff_signoffs SET email_result = ? WHERE kickoff_id = ? AND user_id = ?');
+    $ask = $replan
+        ? ' has been re-planned and needs your sign-off. It carries on as it is while you look; '
+          . 'once approved, this plan becomes its new kick-off version.'
+        : ' is ready to go from setup to active, and needs your sign-off. '
+          . 'Please look at how it is set up and approve it, or ask for changes.';
     foreach ($signers as $s) {
         [$ok, $res] = kickoff_mail(
             ['email' => $s['email'], 'name' => $s['name']],
-            sprintf('[%s] Kick-off sign-off: %s', $project['code'], $project['name']),
-            kickoff_mail_html('<strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8')
-                . '</strong> is ready to go from setup to active, and needs your sign-off. '
-                . 'Please look at how it is set up and approve it, or ask for changes.',
-                $lines, $url, 'Review and sign off'),
-            "{$project['name']} is ready to go from setup to active, and needs your sign-off.\n\n"
-            . implode("\n", $lines) . "\n\nReview and sign off: {$url}\n"
+            sprintf('[%s] %s: %s', $project['code'], $replan ? 'Re-plan sign-off' : 'Kick-off sign-off', $project['name']),
+            kickoff_mail_html('<strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8') . '</strong>'
+                . htmlspecialchars($ask, ENT_QUOTES, 'UTF-8'), $lines, $url, 'Review and sign off'),
+            $project['name'] . $ask . "\n\n" . implode("\n", $lines) . "\n\nReview and sign off: {$url}\n"
         );
         $upd->execute([mb_substr($res, 0, 255), $kid, (int)$s['id']]);
         $msgs[] = $s['name'] . ': ' . $res . '.';
@@ -893,6 +927,7 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $kid = (int)$kickoff['id'];
     $pid = (int)$project['id'];
     $activated = false;
+    $replan = kickoff_kind($kickoff) === 'replan';
 
     $pdo->beginTransaction();
     try {
@@ -931,7 +966,8 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $to   = kickoff_user_email($pdo, $kickoff['requested_by'] !== null ? (int)$kickoff['requested_by'] : null);
 
     if ($decision === 'changes') {
-        $msgs[] = 'Sent back for changes. The project stays in setup.';
+        $msgs[] = $replan ? 'Sent back for changes. The project carries on with its current kick-off version.'
+                          : 'Sent back for changes. The project stays in setup.';
         if ($to) {
             [, $res] = kickoff_mail($to,
                 sprintf('[%s] Changes asked for before kick-off: %s', $project['code'], $project['name']),
@@ -948,6 +984,22 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $state->execute([$kid]);
     if ($state->fetchColumn() !== 'approved') {
         $msgs[] = 'Approved. The project turns active once everybody else has approved too.';
+        return $msgs;
+    }
+
+    if ($replan) {
+        // A re-plan changes no status and leaves the starting estimate per
+        // step (Historic quotas) as the first sign-off recorded it.
+        $msgs[] = 'Re-plan signed off by everybody: saved as kick-off version ' . count(kickoff_versions($pdo, $pid))
+                . '. Kick-off vs now compares with it from now on.';
+        if ($to) {
+            [, $res] = kickoff_mail($to,
+                sprintf('[%s] Re-plan signed off: %s', $project['code'], $project['name']),
+                kickoff_mail_html('The re-plan of <strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8')
+                    . '</strong> has been signed off by everybody and is its new kick-off version.', [], $url, 'Open the kick-off'),
+                "The re-plan of {$project['name']} has been signed off by everybody and is its new kick-off version.\n\n{$url}\n");
+            $msgs[] = ($kickoff['requested_by_name'] ?: 'Whoever sent it') . ': ' . $res . '.';
+        }
         return $msgs;
     }
 
@@ -1015,11 +1067,14 @@ function kickoff_override(PDO $pdo, array $project, array $kickoff, string $reas
     $names = implode(' and ', array_map(fn($s) => $s['signer_name'], $missing));
     $msgs = ['Approved on behalf of ' . $names . '. "' . $project['name'] . '" is '
            . ($st->rowCount() ? 'now active' : 'signed off') . ', and everybody is being told.'];
-    try {
-        $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
-        if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
-    } catch (Throwable $e) {
-        $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+    // Not for a re-plan: the starting estimate per step stays the first one.
+    if (kickoff_kind($kickoff) !== 'replan') {
+        try {
+            $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
+            if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
+        } catch (Throwable $e) {
+            $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+        }
     }
 
     // EVERYBODY: every signer asked, and whoever sent it, once each.
@@ -1149,7 +1204,7 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       <?php if ($was['figures']): ?>
         <table class="data kickoff-figures">
           <?php if ($compare): ?>
-            <thead><tr><th></th><th>At kick-off</th><th>Now</th><th>Change</th></tr></thead>
+            <thead><tr><th></th><th><?= e(kickoff_labels()[0]) ?></th><th><?= e(kickoff_labels()[1]) ?></th><th>Change</th></tr></thead>
           <?php endif; ?>
           <tbody>
           <?php foreach ($was['figures'] as $label => [$v, $kind]):
@@ -1184,8 +1239,8 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
           <h4><?= e($label) ?><?php if ($compare && $nt !== $text): ?> <span class="kickoff-chg">changed</span><?php endif; ?></h4>
           <?php if ($compare && $nt !== $text): ?>
             <div class="kickoff-text-pair">
-              <div><div class="muted small">At kick-off</div><div class="kickoff-prose"><?= e($text !== '' ? $text : '—') ?></div></div>
-              <div><div class="muted small">Now</div><div class="kickoff-prose"><?= e($nt !== '' ? $nt : '—') ?></div></div>
+              <div><div class="muted small"><?= e(kickoff_labels()[0]) ?></div><div class="kickoff-prose"><?= e($text !== '' ? $text : '—') ?></div></div>
+              <div><div class="muted small"><?= e(kickoff_labels()[1]) ?></div><div class="kickoff-prose"><?= e($nt !== '' ? $nt : '—') ?></div></div>
             </div>
           <?php else: ?>
             <div class="kickoff-prose"><?= e($text) ?></div>
@@ -1243,7 +1298,7 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
     <div class="kickoff-list">
       <h4><?= e($title) ?>
         <span class="muted small"><?= count($moved) ? count($moved) . ' changed, added or removed' : 'nothing changed' ?>
-          · <?= count($was['rows']) ?> at kick-off, <?= count($now['rows']) ?> now</span></h4>
+          · <?= count($was['rows']) ?> <?= e(lcfirst(kickoff_labels()[0])) ?>, <?= count($now['rows']) ?> <?= e(lcfirst(kickoff_labels()[1])) ?></span></h4>
       <?php if ($moved): ?>
         <table class="data">
           <thead><tr><th></th><th></th><?php foreach ($cols as [$l]): ?><th><?= e($l) ?></th><?php endforeach; ?></tr></thead>

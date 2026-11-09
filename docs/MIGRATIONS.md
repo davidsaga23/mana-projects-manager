@@ -157,6 +157,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_13 | ⏳ **A contract per position** (`position_terms`, `position_terms_log`): one position on one show paid on its own rate and contract, the person's terms staying the default. Import by hand in phpMyAdmin. Until it is, every position is paid on the person's one rate, as before. *(12 is taken by the invoice-split work.)* |
 | finance_install_14 | ⏳ **Done tick per position** (`position_done`, `position_done_log`): marks a position finished on the Expense projection so its Difference reads *final*. Import by hand in phpMyAdmin. Until it is, the ticks are greyed out. |
 | finance_install_15 | ⏳ **Invoice position separate from its sender** (`position_crew_id` on `invoices`): an invoice on a whole step, or on a position somebody else holds. Import by hand in phpMyAdmin. Until it is, only a whole step with no crew sender can be chosen. *(14 is the Done tick, PR #167.)* |
+| finance_install_16 | ⏳ **Budget requests** (`budget_requests`): an administrator asks for a change to a signed-off budget, Jorik approves or declines, and approving saves the next kick-off version. Import by hand in phpMyAdmin. Until it is, the request form says so; Jorik can still change the budget directly. |
 
 ---
 

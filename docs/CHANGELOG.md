@@ -39,6 +39,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Uploading a new version moves the task to Pending review whoever uploads it (Production and admins
   too), not only the assignee. An approved task is still left alone.
 
+## 2026-11-06 — Kick-off versions: re-plans, budget requests, and comparing with the original *(finance_install_16)*
+
+- **Re-plan sign-off.** A signed-off project shows "Send a re-plan for sign-off…" on its Kick-off page.
+  The people chosen are emailed; the project is **not frozen** while they look. When everybody has
+  approved, the plan as it was sent becomes the next kick-off version (v2, v3…). Withdraw or send
+  again work as for a first sign-off. A re-plan changes no status and leaves Historic quotas alone.
+- **Budget requests.** On a signed-off budget, an administrator can "Ask for a budget change" (new
+  amount, currency, why). Whoever is ticked "Changes budget" (Jorik) is emailed and approves or
+  declines on the finance Overview; approving changes the budget, records it under "Changes since
+  sign-off", and saves the next kick-off version. Answered requests are listed underneath. Jorik can
+  still change the budget directly. Needs **finance_install_16.sql** imported by hand.
+- **Kick-off vs now** still opens on the latest version against now, and now has a dropdown to
+  compare the original (v1) with now or with any later version. All versions are listed with what
+  made each one and who approved it.
+
 ## 2026-11-06 — Kick-off: no client revenue *(no migration)*
 
 - "Revenue (billed to the client)" is no longer saved in a kick-off's money snapshot, and is no longer

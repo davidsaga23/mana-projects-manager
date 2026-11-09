@@ -4957,3 +4957,24 @@ readable. The per-step estimate baseline (Historic quotas) is not rewritten.
 - `board_version_to_review()` no longer requires the uploader to be on the task (this replaces the
   assignee-only rule of 2026-10-29). Never out of an approved status, as before.
 - New bell kind `review` (migration 079); until it runs those bells are written as `mention`.
+
+## 2026-11-06 — Kick-off versions: re-plans and budget requests
+
+**Asked by David:** "Kick-offs have versions: v1, v2, v3. A new version is made when Jorik approves a
+budget request, or when the project is sent for sign-off again after a re-plan. Include a dropdown to
+see how the original kick off compares to another one recorded." He then chose: a re-plan "Stays
+active, not frozen"; "Add a request step" for budgets; and "Original vs one pick" for the dropdown.
+
+**Decided:**
+- A re-plan is an ordinary `project_kickoffs` request whose snapshot starts with
+  `{"version":{"kind":"replan"`. `kickoff_frozen()` skips requests that start that way, so no
+  migration was needed. Approval changes no status and writes no new per-step baseline: Historic
+  quotas keep the first sign-off's estimate.
+- Budget requests are money, so they live in the finance database (`budget_requests`,
+  finance_install_16). Approving goes through `save_project_budget()` with the lock, the same door
+  as Jorik's direct change, so `budget_changes` records both the same way. Then
+  `kickoff_budget_version()` saves the version. One open request per show. Jorik's direct change stays:
+  he is the approver.
+- Kick-off vs now opens on the latest version against now (the rule from earlier the same day). The
+  dropdown adds "v1 (original) with now" and "v1 with vN". Two stored versions are compared with the
+  same renderer; the column headings name the versions.
