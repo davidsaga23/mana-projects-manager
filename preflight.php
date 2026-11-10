@@ -179,17 +179,33 @@ if (!is_array($f) || empty($f['db_name'])) {
 $base = $siteUrl !== '' ? rtrim($siteUrl, '/')
       : ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
         . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-$fetchStatus = function (string $url): ?int {
+// $self: a request to THIS site. It goes straight to this server's own address
+// and does not insist on a trusted certificate. On a new host the certificate is
+// self-signed until AutoSSL runs, and the server's DNS may still remember the
+// old host; neither has anything to do with whether a folder is private, and
+// both used to turn these four checks into "could not ask" (2026-11-10). The
+// outside services below are asked normally, certificate checked.
+$fetchStatus = function (string $url, bool $self = false): ?int {
+    $host = (string)parse_url($url, PHP_URL_HOST);
+    $port = parse_url($url, PHP_URL_SCHEME) === 'http' ? 80 : 443;
+    $ip   = (string)($_SERVER['SERVER_ADDR'] ?? '');
     if (function_exists('curl_init')) {
         $c = curl_init($url);
-        curl_setopt_array($c, [CURLOPT_NOBODY => false, CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 8, CURLOPT_FOLLOWLOCATION => false]);
+        $opts = [CURLOPT_NOBODY => false, CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8, CURLOPT_FOLLOWLOCATION => false];
+        if ($self) {
+            $opts[CURLOPT_SSL_VERIFYPEER] = false;
+            $opts[CURLOPT_SSL_VERIFYHOST] = 0;
+            if ($ip !== '' && $host !== '') $opts[CURLOPT_RESOLVE] = ["{$host}:{$port}:{$ip}"];
+        }
+        curl_setopt_array($c, $opts);
         curl_exec($c);
         $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
         curl_close($c);
         return $code ?: null;
     }
-    $ctx = stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 8]]);
+    $ctx = stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 8],
+        'ssl' => $self ? ['verify_peer' => false, 'verify_peer_name' => false] : []]);
     @file_get_contents($url, false, $ctx);
     if (!empty($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) return (int)$m[1];
     return null;
@@ -202,10 +218,10 @@ $probes = [
 ];
 foreach ($probes as $label => [$path, $file]) {
     if ($file) @file_put_contents($file, 'probe');
-    $code = $fetchStatus($base . '/' . $path);
+    $code = $fetchStatus($base . '/' . $path, true);
     if ($file) @unlink($file);
     if ($code === null) {
-        $add('Kept private', $label, 'warn', 'Could not ask ' . $base . ' from the server itself (DNS not pointed here yet?). Re-check after the switch.');
+        $add('Kept private', $label, 'warn', 'Could not ask ' . $base . ' from the server itself. Check from a browser that this folder answers Forbidden.');
     } else {
         $closed = in_array($code, [401, 403, 404], true);
         $add('Kept private', $label . ': HTTP ' . $code, $closed ? 'ok' : 'bad',

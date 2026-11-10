@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-10 — robots.txt, and pre-flight checks privacy before the real certificate *(no migration)*
+
+- `robots.txt` tells every search engine to stay out: Anima is a private tool behind a login.
+- The pre-flight page's "Kept private" checks now ask this server directly and accept its temporary
+  (self-signed) certificate, so they give a real answer on a new host before AutoSSL has run.
+
 ## 2026-11-09 — Ready to move hosts: pre-flight page, maintenance switch, one site address *(no migration)*
 
 - **`preflight.php?key=…`** checks a host for everything Anima needs: PHP and extensions, upload and
