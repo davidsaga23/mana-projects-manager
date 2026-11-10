@@ -111,18 +111,12 @@ function invite_address(PDO $pdo, int $userId, string $crewEmail): string {
 
 /** Absolute URL of the public page a link opens, built like ticket_url(). */
 function invite_url(string $token): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/set_password.php?t=" . rawurlencode($token);
+    return site_url('set_password.php?t=' . rawurlencode($token));
 }
 
 /** The site's front door, for the email: the same host and folder, no page. */
 function invite_site_url(): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/";
+    return site_url();
 }
 
 /**

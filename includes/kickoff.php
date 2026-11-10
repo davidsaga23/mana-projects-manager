@@ -177,10 +177,7 @@ function kickoff_signoffs(PDO $pdo, int $kickoffId): array {
 
 /** Absolute link to a project's kick-off page, for emails. */
 function kickoff_url(int $projectId): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/kickoff.php?project={$projectId}";
+    return site_url("kickoff.php?project={$projectId}");
 }
 
 // ---------------------------------------------------------------------------
