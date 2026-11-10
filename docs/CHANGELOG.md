@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-09 — Ready to move hosts: pre-flight page, maintenance switch, one site address *(no migration)*
+
+- **`preflight.php?key=…`** checks a host for everything Anima needs: PHP and extensions, upload and
+  time limits, writable folders, both databases (and that they are kept apart), that includes/,
+  migrations/, uploads/ and sessions/ cannot be read from a browser, and the outside services. Shut
+  (404) unless `preflight_key` is set in config.php.
+- **`'maintenance' => true`** in config.php stops the whole site with a "back shortly" page, before
+  the database is touched.
+- **`'site_url'`** in config.php: every emailed link (invites, @mentions, kick-off, hires) is built from
+  it. Unset, links are built from the request exactly as before.
+- `docs/HOSTING_MIGRATION.md`: the step-by-step move to KnownHost / anima-mana.com, and
+  `tools/hosting/old-host-redirect.htaccess` to send old links to the new address.
+
 ## 2026-11-06 — "Artists" is now "Artists pool" *(no migration)*
 
 - The top-bar link and the page title of the artist database read **Artists pool**. Same page,

@@ -4,6 +4,33 @@
 $config = require __DIR__ . '/../config.php';
 date_default_timezone_set($config['timezone']);
 
+// ⚠ MAINTENANCE: THE WHOLE SITE STOPS HERE, before the database is touched.
+// For the move to anima-mana.com (David, 2026-11-09): the old copy is frozen
+// while its data is copied across, so nobody saves anything that would be left
+// behind. Switched on by one line in config.php, 'maintenance' => true (or a
+// sentence to show instead of the default). Every page, every save and every
+// background request answers 503 with that message. preflight.php is the one
+// exception: it is how the new host is checked, and it touches nothing.
+if (!empty($config['maintenance']) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'preflight.php') {
+    $msg = is_string($config['maintenance'])
+        ? $config['maintenance']
+        : 'Anima is being moved to its new home. It will be back shortly.';
+    http_response_code(503);
+    header('Retry-After: 1800');
+    header('Cache-Control: no-store');
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+       . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+       . '<title>Anima · back shortly</title><style>'
+       . 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+       . 'background:#101010;color:#ededed;font:16px/1.5 system-ui,sans-serif;padding:24px}'
+       . 'main{max-width:440px;text-align:center}h1{font-size:22px;margin:0 0 8px}'
+       . 'p{color:rgba(255,255,255,.7);margin:0}</style></head><body><main>'
+       . '<h1>Back shortly</h1><p>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>'
+       . '</main></body></html>';
+    exit;
+}
+
 try {
     $dsn = sprintf(
         'mysql:host=%s;dbname=%s;charset=%s',
