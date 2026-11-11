@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Artist statements: one row per position, Position at the far left *(no migration)*
+
+- Somebody on two or more positions (slots in the Staffing tab, or a supervision position) now gets
+  **a row per position**, each with that position's planned days, logged time, approved seconds,
+  rate (its own contract, else the person's default) and the invoices whose step is that position.
+  **Position** is the first column (David).
+- Anything that belongs to no position they hold (time on cards, an invoice with no step) goes on
+  their supervision position if they have one, otherwise on an **"Other work"** row.
+- One position, or none, is one row with the same figures as before. The Total row counts people
+  and rows; the filter's **Over-invoiced** now means invoiced more than the logged work is worth.
+
 ## 2026-11-11 — Every merge also deploys to the new host, anima-mana.com *(no migration)*
 
 - A second deploy job sends each merge to KnownHost as well as the old host, until the cut-over.
