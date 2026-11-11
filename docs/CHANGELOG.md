@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Artist statements: filters above the table *(no migration)*
+
+- A bar above **Artist statements** (Finance management): **search by name**, **rate** (per day,
+  per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
+  over-invoiced, nothing logged, settled = something earned and all of it invoiced) and **on the
+  show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
+  "Showing N of M" and a **Clear** link (David).
+- **The Total row follows the filter:** it adds up only the rows showing, labelled "3 of 23 people
+  · filtered", and goes back to the server's own total when the filter is cleared.
+- Done in the browser on the rows already drawn: no figure or query changed. Each viewer's filter
+  is remembered in their own browser, per show.
+
 ## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
 
 - **From / to pickers** at the top of Kick-off vs now: any recorded version on the left, a later
