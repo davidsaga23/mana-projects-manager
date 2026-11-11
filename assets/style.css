@@ -368,6 +368,13 @@ details.kickoff-resend summary { cursor: pointer; }
 .kickoff-row-removed td { background: var(--danger-tint); }
 .kickoff-chg { color: var(--warn-strong); white-space: nowrap; font-size: .9em; }
 .kickoff-list { margin: 12px 0; }
+/* David, 2026-11-11: "accentuate the columns to see one one starts and ends".
+   A full-width table pushed each date far from its header; the table now sits at
+   its natural width, headers line up over their numbers, and a line divides the
+   columns so Starts and Ends read as two. */
+.kickoff-list table.data { width: auto; }
+.kickoff-list th.num, .kickoff-list td.num { text-align: right; white-space: nowrap; padding-left: 18px; padding-right: 18px; }
+.kickoff-list td + td, .kickoff-list thead th + th + th { border-left: 1px solid var(--border-strong); }
 .kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
 .kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: var(--radius-md); }
 .kickoff-text-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

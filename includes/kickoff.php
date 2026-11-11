@@ -1275,7 +1275,7 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
         <details class="kickoff-list">
           <summary><?= e($title) ?> <span class="muted">(<?= count($was['rows']) ?>)</span></summary>
           <table class="data">
-            <thead><tr><th></th><?php foreach ($cols as [$l]): ?><th><?= e($l) ?></th><?php endforeach; ?></tr></thead>
+            <thead><tr><th></th><?php foreach ($cols as [$l, $hk]): ?><th class="<?= $hk === 'text' ? '' : 'num' ?>"><?= e($l) ?></th><?php endforeach; ?></tr></thead>
             <tbody>
             <?php foreach ($was['rows'] as $key => $row): ?>
               <tr><th scope="row"><?= e((string)$key) ?></th>
@@ -1312,7 +1312,7 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
           · <?= count($was['rows']) ?> <?= e(lcfirst(kickoff_labels()[0])) ?>, <?= count($now['rows']) ?> <?= e(lcfirst(kickoff_labels()[1])) ?></span></h4>
       <?php if ($moved): ?>
         <table class="data">
-          <thead><tr><th></th><th></th><?php foreach ($cols as [$l]): ?><th><?= e($l) ?></th><?php endforeach; ?></tr></thead>
+          <thead><tr><th></th><th></th><?php foreach ($cols as [$l, $hk]): ?><th class="<?= $hk === 'text' ? '' : 'num' ?>"><?= e($l) ?></th><?php endforeach; ?></tr></thead>
           <tbody>
           <?php foreach ($moved as [$key, $how, $row, $nrow]): ?>
             <tr class="kickoff-row-<?= e($how) ?>">

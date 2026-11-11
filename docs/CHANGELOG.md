@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Kick-off "By step" columns easier to read *(no migration)*
+
+- The By step table (and the other kick-off lists) no longer stretch across the page: each header
+  sits over its numbers and a line divides the columns, so Starts and Ends read as two (David).
+
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 
 - The kick-off figure "Tasks with nobody on them" is now **"Tasks not assigned"** (David). Kick-offs
