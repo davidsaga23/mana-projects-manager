@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Emails can name several reply-to addresses *(no migration)*
+
+- `mail_reply_to` in config.php takes a list, `['david@mana.tv', 'tim@mana.tv']`, or comma-separated
+  addresses; replying to any Anima email then goes to all of them. A single address still works.
+
 ## 2026-11-10 — robots.txt, and pre-flight checks privacy before the real certificate *(no migration)*
 
 - `robots.txt` tells every search engine to stay out: Anima is a private tool behind a login.
