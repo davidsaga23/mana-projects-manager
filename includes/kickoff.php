@@ -1515,19 +1515,34 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
         return;
     }
 
-    $moved = []; $same = [];
-    foreach ($was['rows'] as $key => $row) {
+    // ONE ORDER FOR BOTH SIDES (David, 2026-11-11: "all changes should be
+    // grouped. All the changes in animatic first, then all the changes for the
+    // next pipeline step, etc"). Both snapshots list their rows in pipeline
+    // order, so the kick-off's order is kept and each row that only exists now
+    // is slotted in after the row it follows today, instead of every addition
+    // trailing at the bottom. A renamed step's old rows and new rows then land
+    // next to each other.
+    $order = array_map('strval', array_keys($was['rows']));
+    $prev = null;
+    foreach (array_keys($now['rows']) as $key) {
         $key = (string)$key;
-        if (!array_key_exists($key, $now['rows'])) { $moved[] = [$key, 'removed', $row, null]; continue; }
-        $nrow = $now['rows'][$key];
+        if (!array_key_exists($key, $was['rows'])) {
+            $at = $prev === null ? 0 : array_search($prev, $order, true) + 1;
+            array_splice($order, $at, 0, [$key]);
+        }
+        $prev = $key;
+    }
+    $moved = []; $same = [];
+    foreach ($order as $key) {
+        $row  = $was['rows'][$key] ?? null;
+        $nrow = $now['rows'][$key] ?? null;
+        if ($row === null)  { $moved[] = [$key, 'added', null, $nrow]; continue; }
+        if ($nrow === null) { $moved[] = [$key, 'removed', $row, null]; continue; }
         $diff = false;
         foreach ($cols as $c => [, $kind]) {
             if (kickoff_change($row[$c] ?? null, $nrow[$c] ?? null, $kind, $currency) !== '') { $diff = true; break; }
         }
         if ($diff) $moved[] = [$key, 'changed', $row, $nrow]; else $same[] = [$key, '', $row, $nrow];
-    }
-    foreach ($now['rows'] as $key => $nrow) {
-        if (!array_key_exists((string)$key, $was['rows'])) $moved[] = [(string)$key, 'added', null, $nrow];
     }
     if (!$moved && !$same) return;
     ?>
