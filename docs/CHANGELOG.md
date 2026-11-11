@@ -20,13 +20,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   names invoices use (one per line for somebody on two; "—" for logged time with no position).
 - A bar above **Artist statements** (Finance management): **search by name**, **position**, **rate** (per day,
   per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
-  over-invoiced, nothing logged, settled = something earned and all of it invoiced) and **on the
+  invoiced ahead of logged, nothing logged, settled = nothing left and everything earned invoiced) and **on the
   show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
   "Showing N of M" and a **Clear** link (David).
 - **The Total row follows the filter:** it adds up only the rows showing, labelled "3 of 23 people
-  · filtered", and goes back to the server's own total when the filter is cleared.
+  · filtered", and goes back to the server's own total when the filter is cleared. Days left is counted too.
 - Done in the browser on the rows already drawn: no figure or query changed. Each viewer's filter
   is remembered in their own browser, per show.
+
+## 2026-11-11 — Artist statements: Days left, and Left to invoice is the work still to do *(no migration)*
+
+- A **Days left** column (days planned less days logged) on Finance management → Artist statements,
+  on each statement and on the artist's Home. Logging past the plan reads **"2.5 over"** in amber.
+- **Left to invoice** is now the planned work not yet logged, at the person's rate: days left × a day
+  rate (× hours per day for an hourly rate), seconds not yet approved × a per-second rate, and for a
+  flat fee the fee less what has been invoiced. It never goes below zero. Until now it was "earned
+  minus invoiced", which showed −900 for anyone who invoiced before logging time.
+- Invoices ahead of the logged time are still flagged: **"ahead of logged"** under Invoiced on the
+  list, and a note on the statement.
 
 ## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
 
