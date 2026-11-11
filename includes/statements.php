@@ -386,20 +386,7 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         }
     }
 
-    $invoiced = 0.0; $otherCurrency = false;
-    foreach ($invoices as $inv) {
-        // An EXPECTED invoice has not arrived (finance_install_09): it is not
-        // something the artist has invoiced yet, so it is not subtracted.
-        if (($inv['status'] ?? '') === 'expected') continue;
-        // In the statement's money, converting at the fixed rate when there is
-        // one; an invoice in a currency with no fixed rate is left out and
-        // reported, as it always was.
-        $ic = fx_code($inv['currency'] ?? $cur) ?? $cur;
-        $amt = $ic === $money ? (float)$inv['amount']
-             : ($money === 'USD' ? fx_to_usd((float)$inv['amount'], $ic, $fx) : null);
-        if ($amt === null) { $otherCurrency = true; continue; }
-        $invoiced += $amt;
-    }
+    [$invoiced, $otherCurrency] = statement_invoiced($invoices, $money, $cur, $fx);
     // A flat fee has no days to count down: what is left is the fee less what
     // has been invoiced against it. (On a statement split into contracts the
     // invoices cannot be told apart by position, so a flat-fee line there
@@ -439,7 +426,147 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         // One line per contract when a position has its own (finance_install_13).
         // Empty when everything is paid on the one set of terms.
         'lines'           => $lines,
+        // The plan per step (step id, or MINUS a supervision position's id),
+        // for statement_position_rows().
+        'planned_days_by_step' => $plannedDaysBy,
+        'planned_secs_by_step' => $plannedSecsBy,
     ];
+}
+
+/**
+ * What a set of invoices adds up to, in the statement's money $money.
+ * [amount, true when one was in a currency with no fixed rate and left out].
+ */
+function statement_invoiced(array $invoices, string $money, string $cur, array $fx): array {
+    $invoiced = 0.0; $otherCurrency = false;
+    foreach ($invoices as $inv) {
+        // An EXPECTED invoice has not arrived (finance_install_09): it is not
+        // something the artist has invoiced yet, so it is not subtracted.
+        if (($inv['status'] ?? '') === 'expected') continue;
+        // In the statement's money, converting at the fixed rate when there is
+        // one; an invoice in a currency with no fixed rate is left out and
+        // reported, as it always was.
+        $ic = fx_code($inv['currency'] ?? $cur) ?? $cur;
+        $amt = $ic === $money ? (float)$inv['amount']
+             : ($money === 'USD' ? fx_to_usd((float)$inv['amount'], $ic, $fx) : null);
+        if ($amt === null) { $otherCurrency = true; continue; }
+        $invoiced += $amt;
+    }
+    return [round($invoiced, 2), $otherCurrency];
+}
+
+/**
+ * ONE ROW PER POSITION (David, 2026-11-11: "we need to separate the artists
+ * and their contract by the position/slot that they're hired for in the
+ * staffing tab. Let's add the position at the far left").
+ *
+ * $held is the person's positions on the show, from project_positions(): a
+ * slot (crew + step) or a supervision position (crew + MINUS its id). Each
+ * gets its own figures:
+ *   planned   the person's expense-projection rows on that step
+ *   logged    time on that step, inside the person's window
+ *   seconds   footage approved on that step
+ *   rate      the position's own contract (finance_install_13), else the
+ *             person's default
+ *   invoiced  invoices whose step is that position's
+ * Everything that belongs to no position they hold (time on cards, an invoice
+ * with no step, time on somebody else's step) is THE REST. It goes to their
+ * supervision position when they hold one, because a supervisor logs no
+ * production steps (the same rule as artist_statement()'s contract lines);
+ * otherwise to a row of its own, "Other work", drawn only when it has
+ * something in it.
+ *
+ * Somebody with one position, or none, gets one row with exactly the figures
+ * artist_statement() gives: nothing to split.
+ *
+ * Each row is artist_statement()'s shape (the keys the list draws), plus
+ * 'position' (its name, null for none) and 'step_id' (null for none or the
+ * rest). Read-only, like everything here.
+ */
+function statement_position_rows(PDO $pdo, int $projectId, int $crewId, ?array $terms, array $invoices,
+                                 array $projection, array $fx, array $positionTerms, array $held): array {
+    // One position per step: two lanes on one step are one position to invoice.
+    $bySid = [];
+    foreach ($held as $p) $bySid[(int)$p['step_id']] = $bySid[(int)$p['step_id']] ?? $p;
+    $held = array_values($bySid);
+
+    $st = artist_statement($pdo, $projectId, $crewId, $terms, $invoices, $projection, $fx, $positionTerms);
+    if (count($held) <= 1) {
+        $p = $held[0] ?? null;
+        return [$st + ['position' => $p ? (string)$p['step_name'] : null, 'step_id' => $p ? (int)$p['step_id'] : null]];
+    }
+
+    $win = $st['window']; $hpd = (float)$st['hours_per_day'];
+    $minBy  = statement_minutes_by_step($pdo, $projectId, $crewId, $win['from'], $win['to']);
+    $secsBy = statement_approved_seconds_by_step($pdo, $projectId, $crewId);
+    $pdBy = $st['planned_days_by_step']; $psBy = $st['planned_secs_by_step'];
+    $invBy = [];
+    foreach ($invoices as $iv) $invBy[(int)($iv['step_id'] ?? 0)][] = $iv;
+
+    // The rest: everything the positions held do not account for.
+    $sids = array_map(fn($p) => (int)$p['step_id'], $held);
+    $restMin = $st['hours'] * 60; $restSecs = (float)$st['approved_seconds'];
+    $restPd = (float)$st['planned_days']; $restPs = (float)$st['planned_seconds'];
+    foreach ($sids as $sid) {
+        if ($sid > 0) { $restMin -= (float)($minBy[$sid] ?? 0); $restSecs -= (float)($secsBy[$sid] ?? 0); }
+        $restPd -= (float)($pdBy[$sid] ?? 0); $restPs -= (float)($psBy[$sid] ?? 0);
+    }
+    $restInv = [];
+    foreach ($invBy as $sid => $ivs) if (!in_array((int)$sid, $sids, true)) $restInv = array_merge($restInv, $ivs);
+    $restMin = max(0.0, $restMin); $restSecs = max(0.0, $restSecs);
+    $restPd = max(0.0, $restPd); $restPs = max(0.0, $restPs);
+    $restSid = null;
+    foreach ($sids as $sid) if ($sid < 0) { $restSid = $sid; break; }
+
+    $row = function (?string $name, ?int $sid, ?array $t, float $min, float $sc, float $pd, float $ps,
+                     array $ivs, ?string $from, ?string $to) use ($win, $hpd, $fx): array {
+        $h = $min / 60;
+        $d = $hpd > 0 ? $h / $hpd : 0.0;
+        [$rate, $unit, $cur, $basis, $label, $due] = statement_price($t, $h, $d, $sc);
+        $fxRow = ($cur !== 'USD' && isset($fx[$cur])) ? $fx[$cur] : null;
+        $money = $fxRow ? 'USD' : $cur;
+        $dueOwn = null;
+        if ($fxRow && $due !== null) { $dueOwn = $due; $due = fx_to_usd($due, $cur, $fx); }
+        $left = statement_left($rate, $unit, $pd, $d, $ps, $sc, $hpd);
+        if ($fxRow && $left !== null) $left = fx_to_usd($left, $cur, $fx);
+        [$invoiced, $other] = statement_invoiced($ivs, $money, $cur, $fx);
+        if ($left !== null && $unit === 'flat') $left = max(0.0, round($left - $invoiced, 2));
+        // The person's contract dates when they have them; otherwise the
+        // position's own dates (its step, or the supervision position).
+        $w = $win['source'] === 'contract' ? $win
+           : (($from || $to) ? ['from' => $from, 'to' => $to, 'source' => 'department'] : $win);
+        return [
+            'position' => $name, 'step_id' => $sid, 'window' => $w, 'hours_per_day' => $hpd,
+            'planned_days' => $pd, 'planned_seconds' => $ps, 'hours' => $h, 'days' => $d,
+            'approved_seconds' => $sc, 'rate' => $rate, 'unit' => $unit, 'currency' => $money,
+            'rate_currency' => $cur, 'rate_usd' => ($fxRow && $rate !== null) ? $rate * (float)$fxRow['usd_per_unit'] : null,
+            'due_own' => $dueOwn, 'fx' => $fxRow, 'basis' => $basis, 'basis_label' => $label,
+            'due' => $due, 'invoiced' => $invoiced, 'invoices' => $ivs, 'invoiced_other_currency' => $other,
+            'days_left' => $pd - $d, 'seconds_left' => $ps - $sc, 'left' => $left, 'lines' => [],
+        ];
+    };
+
+    $rows = [];
+    foreach ($held as $p) {
+        $sid = (int)$p['step_id'];
+        $t = $positionTerms[$sid] ?? $terms;
+        $min = $sid > 0 ? (float)($minBy[$sid] ?? 0) : 0.0;
+        $sc  = $sid > 0 ? (float)($secsBy[$sid] ?? 0) : 0.0;
+        $pd = (float)($pdBy[$sid] ?? 0); $ps = (float)($psBy[$sid] ?? 0);
+        $ivs = $invBy[$sid] ?? [];
+        if ($sid === $restSid) {
+            $min += $restMin; $sc += $restSecs; $pd += $restPd; $ps += $restPs;
+            $ivs = array_merge($ivs, $restInv);
+        }
+        $rows[] = $row((string)$p['step_name'], $sid, $t, $min, $sc, $pd, $ps, $ivs, $p['start'] ?? null, $p['end'] ?? null);
+    }
+    if ($restSid === null) {
+        $restBilled = array_filter($restInv, fn($iv) => ($iv['status'] ?? '') !== 'expected');
+        if ($restMin > 0 || $restSecs > 0.0005 || $restPd > 0.005 || $restPs > 0.0005 || $restBilled) {
+            $rows[] = $row('Other work', null, $terms, $restMin, $restSecs, $restPd, $restPs, $restInv, null, null);
+        }
+    }
+    return $rows;
 }
 
 /** "1:23.5" style, for seconds of footage. */
