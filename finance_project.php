@@ -2647,6 +2647,18 @@ function invAddRows() {
     $stInv = [];
     foreach (project_invoices($projectId) as $inv) $stInv[(int)$inv['crew_id']][] = $inv;
     $stProj = expense_projection($pdo, $projectId);
+    // The position(s) each person holds, for the Position column and filter
+    // (David, 2026-11-11: "let's also add the position in the table"). The
+    // same names the invoices and the expense projection use: the step for a
+    // slot, the title for a supervision position, in pipeline order. Somebody
+    // with only logged time and no position has none, and the cell says so.
+    $stPosNames = [];
+    try {
+        foreach (project_positions($pdo, $projectId) as $pp) {
+            $n = trim((string)$pp['step_name']);
+            if ($n !== '') $stPosNames[(int)$pp['crew_id']][$n] = true;
+        }
+    } catch (Throwable $ex) { $stPosNames = []; }
 ?>
   <h3>Artist statements</h3>
   <p class="muted small">
@@ -2669,6 +2681,8 @@ function invAddRows() {
           // half-works. Each viewer's choice is kept in their own browser. ?>
     <div class="inline-form stmt-filter-bar" id="stmtFilter" hidden>
       <label>Artist <input type="search" id="stmtFilterName" placeholder="Search by name" autocomplete="off"></label>
+      <label>Position
+        <select id="stmtFilterPos"><option value="">All positions</option></select></label>
       <label>Rate
         <select id="stmtFilterRate"><option value="">Any rate</option>
           <option value="day">Per day</option><option value="hour">Per hour</option>
@@ -2692,7 +2706,7 @@ function invAddRows() {
     <div class="bd-scroll">
     <table class="review-table statement-list">
       <thead><tr>
-        <th>Artist</th><th>Dates</th><th>Rate</th>
+        <th>Artist</th><th>Position</th><th>Dates</th><th>Rate</th>
         <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Approved sec</th>
         <th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
@@ -2716,14 +2730,16 @@ function invAddRows() {
           // when there are several, none when there is no rate at all.
           $stUnits = [];
           if (count($st['lines']) > 1) { foreach ($st['lines'] as $l) $stUnits[(string)$l['unit']] = true; }
-          elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true; ?>
-        <tr data-stmt="1" data-name="<?= e($name) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
+          elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true;
+          $stHeld = array_keys($stPosNames[$cid] ?? []); ?>
+        <tr data-stmt="1" data-name="<?= e($name) ?>" data-positions="<?= e(implode('|', $stHeld)) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
             data-from="<?= e((string)($w['from'] ?? '')) ?>" data-to="<?= e((string)($w['to'] ?? '')) ?>"
             data-planned="<?= e((string)(float)$st['planned_days']) ?>" data-hours="<?= e((string)(float)$st['hours']) ?>"
             data-days="<?= e((string)(float)$st['days']) ?>" data-secs="<?= e((string)(float)$st['approved_seconds']) ?>"
             data-cur="<?= e($cur) ?>" data-due="<?= $st['due'] !== null ? e((string)(float)$st['due']) : '' ?>"
             data-inv="<?= e((string)(float)$st['invoiced']) ?>" data-left="<?= $st['left'] !== null ? e((string)(float)$st['left']) : '' ?>">
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>"><?= e($name) ?></a></td>
+          <td class="small"><?= $stHeld ? implode('<br>', array_map('e', $stHeld)) : '<span class="muted">—</span>' ?></td>
           <td class="muted small">
             <?= $w['from'] ? e(date('j M', strtotime($w['from']))) : '—' ?> –
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
@@ -2739,7 +2755,7 @@ function invAddRows() {
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>">Statement →</a></td>
         </tr>
       <?php endforeach; ?>
-        <tr class="stmt-filter-empty" hidden><td colspan="10" class="muted">Nobody matches these filters.</td></tr>
+        <tr class="stmt-filter-empty" hidden><td colspan="11" class="muted">Nobody matches these filters.</td></tr>
       </tbody>
       <?php ksort($stMoney);
             $stMoneyCell = function (string $k) use ($stMoney) {
@@ -2748,7 +2764,7 @@ function invAddRows() {
                 return $lines ? implode('<br>', $lines) : '—';
             }; ?>
       <tfoot id="stmtFoot"><tr>
-        <td colspan="3"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
+        <td colspan="4"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
         <td class="num"><strong><?= e(fmt_num($stTot['planned_days'], 1)) ?></strong></td>
         <td class="num"><strong><?= e(fmt_num($stTot['hours'], 1)) ?> h</strong><br><span class="muted small"><?= e(fmt_num($stTot['days'], 2)) ?> d</span></td>
         <td class="num"><strong><?= $stTot['approved_seconds'] > 0 ? e(statement_secs($stTot['approved_seconds'])) : '—' ?></strong></td>
@@ -2770,7 +2786,7 @@ function invAddRows() {
       var bar = document.getElementById('stmtFilter'), foot = document.getElementById('stmtFoot');
       if (!bar || !foot) return;
       var nameIn = document.getElementById('stmtFilterName'), rateSel = document.getElementById('stmtFilterRate'),
-          statusSel = document.getElementById('stmtFilterStatus'), whenSel = document.getElementById('stmtFilterWhen'),
+          statusSel = document.getElementById('stmtFilterStatus'), posSel = document.getElementById('stmtFilterPos'), whenSel = document.getElementById('stmtFilterWhen'),
           dateIn = document.getElementById('stmtFilterDate'), countEl = document.getElementById('stmtFilterCount'),
           clearA = document.getElementById('stmtFilterClear'), emptyRow = document.querySelector('.statement-list .stmt-filter-empty');
       var rows = Array.prototype.slice.call(document.querySelectorAll('.statement-list tbody tr[data-stmt]'));
@@ -2785,6 +2801,17 @@ function invAddRows() {
       var present = {};
       rows.forEach(function (tr) { (tr.getAttribute('data-units') || '').split(' ').forEach(function (u) { if (u) present[u] = true; }); });
       Array.prototype.forEach.call(rateSel.options, function (o) { if (o.value && !present[o.value]) o.remove(); });
+      // Every position somebody holds, in the order they first appear (the
+      // rows' own pipeline order). A person on two steps matches either.
+      var posSeen = {};
+      rows.forEach(function (tr) {
+        (tr.getAttribute('data-positions') || '').split('|').forEach(function (p) {
+          if (!p || posSeen[p]) return;
+          posSeen[p] = true;
+          var o = document.createElement('option'); o.value = p; o.textContent = p; posSel.appendChild(o);
+        });
+      });
+      if (posSel.options.length < 2) posSel.closest('label').hidden = true;
 
       function num(tr, k) { var v = tr.getAttribute('data-' + k); return v === '' || v === null ? null : parseFloat(v); }
       // The PHP formatters, the same way round: number_format, fmt_num, fmt_secs.
@@ -2795,13 +2822,14 @@ function invAddRows() {
       function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 
       function apply(persist) {
-        var q = nameIn.value.trim().toLowerCase(), rate = rateSel.value, status = statusSel.value, when = whenSel.value;
+        var q = nameIn.value.trim().toLowerCase(), pos = posSel.value, rate = rateSel.value, status = statusSel.value, when = whenSel.value;
         dateIn.hidden = when !== 'date';
         var on = when === 'today' ? today() : (when === 'date' ? dateIn.value : '');
         var shown = [];
         rows.forEach(function (tr) {
           var ok = true;
           if (q && (tr.getAttribute('data-name') || '').toLowerCase().indexOf(q) === -1) ok = false;
+          if (ok && pos && ('|' + tr.getAttribute('data-positions') + '|').indexOf('|' + pos + '|') === -1) ok = false;
           if (ok && rate && (' ' + tr.getAttribute('data-units') + ' ').indexOf(' ' + rate + ' ') === -1) ok = false;
           if (ok && status) {
             var left = num(tr, 'left'), due = num(tr, 'due');
@@ -2821,7 +2849,7 @@ function invAddRows() {
           tr.hidden = !ok;
           if (ok) shown.push(tr);
         });
-        var active = !!(q || rate || status || on);
+        var active = !!(q || pos || rate || status || on);
         clearA.hidden = !active;
         emptyRow.hidden = shown.length > 0;
         countEl.textContent = active ? 'Showing ' + shown.length + ' of ' + rows.length : rows.length + ' people';
@@ -2836,7 +2864,7 @@ function invAddRows() {
           });
           var curs = Object.keys(m).sort();
           var cell = function (k) { return curs.length ? curs.map(function (c) { return esc(money(m[c][k]) + ' ' + c); }).join('<br>') : '—'; };
-          foot.innerHTML = '<tr><td colspan="3"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' people · filtered</span></td>'
+          foot.innerHTML = '<tr><td colspan="4"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' people · filtered</span></td>'
             + '<td class="num"><strong>' + esc(fnum(t.planned, 1)) + '</strong></td>'
             + '<td class="num"><strong>' + esc(fnum(t.hours, 1)) + ' h</strong><br><span class="muted small">' + esc(fnum(t.days, 2)) + ' d</span></td>'
             + '<td class="num"><strong>' + (t.secs > 0 ? esc(fsecs(t.secs)) : '—') + '</strong></td>'
@@ -2844,18 +2872,19 @@ function invAddRows() {
             + '<td class="num"><strong>' + cell('inv') + '</strong></td>'
             + '<td class="num"><strong>' + cell('left') + '</strong></td><td></td></tr>';
         }
-        if (persist) save({ q: nameIn.value, rate: rate, status: status, when: when, date: dateIn.value });
+        if (persist) save({ q: nameIn.value, pos: pos, rate: rate, status: status, when: when, date: dateIn.value });
       }
 
       var s = load();
       nameIn.value = s.q || '';
+      if (s.pos && posSeen[s.pos]) posSel.value = s.pos;
       if (s.rate && rateSel.querySelector('option[value="' + s.rate + '"]')) rateSel.value = s.rate;
       if (s.status) statusSel.value = s.status;
       if (s.when) whenSel.value = s.when;
       dateIn.value = s.date || '';
       if (whenSel.value === 'date' && !dateIn.value) dateIn.value = today();
       [nameIn, dateIn].forEach(function (el) { el.addEventListener('input', function () { apply(true); }); });
-      [rateSel, statusSel, whenSel].forEach(function (el) {
+      [posSel, rateSel, statusSel, whenSel].forEach(function (el) {
         el.addEventListener('change', function () {
           if (el === whenSel && whenSel.value === 'date' && !dateIn.value) dateIn.value = today();
           apply(true);
@@ -2863,7 +2892,7 @@ function invAddRows() {
       });
       clearA.addEventListener('click', function (e) {
         e.preventDefault();
-        nameIn.value = ''; rateSel.value = ''; statusSel.value = ''; whenSel.value = ''; dateIn.value = '';
+        nameIn.value = ''; posSel.value = ''; rateSel.value = ''; statusSel.value = ''; whenSel.value = ''; dateIn.value = '';
         apply(true);
       });
       bar.hidden = false;

@@ -408,7 +408,7 @@ details.kickoff-resend summary { cursor: pointer; }
    flex, so [hidden] needs saying to win, on the bar and its date box. */
 .stmt-filter-bar { margin: 0 0 10px; gap: 14px; }
 .stmt-filter-bar input[type="search"] { width: 14em; }
-.stmt-filter-bar[hidden], .stmt-filter-bar input[hidden], .statement-list tr[hidden] { display: none; }
+.stmt-filter-bar[hidden], .stmt-filter-bar input[hidden], .stmt-filter-bar label[hidden], .statement-list tr[hidden] { display: none; }
 /* Cost beside the Shots and assets figures: a line sets the money apart. */
 .kickoff-figures .kickoff-cost { border-left: 1px solid var(--border-strong); }
 .kickoff-figures td.kickoff-diff { font-weight: 600; }
