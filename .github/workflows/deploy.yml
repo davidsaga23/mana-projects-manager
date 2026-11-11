@@ -79,3 +79,59 @@ jobs:
             uploads/**
             *.md
             *.zip
+
+  # ⚠ THE NEW HOST, IN PARALLEL (David, 2026-11-11, moving to KnownHost at
+  # anima-mana.com; docs/HOSTING_MIGRATION.md). Until the cut-over every merge
+  # goes to BOTH servers: the old one stays the live site the team works on,
+  # and the new one always runs the same code, so the cut-over is a data copy
+  # rather than a code copy. At the cut-over the `deploy` job above is removed
+  # and this one becomes the only deploy.
+  #
+  # Its own secrets (KH_FTP_SERVER, KH_FTP_USERNAME, KH_FTP_PASSWORD), so the
+  # old host's are untouched. Until they are set, the sync step is skipped and
+  # the job passes: merging this before the secrets exist changes nothing.
+  #
+  # The FTP account is created with public_html as its home, so the target is
+  # its own top folder. The server name is the machine's (cp50-ga), not
+  # anima-mana.com, because that is the name on the FTP certificate. The first
+  # run uploads every file (there is no sync state file there yet); after that,
+  # only what changed.
+  deploy-knownhost:
+    needs: lint
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      KH_FTP_SERVER: ${{ secrets.KH_FTP_SERVER }}
+    steps:
+      - name: Check out the repository
+        if: env.KH_FTP_SERVER != ''
+        uses: actions/checkout@v4
+
+      - name: Sync changed files over FTP to KnownHost (anima-mana.com)
+        if: env.KH_FTP_SERVER != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.KH_FTP_SERVER }}
+          username: ${{ secrets.KH_FTP_USERNAME }}
+          password: ${{ secrets.KH_FTP_PASSWORD }}
+          server-dir: ./
+          protocol: ftps
+          dry-run: false
+          # The same list as above, for the same reasons: never overwrite the
+          # new server's config.php, uploads or sessions.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/docs/**
+            **/tools/**
+            **/node_modules/**
+            config.php
+            sessions/**
+            uploads/**
+            *.md
+            *.zip
+
+      - name: Say so when the KnownHost secrets are not set yet
+        if: env.KH_FTP_SERVER == ''
+        run: echo "::notice::KH_FTP_SERVER is not set, so nothing was sent to KnownHost. Add the three KH_FTP_* secrets to switch this on."

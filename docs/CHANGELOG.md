@@ -25,6 +25,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - One position, or none, is one row with the same figures as before. The Total row counts people
   and rows; the filter's **Over-invoiced** now means invoiced more than the logged work is worth.
 
+## 2026-11-11 — Every merge also deploys to the new host, anima-mana.com *(no migration)*
+
+- A second deploy job sends each merge to KnownHost as well as the old host, until the cut-over.
+  It uses its own secrets (`KH_FTP_*`) and skips itself until they are set; the same files are
+  never sent (config.php, uploads, sessions, docs, tools).
+
 ## 2026-11-11 — Artist statements count days typed from Finance *(no migration)*
 
 - Days an admin types with "+ days" on the Expense projection's Actual days now show on that
