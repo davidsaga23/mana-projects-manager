@@ -330,6 +330,9 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         $tlRows[$label[(int)$s['id']]] = [
             'start' => $a, 'end' => $b,
             'days'  => ($a && $b && $b >= $a) ? working_days_between($a, $b) : null,
+            // Not a column (not in 'cols', so never compared or listed): the
+            // step's colour, for the bars of Kick-off vs now.
+            'color' => (string)($s['color'] ?? ''),
         ];
     }
     $msRows = [];
@@ -1262,10 +1265,107 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       <?php endforeach; ?>
 
       <?php foreach ($was['lists'] as $listTitle => $list):
-          kickoff_render_list($listTitle, $list, $compare ? ($now['lists'][$listTitle] ?? ['cols' => $list['cols'], 'rows' => []]) : null, $currency);
+          $nowList = $compare ? ($now['lists'][$listTitle] ?? ['cols' => $list['cols'], 'rows' => []]) : null;
+          // David, 2026-11-11: "instead of the timeline being a table let's do a
+          // first bar with the kick off dates and a faded same color for the
+          // actual/current below". The Timeline's step list, compared, is
+          // drawn as bars; its table folds away underneath for exact dates.
+          if ($compare && $listTitle === 'Steps' && isset($list['cols']['start'], $list['cols']['end'])
+              && kickoff_render_gantt($list, $nowList)) {
+              echo '<details class="kickoff-gantt-table"><summary class="muted small">The same dates as a table</summary>';
+              kickoff_render_list($listTitle, $list, $nowList, $currency);
+              echo '</details>';
+              continue;
+          }
+          kickoff_render_list($listTitle, $list, $nowList, $currency);
       endforeach; ?>
     </section>
     <?php
+}
+
+/**
+ * The Timeline's steps as bars: per step, the kick-off dates as a solid bar in
+ * the step's colour and now as a faded bar of the same colour just below, on
+ * one shared calendar. Returns false (and draws nothing) when no step has a
+ * date on either side, so the caller falls back to the table.
+ */
+function kickoff_render_gantt(array $was, array $now): bool {
+    $wr = $was['rows'] ?? []; $nr = $now['rows'] ?? [];
+    $day = static function ($d): ?int {
+        if (!$d) return null;
+        $t = strtotime((string)$d);
+        return $t === false ? null : (int)floor($t / 86400);
+    };
+    $span = static function (?array $r) use ($day): ?array {
+        if (!$r) return null;
+        $a = $day($r['start'] ?? null); $b = $day($r['end'] ?? null);
+        if ($a === null && $b === null) return null;
+        $a = $a ?? $b; $b = $b ?? $a;
+        return [min($a, $b), max($a, $b), (string)($r['start'] ?? ''), (string)($r['end'] ?? '')];
+    };
+    $rows = []; $min = null; $max = null; $i = 0;
+    $keys = array_unique(array_merge(array_map('strval', array_keys($wr)), array_map('strval', array_keys($nr))));
+    foreach ($keys as $key) {
+        $w = $span($wr[$key] ?? null); $n = $span($nr[$key] ?? null);
+        if (!$w && !$n) continue;
+        foreach ([$w, $n] as $x) {
+            if (!$x) continue;
+            $min = $min === null ? $x[0] : min($min, $x[0]);
+            $max = $max === null ? $x[1] : max($max, $x[1]);
+        }
+        // A step colour is data (a hex picked per step); anything else falls
+        // back to the default step colour rather than reaching the style.
+        $c = (string)($nr[$key]['color'] ?? $wr[$key]['color'] ?? '');
+        if (!preg_match('/^#[0-9a-f]{3,8}$/i', $c)) $c = 'var(--step-default)';
+        $how = !isset($wr[$key]) ? 'added' : (!isset($nr[$key]) ? 'removed' : '');
+        $rows[] = [$key, $w, $n, $c, $how, ($w ?? $n)[0], $i++];
+    }
+    if (!$rows) return false;
+    // Earliest kick-off start first (a new step by its start now), so the bars
+    // fall like a cascade; ties keep the pipeline order.
+    usort($rows, fn($x, $y) => [$x[5], $x[6]] <=> [$y[5], $y[6]]);
+    $total = max(1, $max - $min + 1);
+    $pos = static fn(array $x): string => sprintf('left:%.3f%%;width:%.3f%%',
+        ($x[0] - $min) / $total * 100, max(0.6, ($x[1] - $x[0] + 1) / $total * 100));
+    $fmt = static function (array $x): string {
+        if ($x[2] !== '' && $x[3] !== '') return kickoff_fmt($x[2], 'date') . ' – ' . kickoff_fmt($x[3], 'date');
+        return kickoff_fmt($x[2] !== '' ? $x[2] : $x[3], 'date');
+    };
+    $L = kickoff_labels();
+    // A tick at the first of each month inside the range.
+    $ticks = [];
+    $m = strtotime(gmdate('Y-m-01', $min * 86400) . ' UTC');
+    while ($m !== false && ($d = (int)floor($m / 86400)) <= $max) {
+        if ($d >= $min) $ticks[] = [($d - $min) / $total * 100, gmdate('M Y', $m)];
+        $m = strtotime('+1 month', $m);
+    }
+    $today = $day(date('Y-m-d'));
+    ?>
+    <div class="kickoff-gantt">
+      <div class="kickoff-gantt-key muted small">
+        <span><i class="kickoff-gantt-swatch"></i><?= e($L[0]) ?></span>
+        <span><i class="kickoff-gantt-swatch is-now"></i><?= e($L[1]) ?></span>
+      </div>
+      <div class="kickoff-gantt-row kickoff-gantt-head">
+        <div></div>
+        <div class="kickoff-gantt-track">
+          <?php foreach ($ticks as [$p, $txt]): ?><span class="kickoff-gantt-tick" style="left:<?= sprintf('%.3f', $p) ?>%"><?= e($txt) ?></span><?php endforeach; ?>
+        </div>
+      </div>
+      <?php foreach ($rows as [$key, $w, $n, $c, $how]): ?>
+        <div class="kickoff-gantt-row">
+          <div class="kickoff-gantt-name" title="<?= e($key) ?>"><?= e($key) ?><?php if ($how): ?> <span class="kickoff-chg"><?= e($how) ?></span><?php endif; ?></div>
+          <div class="kickoff-gantt-track" style="--bar:<?= e($c) ?>">
+            <?php foreach ($ticks as [$p]): ?><span class="kickoff-gantt-grid" style="left:<?= sprintf('%.3f', $p) ?>%"></span><?php endforeach; ?>
+            <?php if ($today !== null && $today >= $min && $today <= $max): ?><span class="kickoff-gantt-today" style="left:<?= sprintf('%.3f', ($today - $min) / $total * 100) ?>%" title="Today"></span><?php endif; ?>
+            <?php if ($w): ?><span class="kickoff-gantt-bar" style="<?= $pos($w) ?>" title="<?= e($key . ', ' . $L[0] . ': ' . $fmt($w)) ?>"></span><?php endif; ?>
+            <?php if ($n): ?><span class="kickoff-gantt-bar is-now" style="<?= $pos($n) ?>" title="<?= e($key . ', ' . $L[1] . ': ' . $fmt($n)) ?>"></span><?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <?php
+    return true;
 }
 
 /** One list. Compared, the rows that moved come first and the rest fold away. */

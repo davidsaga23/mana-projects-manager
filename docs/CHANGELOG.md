@@ -22,6 +22,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   now pair (headed "v1" / "Now", or "Kick-off" / "Now"), one value per cell. A cell used to read
   "2 Sep → 26 Oct", which looked like a start and an end. The figure that moved is bold, a line
   divides the pairs, and the table no longer stretches across the page.
+- **Timeline as bars:** the Timeline's steps are drawn on one calendar, a solid bar in the step's
+  colour for the kick-off dates and a faded bar of the same colour under it for now, with month
+  lines and today marked (David). Hover a bar for its dates; the table folds away underneath.
+  Steps saved before today have no colour stored and take it from the project as it is now.
 
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 
