@@ -4997,3 +4997,24 @@ the left to invoice should be" (pointing at the column between Logged and Approv
   "ahead of logged" under Invoiced and as a note on the statement.
 - Not decided here: flat fees still count as fully earned from day one, and salaried people still show
   their own rate (David asked to hold both on 2026-11-05).
+
+## 2026-11-11 — A salaried person's day rate comes from their own monthly salary
+
+**Asked by David:** "Junior is right now considered as a salaried artist, so we need to adjust the way
+his day rate is calculated and a place to put his monthly salary so we can calculate his daily rate
+here." Monthly salary 3,500; "Daily rate cost should be calculated on 21 days per month"; "It should be
+automatically grayed out and state that this is a salary calculation without an option to be edited in
+this context." Asked whether to store his own salary or one shared figure for all salaried staff
+(the 2026-10-28 rule was one blended rate, never personal salaries), he chose **his own salary**.
+
+**Decided:**
+- `crew_terms.monthly_salary` (finance_install_17), admin-only like every rate. With a salary, the day
+  rate IS salary ÷ 21 (`SALARY_DAYS_PER_MONTH`), per day, in the terms' currency. It is worked out in
+  `terms_from_salary()` on every read through `crew_terms()` / `own_crew_term()`, and stored by
+  `save_crew_terms()`, so nothing that prices a day needs to know about salaries.
+- The salary box shows for anyone ticked Salaried on the Users page, or who already has a salary.
+  The rate and its unit are greyed out with "Salary calculation". On the expense projection the
+  rate box is read-only, the quick edit refuses, and a bulk rate skips them and says so.
+- A position with its own contract (finance_install_13) still wins over the salary for that position.
+- This replaces the "one blended internal day rate, never store personal salaries" rule of
+  2026-10-28; CLAUDE.md was updated to match.

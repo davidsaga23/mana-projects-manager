@@ -3001,6 +3001,8 @@ button.secondary.danger:hover { background: var(--danger-border); }
 /* Unpriced rows are the ones the warning under the table is about, so the empty
    box says so rather than looking like any other blank field. */
 .rate-edit input.rate-unset { border-color: var(--warn-strong); background: var(--warn-tint); }
+/* A day rate worked out from a monthly salary (2026-11-11): shown, not edited. */
+.rate-from-salary { opacity: .55; cursor: not-allowed; pointer-events: none; }
 
 /* ---- the history screens ---------------------------------------------------
    Long lists of small tables under repeated headings. The headings have to

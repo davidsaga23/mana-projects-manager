@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Salaried staff: a monthly salary, and the day rate worked out from it *(finance_install_17)*
+
+- On the person page, **Terms and contract** has a **Monthly salary** box for anyone ticked Salaried on
+  the Users page (or who already has a salary). With a salary, the day rate is **salary ÷ 21 working
+  days** (3,500 → 166.67/day), greyed out with "Salary calculation", and cannot be edited there.
+- Every page that prices a day uses it: the expense projection, the artist statements, invoices.
+  On the projection the rate box is greyed out and says "salary calculation"; the quick edit
+  refuses, and a bulk rate leaves salaried people alone and says so.
+- Needs **finance_install_17.sql** imported by hand into the finance database. Until then the box
+  says so and every rate works as before. Asked by David for Junior.
+
 ## 2026-11-11 — Artist statements: one row per position, Position at the far left *(no migration)*
 
 - Somebody on two or more positions (slots in the Staffing tab, or a supervision position) now gets

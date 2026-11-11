@@ -42,7 +42,9 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
 
 - Anima tracks **budget against cost, never profit**.
 - The budget pays for **everyone** on the show: freelancers, and salaried staff (David, Tim, Renata,
-  Junior) at **one blended internal day rate** Jorik supplies. Never store personal salaries.
+  Junior) at a **day rate worked out from their own monthly salary ÷ 21 working days**
+  (`crew_terms.monthly_salary`, finance_install_17; David, 2026-11-11, replacing the earlier "one
+  blended rate, never store personal salaries"). Salaries are admin-only, like every rate.
   Diego is paid per job, like a freelancer.
 - Freelancers are paid for the days they work: **one invoice per person per month**, a line per
   project, sent **only to accounting@mana.tv** and paid once by Jorik; Anima splits it across the

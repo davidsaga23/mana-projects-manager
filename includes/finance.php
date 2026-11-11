@@ -459,6 +459,9 @@ function expense_projection(PDO $pdo, int $projectId): array {
                 // The rate is this position's own contract, not the person's
                 // default — so the rate box on the projection saves it there.
                 'own_position' => $ownPos,
+                // The day rate is the person's monthly salary ÷ 21
+                // (finance_install_17, 2026-11-11): shown, not editable here.
+                'from_salary' => !$ownPos && !empty($t['from_salary']),
                 'rate_unit'   => $rate !== null ? $unit : null,
                 'currency'    => $rate !== null ? $cur : null,
                 // The cost's own currency: USD when a fixed rate converted it.

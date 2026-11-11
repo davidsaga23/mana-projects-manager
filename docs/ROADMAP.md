@@ -1281,6 +1281,9 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 **Still open:**
 - ✅ **Who is salaried** is the Salaried tick on the Users page (migration 072). The blended internal
   day rate work can read the same `users.is_salaried`.
+- ✅ **A salaried person's day rate** (2026-11-11): their own monthly salary on the person page ÷ 21
+  working days (finance_install_17). David chose a personal salary over one blended figure.
+  Still open: salaried people still show on the Artist statements list with an amount to invoice.
 - **Per-second and flat-fee contracts** get no monthly line total: what they are paid on is approved
   footage or a fee once, not logged time. Their line points to the show's statement.
 - ✅ **One invoice split across projects (IN4)**, built 2026-10-29: Finance → Monthly invoices.
