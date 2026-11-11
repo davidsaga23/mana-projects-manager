@@ -312,6 +312,52 @@ function time_logs_have_step(PDO $pdo): bool {
 }
 
 /**
+ * WHICH ENTRIES A DATED WINDOW KEEPS, as " AND (...)" for a query on
+ * time_logs AS tl, with its values appended to $args. Empty when there is no
+ * window.
+ *
+ * ⚠ DAYS TYPED FROM FINANCE ALWAYS COUNT (David, 2026-11-11: "I've already
+ * logged 8 [days] in MSD for Dan, but it is not reflected in the artist
+ * statement"). The window is there to catch an artist's own entry made on a
+ * day outside their contract. A day typed on the Actual days cell is not that:
+ * an admin typed it for that person on that position of that show, and its
+ * date defaults to the day it was TYPED, which is usually after the contract
+ * ended (Dan: 22 Oct – 5 Nov, typed 11 Nov). Leaving it out made the statement
+ * say 0 days where the Expense projection said 8. So a typed entry counts
+ * whatever its date, exactly as it does in Actual days, and the two agree on
+ * it. An entry is "typed" when it carries its own step and no task: only
+ * log_step_days() writes that shape (the same test the remove button uses).
+ */
+function tl_window_where(PDO $pdo, ?string $from, ?string $to, array &$args): string {
+    $w = [];
+    if ($from) { $w[] = 'tl.log_date >= ?'; $args[] = $from; }
+    if ($to)   { $w[] = 'tl.log_date <= ?'; $args[] = $to; }
+    if (!$w) return '';
+    $in = implode(' AND ', $w);
+    if (time_logs_have_step($pdo)) $in = "({$in}) OR (tl.step_id IS NOT NULL AND tl.progress_id IS NULL)";
+    return " AND ({$in})";
+}
+
+/**
+ * Minutes one person logged on one show inside a statement window, typed days
+ * included whatever their date (tl_window_where()). The statements and Home's
+ * show card read this, so they and the Expense projection agree on typed days.
+ */
+function logged_in_window(PDO $pdo, int $crewId, int $projectId, ?string $from, ?string $to): int {
+    if (!time_logs_available($pdo)) return 0;
+    $args = [$crewId, $projectId];
+    $sql = 'SELECT COALESCE(SUM(tl.minutes), 0) FROM time_logs tl WHERE tl.crew_id = ? AND tl.project_id = ?'
+         . tl_window_where($pdo, $from, $to, $args);
+    try {
+        $q = $pdo->prepare($sql);
+        $q->execute($args);
+        return (int)$q->fetchColumn();
+    } catch (PDOException $e) {
+        return 0;
+    }
+}
+
+/**
  * The step an entry belongs to, for a query that LEFT JOINs progress AS pr onto
  * time_logs AS tl: the task's step, or the entry's own step (076).
  */
