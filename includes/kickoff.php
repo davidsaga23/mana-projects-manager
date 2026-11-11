@@ -527,6 +527,20 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'status' => (string)$i['status'],
         ];
     }
+    // David, 2026-11-11: "let's include a row for committed so far so we can
+    // compare too". The Overview's own figure (step_variance()'s 'spent': every
+    // invoice plus logged days not invoiced yet), so the two cannot disagree.
+    // A failure here leaves the row empty rather than stopping a sign-off.
+    $committed = null;
+    try {
+        require_once __DIR__ . '/step_variance.php';
+        $sv = step_variance($pdo, $project, $proj,
+                            isset($budget['budget_amount']) ? (float)$budget['budget_amount'] : null,
+                            dashboard_steps($pdo, $pid, $project['delivery_date'] ?? null));
+        $committed = isset($sv['spent']) ? (float)$sv['spent'] : null;
+    } catch (Throwable $e) {
+        $committed = null;
+    }
     $pool = budget_pool($pdo, $project, $proj);
     $poolRows = [];
     foreach ($pool['days']['rows'] ?? [] as $r) {
@@ -550,6 +564,7 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'Other expenses'                 => [(float)$proj['other_total'], 'money'],
             'Projected total'                => [(float)$proj['grand_total'], 'money'],
             'Invoiced so far'                => [$invoiced, 'money'],
+            'Committed so far'               => [$committed, 'money'],
             'Budget pool, days'              => [round((float)$pool['days']['pool'], 2), 'num'],
             'Budget pool, days used'         => [round((float)$pool['days']['used'], 2), 'num'],
         ],
@@ -597,6 +612,17 @@ function kickoff_finance_load(int $kickoffId): ?array {
     // record stays as it was taken, and no screen shows the figure.
     if (is_array($snap) && isset($snap['figures']) && is_array($snap['figures'])) {
         unset($snap['figures']['Revenue (billed to the client)']);
+        // Snapshots taken before 2026-11-11 did not record Committed so far.
+        // An empty slot right under Invoiced keeps the row in its place
+        // (shown "—") instead of trailing at the bottom as "added".
+        if (!array_key_exists('Committed so far', $snap['figures'])) {
+            $f = [];
+            foreach ($snap['figures'] as $k => $v) {
+                $f[$k] = $v;
+                if ($k === 'Invoiced so far') $f['Committed so far'] = [null, 'money'];
+            }
+            $snap['figures'] = $f;
+        }
     }
     return $snap;
 }
