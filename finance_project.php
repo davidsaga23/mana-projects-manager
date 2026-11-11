@@ -2694,7 +2694,7 @@ function invAddRows() {
       <label>Status
         <select id="stmtFilterStatus"><option value="">All</option>
           <option value="left">Left to invoice</option>
-          <option value="over">Over-invoiced</option>
+          <option value="over">Invoiced ahead of logged</option>
           <option value="nolog">Nothing logged</option>
           <option value="settled">Settled</option>
         </select></label>
@@ -2742,10 +2742,9 @@ function invAddRows() {
           if (count($st['lines']) > 1) { foreach ($st['lines'] as $l) $stUnits[(string)$l['unit']] = true; }
           elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true; ?>
         <tr data-stmt="1" data-name="<?= e($name) ?>" data-positions="<?= e((string)($st['position'] ?? '')) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
-            data-dleft="<?= e((string)max(0.0, (float)$st['days_left'])) ?>"
             data-from="<?= e((string)($w['from'] ?? '')) ?>" data-to="<?= e((string)($w['to'] ?? '')) ?>"
             data-planned="<?= e((string)(float)$st['planned_days']) ?>" data-hours="<?= e((string)(float)$st['hours']) ?>"
-            data-days="<?= e((string)(float)$st['days']) ?>" data-secs="<?= e((string)(float)$st['approved_seconds']) ?>"
+            data-days="<?= e((string)(float)$st['days']) ?>" data-daysleft="<?= e((string)(float)$st['days_left']) ?>" data-secs="<?= e((string)(float)$st['approved_seconds']) ?>"
             data-cur="<?= e($cur) ?>" data-due="<?= $st['due'] !== null ? e((string)(float)$st['due']) : '' ?>"
             data-inv="<?= e((string)(float)$st['invoiced']) ?>" data-left="<?= $st['left'] !== null ? e((string)(float)$st['left']) : '' ?>">
           <td class="small"><?= $st['position'] !== null ? e($st['position']) : '<span class="muted">—</span>' ?></td>
@@ -2850,13 +2849,14 @@ function invAddRows() {
           if (ok && status) {
             var left = num(tr, 'left'), due = num(tr, 'due');
             if (status === 'left') ok = left !== null && left > 0;
-            // Over-invoiced: invoiced more than the logged work is worth. Left
-            // to invoice no longer goes negative to say so (2026-11-11).
-            else if (status === 'over') ok = due !== null && (num(tr, 'inv') || 0) > due + 0.005;
+            // Left to invoice never goes below zero since 2026-11-11 (it is
+            // the work still to do), so over-invoiced is the "ahead of
+            // logged" case: more invoiced than the logged time has earned.
+            else if (status === 'over') ok = due !== null && num(tr, 'inv') > due + 0.005;
             else if (status === 'nolog') ok = !(num(tr, 'hours') > 0) && !(num(tr, 'secs') > 0);
-            // Settled: something earned, and all of it invoiced. Somebody
-            // with nothing earned yet is not "settled", just not started.
-            else if (status === 'settled') ok = left !== null && left === 0 && due !== null && due > 0;
+            // Settled: nothing left to invoice, something earned, and all of
+            // it invoiced. Somebody with nothing earned yet is not settled.
+            else if (status === 'settled') ok = left !== null && left === 0 && due !== null && due > 0 && num(tr, 'inv') >= due - 0.005;
           }
           // On the show on a date: inside their Dates. A missing end is open,
           // so a row with no dates at all (salaried, say) is never hidden.
@@ -2873,9 +2873,10 @@ function invAddRows() {
         countEl.textContent = active ? 'Showing ' + shown.length + ' of ' + rows.length : rows.length + ' rows';
         if (!active) { foot.innerHTML = footHtml; }
         else {
-          var t = { planned: 0, hours: 0, days: 0, dleft: 0, secs: 0 }, m = {};
+          var t = { planned: 0, hours: 0, days: 0, secs: 0 }, dl = 0, m = {};
           shown.forEach(function (tr) {
             for (var k in t) t[k] += num(tr, k) || 0;
+            dl += Math.max(0, num(tr, 'daysleft') || 0);   // over-plan does not cancel, as on the server
             var c = tr.getAttribute('data-cur');
             m[c] = m[c] || { due: 0, inv: 0, left: 0 };
             m[c].due += num(tr, 'due') || 0; m[c].inv += num(tr, 'inv') || 0; m[c].left += num(tr, 'left') || 0;
@@ -2885,7 +2886,7 @@ function invAddRows() {
           foot.innerHTML = '<tr><td colspan="4"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' rows · filtered</span></td>'
             + '<td class="num"><strong>' + esc(fnum(t.planned, 1)) + '</strong></td>'
             + '<td class="num"><strong>' + esc(fnum(t.hours, 1)) + ' h</strong><br><span class="muted small">' + esc(fnum(t.days, 2)) + ' d</span></td>'
-            + '<td class="num"><strong>' + esc(fnum(t.dleft, 2)) + '</strong></td>'
+            + '<td class="num"><strong>' + esc(fnum(dl, 2)) + '</strong></td>'
             + '<td class="num"><strong>' + (t.secs > 0 ? esc(fsecs(t.secs)) : '—') + '</strong></td>'
             + '<td class="num"><strong>' + cell('due') + '</strong></td>'
             + '<td class="num"><strong>' + cell('inv') + '</strong></td>'

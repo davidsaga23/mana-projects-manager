@@ -1312,6 +1312,31 @@ Open before building:
 - **Numbering:** the artist's own invoice number (`invoice_ref`) or one Anima suggests.
 - **Currency:** USD by default; a non-USD contract shows its own currency at the project's fixed rate.
 
+### Reminders to log time: an end-of-day pop-up, and an instant one from an admin — NOT BUILT
+
+David: *"add pop up reminders for everyone to log times at the end of the day and a button for
+admins to send and instant pop up for logging times as an alternative"*.
+
+Artists log their time every day (the money rules in `CLAUDE.md`), and statements, actual days and
+the budget pool are only as good as those logs; on MSD most people had logged nothing. Two parts:
+- **End of day, automatic.** Around the end of the working day (a set time in the studio's time
+  zone, e.g. 5 pm, weekdays, not on studio holidays or the person's days off), anybody who has
+  logged nothing today gets a pop-up: "You haven't logged today" with a button to log it there.
+  Shown once a day, easy to dismiss.
+- **Instant, from an admin.** A button (e.g. on Users or the team views) that sends the same pop-up
+  now, to everybody or to chosen people, for the days somebody needs the numbers today.
+
+Things to settle when building:
+- **A pop-up only reaches somebody with Anima open.** The page checks every few minutes; for people
+  who are not in Anima, the bell keeps it, and an email at the same time is the fallback (decide).
+- **Who gets it:** everybody who logs time on a show; salaried staff too (their time is project cost
+  at the blended day rate). Not people with no show that day.
+- **Light on every page.** It loads from the header, so it must stay small and never throw (the rule
+  in `CLAUDE.md`); the check is one cheap query.
+- **Where to log:** the pop-up opens the same logging Home's "missing days" panel uses, not a second
+  way of logging.
+- Probably a switch per person on Users → Access (#170), and a record of who sent an instant one.
+
 ## Access switches — BUILT 2026-11-05 (migration 077)
 
 Users → Access by role / People / Access log; `includes/features.php`. What is left:

@@ -25,6 +25,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - One position, or none, is one row with the same figures as before. The Total row counts people
   and rows; the filter's **Over-invoiced** now means invoiced more than the logged work is worth.
 
+## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
+
+- A **Position** column next to Artist: the step or supervision position each person holds, the
+  names invoices use (one per line for somebody on two; "—" for logged time with no position).
+- A bar above **Artist statements** (Finance management): **search by name**, **position**, **rate** (per day,
+  per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
+  invoiced ahead of logged, nothing logged, settled = nothing left and everything earned invoiced) and **on the
+  show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
+  "Showing N of M" and a **Clear** link (David).
+- **The Total row follows the filter:** it adds up only the rows showing, labelled "3 of 23 people
+  · filtered", and goes back to the server's own total when the filter is cleared. Days left is counted too.
+- Done in the browser on the rows already drawn: no figure or query changed. Each viewer's filter
+  is remembered in their own browser, per show.
+
 ## 2026-11-11 — Artist statements: Days left, and Left to invoice is the work still to do *(no migration)*
 
 - A **Days left** column (days planned less days logged) on Finance management → Artist statements,
@@ -35,20 +49,6 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   minus invoiced", which showed −900 for anyone who invoiced before logging time.
 - Invoices ahead of the logged time are still flagged: **"ahead of logged"** under Invoiced on the
   list, and a note on the statement.
-
-## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
-
-- A **Position** column next to Artist: the step or supervision position each person holds, the
-  names invoices use (one per line for somebody on two; "—" for logged time with no position).
-- A bar above **Artist statements** (Finance management): **search by name**, **position**, **rate** (per day,
-  per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
-  over-invoiced, nothing logged, settled = something earned and all of it invoiced) and **on the
-  show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
-  "Showing N of M" and a **Clear** link (David).
-- **The Total row follows the filter:** it adds up only the rows showing, labelled "3 of 23 people
-  · filtered", and goes back to the server's own total when the filter is cleared.
-- Done in the browser on the rows already drawn: no figure or query changed. Each viewer's filter
-  is remembered in their own browser, per show.
 
 ## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
 
