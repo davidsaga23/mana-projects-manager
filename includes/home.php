@@ -155,7 +155,8 @@ function home_show(PDO $pdo, array $project, int $crewId, string $monthFrom, str
     }
 
     $hpd = hours_per_day($pdo, $pid);
-    $minutesWindow = logged_total_for_crew($pdo, $crewId, $pid, $win['from'], $win['to']);
+    // Typed days count whatever their date, as on the statement (2026-11-11).
+    $minutesWindow = logged_in_window($pdo, $crewId, $pid, $win['from'], $win['to']);
     $minutesMonth  = logged_total_for_crew($pdo, $crewId, $pid, $monthFrom, $today);
 
     return [
