@@ -65,9 +65,10 @@ every old link to the new site. Never run both at once: two databases cannot be 
 - [ ] Old host `config.php`: `'maintenance' => true`. Every page now says "back shortly".
 - [ ] Take the **final** exports of both databases and the final copy of `uploads/` (step 2 again,
       overwriting the rehearsal data on KnownHost).
-- [ ] GitHub → Settings → Secrets → Actions: `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`,
-      `FTP_TARGET_DIR` for KnownHost. Push a trivial commit (a CHANGELOG line) and watch the deploy
-      land. The first one uploads every file; that is expected.
+- [ ] Deploys already go to both hosts (the `deploy-knownhost` job, from 2026-11-11, using the
+      `KH_FTP_SERVER`, `KH_FTP_USERNAME`, `KH_FTP_PASSWORD` secrets). At the cut-over, remove the
+      old `deploy` job from `.github/workflows/deploy.yml` so only KnownHost gets new code, and
+      check the next deploy lands there.
 - [ ] `preflight.php` again: all green, **Kept private** included. `migrate.php`: nothing pending.
 - [ ] Log in and run the step-2 checks once more on the real data.
 - [ ] Old host: upload `tools/hosting/old-host-redirect.htaccess` as `.htaccess` in

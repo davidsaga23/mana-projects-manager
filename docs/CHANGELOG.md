@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Every merge also deploys to the new host, anima-mana.com *(no migration)*
+
+- A second deploy job sends each merge to KnownHost as well as the old host, until the cut-over.
+  It uses its own secrets (`KH_FTP_*`) and skips itself until they are set; the same files are
+  never sent (config.php, uploads, sessions, docs, tools).
+
 ## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
 
 - A **Position** column next to Artist: the step or supervision position each person holds, the
