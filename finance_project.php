@@ -2653,7 +2653,9 @@ function invAddRows() {
     What each person on the show should invoice, counted from their contract dates (or, where none
     are set, from the dates of the steps they are on). Days come from time logged in Anima, seconds
     from shots <strong>approved</strong> on the footage steps, and the amount follows each person's
-    rate unit. Every artist sees their own statement, and only theirs, from My tasks.
+    rate unit. <strong>Left to invoice</strong> is the planned work not yet logged (days left, or
+    seconds not yet approved) at their rate; for a flat fee, the fee less what has been invoiced.
+    Every artist sees their own statement, and only theirs, from My tasks.
   </p>
   <?php if (!$stPeople): ?>
     <div class="empty-state"><p>Nobody has a position, a task or logged time on this show yet.</p></div>
@@ -2666,7 +2668,7 @@ function invAddRows() {
     <table class="review-table statement-list">
       <thead><tr>
         <th>Artist</th><th>Dates</th><th>Rate</th>
-        <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Approved sec</th>
+        <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Days left</th><th class="num">Approved sec</th>
         <th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
       <tbody>
@@ -2674,12 +2676,16 @@ function invAddRows() {
       // Totals. Days, hours and seconds add up across everybody; money only
       // within one currency, so the money columns get a line per currency.
       $stTot = ['planned_days' => 0.0, 'hours' => 0.0, 'days' => 0.0, 'approved_seconds' => 0.0];
+      // Days left adds only what is still to do: somebody over their plan
+      // does not cancel out somebody who has not started (2026-11-11).
+      $stDaysLeft = 0.0;
       $stMoney = [];   // currency => ['due' =>, 'invoiced' =>, 'left' =>]
       foreach ($stPeople as $cid => $name):
           $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj, $fxRates, $stPos[$cid] ?? []);
           $w = $st['window'];
           $cur = $st['currency'];
           foreach ($stTot as $k => $v) $stTot[$k] = $v + (float)$st[$k];
+          $stDaysLeft += max(0.0, (float)$st['days_left']);
           $m = $stMoney[$cur] ?? ['due' => 0.0, 'invoiced' => 0.0, 'left' => 0.0];
           $m['due'] += (float)($st['due'] ?? 0);
           $m['invoiced'] += (float)$st['invoiced'];
@@ -2695,10 +2701,15 @@ function invAddRows() {
           <td class="small"><?php if (count($st['lines']) > 1): ?><?= count($st['lines']) ?> contracts<br><span class="muted">see the statement</span><?php else: ?><?php if ($st['rate'] !== null && $st['fx'] && $st['rate_usd'] !== null): // dollars first (2026-11-02) ?><?= e(fmt_money($st['rate_usd'], $st['unit'], 'USD')) ?><br><span class="muted">(<?= e(number_format($st['rate'], 2) . ' ' . $st['rate_currency']) ?>)</span><?php else: ?><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?><?php endif; ?><?php endif; ?></td>
           <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
           <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h<br><span class="muted small"><?= e(fmt_num($st['days'], 2)) ?> d</span></td>
+          <?php // DAYS LEFT: planned less logged (David, 2026-11-11). Logged past
+                // the plan shows as "over", in amber, rather than as a minus. ?>
+          <td class="num"><?php if ($st['days_left'] < -0.005): ?><span class="warn-text"><?= e(fmt_num(-$st['days_left'], 2)) ?> over</span><?php else: ?><?= e(fmt_num(max(0.0, $st['days_left']), 2)) ?><?php endif; ?></td>
           <td class="num"><?= $st['approved_seconds'] > 0 ? e(statement_secs($st['approved_seconds'])) : '<span class="muted">—</span>' ?></td>
           <td class="num"><?= e(fmt_money_plain($st['due'], $cur)) ?></td>
-          <td class="num"><?= e(fmt_money_plain($st['invoiced'], $cur)) ?></td>
-          <td class="num"><strong class="<?= ($st['left'] ?? 0) < 0 ? 'warn-text' : '' ?>"><?= e(fmt_money_plain($st['left'], $cur)) ?></strong></td>
+          <?php // Invoiced ahead of the logged time is still worth seeing, now that
+                // Left to invoice no longer goes negative to show it. ?>
+          <td class="num"><?= e(fmt_money_plain($st['invoiced'], $cur)) ?><?php if ($st['due'] !== null && $st['invoiced'] > $st['due'] + 0.005): ?><br><span class="warn-text small" title="More has been invoiced than the logged time is worth so far">ahead of logged</span><?php endif; ?></td>
+          <td class="num"><strong><?= e(fmt_money_plain($st['left'], $cur)) ?></strong></td>
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>">Statement →</a></td>
         </tr>
       <?php endforeach; ?>
@@ -2713,6 +2724,7 @@ function invAddRows() {
         <td colspan="3"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
         <td class="num"><strong><?= e(fmt_num($stTot['planned_days'], 1)) ?></strong></td>
         <td class="num"><strong><?= e(fmt_num($stTot['hours'], 1)) ?> h</strong><br><span class="muted small"><?= e(fmt_num($stTot['days'], 2)) ?> d</span></td>
+        <td class="num"><strong><?= e(fmt_num($stDaysLeft, 2)) ?></strong></td>
         <td class="num"><strong><?= $stTot['approved_seconds'] > 0 ? e(statement_secs($stTot['approved_seconds'])) : '—' ?></strong></td>
         <td class="num"><strong><?= $stMoneyCell('due') ?></strong></td>
         <td class="num"><strong><?= $stMoneyCell('invoiced') ?></strong></td>

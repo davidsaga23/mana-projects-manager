@@ -117,6 +117,15 @@ if ($admin && $project) {
       <span class="muted small">from the expense projection</span></div>
     <div><span class="muted small">Time logged</span><strong><?= e(fmt_num($s['hours'], 1)) ?> h</strong>
       <span class="muted small"><?= e(fmt_num($s['days'], 2)) ?> days at <?= e(fmt_num($s['hours_per_day'], 1)) ?> h a day</span></div>
+    <?php // Days left: planned less logged (David, 2026-11-11). ?>
+    <div><span class="muted small">Days left</span>
+      <?php if ($s['days_left'] < -0.005): ?>
+        <strong class="warn-text"><?= e(fmt_num(-$s['days_left'], 2)) ?> over</strong>
+        <span class="muted small">logged past the days planned</span>
+      <?php else: ?>
+        <strong><?= e(fmt_num(max(0.0, $s['days_left']), 2)) ?></strong>
+        <span class="muted small">planned, not yet logged</span>
+      <?php endif; ?></div>
     <?php if ($s['planned_seconds'] > 0 || $s['approved_seconds'] > 0): ?>
       <div><span class="muted small">Seconds approved</span><strong><?= e(statement_secs($s['approved_seconds'])) ?></strong>
         <span class="muted small">of <?= e(statement_secs($s['planned_seconds'])) ?> planned</span></div>
@@ -132,7 +141,7 @@ if ($admin && $project) {
           // Angelys's CH Layout on its rate, the rest on her default. ?>
     <?php if (!empty($s['lines'])): ?>
       <table class="review-table">
-        <thead><tr><th>Position</th><th>Rate</th><th>Counted on</th><th class="num">Earned so far</th></tr></thead>
+        <thead><tr><th>Position</th><th>Rate</th><th>Counted on</th><th class="num">Earned so far</th><th class="num">Days left</th><th class="num">Left to invoice</th></tr></thead>
         <tbody>
           <?php foreach ($s['lines'] as $l): ?>
             <tr>
@@ -148,6 +157,8 @@ if ($admin && $project) {
                 <?php else: ?><?= e(fmt_num($l['days'], 2)) ?> days logged<?php endif; ?>
               </td>
               <td class="num"><?= e($l['due'] === null ? '—' : fmt_money_plain($l['due'], $l['currency'])) ?></td>
+              <td class="num"><?php if ($l['days_left'] < -0.005): ?><span class="warn-text"><?= e(fmt_num(-$l['days_left'], 2)) ?> over</span><?php else: ?><?= e(fmt_num(max(0.0, $l['days_left']), 2)) ?><?php endif; ?></td>
+              <td class="num"><?= e($l['left'] === null ? '—' : fmt_money_plain($l['left'], $l['currency'])) ?></td>
             </tr>
           <?php endforeach; ?>
         </tbody>
@@ -186,10 +197,17 @@ if ($admin && $project) {
               ? fmt_money_both($s['due'], $s['due_own'], $s['rate_currency']) : $money($s['due'])) ?></strong></td></tr>
         <tr><th>Invoiced</th><td><?= e($money($s['invoiced'])) ?></td></tr>
         <tr class="statement-left"><th>Left to invoice</th>
-          <td><strong class="<?= ($s['left'] ?? 0) < 0 ? 'warn-text' : '' ?>"><?= e($money($s['left'])) ?></strong></td></tr>
+          <td><strong><?= e($money($s['left'])) ?></strong>
+            <div class="muted small"><?= $s['unit'] === 'flat' && empty($s['lines'])
+                ? 'The flat fee, less what has been invoiced.'
+                : ($s['unit'] === 'second' && empty($s['lines'])
+                    ? 'The planned seconds not yet approved, at the rate.'
+                    : 'The planned days not yet logged, at the rate.') ?></div></td></tr>
       </tbody>
     </table>
-    <?php if (($s['left'] ?? 0) < 0): ?>
+    <?php // Left to invoice no longer goes negative (2026-11-11), so invoices
+          // ahead of the logged time are said here instead. ?>
+    <?php if ($s['due'] !== null && $s['invoiced'] > $s['due'] + 0.005): ?>
       <p class="warn-text small">More has been invoiced than the logged work covers so far.</p>
     <?php endif; ?>
   <?php endif; ?>

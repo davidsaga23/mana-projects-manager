@@ -618,12 +618,14 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
     <p class="muted small">You are not on any show at the moment.</p>
   <?php else: ?>
     <table class="review-table">
-      <thead><tr><th>Show</th><th class="num">Logged</th><th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th></tr></thead>
+      <thead><tr><th>Show</th><th class="num">Logged</th><th class="num">Days left</th><th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th></tr></thead>
       <tbody>
         <?php foreach ($statements as $pid => $st): ?>
           <tr>
             <td><?= e($projectNames[$pid] ?? '') ?></td>
             <td class="num"><?= e(fmt_num($st['hours'], 1)) ?> h</td>
+            <?php // Planned less logged, as on the statement (2026-11-11). ?>
+            <td class="num"><?= $st['days_left'] < -0.005 ? e(fmt_num(-$st['days_left'], 2)) . ' over' : e(fmt_num(max(0.0, $st['days_left']), 2)) ?></td>
             <td class="num"><?= e(home_money($st['due'], (string)$st['currency'])) ?></td>
             <td class="num"><?= e(home_money($st['invoiced'], (string)$st['currency'])) ?></td>
             <td class="num"><strong><?= e(home_money($st['left'], (string)$st['currency'])) ?></strong></td>
@@ -632,7 +634,8 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
         <?php endforeach; ?>
       </tbody>
     </table>
-    <p class="muted small">A statement counts everything inside your dates on the show; the lines above are one month.</p>
+    <p class="muted small">A statement counts everything inside your dates on the show; the lines above are one month.
+      Left to invoice is the planned work you have not logged yet, at your rate.</p>
   <?php endif; ?>
 
   <?php // YOUR CONTRACT(S): a position with its own contract (finance_install_13) on a
