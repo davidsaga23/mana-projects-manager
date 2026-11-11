@@ -35,6 +35,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   paid for than budgeted.
 - **Workflow list removed** from Kick-off vs now and the frozen view (David). The step links are
   still saved with each kick-off, only not shown.
+- **Finance management moved to the top** of Kick-off vs now and the frozen view (David).
 
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 

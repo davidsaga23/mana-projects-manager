@@ -194,15 +194,20 @@ function kickoff_url(int $projectId): string {
 // and how a change is described ("+3", "+12 days", "changed").
 // ---------------------------------------------------------------------------
 
-/** The order the sections are shown in, as David listed them. */
+/**
+ * The order the sections are shown in, as David listed them, except Finance,
+ * which he moved to the top (2026-11-11: "let's move this section to the top
+ * of the page"). Administrators only see it, so for everyone else Brief still
+ * opens the page.
+ */
 const KICKOFF_SECTIONS = [
+    'finance'  => 'Finance management',
     'brief'    => 'Brief',
     'staffing' => 'Staffing',
     'schedule' => 'Schedule',
     'timeline' => 'Timeline',
     'shots'    => 'Shots',
     'setup'    => 'Setup',
-    'finance'  => 'Finance management',
 ];
 
 /** A list row key that stays unique when two rows would read the same. */
