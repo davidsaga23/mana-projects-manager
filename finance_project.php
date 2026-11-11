@@ -172,6 +172,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     array_merge($own, ['day_rate' => $_POST['day_rate'] ?? '']), $who));
             } else {
                 $existing = crew_term($crewId) ?? [];
+                // A day rate worked out from a monthly salary (2026-11-11) is not
+                // typed here; save_crew_terms() would ignore the number anyway.
+                if (!empty($existing['from_salary'])) {
+                    throw new RuntimeException($name . "'s day rate is worked out from their monthly salary. "
+                        . 'Change the salary on their person page. Nothing was saved.');
+                }
                 $merged = array_merge($existing, ['day_rate' => $_POST['day_rate'] ?? '']);
                 flash('ok', save_crew_terms($crewId, $name, $merged, $who));
             }
@@ -240,8 +246,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // typed, in its own currency, as before.
             $fxNow = project_fx_rates($projectId);
             $inOwn = fn(?array $t) => rate_from_usd_box($clean, $t['rate_currency'] ?? 'USD', $fxNow, true);
+            $salaried = [];
             foreach ($ids as $id) {
                 $existing = crew_term($id) ?? [];
+                // A rate from a monthly salary (2026-11-11) is left as it is.
+                if (!empty($existing['from_salary'])) { $salaried[] = $onShow[$id]['name']; continue; }
                 save_crew_terms($id, $onShow[$id]['name'],
                     array_merge($existing, ['day_rate' => $inOwn($existing)]), $who);
             }
@@ -253,8 +262,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         array_merge($ownAll[$key], ['day_rate' => $inOwn($ownAll[$key])]), $who);
                 }
             }
-            $n = count($ids) + count($posPicks);
+            $n = count($ids) - count($salaried) + count($posPicks);
             $said = sprintf('Rate %s applied to %d row%s.', $clean, $n, $n === 1 ? '' : 's');
+            if ($salaried) {
+                $said .= ' Left alone, their rate comes from a monthly salary: ' . implode(', ', $salaried) . '.';
+            }
             if ($people) {
                 $said .= ' Changed on every show for: ' . implode(', ', $people) . '.';
             }
@@ -1729,7 +1741,14 @@ if ($retakePct <= 0):
                 // a second implementation of the money, free to disagree with
                 // the first. ?>
           <td class="small">
-            <?php if ($r['crew_id']): ?>
+            <?php if ($r['crew_id'] && !empty($r['from_salary'])): ?>
+              <?php // A SALARY (2026-11-11): the rate is worked out from it on the
+                    // person page and cannot be typed here. ?>
+              <span class="rate-edit"><input value="<?= e(fmt_num(round((float)$r['rate'], 2), 2)) ?>" size="6" readonly
+                     class="rate-from-salary" aria-label="Day rate for <?= e((string)$r['artist']) ?>, from salary"></span>
+              <span class="muted"><?= e($r['currency'] ?: 'USD') ?> / day</span>
+              <div class="muted small" title="Monthly salary ÷ <?= SALARY_DAYS_PER_MONTH ?> working days; change the salary on the person page">salary calculation</div>
+            <?php elseif ($r['crew_id']): ?>
               <form method="post" class="rate-edit">
                 <input type="hidden" name="set_rate" value="1">
                 <input type="hidden" name="crew_id" value="<?= (int)$r['crew_id'] ?>">

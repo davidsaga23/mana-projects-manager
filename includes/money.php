@@ -148,8 +148,49 @@ function crew_terms(array $crewIds): array {
     $rows = $db->query("SELECT * FROM crew_terms WHERE crew_id IN ({$ids})")->fetchAll();
 
     $out = [];
-    foreach ($rows as $r) $out[(int)$r['crew_id']] = $r;
+    foreach ($rows as $r) $out[(int)$r['crew_id']] = terms_from_salary($r);
     return $out;
+}
+
+/* ---------------------------------------------------------------------------
+ * A SALARY, AND THE DAY RATE WORKED OUT FROM IT (David, 2026-11-11, for
+ * Junior: "a place to put his monthly salary so we can calculate his daily
+ * rate here ... Daily rate cost should be calculated on 21 days per month").
+ *
+ * crew_terms.monthly_salary (finance_install_17). When it is set, the day rate
+ * IS the salary ÷ 21, per day, in the terms' currency — whatever day_rate and
+ * rate_unit say. Applied here, on every read of the terms, so the expense
+ * projection, the statements and the invoices all price the day the same way
+ * without knowing a salary exists; and on every save (save_crew_terms()), so
+ * the stored day_rate agrees for anything that reads the column raw.
+ *
+ * He chose to store the person's own salary over one shared figure for all
+ * salaried staff (2026-11-11), replacing the 2026-10-28 rule that no personal
+ * salary is stored. Admin-only, like every rate: it is in the finance
+ * database, read through the same doors.
+ * ------------------------------------------------------------------------ */
+
+/** Working days a monthly salary is spread over to make a day rate. */
+const SALARY_DAYS_PER_MONTH = 21;
+
+/**
+ * A terms row with the salary's day rate applied: day_rate = salary ÷ 21,
+ * rate_unit 'day', and 'from_salary' => true so a screen can say so and not
+ * offer the rate for editing. Unchanged when there is no salary.
+ */
+function terms_from_salary(array $r): array {
+    $s = $r['monthly_salary'] ?? null;
+    if ($s !== null && $s !== '' && (float)$s > 0) {
+        $r['day_rate'] = round((float)$s / SALARY_DAYS_PER_MONTH, 2);
+        $r['rate_unit'] = 'day';
+        $r['from_salary'] = true;
+    }
+    return $r;
+}
+
+/** Has finance_install_17 been imported? Salaries cannot be stored without it. */
+function salary_available(): bool {
+    return finance_column_exists('crew_terms', 'monthly_salary');
 }
 
 /** One person's terms, or null. */
@@ -190,7 +231,8 @@ function own_crew_term(int $crewId): ?array {
     if (!$db) return null;
     $q = $db->prepare('SELECT * FROM crew_terms WHERE crew_id = ?');
     $q->execute([$crewId]);
-    return $q->fetch() ?: null;
+    $r = $q->fetch();
+    return $r ? terms_from_salary($r) : null;
 }
 
 /** A person's own invoices on one project, newest first; empty for anybody else's. */
@@ -481,6 +523,34 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
     $hasContract = finance_column_exists('crew_terms', 'contract_status');
     [$cStatus, $cSent, $cSigned] = $hasContract ? contract_input($in) : [null, null, null];
 
+    // A MONTHLY SALARY (finance_install_17, 2026-11-11). Only when the form
+    // sent the box: a caller that did not (the hiring quote, say) leaves the
+    // stored salary as it is, because the column is then not written at all.
+    // With a salary, the rate is the salary ÷ 21 per day, whatever was typed
+    // or merged into day_rate (terms_from_salary() above).
+    $salaryGiven = array_key_exists('monthly_salary', $in);
+    $salary = null;
+    if ($salaryGiven) {
+        $raw = trim((string)$in['monthly_salary']);
+        if ($raw !== '') {
+            if (!salary_available()) {
+                throw new RuntimeException('A monthly salary needs finance_install_17.sql imported into the finance '
+                    . 'database (by hand, in phpMyAdmin). Nothing was saved.');
+            }
+            $clean = preg_replace('/[^0-9.\-]/', '', str_replace(',', '', $raw));
+            if ($clean === '' || !is_numeric($clean) || (float)$clean < 0) {
+                throw new RuntimeException('"' . $raw . '" is not a salary, nothing was saved.');
+            }
+            $salary = round((float)$clean, 2);
+            if ($salary <= 0) $salary = null;
+        }
+        if (!salary_available()) $salaryGiven = false;
+    }
+    if ($salary !== null) {
+        $rateVal = round($salary / SALARY_DAYS_PER_MONTH, 2);
+        $unit = 'day';
+    }
+
     // The column list is built rather than written out twice, because the
     // alternative is splicing placeholders into a SQL string by offset — which
     // is how a mismatched quote took includes/finance.php down on 18 August.
@@ -490,6 +560,7 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         $cols = array_merge($cols, ['contract_status', 'contract_sent_date', 'contract_signed_date']);
         $args = array_merge($args, [$cStatus, $cSent, $cSigned]);
     }
+    if ($salaryGiven) { $cols[] = 'monthly_salary'; $args[] = $salary; }
 
     $update = [];
     foreach ($cols as $c) {
@@ -514,6 +585,9 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
         $logCols = array_merge($logCols, ['contract_status', 'contract_sent_date', 'contract_signed_date']);
         $logArgs = array_merge($logArgs, [$cStatus, $cSent, $cSigned]);
     }
+    if ($salaryGiven && finance_column_exists('crew_terms_log', 'monthly_salary')) {
+        $logCols[] = 'monthly_salary'; $logArgs[] = $salary;
+    }
     $db->prepare(
         'INSERT INTO crew_terms_log (' . implode(', ', $logCols) . ', changed_by) VALUES ('
         . implode(', ', array_fill(0, count($logCols) + 1, '?')) . ')'
@@ -521,7 +595,10 @@ function save_crew_terms(int $crewId, string $crewName, array $in, string $who =
 
     $said = $rateVal === null
         ? 'Terms saved, no rate recorded.'
-        : 'Terms saved: ' . fmt_money($rateVal, $unit, $cur) . '.';
+        : ($salary !== null
+            ? 'Terms saved: a monthly salary of ' . number_format($salary, 2) . ' ' . $cur . ', so '
+              . fmt_money($rateVal, 'day', $cur) . ' (÷ ' . SALARY_DAYS_PER_MONTH . ' days).'
+            : 'Terms saved: ' . fmt_money($rateVal, $unit, $cur) . '.');
     if ($hasContract && $cStatus !== 'none') {
         $said .= ' Contract ' . contract_state_phrase($cStatus, $cSent, $cSigned) . '.';
     }

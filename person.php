@@ -259,6 +259,23 @@ try {
 } catch (Throwable $e) {
     $termsError = $e->getMessage();
 }
+// SALARIED (the tick on the Users page, migration 072): they get a Monthly
+// salary box, and their day rate is worked out from it (finance_install_17,
+// David 2026-11-11). Somebody who already has a salary keeps the box even if
+// the tick comes off, so it can be seen and cleared. The same question as
+// home_is_salaried(), asked here so this page does not load includes/home.php.
+$isSalaried = false;
+try {
+    if (column_exists($pdo, 'users', 'is_salaried')) {
+        $sq = $pdo->prepare('SELECT COUNT(*) FROM users WHERE crew_id = ? AND is_salaried = 1');
+        $sq->execute([$crewId]);
+        $isSalaried = (int)$sq->fetchColumn() > 0;
+    }
+} catch (Throwable $e) {
+    $isSalaried = false;
+}
+$fromSalary = !empty($terms['from_salary']);
+$showSalary = $isSalaried || $fromSalary;
 $hours   = hours_per_day($pdo, $projectId);
 $isSlot  = (int)($person['is_placeholder'] ?? 0) === 1;
 
@@ -791,13 +808,33 @@ require __DIR__ . '/includes/header.php';
     <form method="post" class="stack">
       <input type="hidden" name="save_terms" value="1">
       <?php if ($from): ?><input type="hidden" name="from" value="finance"><?php endif; ?>
+      <?php // A SALARY (David, 2026-11-11, for Junior): the monthly salary is
+            // typed here and the day rate is worked out from it, salary ÷ 21
+            // working days, greyed out and not editable while there is one.
+            // The script below greys it the moment a salary is typed; the
+            // save works it out again on the server either way
+            // (save_crew_terms(), terms_from_salary()). ?>
+      <?php if ($showSalary): ?>
+        <div class="row">
+          <label>Monthly salary
+            <input name="monthly_salary" id="termsSalary" inputmode="decimal" placeholder="e.g. 3,500.00"
+                   value="<?= e(isset($terms['monthly_salary']) && $terms['monthly_salary'] !== null ? fmt_num((float)$terms['monthly_salary'], 2) : '') ?>"
+                   <?= salary_available() ? '' : 'disabled' ?>>
+          </label>
+        </div>
+        <?php if (!salary_available()): ?>
+          <p class="muted small warn-text">A monthly salary needs <code>finance_install_17.sql</code> imported into the
+            finance database (by hand, in phpMyAdmin). Until then the rate below is typed as usual.</p>
+        <?php endif; ?>
+      <?php endif; ?>
       <div class="row">
         <label>Rate
-          <input name="day_rate" inputmode="decimal" placeholder="e.g. 350.00"
+          <input name="day_rate" id="termsRate" inputmode="decimal" placeholder="e.g. 350.00"
+                 class="<?= $fromSalary ? 'rate-from-salary' : '' ?>" <?= $fromSalary ? 'readonly' : '' ?>
                  value="<?= e($terms && $terms['day_rate'] !== null ? fmt_num((float)$terms['day_rate'], 2) : '') ?>">
         </label>
         <label>Per
-          <select name="rate_unit">
+          <select name="rate_unit" id="termsUnit" class="<?= $fromSalary ? 'rate-from-salary' : '' ?>">
             <?php // 'second' is for footage steps — rough animation, tie-down,
                   // cleanup — quoted per second of screen time. It only prices a
                   // step that actually tracks seconds; on any other step the
@@ -815,6 +852,31 @@ require __DIR__ . '/includes/header.php';
                  value="<?= e($terms['rate_currency'] ?? 'USD') ?>">
         </label>
       </div>
+      <?php if ($showSalary): ?>
+        <p class="muted small" id="termsSalaryNote" <?= $fromSalary ? '' : 'hidden' ?>>
+          <strong>Salary calculation:</strong> the day rate is the monthly salary ÷ <?= SALARY_DAYS_PER_MONTH ?> working
+          days, so it cannot be edited here. Change the salary to change it.</p>
+        <script>
+        (function () {
+          var sal = document.getElementById('termsSalary'), rate = document.getElementById('termsRate'),
+              unit = document.getElementById('termsUnit'), note = document.getElementById('termsSalaryNote');
+          if (!sal || !rate || !unit || !note) return;
+          function sync() {
+            var v = parseFloat(String(sal.value).replace(/[^0-9.]/g, ''));
+            var on = !sal.disabled && v > 0;
+            rate.readOnly = on;
+            rate.classList.toggle('rate-from-salary', on);
+            unit.classList.toggle('rate-from-salary', on);
+            if (on) { rate.value = (Math.round(v / <?= SALARY_DAYS_PER_MONTH ?> * 100) / 100).toFixed(2); unit.value = 'day'; }
+            note.hidden = !on;
+          }
+          sal.addEventListener('input', sync);
+          // A select cannot be read-only; while a salary is set it snaps back to "per day".
+          unit.addEventListener('change', function () { if (rate.readOnly) unit.value = 'day'; });
+          sync();
+        })();
+        </script>
+      <?php endif; ?>
       <label>Contract link <span class="muted small">(Google Drive)</span>
         <input type="url" name="contract_url" placeholder="https://drive.google.com/…"
                value="<?= e($terms['contract_url'] ?? '') ?>">
