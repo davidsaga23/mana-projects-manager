@@ -2666,18 +2666,19 @@ function invAddRows() {
     $stInv = [];
     foreach (project_invoices($projectId) as $inv) $stInv[(int)$inv['crew_id']][] = $inv;
     $stProj = expense_projection($pdo, $projectId);
-    // The position(s) each person holds, for the Position column and filter
-    // (David, 2026-11-11: "let's also add the position in the table"). The
-    // same names the invoices and the expense projection use: the step for a
-    // slot, the title for a supervision position, in pipeline order. Somebody
-    // with only logged time and no position has none, and the cell says so.
-    $stPosNames = [];
+    // The position(s) each person holds (David, 2026-11-11: "let's also add
+    // the position in the table"), and since the same day ONE ROW PER
+    // POSITION: "we need to separate the artists and their contract by the
+    // position/slot that they're hired for in the staffing tab. Let's add the
+    // position at the far left". The same positions the invoices and the
+    // expense projection use: a slot (step), or a supervision position, in
+    // pipeline order. statement_position_rows() splits the figures.
+    $stHeldBy = [];
     try {
         foreach (project_positions($pdo, $projectId) as $pp) {
-            $n = trim((string)$pp['step_name']);
-            if ($n !== '') $stPosNames[(int)$pp['crew_id']][$n] = true;
+            if (trim((string)$pp['step_name']) !== '') $stHeldBy[(int)$pp['crew_id']][] = $pp;
         }
-    } catch (Throwable $ex) { $stPosNames = []; }
+    } catch (Throwable $ex) { $stHeldBy = []; }
 ?>
   <h3>Artist statements</h3>
   <p class="muted small">
@@ -2727,7 +2728,7 @@ function invAddRows() {
     <div class="bd-scroll">
     <table class="review-table statement-list">
       <thead><tr>
-        <th>Artist</th><th>Position</th><th>Dates</th><th>Rate</th>
+        <th>Position</th><th>Artist</th><th>Dates</th><th>Rate</th>
         <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Days left</th><th class="num">Approved sec</th>
         <th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
@@ -2740,8 +2741,11 @@ function invAddRows() {
       // does not cancel out somebody who has not started (2026-11-11).
       $stDaysLeft = 0.0;
       $stMoney = [];   // currency => ['due' =>, 'invoiced' =>, 'left' =>]
+      $stRows = 0;
       foreach ($stPeople as $cid => $name):
-          $st = artist_statement($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj, $fxRates, $stPos[$cid] ?? []);
+        foreach (statement_position_rows($pdo, $projectId, $cid, $stTerms[$cid] ?? null, $stInv[$cid] ?? [], $stProj,
+                                         $fxRates, $stPos[$cid] ?? [], $stHeldBy[$cid] ?? []) as $st):
+          $stRows++;
           $w = $st['window'];
           $cur = $st['currency'];
           foreach ($stTot as $k => $v) $stTot[$k] = $v + (float)$st[$k];
@@ -2755,16 +2759,15 @@ function invAddRows() {
           // when there are several, none when there is no rate at all.
           $stUnits = [];
           if (count($st['lines']) > 1) { foreach ($st['lines'] as $l) $stUnits[(string)$l['unit']] = true; }
-          elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true;
-          $stHeld = array_keys($stPosNames[$cid] ?? []); ?>
-        <tr data-stmt="1" data-name="<?= e($name) ?>" data-positions="<?= e(implode('|', $stHeld)) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
+          elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true; ?>
+        <tr data-stmt="1" data-name="<?= e($name) ?>" data-positions="<?= e((string)($st['position'] ?? '')) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
             data-from="<?= e((string)($w['from'] ?? '')) ?>" data-to="<?= e((string)($w['to'] ?? '')) ?>"
             data-planned="<?= e((string)(float)$st['planned_days']) ?>" data-hours="<?= e((string)(float)$st['hours']) ?>"
             data-days="<?= e((string)(float)$st['days']) ?>" data-daysleft="<?= e((string)(float)$st['days_left']) ?>" data-secs="<?= e((string)(float)$st['approved_seconds']) ?>"
             data-cur="<?= e($cur) ?>" data-due="<?= $st['due'] !== null ? e((string)(float)$st['due']) : '' ?>"
             data-inv="<?= e((string)(float)$st['invoiced']) ?>" data-left="<?= $st['left'] !== null ? e((string)(float)$st['left']) : '' ?>">
+          <td class="small"><?= $st['position'] !== null ? e($st['position']) : '<span class="muted">—</span>' ?></td>
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>"><?= e($name) ?></a></td>
-          <td class="small"><?= $stHeld ? implode('<br>', array_map('e', $stHeld)) : '<span class="muted">—</span>' ?></td>
           <td class="muted small">
             <?= $w['from'] ? e(date('j M', strtotime($w['from']))) : '—' ?> –
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
@@ -2784,7 +2787,7 @@ function invAddRows() {
           <td class="num"><strong><?= e(fmt_money_plain($st['left'], $cur)) ?></strong></td>
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>">Statement →</a></td>
         </tr>
-      <?php endforeach; ?>
+      <?php endforeach; endforeach; ?>
         <tr class="stmt-filter-empty" hidden><td colspan="12" class="muted">Nobody matches these filters.</td></tr>
       </tbody>
       <?php ksort($stMoney);
@@ -2794,7 +2797,7 @@ function invAddRows() {
                 return $lines ? implode('<br>', $lines) : '—';
             }; ?>
       <tfoot id="stmtFoot"><tr>
-        <td colspan="4"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
+        <td colspan="4"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people<?= $stRows !== count($stPeople) ? ' · ' . (int)$stRows . ' rows' : '' ?></span></td>
         <td class="num"><strong><?= e(fmt_num($stTot['planned_days'], 1)) ?></strong></td>
         <td class="num"><strong><?= e(fmt_num($stTot['hours'], 1)) ?> h</strong><br><span class="muted small"><?= e(fmt_num($stTot['days'], 2)) ?> d</span></td>
         <td class="num"><strong><?= e(fmt_num($stDaysLeft, 2)) ?></strong></td>
@@ -2886,7 +2889,7 @@ function invAddRows() {
         var active = !!(q || pos || rate || status || on);
         clearA.hidden = !active;
         emptyRow.hidden = shown.length > 0;
-        countEl.textContent = active ? 'Showing ' + shown.length + ' of ' + rows.length : rows.length + ' people';
+        countEl.textContent = active ? 'Showing ' + shown.length + ' of ' + rows.length : rows.length + ' rows';
         if (!active) { foot.innerHTML = footHtml; }
         else {
           var t = { planned: 0, hours: 0, days: 0, secs: 0 }, dl = 0, m = {};
@@ -2899,7 +2902,7 @@ function invAddRows() {
           });
           var curs = Object.keys(m).sort();
           var cell = function (k) { return curs.length ? curs.map(function (c) { return esc(money(m[c][k]) + ' ' + c); }).join('<br>') : '—'; };
-          foot.innerHTML = '<tr><td colspan="4"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' people · filtered</span></td>'
+          foot.innerHTML = '<tr><td colspan="4"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' rows · filtered</span></td>'
             + '<td class="num"><strong>' + esc(fnum(t.planned, 1)) + '</strong></td>'
             + '<td class="num"><strong>' + esc(fnum(t.hours, 1)) + ' h</strong><br><span class="muted small">' + esc(fnum(t.days, 2)) + ' d</span></td>'
             + '<td class="num"><strong>' + esc(fnum(dl, 2)) + '</strong></td>'
