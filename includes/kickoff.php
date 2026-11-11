@@ -497,6 +497,11 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             // against its own plan from sign-off even after a rename. Not one of
             // the list's columns, so the kick-off page never draws it.
             'step_id' => (int)$r['step']['id'],
+            // What the step works on, as it was when this was saved, so the
+            // cost of shots and assets can be split later even if the step is
+            // retagged or deleted. Not columns either.
+            'applies'    => (string)($r['step']['applies_to'] ?? ''),
+            'asset_type' => (string)($r['step']['applies_to_asset_type'] ?? ''),
         ];
     }
     $otherRows = [];
@@ -1201,8 +1206,11 @@ function kickoff_change($was, $now, string $kind, string $currency = 'USD'): str
 /**
  * Draw one section: the frozen picture alone ($now null), or kick-off beside now.
  */
-function kickoff_render_section(string $title, array $was, ?array $now, string $currency = 'USD'): void {
+function kickoff_render_section(string $title, array $was, ?array $now, string $currency = 'USD', ?array $costs = null): void {
     $compare = $now !== null;
+    // $costs, compared only: [left, right, project-wide left, project-wide
+    // right], the first two figure label => money (see kickoff_shot_costs()).
+    if (!$compare) $costs = null;
     // Figures are matched by label, and a saved kick-off keeps the label it was
     // saved with. A renamed figure is mapped back to its new name here, in
     // place (the order is kept), so an old version and now still line up.
@@ -1220,7 +1228,10 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       <?php if ($was['figures']): ?>
         <table class="data kickoff-figures">
           <?php if ($compare): ?>
-            <thead><tr><th></th><th><?= e(kickoff_labels()[0]) ?></th><th><?= e(kickoff_labels()[1]) ?></th><th>Change</th></tr></thead>
+            <thead><tr><th></th><th><?= e(kickoff_labels()[0]) ?></th><th><?= e(kickoff_labels()[1]) ?></th><th>Change</th>
+              <?php if ($costs !== null): $L = kickoff_labels(); ?>
+                <th class="num kickoff-cost"><?= e(($L[2] ?? $L[0]) . ' cost') ?></th><th class="num"><?= e(($L[3] ?? $L[1]) . ' cost') ?></th>
+              <?php endif; ?></tr></thead>
           <?php endif; ?>
           <tbody>
           <?php foreach ($was['figures'] as $label => [$v, $kind]):
@@ -1233,6 +1244,11 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
                 <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?= e(kickoff_fmt($n, $kind, $currency)) ?></td>
                 <td class="kickoff-chg"><?= e($chg) ?></td>
               <?php endif; ?>
+              <?php if ($costs !== null):
+                  $ca = $costs[0][$label] ?? null; $cb = $costs[1][$label] ?? null; ?>
+                <td class="num kickoff-cost"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($ca, 'money', $currency)) ?></td>
+                <td class="num<?= $ca !== null && $cb !== null && abs($ca - $cb) >= 0.5 ? ' kickoff-diff' : '' ?>"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($cb, 'money', $currency)) ?></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
           <?php if ($compare): // a figure that only exists now, like a new asset type
@@ -1242,10 +1258,22 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
               <th scope="row"><?= e($label) ?></th><td class="num">—</td>
               <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?= e(kickoff_fmt($n, $kind, $currency)) ?></td>
               <td class="kickoff-chg">added</td>
+              <?php if ($costs !== null):
+                  $ca = $costs[0][$label] ?? null; $cb = $costs[1][$label] ?? null; ?>
+                <td class="num kickoff-cost"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($ca, 'money', $currency)) ?></td>
+                <td class="num<?= $ca !== null && $cb !== null && abs($ca - $cb) >= 0.5 ? ' kickoff-diff' : '' ?>"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($cb, 'money', $currency)) ?></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; endif; ?>
           </tbody>
         </table>
+        <?php if ($costs !== null): ?>
+          <p class="muted small">Costs are the expense projection's labour, step by step. A step for all assets is
+            shared across the types by how many of each there are, and one for shots and assets by count too.
+            <?php if (($costs[2] ?? 0) > 0 || ($costs[3] ?? 0) > 0): ?>Project-wide steps belong to no shot or asset and are left out:
+            <?= e(kickoff_fmt($costs[2], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[2] ?? 'kick-off')) ?>,
+            <?= e(kickoff_fmt($costs[3], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[3] ?? 'now')) ?>.<?php endif; ?></p>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php foreach ($was['texts'] as $label => $text):
@@ -1281,6 +1309,66 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       endforeach; ?>
     </section>
     <?php
+}
+
+/**
+ * The labour cost behind each Shots and assets figure, for one side.
+ *
+ * David, 2026-11-11: "new columns here where we can see the kick off cost of
+ * things vs the current cost of assets". Money is projected per role per STEP,
+ * not per asset, so each step's cost goes to what the step works on. He chose
+ * how shared steps split ("Split by count"): a step for all assets is shared
+ * across the types by how many assets of each there are, and a step for shots
+ * and assets is split by count between the two. Project-wide steps belong to
+ * nothing here and are returned apart.
+ *
+ * $fin is one side's finance snapshot; $figs that side's Shots and assets
+ * figures (the counts). A row saved before 2026-11-11 holds no 'applies', so
+ * its step is looked up as it is today ($stepsNow, id => step); a deleted one
+ * cannot be placed and is skipped.
+ * Returns [label => cost, project-wide total].
+ */
+function kickoff_shot_costs(array $fin, array $figs, array $stepsNow): array {
+    $shots = (float)($figs['Shots'][0] ?? 0);
+    $types = [];
+    foreach ($figs as $label => [$n]) {
+        if (strpos((string)$label, 'Assets: ') === 0) $types[substr((string)$label, 8)] = (float)$n;
+    }
+    $assets = array_sum($types);
+    $out = []; $project = 0.0; $any = false;
+    $add = static function (string $label, float $c) use (&$out) { $out[$label] = ($out[$label] ?? 0.0) + $c; };
+    $toAssets = static function (float $c, string $type) use (&$add, $types, $assets) {
+        $add('Assets', $c);
+        if ($type !== '') { $add('Assets: ' . $type, $c); return; }
+        if ($assets <= 0) return;   // no assets to share it across: on the total only
+        foreach ($types as $t => $n) if ($n > 0) $add('Assets: ' . $t, $c * $n / $assets);
+    };
+    foreach ($fin['lists']['Expense projection']['rows'] ?? [] as $r) {
+        if (!isset($r['cost']) || $r['cost'] === null) continue;
+        $c = (float)$r['cost'];
+        $sid = (int)($r['step_id'] ?? 0);
+        if (isset($r['applies'])) {
+            $ap = (string)$r['applies']; $ty = trim((string)($r['asset_type'] ?? ''));
+        } elseif (isset($stepsNow[$sid])) {
+            $ap = (string)$stepsNow[$sid]['applies_to']; $ty = trim((string)($stepsNow[$sid]['applies_to_asset_type'] ?? ''));
+        } else {
+            continue;
+        }
+        $any = true;
+        if ($ap === 'shot') {
+            $add('Shots', $c);
+        } elseif ($ap === 'asset') {
+            $toAssets($c, $ty);
+        } elseif ($ap === 'both') {
+            $all = $shots + ($ty !== '' ? ($types[$ty] ?? 0) : $assets);
+            if ($all <= 0) { $project += $c; continue; }
+            $add('Shots', $c * $shots / $all);
+            $toAssets($c * ($all - $shots) / $all, $ty);
+        } else {
+            $project += $c;
+        }
+    }
+    return [$any ? $out : [], $project];
 }
 
 /**

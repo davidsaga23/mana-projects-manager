@@ -345,8 +345,30 @@ elseif ($view === 'compare'):
       endif;
       if (!isset($was['sections'][$key])) continue;
       // ?? because a stored version on the right may predate a section.
-      kickoff_render_section($title, $was['sections'][$key],
-                             $now['sections'][$key] ?? ['figures' => [], 'texts' => [], 'lists' => []]);
+      $secWas = $was['sections'][$key];
+      $secNow = $now['sections'][$key] ?? ['figures' => [], 'texts' => [], 'lists' => []];
+      $costs  = null;
+      // Money beside the production figures: administrators only, and only
+      // when both sides have their finance snapshot.
+      $finOk = can_see_money() && $finWas && !empty($finWas['configured']) && $finNow && !empty($finNow['configured']);
+      if ($finOk && $key === 'shots') {
+          $stepsNow = [];
+          foreach (pipeline_steps($pdo, $projectId) as $st) $stepsNow[(int)$st['id']] = $st;
+          [$ca, $pa] = kickoff_shot_costs($finWas, $secWas['figures'] ?? [], $stepsNow);
+          [$cb, $pb] = kickoff_shot_costs($finNow, $secNow['figures'] ?? [], $stepsNow);
+          if ($ca || $cb) $costs = [$ca, $cb, $pa, $pb];
+      }
+      // David, 2026-11-11: "let's add the original budget in days kick off and
+      // current, and also below the time logged so we know at the end how much
+      // more or less time we ended up paying for". Both are the budget pool's,
+      // stored with each side's money, so they show to administrators only.
+      if ($finOk && $key === 'setup') {
+          foreach (['Budget, days' => 'Budget pool, days', 'Time logged, days' => 'Budget pool, days used'] as $show => $src) {
+              if (isset($finWas['figures'][$src])) $secWas['figures'][$show] = $finWas['figures'][$src];
+              if (isset($finNow['figures'][$src])) $secNow['figures'][$show] = $finNow['figures'][$src];
+          }
+      }
+      kickoff_render_section($title, $secWas, $secNow, (string)($finWas['currency'] ?? 'USD'), $costs);
   endforeach; ?>
     <?php endif;
 

@@ -26,6 +26,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   colour for the kick-off dates and a faded bar of the same colour under it for now, with month
   lines and today marked (David). Hover a bar for its dates; the table folds away underneath.
   Steps saved before today have no colour stored and take it from the project as it is now.
+- **Cost beside Shots and assets** (administrators only): two columns, kick-off cost and now cost,
+  from the expense projection's labour step by step. A step for all assets is shared across the
+  types by count, and a step for shots and assets is split by count (David's choice). Project-wide
+  steps are left out and their total is noted under the table.
+- **Budget, days and Time logged, days** in Setup (administrators only), kick-off and now, from
+  the budget pool stored with each side's money, to see at the end how much more or less time was
+  paid for than budgeted.
 
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 

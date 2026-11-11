@@ -400,6 +400,9 @@ details.kickoff-resend summary { cursor: pointer; }
 .kickoff-gantt-bar { position: absolute; top: 4px; height: 8px; border-radius: 2px; background: var(--bar); }
 .kickoff-gantt-bar.is-now { top: 14px; opacity: .38; }
 .kickoff-gantt-table { margin-top: 6px; }
+/* Cost beside the Shots and assets figures: a line sets the money apart. */
+.kickoff-figures .kickoff-cost { border-left: 1px solid var(--border-strong); }
+.kickoff-figures td.kickoff-diff { font-weight: 600; }
 @media (max-width: 700px) { .kickoff-gantt-row { grid-template-columns: 100px 1fr; } }
 .kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
 .kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: var(--radius-md); }
