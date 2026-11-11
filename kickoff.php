@@ -230,11 +230,25 @@ elseif ($view === 'compare'):
     //                  another one recorded"; he chose "Original vs one pick")
     // Versions are listed by kickoff_versions(): the sign-off, then one per
     // approved budget request or re-plan.
+    //
+    // David, 2026-11-11: "let's include in the top a start version and another
+    // one (later) to compare it to". Two pickers replace the fixed pairs:
+    //   &from=<id>     any recorded version on the left
+    //   &to=<id>|now   a LATER version, or now, on the right (an earlier or
+    //                  unknown one falls back to now)
+    // The old &with= links above still open what they used to.
     $versions = kickoff_versions($pdo, $projectId);
     $kick = $versions ? $versions[count($versions) - 1] : null;
     $with = (string)($_GET['with'] ?? '');
     $right = null;   // null = now, else a stored version
-    if ($versions && $with !== '') {
+    $byId = [];
+    foreach ($versions as $v) $byId[(int)$v['id']] = $v;
+    $fromId = (int)($_GET['from'] ?? 0);
+    if ($fromId && isset($byId[$fromId])) {
+        $kick = $byId[$fromId];
+        $toId = (int)($_GET['to'] ?? 0);
+        if ($toId && isset($byId[$toId]) && (int)$byId[$toId]['n'] > (int)$kick['n']) $right = $byId[$toId];
+    } elseif ($versions && $with !== '') {
         if ($with === 'now') {
             $kick = $versions[0];
         } else {
@@ -261,7 +275,9 @@ elseif ($view === 'compare'):
         $finNow = kickoff_finance_load((int)$right['id']);
     }
     $vName = fn($v) => 'v' . (int)$v['n'] . ', ' . date('j M Y', strtotime((string)$v['decided_at']));
-    kickoff_labels([$vName($kick), $right === null ? 'Now' : $vName($right)]);
+    // The last two are the short names over the paired columns of a list.
+    kickoff_labels([$vName($kick), $right === null ? 'Now' : $vName($right),
+                    'v' . (int)$kick['n'], $right === null ? 'Now' : 'v' . (int)$right['n']]);
     $latestN = count($versions);
     // One line per version: what made it, who approved it, and for a budget
     // change the amounts and the reason (administrators only: it is money).
@@ -285,18 +301,106 @@ elseif ($view === 'compare'):
       <input type="hidden" name="project" value="<?= (int)$projectId ?>">
       <input type="hidden" name="view" value="compare">
       <?php if ($sec): ?><input type="hidden" name="section" value="finance"><?php endif; ?>
-      <label>Compare
-        <select name="with" onchange="this.form.submit()">
-          <option value="" <?= $with === '' ? 'selected' : '' ?>>v<?= $latestN ?> (latest) with now</option>
-          <option value="now" <?= $with === 'now' ? 'selected' : '' ?>>v1 (original) with now</option>
-          <?php foreach (array_slice($versions, 1) as $v): ?>
-            <option value="<?= (int)$v['id'] ?>" <?= $right && (int)$right['id'] === (int)$v['id'] ? 'selected' : '' ?>>v1 (original) with <?= e($vName($v)) ?></option>
+      <label>From
+        <select name="from" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): ?>
+            <option value="<?= (int)$v['id'] ?>" <?= (int)$v['id'] === (int)$kick['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === 1 ? ' (original)' : ((int)$v['n'] === $latestN ? ' (latest)' : '') ?></option>
           <?php endforeach; ?>
+        </select></label>
+      <label>to
+        <select name="to" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): if ((int)$v['n'] <= (int)$kick['n']) continue; ?>
+            <option value="<?= (int)$v['id'] ?>" <?= $right && (int)$right['id'] === (int)$v['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === $latestN ? ' (latest)' : '' ?></option>
+          <?php endforeach; ?>
+          <option value="now" <?= $right === null ? 'selected' : '' ?>>Now</option>
         </select></label>
       <noscript><button type="submit">Show</button></noscript>
     </form>
   <?php endif; ?>
-  <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ' (the original)' ?>,
+  <?php
+  // FILTER BY STEP OR PERSON (David, 2026-11-11: "let's include a filter to
+  // see by pipeline step or name/artist"). Done in the browser, on the rows
+  // already drawn, so nothing is fetched again. The choices come from both
+  // sides: the Timeline's steps, and the people named in Staffing, the expense
+  // projection and the invoices (the last two for administrators only, since
+  // they are only drawn for them). The headline figures stay whole-show.
+  $fSteps = []; $fPeople = [];
+  foreach ([$now, $was] as $side) {
+      foreach (array_keys($side['sections']['timeline']['lists']['Steps']['rows'] ?? []) as $k) $fSteps[(string)$k] = true;
+      foreach ($side['sections']['staffing']['lists']['Positions']['rows'] ?? [] as $r) {
+          $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+      }
+  }
+  if (can_see_money()) {
+      foreach ([$finNow, $finWas] as $side) {
+          if (!is_array($side)) continue;
+          foreach (array_keys($side['lists']['Expense projection']['rows'] ?? []) as $k) {
+              $i = strrpos((string)$k, ' · ');
+              if ($i !== false) $fPeople[substr((string)$k, $i + strlen(' · '))] = true;
+          }
+          foreach ($side['lists']['Invoices']['rows'] ?? [] as $r) {
+              $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+          }
+      }
+  }
+  // Not names: an empty position and a projection row with nobody on it.
+  foreach (['unfilled', 'Unfilled', '—'] as $x) unset($fPeople[$x]);
+  $fPeople = array_keys($fPeople);
+  sort($fPeople, SORT_NATURAL | SORT_FLAG_CASE);
+  if ($fSteps || $fPeople): ?>
+    <div class="inline-form kickoff-filter">
+      <label>Step
+        <select id="kfStep"><option value="">All steps</option>
+          <?php foreach (array_keys($fSteps) as $st): ?><option value="<?= e((string)$st) ?>"><?= e((string)$st) ?></option><?php endforeach; ?>
+        </select></label>
+      <label>Person
+        <select id="kfPerson"><option value="">Everyone</option>
+          <?php foreach ($fPeople as $pp): ?><option value="<?= e((string)$pp) ?>"><?= e((string)$pp) ?></option><?php endforeach; ?>
+        </select></label>
+      <span class="muted small" id="kfNote" hidden>Showing only matching rows; the totals above each list are still the whole show.</span>
+    </div>
+    <script>
+    (function () {
+      var stepSel = document.getElementById('kfStep'), personSel = document.getElementById('kfPerson');
+      if (!stepSel || !personSel) return;
+      // A row belongs to a step when its name IS the step, or the step followed
+      // by " (type)", " · person" or " #lane", which is how the lists name rows.
+      // "Color" therefore matches "Color (BG) · Artie" but not "Color script".
+      // A step shown with its type, "Color (BG assets)", also matches rows
+      // named by its base name, since the projection words the type its own way.
+      function stepMatch(label, step) {
+        var l = label.toLowerCase(), names = [step.toLowerCase()];
+        var base = step.replace(/\s*\(.*\)\s*$/, '');
+        if (base !== step) names.push(base.toLowerCase());
+        return names.some(function (n) {
+          if (l === n) return true;
+          if (l.indexOf(n) !== 0) return false;
+          return /^\s*(\(|·|#)/.test(l.slice(n.length));
+        });
+      }
+      function apply() {
+        var step = stepSel.value, person = personSel.value.toLowerCase();
+        var rows = document.querySelectorAll('.kickoff-list tbody tr, .kickoff-gantt-row[data-key]');
+        rows.forEach(function (tr) {
+          var th = tr.querySelector('th[scope="row"]');
+          var label = tr.getAttribute('data-key') || (th ? th.textContent.trim() : '');
+          var ok = (!step || stepMatch(label, step)) && (!person || tr.textContent.toLowerCase().indexOf(person) !== -1);
+          tr.hidden = !ok;
+        });
+        // A list with nothing left to show folds away entirely.
+        document.querySelectorAll('.kickoff-list, .kickoff-gantt').forEach(function (box) {
+          var any = box.querySelectorAll('tbody tr, .kickoff-gantt-row[data-key]');
+          var shown = Array.prototype.some.call(any, function (r) { return !r.hidden; });
+          box.hidden = any.length > 0 && !shown;
+        });
+        document.getElementById('kfNote').hidden = !(step || person);
+      }
+      stepSel.addEventListener('change', apply);
+      personSel.addEventListener('change', apply);
+    })();
+    </script>
+  <?php endif; ?>
+  <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ((int)$kick['n'] === 1 ? ' (the original)' : '') ?>,
     against <?= $right === null ? 'how it stands today' : 'kick-off ' . e($vName($right)) ?>.
     Only what moved is listed first; whatever is unchanged is folded underneath.</p>
   <?php if ($latestN > 1): ?>
@@ -324,8 +428,30 @@ elseif ($view === 'compare'):
       endif;
       if (!isset($was['sections'][$key])) continue;
       // ?? because a stored version on the right may predate a section.
-      kickoff_render_section($title, $was['sections'][$key],
-                             $now['sections'][$key] ?? ['figures' => [], 'texts' => [], 'lists' => []]);
+      $secWas = $was['sections'][$key];
+      $secNow = $now['sections'][$key] ?? ['figures' => [], 'texts' => [], 'lists' => []];
+      $costs  = null;
+      // Money beside the production figures: administrators only, and only
+      // when both sides have their finance snapshot.
+      $finOk = can_see_money() && $finWas && !empty($finWas['configured']) && $finNow && !empty($finNow['configured']);
+      if ($finOk && $key === 'shots') {
+          $stepsNow = [];
+          foreach (pipeline_steps($pdo, $projectId) as $st) $stepsNow[(int)$st['id']] = $st;
+          [$ca, $pa] = kickoff_shot_costs($finWas, $secWas['figures'] ?? [], $stepsNow);
+          [$cb, $pb] = kickoff_shot_costs($finNow, $secNow['figures'] ?? [], $stepsNow);
+          if ($ca || $cb) $costs = [$ca, $cb, $pa, $pb];
+      }
+      // David, 2026-11-11: "let's add the original budget in days kick off and
+      // current, and also below the time logged so we know at the end how much
+      // more or less time we ended up paying for". Both are the budget pool's,
+      // stored with each side's money, so they show to administrators only.
+      if ($finOk && $key === 'setup') {
+          foreach (['Budget, days' => 'Budget pool, days', 'Time logged, days' => 'Budget pool, days used'] as $show => $src) {
+              if (isset($finWas['figures'][$src])) $secWas['figures'][$show] = $finWas['figures'][$src];
+              if (isset($finNow['figures'][$src])) $secNow['figures'][$show] = $finNow['figures'][$src];
+          }
+      }
+      kickoff_render_section($title, $secWas, $secNow, (string)($finWas['currency'] ?? 'USD'), $costs);
   endforeach; ?>
     <?php endif;
 

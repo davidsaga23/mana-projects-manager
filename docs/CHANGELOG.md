@@ -14,6 +14,36 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
+
+- **From / to pickers** at the top of Kick-off vs now: any recorded version on the left, a later
+  version or Now on the right (David). Old `&with=` links still open what they did.
+- **By step** (and the other compared lists): Tasks, Starts and Ends each split into a kick-off |
+  now pair (headed "v1" / "Now", or "Kick-off" / "Now"), one value per cell. A cell used to read
+  "2 Sep → 26 Oct", which looked like a start and an end. The figure that moved is bold, a line
+  divides the pairs, and the table no longer stretches across the page.
+- **Timeline as bars:** the Timeline's steps are drawn on one calendar, a solid bar in the step's
+  colour for the kick-off dates and a faded bar of the same colour under it for now, with month
+  lines and today marked (David). Hover a bar for its dates; the table folds away underneath.
+  Steps saved before today have no colour stored and take it from the project as it is now.
+- **Cost beside Shots and assets** (administrators only): two columns, kick-off cost and now cost,
+  from the expense projection's labour step by step. A step for all assets is shared across the
+  types by count, and a step for shots and assets is split by count (David's choice). Project-wide
+  steps are left out and their total is noted under the table.
+- **Budget, days and Time logged, days** in Setup (administrators only), kick-off and now, from
+  the budget pool stored with each side's money, to see at the end how much more or less time was
+  paid for than budgeted.
+- **Workflow list removed** from Kick-off vs now and the frozen view (David). The step links are
+  still saved with each kick-off, only not shown.
+- **Committed so far** row in Finance management, under Invoiced so far: the Overview's figure
+  (every invoice plus logged days not invoiced yet). Kick-offs saved before today show "—" (David).
+- **Changes grouped by step:** every compared list keeps one pipeline order, so a new row sits
+  beside the rows of its step (all of Animatic, then the next step…) instead of all additions
+  trailing at the bottom (David).
+- **Filter by step or person** at the top of Kick-off vs now: shows only the rows (and timeline
+  bars) for one pipeline step or one person; the totals stay whole-show (David).
+- **Finance management moved to the top** of Kick-off vs now and the frozen view (David).
+
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 
 - The kick-off figure "Tasks with nobody on them" is now **"Tasks not assigned"** (David). Kick-offs
