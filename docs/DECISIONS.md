@@ -4978,3 +4978,22 @@ active, not frozen"; "Add a request step" for budgets; and "Original vs one pick
 - Kick-off vs now opens on the latest version against now (the rule from earlier the same day). The
   dropdown adds "v1 (original) with now" and "v1 with vN". Two stored versions are compared with the
   same renderer; the column headings name the versions.
+
+## 2026-11-11 — Artist statements: Left to invoice is the planned work not yet logged
+
+**Asked by David:** "add a column subtracting the logged time so we have days left and that's what
+the left to invoice should be" (pointing at the column between Logged and Approved sec).
+
+**Decided:**
+- `days_left` = days planned (the person's expense-projection rows) − days logged inside their window.
+  Shown on the list, the statement and Home; below zero reads "N over", never a minus.
+- `left` (Left to invoice) = the planned work still to do at the rate, worked out once in
+  `statement_left()` (includes/statements.php): day rate × days left; hourly × days left × hours per
+  day; per second × (seconds planned − seconds approved), because footage is what that rate buys;
+  flat fee − invoiced. Never negative. It replaces "earned − invoiced".
+- A position with its own contract gets its own days left from the planned days on its step; the
+  rest (supervision included) gets what remains.
+- What was lost by dropping "earned − invoiced", invoices ahead of the logged time, stays visible as
+  "ahead of logged" under Invoiced and as a note on the statement.
+- Not decided here: flat fees still count as fully earned from day one, and salaried people still show
+  their own rate (David asked to hold both on 2026-11-05).
