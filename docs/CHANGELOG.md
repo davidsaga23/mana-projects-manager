@@ -25,6 +25,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Needs **finance_install_17.sql** imported by hand into the finance database. Until then the box
   says so and every rate works as before. Asked by David for Junior.
 
+## 2026-11-11 — Every merge also deploys to the new host, anima-mana.com *(no migration)*
+
+- A second deploy job sends each merge to KnownHost as well as the old host, until the cut-over.
+  It uses its own secrets (`KH_FTP_*`) and skips itself until they are set; the same files are
+  never sent (config.php, uploads, sessions, docs, tools).
+
 ## 2026-11-11 — Artist statements count days typed from Finance *(no migration)*
 
 - Days an admin types with "+ days" on the Expense projection's Actual days now show on that
