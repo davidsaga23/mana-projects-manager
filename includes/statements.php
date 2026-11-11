@@ -190,9 +190,8 @@ function statement_minutes_by_step(PDO $pdo, int $projectId, int $crewId, ?strin
               LEFT JOIN tickets t ON t.id = tl.ticket_id
              WHERE tl.crew_id = ? AND tl.project_id = ?";
     $args = [$crewId, $projectId];
-    if ($from) { $sql .= ' AND tl.log_date >= ?'; $args[] = $from; }
-    if ($to)   { $sql .= ' AND tl.log_date <= ?'; $args[] = $to; }
-    $sql .= ' GROUP BY sid';
+    // Days typed from Finance count whatever their date (tl_window_where()).
+    $sql .= tl_window_where($pdo, $from, $to, $args) . ' GROUP BY sid';
     try {
         $q = $pdo->prepare($sql);
         $q->execute($args);
@@ -282,7 +281,11 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
 
     // What happened: hours logged inside their window, and any outside it,
     // which is reported rather than dropped or silently counted.
-    $minutesIn = logged_total_for_crew($pdo, $crewId, $projectId, $win['from'], $win['to']);
+    // Days an admin typed on the Actual days cell count whatever their date,
+    // as they do there (tl_window_where(), 2026-11-11). On a per-second rate
+    // they show in the hours and days but pay nothing: footage approved is
+    // what that rate buys, so they cannot be counted twice.
+    $minutesIn = logged_in_window($pdo, $crewId, $projectId, $win['from'], $win['to']);
     $minutesAll = logged_total_for_crew($pdo, $crewId, $projectId);
     $hours = $minutesIn / 60;
     $days = $hpd > 0 ? $hours / $hpd : 0.0;

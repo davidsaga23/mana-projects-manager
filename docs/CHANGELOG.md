@@ -20,6 +20,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   It uses its own secrets (`KH_FTP_*`) and skips itself until they are set; the same files are
   never sent (config.php, uploads, sessions, docs, tools).
 
+## 2026-11-11 — Artist statements count days typed from Finance *(no migration)*
+
+- Days an admin types with "+ days" on the Expense projection's Actual days now show on that
+  person's Artist statement, on Home's Invoice and billing tab and on Home's show card, whatever
+  date they carry. Before, the statement only counted time dated inside the person's contract
+  dates, and a typed entry is dated the day it was typed: Dan Elder's 8 days on MSD (typed
+  11 Nov, contract 22 Oct – 5 Nov) showed as 0 there while Actual days said 8.
+- An artist's own logging is still counted only inside their dates, as before.
+- On a per-second rate, typed days show in the hours and days but add nothing to "Earned so far":
+  approved footage is what that rate pays for.
 ## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
 
 - A **Position** column next to Artist: the step or supervision position each person holds, the
