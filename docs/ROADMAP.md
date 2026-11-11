@@ -1288,6 +1288,30 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 - **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
   invoices it is for David to say.
 
+## Asked for on 2026-11-11
+
+### An invoice template — NOT BUILT
+
+David: *"let's put on the roadmap an invoice template"*.
+
+A standard invoice every freelancer uses for their monthly invoice to accounting@mana.tv: one
+invoice a month, one line per project (the money rules in `CLAUDE.md`). Why it is worth having:
+- **Fewer wrong invoices.** Home's Invoice and billing tab already says what to put on this month's
+  invoice (project, step, unit and rate, days, totals); a template turns that into the document.
+- **The invoice intake gets easier.** The planned reading of emailed invoices (DECISIONS
+  2026-10-28, "Invoices arrive by email and file themselves") is far more reliable when every PDF
+  has the same layout and fields.
+
+Open before building:
+- **Form:** a PDF Anima fills in from the month's invoice lines for the artist to download, or a
+  blank template (Google Docs / Word) they fill in themselves. The first is less work for artists and
+  matches the intake best.
+- **Required fields:** David is to share the full list of what an invoice must carry (legal name,
+  address, tax ID, invoice number, dates, bank details…). Bank details and tax IDs are sensitive:
+  decide whether Anima stores them or the artist adds them to the downloaded file.
+- **Numbering:** the artist's own invoice number (`invoice_ref`) or one Anima suggests.
+- **Currency:** USD by default; a non-USD contract shows its own currency at the project's fixed rate.
+
 ## Access switches — BUILT 2026-11-05 (migration 077)
 
 Users → Access by role / People / Access log; `includes/features.php`. What is left:
