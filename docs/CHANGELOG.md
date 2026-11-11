@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Artist statements: Days left, and Left to invoice is the work still to do *(no migration)*
+
+- A **Days left** column (days planned less days logged) on Finance management → Artist statements,
+  on each statement and on the artist's Home. Logging past the plan reads **"2.5 over"** in amber.
+- **Left to invoice** is now the planned work not yet logged, at the person's rate: days left × a day
+  rate (× hours per day for an hourly rate), seconds not yet approved × a per-second rate, and for a
+  flat fee the fee less what has been invoiced. It never goes below zero. Until now it was "earned
+  minus invoiced", which showed −900 for anyone who invoiced before logging time.
+- Invoices ahead of the logged time are still flagged: **"ahead of logged"** under Invoiced on the
+  list, and a note on the statement.
+
 ## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
 
 - **From / to pickers** at the top of Kick-off vs now: any recorded version on the left, a later
