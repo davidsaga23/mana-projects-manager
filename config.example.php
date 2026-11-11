@@ -93,6 +93,8 @@ return [
     'smtp_verify_peer' => false,
     'mail_from'      => 'hi@davidsaga.com',
     'mail_from_name' => 'Anima | Project manager',
+    // Replies go to Mana, not the sending box. One address, or several:
+    //   'mail_reply_to' => ['david@mana.tv', 'tim@mana.tv'],
     'mail_reply_to'  => 'david@mana.tv',     // replies go to Mana, not the sending box
 
     // -------------------------------------------------------------------------
@@ -131,4 +133,23 @@ return [
     // empty and the export is switched off.
     // -------------------------------------------------------------------------
     'bug_export_key' => '',
+
+    // --- Hosting --------------------------------------------------------------
+    // The site's own address, used for every link an email carries (invites,
+    // @mentions, kick-off, hires). Leave '' to take it from each request, as it
+    // always was. Set it on the new host: 'https://anima-mana.com'.
+    'site_url' => '',
+
+    // Stops the whole site with a "back shortly" page (HTTP 503) before the
+    // database is touched. true, or a sentence to show. Used to freeze the old
+    // copy while the data is moved. preflight.php still answers.
+    'maintenance' => false,
+
+    // Opens preflight.php, the new-host checklist, as preflight.php?key=...
+    // Any long random string; '' keeps the page shut. Clear it once moved.
+    'preflight_key' => '',
+
+    // Read by the code with a built-in default; listed here so they are known.
+    // 'invoice_cc' => ['david@mana.tv', 'tim@mana.tv'],   // copied on an artist's invoice
+    // 'project_visibility_see_all' => ['admin', 'editor'], // roles that see every show
 ];

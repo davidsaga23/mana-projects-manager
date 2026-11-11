@@ -177,10 +177,7 @@ function kickoff_signoffs(PDO $pdo, int $kickoffId): array {
 
 /** Absolute link to a project's kick-off page, for emails. */
 function kickoff_url(int $projectId): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/kickoff.php?project={$projectId}";
+    return site_url("kickoff.php?project={$projectId}");
 }
 
 // ---------------------------------------------------------------------------
@@ -197,15 +194,20 @@ function kickoff_url(int $projectId): string {
 // and how a change is described ("+3", "+12 days", "changed").
 // ---------------------------------------------------------------------------
 
-/** The order the sections are shown in, as David listed them. */
+/**
+ * The order the sections are shown in, as David listed them, except Finance,
+ * which he moved to the top (2026-11-11: "let's move this section to the top
+ * of the page"). Administrators only see it, so for everyone else Brief still
+ * opens the page.
+ */
 const KICKOFF_SECTIONS = [
+    'finance'  => 'Finance management',
     'brief'    => 'Brief',
     'staffing' => 'Staffing',
     'schedule' => 'Schedule',
     'timeline' => 'Timeline',
     'shots'    => 'Shots',
     'setup'    => 'Setup',
-    'finance'  => 'Finance management',
 ];
 
 /** A list row key that stays unique when two rows would read the same. */
@@ -309,7 +311,10 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
             'Scheduled tasks'          => [$tasks, 'num'],
             'First task starts'        => [$first, 'date'],
             'Last task ends'           => [$last, 'date'],
-            'Tasks with nobody on them' => [$nobody, 'num'],
+            // David, 2026-11-11: "change task with nobody assigned to tasks not
+            // assigned". Kick-offs saved before then hold the old label;
+            // kickoff_render_section() renames it so v1 and now stay one row.
+            'Tasks not assigned'       => [$nobody, 'num'],
         ],
         'texts' => [],
         'lists' => [
@@ -330,6 +335,9 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         $tlRows[$label[(int)$s['id']]] = [
             'start' => $a, 'end' => $b,
             'days'  => ($a && $b && $b >= $a) ? working_days_between($a, $b) : null,
+            // Not a column (not in 'cols', so never compared or listed): the
+            // step's colour, for the bars of Kick-off vs now.
+            'color' => (string)($s['color'] ?? ''),
         ];
     }
     $msRows = [];
@@ -494,6 +502,11 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             // against its own plan from sign-off even after a rename. Not one of
             // the list's columns, so the kick-off page never draws it.
             'step_id' => (int)$r['step']['id'],
+            // What the step works on, as it was when this was saved, so the
+            // cost of shots and assets can be split later even if the step is
+            // retagged or deleted. Not columns either.
+            'applies'    => (string)($r['step']['applies_to'] ?? ''),
+            'asset_type' => (string)($r['step']['applies_to_asset_type'] ?? ''),
         ];
     }
     $otherRows = [];
@@ -513,6 +526,20 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'person' => (string)($i['crew_name'] ?? ''), 'amount' => (float)$i['amount'],
             'status' => (string)$i['status'],
         ];
+    }
+    // David, 2026-11-11: "let's include a row for committed so far so we can
+    // compare too". The Overview's own figure (step_variance()'s 'spent': every
+    // invoice plus logged days not invoiced yet), so the two cannot disagree.
+    // A failure here leaves the row empty rather than stopping a sign-off.
+    $committed = null;
+    try {
+        require_once __DIR__ . '/step_variance.php';
+        $sv = step_variance($pdo, $project, $proj,
+                            isset($budget['budget_amount']) ? (float)$budget['budget_amount'] : null,
+                            dashboard_steps($pdo, $pid, $project['delivery_date'] ?? null));
+        $committed = isset($sv['spent']) ? (float)$sv['spent'] : null;
+    } catch (Throwable $e) {
+        $committed = null;
     }
     $pool = budget_pool($pdo, $project, $proj);
     $poolRows = [];
@@ -537,6 +564,7 @@ function kickoff_finance_snapshot(PDO $pdo, array $project): ?array {
             'Other expenses'                 => [(float)$proj['other_total'], 'money'],
             'Projected total'                => [(float)$proj['grand_total'], 'money'],
             'Invoiced so far'                => [$invoiced, 'money'],
+            'Committed so far'               => [$committed, 'money'],
             'Budget pool, days'              => [round((float)$pool['days']['pool'], 2), 'num'],
             'Budget pool, days used'         => [round((float)$pool['days']['used'], 2), 'num'],
         ],
@@ -584,6 +612,17 @@ function kickoff_finance_load(int $kickoffId): ?array {
     // record stays as it was taken, and no screen shows the figure.
     if (is_array($snap) && isset($snap['figures']) && is_array($snap['figures'])) {
         unset($snap['figures']['Revenue (billed to the client)']);
+        // Snapshots taken before 2026-11-11 did not record Committed so far.
+        // An empty slot right under Invoiced keeps the row in its place
+        // (shown "—") instead of trailing at the bottom as "added".
+        if (!array_key_exists('Committed so far', $snap['figures'])) {
+            $f = [];
+            foreach ($snap['figures'] as $k => $v) {
+                $f[$k] = $v;
+                if ($k === 'Invoiced so far') $f['Committed so far'] = [null, 'money'];
+            }
+            $snap['figures'] = $f;
+        }
     }
     return $snap;
 }
@@ -615,8 +654,32 @@ function kickoff_finance_load(int $kickoffId): ?array {
 // ---------------------------------------------------------------------------
 
 /**
+ * What made a kick-off row: 'signoff' (setup to active), 'replan' (sent again
+ * after a re-plan) or 'budget_change' (a budget request approved). Read from
+ * the 'version' key of its production snapshot; rows without one are
+ * sign-offs.
+ */
+function kickoff_kind(array $kickoff): string {
+    $snap = json_decode((string)($kickoff['snapshot'] ?? ''), true);
+    return (string)($snap['version']['kind'] ?? 'signoff');
+}
+
+/**
+ * The two column headings of a comparison: "At kick-off" and "Now" unless the
+ * page compares two stored versions. Set once by the page and read by the
+ * renderers below, so their signatures stay as every caller knows them.
+ */
+function kickoff_labels(?array $set = null): array {
+    // [long left, long right, short left, short right]; the short pair heads the
+    // paired columns of a compared list.
+    static $labels = ['At kick-off', 'Now', 'Kick-off', 'Now'];
+    if ($set !== null) $labels = $set;
+    return $labels;
+}
+
+/**
  * Every approved kick-off of a project, oldest first, each with its version
- * number ('n') and 'kind': 'signoff' for the original, 'budget_change' after.
+ * number ('n') and 'kind' (see kickoff_kind()).
  */
 function kickoff_versions(PDO $pdo, int $projectId): array {
     try {
@@ -630,9 +693,8 @@ function kickoff_versions(PDO $pdo, int $projectId): array {
     }
     $n = 0;
     foreach ($rows as &$r) {
-        $snap = json_decode((string)$r['snapshot'], true);
         $r['n'] = ++$n;
-        $r['kind'] = (string)($snap['version']['kind'] ?? 'signoff');
+        $r['kind'] = kickoff_kind($r);
     }
     unset($r);
     return $rows;
@@ -769,8 +831,14 @@ function kickoff_user_email(PDO $pdo, ?int $userId): ?array {
  */
 function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     $pid = (int)$project['id'];
-    if ($project['status'] !== 'setup') {
-        throw new RuntimeException('Only a project in setup is sent for sign-off.');
+    // A RE-PLAN (David, 2026-11-06: "A new version is made when Jorik approves
+    // a budget request, or when the project is sent for sign-off again after a
+    // re-plan"). A project that is already signed off can be sent again; it
+    // keeps its status and is NOT frozen while it waits (his choice that day:
+    // "Stays active, not frozen"). Approval makes it the next kick-off version.
+    $replan = $project['status'] !== 'setup';
+    if ($replan && kickoff_approved($pdo, $pid) === null) {
+        throw new RuntimeException('Only a project in setup, or one already signed off, is sent for sign-off.');
     }
     if ($why = kickoff_finance_problem()) throw new RuntimeException($why);
     // Chosen in the pop-up, and checked again here: only people who can save
@@ -801,6 +869,11 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     }
 
     $snap = kickoff_snapshot($pdo, $project);
+    // ⚠ FIRST KEY, ON PURPOSE: kickoff_frozen() in includes/auth.php tells a
+    // re-plan from a first sign-off by how the stored JSON BEGINS
+    // ('{"version":{"kind":"replan"'), so it can skip the freeze without
+    // reading the whole snapshot on every save.
+    if ($replan) $snap = ['version' => ['kind' => 'replan']] + $snap;
     $fin  = kickoff_finance_snapshot($pdo, $project);
     $user = current_user();
     $who  = current_user_display();
@@ -848,16 +921,18 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
     ];
     $msgs = [];
     $upd = $pdo->prepare('UPDATE project_kickoff_signoffs SET email_result = ? WHERE kickoff_id = ? AND user_id = ?');
+    $ask = $replan
+        ? ' has been re-planned and needs your sign-off. It carries on as it is while you look; '
+          . 'once approved, this plan becomes its new kick-off version.'
+        : ' is ready to go from setup to active, and needs your sign-off. '
+          . 'Please look at how it is set up and approve it, or ask for changes.';
     foreach ($signers as $s) {
         [$ok, $res] = kickoff_mail(
             ['email' => $s['email'], 'name' => $s['name']],
-            sprintf('[%s] Kick-off sign-off: %s', $project['code'], $project['name']),
-            kickoff_mail_html('<strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8')
-                . '</strong> is ready to go from setup to active, and needs your sign-off. '
-                . 'Please look at how it is set up and approve it, or ask for changes.',
-                $lines, $url, 'Review and sign off'),
-            "{$project['name']} is ready to go from setup to active, and needs your sign-off.\n\n"
-            . implode("\n", $lines) . "\n\nReview and sign off: {$url}\n"
+            sprintf('[%s] %s: %s', $project['code'], $replan ? 'Re-plan sign-off' : 'Kick-off sign-off', $project['name']),
+            kickoff_mail_html('<strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8') . '</strong>'
+                . htmlspecialchars($ask, ENT_QUOTES, 'UTF-8'), $lines, $url, 'Review and sign off'),
+            $project['name'] . $ask . "\n\n" . implode("\n", $lines) . "\n\nReview and sign off: {$url}\n"
         );
         $upd->execute([mb_substr($res, 0, 255), $kid, (int)$s['id']]);
         $msgs[] = $s['name'] . ': ' . $res . '.';
@@ -893,6 +968,7 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $kid = (int)$kickoff['id'];
     $pid = (int)$project['id'];
     $activated = false;
+    $replan = kickoff_kind($kickoff) === 'replan';
 
     $pdo->beginTransaction();
     try {
@@ -931,7 +1007,8 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $to   = kickoff_user_email($pdo, $kickoff['requested_by'] !== null ? (int)$kickoff['requested_by'] : null);
 
     if ($decision === 'changes') {
-        $msgs[] = 'Sent back for changes. The project stays in setup.';
+        $msgs[] = $replan ? 'Sent back for changes. The project carries on with its current kick-off version.'
+                          : 'Sent back for changes. The project stays in setup.';
         if ($to) {
             [, $res] = kickoff_mail($to,
                 sprintf('[%s] Changes asked for before kick-off: %s', $project['code'], $project['name']),
@@ -948,6 +1025,22 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     $state->execute([$kid]);
     if ($state->fetchColumn() !== 'approved') {
         $msgs[] = 'Approved. The project turns active once everybody else has approved too.';
+        return $msgs;
+    }
+
+    if ($replan) {
+        // A re-plan changes no status and leaves the starting estimate per
+        // step (Historic quotas) as the first sign-off recorded it.
+        $msgs[] = 'Re-plan signed off by everybody: saved as kick-off version ' . count(kickoff_versions($pdo, $pid))
+                . '. Kick-off vs now compares with it from now on.';
+        if ($to) {
+            [, $res] = kickoff_mail($to,
+                sprintf('[%s] Re-plan signed off: %s', $project['code'], $project['name']),
+                kickoff_mail_html('The re-plan of <strong>' . htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8')
+                    . '</strong> has been signed off by everybody and is its new kick-off version.', [], $url, 'Open the kick-off'),
+                "The re-plan of {$project['name']} has been signed off by everybody and is its new kick-off version.\n\n{$url}\n");
+            $msgs[] = ($kickoff['requested_by_name'] ?: 'Whoever sent it') . ': ' . $res . '.';
+        }
         return $msgs;
     }
 
@@ -1015,11 +1108,14 @@ function kickoff_override(PDO $pdo, array $project, array $kickoff, string $reas
     $names = implode(' and ', array_map(fn($s) => $s['signer_name'], $missing));
     $msgs = ['Approved on behalf of ' . $names . '. "' . $project['name'] . '" is '
            . ($st->rowCount() ? 'now active' : 'signed off') . ', and everybody is being told.'];
-    try {
-        $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
-        if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
-    } catch (Throwable $e) {
-        $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+    // Not for a re-plan: the starting estimate per step stays the first one.
+    if (kickoff_kind($kickoff) !== 'replan') {
+        try {
+            $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
+            if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
+        } catch (Throwable $e) {
+            $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+        }
     }
 
     // EVERYBODY: every signer asked, and whoever sent it, once each.
@@ -1141,15 +1237,32 @@ function kickoff_change($was, $now, string $kind, string $currency = 'USD'): str
 /**
  * Draw one section: the frozen picture alone ($now null), or kick-off beside now.
  */
-function kickoff_render_section(string $title, array $was, ?array $now, string $currency = 'USD'): void {
+function kickoff_render_section(string $title, array $was, ?array $now, string $currency = 'USD', ?array $costs = null): void {
     $compare = $now !== null;
+    // $costs, compared only: [left, right, project-wide left, project-wide
+    // right], the first two figure label => money (see kickoff_shot_costs()).
+    if (!$compare) $costs = null;
+    // Figures are matched by label, and a saved kick-off keeps the label it was
+    // saved with. A renamed figure is mapped back to its new name here, in
+    // place (the order is kept), so an old version and now still line up.
+    $renamed = ['Tasks with nobody on them' => 'Tasks not assigned'];
+    $relabel = static function (array $figs) use ($renamed): array {
+        $out = [];
+        foreach ($figs as $label => $fig) $out[$renamed[$label] ?? $label] = $fig;
+        return $out;
+    };
+    $was['figures'] = $relabel($was['figures'] ?? []);
+    if ($compare) $now['figures'] = $relabel($now['figures'] ?? []);
     ?>
     <section class="kickoff-section">
       <h3><?= e($title) ?></h3>
       <?php if ($was['figures']): ?>
         <table class="data kickoff-figures">
           <?php if ($compare): ?>
-            <thead><tr><th></th><th>At kick-off</th><th>Now</th><th>Change</th></tr></thead>
+            <thead><tr><th></th><th><?= e(kickoff_labels()[0]) ?></th><th><?= e(kickoff_labels()[1]) ?></th><th>Change</th>
+              <?php if ($costs !== null): $L = kickoff_labels(); ?>
+                <th class="num kickoff-cost"><?= e(($L[2] ?? $L[0]) . ' cost') ?></th><th class="num"><?= e(($L[3] ?? $L[1]) . ' cost') ?></th>
+              <?php endif; ?></tr></thead>
           <?php endif; ?>
           <tbody>
           <?php foreach ($was['figures'] as $label => [$v, $kind]):
@@ -1162,6 +1275,11 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
                 <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?= e(kickoff_fmt($n, $kind, $currency)) ?></td>
                 <td class="kickoff-chg"><?= e($chg) ?></td>
               <?php endif; ?>
+              <?php if ($costs !== null):
+                  $ca = $costs[0][$label] ?? null; $cb = $costs[1][$label] ?? null; ?>
+                <td class="num kickoff-cost"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($ca, 'money', $currency)) ?></td>
+                <td class="num<?= $ca !== null && $cb !== null && abs($ca - $cb) >= 0.5 ? ' kickoff-diff' : '' ?>"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($cb, 'money', $currency)) ?></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; ?>
           <?php if ($compare): // a figure that only exists now, like a new asset type
@@ -1171,10 +1289,22 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
               <th scope="row"><?= e($label) ?></th><td class="num">—</td>
               <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?= e(kickoff_fmt($n, $kind, $currency)) ?></td>
               <td class="kickoff-chg">added</td>
+              <?php if ($costs !== null):
+                  $ca = $costs[0][$label] ?? null; $cb = $costs[1][$label] ?? null; ?>
+                <td class="num kickoff-cost"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($ca, 'money', $currency)) ?></td>
+                <td class="num<?= $ca !== null && $cb !== null && abs($ca - $cb) >= 0.5 ? ' kickoff-diff' : '' ?>"><?= $ca === null && $cb === null ? '' : e(kickoff_fmt($cb, 'money', $currency)) ?></td>
+              <?php endif; ?>
             </tr>
           <?php endforeach; endif; ?>
           </tbody>
         </table>
+        <?php if ($costs !== null): ?>
+          <p class="muted small">Costs are the expense projection's labour, step by step. A step for all assets is
+            shared across the types by how many of each there are, and one for shots and assets by count too.
+            <?php if (($costs[2] ?? 0) > 0 || ($costs[3] ?? 0) > 0): ?>Project-wide steps belong to no shot or asset and are left out:
+            <?= e(kickoff_fmt($costs[2], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[2] ?? 'kick-off')) ?>,
+            <?= e(kickoff_fmt($costs[3], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[3] ?? 'now')) ?>.<?php endif; ?></p>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php foreach ($was['texts'] as $label => $text):
@@ -1184,8 +1314,8 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
           <h4><?= e($label) ?><?php if ($compare && $nt !== $text): ?> <span class="kickoff-chg">changed</span><?php endif; ?></h4>
           <?php if ($compare && $nt !== $text): ?>
             <div class="kickoff-text-pair">
-              <div><div class="muted small">At kick-off</div><div class="kickoff-prose"><?= e($text !== '' ? $text : '—') ?></div></div>
-              <div><div class="muted small">Now</div><div class="kickoff-prose"><?= e($nt !== '' ? $nt : '—') ?></div></div>
+              <div><div class="muted small"><?= e(kickoff_labels()[0]) ?></div><div class="kickoff-prose"><?= e($text !== '' ? $text : '—') ?></div></div>
+              <div><div class="muted small"><?= e(kickoff_labels()[1]) ?></div><div class="kickoff-prose"><?= e($nt !== '' ? $nt : '—') ?></div></div>
             </div>
           <?php else: ?>
             <div class="kickoff-prose"><?= e($text) ?></div>
@@ -1194,10 +1324,171 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       <?php endforeach; ?>
 
       <?php foreach ($was['lists'] as $listTitle => $list):
-          kickoff_render_list($listTitle, $list, $compare ? ($now['lists'][$listTitle] ?? ['cols' => $list['cols'], 'rows' => []]) : null, $currency);
+          // David, 2026-11-11: "delete this section for the workflow". The
+          // step-to-step links are still saved with each kick-off, just not
+          // shown: a re-plan rewires them wholesale and the list was all noise.
+          if ($listTitle === 'Workflow') continue;
+          $nowList = $compare ? ($now['lists'][$listTitle] ?? ['cols' => $list['cols'], 'rows' => []]) : null;
+          // David, 2026-11-11: "instead of the timeline being a table let's do a
+          // first bar with the kick off dates and a faded same color for the
+          // actual/current below". The Timeline's step list, compared, is
+          // drawn as bars; its table folds away underneath for exact dates.
+          if ($compare && $listTitle === 'Steps' && isset($list['cols']['start'], $list['cols']['end'])
+              && kickoff_render_gantt($list, $nowList)) {
+              echo '<details class="kickoff-gantt-table"><summary class="muted small">The same dates as a table</summary>';
+              kickoff_render_list($listTitle, $list, $nowList, $currency);
+              echo '</details>';
+              continue;
+          }
+          kickoff_render_list($listTitle, $list, $nowList, $currency);
       endforeach; ?>
     </section>
     <?php
+}
+
+/**
+ * The labour cost behind each Shots and assets figure, for one side.
+ *
+ * David, 2026-11-11: "new columns here where we can see the kick off cost of
+ * things vs the current cost of assets". Money is projected per role per STEP,
+ * not per asset, so each step's cost goes to what the step works on. He chose
+ * how shared steps split ("Split by count"): a step for all assets is shared
+ * across the types by how many assets of each there are, and a step for shots
+ * and assets is split by count between the two. Project-wide steps belong to
+ * nothing here and are returned apart.
+ *
+ * $fin is one side's finance snapshot; $figs that side's Shots and assets
+ * figures (the counts). A row saved before 2026-11-11 holds no 'applies', so
+ * its step is looked up as it is today ($stepsNow, id => step); a deleted one
+ * cannot be placed and is skipped.
+ * Returns [label => cost, project-wide total].
+ */
+function kickoff_shot_costs(array $fin, array $figs, array $stepsNow): array {
+    $shots = (float)($figs['Shots'][0] ?? 0);
+    $types = [];
+    foreach ($figs as $label => [$n]) {
+        if (strpos((string)$label, 'Assets: ') === 0) $types[substr((string)$label, 8)] = (float)$n;
+    }
+    $assets = array_sum($types);
+    $out = []; $project = 0.0; $any = false;
+    $add = static function (string $label, float $c) use (&$out) { $out[$label] = ($out[$label] ?? 0.0) + $c; };
+    $toAssets = static function (float $c, string $type) use (&$add, $types, $assets) {
+        $add('Assets', $c);
+        if ($type !== '') { $add('Assets: ' . $type, $c); return; }
+        if ($assets <= 0) return;   // no assets to share it across: on the total only
+        foreach ($types as $t => $n) if ($n > 0) $add('Assets: ' . $t, $c * $n / $assets);
+    };
+    foreach ($fin['lists']['Expense projection']['rows'] ?? [] as $r) {
+        if (!isset($r['cost']) || $r['cost'] === null) continue;
+        $c = (float)$r['cost'];
+        $sid = (int)($r['step_id'] ?? 0);
+        if (isset($r['applies'])) {
+            $ap = (string)$r['applies']; $ty = trim((string)($r['asset_type'] ?? ''));
+        } elseif (isset($stepsNow[$sid])) {
+            $ap = (string)$stepsNow[$sid]['applies_to']; $ty = trim((string)($stepsNow[$sid]['applies_to_asset_type'] ?? ''));
+        } else {
+            continue;
+        }
+        $any = true;
+        if ($ap === 'shot') {
+            $add('Shots', $c);
+        } elseif ($ap === 'asset') {
+            $toAssets($c, $ty);
+        } elseif ($ap === 'both') {
+            $all = $shots + ($ty !== '' ? ($types[$ty] ?? 0) : $assets);
+            if ($all <= 0) { $project += $c; continue; }
+            $add('Shots', $c * $shots / $all);
+            $toAssets($c * ($all - $shots) / $all, $ty);
+        } else {
+            $project += $c;
+        }
+    }
+    return [$any ? $out : [], $project];
+}
+
+/**
+ * The Timeline's steps as bars: per step, the kick-off dates as a solid bar in
+ * the step's colour and now as a faded bar of the same colour just below, on
+ * one shared calendar. Returns false (and draws nothing) when no step has a
+ * date on either side, so the caller falls back to the table.
+ */
+function kickoff_render_gantt(array $was, array $now): bool {
+    $wr = $was['rows'] ?? []; $nr = $now['rows'] ?? [];
+    $day = static function ($d): ?int {
+        if (!$d) return null;
+        $t = strtotime((string)$d);
+        return $t === false ? null : (int)floor($t / 86400);
+    };
+    $span = static function (?array $r) use ($day): ?array {
+        if (!$r) return null;
+        $a = $day($r['start'] ?? null); $b = $day($r['end'] ?? null);
+        if ($a === null && $b === null) return null;
+        $a = $a ?? $b; $b = $b ?? $a;
+        return [min($a, $b), max($a, $b), (string)($r['start'] ?? ''), (string)($r['end'] ?? '')];
+    };
+    $rows = []; $min = null; $max = null; $i = 0;
+    $keys = array_unique(array_merge(array_map('strval', array_keys($wr)), array_map('strval', array_keys($nr))));
+    foreach ($keys as $key) {
+        $w = $span($wr[$key] ?? null); $n = $span($nr[$key] ?? null);
+        if (!$w && !$n) continue;
+        foreach ([$w, $n] as $x) {
+            if (!$x) continue;
+            $min = $min === null ? $x[0] : min($min, $x[0]);
+            $max = $max === null ? $x[1] : max($max, $x[1]);
+        }
+        // A step colour is data (a hex picked per step); anything else falls
+        // back to the default step colour rather than reaching the style.
+        $c = (string)($nr[$key]['color'] ?? $wr[$key]['color'] ?? '');
+        if (!preg_match('/^#[0-9a-f]{3,8}$/i', $c)) $c = 'var(--step-default)';
+        $how = !isset($wr[$key]) ? 'added' : (!isset($nr[$key]) ? 'removed' : '');
+        $rows[] = [$key, $w, $n, $c, $how, ($w ?? $n)[0], $i++];
+    }
+    if (!$rows) return false;
+    // Earliest kick-off start first (a new step by its start now), so the bars
+    // fall like a cascade; ties keep the pipeline order.
+    usort($rows, fn($x, $y) => [$x[5], $x[6]] <=> [$y[5], $y[6]]);
+    $total = max(1, $max - $min + 1);
+    $pos = static fn(array $x): string => sprintf('left:%.3f%%;width:%.3f%%',
+        ($x[0] - $min) / $total * 100, max(0.6, ($x[1] - $x[0] + 1) / $total * 100));
+    $fmt = static function (array $x): string {
+        if ($x[2] !== '' && $x[3] !== '') return kickoff_fmt($x[2], 'date') . ' – ' . kickoff_fmt($x[3], 'date');
+        return kickoff_fmt($x[2] !== '' ? $x[2] : $x[3], 'date');
+    };
+    $L = kickoff_labels();
+    // A tick at the first of each month inside the range.
+    $ticks = [];
+    $m = strtotime(gmdate('Y-m-01', $min * 86400) . ' UTC');
+    while ($m !== false && ($d = (int)floor($m / 86400)) <= $max) {
+        if ($d >= $min) $ticks[] = [($d - $min) / $total * 100, gmdate('M Y', $m)];
+        $m = strtotime('+1 month', $m);
+    }
+    $today = $day(date('Y-m-d'));
+    ?>
+    <div class="kickoff-gantt">
+      <div class="kickoff-gantt-key muted small">
+        <span><i class="kickoff-gantt-swatch"></i><?= e($L[0]) ?></span>
+        <span><i class="kickoff-gantt-swatch is-now"></i><?= e($L[1]) ?></span>
+      </div>
+      <div class="kickoff-gantt-row kickoff-gantt-head">
+        <div></div>
+        <div class="kickoff-gantt-track">
+          <?php foreach ($ticks as [$p, $txt]): ?><span class="kickoff-gantt-tick" style="left:<?= sprintf('%.3f', $p) ?>%"><?= e($txt) ?></span><?php endforeach; ?>
+        </div>
+      </div>
+      <?php foreach ($rows as [$key, $w, $n, $c, $how]): ?>
+        <div class="kickoff-gantt-row" data-key="<?= e($key) ?>">
+          <div class="kickoff-gantt-name" title="<?= e($key) ?>"><?= e($key) ?><?php if ($how): ?> <span class="kickoff-chg"><?= e($how) ?></span><?php endif; ?></div>
+          <div class="kickoff-gantt-track" style="--bar:<?= e($c) ?>">
+            <?php foreach ($ticks as [$p]): ?><span class="kickoff-gantt-grid" style="left:<?= sprintf('%.3f', $p) ?>%"></span><?php endforeach; ?>
+            <?php if ($today !== null && $today >= $min && $today <= $max): ?><span class="kickoff-gantt-today" style="left:<?= sprintf('%.3f', ($today - $min) / $total * 100) ?>%" title="Today"></span><?php endif; ?>
+            <?php if ($w): ?><span class="kickoff-gantt-bar" style="<?= $pos($w) ?>" title="<?= e($key . ', ' . $L[0] . ': ' . $fmt($w)) ?>"></span><?php endif; ?>
+            <?php if ($n): ?><span class="kickoff-gantt-bar is-now" style="<?= $pos($n) ?>" title="<?= e($key . ', ' . $L[1] . ': ' . $fmt($n)) ?>"></span><?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <?php
+    return true;
 }
 
 /** One list. Compared, the rows that moved come first and the rest fold away. */
@@ -1209,7 +1500,7 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
         <details class="kickoff-list">
           <summary><?= e($title) ?> <span class="muted">(<?= count($was['rows']) ?>)</span></summary>
           <table class="data">
-            <thead><tr><th></th><?php foreach ($cols as [$l]): ?><th><?= e($l) ?></th><?php endforeach; ?></tr></thead>
+            <thead><tr><th></th><?php foreach ($cols as [$l, $hk]): ?><th class="<?= $hk === 'text' ? '' : 'num' ?>"><?= e($l) ?></th><?php endforeach; ?></tr></thead>
             <tbody>
             <?php foreach ($was['rows'] as $key => $row): ?>
               <tr><th scope="row"><?= e((string)$key) ?></th>
@@ -1224,38 +1515,69 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
         return;
     }
 
-    $moved = []; $same = [];
-    foreach ($was['rows'] as $key => $row) {
+    // ONE ORDER FOR BOTH SIDES (David, 2026-11-11: "all changes should be
+    // grouped. All the changes in animatic first, then all the changes for the
+    // next pipeline step, etc"). Both snapshots list their rows in pipeline
+    // order, so the kick-off's order is kept and each row that only exists now
+    // is slotted in after the row it follows today, instead of every addition
+    // trailing at the bottom. A renamed step's old rows and new rows then land
+    // next to each other.
+    $order = array_map('strval', array_keys($was['rows']));
+    $prev = null;
+    foreach (array_keys($now['rows']) as $key) {
         $key = (string)$key;
-        if (!array_key_exists($key, $now['rows'])) { $moved[] = [$key, 'removed', $row, null]; continue; }
-        $nrow = $now['rows'][$key];
+        if (!array_key_exists($key, $was['rows'])) {
+            $at = $prev === null ? 0 : array_search($prev, $order, true) + 1;
+            array_splice($order, $at, 0, [$key]);
+        }
+        $prev = $key;
+    }
+    $moved = []; $same = [];
+    foreach ($order as $key) {
+        $row  = $was['rows'][$key] ?? null;
+        $nrow = $now['rows'][$key] ?? null;
+        if ($row === null)  { $moved[] = [$key, 'added', null, $nrow]; continue; }
+        if ($nrow === null) { $moved[] = [$key, 'removed', $row, null]; continue; }
         $diff = false;
         foreach ($cols as $c => [, $kind]) {
             if (kickoff_change($row[$c] ?? null, $nrow[$c] ?? null, $kind, $currency) !== '') { $diff = true; break; }
         }
         if ($diff) $moved[] = [$key, 'changed', $row, $nrow]; else $same[] = [$key, '', $row, $nrow];
     }
-    foreach ($now['rows'] as $key => $nrow) {
-        if (!array_key_exists((string)$key, $was['rows'])) $moved[] = [(string)$key, 'added', null, $nrow];
-    }
     if (!$moved && !$same) return;
     ?>
     <div class="kickoff-list">
       <h4><?= e($title) ?>
         <span class="muted small"><?= count($moved) ? count($moved) . ' changed, added or removed' : 'nothing changed' ?>
-          · <?= count($was['rows']) ?> at kick-off, <?= count($now['rows']) ?> now</span></h4>
+          · <?= count($was['rows']) ?> <?= e(lcfirst(kickoff_labels()[0])) ?>, <?= count($now['rows']) ?> <?= e(lcfirst(kickoff_labels()[1])) ?></span></h4>
       <?php if ($moved): ?>
-        <table class="data">
-          <thead><tr><th></th><th></th><?php foreach ($cols as [$l]): ?><th><?= e($l) ?></th><?php endforeach; ?></tr></thead>
+        <?php
+        // David, 2026-11-11: "instead of starts and ends change it to Kick off
+        // and Now". A cell used to read "2 Sep → 26 Oct", which looked like a
+        // step's start and end. Each column is now a pair, kick-off and now
+        // side by side under it, one date per cell.
+        $L = kickoff_labels(); $short0 = $L[2] ?? $L[0]; $short1 = $L[3] ?? $L[1]; ?>
+        <table class="data kickoff-cmp">
+          <thead>
+            <tr><th rowspan="2"></th><th rowspan="2"></th>
+              <?php foreach ($cols as [$l]): ?><th colspan="2" class="kickoff-grp"><?= e($l) ?></th><?php endforeach; ?></tr>
+            <tr><?php foreach ($cols as [, $hk]): $nc = $hk === 'text' ? '' : 'num'; ?>
+              <th class="<?= $nc ?> kickoff-was"><?= e($short0) ?></th><th class="<?= $nc ?>"><?= e($short1) ?></th>
+            <?php endforeach; ?></tr>
+          </thead>
           <tbody>
           <?php foreach ($moved as [$key, $how, $row, $nrow]): ?>
             <tr class="kickoff-row-<?= e($how) ?>">
               <th scope="row"><?= e($key) ?></th><td class="kickoff-chg"><?= e($how) ?></td>
               <?php foreach ($cols as $c => [, $kind]):
-                  $a = $row[$c] ?? null; $b = $nrow[$c] ?? null; ?>
-                <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?php
-                  if ($how === 'changed' && kickoff_change($a, $b, $kind, $currency) !== ''): ?><span class="muted"><?= e(kickoff_fmt($a, $kind, $currency)) ?> →</span> <?= e(kickoff_fmt($b, $kind, $currency)) ?><?php
-                  else: ?><?= e(kickoff_fmt($how === 'added' ? $b : $a, $kind, $currency)) ?><?php endif; ?></td>
+                  $a = $how === 'added' ? null : ($row[$c] ?? null);
+                  $b = $how === 'removed' ? null : ($nrow[$c] ?? null);
+                  $nc = $kind === 'text' ? '' : 'num';
+                  // In a changed row, a figure that held still is muted so the
+                  // one that moved stands out.
+                  $tone = $how !== 'changed' ? '' : (kickoff_change($a, $b, $kind, $currency) !== '' ? ' kickoff-diff' : ' muted'); ?>
+                <td class="<?= $nc ?> kickoff-was<?= $how === 'added' ? ' muted' : '' ?>"><?= $how === 'added' ? '—' : e(kickoff_fmt($a, $kind, $currency)) ?></td>
+                <td class="<?= $nc ?><?= $tone ?><?= $how === 'removed' ? ' muted' : '' ?>"><?= $how === 'removed' ? '—' : e(kickoff_fmt($b, $kind, $currency)) ?></td>
               <?php endforeach; ?>
             </tr>
           <?php endforeach; ?>

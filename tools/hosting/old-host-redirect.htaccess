@@ -1,0 +1,23 @@
+# Anima has moved to https://anima-mana.com (David, 2026-11-09).
+#
+# For the OLD host only: upload this as .htaccess into the old site's folder
+# (public_html/mana), replacing the one there, at the end of the cut-over.
+# It sends every old address to the same page on the new site, so bells,
+# emails, Slack links and bookmarks keep working:
+#   mana.davidsaga.com/spell.php?project=3&open=7:sh010
+#   -> anima-mana.com/spell.php?project=3&open=7:sh010   (the query string carries over)
+#
+# 302 (temporary) for the two-week transition: browsers remember a 301 for
+# good, which would make switching back to the old host painful. Once the move
+# is settled, change R=302 to R=301 and leave it for as long as davidsaga.com
+# is kept. Never deploy this to the new host: tools/ is excluded from deploys.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(.*)$ https://anima-mana.com/$1 [R=302,L]
+</IfModule>
+
+# Without mod_rewrite, the same redirect through mod_alias.
+<IfModule !mod_rewrite.c>
+  RedirectMatch 302 ^/(.*)$ https://anima-mana.com/$1
+</IfModule>

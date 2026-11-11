@@ -24,6 +24,94 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - An artist's own logging is still counted only inside their dates, as before.
 - On a per-second rate, typed days show in the hours and days but add nothing to "Earned so far":
   approved footage is what that rate pays for.
+## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
+
+- A **Position** column next to Artist: the step or supervision position each person holds, the
+  names invoices use (one per line for somebody on two; "—" for logged time with no position).
+- A bar above **Artist statements** (Finance management): **search by name**, **position**, **rate** (per day,
+  per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
+  invoiced ahead of logged, nothing logged, settled = nothing left and everything earned invoiced) and **on the
+  show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
+  "Showing N of M" and a **Clear** link (David).
+- **The Total row follows the filter:** it adds up only the rows showing, labelled "3 of 23 people
+  · filtered", and goes back to the server's own total when the filter is cleared. Days left is counted too.
+- Done in the browser on the rows already drawn: no figure or query changed. Each viewer's filter
+  is remembered in their own browser, per show.
+
+## 2026-11-11 — Artist statements: Days left, and Left to invoice is the work still to do *(no migration)*
+
+- A **Days left** column (days planned less days logged) on Finance management → Artist statements,
+  on each statement and on the artist's Home. Logging past the plan reads **"2.5 over"** in amber.
+- **Left to invoice** is now the planned work not yet logged, at the person's rate: days left × a day
+  rate (× hours per day for an hourly rate), seconds not yet approved × a per-second rate, and for a
+  flat fee the fee less what has been invoiced. It never goes below zero. Until now it was "earned
+  minus invoiced", which showed −900 for anyone who invoiced before logging time.
+- Invoices ahead of the logged time are still flagged: **"ahead of logged"** under Invoiced on the
+  list, and a note on the statement.
+
+## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
+
+- **From / to pickers** at the top of Kick-off vs now: any recorded version on the left, a later
+  version or Now on the right (David). Old `&with=` links still open what they did.
+- **By step** (and the other compared lists): Tasks, Starts and Ends each split into a kick-off |
+  now pair (headed "v1" / "Now", or "Kick-off" / "Now"), one value per cell. A cell used to read
+  "2 Sep → 26 Oct", which looked like a start and an end. The figure that moved is bold, a line
+  divides the pairs, and the table no longer stretches across the page.
+- **Timeline as bars:** the Timeline's steps are drawn on one calendar, a solid bar in the step's
+  colour for the kick-off dates and a faded bar of the same colour under it for now, with month
+  lines and today marked (David). Hover a bar for its dates; the table folds away underneath.
+  Steps saved before today have no colour stored and take it from the project as it is now.
+- **Cost beside Shots and assets** (administrators only): two columns, kick-off cost and now cost,
+  from the expense projection's labour step by step. A step for all assets is shared across the
+  types by count, and a step for shots and assets is split by count (David's choice). Project-wide
+  steps are left out and their total is noted under the table.
+- **Budget, days and Time logged, days** in Setup (administrators only), kick-off and now, from
+  the budget pool stored with each side's money, to see at the end how much more or less time was
+  paid for than budgeted.
+- **Workflow list removed** from Kick-off vs now and the frozen view (David). The step links are
+  still saved with each kick-off, only not shown.
+- **Committed so far** row in Finance management, under Invoiced so far: the Overview's figure
+  (every invoice plus logged days not invoiced yet). Kick-offs saved before today show "—" (David).
+- **Changes grouped by step:** every compared list keeps one pipeline order, so a new row sits
+  beside the rows of its step (all of Animatic, then the next step…) instead of all additions
+  trailing at the bottom (David).
+- **Filter by step or person** at the top of Kick-off vs now: shows only the rows (and timeline
+  bars) for one pipeline step or one person; the totals stay whole-show (David).
+- **Finance management moved to the top** of Kick-off vs now and the frozen view (David).
+
+## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
+
+- The kick-off figure "Tasks with nobody on them" is now **"Tasks not assigned"** (David). Kick-offs
+  saved earlier still hold the old label; it is renamed when drawn, so v1 and now stay one row.
+
+## 2026-11-11 — Emails can name several reply-to addresses *(no migration)*
+
+- `mail_reply_to` in config.php takes a list, `['david@mana.tv', 'tim@mana.tv']`, or comma-separated
+  addresses; replying to any Anima email then goes to all of them. A single address still works.
+
+## 2026-11-10 — robots.txt, and pre-flight checks privacy before the real certificate *(no migration)*
+
+- `robots.txt` tells every search engine to stay out: Anima is a private tool behind a login.
+- The pre-flight page's "Kept private" checks now ask this server directly and accept its temporary
+  (self-signed) certificate, so they give a real answer on a new host before AutoSSL has run.
+
+## 2026-11-09 — Ready to move hosts: pre-flight page, maintenance switch, one site address *(no migration)*
+
+- **`preflight.php?key=…`** checks a host for everything Anima needs: PHP and extensions, upload and
+  time limits, writable folders, both databases (and that they are kept apart), that includes/,
+  migrations/, uploads/ and sessions/ cannot be read from a browser, and the outside services. Shut
+  (404) unless `preflight_key` is set in config.php.
+- **`'maintenance' => true`** in config.php stops the whole site with a "back shortly" page, before
+  the database is touched.
+- **`'site_url'`** in config.php: every emailed link (invites, @mentions, kick-off, hires) is built from
+  it. Unset, links are built from the request exactly as before.
+- `docs/HOSTING_MIGRATION.md`: the step-by-step move to KnownHost / anima-mana.com, and
+  `tools/hosting/old-host-redirect.htaccess` to send old links to the new address.
+
+## 2026-11-06 — "Artists" is now "Artists pool" *(no migration)*
+
+- The top-bar link and the page title of the artist database read **Artists pool**. Same page,
+  label only.
 
 ## 2026-11-06 — Projects list: no "My tasks" button *(no migration)*
 
@@ -44,6 +132,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   mention. Plain comments still ring only who they name.
 - Uploading a new version moves the task to Pending review whoever uploads it (Production and admins
   too), not only the assignee. An approved task is still left alone.
+
+## 2026-11-06 — Kick-off versions: re-plans, budget requests, and comparing with the original *(finance_install_16)*
+
+- **Re-plan sign-off.** A signed-off project shows "Send a re-plan for sign-off…" on its Kick-off page.
+  The people chosen are emailed; the project is **not frozen** while they look. When everybody has
+  approved, the plan as it was sent becomes the next kick-off version (v2, v3…). Withdraw or send
+  again work as for a first sign-off. A re-plan changes no status and leaves Historic quotas alone.
+- **Budget requests.** On a signed-off budget, an administrator can "Ask for a budget change" (new
+  amount, currency, why). Whoever is ticked "Changes budget" (Jorik) is emailed and approves or
+  declines on the finance Overview; approving changes the budget, records it under "Changes since
+  sign-off", and saves the next kick-off version. Answered requests are listed underneath. Jorik can
+  still change the budget directly. Needs **finance_install_16.sql** imported by hand.
+- **Kick-off vs now** still opens on the latest version against now, and now has a dropdown to
+  compare the original (v1) with now or with any later version. All versions are listed with what
+  made each one and who approved it.
 
 ## 2026-11-06 — Kick-off: no client revenue *(no migration)*
 

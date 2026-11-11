@@ -223,6 +223,32 @@ function statement_price(?array $terms, float $hours, float $days, float $second
 }
 
 /**
+ * LEFT TO INVOICE is the planned work not yet logged, at the rate (David,
+ * 2026-11-11: "add a column subtracting the logged time so we have days left
+ * and that's what the left to invoice should be"). Until then it was what the
+ * logged time was worth minus what had been invoiced, which went negative for
+ * everybody who invoiced without logging (Artie: 900 invoiced, nothing logged,
+ * −900). Now it is what the plan still has to pay them for, never below zero:
+ *   day     days planned − days logged, × rate
+ *   hour    the same days, × hours per day × rate
+ *   second  seconds planned − seconds approved, × rate (footage is what a
+ *           per-second rate buys, so the footage still to come is what is left)
+ *   flat    the fee; the caller takes off what has been invoiced against it
+ * In the rate's own currency, like statement_price(); null without a rate.
+ */
+function statement_left(?float $rate, string $unit, float $plannedDays, float $loggedDays,
+                        float $plannedSecs, float $approvedSecs, float $hpd): ?float {
+    if ($rate === null) return null;
+    $daysLeft = max(0.0, $plannedDays - $loggedDays);
+    switch ($unit) {
+        case 'second': return round(max(0.0, $plannedSecs - $approvedSecs) * $rate, 2);
+        case 'flat':   return round($rate, 2);
+        case 'hour':   return round($daysLeft * $hpd * $rate, 2);
+        default:       return round($daysLeft * $rate, 2);
+    }
+}
+
+/**
  * One person's statement on one show.
  *
  * $terms and $invoices are passed in, not read here, so the admin tab can read
@@ -238,6 +264,9 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     $projection = $projection ?? expense_projection($pdo, $projectId);
     $positions = [];
     $plannedDays = 0.0; $plannedSeconds = 0.0;
+    // Per step as well, so a position with its own contract has its own days
+    // left (statement_left(), below).
+    $plannedDaysBy = []; $plannedSecsBy = [];
     foreach ($projection['rows'] as $r) {
         if ((int)($r['crew_id'] ?? 0) !== $crewId) continue;
         $secs = !empty($r['tracks_seconds']) && (int)($r['lane_count'] ?? 0) > 0
@@ -245,6 +274,9 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         $positions[] = ['role' => (string)$r['role'], 'days' => (float)$r['days'], 'seconds' => $secs];
         $plannedDays += (float)$r['days'];
         $plannedSeconds += $secs;
+        $psid = (int)($r['step']['id'] ?? 0);
+        $plannedDaysBy[$psid] = ($plannedDaysBy[$psid] ?? 0.0) + (float)$r['days'];
+        $plannedSecsBy[$psid] = ($plannedSecsBy[$psid] ?? 0.0) + $secs;
     }
 
     // What happened: hours logged inside their window, and any outside it,
@@ -272,6 +304,8 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
     $money = $fxRow ? 'USD' : $cur;
     $dueOwn = null;
     if ($fxRow && $due !== null) { $dueOwn = $due; $due = fx_to_usd($due, $cur, $fx); }
+    $left = statement_left($rate, $unit, $plannedDays, $days, $plannedSeconds, $approvedSecs, $hpd);
+    if ($fxRow && $left !== null) $left = fx_to_usd($left, $cur, $fx);
 
     // ⚠ A POSITION WITH ITS OWN CONTRACT (finance_install_13, David 2026-10-29)
     // is paid on ITS time and footage at ITS rate; everything else is paid on
@@ -295,33 +329,42 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
             }
         }
         $restMin = $minutesIn; $restSecs = $approvedSecs;
+        $restPlanD = $plannedDays; $restPlanS = $plannedSeconds;
         $buckets = [];
         foreach ($positionTerms as $sid => $pt) {
             if ((int)$sid <= 0) continue;
             $m = (int)($minByStep[(int)$sid] ?? 0);
             $sc = (float)($secsByStep[(int)$sid] ?? 0.0);
-            $restMin -= $m; $restSecs -= $sc;
-            $buckets[] = [(string)($pt['position_name'] ?? 'Position'), $pt, $m, $sc, true];
+            $pd = (float)($plannedDaysBy[(int)$sid] ?? 0.0);
+            $ps = (float)($plannedSecsBy[(int)$sid] ?? 0.0);
+            $restMin -= $m; $restSecs -= $sc; $restPlanD -= $pd; $restPlanS -= $ps;
+            $buckets[] = [(string)($pt['position_name'] ?? 'Position'), $pt, $m, $sc, true, $pd, $ps];
         }
-        $buckets[] = [$restName, $restTerms, max(0, $restMin), max(0.0, $restSecs), $restOwn];
+        $buckets[] = [$restName, $restTerms, max(0, $restMin), max(0.0, $restSecs), $restOwn,
+                      max(0.0, $restPlanD), max(0.0, $restPlanS)];
 
         $moneys = [];
-        foreach ($buckets as [$name, $bt, $m, $sc, $own]) {
+        foreach ($buckets as [$name, $bt, $m, $sc, $own, $pd, $ps]) {
             $h = $m / 60;
             $d = $hpd > 0 ? $h / $hpd : 0.0;
             [$lr, $lu, $lc, $lb, $ll, $ld] = statement_price($bt, $h, $d, $sc);
-            // A position nobody has worked on yet, on a rate that is not a
-            // flat fee, has nothing to say; it stays off the list.
-            if ($lu !== 'flat' && $m <= 0 && $sc <= 0) continue;
+            // A position nobody has worked on yet and nothing is planned on,
+            // on a rate that is not a flat fee, has nothing to say; it stays
+            // off the list. (Planned work counts since 2026-11-11: it is what
+            // is left to invoice.)
+            if ($lu !== 'flat' && $m <= 0 && $sc <= 0 && $pd <= 0 && $ps <= 0) continue;
             $lFx = ($lc !== 'USD' && isset($fx[$lc])) ? $fx[$lc] : null;
             $lMoney = $lFx ? 'USD' : $lc;
             $lDueOwn = null;
             if ($lFx && $ld !== null) { $lDueOwn = $ld; $ld = fx_to_usd($ld, $lc, $fx); }
+            $lLeft = statement_left($lr, $lu, $pd, $d, $ps, $sc, $hpd);
+            if ($lFx && $lLeft !== null) $lLeft = fx_to_usd($lLeft, $lc, $fx);
             $moneys[$lMoney] = true;
             $lines[] = ['position' => $name, 'own_contract' => $own, 'rate' => $lr, 'unit' => $lu,
                         'rate_currency' => $lc, 'currency' => $lMoney, 'hours' => $h, 'days' => $d,
                         'seconds' => $sc, 'basis' => $lb, 'basis_label' => $ll, 'due' => $ld,
                         'due_own' => $lDueOwn,
+                        'planned_days' => $pd, 'days_left' => $pd - $d, 'left' => $lLeft,
                         'rate_usd' => ($lFx && $lr !== null) ? $lr * (float)$lFx['usd_per_unit'] : null];
         }
         // One line on the default is the statement as it always was (the own
@@ -331,11 +374,15 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         // The show's due is the sum of its lines, in one currency, or nothing
         // when the lines are in two that no fixed rate brings together.
         if ($lines) {
-            $unpriced = false; $sum = 0.0;
-            foreach ($lines as $l) { if ($l['due'] === null) $unpriced = true; else $sum += $l['due']; }
+            $unpriced = false; $sum = 0.0; $leftSum = 0.0;
+            foreach ($lines as $l) {
+                if ($l['due'] === null) $unpriced = true; else $sum += $l['due'];
+                $leftSum += (float)($l['left'] ?? 0);
+            }
             $oneMoney = count($moneys) === 1;
             $money = $oneMoney ? (string)array_key_first($moneys) : 'USD';
             $due = ($oneMoney && !$unpriced) ? round($sum, 2) : null;
+            $left = ($oneMoney && !$unpriced) ? round($leftSum, 2) : null;
             $fxRow = null; $dueOwn = null;
             $rate = $lines[0]['rate']; $unit = $lines[0]['unit']; $cur = $lines[0]['rate_currency'];
             $basis = $lines[0]['basis']; $basisLabel = $lines[0]['basis_label'];
@@ -356,6 +403,11 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         if ($amt === null) { $otherCurrency = true; continue; }
         $invoiced += $amt;
     }
+    // A flat fee has no days to count down: what is left is the fee less what
+    // has been invoiced against it. (On a statement split into contracts the
+    // invoices cannot be told apart by position, so a flat-fee line there
+    // keeps its whole fee.)
+    if ($left !== null && !$lines && $unit === 'flat') $left = max(0.0, round($left - $invoiced, 2));
 
     return [
         'window'          => $win,
@@ -380,7 +432,13 @@ function artist_statement(PDO $pdo, int $projectId, int $crewId, ?array $terms, 
         'invoiced'        => round($invoiced, 2),
         'invoices'        => $invoices,
         'invoiced_other_currency' => $otherCurrency,
-        'left'            => $due !== null ? round($due - $invoiced, 2) : null,
+        // Days planned not yet logged; below zero when they have logged more
+        // than the plan has them for, which the screens show as "over".
+        'days_left'       => $plannedDays - $days,
+        'seconds_left'    => $plannedSeconds - $approvedSecs,
+        // The planned work still to invoice at the rate (statement_left()).
+        // It no longer takes off what has been invoiced, except on a flat fee.
+        'left'            => $left,
         // One line per contract when a position has its own (finance_install_13).
         // Empty when everything is paid on the one set of terms.
         'lines'           => $lines,

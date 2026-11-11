@@ -720,6 +720,8 @@ the two. `kickoff.php`, `includes/kickoff.php`; DECISIONS 2026-10-16 says why. T
 
 **2026-11-06: versions.** A change to the signed-off budget amount saves a new approved kick-off
 version; Kick-off vs now compares with the latest and lists the earlier ones (DECISIONS 2026-11-06).
+Later the same day: a re-plan sent for sign-off again (not frozen) and an approved budget request each
+make the next version, and a dropdown compares the original with any later version.
 
 > *"A project should have a planning status until we get a sign off from the CEO and COO, once that
 > happens, everything from that project will have to be stored as a first entry. Things like overall
@@ -1285,6 +1287,55 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
   Home's invoice status now shows a monthly invoice as one row with its projects.
 - **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
   invoices it is for David to say.
+
+## Asked for on 2026-11-11
+
+### An invoice template — NOT BUILT
+
+David: *"let's put on the roadmap an invoice template"*.
+
+A standard invoice every freelancer uses for their monthly invoice to accounting@mana.tv: one
+invoice a month, one line per project (the money rules in `CLAUDE.md`). Why it is worth having:
+- **Fewer wrong invoices.** Home's Invoice and billing tab already says what to put on this month's
+  invoice (project, step, unit and rate, days, totals); a template turns that into the document.
+- **The invoice intake gets easier.** The planned reading of emailed invoices (DECISIONS
+  2026-10-28, "Invoices arrive by email and file themselves") is far more reliable when every PDF
+  has the same layout and fields.
+
+Open before building:
+- **Form:** a PDF Anima fills in from the month's invoice lines for the artist to download, or a
+  blank template (Google Docs / Word) they fill in themselves. The first is less work for artists and
+  matches the intake best.
+- **Required fields:** David is to share the full list of what an invoice must carry (legal name,
+  address, tax ID, invoice number, dates, bank details…). Bank details and tax IDs are sensitive:
+  decide whether Anima stores them or the artist adds them to the downloaded file.
+- **Numbering:** the artist's own invoice number (`invoice_ref`) or one Anima suggests.
+- **Currency:** USD by default; a non-USD contract shows its own currency at the project's fixed rate.
+
+### Reminders to log time: an end-of-day pop-up, and an instant one from an admin — NOT BUILT
+
+David: *"add pop up reminders for everyone to log times at the end of the day and a button for
+admins to send and instant pop up for logging times as an alternative"*.
+
+Artists log their time every day (the money rules in `CLAUDE.md`), and statements, actual days and
+the budget pool are only as good as those logs; on MSD most people had logged nothing. Two parts:
+- **End of day, automatic.** Around the end of the working day (a set time in the studio's time
+  zone, e.g. 5 pm, weekdays, not on studio holidays or the person's days off), anybody who has
+  logged nothing today gets a pop-up: "You haven't logged today" with a button to log it there.
+  Shown once a day, easy to dismiss.
+- **Instant, from an admin.** A button (e.g. on Users or the team views) that sends the same pop-up
+  now, to everybody or to chosen people, for the days somebody needs the numbers today.
+
+Things to settle when building:
+- **A pop-up only reaches somebody with Anima open.** The page checks every few minutes; for people
+  who are not in Anima, the bell keeps it, and an email at the same time is the fallback (decide).
+- **Who gets it:** everybody who logs time on a show; salaried staff too (their time is project cost
+  at the blended day rate). Not people with no show that day.
+- **Light on every page.** It loads from the header, so it must stay small and never throw (the rule
+  in `CLAUDE.md`); the check is one cheap query.
+- **Where to log:** the pop-up opens the same logging Home's "missing days" panel uses, not a second
+  way of logging.
+- Probably a switch per person on Users → Access (#170), and a record of who sent an instant one.
 
 ## Access switches — BUILT 2026-11-05 (migration 077)
 

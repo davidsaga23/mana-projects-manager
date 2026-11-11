@@ -1,0 +1,4 @@
+# Anima is a private studio tool: every page needs a login, and none of it
+# belongs in a search engine. (David, 2026-11-10, moving to anima-mana.com.)
+User-agent: *
+Disallow: /

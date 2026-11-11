@@ -368,6 +368,51 @@ details.kickoff-resend summary { cursor: pointer; }
 .kickoff-row-removed td { background: var(--danger-tint); }
 .kickoff-chg { color: var(--warn-strong); white-space: nowrap; font-size: .9em; }
 .kickoff-list { margin: 12px 0; }
+/* David, 2026-11-11: "accentuate the columns to see one one starts and ends".
+   A full-width table pushed each date far from its header; the table now sits at
+   its natural width, headers line up over their numbers, and a line divides the
+   columns so Starts and Ends read as two. */
+.kickoff-list table.data { width: auto; }
+.kickoff-list th.num, .kickoff-list td.num { text-align: right; white-space: nowrap; padding-left: 18px; padding-right: 18px; }
+.kickoff-list table:not(.kickoff-cmp) td + td,
+.kickoff-list table:not(.kickoff-cmp) thead th + th + th { border-left: 1px solid var(--border-strong); }
+/* Compared: each column is a kick-off | now pair; the line falls between pairs. */
+.kickoff-cmp .kickoff-grp { text-align: center; border-left: 1px solid var(--border-strong); }
+.kickoff-cmp .kickoff-was { border-left: 1px solid var(--border-strong); }
+.kickoff-cmp td.kickoff-diff { font-weight: 600; }
+/* Timeline as bars (Kick-off vs now): the kick-off bar solid in the step's
+   colour, now faded in the same colour just under it. --bar is the step's hex. */
+.kickoff-gantt { margin: 12px 0 8px; }
+.kickoff-gantt-key { display: flex; gap: 16px; margin-bottom: 6px; }
+.kickoff-gantt-key span { display: inline-flex; align-items: center; gap: 6px; }
+.kickoff-gantt-swatch { display: inline-block; width: 22px; height: 8px; border-radius: 2px; background: var(--muted); }
+.kickoff-gantt-swatch.is-now { opacity: .38; }
+.kickoff-gantt-row { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: center;
+  border-bottom: 1px solid var(--border); }
+.kickoff-gantt-name { font-size: .85em; padding: 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kickoff-gantt-track { position: relative; height: 26px; }
+.kickoff-gantt-head { border-bottom-color: var(--border-strong); }
+.kickoff-gantt-head .kickoff-gantt-track { height: 20px; }
+.kickoff-gantt-tick { position: absolute; bottom: 2px; font-size: .72em; color: var(--muted); white-space: nowrap;
+  padding-left: 3px; border-left: 1px solid var(--border-strong); }
+.kickoff-gantt-grid { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); }
+.kickoff-gantt-today { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--danger); opacity: .6; }
+.kickoff-gantt-bar { position: absolute; top: 4px; height: 8px; border-radius: 2px; background: var(--bar); }
+.kickoff-gantt-bar.is-now { top: 14px; opacity: .38; }
+.kickoff-gantt-table { margin-top: 6px; }
+/* Step / person filter on Kick-off vs now. The grid rows and lists set their
+   own display, so [hidden] needs saying to win. */
+.kickoff-filter { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+.kickoff-gantt-row[hidden], .kickoff-list[hidden], .kickoff-gantt[hidden] { display: none; }
+/* Filters above Artist statements (2026-11-11). .inline-form sets display:
+   flex, so [hidden] needs saying to win, on the bar and its date box. */
+.stmt-filter-bar { margin: 0 0 10px; gap: 14px; }
+.stmt-filter-bar input[type="search"] { width: 14em; }
+.stmt-filter-bar[hidden], .stmt-filter-bar input[hidden], .stmt-filter-bar label[hidden], .statement-list tr[hidden] { display: none; }
+/* Cost beside the Shots and assets figures: a line sets the money apart. */
+.kickoff-figures .kickoff-cost { border-left: 1px solid var(--border-strong); }
+.kickoff-figures td.kickoff-diff { font-weight: 600; }
+@media (max-width: 700px) { .kickoff-gantt-row { grid-template-columns: 100px 1fr; } }
 .kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
 .kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: var(--radius-md); }
 .kickoff-text-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

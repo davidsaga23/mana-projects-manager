@@ -158,12 +158,21 @@ class SmtpMailer
             'To: ' . $toHeader,
             'Subject: ' . $this->encodeHeader($subject),
             'Message-ID: <' . bin2hex(random_bytes(16)) . '@'
-                . ($this->cfg['smtp_ehlo'] ?: 'mana.davidsaga.com') . '>',
+                . ($this->cfg['smtp_ehlo'] ?: (parse_url(site_url(), PHP_URL_HOST) ?: 'localhost')) . '>',
             'MIME-Version: 1.0',
             'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
         ];
-        if (!empty($this->cfg['mail_reply_to'])) {
-            $headers[] = 'Reply-To: <' . $this->cfg['mail_reply_to'] . '>';
+        // ONE OR SEVERAL REPLY-TO ADDRESSES (David, 2026-11-11: "can we add multiple
+        // emails to the mail reply to?"). config.php may give a list, ['a@x', 'b@y'],
+        // or one string with commas; the old single address still works. Anything
+        // that is not a plain address is dropped rather than written into a header,
+        // so a stray line break can never add a header of its own.
+        $replyTo = $this->cfg['mail_reply_to'] ?? '';
+        $replyTo = is_array($replyTo) ? $replyTo : explode(',', (string)$replyTo);
+        $replyTo = array_filter(array_map('trim', $replyTo),
+            fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL) !== false);
+        if ($replyTo) {
+            $headers[] = 'Reply-To: ' . implode(', ', array_map(fn($a) => "<{$a}>", $replyTo));
         }
 
         $body  = "--{$boundary}\r\n";
@@ -192,12 +201,32 @@ class SmtpMailer
 // Ticket notifications
 // ---------------------------------------------------------------------------
 
+/**
+ * The site's own address, with $path on the end: every link an email carries.
+ *
+ * ⚠ ONE PLACE, AND IT CAN BE SET. Seven functions used to build this each for
+ * themselves from the request, falling back to "mana.davidsaga.com" when there
+ * was no request to read. The move to anima-mana.com (David, 2026-11-09) is the
+ * reason it now reads `site_url` from config.php first: an email written during
+ * the move, or by a page reached through the old address, still links to the
+ * new one. With site_url unset it behaves exactly as before: this request's
+ * scheme, host and folder.
+ */
+function site_url(string $path = ''): string {
+    global $config;
+    $base = trim((string)($config['site_url'] ?? ''));
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+        $base   = "{$scheme}://{$host}{$dir}";
+    }
+    return rtrim($base, '/') . '/' . ltrim($path, '/');
+}
+
 /** Absolute URL to a ticket, for links inside notification emails. */
 function ticket_url(int $ticketId): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/ticket.php?id={$ticketId}";
+    return site_url("ticket.php?id={$ticketId}");
 }
 
 /**
@@ -473,10 +502,7 @@ function notify_admins_of_hire(PDO $pdo, array $h): array {
             : ''];
     }
 
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir    = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    $url    = "{$scheme}://{$host}{$dir}/crew.php?project=" . (int)$h['project_id'];
+    $url    = site_url('crew.php?project=' . (int)$h['project_id']);
     $esc    = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
     $where = $h['slot'] !== '' ? $h['slot'] : ($h['step'] !== '' ? $h['step'] : 'no position yet');
@@ -613,11 +639,8 @@ function notify_transcript_tasks(PDO $pdo, array $byCrew): array {
  * with "somewhere in here" as the instruction.
  */
 function board_task_url(int $projectId, int $stepId, string $itemKey): string {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'mana.davidsaga.com';
-    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
-    return "{$scheme}://{$host}{$dir}/spell.php?project={$projectId}"
-         . '&open=' . rawurlencode($stepId . ':' . $itemKey);
+    return site_url("spell.php?project={$projectId}"
+         . '&open=' . rawurlencode($stepId . ':' . $itemKey));
 }
 
 /**

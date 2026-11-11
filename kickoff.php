@@ -55,7 +55,10 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Tick the box to confirm you have read the warning.');
             }
             foreach (kickoff_request($pdo, $project, (array)($_POST['signers'] ?? [])) as $m) flash('ok', $m);
-            flash('ok', 'The setup is frozen and waiting for sign-off. The project stays in setup until everybody has approved.');
+            flash('ok', $project['status'] === 'setup'
+                ? 'The setup is frozen and waiting for sign-off. The project stays in setup until everybody has approved.'
+                : 'The re-plan is waiting for sign-off. The project carries on and can still be edited; once everybody '
+                  . 'has approved, the plan as it was sent becomes the next kick-off version.');
 
         } elseif ($action === 'approve' || $action === 'changes') {
             if (!$kick || (int)$kick['id'] !== (int)($_POST['kickoff_id'] ?? 0)) {
@@ -74,7 +77,9 @@ if ($ready && $_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'withdraw') {
             if (!$kick) throw new RuntimeException('There is nothing open to withdraw.');
             kickoff_withdraw($pdo, $kick);
-            flash('ok', 'Withdrawn. The project stays in setup, and nobody is waiting on it.');
+            flash('ok', $project['status'] === 'setup'
+                ? 'Withdrawn. The project stays in setup, and nobody is waiting on it.'
+                : 'Withdrawn. The current kick-off version stays, and nobody is waiting on the re-plan.');
 
         } elseif ($action === 'reopen') {
             if (!$kick) throw new RuntimeException('There is nothing open to reopen.');
@@ -216,13 +221,42 @@ if ($view === 'people'):
 // KICK-OFF VS NOW
 // ===========================================================================
 elseif ($view === 'compare'):
-    // THE LATEST VERSION unless an older one is picked (David, 2026-11-06:
-    // "'Kick-off vs now' always compares with the latest one he approved").
-    // See kickoff_versions() in includes/kickoff.php.
+    // WHAT IS COMPARED WITH WHAT (David, 2026-11-06).
+    //   default        the LATEST approved version against now ("'Kick-off vs
+    //                  now' always compares with the latest one he approved")
+    //   &with=now      the ORIGINAL (v1) against now
+    //   &with=<id>     the original against another recorded version ("a
+    //                  dropdown to see how the original kick off compares to
+    //                  another one recorded"; he chose "Original vs one pick")
+    // Versions are listed by kickoff_versions(): the sign-off, then one per
+    // approved budget request or re-plan.
+    //
+    // David, 2026-11-11: "let's include in the top a start version and another
+    // one (later) to compare it to". Two pickers replace the fixed pairs:
+    //   &from=<id>     any recorded version on the left
+    //   &to=<id>|now   a LATER version, or now, on the right (an earlier or
+    //                  unknown one falls back to now)
+    // The old &with= links above still open what they used to.
     $versions = kickoff_versions($pdo, $projectId);
-    $kick = $versions ? end($versions) : null;
-    $pick = (int)($_GET['version'] ?? 0);
-    foreach ($versions as $v) if ((int)$v['id'] === $pick) $kick = $v;
+    $kick = $versions ? $versions[count($versions) - 1] : null;
+    $with = (string)($_GET['with'] ?? '');
+    $right = null;   // null = now, else a stored version
+    $byId = [];
+    foreach ($versions as $v) $byId[(int)$v['id']] = $v;
+    $fromId = (int)($_GET['from'] ?? 0);
+    if ($fromId && isset($byId[$fromId])) {
+        $kick = $byId[$fromId];
+        $toId = (int)($_GET['to'] ?? 0);
+        if ($toId && isset($byId[$toId]) && (int)$byId[$toId]['n'] > (int)$kick['n']) $right = $byId[$toId];
+    } elseif ($versions && $with !== '') {
+        if ($with === 'now') {
+            $kick = $versions[0];
+        } else {
+            foreach ($versions as $v) {
+                if ((int)$v['id'] === (int)$with && (int)$v['n'] > 1) { $kick = $versions[0]; $right = $v; }
+            }
+        }
+    }
     if (!$kick): ?>
   <div class="empty-state">
     <p><strong>This project has no signed-off kick-off to compare with.</strong></p>
@@ -231,42 +265,155 @@ elseif ($view === 'compare'):
       estimate per step, where one was recorded, is on <a href="history_quotas.php">Historic quotas</a>.</p>
   </div>
     <?php else:
-    $was = json_decode((string)$kick['snapshot'], true) ?: ['sections' => []];
-    $now = kickoff_snapshot($pdo, $project);
+    $was    = json_decode((string)$kick['snapshot'], true) ?: ['sections' => []];
     $finWas = kickoff_finance_load((int)$kick['id']);
-    $finNow = can_see_money() ? kickoff_finance_snapshot($pdo, $project) : null;
-    $signs  = kickoff_signoffs($pdo, (int)$kick['id']); ?>
-  <?php $latest = (int)$kick['id'] === (int)end($versions)['id'];
-        $finV = is_array($finWas['version'] ?? null) ? $finWas['version'] : null; ?>
-  <p class="lead">How <?= e($project['name']) ?> stood in kick-off version <?= (int)$kick['n'] ?><?= $latest ? ', the latest one approved,' : '' ?>
-    against how it stands today. Only what moved is listed first; whatever is unchanged is folded underneath.</p>
-  <?php if (count($versions) > 1): ?>
-    <?php // Every approved version, oldest first: the original sign-off, then
-          // one per change to the signed-off budget. ?>
-    <ol class="kickoff-versions">
-      <?php foreach ($versions as $v): $isPick = (int)$v['id'] === (int)$kick['id']; ?>
-        <li<?= $isPick ? ' class="is-current"' : '' ?>>
-          <?php $label = 'Version ' . (int)$v['n'] . ', ' . date('j M Y', strtotime((string)$v['decided_at'])) . ': '
-                       . ($v['kind'] === 'budget_change'
-                           ? 'budget changed by ' . (string)$v['requested_by_name']
-                           : 'signed off'); ?>
-          <?php if ($isPick): ?><strong><?= e($label) ?></strong>
-          <?php else: ?><a href="<?= e($selfUrl . $sec . '&view=compare&version=' . (int)$v['id']) ?>"><?= e($label) ?></a><?php endif; ?>
-        </li>
-      <?php endforeach; ?>
-    </ol>
+    if ($right === null) {
+        $now    = kickoff_snapshot($pdo, $project);
+        $finNow = can_see_money() ? kickoff_finance_snapshot($pdo, $project) : null;
+    } else {
+        $now    = json_decode((string)$right['snapshot'], true) ?: ['sections' => []];
+        $finNow = kickoff_finance_load((int)$right['id']);
+    }
+    $vName = fn($v) => 'v' . (int)$v['n'] . ', ' . date('j M Y', strtotime((string)$v['decided_at']));
+    // The last two are the short names over the paired columns of a list.
+    kickoff_labels([$vName($kick), $right === null ? 'Now' : $vName($right),
+                    'v' . (int)$kick['n'], $right === null ? 'Now' : 'v' . (int)$right['n']]);
+    $latestN = count($versions);
+    // One line per version: what made it, who approved it, and for a budget
+    // change the amounts and the reason (administrators only: it is money).
+    $describe = function (array $v) use ($pdo): string {
+        $names = implode(' and ', array_map(fn($s) => $s['signer_name'], kickoff_signoffs($pdo, (int)$v['id'])));
+        if ($v['kind'] === 'budget_change') {
+            $line = 'budget change approved by ' . ($names ?: (string)$v['requested_by_name']);
+            $fv = can_see_money() ? (kickoff_finance_load((int)$v['id'])['version'] ?? null) : null;
+            if (is_array($fv)) {
+                $line .= ': ' . ($fv['old_amount'] === null ? 'none' : fmt_money_plain((float)$fv['old_amount'], (string)$fv['old_currency']))
+                       . ' → ' . ($fv['new_amount'] === null ? 'none' : fmt_money_plain((float)$fv['new_amount'], (string)$fv['new_currency']))
+                       . ', “' . $fv['reason'] . '”';
+            }
+            return $line;
+        }
+        return ($v['kind'] === 'replan' ? 're-plan sent by ' : 'kick-off sent by ') . $v['requested_by_name']
+             . ', signed off by ' . $names;
+    }; ?>
+  <?php if ($latestN > 1): ?>
+    <form method="get" class="inline-form kickoff-pick-compare">
+      <input type="hidden" name="project" value="<?= (int)$projectId ?>">
+      <input type="hidden" name="view" value="compare">
+      <?php if ($sec): ?><input type="hidden" name="section" value="finance"><?php endif; ?>
+      <label>From
+        <select name="from" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): ?>
+            <option value="<?= (int)$v['id'] ?>" <?= (int)$v['id'] === (int)$kick['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === 1 ? ' (original)' : ((int)$v['n'] === $latestN ? ' (latest)' : '') ?></option>
+          <?php endforeach; ?>
+        </select></label>
+      <label>to
+        <select name="to" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): if ((int)$v['n'] <= (int)$kick['n']) continue; ?>
+            <option value="<?= (int)$v['id'] ?>" <?= $right && (int)$right['id'] === (int)$v['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === $latestN ? ' (latest)' : '' ?></option>
+          <?php endforeach; ?>
+          <option value="now" <?= $right === null ? 'selected' : '' ?>>Now</option>
+        </select></label>
+      <noscript><button type="submit">Show</button></noscript>
+    </form>
   <?php endif; ?>
-  <?php if ($kick['kind'] === 'budget_change'): ?>
-    <p class="muted small">Saved <?= e(date('j M Y', strtotime((string)$kick['decided_at']))) ?> when
-      <?= e((string)$kick['requested_by_name']) ?> changed the signed-off budget<?php
-      if ($finV): ?> from <?= e($finV['old_amount'] === null ? 'none' : fmt_money_plain((float)$finV['old_amount'], (string)$finV['old_currency'])) ?>
-      to <?= e($finV['new_amount'] === null ? 'none' : fmt_money_plain((float)$finV['new_amount'], (string)$finV['new_currency'])) ?>:
-      “<?= e((string)$finV['reason']) ?>”<?php endif; ?>.
-      Everything on the show was saved again at that moment.</p>
+  <?php
+  // FILTER BY STEP OR PERSON (David, 2026-11-11: "let's include a filter to
+  // see by pipeline step or name/artist"). Done in the browser, on the rows
+  // already drawn, so nothing is fetched again. The choices come from both
+  // sides: the Timeline's steps, and the people named in Staffing, the expense
+  // projection and the invoices (the last two for administrators only, since
+  // they are only drawn for them). The headline figures stay whole-show.
+  $fSteps = []; $fPeople = [];
+  foreach ([$now, $was] as $side) {
+      foreach (array_keys($side['sections']['timeline']['lists']['Steps']['rows'] ?? []) as $k) $fSteps[(string)$k] = true;
+      foreach ($side['sections']['staffing']['lists']['Positions']['rows'] ?? [] as $r) {
+          $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+      }
+  }
+  if (can_see_money()) {
+      foreach ([$finNow, $finWas] as $side) {
+          if (!is_array($side)) continue;
+          foreach (array_keys($side['lists']['Expense projection']['rows'] ?? []) as $k) {
+              $i = strrpos((string)$k, ' · ');
+              if ($i !== false) $fPeople[substr((string)$k, $i + strlen(' · '))] = true;
+          }
+          foreach ($side['lists']['Invoices']['rows'] ?? [] as $r) {
+              $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+          }
+      }
+  }
+  // Not names: an empty position and a projection row with nobody on it.
+  foreach (['unfilled', 'Unfilled', '—'] as $x) unset($fPeople[$x]);
+  $fPeople = array_keys($fPeople);
+  sort($fPeople, SORT_NATURAL | SORT_FLAG_CASE);
+  if ($fSteps || $fPeople): ?>
+    <div class="inline-form kickoff-filter">
+      <label>Step
+        <select id="kfStep"><option value="">All steps</option>
+          <?php foreach (array_keys($fSteps) as $st): ?><option value="<?= e((string)$st) ?>"><?= e((string)$st) ?></option><?php endforeach; ?>
+        </select></label>
+      <label>Person
+        <select id="kfPerson"><option value="">Everyone</option>
+          <?php foreach ($fPeople as $pp): ?><option value="<?= e((string)$pp) ?>"><?= e((string)$pp) ?></option><?php endforeach; ?>
+        </select></label>
+      <span class="muted small" id="kfNote" hidden>Showing only matching rows; the totals above each list are still the whole show.</span>
+    </div>
+    <script>
+    (function () {
+      var stepSel = document.getElementById('kfStep'), personSel = document.getElementById('kfPerson');
+      if (!stepSel || !personSel) return;
+      // A row belongs to a step when its name IS the step, or the step followed
+      // by " (type)", " · person" or " #lane", which is how the lists name rows.
+      // "Color" therefore matches "Color (BG) · Artie" but not "Color script".
+      // A step shown with its type, "Color (BG assets)", also matches rows
+      // named by its base name, since the projection words the type its own way.
+      function stepMatch(label, step) {
+        var l = label.toLowerCase(), names = [step.toLowerCase()];
+        var base = step.replace(/\s*\(.*\)\s*$/, '');
+        if (base !== step) names.push(base.toLowerCase());
+        return names.some(function (n) {
+          if (l === n) return true;
+          if (l.indexOf(n) !== 0) return false;
+          return /^\s*(\(|·|#)/.test(l.slice(n.length));
+        });
+      }
+      function apply() {
+        var step = stepSel.value, person = personSel.value.toLowerCase();
+        var rows = document.querySelectorAll('.kickoff-list tbody tr, .kickoff-gantt-row[data-key]');
+        rows.forEach(function (tr) {
+          var th = tr.querySelector('th[scope="row"]');
+          var label = tr.getAttribute('data-key') || (th ? th.textContent.trim() : '');
+          var ok = (!step || stepMatch(label, step)) && (!person || tr.textContent.toLowerCase().indexOf(person) !== -1);
+          tr.hidden = !ok;
+        });
+        // A list with nothing left to show folds away entirely.
+        document.querySelectorAll('.kickoff-list, .kickoff-gantt').forEach(function (box) {
+          var any = box.querySelectorAll('tbody tr, .kickoff-gantt-row[data-key]');
+          var shown = Array.prototype.some.call(any, function (r) { return !r.hidden; });
+          box.hidden = any.length > 0 && !shown;
+        });
+        document.getElementById('kfNote').hidden = !(step || person);
+      }
+      stepSel.addEventListener('change', apply);
+      personSel.addEventListener('change', apply);
+    })();
+    </script>
+  <?php endif; ?>
+  <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ((int)$kick['n'] === 1 ? ' (the original)' : '') ?>,
+    against <?= $right === null ? 'how it stands today' : 'kick-off ' . e($vName($right)) ?>.
+    Only what moved is listed first; whatever is unchanged is folded underneath.</p>
+  <?php if ($latestN > 1): ?>
+    <details class="kickoff-versions-list">
+      <summary class="muted small">All <?= $latestN ?> kick-off versions</summary>
+      <ol class="kickoff-versions">
+        <?php foreach ($versions as $v): ?>
+          <li><strong><?= e($vName($v)) ?></strong>: <?= e($describe($v)) ?></li>
+        <?php endforeach; ?>
+      </ol>
+    </details>
   <?php else: ?>
-  <p class="muted small">Signed off <?= e(date('j M Y', strtotime((string)$kick['decided_at']))) ?> by
-    <?= e(implode(' and ', array_map(fn($s) => $s['signer_name'], $signs))) ?>, as sent by
-    <?= e((string)$kick['requested_by_name']) ?> on <?= e(date('j M Y', strtotime((string)$kick['requested_at']))) ?>.</p>
+    <p class="muted small"><?= e($vName($kick)) ?>: <?= e($describe($kick)) ?>.</p>
   <?php endif; ?>
   <?php foreach (KICKOFF_SECTIONS as $key => $title):
       if ($key === 'finance'):
@@ -280,7 +427,31 @@ elseif ($view === 'compare'):
           continue;
       endif;
       if (!isset($was['sections'][$key])) continue;
-      kickoff_render_section($title, $was['sections'][$key], $now['sections'][$key]);
+      // ?? because a stored version on the right may predate a section.
+      $secWas = $was['sections'][$key];
+      $secNow = $now['sections'][$key] ?? ['figures' => [], 'texts' => [], 'lists' => []];
+      $costs  = null;
+      // Money beside the production figures: administrators only, and only
+      // when both sides have their finance snapshot.
+      $finOk = can_see_money() && $finWas && !empty($finWas['configured']) && $finNow && !empty($finNow['configured']);
+      if ($finOk && $key === 'shots') {
+          $stepsNow = [];
+          foreach (pipeline_steps($pdo, $projectId) as $st) $stepsNow[(int)$st['id']] = $st;
+          [$ca, $pa] = kickoff_shot_costs($finWas, $secWas['figures'] ?? [], $stepsNow);
+          [$cb, $pb] = kickoff_shot_costs($finNow, $secNow['figures'] ?? [], $stepsNow);
+          if ($ca || $cb) $costs = [$ca, $cb, $pa, $pb];
+      }
+      // David, 2026-11-11: "let's add the original budget in days kick off and
+      // current, and also below the time logged so we know at the end how much
+      // more or less time we ended up paying for". Both are the budget pool's,
+      // stored with each side's money, so they show to administrators only.
+      if ($finOk && $key === 'setup') {
+          foreach (['Budget, days' => 'Budget pool, days', 'Time logged, days' => 'Budget pool, days used'] as $show => $src) {
+              if (isset($finWas['figures'][$src])) $secWas['figures'][$show] = $finWas['figures'][$src];
+              if (isset($finNow['figures'][$src])) $secNow['figures'][$show] = $finNow['figures'][$src];
+          }
+      }
+      kickoff_render_section($title, $secWas, $secNow, (string)($finWas['currency'] ?? 'USD'), $costs);
   endforeach; ?>
     <?php endif;
 
@@ -300,7 +471,7 @@ else:
     // from the users who should sign off"). Pre-ticked with whoever was asked
     // last time, else with the defaults under Who signs off.
     $askedBefore = array_map(fn($s) => (int)$s['user_id'], $signs);
-    $sendDialog = function (string $buttonLabel, string $buttonClass) use ($candidates, $askedBefore, $project) {
+    $sendDialog = function (string $buttonLabel, string $buttonClass, bool $replan = false) use ($candidates, $askedBefore, $project) {
         if ($why = kickoff_finance_problem()) { echo '<p class="err">' . e($why) . '</p>'; return; }
         if (!can_edit()) return; ?>
         <button type="button" class="<?= e($buttonClass) ?>"
@@ -308,8 +479,10 @@ else:
         <dialog id="kickoff-send-dialog" class="kickoff-dialog">
           <form method="post" class="kickoff-send" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
             <input type="hidden" name="action" value="send">
-            <h3>Who should sign off <?= e($project['name']) ?>?</h3>
-            <p class="muted small">The project turns active once everybody ticked here has approved. Each is emailed a
+            <h3>Who should sign off <?= e($project['name']) ?><?= $replan ? "'s re-plan" : '' ?>?</h3>
+            <p class="muted small"><?= $replan
+                ? 'The plan as it is now becomes the next kick-off version once everybody ticked here has approved.'
+                : 'The project turns active once everybody ticked here has approved.' ?> Each is emailed a
               link; they log in to Anima to answer.</p>
             <?php if (!$candidates): ?>
               <p class="err">There is nobody with an admin or editor login to ask.</p>
@@ -321,9 +494,10 @@ else:
             <?php endforeach; ?>
             <hr>
             <label class="kickoff-pick"><input type="checkbox" name="understood" value="1" required>
-              I've checked the setup and want to freeze it and send it for sign-off</label>
+              <?= $replan ? "I've checked the new plan and want to send it for sign-off"
+                          : "I've checked the setup and want to freeze it and send it for sign-off" ?></label>
             <div class="inline-form">
-              <button type="submit">Freeze and send</button>
+              <button type="submit"><?= $replan ? 'Send for sign-off' : 'Freeze and send' ?></button>
               <button type="button" class="secondary" onclick="this.closest('dialog').close()">Cancel</button>
             </div>
           </form>
@@ -364,17 +538,21 @@ else:
         'approved'          => 'Signed off',
         'changes_requested' => 'Changes asked for',
     ][$kick['state']] ?? $kick['state']; ?>
-    <?php $kickKind = (string)((json_decode((string)$kick['snapshot'], true) ?: [])['version']['kind'] ?? ''); ?>
+    <?php $kickKind = kickoff_kind($kick); ?>
     <p class="kickoff-state kickoff-state-<?= e($kick['state']) ?>"><strong><?= e($stateText) ?></strong>
-      <span class="muted">· <?= $kickKind === 'budget_change' ? 'new version saved when the budget was changed by' : 'sent by' ?>
+      <span class="muted">· <?= $kickKind === 'budget_change' ? 'new version saved when the budget was changed by'
+                               : ($kickKind === 'replan' ? 're-plan sent by' : 'sent by') ?>
         <?= e((string)$kick['requested_by_name']) ?>,
         <?= e(date('j M Y, H:i', strtotime((string)$kick['requested_at']))) ?></span></p>
-    <?php if ($kickKind === 'budget_change'): ?>
-      <p class="muted small">Each change to a signed-off budget saves the show as a new kick-off version, and
+    <?php if ($kickKind !== 'signoff' && $kick['state'] === 'approved'): ?>
+      <p class="muted small">An approved budget change or re-plan saves the show as a new kick-off version, and
         <a href="<?= e($selfUrl . $sec) ?>&amp;view=compare">Kick-off vs now</a> compares with the latest one.
         Earlier versions, the original sign-off among them, are listed there.</p>
     <?php endif; ?>
-    <?php if ($kick['state'] === 'pending'): ?>
+    <?php if ($kick['state'] === 'pending' && $kickKind === 'replan'): ?>
+      <div class="flash">This re-plan is waiting for sign-off. The project is not frozen: it carries on, and its
+        current kick-off version stays the one compared with until everybody has approved.</div>
+    <?php elseif ($kick['state'] === 'pending'): ?>
       <div class="flash flash-warn">The project is frozen until this is answered: its setup screens refuse
         every save. Asking for changes, or withdrawing, unfreezes it.</div>
     <?php endif; ?>
@@ -398,8 +576,9 @@ else:
 
     <?php if ($kick['state'] === 'pending' && $mine && $mine['decision'] === null): ?>
       <div class="kickoff-answer">
-        <p><strong>You are asked to sign this off.</strong> Below is exactly what was frozen when it was sent,
-          which is also what the project's own tabs show, since nothing can change until you answer.</p>
+        <p><strong>You are asked to sign this off.</strong> Below is exactly what was <?= $kickKind === 'replan'
+          ? 'sent. It is a re-plan, so the project was not frozen: its own tabs may have moved on since'
+          : 'frozen when it was sent, which is also what the project\'s own tabs show, since nothing can change until you answer' ?>.</p>
         <form method="post" class="inline-form">
           <input type="hidden" name="kickoff_id" value="<?= (int)$kick['id'] ?>">
           <button type="submit" name="action" value="approve"
@@ -434,6 +613,21 @@ else:
       </details>
     <?php endif; ?>
 
+    <?php if ($isOpen && can_edit() && $project['status'] !== 'setup' && $kickKind === 'replan'): ?>
+      <?php // A RE-PLAN is not frozen, so there is nothing to reopen: it is
+            // withdrawn, or sent again with the plan as it is by then. ?>
+      <div class="kickoff-resend">
+        <p>Changed the plan again since sending it? Send it again: that replaces this request with the plan as it
+          is now and asks everybody afresh. Or withdraw it.</p>
+        <?php $sendDialog('Send the re-plan again…', '', true); ?>
+        <form method="post" class="inline-form"
+              onsubmit="return confirm('Withdraw the re-plan sign-off request? The current kick-off version stays.');">
+          <input type="hidden" name="action" value="withdraw">
+          <button type="submit" class="secondary">Withdraw</button>
+        </form>
+      </div>
+    <?php endif; ?>
+
     <?php if ($isOpen && can_edit() && $project['status'] === 'setup'): ?>
       <div class="kickoff-resend">
         <?php if ($kick['state'] === 'pending'): ?>
@@ -461,6 +655,17 @@ else:
 
     <?php if ($kick['state'] === 'approved'): ?>
       <p><a class="button" href="<?= e($selfUrl . $sec) ?>&amp;view=compare">Compare the kick-off with now →</a></p>
+    <?php endif; ?>
+    <?php // SEND A RE-PLAN (David, 2026-11-06). On a signed-off project with
+          // nothing waiting: the plan as it is now goes to the people chosen,
+          // and their approval makes it the next kick-off version. Not frozen. ?>
+    <?php if (!$isOpen && $project['status'] !== 'setup' && kickoff_approved($pdo, $projectId) && can_edit()): ?>
+      <div class="kickoff-resend">
+        <p><strong>Re-planned the show?</strong> Send it for sign-off again. Once everybody you choose has approved,
+          the plan as it is when you send it becomes kick-off version <?= count(kickoff_versions($pdo, $projectId)) + 1 ?>,
+          and Kick-off vs now compares with it. The project carries on and can be edited while they look.</p>
+        <?php $sendDialog('Send a re-plan for sign-off…', '', true); ?>
+      </div>
     <?php endif; ?>
 
     <h3>What was frozen</h3>

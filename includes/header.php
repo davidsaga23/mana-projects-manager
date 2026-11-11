@@ -193,7 +193,7 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
             // A third link rather than a fourth: what is on my desk, the shows,
             // and the people. Everything about one show is still reached by
             // picking it from Projects. ?>
-      <?php if ($fa('artists')): ?> · <a href="artists.php">Artists</a><?php endif; ?>
+      <?php if ($fa('artists')): ?> · <a href="artists.php">Artists pool</a><?php endif; ?>
       <?php // BOOKINGS beside Artists (David, 2026-09-21): the same people, seen
             // across every show at once, who is needed where and when two shows
             // want the same person. Up here for the reason Artists is: it is
