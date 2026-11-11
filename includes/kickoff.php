@@ -1293,6 +1293,10 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
       <?php endforeach; ?>
 
       <?php foreach ($was['lists'] as $listTitle => $list):
+          // David, 2026-11-11: "delete this section for the workflow". The
+          // step-to-step links are still saved with each kick-off, just not
+          // shown: a re-plan rewires them wholesale and the list was all noise.
+          if ($listTitle === 'Workflow') continue;
           $nowList = $compare ? ($now['lists'][$listTitle] ?? ['cols' => $list['cols'], 'rows' => []]) : null;
           // David, 2026-11-11: "instead of the timeline being a table let's do a
           // first bar with the kick off dates and a faded same color for the
