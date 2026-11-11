@@ -14,9 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-11 — Artist statements: filters above the table *(no migration)*
+## 2026-11-11 — Artist statements: Position column and filters *(no migration)*
 
-- A bar above **Artist statements** (Finance management): **search by name**, **rate** (per day,
+- A **Position** column next to Artist: the step or supervision position each person holds, the
+  names invoices use (one per line for somebody on two; "—" for logged time with no position).
+- A bar above **Artist statements** (Finance management): **search by name**, **position**, **rate** (per day,
   per second, flat fee; only the kinds somebody on the show is paid in), **status** (left to invoice,
   over-invoiced, nothing logged, settled = something earned and all of it invoiced) and **on the
   show** today or on a chosen date, from the Dates column (a row with no dates is never hidden).
