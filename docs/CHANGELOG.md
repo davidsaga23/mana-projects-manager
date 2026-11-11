@@ -14,10 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-11 — Kick-off "By step" columns easier to read *(no migration)*
+## 2026-11-11 — Kick-off vs now: pick both versions, paired columns *(no migration)*
 
-- The By step table (and the other kick-off lists) no longer stretch across the page: each header
-  sits over its numbers and a line divides the columns, so Starts and Ends read as two (David).
+- **From / to pickers** at the top of Kick-off vs now: any recorded version on the left, a later
+  version or Now on the right (David). Old `&with=` links still open what they did.
+- **By step** (and the other compared lists): Tasks, Starts and Ends each split into a kick-off |
+  now pair (headed "v1" / "Now", or "Kick-off" / "Now"), one value per cell. A cell used to read
+  "2 Sep → 26 Oct", which looked like a start and an end. The figure that moved is bold, a line
+  divides the pairs, and the table no longer stretches across the page.
 
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
 

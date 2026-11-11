@@ -631,7 +631,9 @@ function kickoff_kind(array $kickoff): string {
  * renderers below, so their signatures stay as every caller knows them.
  */
 function kickoff_labels(?array $set = null): array {
-    static $labels = ['At kick-off', 'Now'];
+    // [long left, long right, short left, short right]; the short pair heads the
+    // paired columns of a compared list.
+    static $labels = ['At kick-off', 'Now', 'Kick-off', 'Now'];
     if ($set !== null) $labels = $set;
     return $labels;
 }
@@ -1311,17 +1313,33 @@ function kickoff_render_list(string $title, array $was, ?array $now, string $cur
         <span class="muted small"><?= count($moved) ? count($moved) . ' changed, added or removed' : 'nothing changed' ?>
           · <?= count($was['rows']) ?> <?= e(lcfirst(kickoff_labels()[0])) ?>, <?= count($now['rows']) ?> <?= e(lcfirst(kickoff_labels()[1])) ?></span></h4>
       <?php if ($moved): ?>
-        <table class="data">
-          <thead><tr><th></th><th></th><?php foreach ($cols as [$l, $hk]): ?><th class="<?= $hk === 'text' ? '' : 'num' ?>"><?= e($l) ?></th><?php endforeach; ?></tr></thead>
+        <?php
+        // David, 2026-11-11: "instead of starts and ends change it to Kick off
+        // and Now". A cell used to read "2 Sep → 26 Oct", which looked like a
+        // step's start and end. Each column is now a pair, kick-off and now
+        // side by side under it, one date per cell.
+        $L = kickoff_labels(); $short0 = $L[2] ?? $L[0]; $short1 = $L[3] ?? $L[1]; ?>
+        <table class="data kickoff-cmp">
+          <thead>
+            <tr><th rowspan="2"></th><th rowspan="2"></th>
+              <?php foreach ($cols as [$l]): ?><th colspan="2" class="kickoff-grp"><?= e($l) ?></th><?php endforeach; ?></tr>
+            <tr><?php foreach ($cols as [, $hk]): $nc = $hk === 'text' ? '' : 'num'; ?>
+              <th class="<?= $nc ?> kickoff-was"><?= e($short0) ?></th><th class="<?= $nc ?>"><?= e($short1) ?></th>
+            <?php endforeach; ?></tr>
+          </thead>
           <tbody>
           <?php foreach ($moved as [$key, $how, $row, $nrow]): ?>
             <tr class="kickoff-row-<?= e($how) ?>">
               <th scope="row"><?= e($key) ?></th><td class="kickoff-chg"><?= e($how) ?></td>
               <?php foreach ($cols as $c => [, $kind]):
-                  $a = $row[$c] ?? null; $b = $nrow[$c] ?? null; ?>
-                <td class="<?= $kind === 'text' ? '' : 'num' ?>"><?php
-                  if ($how === 'changed' && kickoff_change($a, $b, $kind, $currency) !== ''): ?><span class="muted"><?= e(kickoff_fmt($a, $kind, $currency)) ?> →</span> <?= e(kickoff_fmt($b, $kind, $currency)) ?><?php
-                  else: ?><?= e(kickoff_fmt($how === 'added' ? $b : $a, $kind, $currency)) ?><?php endif; ?></td>
+                  $a = $how === 'added' ? null : ($row[$c] ?? null);
+                  $b = $how === 'removed' ? null : ($nrow[$c] ?? null);
+                  $nc = $kind === 'text' ? '' : 'num';
+                  // In a changed row, a figure that held still is muted so the
+                  // one that moved stands out.
+                  $tone = $how !== 'changed' ? '' : (kickoff_change($a, $b, $kind, $currency) !== '' ? ' kickoff-diff' : ' muted'); ?>
+                <td class="<?= $nc ?> kickoff-was<?= $how === 'added' ? ' muted' : '' ?>"><?= $how === 'added' ? '—' : e(kickoff_fmt($a, $kind, $currency)) ?></td>
+                <td class="<?= $nc ?><?= $tone ?><?= $how === 'removed' ? ' muted' : '' ?>"><?= $how === 'removed' ? '—' : e(kickoff_fmt($b, $kind, $currency)) ?></td>
               <?php endforeach; ?>
             </tr>
           <?php endforeach; ?>

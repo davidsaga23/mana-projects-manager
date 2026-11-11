@@ -230,11 +230,25 @@ elseif ($view === 'compare'):
     //                  another one recorded"; he chose "Original vs one pick")
     // Versions are listed by kickoff_versions(): the sign-off, then one per
     // approved budget request or re-plan.
+    //
+    // David, 2026-11-11: "let's include in the top a start version and another
+    // one (later) to compare it to". Two pickers replace the fixed pairs:
+    //   &from=<id>     any recorded version on the left
+    //   &to=<id>|now   a LATER version, or now, on the right (an earlier or
+    //                  unknown one falls back to now)
+    // The old &with= links above still open what they used to.
     $versions = kickoff_versions($pdo, $projectId);
     $kick = $versions ? $versions[count($versions) - 1] : null;
     $with = (string)($_GET['with'] ?? '');
     $right = null;   // null = now, else a stored version
-    if ($versions && $with !== '') {
+    $byId = [];
+    foreach ($versions as $v) $byId[(int)$v['id']] = $v;
+    $fromId = (int)($_GET['from'] ?? 0);
+    if ($fromId && isset($byId[$fromId])) {
+        $kick = $byId[$fromId];
+        $toId = (int)($_GET['to'] ?? 0);
+        if ($toId && isset($byId[$toId]) && (int)$byId[$toId]['n'] > (int)$kick['n']) $right = $byId[$toId];
+    } elseif ($versions && $with !== '') {
         if ($with === 'now') {
             $kick = $versions[0];
         } else {
@@ -261,7 +275,9 @@ elseif ($view === 'compare'):
         $finNow = kickoff_finance_load((int)$right['id']);
     }
     $vName = fn($v) => 'v' . (int)$v['n'] . ', ' . date('j M Y', strtotime((string)$v['decided_at']));
-    kickoff_labels([$vName($kick), $right === null ? 'Now' : $vName($right)]);
+    // The last two are the short names over the paired columns of a list.
+    kickoff_labels([$vName($kick), $right === null ? 'Now' : $vName($right),
+                    'v' . (int)$kick['n'], $right === null ? 'Now' : 'v' . (int)$right['n']]);
     $latestN = count($versions);
     // One line per version: what made it, who approved it, and for a budget
     // change the amounts and the reason (administrators only: it is money).
@@ -285,18 +301,23 @@ elseif ($view === 'compare'):
       <input type="hidden" name="project" value="<?= (int)$projectId ?>">
       <input type="hidden" name="view" value="compare">
       <?php if ($sec): ?><input type="hidden" name="section" value="finance"><?php endif; ?>
-      <label>Compare
-        <select name="with" onchange="this.form.submit()">
-          <option value="" <?= $with === '' ? 'selected' : '' ?>>v<?= $latestN ?> (latest) with now</option>
-          <option value="now" <?= $with === 'now' ? 'selected' : '' ?>>v1 (original) with now</option>
-          <?php foreach (array_slice($versions, 1) as $v): ?>
-            <option value="<?= (int)$v['id'] ?>" <?= $right && (int)$right['id'] === (int)$v['id'] ? 'selected' : '' ?>>v1 (original) with <?= e($vName($v)) ?></option>
+      <label>From
+        <select name="from" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): ?>
+            <option value="<?= (int)$v['id'] ?>" <?= (int)$v['id'] === (int)$kick['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === 1 ? ' (original)' : ((int)$v['n'] === $latestN ? ' (latest)' : '') ?></option>
           <?php endforeach; ?>
+        </select></label>
+      <label>to
+        <select name="to" onchange="this.form.submit()">
+          <?php foreach ($versions as $v): if ((int)$v['n'] <= (int)$kick['n']) continue; ?>
+            <option value="<?= (int)$v['id'] ?>" <?= $right && (int)$right['id'] === (int)$v['id'] ? 'selected' : '' ?>><?= e($vName($v)) ?><?= (int)$v['n'] === $latestN ? ' (latest)' : '' ?></option>
+          <?php endforeach; ?>
+          <option value="now" <?= $right === null ? 'selected' : '' ?>>Now</option>
         </select></label>
       <noscript><button type="submit">Show</button></noscript>
     </form>
   <?php endif; ?>
-  <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ' (the original)' ?>,
+  <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ((int)$kick['n'] === 1 ? ' (the original)' : '') ?>,
     against <?= $right === null ? 'how it stands today' : 'kick-off ' . e($vName($right)) ?>.
     Only what moved is listed first; whatever is unchanged is folded underneath.</p>
   <?php if ($latestN > 1): ?>

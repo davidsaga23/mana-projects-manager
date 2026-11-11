@@ -374,7 +374,12 @@ details.kickoff-resend summary { cursor: pointer; }
    columns so Starts and Ends read as two. */
 .kickoff-list table.data { width: auto; }
 .kickoff-list th.num, .kickoff-list td.num { text-align: right; white-space: nowrap; padding-left: 18px; padding-right: 18px; }
-.kickoff-list td + td, .kickoff-list thead th + th + th { border-left: 1px solid var(--border-strong); }
+.kickoff-list table:not(.kickoff-cmp) td + td,
+.kickoff-list table:not(.kickoff-cmp) thead th + th + th { border-left: 1px solid var(--border-strong); }
+/* Compared: each column is a kick-off | now pair; the line falls between pairs. */
+.kickoff-cmp .kickoff-grp { text-align: center; border-left: 1px solid var(--border-strong); }
+.kickoff-cmp .kickoff-was { border-left: 1px solid var(--border-strong); }
+.kickoff-cmp td.kickoff-diff { font-weight: 600; }
 .kickoff-list h4, .kickoff-text h4 { margin: 14px 0 6px; }
 .kickoff-prose { white-space: pre-wrap; background: var(--surface-2); padding: 8px 10px; border-radius: var(--radius-md); }
 .kickoff-text-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
