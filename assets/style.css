@@ -400,6 +400,10 @@ details.kickoff-resend summary { cursor: pointer; }
 .kickoff-gantt-bar { position: absolute; top: 4px; height: 8px; border-radius: 2px; background: var(--bar); }
 .kickoff-gantt-bar.is-now { top: 14px; opacity: .38; }
 .kickoff-gantt-table { margin-top: 6px; }
+/* Step / person filter on Kick-off vs now. The grid rows and lists set their
+   own display, so [hidden] needs saying to win. */
+.kickoff-filter { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+.kickoff-gantt-row[hidden], .kickoff-list[hidden], .kickoff-gantt[hidden] { display: none; }
 /* Cost beside the Shots and assets figures: a line sets the money apart. */
 .kickoff-figures .kickoff-cost { border-left: 1px solid var(--border-strong); }
 .kickoff-figures td.kickoff-diff { font-weight: 600; }

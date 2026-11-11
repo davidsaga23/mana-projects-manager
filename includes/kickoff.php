@@ -1476,7 +1476,7 @@ function kickoff_render_gantt(array $was, array $now): bool {
         </div>
       </div>
       <?php foreach ($rows as [$key, $w, $n, $c, $how]): ?>
-        <div class="kickoff-gantt-row">
+        <div class="kickoff-gantt-row" data-key="<?= e($key) ?>">
           <div class="kickoff-gantt-name" title="<?= e($key) ?>"><?= e($key) ?><?php if ($how): ?> <span class="kickoff-chg"><?= e($how) ?></span><?php endif; ?></div>
           <div class="kickoff-gantt-track" style="--bar:<?= e($c) ?>">
             <?php foreach ($ticks as [$p]): ?><span class="kickoff-gantt-grid" style="left:<?= sprintf('%.3f', $p) ?>%"></span><?php endforeach; ?>

@@ -317,6 +317,89 @@ elseif ($view === 'compare'):
       <noscript><button type="submit">Show</button></noscript>
     </form>
   <?php endif; ?>
+  <?php
+  // FILTER BY STEP OR PERSON (David, 2026-11-11: "let's include a filter to
+  // see by pipeline step or name/artist"). Done in the browser, on the rows
+  // already drawn, so nothing is fetched again. The choices come from both
+  // sides: the Timeline's steps, and the people named in Staffing, the expense
+  // projection and the invoices (the last two for administrators only, since
+  // they are only drawn for them). The headline figures stay whole-show.
+  $fSteps = []; $fPeople = [];
+  foreach ([$now, $was] as $side) {
+      foreach (array_keys($side['sections']['timeline']['lists']['Steps']['rows'] ?? []) as $k) $fSteps[(string)$k] = true;
+      foreach ($side['sections']['staffing']['lists']['Positions']['rows'] ?? [] as $r) {
+          $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+      }
+  }
+  if (can_see_money()) {
+      foreach ([$finNow, $finWas] as $side) {
+          if (!is_array($side)) continue;
+          foreach (array_keys($side['lists']['Expense projection']['rows'] ?? []) as $k) {
+              $i = strrpos((string)$k, ' · ');
+              if ($i !== false) $fPeople[substr((string)$k, $i + strlen(' · '))] = true;
+          }
+          foreach ($side['lists']['Invoices']['rows'] ?? [] as $r) {
+              $n = trim((string)($r['person'] ?? '')); if ($n !== '') $fPeople[$n] = true;
+          }
+      }
+  }
+  // Not names: an empty position and a projection row with nobody on it.
+  foreach (['unfilled', 'Unfilled', '—'] as $x) unset($fPeople[$x]);
+  $fPeople = array_keys($fPeople);
+  sort($fPeople, SORT_NATURAL | SORT_FLAG_CASE);
+  if ($fSteps || $fPeople): ?>
+    <div class="inline-form kickoff-filter">
+      <label>Step
+        <select id="kfStep"><option value="">All steps</option>
+          <?php foreach (array_keys($fSteps) as $st): ?><option value="<?= e((string)$st) ?>"><?= e((string)$st) ?></option><?php endforeach; ?>
+        </select></label>
+      <label>Person
+        <select id="kfPerson"><option value="">Everyone</option>
+          <?php foreach ($fPeople as $pp): ?><option value="<?= e((string)$pp) ?>"><?= e((string)$pp) ?></option><?php endforeach; ?>
+        </select></label>
+      <span class="muted small" id="kfNote" hidden>Showing only matching rows; the totals above each list are still the whole show.</span>
+    </div>
+    <script>
+    (function () {
+      var stepSel = document.getElementById('kfStep'), personSel = document.getElementById('kfPerson');
+      if (!stepSel || !personSel) return;
+      // A row belongs to a step when its name IS the step, or the step followed
+      // by " (type)", " · person" or " #lane", which is how the lists name rows.
+      // "Color" therefore matches "Color (BG) · Artie" but not "Color script".
+      // A step shown with its type, "Color (BG assets)", also matches rows
+      // named by its base name, since the projection words the type its own way.
+      function stepMatch(label, step) {
+        var l = label.toLowerCase(), names = [step.toLowerCase()];
+        var base = step.replace(/\s*\(.*\)\s*$/, '');
+        if (base !== step) names.push(base.toLowerCase());
+        return names.some(function (n) {
+          if (l === n) return true;
+          if (l.indexOf(n) !== 0) return false;
+          return /^\s*(\(|·|#)/.test(l.slice(n.length));
+        });
+      }
+      function apply() {
+        var step = stepSel.value, person = personSel.value.toLowerCase();
+        var rows = document.querySelectorAll('.kickoff-list tbody tr, .kickoff-gantt-row[data-key]');
+        rows.forEach(function (tr) {
+          var th = tr.querySelector('th[scope="row"]');
+          var label = tr.getAttribute('data-key') || (th ? th.textContent.trim() : '');
+          var ok = (!step || stepMatch(label, step)) && (!person || tr.textContent.toLowerCase().indexOf(person) !== -1);
+          tr.hidden = !ok;
+        });
+        // A list with nothing left to show folds away entirely.
+        document.querySelectorAll('.kickoff-list, .kickoff-gantt').forEach(function (box) {
+          var any = box.querySelectorAll('tbody tr, .kickoff-gantt-row[data-key]');
+          var shown = Array.prototype.some.call(any, function (r) { return !r.hidden; });
+          box.hidden = any.length > 0 && !shown;
+        });
+        document.getElementById('kfNote').hidden = !(step || person);
+      }
+      stepSel.addEventListener('change', apply);
+      personSel.addEventListener('change', apply);
+    })();
+    </script>
+  <?php endif; ?>
   <p class="lead">How <?= e($project['name']) ?> stood in kick-off <?= e($vName($kick)) ?><?= (int)$kick['n'] === $latestN ? ' (the latest approved)' : ((int)$kick['n'] === 1 ? ' (the original)' : '') ?>,
     against <?= $right === null ? 'how it stands today' : 'kick-off ' . e($vName($right)) ?>.
     Only what moved is listed first; whatever is unchanged is folded underneath.</p>

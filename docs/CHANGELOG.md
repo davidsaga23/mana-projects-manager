@@ -40,6 +40,8 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - **Changes grouped by step:** every compared list keeps one pipeline order, so a new row sits
   beside the rows of its step (all of Animatic, then the next step…) instead of all additions
   trailing at the bottom (David).
+- **Filter by step or person** at the top of Kick-off vs now: shows only the rows (and timeline
+  bars) for one pipeline step or one person; the totals stay whole-show (David).
 - **Finance management moved to the top** of Kick-off vs now and the frozen view (David).
 
 ## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
