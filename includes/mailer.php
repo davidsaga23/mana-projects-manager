@@ -162,8 +162,17 @@ class SmtpMailer
             'MIME-Version: 1.0',
             'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
         ];
-        if (!empty($this->cfg['mail_reply_to'])) {
-            $headers[] = 'Reply-To: <' . $this->cfg['mail_reply_to'] . '>';
+        // ONE OR SEVERAL REPLY-TO ADDRESSES (David, 2026-11-11: "can we add multiple
+        // emails to the mail reply to?"). config.php may give a list, ['a@x', 'b@y'],
+        // or one string with commas; the old single address still works. Anything
+        // that is not a plain address is dropped rather than written into a header,
+        // so a stray line break can never add a header of its own.
+        $replyTo = $this->cfg['mail_reply_to'] ?? '';
+        $replyTo = is_array($replyTo) ? $replyTo : explode(',', (string)$replyTo);
+        $replyTo = array_filter(array_map('trim', $replyTo),
+            fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL) !== false);
+        if ($replyTo) {
+            $headers[] = 'Reply-To: ' . implode(', ', array_map(fn($a) => "<{$a}>", $replyTo));
         }
 
         $body  = "--{$boundary}\r\n";

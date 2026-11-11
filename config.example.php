@@ -93,6 +93,8 @@ return [
     'smtp_verify_peer' => false,
     'mail_from'      => 'hi@davidsaga.com',
     'mail_from_name' => 'Anima | Project manager',
+    // Replies go to Mana, not the sending box. One address, or several:
+    //   'mail_reply_to' => ['david@mana.tv', 'tim@mana.tv'],
     'mail_reply_to'  => 'david@mana.tv',     // replies go to Mana, not the sending box
 
     // -------------------------------------------------------------------------
