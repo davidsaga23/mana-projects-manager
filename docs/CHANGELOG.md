@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Kick-off "Tasks not assigned" *(no migration)*
+
+- The kick-off figure "Tasks with nobody on them" is now **"Tasks not assigned"** (David). Kick-offs
+  saved earlier still hold the old label; it is renamed when drawn, so v1 and now stay one row.
+
 ## 2026-11-11 — Emails can name several reply-to addresses *(no migration)*
 
 - `mail_reply_to` in config.php takes a list, `['david@mana.tv', 'tim@mana.tv']`, or comma-separated

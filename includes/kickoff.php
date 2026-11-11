@@ -306,7 +306,10 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
             'Scheduled tasks'          => [$tasks, 'num'],
             'First task starts'        => [$first, 'date'],
             'Last task ends'           => [$last, 'date'],
-            'Tasks with nobody on them' => [$nobody, 'num'],
+            // David, 2026-11-11: "change task with nobody assigned to tasks not
+            // assigned". Kick-offs saved before then hold the old label;
+            // kickoff_render_section() renames it so v1 and now stay one row.
+            'Tasks not assigned'       => [$nobody, 'num'],
         ],
         'texts' => [],
         'lists' => [
@@ -1195,6 +1198,17 @@ function kickoff_change($was, $now, string $kind, string $currency = 'USD'): str
  */
 function kickoff_render_section(string $title, array $was, ?array $now, string $currency = 'USD'): void {
     $compare = $now !== null;
+    // Figures are matched by label, and a saved kick-off keeps the label it was
+    // saved with. A renamed figure is mapped back to its new name here, in
+    // place (the order is kept), so an old version and now still line up.
+    $renamed = ['Tasks with nobody on them' => 'Tasks not assigned'];
+    $relabel = static function (array $figs) use ($renamed): array {
+        $out = [];
+        foreach ($figs as $label => $fig) $out[$renamed[$label] ?? $label] = $fig;
+        return $out;
+    };
+    $was['figures'] = $relabel($was['figures'] ?? []);
+    if ($compare) $now['figures'] = $relabel($now['figures'] ?? []);
     ?>
     <section class="kickoff-section">
       <h3><?= e($title) ?></h3>
