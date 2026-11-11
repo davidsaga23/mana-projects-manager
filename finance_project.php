@@ -2666,6 +2666,18 @@ function invAddRows() {
     $stInv = [];
     foreach (project_invoices($projectId) as $inv) $stInv[(int)$inv['crew_id']][] = $inv;
     $stProj = expense_projection($pdo, $projectId);
+    // The position(s) each person holds, for the Position column and filter
+    // (David, 2026-11-11: "let's also add the position in the table"). The
+    // same names the invoices and the expense projection use: the step for a
+    // slot, the title for a supervision position, in pipeline order. Somebody
+    // with only logged time and no position has none, and the cell says so.
+    $stPosNames = [];
+    try {
+        foreach (project_positions($pdo, $projectId) as $pp) {
+            $n = trim((string)$pp['step_name']);
+            if ($n !== '') $stPosNames[(int)$pp['crew_id']][$n] = true;
+        }
+    } catch (Throwable $ex) { $stPosNames = []; }
 ?>
   <h3>Artist statements</h3>
   <p class="muted small">
@@ -2683,10 +2695,39 @@ function invAddRows() {
           // on a long cast (David, 2026-10-26: "total sum at the end for all
           // columns and a sticky header at the top") — the .bd-scroll note in
           // style.css says why sticky needs the bounded box. ?>
+    <?php // FILTERS (David, 2026-11-11: "can we add filters on top of this
+          // table"). Done in the browser on the rows already drawn, from the
+          // data-* figures on each row, so no figure or query changes. Hidden
+          // until the script below shows it, so without JavaScript nothing
+          // half-works. Each viewer's choice is kept in their own browser. ?>
+    <div class="inline-form stmt-filter-bar" id="stmtFilter" hidden>
+      <label>Artist <input type="search" id="stmtFilterName" placeholder="Search by name" autocomplete="off"></label>
+      <label>Position
+        <select id="stmtFilterPos"><option value="">All positions</option></select></label>
+      <label>Rate
+        <select id="stmtFilterRate"><option value="">Any rate</option>
+          <option value="day">Per day</option><option value="hour">Per hour</option>
+          <option value="second">Per second</option><option value="flat">Flat fee</option>
+        </select></label>
+      <label>Status
+        <select id="stmtFilterStatus"><option value="">All</option>
+          <option value="left">Left to invoice</option>
+          <option value="over">Invoiced ahead of logged</option>
+          <option value="nolog">Nothing logged</option>
+          <option value="settled">Settled</option>
+        </select></label>
+      <label>On the show
+        <select id="stmtFilterWhen"><option value="">Any time</option>
+          <option value="today">Today</option><option value="date">On a date…</option>
+        </select></label>
+      <input type="date" id="stmtFilterDate" aria-label="On the show on this date" hidden>
+      <span class="muted small" id="stmtFilterCount"></span>
+      <a href="#" id="stmtFilterClear" hidden>Clear</a>
+    </div>
     <div class="bd-scroll">
     <table class="review-table statement-list">
       <thead><tr>
-        <th>Artist</th><th>Dates</th><th>Rate</th>
+        <th>Artist</th><th>Position</th><th>Dates</th><th>Rate</th>
         <th class="num">Days planned</th><th class="num">Logged</th><th class="num">Days left</th><th class="num">Approved sec</th>
         <th class="num">Earned so far</th><th class="num">Invoiced</th><th class="num">Left to invoice</th><th></th>
       </tr></thead>
@@ -2709,9 +2750,21 @@ function invAddRows() {
           $m['due'] += (float)($st['due'] ?? 0);
           $m['invoiced'] += (float)$st['invoiced'];
           $m['left'] += (float)($st['left'] ?? 0);
-          $stMoney[$cur] = $m; ?>
-        <tr>
+          $stMoney[$cur] = $m;
+          // The rate units on the row, for the Rate filter: every contract's
+          // when there are several, none when there is no rate at all.
+          $stUnits = [];
+          if (count($st['lines']) > 1) { foreach ($st['lines'] as $l) $stUnits[(string)$l['unit']] = true; }
+          elseif ($st['rate'] !== null) $stUnits[(string)$st['unit']] = true;
+          $stHeld = array_keys($stPosNames[$cid] ?? []); ?>
+        <tr data-stmt="1" data-name="<?= e($name) ?>" data-positions="<?= e(implode('|', $stHeld)) ?>" data-units="<?= e(implode(' ', array_keys($stUnits))) ?>"
+            data-from="<?= e((string)($w['from'] ?? '')) ?>" data-to="<?= e((string)($w['to'] ?? '')) ?>"
+            data-planned="<?= e((string)(float)$st['planned_days']) ?>" data-hours="<?= e((string)(float)$st['hours']) ?>"
+            data-days="<?= e((string)(float)$st['days']) ?>" data-daysleft="<?= e((string)(float)$st['days_left']) ?>" data-secs="<?= e((string)(float)$st['approved_seconds']) ?>"
+            data-cur="<?= e($cur) ?>" data-due="<?= $st['due'] !== null ? e((string)(float)$st['due']) : '' ?>"
+            data-inv="<?= e((string)(float)$st['invoiced']) ?>" data-left="<?= $st['left'] !== null ? e((string)(float)$st['left']) : '' ?>">
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>"><?= e($name) ?></a></td>
+          <td class="small"><?= $stHeld ? implode('<br>', array_map('e', $stHeld)) : '<span class="muted">—</span>' ?></td>
           <td class="muted small">
             <?= $w['from'] ? e(date('j M', strtotime($w['from']))) : '—' ?> –
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
@@ -2732,6 +2785,7 @@ function invAddRows() {
           <td><a href="statement.php?project=<?= $projectId ?>&amp;crew=<?= (int)$cid ?>">Statement →</a></td>
         </tr>
       <?php endforeach; ?>
+        <tr class="stmt-filter-empty" hidden><td colspan="12" class="muted">Nobody matches these filters.</td></tr>
       </tbody>
       <?php ksort($stMoney);
             $stMoneyCell = function (string $k) use ($stMoney) {
@@ -2739,8 +2793,8 @@ function invAddRows() {
                 foreach ($stMoney as $c => $m) $lines[] = e(fmt_money_plain(round($m[$k], 2), $c));
                 return $lines ? implode('<br>', $lines) : '—';
             }; ?>
-      <tfoot><tr>
-        <td colspan="3"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
+      <tfoot id="stmtFoot"><tr>
+        <td colspan="4"><strong>Total</strong> <span class="muted small"><?= count($stPeople) ?> people</span></td>
         <td class="num"><strong><?= e(fmt_num($stTot['planned_days'], 1)) ?></strong></td>
         <td class="num"><strong><?= e(fmt_num($stTot['hours'], 1)) ?> h</strong><br><span class="muted small"><?= e(fmt_num($stTot['days'], 2)) ?> d</span></td>
         <td class="num"><strong><?= e(fmt_num($stDaysLeft, 2)) ?></strong></td>
@@ -2752,6 +2806,135 @@ function invAddRows() {
       </tr></tfoot>
     </table>
     </div>
+    <script>
+    (function () {
+      // THE TOTALS FOLLOW THE FILTER. With a filter on, the Total row adds up
+      // only the rows still showing ("Total · 3 of 23 people"), worked out
+      // here from the same figures the rows print; with no filter it is put
+      // back exactly as the server drew it. Chosen over a whole-show total
+      // because a filter is asked a question ("how much is left to invoice
+      // on the day-rate people?") and the answer is the sum of what is shown.
+      var bar = document.getElementById('stmtFilter'), foot = document.getElementById('stmtFoot');
+      if (!bar || !foot) return;
+      var nameIn = document.getElementById('stmtFilterName'), rateSel = document.getElementById('stmtFilterRate'),
+          statusSel = document.getElementById('stmtFilterStatus'), posSel = document.getElementById('stmtFilterPos'), whenSel = document.getElementById('stmtFilterWhen'),
+          dateIn = document.getElementById('stmtFilterDate'), countEl = document.getElementById('stmtFilterCount'),
+          clearA = document.getElementById('stmtFilterClear'), emptyRow = document.querySelector('.statement-list .stmt-filter-empty');
+      var rows = Array.prototype.slice.call(document.querySelectorAll('.statement-list tbody tr[data-stmt]'));
+      var footHtml = foot.innerHTML;
+      // Kept per viewer and per show, in this browser only. Every access is
+      // wrapped: localStorage throws outright in some privacy modes.
+      var KEY = 'anima.stmtFilter.<?= (int)$projectId ?>';
+      function load() { try { return JSON.parse(window.localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+      function save(v) { try { window.localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+
+      // Only the rate units somebody on this show is actually paid in.
+      var present = {};
+      rows.forEach(function (tr) { (tr.getAttribute('data-units') || '').split(' ').forEach(function (u) { if (u) present[u] = true; }); });
+      Array.prototype.forEach.call(rateSel.options, function (o) { if (o.value && !present[o.value]) o.remove(); });
+      // Every position somebody holds, in the order they first appear (the
+      // rows' own pipeline order). A person on two steps matches either.
+      var posSeen = {};
+      rows.forEach(function (tr) {
+        (tr.getAttribute('data-positions') || '').split('|').forEach(function (p) {
+          if (!p || posSeen[p]) return;
+          posSeen[p] = true;
+          var o = document.createElement('option'); o.value = p; o.textContent = p; posSel.appendChild(o);
+        });
+      });
+      if (posSel.options.length < 2) posSel.closest('label').hidden = true;
+
+      function num(tr, k) { var v = tr.getAttribute('data-' + k); return v === '' || v === null ? null : parseFloat(v); }
+      // The PHP formatters, the same way round: number_format, fmt_num, fmt_secs.
+      function money(v) { return ((Math.round(v * 100) / 100) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      function fnum(v, d) { var s = v.toFixed(d); return s.indexOf('.') !== -1 ? s.replace(/0+$/, '').replace(/\.$/, '') : s; }
+      function fsecs(s) { if (s < 0) s = 0; var m = Math.floor(s / 60), r = (s - m * 60).toFixed(2); return m + ':' + (r.length < 5 ? '0' + r : r); }
+      function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+      function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+      function apply(persist) {
+        var q = nameIn.value.trim().toLowerCase(), pos = posSel.value, rate = rateSel.value, status = statusSel.value, when = whenSel.value;
+        dateIn.hidden = when !== 'date';
+        var on = when === 'today' ? today() : (when === 'date' ? dateIn.value : '');
+        var shown = [];
+        rows.forEach(function (tr) {
+          var ok = true;
+          if (q && (tr.getAttribute('data-name') || '').toLowerCase().indexOf(q) === -1) ok = false;
+          if (ok && pos && ('|' + tr.getAttribute('data-positions') + '|').indexOf('|' + pos + '|') === -1) ok = false;
+          if (ok && rate && (' ' + tr.getAttribute('data-units') + ' ').indexOf(' ' + rate + ' ') === -1) ok = false;
+          if (ok && status) {
+            var left = num(tr, 'left'), due = num(tr, 'due');
+            if (status === 'left') ok = left !== null && left > 0;
+            // Left to invoice never goes below zero since 2026-11-11 (it is
+            // the work still to do), so over-invoiced is the "ahead of
+            // logged" case: more invoiced than the logged time has earned.
+            else if (status === 'over') ok = due !== null && num(tr, 'inv') > due + 0.005;
+            else if (status === 'nolog') ok = !(num(tr, 'hours') > 0) && !(num(tr, 'secs') > 0);
+            // Settled: nothing left to invoice, something earned, and all of
+            // it invoiced. Somebody with nothing earned yet is not settled.
+            else if (status === 'settled') ok = left !== null && left === 0 && due !== null && due > 0 && num(tr, 'inv') >= due - 0.005;
+          }
+          // On the show on a date: inside their Dates. A missing end is open,
+          // so a row with no dates at all (salaried, say) is never hidden.
+          if (ok && on) {
+            var f = tr.getAttribute('data-from'), t = tr.getAttribute('data-to');
+            if ((f && on < f) || (t && on > t)) ok = false;
+          }
+          tr.hidden = !ok;
+          if (ok) shown.push(tr);
+        });
+        var active = !!(q || pos || rate || status || on);
+        clearA.hidden = !active;
+        emptyRow.hidden = shown.length > 0;
+        countEl.textContent = active ? 'Showing ' + shown.length + ' of ' + rows.length : rows.length + ' people';
+        if (!active) { foot.innerHTML = footHtml; }
+        else {
+          var t = { planned: 0, hours: 0, days: 0, secs: 0 }, dl = 0, m = {};
+          shown.forEach(function (tr) {
+            for (var k in t) t[k] += num(tr, k) || 0;
+            dl += Math.max(0, num(tr, 'daysleft') || 0);   // over-plan does not cancel, as on the server
+            var c = tr.getAttribute('data-cur');
+            m[c] = m[c] || { due: 0, inv: 0, left: 0 };
+            m[c].due += num(tr, 'due') || 0; m[c].inv += num(tr, 'inv') || 0; m[c].left += num(tr, 'left') || 0;
+          });
+          var curs = Object.keys(m).sort();
+          var cell = function (k) { return curs.length ? curs.map(function (c) { return esc(money(m[c][k]) + ' ' + c); }).join('<br>') : '—'; };
+          foot.innerHTML = '<tr><td colspan="4"><strong>Total</strong> <span class="muted small">' + shown.length + ' of ' + rows.length + ' people · filtered</span></td>'
+            + '<td class="num"><strong>' + esc(fnum(t.planned, 1)) + '</strong></td>'
+            + '<td class="num"><strong>' + esc(fnum(t.hours, 1)) + ' h</strong><br><span class="muted small">' + esc(fnum(t.days, 2)) + ' d</span></td>'
+            + '<td class="num"><strong>' + esc(fnum(dl, 2)) + '</strong></td>'
+            + '<td class="num"><strong>' + (t.secs > 0 ? esc(fsecs(t.secs)) : '—') + '</strong></td>'
+            + '<td class="num"><strong>' + cell('due') + '</strong></td>'
+            + '<td class="num"><strong>' + cell('inv') + '</strong></td>'
+            + '<td class="num"><strong>' + cell('left') + '</strong></td><td></td></tr>';
+        }
+        if (persist) save({ q: nameIn.value, pos: pos, rate: rate, status: status, when: when, date: dateIn.value });
+      }
+
+      var s = load();
+      nameIn.value = s.q || '';
+      if (s.pos && posSeen[s.pos]) posSel.value = s.pos;
+      if (s.rate && rateSel.querySelector('option[value="' + s.rate + '"]')) rateSel.value = s.rate;
+      if (s.status) statusSel.value = s.status;
+      if (s.when) whenSel.value = s.when;
+      dateIn.value = s.date || '';
+      if (whenSel.value === 'date' && !dateIn.value) dateIn.value = today();
+      [nameIn, dateIn].forEach(function (el) { el.addEventListener('input', function () { apply(true); }); });
+      [posSel, rateSel, statusSel, whenSel].forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (el === whenSel && whenSel.value === 'date' && !dateIn.value) dateIn.value = today();
+          apply(true);
+        });
+      });
+      clearA.addEventListener('click', function (e) {
+        e.preventDefault();
+        nameIn.value = ''; posSel.value = ''; rateSel.value = ''; statusSel.value = ''; whenSel.value = ''; dateIn.value = '';
+        apply(true);
+      });
+      bar.hidden = false;
+      apply(false);
+    })();
+    </script>
   <?php endif; ?>
 <?php endif; ?>
 
