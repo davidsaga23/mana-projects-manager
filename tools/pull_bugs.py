@@ -36,7 +36,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INBOX = ROOT / "bug-inbox"
 KEY_FILE = Path(__file__).resolve().parent / ".bug_key"
-SITE = os.environ.get("ANIMA_URL", "https://mana.davidsaga.com").rstrip("/")
+# The live site (David, 2026-11-12): "change the bug report from the new site". The old
+# mana.davidsaga.com is a legacy deployment; reports filed there are no longer pulled.
+# ANIMA_URL still overrides it, for looking at the old site one last time.
+SITE = os.environ.get("ANIMA_URL", "https://anima-mana.com").rstrip("/")
 FRAMES_PER_VIDEO = 6
 
 
