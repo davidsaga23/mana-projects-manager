@@ -32,6 +32,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Needs **finance_install_18.sql** imported by hand into the finance database for the details to save.
   Until then the invoice still fills in its lines and prints without them.
 
+## 2026-11-11 — Reminders to log time reach the desktop too *(no migration)*
+
+- Anima now asks once, with a small card: **Get Anima reminders on your desktop?** with **Turn on**
+  (the browser then asks to confirm) and **Not now** (asked again in two weeks).
+- Once allowed, a reminder to log time (the 5 pm one, or one sent from Log reminders) also arrives as
+  a desktop notification when Anima is in a background tab or another window is in front. Clicking it
+  brings Anima back. The page keeps checking in the background (every five minutes) only for people
+  who allowed it.
+
 ## 2026-11-11 — Reminders to log time: a 5 pm pop-up, and an instant one from an admin *(migration 080)*
 
 - **At 5 pm studio time**, on working days, anyone on a show who has logged nothing today gets a pop-up
