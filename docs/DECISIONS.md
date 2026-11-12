@@ -5413,3 +5413,26 @@ music, can we try something more lofi?"
   booked a couple of seconds ahead on the sound engine's clock, so the beat does not stumble when
   the Realm is behind another window.
 - **Not done:** walking up to the shelf (rooms have no walking yet), and a choice of music.
+
+## 2026-11-12 — The Realm wears Anima's look
+
+David: "let's do a whole pass on the UI aesthetics and try to match it closer to what anima has
+already, it should feel like we're in the same universe". This replaces the first day's decision
+that the Realm's frame had its own night-blue and gold palette.
+
+- **The frame is Anima; the map is the world inside it.** Top bar, lists, panels, buttons, chat,
+  notices and windows use Anima's roles. The pixel map keeps its own paint.
+- **`assets/realm.css` copies Anima's roles by NAME and VALUE** (`--bg`, `--surface`, `--primary`,
+  `--ok`, `--radius`, `--shadow-pop` and the rest) and still does not load `assets/style.css`.
+  That sheet styles bare elements (every `<button>` gets a 16px top margin and a solid blue fill,
+  every `<input>` is full width), which a screen of small controls over a map cannot wear. The cost
+  is that a role changed in `style.css` must be changed in `realm.css` too; the matching names make
+  that a search.
+- **The old names survive as aliases** (`--night`, `--candle`, `--spell`, `--ember` and others),
+  each pointing at an Anima role, because `assets/realm.js` asks for some of them inline. An open
+  door is `--ok`, ajar is `--warn`, sealed is `--danger`.
+- **The top bar is drawn by `realm.php`, not by `includes/header.php`**, for the same reason: the
+  header brings the whole stylesheet. It repeats the brand and the navigation buttons, gated by
+  the same switches. It does not carry the bell; the Realm has its own notices.
+- **Type**: Anima's system typeface everywhere in the frame. The monospace stays only for names
+  drawn over the map.
