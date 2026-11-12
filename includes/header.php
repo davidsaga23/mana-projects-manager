@@ -191,7 +191,7 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       <?php // The Realm (David, 2026-11-12). Its own full-screen page, so this is
             // only the way in; drawn while the switch is on, like the rest. ?>
       <?php if (function_exists('feature_on') && feature_on('realm')): ?>
-      <a href="realm.php" class="nav-board">Realm</a>
+      <a href="realm.php" class="nav-board" id="navRealm">Realm</a>
       <?php endif; ?>
       <?php // A button too, beside Spell (David, 2026-10-22): the two screens
             // people open first thing, so they are the two that stand out. ?>
@@ -293,6 +293,9 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
     </div>
   </div>
 <?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
+<?php // The unread count on the Realm button, kept fresh (David, 2026-11-12: "I need to be
+      // on that page"). Only for somebody who has the Realm; see assets/realm-nudge.js. ?>
+<?php if (function_exists('feature_on') && feature_on('realm')): ?><script defer src="assets/realm-nudge.js<?= asset_ver('realm-nudge.js') ?>"></script><?php endif; ?>
 <?php // THE "LOG YOUR TIME" POP-UP (David, 2026-11-11; includes/log_reminders.php).
       // Only a script tag here: it asks log_reminder_api.php every few minutes
       // and the server decides the rest, so the page pays nothing more. Not

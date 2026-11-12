@@ -479,7 +479,7 @@ function renderSide() {
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
-  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
+  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+(ravens(p)?'" data-chat="'+dmId(ST.me,p.id)+'" title="Open their ravens">':'" data-sel="user:'+p.id+'" data-center="1">')+'<i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
   if (!ppl.length) h += '<small style="padding:0 8px">Nobody has a house yet.</small>';
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
@@ -511,12 +511,17 @@ function renderDoor() {
   var lb = $('lookBtn'); if (lb) lb.disabled = !m;
 }
 function renderAll() { $('overlay').innerHTML = overlay(); bindMap(); renderSide(); renderCard(); renderInside(); renderDoor(); badge(); draw(); }
-function toast(msg) { var t = document.createElement('div'); t.className = 'rtoast'; t.textContent = msg; $('toasts').appendChild(t); setTimeout(function () { t.remove(); },6000); }
+
+/* With `chat`, the message is itself a button that opens that conversation. */
+function toast(msg, chat) { var t = document.createElement('div'); t.className = 'rtoast'; t.textContent = msg;
+  if (chat) { t.className = 'rtoast is-link'; t.setAttribute('data-chat',chat); t.setAttribute('role','button'); t.tabIndex = 0; } $('toasts').appendChild(t); setTimeout(function () { t.remove(); },chat?15000:6000); }
 
 /* ---------- taking in what the server says ---------- */
 var SIG = {land:'',house:''};
 function applyState(st) {
   if (!st || !st.people) return;
+  var fresh = st.chat && st.chat.unread, was = ST && ST.chat && ST.chat.unread;
+  if (st.chat && was) st.chat.unread = was;
   ST = st; rebuildBuildings();
   var land = ST.people.map(function (p) { return p.slot+p.kind; }).join(',')+'|'+ST.lands.map(function (l) { return l.claimed?1:0; }).join('');
   var house = BLIST.map(function (o) { return o.id+o.kind+o.tint+(o.lit?1:0)+(o.door||''); }).join(',');
@@ -525,6 +530,7 @@ function applyState(st) {
   if (S.sel && !B[S.sel]) S.sel = null;
   if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
+  if (fresh) takeUnread(fresh);
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -631,7 +637,7 @@ window.addEventListener('blur',function () { held.clear(); });
 document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
-  if ((b = t.closest('[data-chat]'))) openChat(b.getAttribute('data-chat'));
+  if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
   else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
   else if ((b = t.closest('[data-walk]'))) walkTo(b.getAttribute('data-walk'));
@@ -669,6 +675,24 @@ function chanFor(placeId) {
   m = /^user:(\d+)$/.exec(placeId);
   return m && +m[1]!==ST.me ? dmId(ST.me,+m[1]) : null;
 }
+/* New unread counts arrived. A raven that was not there a moment ago is announced, because a small
+   number appearing beside a name is easy to miss (David, 2026-11-12: "not working atm"). */
+function takeUnread(u) {
+  if (!ST.chat || !u) return;
+  var old = ST.chat.unread || {};
+  Object.keys(u).forEach(function (k) {
+    var m = /^dm:(\d+):(\d+)$/.exec(k);
+    if (!m || k===CH.open || u[k] <= (old[k]||0)) return;
+    var who = person(+m[1]===ST.me ? +m[2] : +m[1]);
+    toast('A raven from '+(who ? firstName(who.name) : 'somebody')+'. Click here to read it.',k);
+  });
+  ST.chat.unread = u; renderSide(); badge();
+}
+function askUnread() {
+  if (!ST.chat || CH.open || document.hidden) return;
+  fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) takeUnread(j.unread); }).catch(function () {});
+}
 function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) { if (k!==CH.open) n += u[k]; }); document.title = (n?'('+n+') ':'')+'Anima Realm'; }
 function msgHTML(m) { return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div><div class="rmsgbody">'+esc(m.body)+'</div></div>'; }
 function chatTake(j) {
@@ -682,7 +706,7 @@ function chatTake(j) {
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
   CH.seen = true;
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post; $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
-  if (j.unread && ST.chat) { ST.chat.unread = j.unread; renderSide(); badge(); }
+  if (j.unread) takeUnread(j.unread);
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
@@ -726,6 +750,9 @@ applyState(ST);
 /* The heartbeat. One small request every 25 seconds says I am still here and brings back where
    everybody else is. `active` is whether I touched the page since the last one. */
 setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); },25000);
+/* With no conversation open, ask for unread counts every 8 seconds. An open conversation already
+   brings them every 3. Not asked while the window is hidden. */
+setInterval(askUnread,8000);
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
 window.addEventListener('resize',function () { draw(); });
 })();
