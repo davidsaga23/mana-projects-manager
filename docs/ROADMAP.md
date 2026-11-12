@@ -312,7 +312,7 @@ first (`scheduler_pick_lane()`, `includes/absences.php`). Public holidays were a
 maths count every working day as available to everyone, and the timeline does not shade a
 person's days off. A saved schedule moves only when it is re-run.
 
-✅ **2026-11-12: the Days off calendar** (`days_off.php`): everybody's days off on one month grid,
+✅ **2026-11-12: the Days off tab on Bookings** (`bookings.php?tab=days-off`): everybody's days off on one month grid,
 entered by Production by dragging across days. `crew_days_off_between()` is the shared lookup the
 Realm streak reads. **Next, if David wants it:** artists requesting their own days off for
 Production to approve (needs a state on `crew_absences`, a migration). The original note:
