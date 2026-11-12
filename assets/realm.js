@@ -392,6 +392,26 @@ function roomArt(kind, tint) {
   });
   return ROOMS[key];
 }
+/* SPEECH BUBBLES (David, 2026-11-12): "when two or more characters are in the same space inside a
+   house or project, let's make the avatars 'say' the text they sent through chat in a dialogue
+   bubble". BUB holds the last thing each person said in the room I am standing in, by user id, and
+   when it stops showing. Only what is said WHILE I am in the room: walking in does not replay the
+   history over everybody's heads. Up to three lines; the chat panel keeps the whole message. */
+var BUB = {}, BUBBLE_MS = 7000;
+function bubble(c, x, y, text) {
+  c.font = 'bold 7px "Courier New", monospace'; c.textBaseline = 'top';
+  var words = String(text).replace(/\s+/g,' ').split(' '), lines = [], cur = '', w = 0;
+  words.forEach(function (wd) { var t = cur ? cur+' '+wd : wd; if (cur && c.measureText(t).width > 104) { lines.push(cur); cur = wd; } else cur = t; });
+  if (cur) lines.push(cur);
+  if (lines.length > 3) { lines = lines.slice(0,3); lines[2] += '…'; }
+  lines = lines.map(function (l) { while (l.length > 2 && c.measureText(l).width > 108) l = l.slice(0,-2)+'…'; return l; });
+  lines.forEach(function (l) { w = Math.max(w,c.measureText(l).width); });
+  w = Math.ceil(w)+8;
+  var h = lines.length*9+5, bx = Math.max(12,Math.min(228-w,Math.round(x-w/2))), by = Math.round(y-h-4);
+  c.fillStyle = PAL.out; c.fillRect(bx-1,by-1,w+2,h+2); c.fillRect(x-2,by+h,5,4);
+  c.fillStyle = PAL.hot; c.fillRect(bx,by,w,h); c.fillRect(x-1,by+h,3,3);
+  c.fillStyle = PAL.out; lines.forEach(function (l, i) { c.fillText(l,bx+4,by+3+i*9); });
+}
 var SEATS = [[120,132],[86,126],[154,126],[60,134],[180,134],[100,112],[140,112],[46,118],[194,118]];
 function drawRoom(c, cw, ch) {
   var o = B[S.inside]; if (!o) return;
@@ -404,6 +424,10 @@ function drawRoom(c, cw, ch) {
   c.setTransform(s*.9,0,0,s*.9,ox,oy);
   list.slice(0,SEATS.length-1).forEach(function (p, i) { var st = SEATS[i+1]; if (p.state==='idle') c.globalAlpha = .6; sprite(c,Math.round(st[0]/.9),Math.round(st[1]/.9),p,(f+i)%4===0?2:0); c.globalAlpha = 1; if (p.state==='idle') zed(c,Math.round(st[0]/.9),Math.round(st[1]/.9)); });
   sprite(c,Math.round(SEATS[0][0]/.9),Math.round(SEATS[0][1]/.9),my,0);
+  c.setTransform(s,0,0,s,ox,oy);
+  var now = Date.now(), say = function (uid, st) { var b = BUB[uid]; if (b && b.until > now) bubble(c,st[0],st[1]-60,b.text); };
+  list.slice(0,SEATS.length-1).forEach(function (p, i) { say(p.id,SEATS[i+1]); });
+  say(ST.me,SEATS[0]);
   return list;
 }
 
@@ -594,7 +618,7 @@ function goInside(id) {
   });
 }
 function leave() {
-  if (!S.inside) return; var id = S.inside;
+  if (!S.inside) return; var id = S.inside; BUB = {};
   play(220,function (k) { S.fade = k; },function () {
     S.inside = null; var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
     play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
@@ -702,6 +726,10 @@ function chatTake(j) {
   if (!j.ok) { closeChat(); return; }
   if (j.channel!==CH.open) return;
   var box = $('chatMsgs'), stick = box.scrollHeight-box.scrollTop-box.clientHeight < 60, fresh = j.messages.filter(function (m) { return m.id > CH.last; });
+  if (fresh.length && CH.last && S.inside && j.channel===chanFor(S.inside)) {
+    fresh.forEach(function (m) { BUB[m.user] = {text:m.body,until:Date.now()+BUBBLE_MS}; });
+    draw(); setTimeout(draw,BUBBLE_MS+100);
+  }
   if (fresh.length) { if (!CH.last) box.innerHTML = ''; box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen) box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
   CH.seen = true;
