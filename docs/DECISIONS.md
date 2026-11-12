@@ -5019,6 +5019,40 @@ this context." Asked whether to store his own salary or one shared figure for al
 - This replaces the "one blended internal day rate, never store personal salaries" rule of
   2026-10-28; CLAUDE.md was updated to match.
 
+## 2026-11-11 — Reminders to log time: worked out on each page, no cron (migration 080)
+
+**Asked by David:** "add pop up reminders for everyone to log times at the end of the day and a button
+for admins to send and instant pop up for logging times as an alternative".
+
+**Settled with David the same day:** 5 pm studio time with a one-hour snooze; anyone on a show that
+day, salaried staff included, nobody with no show; email only when an admin ticks it on an instant
+reminder, never for the automatic one.
+
+**Decided:**
+- **No cron and nothing stored for the 5 pm one.** Each open page asks `log_reminder_api.php` every
+  three minutes (paused while the tab is hidden). After 5 pm the server checks: a working day
+  (`non_working_days`), not on a day off (`crew_absences`), on a show whose dates cover today (the
+  same reading as Home's missing days), and nothing in `time_logs` today. The pop-up is only a
+  script tag in the header; its stylesheet loads the first time a card is drawn.
+- **"Dismiss" and the snooze for the 5 pm one live in the login's session**, shared by every tab of
+  that browser. A second device may show it once more; that was judged better than a table for it.
+  Once someone has logged (or does not owe a log today) the session remembers, so later polls stop early.
+- **An instant reminder is a row per send plus a row per person** (`log_reminders`,
+  `log_reminder_recipients`), which is also the record of who sent what. It shows only on the day it
+  was sent, outranks the 5 pm one, and dismissing it marks the person's row, so it stays away on
+  every device. It shows even to somebody who has logged, worded as "You have 3 h logged today; add
+  anything missing".
+- **"Log my time" goes to My tasks**, the existing logging, not a second way to log. On My tasks itself
+  it scrolls to the first hours box.
+- **The bell gets a `reminder` kind** ("Anima asked you to log your time for Tue 11 Nov"). Until 080
+  runs a reminder does not ring at all, because the 079-style fallback ("mentioned you on") would be untrue.
+- **Two switches**: `log_reminders` (receiving; client locked off) and `log_reminder_send` (Production
+  on by default, locked off below it; admins always). Not shown while viewing as somebody.
+- **Artists and supervisors may POST `dismiss` / `snooze` to `log_reminder_api.php`** (the allow-list in
+  `artist_may_post()`). The person always comes from the session; the one id that can be posted, a
+  reminder's, is matched against their own crew id in the UPDATE.
+- The poll counts as activity for "Last seen" on Users, like any other request from an open tab.
+
 ## 2026-11-11 — The invoice template: Anima fills it in, and keeps the bank details
 
 **Asked by David:** "Let's work on the invoice template now" (roadmap, "An invoice template"). Goal:

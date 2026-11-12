@@ -81,6 +81,11 @@ const FEATURES = [
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 0, 'client' => 0], 'locked' => ['artist', 'client']],
     'bell'          => ['label' => 'Notifications bell', 'group' => 'Every day',
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 0]],
+    // David, 2026-11-11: the 5 pm "you haven't logged today" pop-up, and an
+    // admin's instant one (includes/log_reminders.php). Anyone on a show gets
+    // it; this is how one role or one person is let off.
+    'log_reminders' => ['label' => 'Reminders to log time', 'group' => 'Every day', 'note' => 'the 5 pm pop-up, and one sent from Log reminders',
+                        'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 0], 'locked' => ['client']],
     'bug_report'    => ['label' => 'Report a bug (the bug button)', 'group' => 'Every day',
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 1]],
     'bugs_list'     => ['label' => 'Bugs list', 'group' => 'Every day',
@@ -154,6 +159,10 @@ const FEATURES = [
     // in users.php and feature_may_grant() below.
     'users'         => ['label' => 'Users', 'group' => 'Running the studio', 'note' => 'Production: Supervisors, Artists and Clients only',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
+    // Sending an instant "log your time" pop-up (David, 2026-11-11: "a button
+    // for admins"). Production too by default, since they chase the numbers.
+    'log_reminder_send' => ['label' => 'Send a reminder to log time', 'group' => 'Running the studio', 'note' => 'to everybody or chosen people, now',
+                        'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
     'view_as'       => ['label' => 'View as', 'group' => 'Running the studio', 'note' => 'only people below your own role, never money',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
 ];
@@ -183,6 +192,7 @@ const FEATURE_SCRIPTS = [
     'bookings.php'        => 'bookings',
     'history_quotas.php'  => 'quotas',
     'users.php'           => 'users',
+    'log_reminders.php'   => 'log_reminder_send',
     // Admins read anybody's; anybody else their own (statement.php decides whose).
     'statement.php'       => 'own_statement',
     // project tabs

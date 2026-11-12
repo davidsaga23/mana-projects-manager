@@ -1,0 +1,46 @@
+/* The "log your time" pop-up (migration 080, assets/log-reminder.js).
+
+   Its own small file, fetched the first time a card is drawn rather than on
+   every page: most page loads never show one. Spell's look (DECISIONS,
+   2026-10-29): one --surface panel with a hairline and the 14px radius, a
+   whispering label, depth only because it floats, blue for the one thing to
+   press. It sits above the bug button in the bottom-right corner (that button's
+   height plus its gap; see .bug-fab), and never covers the whole page: it asks,
+   it does not block. */
+.logrem {
+  position: fixed; right: 16px; bottom: 64px; z-index: 95;
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px 18px 14px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-pop, 0 12px 34px rgba(0, 0, 0, .55));
+  animation: logrem-in .18s ease-out;
+}
+@keyframes logrem-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .logrem { animation: none; } }
+
+.logrem-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--warn); margin: 0 0 4px;
+}
+.logrem-title { margin: 0 28px 6px 0; font-size: 17px; letter-spacing: -.02em; }
+.logrem-text { margin: 0; font-size: 14px; color: var(--text-2); line-height: 1.45; }
+.logrem-note {
+  margin: 10px 0 0; padding: 6px 10px; font-size: 13.5px; color: var(--text-2);
+  border-left: 3px solid var(--border-strong); background: var(--surface-2);
+  border-radius: 0 var(--radius-sm, 7px) var(--radius-sm, 7px) 0;
+}
+
+.logrem-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+.logrem-actions button { margin-top: 0; padding: 7px 14px; font-size: 14px; }
+.logrem-actions button.linkish { padding: 0; font-size: 13px; color: var(--muted); }
+.logrem-actions button.linkish:hover { color: var(--text); }
+
+.logrem-x {
+  position: absolute; top: 10px; right: 10px; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: transparent; border: none; border-radius: var(--radius-sm, 7px);
+  color: var(--muted); cursor: pointer;
+}
+.logrem-x:hover { background: var(--surface-2); color: var(--text); }

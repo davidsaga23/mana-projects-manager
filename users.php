@@ -450,6 +450,13 @@ require __DIR__ . '/includes/header.php';
 
 <?php if ($tab === 'people'): ?>
 
+<?php // The instant "log your time" pop-up (David, 2026-11-11: "a button for
+      // admins to send an instant pop up"). Its own screen, log_reminders.php,
+      // which also shows who has logged today and what was sent. ?>
+<?php if (feature_on('log_reminder_send')): ?>
+  <p><a href="log_reminders.php" class="button secondary">Remind people to log time</a></p>
+<?php endif; ?>
+
 <?php if ($hasCrewLink && $unlinked > 0): ?>
   <div class="flash flash-warn">
     <strong><?= $unlinked ?></strong> active account<?= $unlinked === 1 ? '' : 's' ?>

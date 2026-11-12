@@ -1310,7 +1310,16 @@ Still open:
 - **A notice when bank details change** (to Jorik or David) was not built; the panel only shows who
   changed them last.
 
-### Reminders to log time: an end-of-day pop-up, and an instant one from an admin — NOT BUILT
+### Reminders to log time: an end-of-day pop-up, and an instant one from an admin — BUILT 2026-11-11 (migration 080)
+
+**Built** as settled with David: 5 pm studio time with a one-hour snooze, anyone on a show that day,
+email only when an admin ticks it on an instant one. `includes/log_reminders.php`,
+`log_reminder_api.php`, `log_reminders.php` (Users → Remind people to log time); DECISIONS has the
+details. What is left: the 5 pm time is a constant (`LOG_REMINDER_HOUR`), not a setting; a person
+cannot choose their own reminder time; the automatic one is never emailed.
+
+The original request:
+
 
 David: *"add pop up reminders for everyone to log times at the end of the day and a button for
 admins to send and instant pop up for logging times as an alternative"*.

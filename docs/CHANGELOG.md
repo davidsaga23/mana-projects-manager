@@ -32,6 +32,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Needs **finance_install_18.sql** imported by hand into the finance database for the details to save.
   Until then the invoice still fills in its lines and prints without them.
 
+## 2026-11-11 — Reminders to log time: a 5 pm pop-up, and an instant one from an admin *(migration 080)*
+
+- **At 5 pm studio time**, on working days, anyone on a show who has logged nothing today gets a pop-up
+  in the bottom-right corner: "You haven't logged today", with **Log my time** (goes to My tasks),
+  **Remind me in an hour** and **Dismiss**. Not on weekends, studio holidays or their own days off,
+  and not for anyone with no show that day. Salaried staff get it too. It also leaves a line in the bell.
+- **Send one now:** Users → **Remind people to log time** opens **Log reminders**, which lists
+  everyone, who is on a show today and how much they have logged, with the people who have logged
+  nothing already ticked. A line from the sender and an **also email them** tick are optional. The
+  pop-up shows on their open pages within a few minutes and waits in their bell. Every reminder sent
+  is listed: when, by whom, to whom, emailed or not, how many have put it away.
+- Two new access switches on Users → Access: **Reminders to log time** (who gets the pop-up) and
+  **Send a reminder to log time** (admins always; Production by default).
+- Needs **migration 080** for sending one and for the bell line. The 5 pm pop-up works before it runs.
+
 ## 2026-11-11 — Salaried staff: a monthly salary, and the day rate worked out from it *(finance_install_17)*
 
 - On the person page, **Terms and contract** has a **Monthly salary** box for anyone ticked Salaried on
