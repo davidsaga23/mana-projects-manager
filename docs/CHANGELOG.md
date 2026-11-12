@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: characters say what they write, in a speech bubble *(no migration)*
+
+**Asked by David:** "when two or more characters are in the same space inside a house or project,
+let's make the avatars 'say' the text they sent through chat in a dialogue bubble".
+
+- **Inside a room, a message written in that room's conversation appears over the speaker's
+  character** for seven seconds: the place's channel in the Tavern, the Council Hall or a war room,
+  and your ravens with the owner in somebody's house. Yours too.
+- **Only what is said while you are in the room.** Walking in does not replay the history. Up to
+  three lines; the chat panel keeps the whole message.
+- Somebody writing in a channel from elsewhere has no bubble: they are not in the room.
+
 ## 2026-11-12 — The Realm tells you about a raven wherever you are in Anima *(no migration)*
 
 **Reported by David**, trying ravens with Renata: the count beside her name was "not working atm",
