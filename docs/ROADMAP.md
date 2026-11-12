@@ -1357,6 +1357,19 @@ Things to settle when building:
   way of logging.
 - Probably a switch per person on Users → Access (#170), and a record of who sent an instant one.
 
+### Invoice payments for Jorik — BUILT 2026-11-11, waiting for David's go-ahead (no migration)
+
+David: *"an invoice payment tab/button at the top next to reviews for Jorik"*. `payments.php`, from
+the Invoices button beside Reviews (admins, with the waiting count): every invoice waiting to be
+paid on every show, with a Mark paid on each; *Expected*, *Paid* and *All* views. See DECISIONS
+2026-11-11. Still open:
+- **An Approved step before Paid?** Built as one "Mark paid"; a separate approve step needs a new
+  status value in the finance database.
+- **Jorik only, or every admin?** Every admin for now.
+- **The invoice intake** (DECISIONS 2026-10-28) will add "needs a look" flags (already shown on a
+  monthly invoice's row) and Drive links (the document column); the generated invoice from the
+  invoice template (PR #200) could be linked from a row once it lands.
+
 ## Access switches — BUILT 2026-11-05 (migration 077)
 
 Users → Access by role / People / Access log; `includes/features.php`. What is left:

@@ -5106,3 +5106,29 @@ migration system?"
   and any failure counts as 0.
 - `finance_install.sql` (the baseline) stays a by-hand step: it comes with creating the database, the
   user and the config block, none of which a page can do.
+
+## 2026-11-11 — Invoice payments: a list for paying, not a second place to enter invoices
+
+David asked for a top-bar button for Jorik listing every pending invoice, to check and pay each one.
+
+**Decided:**
+- **`payments.php` only pays.** Invoices are still entered on a show's Invoices tab or in Monthly
+  invoices; each row links there to be edited. One place to enter, one place to pay.
+- **One row per invoice as Jorik receives it.** A monthly invoice (IN4) is one row with its lines
+  listed, and is paid through `pay_invoice_header()`, so paying it pays every line in one
+  transaction. A line of a monthly invoice can never be paid on its own here.
+- **The views are the existing statuses, nothing new in the database:** *Waiting to be paid* is
+  Pending (and the four old values, before finance_install_09) with no paid date; *Expected* (not
+  arrived, nothing to pay) is shown apart and not counted; *Paid* is newest payment first, the last
+  200 of each kind. Paying sets status Paid and the date typed (today by default, never a future
+  date), exactly what the project tab does. **"Approved" was not added as a status**: David's words
+  were "pay each one … change their status to approved", read as "mark it paid" until he says he
+  wants a separate approve step before paying (that would be a finance-database change).
+- **A payment can be undone** ("Not paid after all", with a confirm), back to Pending with its date
+  cleared, for a click on the wrong row.
+- **Admins only**, like all money. Not limited to Jorik: access switches (`includes/features.php`)
+  can never turn anything off for an admin, by design, so "Jorik only" would need a new rule. Ask
+  David if the other admins should not see it.
+- **The count in the top bar** is cached in the session for two minutes, cleared whenever an
+  invoice is saved, paid or removed anywhere, and any failure counts as 0, so `includes/header.php`
+  neither opens the finance database on every page nor can fail because of it.
