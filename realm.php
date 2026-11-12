@@ -130,6 +130,11 @@ foreach (($state['people'] ?? []) as $p) {
       </div>
     </main>
     <aside class="rchat" id="chat" aria-label="Conversation" hidden>
+      <?php /* The handle on the conversation's left edge (David, 2026-11-12: "an arrow pointing left
+               at the middle of the chat bar so there's an option to extend it over the map"). It
+               lays the conversation over the map and back; assets/realm.js keeps its label, and
+               which way the arrow points is assets/realm.css. */ ?>
+      <button type="button" class="rwide" id="chatWide" aria-expanded="false" aria-label="Make the conversation wider" title="Make the conversation wider"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><path d="M8 2 2 8l6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="rchathead"><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
       <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
       <div class="rsuggest" id="chatSuggest" hidden></div>

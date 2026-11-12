@@ -711,6 +711,9 @@ function keyTick(ts) {
 document.addEventListener('keydown',function (e) {
   S.touched = true;
   var t = e.target, is = function (q) { return t && t.matches && t.matches(q); };
+  /* With the conversation laid over the map (the handle on its edge) the map is not on screen, so
+     no key may walk the character, enter a house or leave a room where nobody can see it happen. */
+  if (mapAway()) { held.clear(); return; }
   if (is('input,select,textarea') || $('lookDlg').open || ($('picDlg') && $('picDlg').open) || ($('focusDlg') && $('focusDlg').open)) return;
   if (S.inside) { if (e.key==='Escape') leave(); return; }
   if (e.key.indexOf('Arrow')===0) { e.preventDefault(); if (S.walk) { S.walk = null; renderCard(); } held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); }
@@ -734,9 +737,10 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#chatAttach')) { if ($('chatFile')) $('chatFile').click(); }
   else if (t.closest('[data-unpick]')) setPick(null);
   else if ((b = t.closest('[data-tag]'))) sugPick(+b.getAttribute('data-tag'));
+  else if (t.closest('#chatWide')) chatWide(!CH.wide);
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
-  else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
+  else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; if (mapAway()) chatWide(false); select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
   else if ((b = t.closest('[data-walk]'))) walkTo(b.getAttribute('data-walk'));
   else if ((b = t.closest('[data-tele]'))) teleport(b.getAttribute('data-tele'));
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
@@ -758,7 +762,27 @@ document.addEventListener('click',function (e) {
    between two people. An open conversation asks for anything new every 3 seconds and stops asking
    while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
    ST.chat is null until the migration has run, and then none of this draws. */
-var CH = {open:null,last:0,timer:0,busy:false,seen:false};
+var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false};
+/* THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at the middle of the
+   chat bar so there's an option to extend it over the map"). The handle on the conversation's left
+   edge lays it over the map, for room to read and write, and brings it back. The choice is kept
+   for the next conversation and the next visit. assets/realm.css does the laying out (and does
+   nothing on a narrow screen, where the panels are stacked); this keeps the handle's words right
+   and repaints the map, whose canvas takes its size from its box.
+   Picking a house or a place in the lists brings the map back: that click is about the map. */
+try { CH.wide = localStorage.getItem('realmChatWide')==='1'; } catch (e) { /* A private window may refuse; the normal width stands. */ }
+function chatWide(on) {
+  var app = $('chat') && $('chat').parentNode, btn = $('chatWide'), box = $('chatMsgs'); if (!app) return;
+  var stick = box && box.scrollHeight-box.scrollTop-box.clientHeight < 60, say = on ? 'Make the conversation narrower' : 'Make the conversation wider';
+  CH.wide = !!on; app.classList.toggle('chat-wide',CH.wide); held.clear();
+  if (btn) { btn.setAttribute('aria-expanded',String(CH.wide)); btn.setAttribute('aria-label',say); btn.title = say; }
+  try { localStorage.setItem('realmChatWide',CH.wide?'1':'0'); } catch (e) { /* Then it is simply not remembered. */ }
+  if (stick) box.scrollTop = box.scrollHeight;
+  draw();
+}
+/* True while the map is not on screen because the conversation lies over it. Asked of the page, not
+   of CH.wide: on a narrow screen the wide setting changes nothing and the map is still there. */
+function mapAway() { var m = $('mapbox'); return !!(CH.open && CH.wide && m && !m.offsetWidth); }
 function unread() { return (ST.chat && ST.chat.unread) || {}; }
 function dmId(a, b) { return 'dm:'+Math.min(a,b)+':'+Math.max(a,b); }
 function chanTitle(id) {
@@ -882,7 +906,7 @@ function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
   if (CH.open===id) { $('chatInput').focus(); return; }
   CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
-  $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
+  $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
 }
 function closeChat() { CH.open = null; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
