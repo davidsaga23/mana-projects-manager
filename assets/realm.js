@@ -529,7 +529,7 @@ function renderSide() {
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
-  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+(ravens(p)?'" data-chat="'+dmId(ST.me,p.id)+'" title="Open their ravens">':'" data-sel="user:'+p.id+'" data-center="1">')+'<i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
+  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"'+((ST.chat && !p.me)?' data-raven="'+dmId(ST.me,p.id)+'" title="Open your ravens with '+esc(firstName(p.name))+'"':'')+'><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
   if (!ppl.length) h += '<small style="padding:0 8px">Nobody has a house yet.</small>';
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
@@ -694,7 +694,11 @@ document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
   musicWake(t);
-  if ((b = t.closest('.rimglink'))) { e.preventDefault(); showPicture(b.getAttribute('href'),(b.querySelector('img')||{}).alt); }
+  /* A name in the People list opens your ravens with that person (David, 2026-11-12: "clicking
+     here should automatically open the ravens with Renata"), whether or not anything is unread and
+     whether or not they are here, and still finds their house on the map. */
+  if ((b = t.closest('[data-raven]'))) { openChat(b.getAttribute('data-raven')); if (!S.inside) select(b.getAttribute('data-sel'),true); }
+  else if ((b = t.closest('.rimglink'))) { e.preventDefault(); showPicture(b.getAttribute('href'),(b.querySelector('img')||{}).alt); }
   else if (t.closest('[data-picclose]')) { if ($('picDlg')) $('picDlg').close(); }
   else if ((b = t.closest('[data-knock]'))) send({knock:b.getAttribute('data-knock')});
   else if ((b = t.closest('[data-knockanswer]'))) { send({answer_knock:b.getAttribute('data-knockanswer'),let:b.getAttribute('data-let')}); var box = b.closest('[data-knockbox]'); if (box) box.remove(); }
