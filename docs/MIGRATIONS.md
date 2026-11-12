@@ -159,6 +159,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | finance_install_15 | ⏳ **Invoice position separate from its sender** (`position_crew_id` on `invoices`): an invoice on a whole step, or on a position somebody else holds. Import by hand in phpMyAdmin. Until it is, only a whole step with no crew sender can be chosen. *(14 is the Done tick, PR #167.)* |
 | finance_install_16 | ⏳ **Budget requests** (`budget_requests`): an administrator asks for a change to a signed-off budget, Jorik approves or declines, and approving saves the next kick-off version. Import by hand in phpMyAdmin. Until it is, the request form says so; Jorik can still change the budget directly. |
 | finance_install_17 | ⏳ **Monthly salary** (`monthly_salary` on `crew_terms` and `crew_terms_log`): a salaried person's day rate is the salary ÷ 21, greyed out on the person page and the projection. Import by hand in phpMyAdmin. Until it is, the salary box says so and rates work as before. |
+| finance_install_18 | ⏳ **Invoice details** (`invoice_details`): the legal name, address, tax ID and bank details on a freelancer's invoice template (invoice.php). Import by hand in phpMyAdmin. Until it is, the invoice prints its lines without them and the details panel says so. |
 
 ---
 

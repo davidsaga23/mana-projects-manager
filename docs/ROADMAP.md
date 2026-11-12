@@ -1293,27 +1293,22 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 
 ## Asked for on 2026-11-11
 
-### An invoice template — NOT BUILT
+### ✅ An invoice template — BUILT 2026-11-11
 
-David: *"let's put on the roadmap an invoice template"*.
+David: *"let's put on the roadmap an invoice template"*, then *"Let's work on the invoice template now"*.
 
-A standard invoice every freelancer uses for their monthly invoice to accounting@mana.tv: one
-invoice a month, one line per project (the money rules in `CLAUDE.md`). Why it is worth having:
-- **Fewer wrong invoices.** Home's Invoice and billing tab already says what to put on this month's
-  invoice (project, step, unit and rate, days, totals); a template turns that into the document.
-- **The invoice intake gets easier.** The planned reading of emailed invoices (DECISIONS
-  2026-10-28, "Invoices arrive by email and file themselves") is far more reliable when every PDF
-  has the same layout and fields.
+Built as `invoice.php`: Anima fills in the month's invoice from the logged days, the artist prints it to
+PDF and emails it to accounting@mana.tv. Opened from Home → Invoice and billing (Make my invoice) and,
+for admins, from Finance → Monthly invoices. Details and bank account stored in the finance database
+(finance_install_18). The choices are in DECISIONS 2026-11-11.
 
-Open before building:
-- **Form:** a PDF Anima fills in from the month's invoice lines for the artist to download, or a
-  blank template (Google Docs / Word) they fill in themselves. The first is less work for artists and
-  matches the intake best.
-- **Required fields:** David is to share the full list of what an invoice must carry (legal name,
-  address, tax ID, invoice number, dates, bank details…). Bank details and tax IDs are sensitive:
-  decide whether Anima stores them or the artist adds them to the downloaded file.
-- **Numbering:** the artist's own invoice number (`invoice_ref`) or one Anima suggests.
-- **Currency:** USD by default; a non-USD contract shows its own currency at the project's fixed rate.
+Still open:
+- **The email intake** (DECISIONS 2026-10-28) can now rely on one layout: "Invoice number", "Date of
+  issue", "Period", one table of lines, "Invoice total (USD)", and a footer with the freelancer ID.
+- **Per-second and flat-fee lines** have no amount from logged days; the artist types it from the
+  statement. Filling it from approved footage needs a rule for which month an approval belongs to.
+- **A notice when bank details change** (to Jorik or David) was not built; the panel only shows who
+  changed them last.
 
 ### Reminders to log time: an end-of-day pop-up, and an instant one from an admin — NOT BUILT
 
