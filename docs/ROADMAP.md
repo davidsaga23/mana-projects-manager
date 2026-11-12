@@ -1321,7 +1321,8 @@ Open before building:
 email only when an admin ticks it on an instant one. `includes/log_reminders.php`,
 `log_reminder_api.php`, `log_reminders.php` (Users → Remind people to log time); DECISIONS has the
 details. What is left: the 5 pm time is a constant (`LOG_REMINDER_HOUR`), not a setting; a person
-cannot choose their own reminder time; the automatic one is never emailed.
+cannot choose their own reminder time; the automatic one is never emailed. Desktop notifications
+(2026-11-11) need an Anima tab open somewhere; bell lines do not go to the desktop.
 
 The original request:
 
