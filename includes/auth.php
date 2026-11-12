@@ -566,7 +566,13 @@ function artist_may_post(): bool {
         // ajar door you are standing at, and answering a knock on your own.
         // `focus` (2026-11-12): start or stop Anima's own timer from the Realm.
         // realm_focus_start() checks the task is the asker's, as mytasks.php does.
-        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus'],
+        // `task_status` (2026-11-12): the status of their own task or card, from
+        // the Realm's task list. ⚠ THE SAME HOLE AS My tasks AND Spell, wearing a
+        // third screen: the FIELD is permitted here; WHOSE row it may touch is
+        // checked in includes/own_status.php, the very functions mytasks.php
+        // calls, and the two-status limit is status_self_serve(), as there.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
+                            'task_status'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

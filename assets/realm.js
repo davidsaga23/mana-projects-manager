@@ -1003,14 +1003,40 @@ $('lookForm').addEventListener('submit',function (e) { e.preventDefault(); $('lo
    while a clock is running: it reads "Focus 18:42", so the time is in sight, and can be stopped,
    from anywhere in the village. Somebody with no house yet has no shelf, so for them the button
    stays, reading "Your tasks". */
-var FO = {data:null,at:0,busy:false,seq:0,settled:'',zero:false,err:''};
+var FO = {data:null,at:0,busy:false,seq:0,settled:'',zero:false,err:'',force:false};
 function clockWords(s) { s = Math.max(0,Math.floor(s)); var h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h?h+':'+(m<10?'0':'')+m:m)+':'+(x<10?'0':'')+x; }
 function focusNow() { return FO.data && FO.data.ready ? FO.data.now : null; }
 function onBreak(n) { return !!n && (n.phase==='short_break' || n.phase==='long_break'); }
 /* Seconds left in the phase, or, for a plain timer with no end, seconds run so far. */
 function focusLeft() { var n = focusNow(); if (!n) return 0; var gone = Math.max(0,Math.floor((Date.now()-FO.at)/1000)); return n.remaining===null ? n.elapsed+gone : Math.max(0,n.remaining-gone); }
 function focusTask(key) { var l = (FO.data && FO.data.tasks)||[]; for (var i = 0; i < l.length; i++) if (l[i].key===key) return l[i]; return null; }
-function renderFocus() {
+/* WHAT EACH TASK SHOWS (David, 2026-11-12, with a picture of the Production tasks table on My tasks:
+   "I'd like to expand what we see for each task and include status, editable in this context, and
+   due date"). A row is the title, then the show, the due date (red, and the row tinted, once it has
+   passed, as on My tasks), the hours already logged and a way to open it in Anima; beside them its
+   status in the status's own colour, and Start.
+
+   THE STATUS IS A CONTROL ONLY WHEN IT CAN BE CHANGED. The server sends, per show, the statuses and
+   which of them this account may choose (`open`): every one for Production, In progress and Pending
+   review for anybody else, exactly as My tasks offers them. A task with nothing to choose (the
+   switch is off, or the show spells those two differently) shows its status as plain words. The
+   list is only what is DRAWN: the server asks the same rules again when a change arrives
+   (includes/own_status.php, the code My tasks runs), so nothing here is a permission.
+
+   A status's colour is data from the show's own list, so it is written into a style only when it is
+   a plain six-digit hex; anything else falls back to the frame's own colours. */
+function hex(c) { return /^#[0-9a-f]{6}$/i.test(c||'') ? c : ''; }
+function statusCell(k, d) {
+  var may = d.may||{}, all = (d.statuses||{})[k.pid]||[], c = hex(k.color), none = k.key.charAt(0)==='p'?'Not started':'No status', pick = 0, seen = false, o = '';
+  all.forEach(function (s) { var now = s.id===k.sid; if (now) seen = true; if (!s.open && !now) return; if (s.open && !now) pick++;
+    o += '<option value="'+s.id+'"'+(now?' selected':'')+(s.open?'':' disabled')+'>'+esc(s.name)+'</option>'; });
+  if (may.clear && k.sid!==null) pick++;
+  if (!may.status || !pick) return '<span class="rfchip"'+(c?' style="color:'+c+';border-color:'+c+'66;background:'+c+'1a"':'')+'>'+esc(k.status||none)+'</span>';
+  o = (k.sid===null || may.clear ? '<option value=""'+(k.sid===null?' selected':'')+(may.clear?'':' disabled')+'>'+none+'</option>' : '')
+    + (k.sid!==null && !seen ? '<option value="'+k.sid+'" selected disabled>'+esc(k.status)+'</option>' : '') + o;
+  return '<select class="rfsel" data-focusstatus="'+esc(k.key)+'" aria-label="Status of '+esc(k.title)+'"'+(c?' style="color:'+c+';border-color:'+c+'66"':'')+'>'+o+'</select>';
+}
+function renderFocus(force) {
   var top = $('focusNow'), list = $('focusList'); if (!top) return;
   var d = FO.data, n = focusNow(), brk = onBreak(n), left = focusLeft(), h = '';
   $('focusMusic').hidden = !(d && d.ready && (window.AudioContext || window.webkitAudioContext));
@@ -1025,14 +1051,24 @@ function renderFocus() {
             : '<button type="button" class="rbtn rprimary rsmall" data-focusstop="1">Stop and log</button>')+'</div></div>';
   } else h = '<p class="rfidle">No clock is running. Press Start on something below. It starts Anima\'s own timer, the one My tasks shows, and seals your door until the focus block ends.</p>';
   top.innerHTML = h;
+  /* The minute's refresh must not close a status list somebody has open. A change they made, or a
+     refusal, always redraws (force). */
+  var at = document.activeElement, box = list.querySelector('.rflist'), y = box ? box.scrollTop : 0;
+  if (!force && at && at.getAttribute && at.getAttribute('data-focusstatus') && list.contains(at)) return;
   h = '<h3 class="rfhead">Your open work</h3>';
   if (!d.tasks.length) h += '<p class="rfidle">Nothing is assigned to you right now. Tasks and cards given to you in Anima appear here.</p>';
   else { h += '<div class="rflist">';
-    d.tasks.forEach(function (k) { var mine = !!n && n.key===k.key, sub = [k.show,k.due?'due '+k.due:''].filter(Boolean).join(', ');
-      h += '<div class="rftask'+(mine?' is-on':'')+'"><div><b>'+esc(k.title)+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div>'
-        +(mine ? '<small>'+(brk?'On a break':'Running')+'</small>' : '<button type="button" class="rbtn rsmall" data-focusstart="'+esc(k.key)+'"'+(n?' title="This stops and logs the one already running"':'')+'>Start</button>')+'</div>'; });
+    d.tasks.forEach(function (k) { var mine = !!n && n.key===k.key, card = k.key.charAt(0)==='t';
+      h += '<div class="rftask'+(mine?' is-on':'')+(k.late?' is-late':'')+'"><div class="rfwhat"><b title="'+esc(k.title)+'">'+esc(k.title)+'</b><small class="rfmeta">'
+        +'<span>'+esc([k.ref,k.show].filter(Boolean).join(', '))+'</span>'
+        +'<span class="rfdue'+(k.late?' is-late':k.due?'':' is-none')+'">'+(k.due ? 'Due '+esc(k.due)+(k.late?', overdue':'') : 'No due date')+'</span>'
+        +(k.logged?'<span>'+esc(k.logged)+' logged</span>':'')
+        +(k.link?'<a href="'+esc(k.link)+'" target="_blank" rel="noopener">'+(card?'Open the card':'Open in Spell')+'</a>':'')+'</small></div>'
+        +'<div class="rfstat">'+statusCell(k,d)+(k.blocked?'<small class="rfblocked">blocked</small>':'')+'</div>'
+        +(mine ? '<small class="rfrun">'+(brk?'On a break':'Running')+'</small>' : '<button type="button" class="rbtn rsmall" data-focusstart="'+esc(k.key)+'"'+(n?' title="This stops and logs the one already running"':'')+'>Start</button>')+'</div>'; });
     h += '</div>'; }
   list.innerHTML = h;
+  box = list.querySelector('.rflist'); if (box) box.scrollTop = y;
 }
 /* Once a second: the readout in the desk and on the top bar, the music, and the settle at zero. */
 function focusTick() {
@@ -1053,7 +1089,8 @@ function focusTick() {
 function focusTake(j, seq, acted) {
   if (seq!==FO.seq) return;
   FO.busy = false;
-  if (!j) { if (!FO.data) { FO.err = 'Your tasks could not be reached. Try again in a moment.'; renderFocus(); } return; }
+  var force = FO.force; FO.force = false;
+  if (!j) { if (!FO.data) FO.err = 'Your tasks could not be reached. Try again in a moment.'; if (!FO.data || force) renderFocus(true); return; }
   if (j.said) toast(j.said);
   if (j.error) { toast(j.error); if (!FO.data) FO.err = j.error; }
   if (j.focus) {
@@ -1063,7 +1100,7 @@ function focusTake(j, seq, acted) {
     if (!n || n.phase!=='focus' || n.remaining > 0) FO.settled = '';
     if (was && was.phase==='focus' && onBreak(n)) musicChime();
   }
-  renderFocus(); focusTick();
+  renderFocus(force); focusTick();
   /* My own door has just sealed or opened: fetch the map again so it is redrawn now, not at the next beat. */
   if (acted) send({ping:1,active:1});
 }
@@ -1073,13 +1110,22 @@ function focusAsk() {
     .then(function (r) { return r.json(); }).then(function (j) { focusTake(j,seq,false); }).catch(function () { focusTake(null,seq,false); });
 }
 function focusDo(fields) {
-  if (FO.busy) return; FO.busy = true; var seq = ++FO.seq, body = new URLSearchParams();
+  if (FO.busy) return; FO.busy = true; FO.force = true; var seq = ++FO.seq, body = new URLSearchParams();
+  /* A status change moves no door, so the map is not asked for again after it. */
+  var door = !('task_status' in fields);
   Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
   fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { focusTake(j,seq,true); })
+    .then(function (r) { return r.json(); }).then(function (j) { focusTake(j,seq,door); })
     .catch(function () { focusTake(null,seq,false); toast('That did not reach Anima. Try again.'); });
 }
-function openFocus() { var d = $('focusDlg'); if (!d || d.open) return; renderFocus(); d.showModal(); focusAsk(); }
+function openFocus() { var d = $('focusDlg'); if (!d || d.open) return; renderFocus(true); d.showModal(); focusAsk(); }
+/* Somebody picked a status. The server decides (the rules My tasks runs) and answers with the whole
+   list again, so a refused change snaps back, and a task that is now approved leaves the list as it
+   leaves My tasks. Until the answer comes the control is held, so it cannot be changed twice. */
+function focusStatus(sel) {
+  if (FO.busy) { toast('One moment, Anima is still answering.'); renderFocus(true); return; }
+  sel.disabled = true; focusDo({task_status:sel.value,task:sel.getAttribute('data-focusstatus')});
+}
 
 /* THE MUSIC (the same request: "a soft music while on focus"). Made here, by the browser's own sound
    engine: no audio file, nothing to license, nothing loaded from another site (the rule at the top
@@ -1182,6 +1228,7 @@ if ($('focusBody')) {
     +'<div class="rmusic" id="focusMusic" hidden><label><input type="checkbox" id="musicOn"> Music while you focus</label><label>Volume <input type="range" id="musicVol" min="0" max="100" step="1"></label><small>A soft sound made by this page. It plays only during a focus block.</small></div>'
     +'<div class="rdacts"><a class="rbtn" href="mytasks.php">Open My tasks</a><button type="button" class="rbtn" data-focusclose="1">Close</button></div>';
   $('musicOn').checked = MU.on; $('musicVol').value = Math.round(MU.vol*100);
+  $('focusBody').addEventListener('change',function (e) { if (e.target.getAttribute && e.target.getAttribute('data-focusstatus')) focusStatus(e.target); });
   $('musicOn').addEventListener('change',function () { MU.on = this.checked; musicSave(); musicWake(this); musicSync(); });
   $('musicVol').addEventListener('input',function () { MU.vol = this.value/100; musicSave(); if (MU.rig) MU.rig.master.gain.setTargetAtTime(musicLevel(),MU.ctx.currentTime,.1); });
 }

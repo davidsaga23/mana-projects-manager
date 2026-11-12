@@ -278,11 +278,36 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rfhead { margin: 0 0 6px; }
 .rfclock { font: 700 40px/1.1 var(--body); color: var(--text); font-variant-numeric: tabular-nums; }
 .rflist { display: flex; flex-direction: column; gap: 4px; max-height: 38vh; overflow: auto; }
-.rftask { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 7px 11px; }
+.rftask { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 8px 11px; }
+/* Past its date: the tint My tasks gives an overdue row. The running task's blue wins over it. */
+.rftask.is-late { background: var(--danger-tint); }
 .rftask.is-on { background: var(--primary-tint); border-color: var(--primary-border); }
-.rftask > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.rftask b, .rftask > div small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rftask > small { flex: none; color: var(--warn); }
+.rfwhat { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rfwhat b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Under the title: the show, the due date, hours logged, the way into Anima. */
+.rfmeta { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.rfdue { color: var(--text-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.rfdue.is-none { color: var(--faint); font-weight: 400; }
+.rfdue.is-late { color: var(--danger); }
+/* The status (David, 2026-11-12: "include status, editable in this context"). A dropdown when this
+   person may change it, the same words as a chip when they may not. The text and edge take the
+   status's own colour from the show's list, set inline by assets/realm.js; these are the fallbacks. */
+.rfstat { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 42%; }
+.rfsel, .rfchip { max-width: 100%; font-size: 13px; font-weight: 600; color: var(--text-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
+.rfsel { background: var(--surface); padding: 4px 6px; cursor: pointer; transition: border-color var(--ease); }
+.rfsel:hover { border-color: var(--primary); }
+.rfsel:disabled { opacity: .55; cursor: progress; }
+.rfsel option { color: var(--text); background: var(--surface-2); font-weight: 400; }
+.rfsel option:disabled { color: var(--faint); }
+.rfchip { padding: 3px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rfblocked { color: var(--warn); }
+.rfrun { flex: none; color: var(--warn); }
+#focusDlg { width: min(640px, calc(100% - 32px)); }
+@media (max-width: 520px) {
+  .rftask { flex-wrap: wrap; }
+  .rfwhat { flex-basis: 100%; }
+  .rfstat { align-items: flex-start; max-width: none; flex: 1; }
+}
 .rmusic { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border-top: 1px solid var(--border-soft); padding-top: 14px; }
 .rmusic[hidden] { display: none; }
 .rmusic label { display: inline-flex; align-items: center; gap: 8px; }

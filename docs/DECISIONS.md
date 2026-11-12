@@ -5437,6 +5437,46 @@ that the Realm's frame had its own night-blue and gold palette.
 - **Type**: Anima's system typeface everywhere in the frame. The monospace stays only for names
   drawn over the map.
 
+## 2026-11-12 — A status changed in the Realm is a status changed on My tasks
+
+David, with a picture of the Production tasks table on My tasks: "work on how tasks are seen in
+realm. I'd like to expand what we see for each task and include status, editable in this context,
+and due date".
+
+- **One set of rules, in one file.** The two handlers My tasks has had since 2026-09-28
+  (`set_status` for a production task, `set_ticket_status` for a card) were lifted out of
+  `mytasks.php` word for word into `includes/own_status.php` (`own_task_set_status()`,
+  `own_ticket_set_status()`). `mytasks.php` and the Realm both call them. The alternative, a second
+  copy of the rules inside the Realm, would have drifted the first time either was touched. The
+  lift changes nothing My tasks does: the same ownership check, the same refusals in the same
+  words, the same flags, the same line in the status log (`source` stays `item`) or in the card's
+  thread.
+- **Who may change what, unchanged from 2026-10-21**: Production any status of that show, anybody
+  else only In progress or Pending review, and only on work assigned to them
+  (`status_self_serve()`). The Realm asks nothing of its own.
+- **Three locks, as on My tasks.** `task_status` is a new field on `realm_api.php`, named in
+  `artist_may_post()`; `FEATURE_POSTS` puts it under the `own_status` switch; and the shared
+  functions check the row belongs to the asker. It is its own field, not a fourth word for `focus`,
+  because the first two lists are keyed on the field.
+- **The person is the real login's**, as everywhere in the Realm (`realm_crew_id()`), where My tasks
+  follows a "view as" preview. The shared functions take the crew id from their caller for that reason.
+- **A control only when it can be used.** The server sends each show's statuses once, with which of
+  them this account may choose (`own_status_options()`); the window draws a dropdown when there is
+  something to choose and a plain label when there is not. That list is only what is drawn: the
+  server asks the rules again when a change arrives.
+- **A status's colour is data**, so the page writes it into a style only when it is a plain
+  six-digit hex. Every other colour in the window is a role on `:root`, as before.
+- **What each task shows was chosen to fit a window over a game**: status, due date (overdue marked
+  the way My tasks marks it), hours logged on a production task, a card's reference, "blocked", and
+  a link into Spell or to the card. Left out: the Log time box, priority, and the snooze button.
+- **Known limits.** `mytasks.php` still draws its own two dropdowns inline, by the same test
+  (`status_self_serve()`), rather than from `own_status_options()`; changing how a screen in daily
+  use is drawn was not worth doing blind. Spell's own status change (`board_api.php`) also tells the
+  people following a task; My tasks never has, so the Realm does not either. If the task a clock is
+  running on is approved from the Realm, it leaves the list and the clock panel names it "Work
+  started in My tasks" until the clock is stopped. A status set by hand can still be overwritten by
+  the next Plaky import, as before.
+
 ## 2026-11-12 — The conversation over the map
 
 **David:** "can you have an arrow pointing left at the middle of the chat bar so there's an option to

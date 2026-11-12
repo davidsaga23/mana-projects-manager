@@ -257,6 +257,9 @@ const FEATURE_POSTS = [
                             ['field', 'log_time', 'time_log'], ['field', 'timer', 'time_log'],
                             ['field', 'delete_log', 'time_log'], ['field', 'overhead_timer', 'time_log'],
                             ['field', 'overhead_log', 'time_log']],
+    // The Realm's task list changes a status by My tasks' rules, so it asks the
+    // same switch. Nothing else posted to realm_api.php is listed: no '*' line.
+    'realm_api.php'     => [['field', 'task_status', 'own_status']],
     'bugs.php'          => [['field', 'report_bug', 'bug_report'], ['*', '', 'bugs_list']],
     'alltasks.php'      => [['*', '', 'studio_tasks_edit']],
     'artists.php'       => [['*', '', 'artists_edit']],
