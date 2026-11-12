@@ -535,7 +535,7 @@ OUT_PARAMS = re.compile(
     r'settype|sscanf|openssl_[a-z_]+)\s*\(([^;]*?)\)', re.S)
 # Files included INTO another page's scope, which legitimately read variables
 # the parent set. They are partials, not programs.
-PARTIAL_DIRS = ('import', 'wizard')
+PARTIAL_DIRS = ('import', 'wizard', 'days_off')
 # A parameter list or a use() clause holds several names at once.
 LISTS = [re.compile(r'\bfunction\s*&?\s*\w*\s*\(([^)]*)\)', re.S),
          re.compile(r'\bfn\s*\(([^)]*)\)', re.S),

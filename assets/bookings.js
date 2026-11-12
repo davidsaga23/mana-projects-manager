@@ -640,9 +640,13 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePop(); });
 
   // --- the two tabs --------------------------------------------------------------------------
-  var tab = load('tab', 'timeline') === 'calendar' ? 'calendar' : 'timeline';
+  // ?tab=timeline / ?tab=calendar, from the Days off tab's links (that tab is
+  // drawn by the server), wins over the remembered one.
+  var urlTab = (window.location.search.match(/[?&]tab=(timeline|calendar)/) || [])[1];
+  if (urlTab) save('tab', urlTab);
+  var tab = (urlTab || load('tab', 'timeline')) === 'calendar' ? 'calendar' : 'timeline';
   function applyTab() {
-    document.querySelectorAll('.bk-tabs .panel-tab').forEach(function (t) {
+    document.querySelectorAll('.bk-tabs .panel-tab[data-tab]').forEach(function (t) {
       var on = t.getAttribute('data-tab') === tab;
       t.classList.toggle('is-on', on);
       t.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -716,7 +720,7 @@
     });
   });
   if ($('bkOnlyClashes')) $('bkOnlyClashes').addEventListener('change', render);
-  document.querySelectorAll('.bk-tabs .panel-tab').forEach(function (t) {
+  document.querySelectorAll('.bk-tabs .panel-tab[data-tab]').forEach(function (t) {
     t.addEventListener('click', function () {
       tab = t.getAttribute('data-tab') === 'calendar' ? 'calendar' : 'timeline';
       save('tab', tab);

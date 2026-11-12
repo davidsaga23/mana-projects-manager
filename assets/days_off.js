@@ -1,4 +1,4 @@
-// Days off calendar (days_off.php): drag across a person's days to add days
+// Days off tab on Bookings (includes/days_off/view.php): drag across a person's days to add days
 // off, click a day off to change or remove it. Loaded only for Production and
 // admins; everything it does is an ordinary form POST the page also offers
 // without it (the list and the "Add days off" form under the grid), so the

@@ -3994,6 +3994,8 @@ button.secondary.danger:hover { background: var(--danger-border); }
   font-size: 13.5px; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
 }
 .panel-tab.is-on { color: var(--text); border-bottom-color: var(--primary); font-weight: 600; }
+/* A tab that is a link (Bookings' Days off, drawn by the server) looks like the rest. */
+a.panel-tab:hover { text-decoration: none; color: var(--text); }
 
 .panel-body { padding-top: 18px; }
 .panel-body[hidden] { display: none; }
