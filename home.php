@@ -293,10 +293,15 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
                 <?php endforeach; ?>
               <?php else: ?><span class="muted">Ask Production</span><?php endif; ?>
             </td>
+            <?php // Buttons, and the third one onto the Brief (David, 2026-11-11): "Standards"
+                  // went to standards.php, a forwarding address to Dates & headcount since
+                  // the ideal-quotas tab was removed (2026-10-16), which is planning, not a
+                  // reference. The show's own rules for the work live on the Brief, and its
+                  // naming convention has an anchor there. ?>
             <td class="small home-refs">
-              <a href="spell.php?project=<?= (int)$pid ?>">Spell</a>
-              · <a href="brief.php?project=<?= (int)$pid ?>">Brief</a>
-              · <a href="standards.php?project=<?= (int)$pid ?>">Standards</a>
+              <a class="row-btn" href="spell.php?project=<?= (int)$pid ?>">Spell</a>
+              <a class="row-btn" href="brief.php?project=<?= (int)$pid ?>">Brief</a>
+              <a class="row-btn" href="brief.php?project=<?= (int)$pid ?>#naming">Naming convention</a>
             </td>
           </tr>
         <?php endforeach; ?>

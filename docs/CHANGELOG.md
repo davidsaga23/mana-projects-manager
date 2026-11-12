@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Home: show references are buttons, and none goes to Dates & headcount *(no migration)*
+
+- On Home → Your shows, References are now buttons: **Spell**, **Brief**, and **Naming convention**
+  (the Brief, at its naming section). "Standards" is gone: it led to the retired ideal-quotas page,
+  which forwards to Dates & headcount.
+
 ## 2026-11-11 — Finance database updates apply from migrate.php *(no migration; finance user needs CREATE/ALTER/INDEX)*
 
 **Asked by David:** "why do I need to paste so many codes to the DB when we used to do it through the
