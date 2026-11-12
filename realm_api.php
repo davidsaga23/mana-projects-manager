@@ -97,7 +97,7 @@ if (isset($_GET['focus']) || isset($_POST['focus'])) {
         if ($bad !== '') $answer['error'] = $bad;
         echo json_encode($answer);
     } catch (Throwable $e) {
-        echo json_encode(['ok' => false, 'error' => 'The focus desk could not be reached. Try again in a moment.']);
+        echo json_encode(['ok' => false, 'error' => 'Your tasks could not be reached. Try again in a moment.']);
     }
     exit;
 }
