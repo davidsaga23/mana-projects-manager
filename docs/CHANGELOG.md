@@ -14,6 +14,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — The invoice template: Anima fills in each freelancer's monthly invoice *(finance_install_18)*
+
+- **Home → Invoice and billing → Make my invoice** opens the month's invoice, filled in from the days
+  logged on every show: invoice number (suggested `MANA-2026-11-ABC`, editable), date of issue,
+  period, **Billed to** (Mana / Saga Productions LLC), **From**, one table of lines (project · position,
+  days worked, unit cost, qty, amount), the invoice total in USD, notes and bank account details.
+  **Print or save as PDF** turns it into the PDF to email to accounting@mana.tv. No PDF library.
+- The layout follows the two invoices David shared as good examples. A non-USD contract shows both
+  amounts at the project's fixed rate ("$2,080.00 (£1,600.00)"). A per-second or flat-fee line has an
+  amount box to fill in from the statement, and the total adds it.
+- The artist's legal name, job title, email, address, tax ID, bank details and payment notes are
+  saved once, in the **finance database**, and go on every month's invoice. Only the person and
+  administrators can see them; the panel says who last changed them.
+- Admins open anybody's from **Finance → Monthly invoices → (person) → Open their invoice template**.
+- Salaried staff have no invoice, as before.
+- Needs **finance_install_18** applied from migrate.php → Finance database updates for the details to save.
+  Until then the invoice still fills in its lines and prints without them.
+
 ## 2026-11-11 — Home: show references are buttons, and none goes to Dates & headcount *(no migration)*
 
 - On Home → Your shows, References are now buttons: **Spell**, **Brief**, and **Naming convention**

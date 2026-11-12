@@ -5106,3 +5106,31 @@ migration system?"
   and any failure counts as 0.
 - `finance_install.sql` (the baseline) stays a by-hand step: it comes with creating the database, the
   user and the config block, none of which a page can do.
+
+## 2026-11-11 — The invoice template: Anima fills it in, and keeps the bank details
+
+**Asked by David:** "Let's work on the invoice template now" (roadmap, "An invoice template"). Goal:
+every freelancer sends the same, correct monthly invoice to accounting@mana.tv, which also makes the
+planned email intake (2026-10-28, "Invoices arrive by email and file themselves") reliable.
+
+**Asked and chosen by David:**
+- **Form:** Anima fills the invoice in (not a blank Docs/Word template). It is a page printed to PDF
+  from the browser (`invoice.php`, `assets/invoice.css`), so no PDF library. The layout follows the
+  two example invoices he shared: title, number / date of issue / period, Billed to / From, one table
+  of lines, total, notes, bank account details.
+- **Bank details: stored in Anima**, in the finance database (`invoice_details`, finance_install_18),
+  behind the same own-or-admin door as rates (`money_own_db()`). The alternative recommended,
+  keeping them only in the artist's browser, was declined. The row records who changed it last, and
+  the panel shows it, because a changed bank account is what a payer should notice.
+- **Invoice number:** suggested as `MANA-YYYY-MM-ABC` (initials from the legal name), editable on the
+  page and not stored.
+- **Admin view:** yes, from Finance → Monthly invoices (`invoice.php?crew=`, admins only).
+
+**Decided while building:**
+- The lines are every show the person logged time on that month (as Monthly invoices prefills), not
+  only the shows open today, so a show that wrapped since still gets its line. Counting is
+  `home_invoice_lines()`, the same as Home.
+- No due date on the invoice: payment terms are Jorik's to set, not the template's. The period is shown
+  instead, which the intake needs.
+- A footer line on every invoice ("Made with Anima · Freelancer ID · Period") gives the intake the
+  same plain facts in one place.
