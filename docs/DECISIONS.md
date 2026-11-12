@@ -5070,3 +5070,39 @@ reminder, never for the automatic one.
 - **The poll keeps going while the tab is hidden, every five minutes, only for people who allowed it**;
   everyone else still pauses as before. No service worker, so a desktop notification needs an Anima tab
   open somewhere (a closed browser gets nothing until Anima is next opened, when the pop-up and bell show).
+
+## 2026-11-11 — Finance database updates run from migrate.php, and the finance user may change tables
+
+**Asked by David:** "why do I need to paste so many codes to the DB when we used to do it through the
+migration system?"
+
+**Decided:**
+- **The finance files apply from `migrate.php`**, in a second section under the production
+  migrations. The runner is in `includes/money.php`, not in `migrate.php`: rule 1 of that file (only it
+  opens the finance connection) still holds, and the page only calls `finance_apply_migrations()`,
+  `finance_migration_status()` and `finance_mark_migration_done()`, all admin-only.
+- **A `finance_migrations` table in the finance DB** records each file (`how`: ran here, found already
+  in place, or marked by hand), the same idea as `schema_migrations`.
+- **Hand imports are detected by schema, not by a "mark everything done" button.** Each file has a
+  list of the tables/columns it adds (`finance_migration_checks()`); all present means it was imported
+  by hand, so it is recorded and never run. Chosen because 02–17 are mostly `ADD COLUMN`, which fails a
+  second time, and 09 rewrites invoice statuses; a blanket button would trust memory where the
+  database can answer. **Mark as done** stays for the cases the checks cannot settle: a file half there
+  (blocked, and nothing after it runs, because the files build on each other) or a new file with no
+  check. 03 is "found" on a database built from the later 02, which already contains its columns.
+- **A new finance file must add its check.** Without one it still runs, but a copy pasted in by hand
+  could not be recognised.
+- **The rights are read before anything runs** (`SHOW GRANTS`): the finance user needs CREATE, ALTER
+  and INDEX. Without them the page says what to tick in cPanel and runs nothing, rather than letting a
+  file like 04 create its table and then be refused on its first ALTER. A refusal mid-run (when the
+  grants could not be read) is reported the same way, not as a fatal.
+- **The trade-off, stated for David:** with these rights the app's finance user can change the finance
+  tables' shape, not only their rows. The separation that matters is unchanged: the production user
+  still has no rights to the finance DB, so an ordinary bug on an ordinary screen still cannot reach a
+  rate. What widens is what someone could do if they ran arbitrary code as this app, which could
+  already read and rewrite every rate. Small, and the price of not pasting SQL by hand.
+- **The banner counts finance updates too**, for admins, through `finance_pending_count()`: kept in the
+  session for ten minutes so `includes/header.php` does not open a second connection on every page,
+  and any failure counts as 0.
+- `finance_install.sql` (the baseline) stays a by-hand step: it comes with creating the database, the
+  user and the config block, none of which a page can do.
