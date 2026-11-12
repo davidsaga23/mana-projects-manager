@@ -43,6 +43,7 @@ small { color: var(--muted); font-size: .84rem; }
 .rrows { display: flex; flex-direction: column; gap: 1px; }
 .rrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
 .rrow:hover, .rrow.is-on { background: var(--ridge); }
+.rrow > span:not(.rhash) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rrow small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
 .rrow.is-away { color: var(--muted); }
 .rdot { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--muted); display: inline-block; }
@@ -95,6 +96,7 @@ small { color: var(--muted); font-size: .84rem; }
 .freeland { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 8; opacity: .85; }
 
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; width: min(340px, calc(100% - 32px)); z-index: 20; }
+.rtoast.is-link { cursor: pointer; border-color: var(--mana); }
 .rtoast { background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px var(--shade); }
 
 dialog { background: var(--dusk); color: var(--parchment); border: 1px solid var(--stone); border-radius: 10px; padding: 18px; width: min(480px, calc(100% - 32px)); }

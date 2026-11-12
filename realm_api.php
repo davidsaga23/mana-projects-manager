@@ -49,10 +49,20 @@ if (!realm_available($pdo)) {
 // ---- chat (stage 2, migration 082) ------------------------------------------
 // GET  chat=<channel>&after=<id>           what was said, and marks it read
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
+// GET  unread=1                            only the unread counts
 //
 // Answered here, apart from the map: an open conversation asks every few
 // seconds and has no use for where everybody is standing.
 $mayAnnounce = can_edit();
+// GET unread=1: only the unread counts. David, 2026-11-12, trying ravens with
+// Renata: the count beside the sender's name was "not working atm". It was
+// arriving with the 25-second heartbeat, which reads as broken when you are
+// watching for it. Somebody with no conversation open now asks this every few
+// seconds instead; it is one small query and touches nothing.
+if (isset($_GET['unread'])) {
+    echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : []]);
+    exit;
+}
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
 if ($channel !== '') {
     if (!realm_chat_available($pdo)) {
@@ -79,7 +89,13 @@ if ($channel !== '') {
         }
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
         $messages = realm_messages($pdo, $uid, $channel, $after);
-        if ($messages) realm_mark_read($pdo, $uid, $channel, (int)$messages[count($messages) - 1]['id']);
+        if ($messages) {
+            realm_mark_read($pdo, $uid, $channel, (int)$messages[count($messages) - 1]['id']);
+            // Read here, so it is no longer news in Anima's bell.
+            if (preg_match('/^dm:(\d+):(\d+)$/', $channel, $dm) === 1) {
+                realm_raven_bell_clear($pdo, $uid, (int)$dm[1] === $uid ? (int)$dm[2] : (int)$dm[1]);
+            }
+        }
         $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce)];
         if ($said !== '') $answer['error'] = $said;

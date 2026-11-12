@@ -181,9 +181,15 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
 }
 
 /**
- * Ring Anima's bell for a raven left for somebody who is not in the Realm right
- * now (David, 2026-11-12: "let's try it"). Somebody who has the Realm open sees
- * the unread mark there within seconds and needs no bell.
+ * Ring Anima's bell for a raven (David, 2026-11-12: "let's try it").
+ *
+ * ⚠ IT RINGS WHETHER OR NOT THE OTHER PERSON HAS THE REALM OPEN. The first
+ * version stayed silent for anybody whose Realm was open, on the theory that
+ * they would see it there. David and Renata tried it with the Realm in one tab
+ * and Anima in another, which is how people actually work, and "we don't get
+ * any notifications in anima". A line that is rung and then read in the Realm
+ * is taken out of the bell again by realm_raven_bell_clear(), so it does not
+ * linger as old news.
  *
  * ⚠ ONE RING PER SENDER UNTIL IT IS READ. Ten ravens in a row are one line in
  * the bell, not ten: a bell that fills up with one conversation stops being read.
@@ -194,14 +200,12 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
 function realm_raven_bell(PDO $pdo, int $fromUid, int $toUid): void {
     try {
         if (!function_exists('notify_add')) return;
-        $q = $pdo->prepare('SELECT u.crew_id, TIMESTAMPDIFF(SECOND, rp.last_ping, NOW()) AS age
-                              FROM users u LEFT JOIN realm_people rp ON rp.user_id = u.id WHERE u.id = ?');
+        $q = $pdo->prepare('SELECT u.crew_id FROM users u WHERE u.id = ?');
         $q->execute([$toUid]);
         $to = $q->fetch();
         if (!$to) return;
         $crew = (int)($to['crew_id'] ?? 0);
         if ($crew <= 0) return;
-        if ($to['age'] !== null && (int)$to['age'] <= REALM_ONLINE_SECONDS) return;
 
         $q = $pdo->prepare('SELECT u.display_name, u.username, c.name AS crew_name
                               FROM users u LEFT JOIN crew c ON c.id = u.crew_id WHERE u.id = ?');
@@ -216,5 +220,33 @@ function realm_raven_bell(PDO $pdo, int $fromUid, int $toUid): void {
         notify_add($pdo, [$crew], ['kind' => 'raven', 'actor' => $actor, 'summary' => 'in the Realm']);
     } catch (Throwable $e) {
         // The raven itself was kept; only the bell is silent.
+    }
+}
+
+/** The name an account goes by in the bell and in chat: linked person, else display name, else login. */
+function realm_person_name(PDO $pdo, int $uid): string {
+    $q = $pdo->prepare('SELECT u.display_name, u.username, c.name AS crew_name
+                          FROM users u LEFT JOIN crew c ON c.id = u.crew_id WHERE u.id = ?');
+    $q->execute([$uid]);
+    $f = $q->fetch() ?: [];
+    return trim((string)(($f['crew_name'] ?? '') ?: (($f['display_name'] ?? '') ?: ($f['username'] ?? 'Somebody'))));
+}
+
+/**
+ * $readerUid has just read the ravens from $senderUid in the Realm, so the line
+ * about them in the reader's bell is no longer news. Marks it seen; it stays in
+ * the list like any other read line. Never throws.
+ */
+function realm_raven_bell_clear(PDO $pdo, int $readerUid, int $senderUid): void {
+    try {
+        $q = $pdo->prepare('SELECT crew_id FROM users WHERE id = ?');
+        $q->execute([$readerUid]);
+        $crew = (int)$q->fetchColumn();
+        if ($crew <= 0) return;
+        $pdo->prepare("UPDATE notifications SET seen_at = NOW()
+                        WHERE crew_id = ? AND kind = 'raven' AND actor = ? AND seen_at IS NULL")
+            ->execute([$crew, realm_person_name($pdo, $senderUid)]);
+    } catch (Throwable $e) {
+        // The bell keeps a line a little longer than it should; opening the bell clears it.
     }
 }
