@@ -7,7 +7,9 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
 
 ## Deploy — read before merging anything
 
-- **Merging to `master` deploys to the live site (https://mana.davidsaga.com) in ~30 s**, via
+- **The live site is https://anima-mana.com** (David, 2026-11-12). `mana.davidsaga.com` is a legacy
+  deployment: never send David there to test, and never write it in a PR or a doc as the live site.
+- **Merging to `master` deploys to the live site in ~30 s**, via
   `.github/workflows/deploy.yml` (FTP to cPanel). There is no staging; David tests on live.
 - The workflow runs **`php -l` on every tracked `.php` file first**; a syntax error stops the
   deploy. It runs on pull requests too, so check the PR's checks before merging.
