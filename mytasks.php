@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';   // create_ticket() emails the assignee
 require_once __DIR__ . '/includes/tickets.php';
+require_once __DIR__ . '/includes/own_status.php';   // setting the status of your own work, shared with the Realm
 require_once __DIR__ . '/includes/timelog.php';
 require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/crew.php';
@@ -107,49 +108,17 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'GET' && !in_preview()
 $fileTargets = can_edit() ? ticket_file_targets($pdo) : [];
 
 // --- change the status of one production task -------------------------------
+//
+// ⚠ THE RULES ARE IN includes/own_status.php, lifted out of this file word for
+// word on 2026-11-12 so the Realm's task list can change a status by exactly the
+// same rules (David: "include status, editable in this context"). The function
+// checks the row is one of THEIRS, that the status is that project's, and that
+// it is one this account may choose; it writes the flags and the status log.
 if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_status'])) {
     try {
         $progressId = (int)$_POST['progress_id'];
         $statusId   = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
-
-        // The row must be one of THEIRS. Without this check the form's hidden id
-        // is a way to edit anybody's task.
-        $q = $pdo->prepare(
-            'SELECT pr.*, ps.name AS step_name FROM progress pr
-               JOIN pipeline_steps ps ON ps.id = pr.step_id
-              WHERE pr.id = ? AND (pr.crew_id = ?
-                    OR EXISTS (SELECT 1 FROM progress_crew pc
-                                WHERE pc.progress_id = pr.id AND pc.crew_id = ?))'
-        );
-        $q->execute([$progressId, $myCrewId, $myCrewId]);
-        $row = $q->fetch();
-        if (!$row) throw new RuntimeException('That task is not assigned to you.');
-
-        $map = statuses_by_id($pdo, (int)$row['project_id']);
-        if ($statusId !== null && !isset($map[$statusId])) {
-            throw new RuntimeException('That status is not part of that project.');
-        }
-        $status = $statusId ? $map[$statusId] : null;
-        if (!status_self_serve($status)) throw new RuntimeException(status_self_serve_refusal());
-        $flags  = status_flags($status);
-        $oldId  = $row['status_id'] !== null ? (int)$row['status_id'] : null;
-
-        $pdo->prepare(
-            'UPDATE progress SET status_id = ?, is_delivered = ?, is_approved = ? WHERE id = ?'
-        )->execute([$statusId, $flags['is_delivered'], $flags['is_approved'], $progressId]);
-
-        log_status_change_by_id($pdo, (int)$row['project_id'],
-            ['id' => (int)$row['step_id'], 'name' => $row['step_name']],
-            (string)$row['item_key'], $oldId, $statusId, [
-                'shot_id'    => $row['shot_id'],
-                'asset_id'   => $row['asset_id'],
-                'crew_id'    => $myCrewId,
-                'crew_name'  => current_user_display(),
-                'source'     => 'item',
-                'changed_by' => current_user_display(),
-            ]);
-
-        flash('ok', $row['step_name'] . ' set to ' . ($status['name'] ?? 'nothing recorded') . '.');
+        flash('ok', own_task_set_status($pdo, $myCrewId, $progressId, $statusId));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -159,64 +128,15 @@ if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_stat
 
 // --- change the status of one TICKET ----------------------------------------
 //
-// Added 2026-09-28 with the artist role. The ticket screen's own `update` was
-// not reusable: it rewrites the whole card — title, assignee, priority, due
-// date — and an artist saying "this is ready for review" should not be able to
-// hand the ticket to somebody else in the same request.
-//
-// The ownership test is the same shape as the production task above, and matters
-// for the same reason: without it the form's hidden id is a way to move anybody's
-// ticket.
+// Added 2026-09-28 with the artist role; why it is not the ticket screen's own
+// `update` is said beside own_ticket_set_status() in includes/own_status.php,
+// where the handler now lives for the same reason as the one above. $userId is
+// the REAL login, so the card's thread names who actually did it.
 if ($myCrewId && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ticket_status'])) {
     try {
         $ticketId = (int)$_POST['ticket_id'];
         $statusId = !empty($_POST['status_id']) ? (int)$_POST['status_id'] : null;
-
-        // ⚠ LEFT, since migration 041: an INNER JOIN would have told the owner
-        // of an unfiled card it "is not assigned to you", which is false.
-        $q = $pdo->prepare(
-            'SELECT t.*, p.code AS project_code FROM tickets t
-               LEFT JOIN projects p ON p.id = t.project_id
-              WHERE t.id = ? AND t.assigned_crew_id = ?'
-        );
-        $q->execute([$ticketId, $myCrewId]);
-        $tk = $q->fetch();
-        if (!$tk) throw new RuntimeException('That ticket is not assigned to you.');
-
-        if ($tk['project_id'] === null) {
-            throw new RuntimeException(
-                'That card is not on a project yet, so there are no statuses to choose from. '
-              . 'Open it and file it on a show first.'
-            );
-        }
-
-        $map = statuses_by_id($pdo, (int)$tk['project_id']);
-        if ($statusId !== null && !isset($map[$statusId])) {
-            throw new RuntimeException('That status is not part of that project.');
-        }
-        $status = $statusId ? $map[$statusId] : null;
-        if (!status_self_serve($status)) throw new RuntimeException(status_self_serve_refusal());
-        $oldId  = $tk['status_id'] !== null ? (int)$tk['status_id'] : null;
-
-        if ($oldId === $statusId) {
-            flash('ok', 'That was already its status, nothing changed.');
-            header('Location: mytasks.php');
-            exit;
-        }
-
-        $pdo->prepare('UPDATE tickets SET status_id = ? WHERE id = ?')
-            ->execute([$statusId, $ticketId]);
-        // Closing a card is a property of the STATUS, not of a separate tick, so
-        // the same helper the ticket screen uses keeps the two screens agreeing.
-        sync_ticket_completion($pdo, $ticketId, $status);
-
-        // Into the card's own thread, so its history reads the same whoever moved
-        // it and from wherever.
-        $was = $oldId && isset($map[$oldId]) ? $map[$oldId]['name'] : 'no status';
-        $now = $status['name'] ?? 'no status';
-        log_ticket_event($pdo, $ticketId, $userId, 'Status: ' . $was . ' → ' . $now);
-
-        flash('ok', ticket_ref($tk) . ' set to ' . $now . '.');
+        flash('ok', own_ticket_set_status($pdo, $myCrewId, $userId, $ticketId, $statusId));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }

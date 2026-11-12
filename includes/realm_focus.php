@@ -45,20 +45,54 @@ function realm_focus_ready(PDO $pdo, int $crewId): string {
 }
 
 /**
+ * May this account change the status of its own work from the Realm at all?
+ *
+ * The same two questions My tasks asks: the role ($canSetStatus there: Production,
+ * artists and supervisors), and the "Set the status of my own task" switch
+ * (`own_status`, which FEATURE_POSTS also asks before the save). When the answer
+ * is no, the window shows each status as plain words, not a control that fails.
+ */
+function realm_focus_may_status(): bool {
+    return (can_edit() || is_artist() || is_supervisor())
+        && (!function_exists('feature_on') || feature_on('own_status'));
+}
+
+/**
  * The work this person could start a clock on: their open production tasks on
  * running shows, then their open cards. The same two lists My tasks shows, by
  * the same rules (not approved, not excluded, shows that are active or in
  * set-up). A card with no project is left out: hours are costed to a show, so
  * a timer cannot run against it.
  *
- * Each row: key ('p:<progress id>' or 't:<ticket id>'), title, show, due.
+ * David, 2026-11-12, with a picture of the Production tasks table on My tasks:
+ * "I'd like to expand what we see for each task and include status, editable in
+ * this context, and due date". So each row now carries what that table shows.
+ *
+ * Each row:
+ *   key      'p:<progress id>' or 't:<ticket id>'
+ *   title    the step and the shot or asset, or the card's title
+ *   show     the project's name
+ *   pid      the project, which says whose statuses apply (realm_focus_statuses())
+ *   sid      the status it has now, or null
+ *   status   that status's name, '' when it has none
+ *   color    that status's own colour, from the show's status list
+ *   blocked  the status is one marked "blocked"
+ *   due      the date, as '29 Oct', '' when it has none
+ *   late     the date has passed, by the test My tasks uses (before today)
+ *   logged   hours already logged on a production task ('3.5 h'), else ''.
+ *            Everybody's hours on that task, the figure My tasks shows.
+ *   ref      a card's reference ('RTC-12'), '' for a production task
+ *   link     where Anima shows it: the task in Spell, or the card
  */
 function realm_focus_tasks(PDO $pdo, int $crewId): array {
     $out = [];
+    $today = date('Y-m-d');
     try {
         $q = $pdo->prepare(
-            "SELECT pr.id, p.name AS project_name, ps.name AS step_name,
-                    s.episode, s.shot_code, a.name AS asset_name, sc.end_date
+            "SELECT pr.id, pr.project_id, pr.step_id, pr.item_key, pr.status_id,
+                    p.name AS project_name, ps.name AS step_name,
+                    s.episode, s.shot_code, a.name AS asset_name, sc.end_date,
+                    st.name AS status_name, st.color AS status_color, st.is_blocked
                FROM progress pr
                JOIN projects p ON p.id = pr.project_id AND p.status IN ('active','setup')
                JOIN pipeline_steps ps ON ps.id = pr.step_id
@@ -75,15 +109,38 @@ function realm_focus_tasks(PDO $pdo, int $crewId): array {
               LIMIT 40"
         );
         $q->execute([$crewId, $crewId]);
-        foreach ($q->fetchAll() as $r) {
+        $rows = $q->fetchAll();
+        // Hours already logged, as My tasks shows them. Its own try: a database
+        // with no time log yet still lists the work.
+        $logged = [];
+        try {
+            if ($rows && function_exists('logged_by_progress')) {
+                $logged = logged_by_progress($pdo, array_map(function ($r) { return (int)$r['id']; }, $rows));
+            }
+        } catch (Throwable $e) {
+            $logged = [];
+        }
+        foreach ($rows as $r) {
             $what = (string)($r['shot_code'] ?? '') !== ''
                 ? (function_exists('shot_label') ? shot_label($r['episode'], $r['shot_code']) : (string)$r['shot_code'])
                 : (string)($r['asset_name'] ?? '');
+            $mins = (int)($logged[(int)$r['id']] ?? 0);
             $out[] = [
-                'key'   => 'p:' . (int)$r['id'],
-                'title' => trim((string)$r['step_name'] . ($what !== '' ? ', ' . $what : '')),
-                'show'  => (string)$r['project_name'],
-                'due'   => $r['end_date'] ? date('j M', strtotime((string)$r['end_date'])) : '',
+                'key'     => 'p:' . (int)$r['id'],
+                'title'   => trim((string)$r['step_name'] . ($what !== '' ? ', ' . $what : '')),
+                'show'    => (string)$r['project_name'],
+                'pid'     => (int)$r['project_id'],
+                'sid'     => $r['status_id'] !== null ? (int)$r['status_id'] : null,
+                'status'  => (string)($r['status_name'] ?? ''),
+                'color'   => (string)($r['status_color'] ?? ''),
+                'blocked' => (int)($r['is_blocked'] ?? 0) === 1,
+                'due'     => $r['end_date'] ? date('j M', strtotime((string)$r['end_date'])) : '',
+                'late'    => !empty($r['end_date']) && (string)$r['end_date'] < $today,
+                'logged'  => $mins > 0 && function_exists('fmt_hours') ? fmt_hours($mins) : '',
+                'ref'     => '',
+                // The address Anima's own bell and e-mails use to open a task in Spell.
+                'link'    => 'spell.php?project=' . (int)$r['project_id']
+                           . '&open=' . rawurlencode((int)$r['step_id'] . ':' . (string)$r['item_key']),
             ];
         }
     } catch (Throwable $e) {
@@ -94,10 +151,19 @@ function realm_focus_tasks(PDO $pdo, int $crewId): array {
             foreach (array_slice(tickets_for_crew($pdo, $crewId), 0, 40) as $t) {
                 if ((int)($t['project_id'] ?? 0) <= 0) continue;
                 $out[] = [
-                    'key'   => 't:' . (int)$t['id'],
-                    'title' => (string)$t['title'],
-                    'show'  => (string)($t['project_name'] ?? ''),
-                    'due'   => !empty($t['due_date']) ? date('j M', strtotime((string)$t['due_date'])) : '',
+                    'key'     => 't:' . (int)$t['id'],
+                    'title'   => (string)$t['title'],
+                    'show'    => (string)($t['project_name'] ?? ''),
+                    'pid'     => (int)$t['project_id'],
+                    'sid'     => ($t['status_id'] ?? null) !== null ? (int)$t['status_id'] : null,
+                    'status'  => (string)($t['status_name'] ?? ''),
+                    'color'   => (string)($t['status_color'] ?? ''),
+                    'blocked' => (int)($t['status_blocked'] ?? 0) === 1,
+                    'due'     => !empty($t['due_date']) ? date('j M', strtotime((string)$t['due_date'])) : '',
+                    'late'    => !empty($t['due_date']) && (string)$t['due_date'] < $today,
+                    'logged'  => '',
+                    'ref'     => function_exists('ticket_ref') ? ticket_ref($t) : '',
+                    'link'    => 'ticket.php?id=' . (int)$t['id'],
                 ];
             }
         }
@@ -105,6 +171,52 @@ function realm_focus_tasks(PDO $pdo, int $crewId): array {
         // The production tasks above are still returned.
     }
     return $out;
+}
+
+/**
+ * The statuses each listed task could be given, by project id: every show names
+ * its own, so the window needs one list per show and sends each only once.
+ * own_status_options() (includes/own_status.php) says which of them this account
+ * may choose. A show whose list cannot be read gets none, and its tasks show
+ * their status as plain words.
+ */
+function realm_focus_statuses(PDO $pdo, array $tasks): array {
+    $out = [];
+    if (!function_exists('own_status_options') || !function_exists('statuses_by_id')) return $out;
+    foreach ($tasks as $t) {
+        $pid = (int)($t['pid'] ?? 0);
+        if ($pid <= 0 || isset($out[$pid])) continue;
+        try {
+            $out[$pid] = own_status_options(statuses_by_id($pdo, $pid));
+        } catch (Throwable $e) {
+            $out[$pid] = [];
+        }
+    }
+    return $out;
+}
+
+/**
+ * Set the status of one of this person's own tasks or cards, from the Realm.
+ *
+ * ⚠ NO RULES OF ITS OWN. It reads which row is meant and hands over to the two
+ * functions My tasks calls (includes/own_status.php), which check the row is
+ * theirs, that the status is that project's and that this account may choose
+ * it, and which write the same log My tasks writes. $raw is the posted status
+ * id; empty means "none", which only Production may choose.
+ *
+ * Returns the sentence those functions give ("Animation set to In progress.").
+ *
+ * @throws RuntimeException with the refusal to show
+ */
+function realm_focus_set_status(PDO $pdo, int $uid, int $crewId, string $key, string $raw): string {
+    if (preg_match('/^([pt]):(\d+)$/', $key, $m) !== 1) throw new RuntimeException('Pick a task first.');
+    if (!realm_focus_may_status() || !function_exists('own_task_set_status')) {
+        throw new RuntimeException('Your account cannot change a status here. Production can change it for you.');
+    }
+    $statusId = !empty($raw) ? (int)$raw : null;
+    return $m[1] === 'p'
+        ? own_task_set_status($pdo, $crewId, (int)$m[2], $statusId)
+        : own_ticket_set_status($pdo, $crewId, $uid, (int)$m[2], $statusId);
 }
 
 /**
@@ -173,9 +285,21 @@ function realm_focus_door(PDO $pdo, int $uid, ?array $now): void {
     }
 }
 
-/** Everything the focus desk draws: whether it can be used, the clock, the work. */
+/**
+ * Everything the focus desk draws: whether it can be used, the clock, the work,
+ * and what this person may do to a status (`may`: change one at all, and clear
+ * one, which is Production's alone, as on My tasks).
+ */
 function realm_focus_state(PDO $pdo, int $crewId): array {
     $why = realm_focus_ready($pdo, $crewId);
-    if ($why !== '') return ['ready' => false, 'why' => $why, 'now' => null, 'tasks' => []];
-    return ['ready' => true, 'why' => '', 'now' => realm_focus_now($pdo, $crewId), 'tasks' => realm_focus_tasks($pdo, $crewId)];
+    if ($why !== '') {
+        return ['ready' => false, 'why' => $why, 'now' => null, 'tasks' => [],
+                'statuses' => (object)[], 'may' => ['status' => false, 'clear' => false]];
+    }
+    $tasks = realm_focus_tasks($pdo, $crewId);
+    $may = realm_focus_may_status();
+    return ['ready' => true, 'why' => '', 'now' => realm_focus_now($pdo, $crewId), 'tasks' => $tasks,
+            // (object): a list keyed by project id must reach the page as {} even when empty.
+            'statuses' => (object)($may ? realm_focus_statuses($pdo, $tasks) : []),
+            'may' => ['status' => $may, 'clear' => $may && can_edit()]];
 }
