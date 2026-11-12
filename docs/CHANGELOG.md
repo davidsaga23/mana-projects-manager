@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: speech bubbles no longer cover each other *(no migration)*
+
+**Reported by David**, with a screenshot of two bubbles on top of one another: "is there a way we
+can avoid overlapping bubbles?"
+
+- **The newest bubble stays just above its speaker; an older one that would touch it is lifted
+  clear**, with a line down to its own character so it is still plain who said it.
+
 ## 2026-11-12 — The Realm's chat: pictures and tagging people *(migration 083)*
 
 **Asked by David:** "let's also allow images and tagging people possible in all chats".
