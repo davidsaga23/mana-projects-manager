@@ -5052,3 +5052,21 @@ reminder, never for the automatic one.
   `artist_may_post()`). The person always comes from the session; the one id that can be posted, a
   reminder's, is matched against their own crew id in the UPDATE.
 - The poll counts as activity for "Last seen" on Users, like any other request from an open tab.
+
+## 2026-11-11 — Desktop notifications for the log-time reminders
+
+**Asked by David:** "make sure anima ask for permissions to send notifications to the desktop too".
+
+**Decided:**
+- **Anima asks with its own card first**, then the browser's question. Browsers only let a page ask from
+  a click, and a cold browser prompt on page load is the one people block by reflex. "Not now" waits two
+  weeks (stored in that browser); closing the browser's question unanswered waits a day; "Block" is final.
+- **Only the log-time reminders go to the desktop**, not every bell line. The bell list is drawn when a
+  page loads and has no poll of its own; sending bell lines to the desktop would need one.
+- **Shown only when nobody is looking at the tab** (hidden, or another window in front), so a person
+  at the page does not get the card and a desktop notification at once. One per reminder per day,
+  however many tabs: the notification's tag replaces rather than stacks, and a stored key stops a reload
+  from repeating it.
+- **The poll keeps going while the tab is hidden, every five minutes, only for people who allowed it**;
+  everyone else still pauses as before. No service worker, so a desktop notification needs an Anima tab
+  open somewhere (a closed browser gets nothing until Anima is next opened, when the pop-up and bell show).
