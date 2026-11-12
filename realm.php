@@ -116,7 +116,9 @@ foreach (($state['people'] ?? []) as $p) {
     <aside class="rchat" id="chat" aria-label="Conversation" hidden>
       <div class="rchathead"><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
       <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
-      <form class="rcomposer" id="chatForm"><input id="chatInput" autocomplete="off" maxlength="2000" aria-label="Message"><button class="rbtn rprimary" id="chatSend">Send</button></form>
+      <div class="rsuggest" id="chatSuggest" hidden></div>
+      <div class="rpicked" id="chatPicked" hidden></div>
+      <form class="rcomposer" id="chatForm"><input type="file" id="chatFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden><button type="button" class="rbtn" id="chatAttach" title="Add a picture, up to 5 MB" aria-label="Add a picture" hidden>+</button><input id="chatInput" autocomplete="off" maxlength="2000" aria-label="Message"><button class="rbtn rprimary" id="chatSend">Send</button></form>
     </aside>
   </div>
   <div id="toasts" aria-live="polite"></div>

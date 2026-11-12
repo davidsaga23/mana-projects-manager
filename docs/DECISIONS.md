@@ -5317,3 +5317,23 @@ behavior to be more real-time and get those notifications?"
   it is closer to "is this person at Anima" than "did they click".
 - **Not done:** sound, or a desktop notification. Those belong to the Realm's stage 5 (the
   installed app), where the browser's permission is asked once.
+
+## 2026-11-12 — Pictures and tagging in the Realm's chat
+
+David: "let's also allow images and tagging people possible in all chats".
+
+- **One picture per message, pictures only, 5 MB.** Stored in the uploads folder beside ticket
+  attachments under a random name, through the same `accept_upload()` every upload passes (size,
+  extension, and the file's real contents). `realm_take_image()` adds only chat's two stricter
+  rules. Video and other files are not accepted: the hosting is the wrong place for them, and a
+  link does the job.
+- **Served by `realm_image.php`, which asks `realm_channel_access()`.** The id in the address is
+  only a number, so the conversation is read from the message: a picture in a raven is for those
+  two people and nobody else, an admin included.
+- **A tag is the person's name after an @**, the name the Realm shows. The picker writes exactly
+  what `realm_tag_bell()` looks for. Longest names are matched first and taken out of the text, so
+  "@Renata Ruiz" does not also ring for a Renata.
+- **A tag rings the bell once per sender and place until read**, saying who and where, never the
+  words. A show's channel is named only as "a show channel", so the bell of somebody not on that
+  show does not learn its name. New bell kind `tag`.
+- **Not done:** several pictures in one message, and deleting a message or its picture.

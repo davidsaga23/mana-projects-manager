@@ -204,6 +204,7 @@ const FEATURE_SCRIPTS = [
     'log_reminders.php'   => 'log_reminder_send',
     'realm.php'           => 'realm',
     'realm_api.php'       => 'realm',
+    'realm_image.php'     => 'realm',
     // Admins read anybody's; anybody else their own (statement.php decides whose).
     'statement.php'       => 'own_statement',
     // project tabs

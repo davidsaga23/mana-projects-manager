@@ -109,10 +109,12 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag'], true)) return 0;
     // 'raven' (a message left in the Realm for somebody who is away, migration
     // 082) has no fallback either: until 082 runs there are no ravens to ring for.
     if ($kind === 'raven' && !enum_has_value($pdo, 'notifications', 'kind', 'raven')) return 0;
+    // 'tag' (somebody named you in a Realm channel, migration 083): the same.
+    if ($kind === 'tag' && !enum_has_value($pdo, 'notifications', 'kind', 'tag')) return 0;
     // 'review' arrives with migration 079 (the column is an ENUM). Until then a
     // review note still rings, as a mention: late wording beats a silent bell.
     if ($kind === 'review' && !notify_kind_review_ready($pdo)) $kind = 'mention';
@@ -216,7 +218,7 @@ function notify_mark_seen(PDO $pdo, int $crewId): int {
 /** Where a notification goes when you click it. */
 function notify_link(array $n): string {
     // A raven is read in the Realm, where the sender's name carries the unread mark.
-    if (($n['kind'] ?? '') === 'raven') return 'realm.php';
+    if (in_array($n['kind'] ?? '', ['raven', 'tag'], true)) return 'realm.php';
     if (!empty($n['ticket_id'])) {
         return 'ticket.php?id=' . (int)$n['ticket_id']
              . (!empty($n['comment_id']) ? '#c' . (int)$n['comment_id'] : '');
@@ -241,6 +243,7 @@ function notify_verb(string $kind): string {
         'review'   => 'left review notes on',
         'reminder' => 'asked you to log',     // + "your time for Tue 11 Nov" (080)
         'raven'    => 'sent you a raven',     // + "in the Realm" (082)
+        'tag'      => 'tagged you in',        // + "The Tavern in the Realm" (083)
     ];
     return $words[$kind] ?? 'changed';
 }

@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm's chat: pictures and tagging people *(migration 083)*
+
+**Asked by David:** "let's also allow images and tagging people possible in all chats".
+
+- **A picture in a message**: the + button beside the chat box, or paste an image straight into
+  it. One per message, PNG, JPG, GIF or WebP, up to 5 MB, with or without words. It shows in the
+  conversation and opens full size in a new tab.
+- **A picture is as private as its conversation.** One sent by raven is served only to the two
+  people in that raven; one in a show's channel only to people who may see that show.
+- **Tagging**: type @ and pick a name (arrow keys and Enter, or click). The tagged name stands out
+  in the message, and your own is highlighted.
+- **Being tagged in a channel rings your bell**: "David tagged you in The Tavern in the Realm",
+  once per person and place until read. Not for ravens, which already ring.
+- **Until migration 083 runs**, chat works as before: no + button, and a tag is only text.
+
 ## 2026-11-12 — The bell refreshes itself, for everybody *(no migration)*
 
 **Asked by David:** the bell "only refreshes when a page loads ... Can we change that behavior to

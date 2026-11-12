@@ -147,6 +147,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 080 | log_reminders | ⏳ **Reminders to log time** (`log_reminders`, `log_reminder_recipients`; `notifications.kind` gains `reminder`). Until it runs, the 5 pm pop-up still works, but Log reminders cannot send one and no reminder rings the bell. |
 | 081 | realm | ⏳ **The Realm, stage 1** (`realm_people`, `realm_lands`). Until it runs, `realm.php` says the update is waiting and draws nothing; the rest of Anima is untouched. |
 | 082 | realm_chat | ⏳ **The Realm, stage 2: chat** (`realm_messages`, `realm_reads`; `notifications.kind` gains `raven`). Until it runs, the Realm works as before with no channels or ravens in it, and no raven rings the bell. |
+| 083 | realm_chat_images | ⏳ **The Realm's chat: pictures and tagging** (`realm_messages` gains `image`, `image_name`, `image_mime`; `notifications.kind` gains `tag`). Until it runs, chat works as before: no button to add a picture, and tagging somebody does not ring their bell. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

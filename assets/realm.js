@@ -661,7 +661,10 @@ window.addEventListener('blur',function () { held.clear(); });
 document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
-  if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
+  if (t.closest('#chatAttach')) { if ($('chatFile')) $('chatFile').click(); }
+  else if (t.closest('[data-unpick]')) setPick(null);
+  else if ((b = t.closest('[data-tag]'))) sugPick(+b.getAttribute('data-tag'));
+  else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
   else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
   else if ((b = t.closest('[data-walk]'))) walkTo(b.getAttribute('data-walk'));
@@ -728,7 +731,19 @@ function spokenHere(ch) {
   return !!(o && o.inside && o.place===S.inside && o.state!=='away');
 }
 function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) { if (k!==CH.open) n += u[k]; }); document.title = (n?'('+n+') ':'')+'Anima Realm'; }
-function msgHTML(m) { return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div><div class="rmsgbody">'+esc(m.body)+'</div></div>'; }
+/* The words of a message, with every tagged name ("@Renata Ruiz") made to stand out, mine most of
+   all. One pass over the text with the longest names first, so "@Renata Ruiz" is never cut short
+   at "@Renata". The text is escaped BEFORE anything is added to it. */
+function rich(body) {
+  var h = esc(body), ppl = ST.people.slice().sort(function (a, b) { return b.name.length-a.name.length; });
+  if (!ppl.length || h.indexOf('@') < 0) return h;
+  var mine = me(), re = new RegExp('@('+ppl.map(function (p) { return esc(p.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }).join('|')+')','gi');
+  return h.replace(re,function (all, n) { return '<b class="rtag'+(mine && esc(mine.name).toLowerCase()===n.toLowerCase()?' is-me':'')+'">'+all+'</b>'; });
+}
+function msgHTML(m) {
+  var pic = m.image ? '<a class="rimglink" href="realm_image.php?id='+m.id+'" target="_blank" rel="noopener"><img class="rimg" src="realm_image.php?id='+m.id+'" alt="Picture from '+esc(m.name)+'" loading="lazy"></a>' : '';
+  return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
+}
 function chatTake(j) {
   CH.busy = false;
   if (!j) return;
@@ -737,13 +752,14 @@ function chatTake(j) {
   if (j.channel!==CH.open) return;
   var box = $('chatMsgs'), stick = box.scrollHeight-box.scrollTop-box.clientHeight < 60, fresh = j.messages.filter(function (m) { return m.id > CH.last; });
   if (fresh.length && CH.last && spokenHere(j.channel)) {
-    fresh.forEach(function (m) { BUB[m.user] = {text:m.body,until:Date.now()+BUBBLE_MS}; });
+    fresh.forEach(function (m) { BUB[m.user] = {text:m.body || '(a picture)',until:Date.now()+BUBBLE_MS}; });
     draw(); setTimeout(draw,BUBBLE_MS+100);
   }
   if (fresh.length) { if (!CH.last) box.innerHTML = ''; box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen) box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
   CH.seen = true;
-  $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post; $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
+  $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
+  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
 }
 function chatAsk() {
@@ -754,19 +770,76 @@ function chatAsk() {
 function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
   if (CH.open===id) { $('chatInput').focus(); return; }
-  CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false;
+  CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
 }
 function closeChat() { CH.open = null; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
+/* A PICTURE IN A MESSAGE (David, 2026-11-12: "let's also allow images ... in all chats"), migration
+   083. One per message, up to 5 MB, chosen with the + button or pasted straight into the box. The
+   server checks it again; this only saves a wasted upload. */
+var PICK = null;
+function setPick(f) {
+  var el = $('chatPicked'); PICK = f || null;
+  if ($('chatFile') && !PICK) $('chatFile').value = '';
+  if (!el) return;
+  el.hidden = !PICK;
+  el.innerHTML = PICK ? '<span>Picture to send: '+esc(PICK.name || 'pasted image')+'</span><button type="button" class="rbtn rsmall" data-unpick="1">Remove</button>' : '';
+}
+function offerPick(f) {
+  if (!f) return;
+  if (!(ST.chat && ST.chat.images)) { toast('Pictures need a database update first.'); return; }
+  if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { toast('Only pictures can be sent in chat: PNG, JPG, GIF or WebP.'); return; }
+  if (f.size > 5*1024*1024) { toast('That picture is larger than 5 MB. Send a smaller one, or a link to it.'); return; }
+  setPick(f); $('chatInput').focus();
+}
+/* TAGGING (the same request): type @ and pick a name. What the picker writes is exactly the name
+   the server looks for, so somebody who can be picked is somebody whose bell will ring. */
+var SUG = {list:[],at:0,i:0};
+function sugClose() { SUG.list = []; var el = $('chatSuggest'); if (el) { el.hidden = true; el.innerHTML = ''; } }
+function sugDraw() {
+  var el = $('chatSuggest'); if (!el) return;
+  el.hidden = false;
+  el.innerHTML = SUG.list.map(function (p, i) { return '<button type="button" class="rrow'+(i===SUG.i?' is-on':'')+'" data-tag="'+i+'">@'+esc(p.name)+'</button>'; }).join('');
+}
+function sugUpdate() {
+  var inp = $('chatInput'), upto = inp.value.slice(0,inp.selectionStart), m = /(^|\s)@([^\s@]*)$/.exec(upto);
+  if (!m || !CH.open) { sugClose(); return; }
+  var q = m[2].toLowerCase();
+  SUG.at = upto.length-m[2].length-1; SUG.i = 0;
+  SUG.list = ST.people.filter(function (p) { var n = p.name.toLowerCase(); return !p.me && n.split(' ').concat([n]).some(function (w) { return w.indexOf(q)===0; }); }).slice(0,6);
+  if (SUG.list.length) sugDraw(); else sugClose();
+}
+function sugPick(i) {
+  var p = SUG.list[i], inp = $('chatInput'); if (!p) return;
+  var at = SUG.at, end = inp.selectionStart, pos = at+p.name.length+2;
+  inp.value = inp.value.slice(0,at)+'@'+p.name+' '+inp.value.slice(end);
+  sugClose(); inp.focus(); inp.setSelectionRange(pos,pos);
+}
+if ($('chatInput')) {
+  $('chatInput').addEventListener('input',sugUpdate);
+  $('chatInput').addEventListener('keydown',function (e) {
+    if (!SUG.list.length) return;
+    if (e.key==='ArrowDown' || e.key==='ArrowUp') { e.preventDefault(); SUG.i = (SUG.i+(e.key==='ArrowDown'?1:SUG.list.length-1))%SUG.list.length; sugDraw(); }
+    else if (e.key==='Enter' || e.key==='Tab') { e.preventDefault(); sugPick(SUG.i); }
+    else if (e.key==='Escape') { e.stopPropagation(); sugClose(); }
+  });
+  $('chatInput').addEventListener('paste',function (e) {
+    var fs = e.clipboardData && e.clipboardData.files;
+    if (fs && fs.length && /^image\//.test(fs[0].type)) { e.preventDefault(); offerPick(fs[0]); }
+  });
+}
+if ($('chatFile')) $('chatFile').addEventListener('change',function () { offerPick(this.files[0]); });
 /* Guarded: a page drawn before chat existed has no form, and must not stop the map over it. */
 if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
-  var inp = $('chatInput'), body = inp.value.trim(); if (!body || !CH.open) return;
-  inp.value = ''; CH.busy = true;
-  var f = new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last);
+  var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open) return;
+  inp.value = ''; CH.busy = true; sugClose(); setPick(null);
+  /* A picture travels as a file, so the message goes as a form with parts; words alone go as before. */
+  var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last);
+  if (pic) f.append('image',pic,pic.name || 'pasted-image.png');
   fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; inp.value = body; toast('That message was not sent. Try again.'); });
+    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
 });
 
 /* ---------- your character ---------- */
