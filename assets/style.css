@@ -5009,3 +5009,13 @@ body.rv-open { overflow: hidden; }
   border: 1px solid var(--border-strong); color: var(--text-2); white-space: nowrap; }
 .users-table a.pill:hover { border-color: var(--primary); text-decoration: none; }
 .users-table .pill.chg { border-color: var(--warn-border); color: var(--warn); background: var(--warn-tint); }
+
+/* Invoice payments (payments.php, David 2026-11-11): every invoice waiting to
+   be paid, with a date and a Mark paid button on each row. */
+.payments-table td { vertical-align: top; }
+.payments-views .payments-total { margin-left: 10px; }
+.payments-pay { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; }
+.payments-pay input[type="date"] { width: auto; padding: 3px 6px; font-size: 12.5px; margin: 0; }
+.row-actions .payments-pay button.row-btn-go { background: var(--primary); color: var(--on-primary); }
+.row-actions .payments-pay button.row-btn-go:hover { background: var(--primary-hover); }
+.payments-note { display: inline-block; max-width: 220px; }
