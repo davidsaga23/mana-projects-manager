@@ -78,15 +78,19 @@ without re-deriving context.
   edited it.
 - **⚠ The finance database is SEPARATE and has its own install files** — `finance_install.sql`,
   `finance_install_02.sql`, `finance_install_03.sql`, **`finance_install_04.sql`** and
-  **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin, never through `migrate.php` (that
-  runner only touches the production connection). **✅ All six are imported as of 2026-08-31**,
+  **`finance_install_05.sql`** and **`finance_install_06.sql`**, imported by hand via phpMyAdmin at the time (before 2026-11-11 `migrate.php` only touched the
+  production connection). **✅ All six are imported as of 2026-08-31**,
   confirmed by David — 01–03 by 18 August, then 04 (hiring quotes + contract status),
   05 (other expenses) and 06 (per-second rates). So Projected cost and Margin now count
   non-labour costs too, and every finance feature is live. Its credential lives in the
   `finance_db` block of `config.php`, and `includes/money.php` is the **only** place that
   connection is ever opened.
-  **⚠ Run each finance file ONCE** — there is no `schema_migrations` table on that side, so a
-  second import fails on "duplicate column". That failure is harmless and means it was done.
+  **Since 2026-11-11 finance files apply from `migrate.php`** (its second section, "Finance
+  database updates"), no longer pasted into phpMyAdmin. A `finance_migrations` table in the
+  finance DB records what is done, and files imported by hand before that are recognised by the
+  tables and columns they add and never run twice. A new file needs its check in
+  `finance_migration_checks()` (`includes/money.php`). The finance user needs CREATE, ALTER and
+  INDEX rights for this; without them the page says what to tick in cPanel.
 - **Email is live** (confirmed 2026-08-14): sending as `hi@davidsaga.com` through
   `mana.davidsaga.com:465/ssl`, with Reply-To `david@mana.tv`. Same mailbox STFC uses — see
   the 2026-08-14 email entries in `docs/DECISIONS.md` for why it does not send as `@mana.tv`.

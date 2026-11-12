@@ -14,6 +14,27 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Finance database updates apply from migrate.php *(no migration; finance user needs CREATE/ALTER/INDEX)*
+
+**Asked by David:** "why do I need to paste so many codes to the DB when we used to do it through the
+migration system?"
+
+- **`migrate.php` has a second section, Finance database updates**: every `finance_install_NN.sql`
+  from 02 up, which are applied, which are waiting, and one **Apply finance updates** button. No more
+  pasting into phpMyAdmin.
+- **Files you already imported by hand are recognised** by the tables and columns they add, recorded
+  as "imported by hand" and never run again. A file only partly there stops the run and offers
+  **Mark as done**.
+- **What is applied is kept in a new `finance_migrations` table** in the finance database, created
+  by the first run.
+- **The finance user needs CREATE, ALTER and INDEX rights.** The page checks first; without them it
+  says what to tick in cPanel → MySQL Databases and runs nothing.
+- **The "database updates waiting" banner counts finance updates too** (admins only, refreshed every
+  ten minutes).
+- Only the very first `finance_install.sql` (setting finance up at all) is still imported by hand.
+
+---
+
 ## 2026-11-11 — Reminders to log time reach the desktop too *(no migration)*
 
 - Anima now asks once, with a small card: **Get Anima reminders on your desktop?** with **Turn on**

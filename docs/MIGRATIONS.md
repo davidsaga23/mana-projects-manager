@@ -14,13 +14,22 @@ merged.**
    Rules (see `migrations/README.md`): numbered ascending and never reused; **additive only** (never
    DROP data); each statement written to survive being re-run (`IF NOT EXISTS`, `INSERT IGNORE`,
    `UPDATE … WHERE x IS NULL`).
-2. **Finance DB imports** — the `finance_install*.sql` files, imported **by hand through phpMyAdmin
-   into the SEPARATE finance database.** `migrate.php` does **not** and must **not** touch the
-   finance DB. **Run each finance file exactly once** — there is no `schema_migrations` on that side,
-   so a second import fails on "duplicate column" (that failure is harmless and just means it was
-   already done).
+2. **Finance DB updates** — the `finance_install_NN.sql` files in the repo root, for the SEPARATE
+   finance database. **Since 2026-11-11 they apply from `migrate.php` too**, in its second section
+   ("Finance database updates"), not by hand in phpMyAdmin. The runner is in `includes/money.php`
+   (the only file that opens the finance connection) and records each file in a
+   `finance_migrations` table in the finance DB. Files imported by hand before then are recognised
+   by the tables and columns they add (`finance_migration_checks()`), recorded as "found" and never
+   run again; a half-imported one stops the run and offers **Mark as done**. Rules for a new file:
+   the next free number, taken when merging; add its check to `finance_migration_checks()`; prefer
+   statements that survive a re-run (`CREATE TABLE IF NOT EXISTS`). Only the baseline
+   `finance_install.sql` is still imported by hand, once, when finance is first set up.
+   **Rights:** the finance MySQL user needs CREATE, ALTER and INDEX on the finance DB (cPanel →
+   MySQL Databases → Add User To Database → tick them, or ALL PRIVILEGES). `migrate.php` checks
+   before running anything and says so in plain words if they are missing.
 
-The app shows an **"updates waiting"** banner when production migrations are pending.
+The app shows an **"updates waiting"** banner when production migrations or finance updates are
+pending (finance counted for admins, refreshed every ten minutes).
 
 ---
 
@@ -142,7 +151,10 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 062 | bug_reports | ⏳ **Bug reports** (`bug_reports`, `bug_attachments`): the 🐞 button on every screen and the Bugs page. Hidden entirely until run. |
 | 064 | bug_needs_info | ⏳ **Bug reports wait for David** (`needs_info`, `flag_reason`, `admin_notes`, `fix_note` on `bug_reports`): video reports are flagged for a description, admins write notes for Claude, and the export records how each was fixed. Needs 062 first. |
 
-### Finance DB imports (by hand, phpMyAdmin, once each)
+### Finance DB updates (from `migrate.php` since 2026-11-11; before that by hand, phpMyAdmin)
+
+The ✅/⏳ marks below were kept by hand and may be stale: `migrate.php` now shows the real state.
+
 | File | What it unlocks |
 |---|---|
 | finance_install.sql … _03 | ✅ The finance DB baseline (rates, budgets, invoices). |
@@ -166,7 +178,8 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 ## Doing a fresh install (if ever needed)
 1. Import `install.sql` (production DB) — baseline only.
 2. Open `migrate.php` and apply every pending migration in order.
-3. Import each `finance_install*.sql` by hand into the finance DB, in order, once each.
+3. Import `finance_install.sql` by hand into the new finance DB (giving its user CREATE, ALTER and
+   INDEX), then apply the rest from `migrate.php` → Finance database updates.
 4. Create `config.php` from `config.example.php` on the server (DB creds, SMTP, the finance_db
    block, timezone `America/Los_Angeles`, and the Anthropic key if the transcript/AI feature is
    wanted). `config.php` lives only on the server and is never in git or deployed.

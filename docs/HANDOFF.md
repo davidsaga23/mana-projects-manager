@@ -86,8 +86,9 @@ usually where a schedule actually dies, so it is the most valuable gap.
    contracts, budgets, invoices and hire quotes live here. **`includes/money.php` is the only place
    that second connection is ever opened, and only behind `is_admin()` / `can_see_money()`.** Keep
    it that way: it means a bug in any ordinary query physically cannot reach a pay rate. The finance
-   DB is installed from the `finance_install*.sql` files, imported **by hand** through phpMyAdmin,
-   **never** through `migrate.php`. See `docs/MIGRATIONS.md`.
+   DB's baseline is `finance_install.sql` (by hand, once); every `finance_install_NN.sql` after it
+   applies from the **Finance database updates** section of `migrate.php` (since 2026-11-11), whose
+   runner lives in `includes/money.php`. See `docs/MIGRATIONS.md`.
 
 ### Roles (access levels)
 From lowest to highest access:
@@ -122,7 +123,8 @@ should reuse this shape. Nothing else in the app talks to the outside world.
 - David deploys/merges himself (historically from GitHub Desktop); he reviews, then merges.
 - **After a deploy that adds a migration, someone must open `migrate.php` once** in the browser to
   apply it. The app shows an "updates waiting" banner when migrations are pending. Finance
-  (`finance_install*.sql`) files are imported by hand via phpMyAdmin instead.
+  (`finance_install_NN.sql`) files apply from the same page, in its second section, and the
+  banner counts them too.
 - Full setup guide (FTP secrets, the two-folders trap, rollback): `docs/GIT_SETUP.md`.
 - **App clock is `America/Los_Angeles`** (set 2026-10-16), configured in `config.php` → read by
   `includes/db.php`. (Earlier history ran on `America/Mexico_City`.) MySQL is
