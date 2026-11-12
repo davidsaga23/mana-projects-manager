@@ -567,9 +567,21 @@ function renderDoor() {
 }
 function renderAll() { $('overlay').innerHTML = overlay(); bindMap(); renderSide(); renderCard(); renderInside(); renderDoor(); badge(); draw(); }
 
+/* NOTICES MUST STAY ON TOP OF AN OPEN WINDOW. A window opened with showModal() (the Focus desk, Your
+   character, the picture viewer) is drawn above everything else on the page, so a notice left in
+   the page sat behind it, dimmed and unclickable: found with the Focus desk open and somebody
+   knocking (2026-11-12). The notices' box therefore lives inside whichever window is open, and
+   goes back to the page when it shuts. Checked twice a second, because a window opening or
+   shutting sends no event that reaches here, and a notice may already be showing when it does. */
+function toastHome() {
+  var box = $('toasts'), open = document.querySelector('dialog[open]'), want = open || document.body;
+  if (box && box.parentNode !== want) want.appendChild(box);
+  return box;
+}
+setInterval(toastHome,500);
 /* With `chat`, the message is itself a button that opens that conversation. */
 function toast(msg, chat) { var t = document.createElement('div'); t.className = 'rtoast'; t.textContent = msg;
-  if (chat) { t.className = 'rtoast is-link'; t.setAttribute('data-chat',chat); t.setAttribute('role','button'); t.tabIndex = 0; } $('toasts').appendChild(t); setTimeout(function () { t.remove(); },chat?15000:6000); }
+  if (chat) { t.className = 'rtoast is-link'; t.setAttribute('data-chat',chat); t.setAttribute('role','button'); t.tabIndex = 0; } toastHome().appendChild(t); setTimeout(function () { t.remove(); },chat?15000:6000); }
 
 /* ---------- taking in what the server says ---------- */
 var SIG = {land:'',house:''};
@@ -783,7 +795,7 @@ var PASS = {}, KN = {ready:false,mine:null,shown:{},first:true};
 function knockNotice(q) {
   var t = document.createElement('div'); t.className = 'rtoast is-link'; t.setAttribute('data-knockbox',q.id);
   t.innerHTML = '<b>'+esc(firstName(q.name))+' is knocking at your door</b><div class="racts"><button type="button" class="rbtn rprimary rsmall" data-knockanswer="'+q.id+'" data-let="1">Let in</button><button type="button" class="rbtn rsmall" data-knockanswer="'+q.id+'" data-let="0">Not now</button></div>';
-  $('toasts').appendChild(t); setTimeout(function () { t.remove(); },120000);
+  toastHome().appendChild(t); setTimeout(function () { t.remove(); },120000);
 }
 function takeKnocks(k) {
   if (!k) return;

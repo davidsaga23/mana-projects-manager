@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: a notice is never hidden behind an open window *(no migration)*
+
+**Found while testing the focus desk:** with the Focus desk open, "... is knocking at your door"
+appeared behind it, dimmed, and could not be clicked until the desk was closed.
+
+- **Notices now sit on top of whichever window is open** (the Focus desk, Your character, the
+  picture viewer) and can be answered there. They go back to the corner of the page when it shuts.
+
 ## 2026-11-12 — The Realm: a name in the People list opens your ravens with them *(no migration)*
 
 **Asked by David**, pointing at Renata's name in the list while she was away: "clicking here
