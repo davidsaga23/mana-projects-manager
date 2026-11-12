@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — Days off: one calendar for everybody's days away *(no migration)*
+
+**Asked by David:** "let's create a calendar for days off so anima can register those days".
+
+- **A Days off link in the top bar**, beside Bookings, opens **`days_off.php`**: a month, one row
+  per person, a column per day. Weekends and studio holidays are greyed; today is outlined.
+- **Drag across a person's days** to add days off, with a reason (Holiday, Sick, Personal, Course,
+  or anything typed). **Click a day off** to change its dates or reason, or remove it. Each reason
+  has its own colour. A list of the month's days off, and an *Add days off* form, sit under the grid.
+- **Filters:** a show (default: everybody on a running show; or everybody in Anima) and a department.
+- **Who:** Production and admins edit. Supervisors see everybody's, read only. An artist sees only
+  their own days off.
+- Saves use the same rules as the person page, and the flash says to re-run the schedule. The
+  scheduler, Home's missing-log days, Bookings' stripes and the Realm streak all read the same days.
+- **New access switches:** *Days off calendar: see* and *Enter and remove days off*.
+
 ## 2026-11-11 — Invoice payments: every invoice waiting to be paid, in one list *(no migration)*
 
 **Asked by David:** "an invoice payment tab/button at the top next to reviews for Jorik. It should
