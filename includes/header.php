@@ -188,6 +188,11 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       <?php if ($fa('spell')): ?>
       <a href="spell.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'spell.php' ? ' is-on' : '' ?>">Spell</a>
       <?php endif; ?>
+      <?php // The Realm (David, 2026-11-12). Its own full-screen page, so this is
+            // only the way in; drawn while the switch is on, like the rest. ?>
+      <?php if (function_exists('feature_on') && feature_on('realm')): ?>
+      <a href="realm.php" class="nav-board">Realm</a>
+      <?php endif; ?>
       <?php // A button too, beside Spell (David, 2026-10-22): the two screens
             // people open first thing, so they are the two that stand out. ?>
       <?php if ($fa('mytasks')): ?>

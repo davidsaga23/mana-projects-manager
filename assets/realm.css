@@ -1,0 +1,102 @@
+/* The Realm (David, 2026-11-12). Its own stylesheet, on purpose: the Realm is a night scene with lit
+   windows, and Anima's tracker palette lives in style.css. The same rule holds here as there: every
+   colour is a role on :root, and no rule below writes a colour of its own. The map's own paint (grass,
+   stone, cloaks) is in assets/realm.js, because a canvas cannot read a stylesheet. */
+:root {
+  color-scheme: dark;
+  --night: #0d1320; --dusk: #151e30; --ridge: #24314b; --stone: #3b4763; --win: #121929;
+  --parchment: #ebe4d2; --muted: #93a0b8;
+  --candle: #ffc66b; --mana: #5fb2ff; --spell: #26fe89; --ember: #ff7a59;
+  --veil: rgb(0 0 0 / .6); --shade: rgb(0 0 0 / .5);
+  --display: Georgia, "Palatino Linotype", serif;
+  --body: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --pixel: "Courier New", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--night); color: var(--parchment); font: 15px/1.45 var(--body); display: flex; flex-direction: column; padding: 10px 14px; gap: 10px; }
+button, input, select { font: inherit; color: inherit; }
+h1, h2, p, ul { margin: 0; }
+small { color: var(--muted); font-size: .84rem; }
+:focus-visible { outline: 2px solid var(--mana); outline-offset: 2px; }
+
+.rtop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.rbrand { font: 700 1.5rem/1 var(--display); color: var(--candle); letter-spacing: .02em; }
+.rgrow { flex: 1; }
+.rmeter { display: inline-flex; align-items: center; gap: 8px; }
+.rbtn { background: var(--ridge); border: 1px solid var(--stone); border-radius: 6px; padding: 6px 12px; cursor: pointer; color: var(--parchment); text-decoration: none; display: inline-block; }
+.rbtn:hover { border-color: var(--parchment); }
+.rbtn.rprimary { background: var(--candle); border-color: var(--candle); color: var(--night); font-weight: 700; }
+.rbtn.rsmall { padding: 3px 9px; font-size: .9rem; }
+.rbtn:disabled { opacity: .45; cursor: not-allowed; }
+.rseg { display: inline-flex; border: 1px solid var(--ridge); border-radius: 6px; overflow: hidden; }
+.rseg button { background: none; border: 0; padding: 4px 10px; cursor: pointer; color: var(--muted); }
+.rseg button[aria-pressed="true"] { background: var(--ridge); color: var(--parchment); }
+
+.rnote { max-width: 60ch; margin: 8vh auto; display: flex; flex-direction: column; gap: 12px; }
+.rnote h1 { font: 700 1.6rem/1.2 var(--display); }
+.rwarn { padding: 8px 12px; border: 1px solid var(--candle); border-radius: 8px; margin: 10px; }
+
+.rapp { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 10px; }
+.rside { background: var(--dusk); border-radius: 10px; padding: 12px 8px; overflow: auto; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rside h2 { font: 600 .74rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 8px 4px; }
+.rrows { display: flex; flex-direction: column; gap: 1px; }
+.rrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+.rrow:hover, .rrow.is-on { background: var(--ridge); }
+.rrow small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+.rrow.is-away { color: var(--muted); }
+.rdot { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--muted); display: inline-block; }
+.rdot.open { background: var(--spell); border-color: var(--spell); }
+.rdot.ajar { border-color: var(--candle); }
+.rdot.sealed { border-radius: 1px; transform: rotate(45deg); background: var(--ember); border-color: var(--ember); }
+
+.rmain { background: var(--dusk); border-radius: 10px; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.rmapbox { position: relative; flex: 1; min-height: 320px; overflow: hidden; border-radius: 10px 10px 0 0; }
+.rmapbox canvas, .rmapbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.rmapbox canvas { image-rendering: pixelated; }
+.rmapbox svg { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.rmapbox.is-inside svg, .rmapbox.is-inside .rzoom, .rmapbox.is-inside #cardslot { display: none; }
+.rzoom { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.rcard { position: absolute; left: 10px; bottom: 10px; max-width: min(340px, calc(100% - 20px)); background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.racts { display: flex; flex-wrap: wrap; gap: 8px; }
+.rinside { position: absolute; left: 10px; right: 10px; top: 10px; background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.rinside[hidden] { display: none; }
+.rinside h2 { font: 700 1.25rem/1.1 var(--display); color: var(--candle); }
+.rlegend { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 14px; color: var(--muted); font-size: .86rem; }
+.rlegend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.hit { fill: transparent; }
+.bld { cursor: pointer; }
+.bld:focus-visible .hit { stroke: var(--candle); stroke-width: 2; }
+.bld:hover .lbl { fill: var(--candle); }
+.lbl { font: 700 14px var(--pixel); fill: var(--parchment); text-anchor: middle; paint-order: stroke; stroke: var(--night); stroke-width: 3px; }
+.lbl.away { fill: var(--muted); }
+.lbl.place { fill: var(--candle); font-size: 15px; stroke-width: 0; }
+.plate { fill: var(--night); fill-opacity: .85; stroke: var(--candle); stroke-width: 1.5; }
+.region { font: 700 24px var(--pixel); fill: var(--parchment); opacity: .8; text-anchor: middle; letter-spacing: .04em; paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+.region.free { fill: var(--muted); }
+.sub { font: 700 13px var(--pixel); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+.freeland { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 8; opacity: .85; }
+
+#toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; width: min(340px, calc(100% - 32px)); z-index: 20; }
+.rtoast { background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px var(--shade); }
+
+dialog { background: var(--dusk); color: var(--parchment); border: 1px solid var(--stone); border-radius: 10px; padding: 18px; width: min(480px, calc(100% - 32px)); }
+dialog::backdrop { background: var(--veil); }
+dialog h2 { font: 700 1.4rem var(--display); margin-bottom: 12px; }
+dialog form { display: flex; flex-direction: column; gap: 12px; }
+.rlook { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.rchar { width: 120px; height: 120px; flex: none; background: var(--win); border-radius: 8px; image-rendering: pixelated; }
+.rpicks { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rpick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rpick > span:first-child { width: 78px; color: var(--muted); }
+.rdacts { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .rapp { grid-template-columns: minmax(0, 1fr); }
+  .rside .rrows { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
+  .rrow { width: auto; background: var(--night); }
+  .rrow small { margin-left: 4px; }
+  .rmapbox { min-height: 62vh; }
+}

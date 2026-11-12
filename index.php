@@ -8,6 +8,20 @@ require_once __DIR__ . '/includes/studio.php';  // the Studio is filtered out be
 require_once __DIR__ . '/includes/kickoff.php'; // setup -> active goes through a sign-off
 require_login();
 
+// realm.anima-mana.com is pointed at this same folder (David, 2026-11-12), so
+// the logins, the people and the database are shared with no copy of anything.
+// On that address the front door is the Realm, not the project list.
+//
+// ⚠ ONLY WHILE THE SWITCH IS ON for this account. realm.php sends anybody
+// without it back here, and without this check the two would hand the browser
+// back and forth for ever. ?anima=1 is the way to the project list from there.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['anima'])
+    && stripos((string)($_SERVER['HTTP_HOST'] ?? ''), 'realm.') === 0
+    && function_exists('feature_on') && feature_on('realm')) {
+    header('Location: realm.php');
+    exit;
+}
+
 // The values the `projects.status` ENUM allows. Listed once and used by both the
 // form and the check that reads it back, because a dropdown offering a value the
 // column would reject is a save that fails for no visible reason.
