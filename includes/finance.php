@@ -1278,6 +1278,7 @@ function invoice_status_label(string $status): string {
 /** Record or update an invoice. Returns a sentence for the flash message. */
 function save_invoice(array $in, array $project, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can record an invoice.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     $db = finance_db();
     if (!$db) throw new RuntimeException('The finance database is not set up yet.');
 
@@ -1443,6 +1444,7 @@ function save_invoices_bulk(array $rows, array $project, array $positionMap, str
  */
 function save_invoice_notes(int $id, string $notes, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     $db = finance_db();
     if (!$db) throw new RuntimeException('The finance database is not set up yet.');
     $notes = trim($notes);
@@ -1454,6 +1456,7 @@ function save_invoice_notes(int $id, string $notes, string $who = ''): string {
 /** Remove an invoice. */
 function delete_invoice(int $id): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     $db = finance_db();
     if (!$db) throw new RuntimeException('The finance database is not set up yet.');
     $db->prepare('DELETE FROM invoices WHERE id = ?')->execute([$id]);

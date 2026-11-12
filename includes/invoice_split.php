@@ -220,6 +220,7 @@ function invoice_split_number($v, string $what): ?float {
 function save_invoice_split(int $crewId, string $crewName, string $month, array $h, array $rows,
                             array $positions, string $who = ''): array {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can record an invoice.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     if (!invoice_split_available()) {
         throw new RuntimeException('The finance database needs finance_install_12.sql before a monthly '
                                  . 'invoice can be saved.');
@@ -369,6 +370,7 @@ function save_invoice_split(int $crewId, string $crewName, string $month, array 
  */
 function pay_invoice_header(int $headerId, ?string $date, string $who = ''): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     if (!invoice_header($headerId)) throw new RuntimeException('That invoice no longer exists.');
     $date = invoice_split_date($date) ?? date('Y-m-d');
     $db = finance_db();
@@ -390,6 +392,7 @@ function pay_invoice_header(int $headerId, ?string $date, string $who = ''): str
 /** Remove an invoice and every line of it, from every project. */
 function delete_invoice_header(int $headerId): string {
     if (!can_see_money()) throw new RuntimeException('Only an administrator can do that.');
+    unset($_SESSION['payments_waiting']);   // the top bar's Invoices count (includes/payments.php)
     $db = finance_db();
     if (!$db || !invoice_split_available()) throw new RuntimeException('The finance database is not ready.');
     $db->beginTransaction();

@@ -36,6 +36,21 @@ require_once __DIR__ . '/review_badge.php';
 $reviewStage = review_stage();   // null while "Reviews" is switched off (migration 077)
 $reviewCount = ($reviewStage && isset($pdo) && $pdo instanceof PDO) ? review_count($pdo) : 0;
 
+// The Invoices button and its count (David, 2026-11-11: "an invoice payment
+// tab/button at the top next to reviews for Jorik"): how many invoices have
+// arrived and wait to be paid, on every show. Admins only, because invoices are
+// money. Kept in the session for two minutes and never able to throw, like the
+// finance count above: any trouble counts as 0. See includes/payments.php.
+$paymentsCount = 0;
+if (is_admin()) {
+    try {
+        require_once __DIR__ . '/payments.php';
+        $paymentsCount = payments_waiting_count();
+    } catch (Throwable $e) {
+        $paymentsCount = 0;
+    }
+}
+
 // --- the bell (David, 2026-10-22), migration 060 -----------------------------
 //
 // "you need to get a notification in a bell close to your name so you know
@@ -184,6 +199,11 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       <?php if ($reviewStage): ?>
       <a href="review.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'review.php' ? ' is-on' : '' ?>">Reviews<?php if ($reviewCount > 0): ?><span
           class="mytasks-badge is-new" title="Waiting for your review"><?= $reviewCount ?></span><?php endif; ?></a>
+      <?php endif; ?>
+      <?php if (is_admin()): ?>
+      <a href="payments.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'payments.php' ? ' is-on' : '' ?>"
+         title="Invoice payments">Invoices<?php if ($paymentsCount > 0): ?><span
+          class="mytasks-badge is-new" title="Invoices waiting to be paid"><?= (int)$paymentsCount ?></span><?php endif; ?></a>
       <?php endif; ?>
       <?php // TASKS, next to My tasks and not inside a project, because the
             // question it answers spans them: "what is open everywhere, and how

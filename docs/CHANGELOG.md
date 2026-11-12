@@ -14,6 +14,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-11 — Invoice payments: every invoice waiting to be paid, in one list *(no migration)*
+
+**Asked by David:** "an invoice payment tab/button at the top next to reviews for Jorik. It should
+list all the pending invoices, access to the pdfs, amounts, positions, names, dates and status so
+Jorik can easily check them, pay each one of them [...] and then that invoice disappears from the
+filter".
+
+- **An Invoices button in the top bar**, beside Reviews, for administrators, with a count of the
+  invoices waiting to be paid. It opens **`payments.php`**.
+- **One row per invoice, on every show:** who, show and position, their invoice number and a link
+  to the document, period, received and due dates (late ones in red), the amount in USD (a non-USD
+  contract shows its own currency too), status and notes. Total waiting at the top.
+- **Mark paid**, with the date editable (today by default), moves an invoice from *Waiting to be
+  paid* to *Paid*. Nothing is deleted. *Expected*, *Paid* and *All* are one click away, and a paid
+  one can be set back ("Not paid after all").
+- **A monthly invoice split across shows is one row**, its shows and positions listed, and paying
+  it pays every line (the same as Monthly invoices).
+
 ## 2026-11-11 — The invoice template: Anima fills in each freelancer's monthly invoice *(finance_install_18)*
 
 - **Home → Invoice and billing → Make my invoice** opens the month's invoice, filled in from the days
@@ -31,6 +49,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Salaried staff have no invoice, as before.
 - Needs **finance_install_18** applied from migrate.php → Finance database updates for the details to save.
   Until then the invoice still fills in its lines and prints without them.
+
 
 ## 2026-11-11 — Home: show references are buttons, and none goes to Dates & headcount *(no migration)*
 
