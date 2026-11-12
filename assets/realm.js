@@ -398,7 +398,9 @@ function roomArt(kind, tint) {
    when it stops showing. Only what is said WHILE I am in the room: walking in does not replay the
    history over everybody's heads. Up to three lines; the chat panel keeps the whole message. */
 var BUB = {}, BUBBLE_MS = 7000;
-function bubble(c, x, y, text) {
+/* Work out a bubble's lines and box, anchored above the point x,y. Nothing is painted here, so that
+   every bubble in the room can be placed before any is drawn. */
+function bubbleBox(c, x, y, text) {
   c.font = 'bold 7px "Courier New", monospace'; c.textBaseline = 'top';
   var words = String(text).replace(/\s+/g,' ').split(' '), lines = [], cur = '', w = 0;
   words.forEach(function (wd) { var t = cur ? cur+' '+wd : wd; if (cur && c.measureText(t).width > 104) { lines.push(cur); cur = wd; } else cur = t; });
@@ -407,10 +409,32 @@ function bubble(c, x, y, text) {
   lines = lines.map(function (l) { while (l.length > 2 && c.measureText(l).width > 108) l = l.slice(0,-2)+'…'; return l; });
   lines.forEach(function (l) { w = Math.max(w,c.measureText(l).width); });
   w = Math.ceil(w)+8;
-  var h = lines.length*9+5, bx = Math.max(12,Math.min(228-w,Math.round(x-w/2))), by = Math.round(y-h-4);
-  c.fillStyle = PAL.out; c.fillRect(bx-1,by-1,w+2,h+2); c.fillRect(x-2,by+h,5,4);
-  c.fillStyle = PAL.hot; c.fillRect(bx,by,w,h); c.fillRect(x-1,by+h,3,3);
-  c.fillStyle = PAL.out; lines.forEach(function (l, i) { c.fillText(l,bx+4,by+3+i*9); });
+  var h = lines.length*9+5;
+  return {x:x,y:y,w:w,h:h,lines:lines,bx:Math.max(12,Math.min(228-w,Math.round(x-w/2))),by:Math.round(y-h-4)};
+}
+/* BUBBLES MUST NOT COVER EACH OTHER (David, 2026-11-12, with a screenshot of two of them doing
+   exactly that: "is there a way we can avoid overlapping bubbles?"). The newest keeps its place
+   just above its speaker; an older one that would touch it is lifted clear, and keeps a line down
+   to its own character so it is still plain who said it. */
+function placeBubbles(boxes) {
+  var placed = [];
+  boxes.sort(function (a, b) { return b.until-a.until; }).forEach(function (b) {
+    for (var guard = 0; guard < 12; guard++) {
+      var hit = null;
+      placed.forEach(function (p) { if (b.bx < p.bx+p.w+3 && p.bx < b.bx+b.w+3 && b.by < p.by+p.h+3 && p.by < b.by+b.h+3 && (!hit || p.by < hit.by)) hit = p; });
+      /* Stop lifting at the top of the picture: four long speeches at once is the one case left. */
+      if (!hit || hit.by-b.h-4 < -26) break;
+      b.by = hit.by-b.h-4;
+    }
+    placed.push(b);
+  });
+  return placed;
+}
+function paintBubble(c, b) {
+  var tail = b.y-(b.by+b.h);
+  c.fillStyle = PAL.out; c.fillRect(b.bx-1,b.by-1,b.w+2,b.h+2); c.fillRect(b.x-2,b.by+b.h,5,Math.max(4,tail+1));
+  c.fillStyle = PAL.hot; c.fillRect(b.bx,b.by,b.w,b.h); c.fillRect(b.x-1,b.by+b.h,3,Math.max(3,tail));
+  c.fillStyle = PAL.out; b.lines.forEach(function (l, i) { c.fillText(l,b.bx+4,b.by+3+i*9); });
 }
 var SEATS = [[120,132],[86,126],[154,126],[60,134],[180,134],[100,112],[140,112],[46,118],[194,118]];
 function drawRoom(c, cw, ch) {
@@ -425,9 +449,11 @@ function drawRoom(c, cw, ch) {
   list.slice(0,SEATS.length-1).forEach(function (p, i) { var st = SEATS[i+1]; if (p.state==='idle') c.globalAlpha = .6; sprite(c,Math.round(st[0]/.9),Math.round(st[1]/.9),p,(f+i)%4===0?2:0); c.globalAlpha = 1; if (p.state==='idle') zed(c,Math.round(st[0]/.9),Math.round(st[1]/.9)); });
   sprite(c,Math.round(SEATS[0][0]/.9),Math.round(SEATS[0][1]/.9),my,0);
   c.setTransform(s,0,0,s,ox,oy);
-  var now = Date.now(), say = function (uid, st) { var b = BUB[uid]; if (b && b.until > now) bubble(c,st[0],st[1]-60,b.text); };
+  var now = Date.now(), boxes = [], say = function (uid, st) { var b = BUB[uid]; if (b && b.until > now) { var box = bubbleBox(c,st[0],st[1]-60,b.text); box.until = b.until; boxes.push(box); } };
   list.slice(0,SEATS.length-1).forEach(function (p, i) { say(p.id,SEATS[i+1]); });
   say(ST.me,SEATS[0]);
+  /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
+  placeBubbles(boxes).sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
   return list;
 }
 
