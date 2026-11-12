@@ -5390,3 +5390,26 @@ maybe list all the pending tasks you have in anima? With the option to start the
 - **No migration.** Nothing new is stored.
 - **Not done:** dropping a block without logging it (My tasks has "drop"), the overhead categories
   (Meetings, Desk time), a choice of music, and sealing the door for a block started in My tasks.
+
+## 2026-11-12 — The library shelf, and lofi
+
+David, with a screenshot of his house and the bookshelf circled: "let's change the focus button to
+this library where all our 'tasks' will be. If you click on that shelf you'll see all your tasks and
+you can decide which one to work on". Then, having heard the first music: "I don't like the current
+music, can we try something more lofi?"
+
+- **The way in to your tasks is the bookshelf in your own house.** A room is one drawn picture, so a
+  see-through button is laid over the shelf each time the room is drawn (`placeShelf()` in
+  `assets/realm.js`), with a "Your tasks" tag so it reads as something to click. Nobody else's shelf
+  does anything, and neither do the meeting places.
+- **The forge had no shelf, so it gained one** beside the hearth: every kind of house must have the
+  way in.
+- **The top bar keeps a button only while a clock runs.** David asked for the button to become the
+  shelf; the running clock stays in sight because a countdown that can only be read, or stopped, by
+  walking home would be worse than what it replaced. My reading of his request, to confirm.
+- **Somebody with no house keeps a "Your tasks" button**, because they have no shelf to click.
+- **Lofi replaces the first music outright**, no choice between the two: a four-bar loop at 72 beats
+  a minute, built in the browser as before. This reverses "nothing harsh, no rhythm" from the first version. Notes are
+  booked a couple of seconds ahead on the sound engine's clock, so the beat does not stumble when
+  the Realm is behind another window.
+- **Not done:** walking up to the shelf (rooms have no walking yet), and a choice of music.
