@@ -542,6 +542,12 @@ function artist_may_post(): bool {
         // effective_crew_id() and nothing the form sends can name another
         // person. Name and email are not in that form at all.
         'home.php' => ['save_profile'],
+        // save_invoice_details: the name, address, tax ID and bank details on
+        // their own invoice (2026-11-11, finance_install_18). ⚠ NO ID TO FORGE
+        // either: invoice.php saves to effective_crew_id() unless the asker is
+        // an admin, and save_own_invoice_details() goes through money_own_db(),
+        // which refuses any record but the asker's own.
+        'invoice.php' => ['save_invoice_details'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

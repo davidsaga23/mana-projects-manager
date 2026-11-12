@@ -285,6 +285,10 @@ require __DIR__ . '/includes/header.php';
     on a show and are not counted in the lines from the log.</p>
 <?php endif; ?>
 
+<?php // The invoice template (2026-11-11): the invoice as Anima fills it in for them, with their saved details. ?>
+<p class="small"><a href="invoice.php?month=<?= e($month) ?>&amp;crew=<?= (int)$crewId ?>">Open <?= e($person['name']) ?>'s invoice
+  template for <?= e($monthLabel) ?> →</a> <span class="muted">the invoice Anima fills in for them, with their name, address and bank details.</span></p>
+
 <form method="post" class="invoice-split-form">
   <input type="hidden" name="save_invoice_split" value="1">
 

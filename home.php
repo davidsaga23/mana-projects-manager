@@ -491,7 +491,8 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
       <ul class="home-checklist">
         <?php foreach (home_invoice_artist_fields() as $f): ?><li><?= e($f) ?></li><?php endforeach; ?>
       </ul>
-      <p class="muted small">Only the ones that apply to your bank and country. Anima does not keep your bank details.</p>
+      <p class="muted small">Only the ones that apply to your bank and country. Save them once on
+        <a href="invoice.php<?= $month !== date('Y-m') ? '?month=' . e($month) : '' ?>">your invoice</a> and Anima puts them on every month's.</p>
     </div>
   </div>
 
@@ -509,8 +510,13 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
           . '&body=' . rawurlencode("Hello,\n\nPlease find my invoice for " . date('F Y', strtotime($monthFrom))
                                     . " attached.\n\n" . $allText . "\n\nThank you,\n" . $personName);
   ?>
+  <?php // THE INVOICE ITSELF (David, 2026-11-11): Anima fills it in from the lines below. ?>
   <p class="home-send">
-    <a class="button" href="<?= e($mailto) ?>">Write the email to <?= e(HOME_INVOICE_TO) ?></a>
+    <a class="button" href="invoice.php<?= $month !== date('Y-m') ? '?month=' . e($month) : '' ?>">Make my invoice for <?= e(date('F', strtotime($monthFrom))) ?></a>
+    <span class="muted small">Filled in from your logged days, ready to save as a PDF.</span>
+  </p>
+  <p class="home-send">
+    <a class="button secondary" href="<?= e($mailto) ?>">Write the email to <?= e(HOME_INVOICE_TO) ?></a>
     <span class="muted small">Copied to <?= e(implode(', ', home_invoice_cc())) ?>. Attach your invoice PDF before sending.</span>
   </p>
 
