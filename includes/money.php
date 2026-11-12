@@ -1435,3 +1435,94 @@ function finance_mark_migration_done(string $name, string $who): ?string {
     }
     return null;
 }
+
+/* --------------------------------------------------------------------------
+ * WHO IS INVOICING, AND WHERE THE MONEY GOES (finance_install_18).
+ *
+ * David, 2026-11-11, the invoice template: Anima fills in each freelancer's
+ * monthly invoice from their logged days (invoice.php). What it cannot know is
+ * who they are on paper and their bank account, and asked whether to store
+ * those or have the artist type them every month, he chose to store them.
+ * So they are here, in the finance database, behind the same doors as a rate:
+ * the person themselves (money_own_db) or an administrator, nobody else, and
+ * never through somebody else's preview.
+ *
+ * The keys below are the table's columns AND the only fields a form may set:
+ * save_own_invoice_details() writes nothing that is not in this list.
+ * ------------------------------------------------------------------------ */
+
+const INVOICE_DETAIL_FIELDS = [
+    'legal_name'     => 'Legal name',
+    'job_title'      => 'Job title',
+    'email'          => 'Email',
+    'address'        => 'Address',
+    'tax_id'         => 'Tax ID',
+    'bank_name'      => 'Bank name',
+    'account_holder' => 'Account Holder Name',
+    'account_number' => 'Account Number',
+    'routing_number' => 'Routing Number',
+    'swift_iban'     => 'SWIFT/IBAN Number',
+    'clabe'          => 'CLABE (Mexico)',
+    'cpf'            => 'CPF (Brazil)',
+    'holder_address' => 'Address of Account Holder',
+    'payment_notes'  => 'Payment notes',
+];
+
+/** The free-text fields, which keep their line breaks and may run longer. */
+const INVOICE_DETAIL_LONG = ['address', 'holder_address', 'payment_notes'];
+
+/**
+ * A person's own invoice details. ['ready' => bool, 'row' => array].
+ * ready is false when the door is shut (not theirs, not an admin, finance not
+ * set up) or finance_install_18 is not imported yet; row is [] when nothing has
+ * been saved. Never throws for a missing table: the invoice still prints.
+ */
+function own_invoice_details(int $crewId): array {
+    $db = money_own_db($crewId);
+    if (!$db) return ['ready' => false, 'row' => []];
+    try {
+        $q = $db->prepare('SELECT * FROM invoice_details WHERE crew_id = ?');
+        $q->execute([$crewId]);
+        return ['ready' => true, 'row' => $q->fetch() ?: []];
+    } catch (PDOException $e) {
+        return ['ready' => false, 'row' => []];     // before finance_install_18
+    }
+}
+
+/**
+ * Save a person's own invoice details (or anybody's, for an administrator).
+ * The crew id is decided by the caller from the login, never from the form.
+ */
+function save_own_invoice_details(int $crewId, string $crewName, array $in, string $who = ''): string {
+    $db = money_own_db($crewId);
+    if (!$db) {
+        throw new RuntimeException('These details can only be saved by the person themselves or an administrator, '
+                                 . 'once the finance database is set up.');
+    }
+    $vals = [];
+    foreach (INVOICE_DETAIL_FIELDS as $k => $label) {
+        $v = trim(str_replace("\r\n", "\n", (string)($in[$k] ?? '')));
+        if (!in_array($k, INVOICE_DETAIL_LONG, true)) $v = preg_replace('/\s+/', ' ', $v);
+        $max = in_array($k, INVOICE_DETAIL_LONG, true) ? 1000 : ($k === 'tax_id' || $k === 'account_number'
+               || $k === 'routing_number' || $k === 'swift_iban' || $k === 'clabe' || $k === 'cpf' ? 100 : 190);
+        if (mb_strlen($v) > $max) throw new RuntimeException($label . ' is too long (' . $max . ' characters at most).');
+        $vals[$k] = $v === '' ? null : $v;
+    }
+    if ($vals['email'] !== null && filter_var($vals['email'], FILTER_VALIDATE_EMAIL) === false) {
+        throw new RuntimeException('The email does not look like an email address.');
+    }
+    $cols = array_keys(INVOICE_DETAIL_FIELDS);
+    $sql = 'INSERT INTO invoice_details (crew_id, crew_name, ' . implode(', ', $cols) . ', updated_by)
+            VALUES (?, ?, ' . implode(', ', array_fill(0, count($cols), '?')) . ', ?)
+            ON DUPLICATE KEY UPDATE crew_name = VALUES(crew_name), '
+         . implode(', ', array_map(fn($c) => "$c = VALUES($c)", $cols)) . ', updated_by = VALUES(updated_by)';
+    try {
+        $db->prepare($sql)->execute(array_merge([$crewId, mb_substr($crewName, 0, 100)], array_values($vals),
+                                                [mb_substr($who, 0, 100)]));
+    } catch (PDOException $e) {
+        error_log('[Anima invoice details] ' . $e->getMessage());
+        throw new RuntimeException('Your details could not be saved: the finance database needs update '
+                                 . 'finance_install_18 first (migrate.php → Finance database updates). Ask David.');
+    }
+    return 'Invoice details saved.';
+}
