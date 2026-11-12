@@ -383,7 +383,8 @@ function roomArt(kind, tint) {
       parts([[24,62,46,14,PAL.wood]]); parts([[30,54,3,8,PAL.wall]]); P1(30,51,3,3,PAL.win); parts([[44,58,14,5,PAL.wall]]); }
     else if (kind==='tower') { [[90,14],[124,14]].forEach(function (b) { parts([[b[0],b[1],26,32,PAL.wood]]); for (i = 0; i < 3; i++) for (x = 0; x < 5; x++) P1(b[0]+2+x*5,b[1]+3+i*10,4,7,[TINT.violet,TINT.mana,TINT.rose][(x+i)%3]); });
       parts([[188,60,4,26,PAL.wood],[176,56,26,6,PAL.iron]]); P1(198,57,4,4,PAL.win); }
-    else if (kind==='forge') { parts([[92,12,56,40,PAL.stoneD],[102,24,36,28,PAL.lava]]); P1(108,32,24,20,PAL.lavaL); P1(115,40,10,12,PAL.hot);
+    else if (kind==='forge') { parts([[66,14,22,32,PAL.wood]]); for (i = 0; i < 3; i++) { P1(68,18+i*10,18,7,PAL.woodD); for (x = 0; x < 4; x++) P1(69+x*4,19+i*10,3,6,[TINT.ember,TINT.candle,TINT.mana,TINT.spell][(x+i)%4]); }
+      parts([[92,12,56,40,PAL.stoneD],[102,24,36,28,PAL.lava]]); P1(108,32,24,20,PAL.lavaL); P1(115,40,10,12,PAL.hot);
       parts([[40,104,20,8,PAL.iron],[34,98,32,6,PAL.iron]]); parts([[184,96,20,22,PAL.wood]]); P1(184,102,20,2,PAL.iron); P1(184,112,20,2,PAL.iron); }
     else if (kind==='tavern') { parts([[24,54,192,12,PAL.wood]]); P1(24,54,192,2,shade(PAL.wood,35)); for (x = 34; x < 210; x += 22) { parts([[x,46,6,8,PAL.wall]]); P1(x,46,6,2,PAL.win); }
       [[28,100],[190,100]].forEach(function (t) { parts([[t[0],t[1],22,26,PAL.wood]]); P1(t[0],t[1]+6,22,2,PAL.iron); P1(t[0],t[1]+18,22,2,PAL.iron); }); }
@@ -436,10 +437,25 @@ function paintBubble(c, b) {
   c.fillStyle = PAL.hot; c.fillRect(b.bx,b.by,b.w,b.h); c.fillRect(b.x-1,b.by+b.h,3,Math.max(3,tail));
   c.fillStyle = PAL.out; b.lines.forEach(function (l, i) { c.fillText(l,b.bx+4,b.by+3+i*9); });
 }
+/* THE LIBRARY (David, 2026-11-12, circling the bookshelf in his own house: "let's change the focus
+   button to this library where all our 'tasks' will be. If you click on that shelf you'll see all
+   your tasks and you can decide which one to work on"). The shelf in YOUR OWN house is the way in
+   to your tasks; nobody else's shelf does anything. Where the books stand in each kind of house, in
+   the room's own units: the canvas cannot be clicked piece by piece, so a see-through button is
+   laid exactly over the shelf each time the room is drawn. */
+var SHELF = {study:[99,13,42,34],tower:[89,13,62,34],forge:[65,13,24,34]};
+function placeShelf(o, s, ox, oy) {
+  var b = $('shelfBtn'); if (!b) return;
+  var r = o && o.owner && o.owner.me ? SHELF[o.kind] : null;
+  b.hidden = !r; if (!r) return;
+  var k = Math.min(2,window.devicePixelRatio||1);
+  b.style.left = (ox+r[0]*s)/k+'px'; b.style.top = (oy+r[1]*s)/k+'px'; b.style.width = r[2]*s/k+'px'; b.style.height = r[3]*s/k+'px';
+}
 var SEATS = [[120,132],[86,126],[154,126],[60,134],[180,134],[100,112],[140,112],[46,118],[194,118]];
 function drawRoom(c, cw, ch) {
-  var o = B[S.inside]; if (!o) return;
+  var o = B[S.inside]; if (!o) { placeShelf(null); return; }
   var rm = roomArt(o.kind,o.tint), s = Math.max(1,Math.min(cw/240,(ch-70)/160)), ox = Math.round((cw-240*s)/2), oy = Math.round((ch-160*s)/2+30), f = S.frame;
+  placeShelf(o,s,ox,oy);
   c.setTransform(s,0,0,s,ox,oy); c.drawImage(rm.cv,0,0);
   var list = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) list.push(o.owner);
@@ -466,6 +482,7 @@ function draw() {
   c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.out; c.fillRect(0,0,cw,ch);
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
+    placeShelf(null);
     c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
@@ -541,7 +558,7 @@ function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
   if (S.walk) { h = '<div class="rcard"><b>Walking to '+esc(title(S.walk.id))+'…</b><div class="racts"><button type="button" class="rbtn rsmall" data-tele="'+esc(S.walk.id)+'">Teleport instead</button></div></div>'; }
   else if (o) {
-    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')) : 'A place to meet. Chat and voice arrive in the next stages.';
+    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Chat and voice arrive in the next stages.';
     /* At an ajar door, with nobody having let me in yet, the button is Knock. */
     var ajar = o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.door==='ajar' && !PASS[o.owner.id];
     var waiting = ajar && KN.mine && KN.mine.to===o.owner.id && KN.mine.status==='waiting';
@@ -558,7 +575,7 @@ function renderInside() {
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+'</span><span class="rgrow"></span><button type="button" class="rbtn rprimary" data-leave="1">Leave</button>';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Your tasks are on the bookshelf.':'')+'</span><span class="rgrow"></span><button type="button" class="rbtn rprimary" data-leave="1">Leave</button>';
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -728,7 +745,7 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-zoom]'))) { var z = b.getAttribute('data-zoom'), v = S.view, cx = v.x+v.w/2, cy = v.y+v.h/2; if (z==='in') zoomAt(.72,cx,cy); else if (z==='out') zoomAt(1.39,cx,cy); else setView(z==='village'?VILLAGE:FULL); }
   else if ((b = t.closest('[data-door]'))) send({set_door:b.getAttribute('data-door')});
   else if (t.closest('#lookBtn')) openLook();
-  else if (t.closest('#focusBtn')) openFocus();
+  else if (t.closest('#focusBtn') || t.closest('#shelfBtn')) openFocus();
   else if ((b = t.closest('[data-focusstart]'))) focusDo({focus:'start',task:b.getAttribute('data-focusstart')});
   else if (t.closest('[data-focusstop]')) focusDo({focus:'stop'});
   else if (t.closest('[data-focusclose]')) $('focusDlg').close();
@@ -958,8 +975,10 @@ $('lookForm').addEventListener('submit',function (e) { e.preventDefault(); $('lo
    the page asks the server to settle it (log the block, begin the break) ONCE; if the page is shut
    instead, My tasks settles it the next time anybody looks, so no minutes depend on this tab.
 
-   The desk is also the top bar's button: with a clock running it reads "Focus 18:42", so the time
-   is in sight with the desk shut. */
+   THE WAY IN IS THE BOOKSHELF in your own house (placeShelf, above). The top bar shows a button only
+   while a clock is running: it reads "Focus 18:42", so the time is in sight, and can be stopped,
+   from anywhere in the village. Somebody with no house yet has no shelf, so for them the button
+   stays, reading "Your tasks". */
 var FO = {data:null,at:0,busy:false,seq:0,settled:'',zero:false,err:''};
 function clockWords(s) { s = Math.max(0,Math.floor(s)); var h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h?h+':'+(m<10?'0':'')+m:m)+':'+(x<10?'0':'')+x; }
 function focusNow() { return FO.data && FO.data.ready ? FO.data.now : null; }
@@ -971,7 +990,7 @@ function renderFocus() {
   var top = $('focusNow'), list = $('focusList'); if (!top) return;
   var d = FO.data, n = focusNow(), brk = onBreak(n), left = focusLeft(), h = '';
   $('focusMusic').hidden = !(d && d.ready && (window.AudioContext || window.webkitAudioContext));
-  if (!d || !d.ready) { top.innerHTML = '<p class="rfidle">'+esc(d ? d.why : (FO.err || 'Opening the desk…'))+'</p>'; list.innerHTML = ''; return; }
+  if (!d || !d.ready) { top.innerHTML = '<p class="rfidle">'+esc(d ? d.why : (FO.err || 'Fetching your tasks…'))+'</p>'; list.innerHTML = ''; return; }
   if (n) {
     var t = focusTask(n.key), hint = n.phase==='focus' ? (left ? 'Your door is sealed until this block ends. Stopping early logs the minutes so far.' : 'This block is over.')
       : brk ? (left ? 'A break is not logged. Your door is open again.' : 'The break is over. Start the next block when you are ready.')
@@ -994,7 +1013,9 @@ function renderFocus() {
 /* Once a second: the readout in the desk and on the top bar, the music, and the settle at zero. */
 function focusTick() {
   var n = focusNow(), left = focusLeft(), btn = $('focusBtn'), ck = $('focusClock');
-  if (btn) { btn.textContent = n ? (onBreak(n)?'Break ':n.phase==='focus'?'Focus ':'Timer ')+clockWords(left) : 'Focus desk';
+  var word = n ? (onBreak(n)?'Break ':n.phase==='focus'?'Focus ':'Timer ')+clockWords(left) : 'Your tasks', tag = $('shelfTag');
+  if (tag) tag.textContent = word;
+  if (btn) { btn.textContent = word; btn.hidden = !n && !!me();
     btn.classList.toggle('is-focus',!!n && !onBreak(n)); btn.classList.toggle('is-break',onBreak(n)); }
   if (ck) ck.textContent = clockWords(left);
   musicSync();
@@ -1008,7 +1029,7 @@ function focusTick() {
 function focusTake(j, seq, acted) {
   if (seq!==FO.seq) return;
   FO.busy = false;
-  if (!j) { if (!FO.data) { FO.err = 'The focus desk could not be reached. Try again in a moment.'; renderFocus(); } return; }
+  if (!j) { if (!FO.data) { FO.err = 'Your tasks could not be reached. Try again in a moment.'; renderFocus(); } return; }
   if (j.said) toast(j.said);
   if (j.error) { toast(j.error); if (!FO.data) FO.err = j.error; }
   if (j.focus) {
@@ -1038,8 +1059,7 @@ function openFocus() { var d = $('focusDlg'); if (!d || d.open) return; renderFo
 
 /* THE MUSIC (the same request: "a soft music while on focus"). Made here, by the browser's own sound
    engine: no audio file, nothing to license, nothing loaded from another site (the rule at the top
-   of realm.php). A slow chord of eight soft voices behind a filter, each swelling and fading at its
-   own pace, the chord changing every half minute, and now and then one quiet bell note. No beat.
+   of realm.php). What it plays is described at LOFI, below.
 
    IT PLAYS ONLY DURING A FOCUS BLOCK, and only with the switch on: it fades in when one starts and
    out when it stops or becomes a break, where two bell notes mark the end. Browsers refuse sound
@@ -1049,42 +1069,78 @@ function openFocus() { var d = $('focusDlg'); if (!d || d.open) return; renderFo
 var MU = {on:true,vol:.5,ctx:null,rig:null};
 try { if (localStorage.getItem('realmMusic')==='0') MU.on = false; var mv = parseFloat(localStorage.getItem('realmMusicVol')); if (mv >= 0 && mv <= 1) MU.vol = mv; } catch (e) { /* A private window may refuse; the defaults stand. */ }
 function musicSave() { try { localStorage.setItem('realmMusic',MU.on?'1':'0'); localStorage.setItem('realmMusicVol',String(MU.vol)); } catch (e) { /* Then it is simply not remembered. */ } }
-/* D, G, B minor, A: four chords that sit easily one after another, low and close together. */
-var CHORDS = [[146.83,220,329.63,369.99],[98,146.83,246.94,329.63],[123.47,185,220,293.66],[110,164.81,220,293.66]];
+/* LOFI (David, 2026-11-12, after hearing the first version, a slow beatless chord: "I don't like the
+   current music, can we try something more lofi?"). A four-bar loop at 72 beats a minute: mellow
+   jazz chords and a soft bass, a dusty kick, snare and hat with a little swing, a stray high note
+   now and then, record crackle underneath, the whole thing dulled and made to waver slightly in
+   pitch like an old tape. Every sound is still built here from plain waves and noise.
+
+   Notes are booked on the sound engine's own clock a couple of seconds ahead (musicPlan), because a
+   browser slows the timers of a tab that is not in front, and a beat driven straight by a timer
+   would stumble whenever the Realm was behind another window. */
+var BPM = 72, BEAT = 60/BPM;
+/* E minor 9, A 13, D major 9, B minor 11: bass note, then the four notes of the chord. */
+var CHORDS = [[82.41,196,246.94,293.66,369.99],[110,196,246.94,277.18,369.99],[73.42,185,220,277.18,329.63],[123.47,185,220,293.66,329.63]];
 var BELLS = [587.33,659.25,739.99,880,987.77];
-function musicLevel() { return MU.vol*MU.vol*.6; }
+function musicLevel() { return MU.vol*MU.vol*.9; }
 /* Called inside a click, and nowhere else. */
 function musicWake(t) {
   var AC = window.AudioContext || window.webkitAudioContext, n = focusNow();
   if (!AC || !MU.on || !((n && n.phase==='focus') || t.closest('[data-focusstart]'))) return;
   try { if (!MU.ctx) MU.ctx = new AC(); if (MU.ctx.state==='suspended') MU.ctx.resume(); } catch (e) { MU.ctx = null; }
 }
-function musicBell(out, f, loud) {
-  var ctx = MU.ctx, t = ctx.currentTime, o = ctx.createOscillator(), v = ctx.createGain();
-  o.type = 'sine'; o.frequency.value = f;
-  v.gain.setValueAtTime(0,t); v.gain.linearRampToValueAtTime(loud,t+.04); v.gain.exponentialRampToValueAtTime(.0001,t+3.6);
-  o.connect(v); v.connect(out); o.start(t); o.stop(t+3.7); o.onended = function () { v.disconnect(); };
+/* One note: a wave that swells in `attack` seconds and dies away over `dur`. `wow` is the tape wobble. */
+function musicTone(out, type, f, at, dur, loud, attack, wow) {
+  var ctx = MU.ctx, o = ctx.createOscillator(), v = ctx.createGain();
+  o.type = type; o.frequency.value = f; if (wow) wow.connect(o.detune);
+  v.gain.setValueAtTime(0,at); v.gain.linearRampToValueAtTime(loud,at+attack); v.gain.exponentialRampToValueAtTime(.0001,at+dur);
+  o.connect(v); v.connect(out); o.start(at); o.stop(at+dur+.05); o.onended = function () { v.disconnect(); };
+  return o;
+}
+function musicBell(out, f, loud) { musicTone(out,'sine',f,MU.ctx.currentTime,3.6,loud,.04,null); }
+/* A drum made of hiss: a snare (a band of it) or a hat (only the top of it). */
+function musicHiss(rig, at, dur, loud, kind, freq) {
+  var ctx = MU.ctx, src = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), v = ctx.createGain();
+  src.buffer = rig.noise; fl.type = kind; fl.frequency.value = freq;
+  v.gain.setValueAtTime(loud,at); v.gain.exponentialRampToValueAtTime(.0001,at+dur);
+  src.connect(fl); fl.connect(v); v.connect(rig.bus); src.start(at,Math.random()*.8,dur+.05); src.onended = function () { v.disconnect(); };
+}
+/* One half-beat of the loop: n counts 0 to 31 across the four bars. */
+function musicStep(rig, n, t) {
+  var bar = n>>3, s = n&7, ch = CHORDS[bar], at = t+(s&1 ? BEAT*.1 : 0), i;
+  if (s===0 || s===5) for (i = 1; i < 5; i++) musicTone(rig.bus,'triangle',ch[i],at+i*.03,s?BEAT*1.3:BEAT*3.6,s?.035:.07,.02,rig.wow);
+  if (s===0 || s===5) musicTone(rig.bus,'triangle',ch[0],at,s?BEAT*.9:BEAT*1.5,s?.13:.18,.02,rig.wow);
+  if (s===0 || s===5 || (s===3 && (bar&1))) { var k = musicTone(rig.bus,'sine',120,at,.3,.5,.005,null); k.frequency.setValueAtTime(120,at); k.frequency.exponentialRampToValueAtTime(45,at+.12); }
+  if (s===2 || s===6) musicHiss(rig,at,.14,.14,'bandpass',1700);
+  musicHiss(rig,at,.04,s&1?.02:.035,'highpass',6500);
+  if (s && Math.random() < .1) musicTone(rig.bus,'sine',BELLS[Math.floor(Math.random()*BELLS.length)],at,BEAT*1.6,.05,.01,rig.wow);
+}
+function musicPlan(rig) {
+  var ctx = MU.ctx;
+  /* A tab that slept long enough to fall behind picks the beat up from now, not in a rush of late notes. */
+  if (rig.next < ctx.currentTime) rig.next = ctx.currentTime+.05;
+  while (rig.next < ctx.currentTime+2.4) { musicStep(rig,rig.step,rig.next); rig.step = (rig.step+1)%32; rig.next += BEAT/2; }
 }
 function musicStart() {
   var ctx = MU.ctx; if (!ctx || MU.rig || ctx.state!=='running') return;
-  var t = ctx.currentTime, rig = {live:[],voices:[],chord:0,change:0,bell:0};
-  rig.master = ctx.createGain(); rig.master.gain.setValueAtTime(0,t); rig.master.gain.setTargetAtTime(musicLevel(),t,1.4); rig.master.connect(ctx.destination);
-  var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = .4; lp.connect(rig.master);
-  var sweep = ctx.createOscillator(), depth = ctx.createGain(); sweep.frequency.value = .03; depth.gain.value = 300; sweep.connect(depth); depth.connect(lp.frequency); sweep.start(); rig.live.push(sweep);
-  CHORDS[0].forEach(function (f, i) {
-    var vg = ctx.createGain(); vg.gain.value = .1; vg.connect(lp);
-    var swell = ctx.createOscillator(), sd = ctx.createGain(); swell.frequency.value = .05+i*.017; sd.gain.value = .06; swell.connect(sd); sd.connect(vg.gain); swell.start(); rig.live.push(swell);
-    rig.voices.push([-5,5].map(function (cents, k) { var o = ctx.createOscillator(); o.type = k?'triangle':'sine'; o.frequency.value = f; o.detune.value = cents; o.connect(vg); o.start(); rig.live.push(o); return o; }));
-  });
-  rig.change = setInterval(function () { rig.chord = (rig.chord+1)%CHORDS.length; var at = ctx.currentTime;
-    rig.voices.forEach(function (pair, i) { pair.forEach(function (o) { o.frequency.setTargetAtTime(CHORDS[rig.chord][i],at,1.8); }); }); },28000);
-  (function ring() { rig.bell = setTimeout(function () { musicBell(rig.master,BELLS[Math.floor(Math.random()*BELLS.length)],.07); ring(); },9000+Math.random()*14000); })();
+  var t = ctx.currentTime, rig = {live:[],step:0,next:t+.15,plan:0}, i;
+  rig.master = ctx.createGain(); rig.master.gain.setValueAtTime(0,t); rig.master.gain.setTargetAtTime(musicLevel(),t,1.2); rig.master.connect(ctx.destination);
+  /* Everything musical goes through one dull filter: that, more than anything, is the "lo" in lofi. */
+  rig.bus = ctx.createBiquadFilter(); rig.bus.type = 'lowpass'; rig.bus.frequency.value = 2400; rig.bus.Q.value = .7; rig.bus.connect(rig.master);
+  var lfo = ctx.createOscillator(); rig.wow = ctx.createGain(); lfo.frequency.value = .45; rig.wow.gain.value = 9; lfo.connect(rig.wow); lfo.start(); rig.live.push(lfo);
+  rig.noise = ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate); var d = rig.noise.getChannelData(0); for (i = 0; i < d.length; i++) d[i] = Math.random()*2-1;
+  /* Record crackle: two seconds of near silence with a faint hiss and a few clicks, played round and round. */
+  var dust = ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate), c = dust.getChannelData(0); for (i = 0; i < c.length; i++) c[i] = (Math.random()*2-1)*(Math.random() < .0006 ? .9 : .012);
+  var spin = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), dv = ctx.createGain(); spin.buffer = dust; spin.loop = true; hp.type = 'highpass'; hp.frequency.value = 900; dv.gain.value = .5;
+  spin.connect(hp); hp.connect(dv); dv.connect(rig.master); spin.start(); rig.live.push(spin);
+  musicPlan(rig); rig.plan = setInterval(function () { musicPlan(rig); },400);
   MU.rig = rig;
 }
 function musicStop() {
   var rig = MU.rig, ctx = MU.ctx; if (!rig) return; MU.rig = null;
-  clearInterval(rig.change); clearTimeout(rig.bell);
+  clearInterval(rig.plan);
   var t = ctx.currentTime; rig.master.gain.cancelScheduledValues(t); rig.master.gain.setTargetAtTime(0,t,.5);
+  /* Notes already booked play out unheard behind the faded master, which is then unplugged. */
   setTimeout(function () { rig.live.forEach(function (o) { try { o.stop(); } catch (e) { /* already stopped */ } }); rig.master.disconnect(); },2800);
 }
 /* The block is over: two bell notes, falling. Only where the music has been playing. */
@@ -1121,6 +1177,8 @@ setInterval(askUnread,8000);
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 if ($('focusBtn') && $('focusNow')) {
+  var shelf = document.createElement('button'); shelf.type = 'button'; shelf.id = 'shelfBtn'; shelf.className = 'rshelf'; shelf.hidden = true;
+  shelf.setAttribute('aria-label','Your tasks, on the bookshelf'); shelf.innerHTML = '<span id="shelfTag">Your tasks</span>'; $('mapbox').appendChild(shelf);
   focusAsk(); setInterval(focusTick,1000); setInterval(function () { if (!document.hidden) focusAsk(); },60000);
   document.addEventListener('visibilitychange',function () { if (!document.hidden) focusAsk(); });
 }

@@ -68,7 +68,9 @@ foreach (($state['people'] ?? []) as $p) {
       <button type="button" data-door="sealed" aria-pressed="false">Sealed</button>
     </span>
   </span>
-  <button type="button" class="rbtn" id="focusBtn">Focus desk</button>
+  <?php /* Your tasks are on the bookshelf in your own house (David, 2026-11-12). This button shows
+           only while a clock is running, or for somebody with no house and so no shelf. */ ?>
+  <button type="button" class="rbtn" id="focusBtn"<?= $hasHouse ? ' hidden' : '' ?>>Your tasks</button>
   <button type="button" class="rbtn" id="lookBtn">Your character</button>
   <?php endif; ?>
 </header>
@@ -124,7 +126,7 @@ foreach (($state['people'] ?? []) as $p) {
   </div>
   <div id="toasts" aria-live="polite"></div>
   <dialog id="focusDlg" aria-labelledby="focusTitle">
-    <h2 id="focusTitle">Focus desk</h2>
+    <h2 id="focusTitle">Your library</h2>
     <div id="focusBody"></div>
   </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">

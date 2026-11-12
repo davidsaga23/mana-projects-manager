@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: your tasks are on the bookshelf, and the music is lofi *(no migration)*
+
+**Asked by David**, circling the bookshelf in his house: "let's change the focus button to this
+library where all our 'tasks' will be. If you click on that shelf you'll see all your tasks and you
+can decide which one to work on". And of the music: "can we try something more lofi?"
+
+- **Click the bookshelf in your own house to see your tasks** and start the clock on one. It carries
+  a small "Your tasks" tag, and every kind of house has a shelf (the forge gained one).
+- **The Focus desk button has left the top bar.** A button appears there only while a clock is
+  running ("Focus 18:42"), so the time can be seen and stopped from anywhere in the village.
+  Somebody with no house yet keeps a "Your tasks" button, since they have no shelf.
+- **The music is now a lofi loop**: mellow chords, a soft bass, a slow dusty beat, record crackle.
+  Still made by the page itself, with the same switch and volume.
 ## 2026-11-12 — The Realm: a notice is never hidden behind an open window *(no migration)*
 
 **Found while testing the focus desk:** with the Focus desk open, "... is knocking at your door"

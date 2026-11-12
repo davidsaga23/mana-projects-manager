@@ -124,6 +124,12 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
    music. The top bar's button wears the same edge as the panel: ember while a clock is counting
    work, the open-door green on a break. */
 #focusBtn { font-variant-numeric: tabular-nums; }
+.rbtn[hidden], .rshelf[hidden] { display: none; }
+/* The bookshelf in your own house is the way in to your tasks: a see-through button laid over the
+   drawn shelf (placed by assets/realm.js), with a small tag under it so it reads as something to click. */
+.rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
+.rshelf:hover, .rshelf:focus-visible { border-color: var(--candle); }
+.rshelf span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; background: var(--candle); color: var(--night); border-radius: 3px; padding: 1px 7px; font: 700 12px var(--pixel); font-variant-numeric: tabular-nums; }
 #focusBtn.is-focus { border-color: var(--ember); color: var(--candle); }
 #focusBtn.is-break { border-color: var(--spell); }
 #focusBody { display: flex; flex-direction: column; gap: 12px; }
