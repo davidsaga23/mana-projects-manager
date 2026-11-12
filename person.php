@@ -725,7 +725,8 @@ require __DIR__ . '/includes/header.php';
   <h3 id="days-off">Days off</h3>
   <p class="muted small">
     Holidays, leave, a course, any day <?= e($person['name']) ?> is away while the studio works.
-    Recorded for the person, so it counts on every show they are on. Public holidays belong on the
+    Recorded for the person, so it counts on every show they are on, and shown with everybody else's
+    on the <a href="days_off.php">Days off</a> calendar. Public holidays belong on the
     studio <a href="calendar.php">Calendar</a> instead, which closes the day for everyone. The
     scheduler skips these days for this person and hands their work to whoever on the step is free,
     <strong>the next time the schedule is run</strong>, a saved plan does not move by itself.

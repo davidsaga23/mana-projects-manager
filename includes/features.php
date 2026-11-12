@@ -113,6 +113,12 @@ const FEATURES = [
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 0, 'client' => 0]],
     'bookings_edit' => ['label' => 'Edit', 'group' => 'The whole studio', 'parent' => 'bookings',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
+    // David, 2026-11-12: the days-off calendar. Everybody sees it (an artist
+    // only their own row, days_off.php decides); only Production enters days.
+    'days_off'      => ['label' => 'Days off calendar: see', 'group' => 'The whole studio', 'note' => 'an artist sees only their own',
+                        'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 0]],
+    'days_off_edit' => ['label' => 'Enter and remove days off', 'group' => 'The whole studio', 'parent' => 'days_off',
+                        'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
     // David, 2026-11-05: Historic quotas for Admin and Production.
     'quotas'        => ['label' => 'Historic quotas', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
@@ -190,6 +196,7 @@ const FEATURE_SCRIPTS = [
     'artists_api.php'     => 'artists',
     'export_artists.php'  => 'artists',
     'bookings.php'        => 'bookings',
+    'days_off.php'        => 'days_off',
     'history_quotas.php'  => 'quotas',
     'users.php'           => 'users',
     'log_reminders.php'   => 'log_reminder_send',
@@ -250,6 +257,7 @@ const FEATURE_POSTS = [
     'artists.php'       => [['*', '', 'artists_edit']],
     'artists_api.php'   => [['*', '', 'artists_edit']],
     'bookings.php'      => [['*', '', 'bookings_edit']],
+    'days_off.php'      => [['*', '', 'days_off_edit']],
     'shots.php'         => [['*', '', 'shots_edit']],
     'shots_api.php'     => [['*', '', 'shots_edit']],
     'crew.php'          => [['action', '/^hire:\d+$/', 'staffing_hire'], ['*', '', 'staffing_edit']],

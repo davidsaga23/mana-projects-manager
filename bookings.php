@@ -44,7 +44,8 @@ require __DIR__ . '/includes/header.php';
   somebody holding a position on a step is booked from that step's start to its deadline.
   <strong class="bk-clash-text">Red</strong> marks the same person needed on two shows on the
   same working days. Shows in setup, active or on hold are included; wrapped and archived ones
-  are not. <strong>Stripes</strong> are a person's days off, entered on their person page.
+  are not. <strong>Stripes</strong> are a person's days off, entered on the
+  <a href="days_off.php">Days off</a> calendar or their person page.
 </p>
 
 <?php if (!$projects): ?>

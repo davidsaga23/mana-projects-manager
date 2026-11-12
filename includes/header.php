@@ -234,6 +234,9 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
             // want the same person. Up here for the reason Artists is: it is
             // about no one show, so no show's tabs could hold it. ?>
       <?php if ($fa('bookings')): ?> · <a href="bookings.php">Bookings</a><?php endif; ?>
+      <?php // DAYS OFF beside Bookings (David, 2026-11-12): everybody's days away
+            // on one calendar. About no one show, so up here with Bookings. ?>
+      <?php if ($fa('days_off')): ?> · <a href="days_off.php">Days off</a><?php endif; ?>
 
       <?php // THE RECORDS. David, 2026-09-01: "I'll need from time to time, to
             // check the records and see what we used to charge certain slots or
