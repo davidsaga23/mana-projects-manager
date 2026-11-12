@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm looks like Anima *(no migration)*
+
+**Asked by David:** "let's do a whole pass on the UI aesthetics and try to match it closer to what
+anima has already, it should feel like we're in the same universe".
+
+- **Anima's top bar**: the same mark, "Anima | Realm", and the same navigation buttons (Home,
+  Spell, Realm, My tasks), each shown only while its switch is on. Your name is at the right.
+- **Anima's colours, in the same roles**: the near-black ground and raised panels, sky blue for
+  anything you press, spring green for an open door, amber for ajar, red for sealed. The night-blue
+  and gold are gone from the frame.
+- **Anima's type and shapes**: the same typeface (no more serif headings), the same corner radii,
+  hairline borders, and a shadow only on what floats (the house card, notices, windows).
+- **Buttons are Anima's buttons**: a blue fill for the main action, a blue outline for the rest.
+- **The map is untouched**: it stays a small pixel world inside Anima's frame. Its place names now
+  use Anima's blue, and the space around a room is Anima's black.
+- Nothing works differently; this is how it looks only.
+
 ## 2026-11-12 — The Realm: your tasks are on the bookshelf, and the music is lofi *(no migration)*
 
 **Asked by David**, circling the bookshelf in his house: "let's change the focus button to this

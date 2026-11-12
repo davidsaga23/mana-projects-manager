@@ -33,7 +33,7 @@ var PAL = {out:'#141a28',grassA:'#2e6b4b',grassB:'#2a6446',tuft:'#43906a',tuftD:
   wall:'#d2c8b2',wallD:'#aba18d',stone:'#8d95aa',stoneD:'#666e86',wood:'#7a5638',woodD:'#573c27',marble:'#dfe3ee',marbleD:'#b9c0d4',
   cobble:'#7f8699',cobbleL:'#8f96a8',cobbleH:'#a4abbd',iron:'#3b4256',
   win:'#ffd36e',winD:'#2a3350',door:'#4a3020',skin:'#f3d3b0',cheek:'#f0a898',mouth:'#b06a58',hair:'#5a3a26',fur:'#9aa1b4',owl:'#a58b6a',owlL:'#c9b08a',boot:'#3a2a20',
-  smoke:'#c9d1e0',glow:'#e2b35c',shadow:'rgba(0,0,0,.28)',mist:'rgba(176,186,206,.3)',dim:'rgba(0,0,0,.16)',lift:'rgba(255,255,255,.12)',veil:'#0d1320'};
+  smoke:'#c9d1e0',glow:'#e2b35c',shadow:'rgba(0,0,0,.28)',mist:'rgba(176,186,206,.3)',dim:'rgba(0,0,0,.16)',lift:'rgba(255,255,255,.12)',veil:'#191919',ground:'#101010'};
 var TINT = {candle:'#ffc66b',mana:'#5fb2ff',spell:'#26fe89',ember:'#ff7a59',violet:'#b592ff',rose:'#ff8fb3',teal:'#4fd6c8'};
 var CLOAKS = {candle:'Gold',mana:'Blue',spell:'Green',ember:'Ember',violet:'Violet',rose:'Rose',teal:'Teal'};
 var HATS = {none:'Bare',hat:'Pointed hat',hood:'Hood'};
@@ -479,7 +479,7 @@ function draw() {
   var dpr = Math.min(2,window.devicePixelRatio||1), cw = Math.round(cv.clientWidth*dpr), ch = Math.round(cv.clientHeight*dpr); if (!cw || !ch) return;
   if (cv.width!==cw || cv.height!==ch) { cv.width = cw; cv.height = ch; }
   var c = cv.getContext('2d'), v = S.view, s = Math.max(cw/v.w,ch/v.h), ox = (cw-v.w*s)/2-v.x*s, oy = (ch-v.h*s)/2-v.y*s, f = S.frame, i;
-  c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.out; c.fillRect(0,0,cw,ch);
+  c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch);
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
     placeShelf(null);
@@ -506,7 +506,7 @@ function draw() {
     if (!en) { var ay = myy-70-(f%2)*2; c.fillStyle = PAL.out; c.fillRect(mx-6,ay-1,12,5); c.fillRect(mx-4,ay+4,8,3); c.fillRect(mx-2,ay+7,4,2);
       c.fillStyle = PAL.win; c.fillRect(mx-5,ay,10,3); c.fillRect(mx-3,ay+3,6,2); c.fillRect(mx-1,ay+5,2,2); }
   }
-  if (S.fade > 0) { c.setTransform(1,0,0,1,0,0); c.globalAlpha = Math.min(1,S.fade); c.fillStyle = PAL.out; c.fillRect(0,0,cw,ch); c.globalAlpha = 1; }
+  if (S.fade > 0) { c.setTransform(1,0,0,1,0,0); c.globalAlpha = Math.min(1,S.fade); c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch); c.globalAlpha = 1; }
 }
 
 /* ---------- labels and click areas ---------- */

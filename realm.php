@@ -56,9 +56,21 @@ foreach (($state['people'] ?? []) as $p) {
 <link rel="stylesheet" href="assets/realm.css<?= asset_ver('realm.css') ?>">
 </head>
 <body>
+<?php // THE TOP BAR IS ANIMA'S (David, 2026-11-12: "it should feel like we're in the same
+      // universe"): the same mark, "Anima | Realm" where every other screen says "Anima | Project
+      // manager", and the same navigation buttons in the same order, each drawn only while its
+      // switch is on, as includes/header.php does. The Realm's own controls sit to the right.
+      // includes/header.php itself is not loaded: it brings Anima's whole stylesheet, which styles
+      // bare buttons and fields in a way a map screen cannot wear (see assets/realm.css). ?>
+<?php $rfa = fn(string $k): bool => !function_exists('feature_on') || feature_on($k); ?>
 <header class="rtop">
-  <span class="rbrand">Anima Realm</span>
-  <a class="rbtn" href="index.php?anima=1">Back to Anima</a>
+  <a href="index.php?anima=1" class="rbrand"><?= site_logo() ?><span>Anima <span class="rmuted">| Realm</span></span></a>
+  <nav class="rnav" aria-label="Anima">
+    <?php if ($rfa('home') && (int)(effective_crew_id($pdo) ?? 0) > 0): ?><a href="home.php" class="rnavbtn">Home</a><?php endif; ?>
+    <?php if ($rfa('spell')): ?><a href="spell.php" class="rnavbtn">Spell</a><?php endif; ?>
+    <a href="realm.php" class="rnavbtn is-on" aria-current="page">Realm</a>
+    <?php if ($rfa('mytasks')): ?><a href="mytasks.php" class="rnavbtn">My tasks</a><?php endif; ?>
+  </nav>
   <span class="rgrow"></span>
   <?php if ($state): ?>
   <span class="rmeter">Your door
@@ -73,6 +85,7 @@ foreach (($state['people'] ?? []) as $p) {
   <button type="button" class="rbtn" id="focusBtn"<?= $hasHouse ? ' hidden' : '' ?>>Your tasks</button>
   <button type="button" class="rbtn" id="lookBtn">Your character</button>
   <?php endif; ?>
+  <span class="rwho"><?= e(current_user_display()) ?></span>
 </header>
 
 <?php if (!$ready): ?>

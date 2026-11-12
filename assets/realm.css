@@ -1,156 +1,261 @@
-/* The Realm (David, 2026-11-12). Its own stylesheet, on purpose: the Realm is a night scene with lit
-   windows, and Anima's tracker palette lives in style.css. The same rule holds here as there: every
-   colour is a role on :root, and no rule below writes a colour of its own. The map's own paint (grass,
-   stone, cloaks) is in assets/realm.js, because a canvas cannot read a stylesheet. */
+/* The Realm's frame: everything around the map.
+
+   David, 2026-11-12, after a day of using it: "let's do a whole pass on the UI aesthetics and try to
+   match it closer to what anima has already, it should feel like we're in the same universe". The
+   first version wore its own night-blue and gold, a serif for headings and its own button shapes,
+   so stepping from Spell into the Realm felt like changing apps. Now the frame IS Anima: the same
+   near-black ground and raised surfaces, Mana's sky blue for anything you press, spring green for
+   open and done, the same few radii, hairline borders, and shadows only on what floats.
+
+   ⚠ STILL ITS OWN FILE, AND STILL NOT LOADING style.css. That sheet styles bare elements (every
+   <button> gets a 16px top margin and a solid blue fill, every <input> is full width), which is
+   right for Anima's forms and would wreck a screen made of small controls laid over a map. So the
+   Realm takes Anima's ROLES by the same names and the same values, here, and nothing more. If a
+   role changes in style.css, change it here too: the names match so that it is a search, not a hunt.
+
+   The rule from style.css holds: every colour is a role on :root, and no rule below writes a colour
+   of its own. The pixel map's paint (grass, stone, cloaks) is in assets/realm.js, because a canvas
+   cannot read a stylesheet; the map stays a small lit world inside Anima's frame, on purpose. */
 :root {
   color-scheme: dark;
-  --night: #0d1320; --dusk: #151e30; --ridge: #24314b; --stone: #3b4763; --win: #121929;
-  --parchment: #ebe4d2; --muted: #93a0b8;
-  --candle: #ffc66b; --mana: #5fb2ff; --spell: #26fe89; --ember: #ff7a59;
-  --veil: rgb(0 0 0 / .6); --shade: rgb(0 0 0 / .5);
-  --display: Georgia, "Palatino Linotype", serif;
-  --body: "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Anima's roles: same names, same values as assets/style.css */
+  --bg: #101010;
+  --surface: #191919;
+  --surface-2: #1f1f1f;
+  --surface-3: #242424;
+  --border: #2b2b2b;
+  --border-soft: #232323;
+  --border-strong: #3a3a3a;
+  --text: #ededed;
+  --text-2: rgba(255, 255, 255, .78);
+  --muted: rgba(255, 255, 255, .60);
+  --faint: rgba(255, 255, 255, .42);
+  --on-primary: #101010;
+  --primary: #5fb2ff;
+  --primary-hover: #8ac8ff;
+  --primary-tint: rgba(95, 178, 255, .12);
+  --primary-fill: rgba(95, 178, 255, .38);
+  --primary-border: rgba(95, 178, 255, .45);
+  --ok: #26fe89;
+  --ok-tint: rgba(38, 254, 137, .10);
+  --danger: #ff6b6b;
+  --danger-tint: rgba(255, 107, 107, .10);
+  --warn: #f0c33c;
+  --warn-strong: #ffd76a;
+  --warn-tint: rgba(240, 195, 60, .10);
+  --radius-sm: 7px;
+  --radius: 9px;
+  --radius-md: 11px;
+  --radius-lg: 14px;
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, .55);
+  --ease: .12s ease;
+  --row-hover: rgba(255, 255, 255, .03);
+  --veil: rgba(0, 0, 0, .6);
+
+  /* The names the map's script asks for by hand (door marks drawn in the SVG, and anything a later
+     change writes inline). Each is one of Anima's roles: an open door is the green of finished
+     work, ajar is the amber of "heading that way", sealed is the red of "late". */
+  --night: var(--bg);
+  --dusk: var(--surface);
+  --ridge: var(--surface-3);
+  --stone: var(--border-strong);
+  --win: var(--surface-2);
+  --parchment: var(--text);
+  --mana: var(--primary);
+  --spell: var(--ok);
+  --candle: var(--warn);
+  --ember: var(--danger);
+  --shade: var(--veil);
+
+  --body: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --display: var(--body);
+  /* Only inside the map: names over houses and lands, where the world is pixels. */
   --pixel: "Courier New", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { background: var(--night); color: var(--parchment); font: 15px/1.45 var(--body); display: flex; flex-direction: column; padding: 10px 14px; gap: 10px; }
+body {
+  background: var(--bg); color: var(--text); font: 15px/1.45 var(--body);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  display: flex; flex-direction: column; padding: 14px 18px; gap: 12px;
+}
 button, input, select { font: inherit; color: inherit; }
 h1, h2, p, ul { margin: 0; }
-small { color: var(--muted); font-size: .84rem; }
-:focus-visible { outline: 2px solid var(--mana); outline-offset: 2px; }
+a { color: var(--primary); text-decoration: none; }
+small { color: var(--muted); font-size: 13px; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-.rtop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.rbrand { font: 700 1.5rem/1 var(--display); color: var(--candle); letter-spacing: .02em; }
+/* ---- the top bar: Anima's, with the Realm's own controls on the right ---- */
+.rtop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.rbrand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-size: 19px; font-weight: 700; margin-right: 6px; }
+.rbrand:hover { color: var(--primary); }
+.rbrand .rmuted { font-weight: 400; color: var(--muted); }
+/* The A, cut out of the square lockup: the same measured fractions as .site-logo-crop in style.css. */
+.site-logo { height: 24px; width: auto; display: block; }
+.site-logo-crop { --logo-size: 46px; display: inline-block; position: relative; overflow: hidden; width: calc(var(--logo-size) * 0.654); height: calc(var(--logo-size) * 0.561); flex: 0 0 auto; }
+.site-logo-crop img { position: absolute; display: block; width: var(--logo-size); height: var(--logo-size); left: calc(var(--logo-size) * -0.166); top: calc(var(--logo-size) * -0.155); mix-blend-mode: lighten; }
+.site-logo-text { font-weight: 800; letter-spacing: .06em; font-size: 17px; font-style: italic; color: var(--text); }
+/* Anima's navigation buttons (.nav-board there), so the way between screens looks the same from here. */
+.rnav { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.rnavbtn { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 13px; border-radius: 8px; background: var(--primary-tint); color: var(--primary); font-weight: 600; transition: background-color var(--ease), color var(--ease); }
+.rnavbtn:hover { background: var(--primary-fill); color: var(--on-primary); }
+.rnavbtn.is-on { background: var(--primary); color: var(--on-primary); }
 .rgrow { flex: 1; }
-.rmeter { display: inline-flex; align-items: center; gap: 8px; }
-.rbtn { background: var(--ridge); border: 1px solid var(--stone); border-radius: 6px; padding: 6px 12px; cursor: pointer; color: var(--parchment); text-decoration: none; display: inline-block; }
-.rbtn:hover { border-color: var(--parchment); }
-.rbtn.rprimary { background: var(--candle); border-color: var(--candle); color: var(--night); font-weight: 700; }
-.rbtn.rsmall { padding: 3px 9px; font-size: .9rem; }
-.rbtn:disabled { opacity: .45; cursor: not-allowed; }
-.rseg { display: inline-flex; border: 1px solid var(--ridge); border-radius: 6px; overflow: hidden; }
-.rseg button { background: none; border: 0; padding: 4px 10px; cursor: pointer; color: var(--muted); }
-.rseg button[aria-pressed="true"] { background: var(--ridge); color: var(--parchment); }
+.rwho { color: var(--muted); }
+.rmeter { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+
+/* ---- controls ---- */
+/* A button here is Anima's secondary button; .rprimary is its primary one. */
+.rbtn {
+  display: inline-block; cursor: pointer; text-decoration: none;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border);
+  border-radius: var(--radius); padding: 6px 14px; font-weight: 600;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+}
+.rbtn:hover { background: var(--primary-tint); border-color: var(--primary); }
+.rbtn.rprimary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.rbtn.rprimary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.rbtn.rsmall { padding: 3px 10px; font-size: 13px; border-radius: var(--radius-sm); }
+.rbtn:disabled, .rbtn.rprimary:disabled { background: var(--border-strong); border-color: var(--border-strong); color: var(--faint); cursor: not-allowed; }
+.rbtn[hidden], .rshelf[hidden] { display: none; }
+.rseg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.rseg button { background: none; border: 0; padding: 5px 11px; cursor: pointer; color: var(--muted); transition: background-color var(--ease), color var(--ease); }
+.rseg button:hover { color: var(--text); }
+.rseg button[aria-pressed="true"] { background: var(--primary-tint); color: var(--primary); font-weight: 600; }
+.rseg button:disabled { color: var(--faint); cursor: not-allowed; }
 
 .rnote { max-width: 60ch; margin: 8vh auto; display: flex; flex-direction: column; gap: 12px; }
-.rnote h1 { font: 700 1.6rem/1.2 var(--display); }
-.rwarn { padding: 8px 12px; border: 1px solid var(--candle); border-radius: 8px; margin: 10px; }
+.rnote h1 { font-size: 22px; line-height: 1.25; }
+.rwarn { padding: 10px 14px; margin: 12px; border-radius: var(--radius); border-left: 3px solid var(--warn-strong); background: var(--warn-tint); color: var(--warn); }
 
-.rapp { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 10px; }
-.rside { background: var(--dusk); border-radius: 10px; padding: 12px 8px; overflow: auto; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.rside h2 { font: 600 .74rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 8px 4px; }
+/* ---- the three panels: lists, the map, a conversation ---- */
+.rapp { flex: 1; min-height: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 12px; }
+.rapp.with-chat { grid-template-columns: 236px minmax(0, 1fr) 330px; }
+.rside, .rmain, .rchat { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); min-width: 0; min-height: 0; }
+.rside { padding: 14px 8px; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
+.rside h2 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); padding: 0 10px 6px; }
 .rrows { display: flex; flex-direction: column; gap: 1px; }
-.rrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
-.rrow:hover, .rrow.is-on { background: var(--ridge); }
+.rrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-sm); padding: 6px 10px; cursor: pointer; white-space: nowrap; color: var(--text-2); transition: background-color var(--ease), color var(--ease); }
+.rrow:hover { background: var(--row-hover); color: var(--text); }
+.rrow.is-on { background: var(--primary-tint); color: var(--primary); }
 .rrow > span:not(.rhash) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.rrow small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
-.rrow.is-away { color: var(--muted); }
-.rdot { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--muted); display: inline-block; }
-.rdot.open { background: var(--spell); border-color: var(--spell); }
-.rdot.ajar { border-color: var(--candle); }
-.rdot.sealed { border-radius: 1px; transform: rotate(45deg); background: var(--ember); border-color: var(--ember); }
+.rrow small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--faint); }
+.rrow.is-away { color: var(--faint); }
+.rhash { color: var(--faint); width: 10px; }
+.rdot { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--faint); display: inline-block; }
+.rdot.open { background: var(--ok); border-color: var(--ok); }
+.rdot.ajar { border-color: var(--warn); }
+.rdot.sealed { border-radius: 1px; transform: rotate(45deg); background: var(--danger); border-color: var(--danger); }
+/* Anima's count badge (.mytasks-badge.is-new there). */
+.rbadge { margin-left: auto; min-width: 16px; padding: 0 5px; background: var(--primary); color: var(--on-primary); border-radius: 9px; font-size: 11px; line-height: 16px; text-align: center; font-weight: 700; }
 
-.rapp.with-chat { grid-template-columns: 230px minmax(0, 1fr) 320px; }
-.rchat { background: var(--dusk); border-radius: 10px; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.rchat[hidden] { display: none; }
-.rchathead { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--ridge); }
-.rchathead h2 { font: 700 1.1rem var(--display); color: var(--candle); }
-.rmsgs { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.rmsg { background: var(--night); border-radius: 8px; padding: 6px 10px; max-width: 92%; align-self: flex-start; overflow-wrap: anywhere; }
-.rmsg.is-mine { align-self: flex-end; background: var(--ridge); }
-.rmsghead { display: flex; gap: 8px; align-items: baseline; }
-.rmsgbody { white-space: pre-wrap; }
-.rempty { color: var(--muted); }
-.rimglink { cursor: zoom-in; }
-dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
-.rpic img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto 12px; border-radius: 6px; }
-.rimg { display: block; max-width: 100%; max-height: 240px; border-radius: 6px; margin-top: 4px; }
-.rtag { color: var(--mana); }
-.rtag.is-me { background: var(--candle); color: var(--night); border-radius: 3px; padding: 0 3px; }
-.rsuggest { display: flex; flex-direction: column; gap: 1px; margin: 0 12px; padding: 4px; background: var(--night); border: 1px solid var(--stone); border-radius: 8px; }
-.rsuggest[hidden], .rpicked[hidden] { display: none; }
-.rpicked { display: flex; align-items: center; gap: 8px; padding: 6px 12px 0; color: var(--muted); font-size: .88rem; }
-.rpicked span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rcomposer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--ridge); }
-.rcomposer input { flex: 1; min-width: 0; background: var(--win); border: 1px solid var(--ridge); border-radius: 6px; padding: 7px 10px; }
-.rbadge { margin-left: auto; background: var(--mana); color: var(--night); border-radius: 9px; font-size: .74rem; font-weight: 700; padding: 0 6px; }
-.rhash { color: var(--muted); width: 10px; }
-
-.rmain { background: var(--dusk); border-radius: 10px; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.rmapbox { position: relative; flex: 1; min-height: 320px; overflow: hidden; border-radius: 10px 10px 0 0; }
+.rmain { display: flex; flex-direction: column; overflow: hidden; }
+.rmapbox { position: relative; flex: 1; min-height: 320px; overflow: hidden; background: var(--bg); }
 .rmapbox canvas, .rmapbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .rmapbox canvas { image-rendering: pixelated; }
 .rmapbox svg { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
 .rmapbox.is-inside svg, .rmapbox.is-inside .rzoom, .rmapbox.is-inside #cardslot { display: none; }
-.rzoom { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.rcard { position: absolute; left: 10px; bottom: 10px; max-width: min(340px, calc(100% - 20px)); background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.rzoom { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* What floats over the map: Anima's raised surface, a firmer border, and the one shadow. */
+.rcard, .rinside, .rtoast { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); }
+.rcard { position: absolute; left: 12px; bottom: 12px; max-width: min(350px, calc(100% - 24px)); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .racts { display: flex; flex-wrap: wrap; gap: 8px; }
-.rinside { position: absolute; left: 10px; right: 10px; top: 10px; background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.rcard .racts { margin-top: 4px; }
+.rinside { position: absolute; left: 12px; right: 12px; top: 12px; padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
 .rinside[hidden] { display: none; }
-.rinside h2 { font: 700 1.25rem/1.1 var(--display); color: var(--candle); }
-.rlegend { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 14px; color: var(--muted); font-size: .86rem; }
+.rinside h2 { font-size: 18px; font-weight: 700; }
+.rinside span { color: var(--muted); }
+.rlegend { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 9px 16px; color: var(--faint); font-size: 13px; border-top: 1px solid var(--border-soft); }
 .rlegend span { display: inline-flex; align-items: center; gap: 6px; }
 
+/* ---- names and click areas laid over the map ---- */
 .hit { fill: transparent; }
 .bld { cursor: pointer; }
-.bld:focus-visible .hit { stroke: var(--candle); stroke-width: 2; }
-.bld:hover .lbl { fill: var(--candle); }
-.lbl { font: 700 14px var(--pixel); fill: var(--parchment); text-anchor: middle; paint-order: stroke; stroke: var(--night); stroke-width: 3px; }
+.bld:focus-visible .hit { stroke: var(--primary); stroke-width: 2; }
+.bld:hover .lbl { fill: var(--primary); }
+.lbl { font: 700 14px var(--pixel); fill: var(--text); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 .lbl.away { fill: var(--muted); }
-.lbl.place { fill: var(--candle); font-size: 15px; stroke-width: 0; }
-.plate { fill: var(--night); fill-opacity: .85; stroke: var(--candle); stroke-width: 1.5; }
-.region { font: 700 24px var(--pixel); fill: var(--parchment); opacity: .8; text-anchor: middle; letter-spacing: .04em; paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+.lbl.place { fill: var(--primary); font-size: 15px; stroke-width: 0; }
+.plate { fill: var(--bg); fill-opacity: .88; stroke: var(--primary-border); stroke-width: 1.5; }
+.region { font: 700 24px var(--pixel); fill: var(--text); opacity: .8; text-anchor: middle; letter-spacing: .04em; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
 .region.free { fill: var(--muted); }
-.sub { font: 700 13px var(--pixel); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+.sub { font: 700 13px var(--pixel); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
 .freeland { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 8; opacity: .85; }
 
-#toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; width: min(340px, calc(100% - 32px)); z-index: 20; }
-.rtoast.is-link { cursor: pointer; border-color: var(--mana); }
-.rtoast { background: var(--night); border: 1px solid var(--stone); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px var(--shade); }
+/* ---- a conversation ---- */
+.rchat { display: flex; flex-direction: column; }
+.rchat[hidden] { display: none; }
+.rchathead { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
+.rchathead h2 { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rmsgs { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rmsg { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 7px 11px; max-width: 92%; align-self: flex-start; overflow-wrap: anywhere; }
+.rmsg.is-mine { align-self: flex-end; background: var(--primary-tint); border-color: var(--primary-border); }
+.rmsghead { display: flex; gap: 8px; align-items: baseline; }
+.rmsghead b { font-size: 13px; }
+.rmsghead small { font-size: 12px; color: var(--faint); }
+.rmsgbody { white-space: pre-wrap; }
+.rempty { color: var(--muted); }
+.rimglink { cursor: zoom-in; }
+.rimg { display: block; max-width: 100%; max-height: 240px; border-radius: var(--radius-sm); margin-top: 4px; }
+.rtag { color: var(--primary); font-weight: 600; }
+.rtag.is-me { background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 0 4px; }
+.rsuggest { display: flex; flex-direction: column; gap: 1px; margin: 0 14px; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.rsuggest[hidden], .rpicked[hidden] { display: none; }
+.rpicked { display: flex; align-items: center; gap: 8px; padding: 8px 14px 0; color: var(--muted); font-size: 13px; }
+.rpicked span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcomposer { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border-soft); }
+.rcomposer input:not([type=file]) { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; transition: border-color var(--ease); }
+.rcomposer input::placeholder { color: var(--faint); }
+.rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
-dialog { background: var(--dusk); color: var(--parchment); border: 1px solid var(--stone); border-radius: 10px; padding: 18px; width: min(480px, calc(100% - 32px)); }
+/* ---- notices, and the windows that open over the page ---- */
+#toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; width: min(350px, calc(100% - 36px)); z-index: 20; }
+.rtoast { padding: 11px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rtoast.is-link { cursor: pointer; border-color: var(--primary-border); }
+dialog { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); padding: 20px; width: min(500px, calc(100% - 32px)); }
 dialog::backdrop { background: var(--veil); }
-dialog h2 { font: 700 1.4rem var(--display); margin-bottom: 12px; }
-dialog form { display: flex; flex-direction: column; gap: 12px; }
-.rlook { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
-.rchar { width: 120px; height: 120px; flex: none; background: var(--win); border-radius: 8px; image-rendering: pixelated; }
+dialog h2 { font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+dialog form { display: flex; flex-direction: column; gap: 14px; }
+dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
+.rpic img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto 14px; border-radius: var(--radius-sm); }
+.rlook { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.rchar { width: 120px; height: 120px; flex: none; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-md); image-rendering: pixelated; }
 .rpicks { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .rpick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.rpick > span:first-child { width: 78px; color: var(--muted); }
+.rpick > span:first-child { width: 82px; color: var(--muted); }
 .rdacts { display: flex; justify-content: flex-end; gap: 8px; }
 
-/* The focus desk (David, 2026-11-12). The clock that is running, the person's open work, and the
-   music. The top bar's button wears the same edge as the panel: ember while a clock is counting
-   work, the open-door green on a break. */
+/* ---- your tasks (the focus desk, David 2026-11-12) ----
+   The clock that is running, the person's open work, and the music. The button and the panel wear
+   the same edge: red while a clock is counting work, the open-door green on a break. */
 #focusBtn { font-variant-numeric: tabular-nums; }
-.rbtn[hidden], .rshelf[hidden] { display: none; }
+#focusBtn.is-focus { border-color: var(--danger); color: var(--text); }
+#focusBtn.is-break { border-color: var(--ok); color: var(--text); }
 /* The bookshelf in your own house is the way in to your tasks: a see-through button laid over the
    drawn shelf (placed by assets/realm.js), with a small tag under it so it reads as something to click. */
 .rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
-.rshelf:hover, .rshelf:focus-visible { border-color: var(--candle); }
-.rshelf span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; background: var(--candle); color: var(--night); border-radius: 3px; padding: 1px 7px; font: 700 12px var(--pixel); font-variant-numeric: tabular-nums; }
-#focusBtn.is-focus { border-color: var(--ember); color: var(--candle); }
-#focusBtn.is-break { border-color: var(--spell); }
-#focusBody { display: flex; flex-direction: column; gap: 12px; }
+.rshelf:hover, .rshelf:focus-visible { border-color: var(--primary); }
+.rshelf span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 1px 8px; font: 700 12px var(--body); font-variant-numeric: tabular-nums; }
+#focusBody { display: flex; flex-direction: column; gap: 14px; }
 .rfidle { color: var(--muted); }
-.rfnow { background: var(--night); border: 1px solid var(--stone); border-left-width: 4px; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.rfnow.is-focus { border-left-color: var(--ember); }
-.rfnow.is-break { border-left-color: var(--spell); }
+.rfnow { background: var(--surface-2); border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.rfnow.is-focus { border-left-color: var(--danger); }
+.rfnow.is-break { border-left-color: var(--ok); }
 .rfnow .racts { margin-top: 6px; }
-.rfphase, .rfhead { font: 600 .74rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.rfphase, .rfhead { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .rfhead { margin: 0 0 6px; }
-.rfclock { font: 700 2.6rem/1.1 var(--pixel); color: var(--candle); font-variant-numeric: tabular-nums; }
+.rfclock { font: 700 40px/1.1 var(--body); color: var(--text); font-variant-numeric: tabular-nums; }
 .rflist { display: flex; flex-direction: column; gap: 4px; max-height: 38vh; overflow: auto; }
-.rftask { display: flex; align-items: center; gap: 10px; background: var(--night); border-radius: 6px; padding: 6px 10px; }
-.rftask.is-on { background: var(--ridge); }
+.rftask { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 7px 11px; }
+.rftask.is-on { background: var(--primary-tint); border-color: var(--primary-border); }
 .rftask > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rftask b, .rftask > div small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rftask > small { flex: none; color: var(--candle); }
-.rmusic { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border-top: 1px solid var(--ridge); padding-top: 12px; }
+.rftask > small { flex: none; color: var(--warn); }
+.rmusic { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border-top: 1px solid var(--border-soft); padding-top: 14px; }
 .rmusic[hidden] { display: none; }
 .rmusic label { display: inline-flex; align-items: center; gap: 8px; }
-.rmusic input { accent-color: var(--candle); }
+.rmusic input { accent-color: var(--primary); }
 .rmusic small { flex-basis: 100%; }
 
 @media (max-width: 860px) {
@@ -158,7 +263,7 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
   .rapp, .rapp.with-chat { grid-template-columns: minmax(0, 1fr); }
   .rchat { min-height: 50vh; }
   .rside .rrows { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
-  .rrow { width: auto; background: var(--night); }
+  .rrow { width: auto; background: var(--surface-2); }
   .rrow small { margin-left: 4px; }
   .rmapbox { min-height: 62vh; }
 }
