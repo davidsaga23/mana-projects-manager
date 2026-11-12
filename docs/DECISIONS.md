@@ -5296,3 +5296,24 @@ David and Renata tried ravens on live the day chat shipped. What they found, and
 - **The cost to watch:** one request per person every 20 seconds on every open Anima page, and every
   8 seconds on the Realm with no conversation open. Fine for two testers; re-measure before the
   Realm is opened to the whole studio.
+
+## 2026-11-12 — The bell refreshes itself
+
+David, after the ravens test: the bell "only refreshes when a page loads ... Can we change that
+behavior to be more real-time and get those notifications?"
+
+- **`notify_poll.php`** answers "what is in my bell" with the same count and list the header draws,
+  from the same functions (`notify_unseen()`, `notify_recent()`, `notify_link()`, `notify_verb()`).
+  `assets/bell.js` asks it every 30 seconds while the page is in front of somebody, and again when
+  the tab comes back to the front.
+- **Read-only.** Marking read is still only `notify_seen.php`, on opening the bell. A bell that
+  cleared itself because a page was open would never ring.
+- **Never redrawn while open.** The count moves; the rows wait until the bell is shut.
+- **30 seconds, not faster, and nothing held open.** The hosting cannot hold a connection, and this
+  is every Anima user on every page: about one small request per person every 30 seconds while a
+  tab is visible. A background tab asks nothing.
+- **"Last seen" shifts a little.** The poll passes the login gate like any request, so a page left
+  open and visible now keeps `users.last_seen` fresh (throttled to five minutes there). Accepted:
+  it is closer to "is this person at Anima" than "did they click".
+- **Not done:** sound, or a desktop notification. Those belong to the Realm's stage 5 (the
+  installed app), where the browser's permission is asked once.
