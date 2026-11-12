@@ -1402,6 +1402,7 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 1. The village | Map, houses, online / resting / away, door status, walking, going inside, your character | **Built 2026-11-12**, migration 081 |
 | 2. Chat | Channels (Tavern, announcements, one per active show), ravens between people, unread counts, ravens in the bell | **Built 2026-11-12**, migration 082 |
 | 2b. Chat, the rest | Pictures in messages and tagging people: **built 2026-11-12**, migration 083. Speech bubbles in rooms: built the same day. The Herald side panel and knocks in the bell: not built |  |
+| 2c. Focus desk | Your open work with a Start button on Anima's own timer, the door sealing itself during a focus block, the clock in the top bar, soft music made in the browser | **Built 2026-11-12**, no migration |
 | 3. Voice | Voice tables for up to 5, knock to be let in, "Summon the Council" opening a saved Google Meet link | Not built |
 | 4. Mana and praise | Streak mana, praise, private gold, clothes, accessories and pets, gifting and swapping, all face to face | Not built |
 | 5. The app | Install on Windows with start-up, desktop notifications and sounds, then a phone layout and phone notifications | Not built |

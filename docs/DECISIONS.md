@@ -5358,3 +5358,35 @@ attach to the same moment later.
 - **What was already true when the page loaded is not news.** A pass from five minutes ago does not
   announce itself or walk the visitor in on a reload.
 - **Pictures open in a viewer inside the Realm** (David, same day), a `<dialog>` made on first use.
+## 2026-11-12 — The Realm's focus desk
+
+David: "how can I change to in focus time? I think we should play a soft music while on focus and
+maybe list all the pending tasks you have in anima? With the option to start the clock."
+
+- **One clock.** The desk starts and stops Anima's existing timer (`start_timer()`, `stop_timer()`,
+  `pomodoro_settle()` in `includes/timelog.php`), the same functions and the same `time_timers` row
+  My tasks uses. A second timer in the Realm would have let the two screens disagree about
+  somebody's hours. The page only counts down between the server's answers and asks again every
+  minute.
+- **Your own work only, and the show comes from the task.** `realm_focus_start()` repeats the
+  ownership check My tasks makes and reads the project from the task or card, never from the
+  request. A card with no show is not listed: hours are costed to a show.
+- **The door follows the clock.** Sealed while a focus block runs, open when it stops or becomes a
+  break. It is changed only when a start, stop or settle went through, so a refused request never
+  opens a door somebody set by hand. Accepted: stopping the clock opens the door even if it was
+  ajar before the block.
+- **Only a clock started or stopped FROM the Realm moves the door.** A block started in My tasks
+  shows the smoke and the countdown in the Realm but leaves the door as it stands, and a block that
+  ends while the Realm is shut leaves the door sealed until the person next changes it or uses the
+  desk.
+- **A block that reaches zero is settled once by the page.** If the page is shut, My tasks settles
+  it the next time anybody looks, as it always has. No minutes depend on a tab staying open.
+- **The music is made in the browser** (Web Audio): a slow chord of soft voices behind a filter and
+  an occasional quiet bell. No audio file to host or license and nothing fetched from another
+  site, the rule the Realm already keeps for fonts and scripts. It plays only during a focus block,
+  never during a break or a plain timer, and only after a click, because browsers refuse sound
+  before one. On by default, since it was asked for; the switch and volume are kept in the
+  browser's own storage, per computer, not on the account.
+- **No migration.** Nothing new is stored.
+- **Not done:** dropping a block without logging it (My tasks has "drop"), the overhead categories
+  (Meetings, Desk time), a choice of music, and sealing the door for a block started in My tasks.

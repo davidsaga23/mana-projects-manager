@@ -30,6 +30,7 @@ require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
 require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passes accept_upload()
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
+require_once __DIR__ . '/includes/realm_focus.php';
 require_login_json();
 
 header('Content-Type: application/json');
@@ -46,6 +47,58 @@ if (in_preview()) {
 }
 if (!realm_available($pdo)) {
     echo json_encode(['ok' => false, 'error' => 'The Realm needs a database update first. An administrator opens migrate.php once.']);
+    exit;
+}
+
+// ---- the focus desk (David, 2026-11-12) --------------------------------------
+// GET  focus=1                       the clock and this person's open work
+// POST focus=start&task=p:12|t:34    start Anima's timer on one of their own
+// POST focus=stop                    stop it, logging the time as My tasks would
+// POST focus=settle                  a focus block ran out: log it, start the break
+//
+// The timer code and the card list are only loaded for these requests; the
+// heartbeat and chat never need them.
+if (isset($_GET['focus']) || isset($_POST['focus'])) {
+    $said = '';
+    $bad = '';
+    try {
+        require_once __DIR__ . '/includes/statuses.php';
+        require_once __DIR__ . '/includes/mailer.php';
+        require_once __DIR__ . '/includes/tickets.php';
+        require_once __DIR__ . '/includes/timelog.php';
+        $crewId = realm_crew_id($pdo, $uid);
+        $why = realm_focus_ready($pdo, $crewId);
+        if ($why === '' && isset($_POST['focus'])) {
+            $what = (string)$_POST['focus'];
+            try {
+                if ($what === 'start') {
+                    $said = realm_focus_start($pdo, $uid, $crewId, (string)($_POST['task'] ?? ''));
+                } elseif ($what === 'stop') {
+                    $said = stop_timer($pdo, $crewId, $uid);
+                } elseif ($what === 'settle') {
+                    $said = function_exists('pomodoro_settle') ? pomodoro_settle($pdo, $crewId, $uid) : '';
+                }
+            } catch (PDOException $e) {
+                // A PDOException IS a RuntimeException, and its message is the
+                // database's own words: not something to print on the desk.
+                $bad = 'The clock could not be changed. Try again in a moment.';
+            } catch (RuntimeException $e) {
+                // The timer's own refusals ("That task is not assigned to you.").
+                $bad = $e->getMessage();
+            }
+            // The door follows the clock, so it is only touched when the clock
+            // was: a refused request, or a word this desk does not know, must
+            // not open a door somebody had set ajar or sealed by hand.
+            if ($bad === '' && in_array($what, ['start', 'stop', 'settle'], true)) {
+                realm_focus_door($pdo, $uid, realm_focus_now($pdo, $crewId));
+            }
+        }
+        $answer = ['ok' => true, 'focus' => realm_focus_state($pdo, $crewId), 'said' => trim($said)];
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The focus desk could not be reached. Try again in a moment.']);
+    }
     exit;
 }
 

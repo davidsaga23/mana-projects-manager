@@ -120,6 +120,33 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
 .rpick > span:first-child { width: 78px; color: var(--muted); }
 .rdacts { display: flex; justify-content: flex-end; gap: 8px; }
 
+/* The focus desk (David, 2026-11-12). The clock that is running, the person's open work, and the
+   music. The top bar's button wears the same edge as the panel: ember while a clock is counting
+   work, the open-door green on a break. */
+#focusBtn { font-variant-numeric: tabular-nums; }
+#focusBtn.is-focus { border-color: var(--ember); color: var(--candle); }
+#focusBtn.is-break { border-color: var(--spell); }
+#focusBody { display: flex; flex-direction: column; gap: 12px; }
+.rfidle { color: var(--muted); }
+.rfnow { background: var(--night); border: 1px solid var(--stone); border-left-width: 4px; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.rfnow.is-focus { border-left-color: var(--ember); }
+.rfnow.is-break { border-left-color: var(--spell); }
+.rfnow .racts { margin-top: 6px; }
+.rfphase, .rfhead { font: 600 .74rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.rfhead { margin: 0 0 6px; }
+.rfclock { font: 700 2.6rem/1.1 var(--pixel); color: var(--candle); font-variant-numeric: tabular-nums; }
+.rflist { display: flex; flex-direction: column; gap: 4px; max-height: 38vh; overflow: auto; }
+.rftask { display: flex; align-items: center; gap: 10px; background: var(--night); border-radius: 6px; padding: 6px 10px; }
+.rftask.is-on { background: var(--ridge); }
+.rftask > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rftask b, .rftask > div small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rftask > small { flex: none; color: var(--candle); }
+.rmusic { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border-top: 1px solid var(--ridge); padding-top: 12px; }
+.rmusic[hidden] { display: none; }
+.rmusic label { display: inline-flex; align-items: center; gap: 8px; }
+.rmusic input { accent-color: var(--candle); }
+.rmusic small { flex-basis: 100%; }
+
 @media (max-width: 860px) {
   html, body { height: auto; }
   .rapp, .rapp.with-chat { grid-template-columns: minmax(0, 1fr); }

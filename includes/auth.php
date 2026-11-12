@@ -564,7 +564,9 @@ function artist_may_post(): bool {
         // which conversations that account may write in.
         // `knock` and `answer_knock` (2026-11-12, migration 084): knocking on an
         // ajar door you are standing at, and answering a knock on your own.
-        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock'],
+        // `focus` (2026-11-12): start or stop Anima's own timer from the Realm.
+        // realm_focus_start() checks the task is the asker's, as mytasks.php does.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
