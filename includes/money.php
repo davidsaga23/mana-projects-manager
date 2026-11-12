@@ -1434,6 +1434,7 @@ function finance_mark_migration_done(string $name, string $who): ?string {
         return finance_is_rights_error($e) ? finance_rights_message() : $e->getMessage();
     }
     return null;
+}
 
 /* --------------------------------------------------------------------------
  * WHO IS INVOICING, AND WHERE THE MONEY GOES (finance_install_18).
