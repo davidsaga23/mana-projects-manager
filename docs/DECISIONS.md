@@ -5276,3 +5276,23 @@ David, once stage 1 was live and he was standing in Renata's office.
   seconds and stops while the window is hidden. Everything else learns of unread messages from the
   25-second heartbeat. Nothing is held open.
 - **Kept forever.** No 90-day limit: that is the thing David dislikes about free Slack.
+
+## 2026-11-12 — Being told about a raven outside the Realm
+
+David and Renata tried ravens on live the day chat shipped. What they found, and what was changed:
+
+- **The bell must not depend on whether the Realm is open.** The first rule was "ring only if the
+  other person is away from the Realm". People keep the Realm in one tab and work in another, so it
+  never rang. It now rings always (still once per sender until read), and
+  `realm_raven_bell_clear()` marks the line seen when the ravens are read in the Realm.
+- **Anima's bell is drawn when a page loads and does not refresh itself.** That is how it has
+  always worked for every kind of notification, and it was left alone. The live signal is
+  `assets/realm-nudge.js`: the unread count on the Realm button, asked every 20 seconds, loaded by
+  `includes/header.php` only for somebody who has the Realm.
+- **`realm_api.php?unread=1`** is the one small question both that script and the Realm itself ask.
+  It reads counts and touches nothing: it is not a heartbeat and does not make anybody look present.
+- **A count is a way in.** A name with unread ravens opens them when clicked; with nothing unread
+  it selects the house. The same for the short message that announces a raven.
+- **The cost to watch:** one request per person every 20 seconds on every open Anima page, and every
+  8 seconds on the Realm with no conversation open. Fine for two testers; re-measure before the
+  Realm is opened to the whole studio.

@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm tells you about a raven wherever you are in Anima *(no migration)*
+
+**Reported by David**, trying ravens with Renata: the count beside her name was "not working atm",
+then "we don't get any notifications in anima", then "I do see a new counter here but I need to be
+on that page", then "I can't click on that notification/counter/message".
+
+- **The "Realm" button in Anima's top bar carries the unread count**, on every page, refreshed every
+  20 seconds without a reload. The browser tab's title carries it too.
+- **The bell rings for a raven whether or not the other person has the Realm open.** It used to
+  stay silent for anybody with the Realm open in another tab. Reading the ravens in the Realm takes
+  the line out of the bell's unread count again.
+- **In the Realm, the count beside a name arrives within 8 seconds** (it rode the 25-second
+  heartbeat), and a short message says who the raven is from.
+- **Clicking a name that has a count, or that message, opens the ravens.** A name with nothing
+  unread still selects the person's house, as before.
+- Long channel names in the Realm's list end in an ellipsis and no longer run under the map.
+
 ## 2026-11-12 — The Realm, stage 2: written chat and ravens *(migration 082)*
 
 **Asked by David:** "what's the next step? I'd like to see if we can open a chat or a voice chat".
