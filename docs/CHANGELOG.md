@@ -14,6 +14,26 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: a focus desk, with the timer and soft music *(no migration)*
+
+**Asked by David:** "how can I change to in focus time? I think we should play a soft music while
+on focus and maybe list all the pending tasks you have in anima? With the option to start the
+clock."
+
+- **A Focus desk button in the Realm's top bar** lists your open work, the same tasks and cards My
+  tasks shows, each with a Start button.
+- **Start begins Anima's own timer**, the one My tasks runs: a 25-minute focus block, then a break.
+  There is one clock, so the hours logged from the Realm are the hours My tasks shows. Stop logs
+  the minutes so far, and the message says what was written.
+- **Your door seals itself while a focus block runs** and opens again when it stops or becomes a
+  break. Other people already see smoke over the house of anybody in focus.
+- **The button shows the clock** ("Focus 18:42", "Break 4:10"), so it is in sight with the desk
+  shut.
+- **Soft music during a focus block**, made by the page itself: no audio file, nothing loaded from
+  another site. A switch and a volume in the desk, remembered on that computer. Two bell notes mark
+  the end of a block.
+- Still only for the Realm's testers (David and Renata).
+
 ## 2026-11-12 — The Realm: speech bubbles no longer cover each other *(no migration)*
 
 **Reported by David**, with a screenshot of two bubbles on top of one another: "is there a way we
