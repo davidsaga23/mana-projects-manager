@@ -1,0 +1,100 @@
+/* Days off calendar (days_off.php). Its own file rather than more of
+   style.css, which nearly every feature touches: this screen is the only one
+   that needs these rules. Spell look (docs/DECISIONS.md, "What makes Spell look
+   the way it does"): one panel with hairlines, whispering labels, colour only
+   where it means something, tabular figures. */
+
+.do-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 4px 0 12px; }
+.do-nav { display: inline-flex; align-items: center; gap: 6px; }
+.do-nav input[type=month] { width: auto; }
+.do-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-left: auto;
+  font-size: 11.5px; color: var(--muted); }
+.do-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 6px; }
+
+/* ---- the grid: one panel, a row per person, a column per day ------------- */
+.do-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg, 14px); }
+.do-grid { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums;
+  user-select: none; -webkit-user-select: none; }
+.do-grid th, .do-grid td { border-bottom: 1px solid var(--border-soft); padding: 0; }
+.do-grid tbody tr:last-child > * { border-bottom: 0; }
+.do-grid tbody tr:hover > * { background-color: var(--surface-2); }
+
+.do-grid .do-name { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left;
+  min-width: 170px; max-width: 220px; padding: 6px 12px; font-weight: 500; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--border-soft); }
+.do-grid thead .do-name { text-transform: uppercase; letter-spacing: .04em; font-size: 11.5px;
+  font-weight: 600; color: var(--muted); }
+.do-grid .do-name a { color: var(--text); }
+.do-sub { display: block; font-size: 11px; font-weight: 400; color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+
+.do-grid th.do-day { min-width: 26px; padding: 6px 0 5px; text-align: center; font-size: 11.5px;
+  font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.do-dow { display: block; font-size: 10px; font-weight: 500; color: var(--faint); text-transform: uppercase; }
+.do-grid th.do-day.is-today { color: var(--primary); }
+.do-grid th.do-day.is-today .do-dow { color: var(--primary); }
+
+.do-cell { height: 34px; min-width: 26px; position: relative; }
+.do-grid.is-editable .do-cell { cursor: cell; }
+.do-grid.is-editable .do-cell.is-off { cursor: pointer; }
+.do-cell.is-today { box-shadow: inset 1px 0 0 var(--primary-border), inset -1px 0 0 var(--primary-border); }
+
+/* Weekends and studio holidays: the studio is shut, so they whisper. */
+.do-day.is-closed, .do-cell.is-closed { background-color: rgba(255, 255, 255, .025); }
+.do-day.is-closed { color: var(--faint); }
+
+/* A day off: a tinted block, joined across the run so it reads as one holiday. */
+.do-cell.is-off::after { content: ''; position: absolute; inset: 6px 0; background: var(--do-fill);
+  border-top: 1px solid var(--do-edge); border-bottom: 1px solid var(--do-edge); }
+.do-cell.is-off.is-start::after { left: 3px; border-left: 1px solid var(--do-edge);
+  border-radius: var(--radius-sm, 7px) 0 0 var(--radius-sm, 7px); }
+.do-cell.is-off.is-end::after { right: 3px; border-right: 1px solid var(--do-edge);
+  border-radius: 0 var(--radius-sm, 7px) var(--radius-sm, 7px) 0; }
+.do-cell.is-off.is-start.is-end::after { border-radius: var(--radius-sm, 7px); }
+/* A day off on a weekend or holiday costs nothing: drawn, but fainter. */
+.do-cell.is-off.is-closed::after { opacity: .45; }
+.do-grid.is-editable .do-cell.is-off:hover::after { filter: brightness(1.35); }
+
+/* The run being dragged out. */
+.do-cell.is-picking::after { content: ''; position: absolute; inset: 6px 0; background: var(--primary-fill);
+  border-top: 1px solid var(--primary-border); border-bottom: 1px solid var(--primary-border); }
+
+.do-grid .do-total { padding: 0 10px; color: var(--muted); font-size: 12px; text-align: right;
+  border-left: 1px solid var(--border-soft); min-width: 36px; }
+
+/* ---- reason colours: the cell, the legend key and the chip share them ---- */
+.do-k-holiday  { --do-fill: var(--violet-tint);      --do-edge: rgba(192, 140, 240, .45); --do-ink: var(--violet-strong); }
+.do-k-sick     { --do-fill: var(--danger-tint-2);    --do-edge: var(--danger-border);     --do-ink: var(--danger-strong); }
+.do-k-personal { --do-fill: var(--chip-teal-bg);     --do-edge: rgba(69, 184, 172, .45);  --do-ink: var(--chip-teal-ink); }
+.do-k-course   { --do-fill: var(--chip-orange-bg);   --do-edge: rgba(230, 126, 34, .45);  --do-ink: var(--chip-orange-ink); }
+.do-k-other    { --do-fill: var(--chip-grey-bg);     --do-edge: var(--border-strong);     --do-ink: var(--chip-grey-ink); }
+.do-key { background: var(--do-fill); border: 1px solid var(--do-edge); }
+.do-key.do-k-closed { background: rgba(255, 255, 255, .06); border-color: var(--border); }
+
+.do-chip { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm, 7px); font-size: 12px;
+  background: var(--do-fill, var(--chip-grey-bg)); color: var(--do-ink, var(--text-2));
+  border: 1px solid var(--do-edge, transparent); }
+button.do-chip { cursor: pointer; font: inherit; font-size: 12px; min-height: 0; line-height: 1.5; }
+button.do-chip:hover, button.do-chip.is-on { filter: brightness(1.3); box-shadow: 0 0 0 1px var(--do-edge); }
+
+.do-list { margin-top: 18px; }
+.do-row-actions { white-space: nowrap; text-align: right; }
+.do-row-actions .linkish + form { margin-left: 10px; }
+.do-add { margin-top: 14px; border-top: 1px solid var(--border-soft); padding-top: 12px; }
+
+/* ---- the pop-up the grid opens ------------------------------------------- */
+.do-pop { position: fixed; z-index: 50; width: 340px; max-width: calc(100vw - 32px); padding: 14px 16px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-pop, 0 12px 34px rgba(0, 0, 0, .55)); }
+.do-pop[hidden] { display: none; }
+.do-pop h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: -.02em; }
+.do-pop .row { gap: 10px; }
+.do-pop .row label { flex: 1; }
+.do-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0; }
+.do-pop .actions { display: flex; align-items: center; gap: 8px; }
+.do-pop #doPopDelete { margin-left: auto; color: var(--danger-strong); }
+
+@media (max-width: 700px) {
+  .do-legend { margin-left: 0; }
+  .do-grid .do-name { min-width: 120px; }
+}

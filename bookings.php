@@ -16,6 +16,13 @@
 //
 // Read only, and for everybody who can log in: positions and dates are
 // production facts, and no rate is anywhere near this page.
+//
+// David, 2026-11-12: "let's create a calendar for days off so anima can
+// register those days", then "let's include it as a tab in the bookings page".
+// The DAYS OFF tab is the one part of Bookings that saves (Production only,
+// the bookings_edit switch). Unlike the other two it is drawn by the server,
+// at bookings.php?tab=days-off, because it is a form: a month of people and
+// days, posted and redirected back. includes/days_off/prepare.php says the rest.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -24,6 +31,30 @@ require_once __DIR__ . '/includes/bookings.php';
 require_login();
 
 $projects   = bookings_projects($pdo);
+
+// The Days off tab: its own data and its own saving, and none of the timeline's
+// (which it would compute for nothing).
+$daysOffTab = (($_GET['tab'] ?? $_POST['tab'] ?? '') === 'days-off');
+if ($daysOffTab) {
+    require __DIR__ . '/includes/days_off/prepare.php';   // may save and redirect
+    $pageTitle = 'Bookings · Days off';
+    require __DIR__ . '/includes/header.php';
+    ?>
+<h2 class="wizard-title">Bookings <span class="muted">· days off</span></h2>
+<div class="panel-tabs bk-tabs" role="tablist" aria-label="Display">
+  <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=timeline">Timeline</a>
+  <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=calendar">Calendar</a>
+  <a class="panel-tab is-on" role="tab" aria-selected="true" href="bookings.php?tab=days-off">Days off</a>
+</div>
+<?php
+    require __DIR__ . '/includes/days_off/view.php';
+    ?>
+</div>
+</body></html>
+<?php
+    exit;
+}
+
 $projectIds = array_map(function ($p) { return (int)$p['id']; }, $projects);
 $positions  = bookings_positions($pdo, $projectIds);
 $bookings   = $positions['bookings'];
@@ -44,7 +75,8 @@ require __DIR__ . '/includes/header.php';
   somebody holding a position on a step is booked from that step's start to its deadline.
   <strong class="bk-clash-text">Red</strong> marks the same person needed on two shows on the
   same working days. Shows in setup, active or on hold are included; wrapped and archived ones
-  are not. <strong>Stripes</strong> are a person's days off, entered on their person page.
+  are not. <strong>Stripes</strong> are a person's days off, entered on the
+  <strong>Days off</strong> tab or their person page.
 </p>
 
 <?php if (!$projects): ?>
@@ -59,6 +91,8 @@ require __DIR__ . '/includes/header.php';
   <div class="panel-tabs bk-tabs" role="tablist" aria-label="Display">
     <button type="button" class="panel-tab is-on" role="tab" aria-selected="true" data-tab="timeline">Timeline</button>
     <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="calendar">Calendar</button>
+    <?php // Drawn by the server (see the top of this file), so a link, not a button. ?>
+    <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=days-off">Days off</a>
   </div>
 
   <div class="bk-toolbar">

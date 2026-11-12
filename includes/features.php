@@ -111,7 +111,8 @@ const FEATURES = [
     // David, 2026-11-05: Bookings for Admin, Production and Supervisors.
     'bookings'      => ['label' => 'Bookings: see', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 0, 'client' => 0]],
-    'bookings_edit' => ['label' => 'Edit', 'group' => 'The whole studio', 'parent' => 'bookings',
+    // The Days off tab is the part of Bookings that saves (David, 2026-11-12).
+    'bookings_edit' => ['label' => 'Edit', 'group' => 'The whole studio', 'parent' => 'bookings', 'note' => 'enter and remove days off',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
     // David, 2026-11-05: Historic quotas for Admin and Production.
     'quotas'        => ['label' => 'Historic quotas', 'group' => 'The whole studio',

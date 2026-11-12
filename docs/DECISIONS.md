@@ -5160,3 +5160,33 @@ David asked for a top-bar button for Jorik listing every pending invoice, to che
 - **The count in the top bar** is cached in the session for two minutes, cleared whenever an
   invoice is saved, paid or removed anywhere, and any failure counts as 0, so `includes/header.php`
   neither opens the finance database on every page nor can fail because of it.
+
+## 2026-11-12 — Days off calendar: Production enters, on a Bookings tab, nothing new stored
+
+David: "let's create a calendar for days off so anima can register those days", then, when asked
+who enters them and where the page lives: "the Realm streak will read from it".
+
+**Decided:**
+- **Production and admins enter days off; artists don't request them (yet).** The recommended
+  first step, taken because David's reply did not pick. Requests with approval would need a state
+  on `crew_absences` (a migration) and are a follow-up if he wants them.
+- **A third tab on Bookings** (David: "let's include it as a tab in the bookings page"), after a
+  first cut as its own page. Drawn by the server at `bookings.php?tab=days-off`, unlike the other
+  two tabs (drawn by `assets/bookings.js`), because it is a form that saves and redirects; the code
+  is `includes/days_off/` (prepare.php before the header, view.php for the tab).
+- **Access follows Bookings:** seeing it is the *Bookings: see* switch, saving is Bookings' *Edit*
+  (`bookings_edit`, Production only, locked). No switches of its own. Consequence: **artists don't
+  see their own days off** while Bookings is off for them (the default); the tab would show an
+  artist only their own row if it were switched on.
+- **No new table.** Saves go through `add_crew_absence()` / `delete_crew_absence()`, and a change is
+  `replace_crew_absence()`: remove and re-add inside one transaction, so the date and ownership
+  rules stay in one place and a refused change leaves the old row as it was.
+- **`crew_days_off_between()` is THE lookup** for "was this person off that day" (crew_id => date
+  => reason). The Realm streak, and anything else counting logged days, should read it rather
+  than `crew_absences` directly. It does not add weekends or studio holidays: those close the day
+  for everybody and a caller usually wants to tell the two apart.
+- **Who sees whom:** supervisors see everybody, read only (as on the rest of Bookings); an artist
+  only their own row, since somebody else's sick day is not theirs to read.
+- **Default people on the grid** are those on a running show (Staffing positions or show
+  membership), so the Artists pool's long tail stays off it; *Everybody in Anima* is one choice away.
+- **Styles in `assets/days_off.css`**, not `assets/style.css`, which nearly every feature edits.
