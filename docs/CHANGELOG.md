@@ -14,6 +14,31 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: each task shows its status and due date, and the status can be changed there *(no migration)*
+
+**Asked by David**, with a picture of the Production tasks table on My tasks: "work on how tasks
+are seen in realm. I'd like to expand what we see for each task and include status, editable in
+this context, and due date".
+
+- **Each task in the Realm's task window now shows its status**, in the status's own colour, and
+  **its due date**. A date that has passed is red, says "overdue", and tints the row, as on My tasks.
+  A task with no date says "No due date".
+- **The status can be changed there.** It is a dropdown when you may change it, and the same words
+  as a plain label when you may not.
+- **Who can change it to what is exactly what My tasks allows**: Production can choose any status of
+  that show (and clear it); an artist or supervisor can move their own work to In progress or
+  Pending review, nothing else. With "Set the status of my own task" switched off for somebody, or
+  on a show that spells those two statuses differently, they see a label and no dropdown.
+- **A task that becomes approved leaves the list**, as it leaves My tasks.
+- **Also shown**: hours already logged on a production task, a card's reference (such as STU-38),
+  "blocked" when the status is a blocked one, and a link that opens the task in Spell or opens the
+  card, in a new tab so the Realm stays where it is.
+- **My tasks was touched, and behaves as before**: its two status handlers were moved, word for
+  word, into one shared file (`includes/own_status.php`) that both screens now call, so the rules
+  cannot drift apart.
+- **Not shown, on purpose**: the Log time box and priority. The window sits over the map and the
+  clock already logs time; My tasks is one click away.
+
 ## 2026-11-12 — The Realm looks like Anima *(no migration)*
 
 **Asked by David:** "let's do a whole pass on the UI aesthetics and try to match it closer to what
