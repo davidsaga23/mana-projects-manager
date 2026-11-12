@@ -62,6 +62,13 @@ small { color: var(--muted); font-size: .84rem; }
 .rmsghead { display: flex; gap: 8px; align-items: baseline; }
 .rmsgbody { white-space: pre-wrap; }
 .rempty { color: var(--muted); }
+.rimg { display: block; max-width: 100%; max-height: 240px; border-radius: 6px; margin-top: 4px; }
+.rtag { color: var(--mana); }
+.rtag.is-me { background: var(--candle); color: var(--night); border-radius: 3px; padding: 0 3px; }
+.rsuggest { display: flex; flex-direction: column; gap: 1px; margin: 0 12px; padding: 4px; background: var(--night); border: 1px solid var(--stone); border-radius: 8px; }
+.rsuggest[hidden], .rpicked[hidden] { display: none; }
+.rpicked { display: flex; align-items: center; gap: 8px; padding: 6px 12px 0; color: var(--muted); font-size: .88rem; }
+.rpicked span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rcomposer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--ridge); }
 .rcomposer input { flex: 1; min-width: 0; background: var(--win); border: 1px solid var(--ridge); border-radius: 6px; padding: 7px 10px; }
 .rbadge { margin-left: auto; background: var(--mana); color: var(--night); border-radius: 9px; font-size: .74rem; font-weight: 700; padding: 0 6px; }

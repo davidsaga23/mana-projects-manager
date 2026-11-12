@@ -26,6 +26,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
+require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passes accept_upload()
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_login_json();
 
@@ -49,6 +50,7 @@ if (!realm_available($pdo)) {
 // ---- chat (stage 2, migration 082) ------------------------------------------
 // GET  chat=<channel>&after=<id>           what was said, and marks it read
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
+//      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
 //
 // Answered here, apart from the map: an open conversation asks every few
@@ -81,9 +83,17 @@ if ($channel !== '') {
             if (!$may['post']) {
                 $said = 'Only Production can write in Announcements.';
             } else {
-                $said = realm_say($pdo, $uid, $channel, (string)($_POST['body'] ?? ''));
+                // One picture may come with the words (migration 083). A refused
+                // picture refuses the whole message, so nothing half-arrives.
+                $image = null;
+                if (isset($_FILES['image']) && (int)($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                    $image = realm_take_image($pdo, $_FILES['image'], $said);
+                }
+                if ($said === '') $said = realm_say($pdo, $uid, $channel, (string)($_POST['body'] ?? ''), $image);
                 if ($said === '' && preg_match('/^dm:(\d+):(\d+)$/', $channel, $m) === 1) {
                     realm_raven_bell($pdo, $uid, (int)$m[1] === $uid ? (int)$m[2] : (int)$m[1]);
+                } elseif ($said === '') {
+                    realm_tag_bell($pdo, $uid, $channel, (string)($_POST['body'] ?? ''), $mayAnnounce);
                 }
             }
         }

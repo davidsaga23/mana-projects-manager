@@ -98,7 +98,8 @@ function realm_channel_access(PDO $pdo, int $uid, string $channel, bool $mayAnno
  * checked realm_channel_access().
  */
 function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array {
-    $cols = 'm.id, m.user_id, m.body, m.created_at, u.display_name, u.username, c.name AS crew_name';
+    $cols = 'm.id, m.user_id, m.body, m.created_at, u.display_name, u.username, c.name AS crew_name, '
+          . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image';
     $from = ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id';
     if ($after > 0) {
         $q = $pdo->prepare('SELECT ' . $cols . $from . ' WHERE m.channel = ? AND m.id > ? ORDER BY m.id LIMIT 200');
@@ -118,6 +119,8 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array 
             'user' => (int)$r['user_id'],
             'name' => $r['user_id'] === null ? 'Somebody who left' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username']))),
             'body' => (string)$r['body'],
+            // True when realm_image.php?id=<this id> has a picture to serve.
+            'image' => (string)($r['image'] ?? '') !== '',
             'at'   => date('Y-m-d', $t) === $today ? date('H:i', $t) : date('j M, H:i', $t),
             'mine' => (int)$r['user_id'] === $uid,
         ];
@@ -125,12 +128,21 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array 
     return $out;
 }
 
-/** Say something. Returns '' when it was kept, or the sentence to show. */
-function realm_say(PDO $pdo, int $uid, string $channel, string $body): string {
+/**
+ * Say something. Returns '' when it was kept, or the sentence to show.
+ * $image is what realm_take_image() returned, or null; a message with a picture
+ * may have no words.
+ */
+function realm_say(PDO $pdo, int $uid, string $channel, string $body, ?array $image = null): string {
     $body = trim(str_replace("\r\n", "\n", $body));
-    if ($body === '') return 'There was nothing to send.';
+    if ($body === '' && $image === null) return 'There was nothing to send.';
     if (function_exists('mb_substr')) $body = mb_substr($body, 0, REALM_MESSAGE_MAX);
     else $body = substr($body, 0, REALM_MESSAGE_MAX);
+    if ($image !== null) {
+        $pdo->prepare('INSERT INTO realm_messages (channel, user_id, body, image, image_name, image_mime, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())')
+            ->execute([$channel, $uid, $body, $image['stored'], $image['name'], $image['mime']]);
+        return '';
+    }
     $pdo->prepare('INSERT INTO realm_messages (channel, user_id, body, created_at) VALUES (?, ?, ?, NOW())')
         ->execute([$channel, $uid, $body]);
     return '';
@@ -177,7 +189,8 @@ function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce): array {
 /** What the page needs to draw the channel list: the channels and the unread counts. */
 function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     if (!realm_chat_available($pdo)) return null;
-    return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => realm_unread($pdo, $uid, $mayAnnounce)];
+    return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => realm_unread($pdo, $uid, $mayAnnounce),
+            'images' => realm_chat_images($pdo)];
 }
 
 /**
@@ -248,5 +261,98 @@ function realm_raven_bell_clear(PDO $pdo, int $readerUid, int $senderUid): void 
             ->execute([$crew, realm_person_name($pdo, $senderUid)]);
     } catch (Throwable $e) {
         // The bell keeps a line a little longer than it should; opening the bell clears it.
+    }
+}
+
+// ---- images and tagging (migration 083) --------------------------------------
+// David, 2026-11-12: "let's also allow images and tagging people possible in all
+// chats".
+
+/** The largest picture a message may carry. Agreed with David as about 5 MB. */
+const REALM_IMAGE_MAX = 5 * 1024 * 1024;
+
+/** Has migration 083 added the image columns? Asked once per request; never throws. */
+function realm_chat_images(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        return $ok = function_exists('column_exists') && column_exists($pdo, 'realm_messages', 'image');
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/**
+ * Take the picture sent with a message and put it in the uploads folder.
+ * Returns what accept_upload() returns, or null with $error saying why not.
+ *
+ * ⚠ accept_upload() IS THE DEFENCE, as for every other upload in Anima: it
+ * checks the size, the extension, and that the file's contents really are that
+ * kind of file, and stores it under a random name. This adds only the two
+ * things chat is stricter about: pictures only, and 5 MB.
+ */
+function realm_take_image(PDO $pdo, array $file, string &$error): ?array {
+    if (!realm_chat_images($pdo)) { $error = 'Images need a database update first. An administrator opens migrate.php once.'; return null; }
+    if (!function_exists('accept_upload')) { $error = 'Images cannot be sent right now.'; return null; }
+    $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) { $error = 'Only pictures can be sent in chat: PNG, JPG, GIF or WebP.'; return null; }
+    if ((int)($file['size'] ?? 0) > REALM_IMAGE_MAX) { $error = 'That picture is larger than 5 MB. Send a smaller one, or a link to it.'; return null; }
+    $errors = [];
+    $kept = accept_upload($file, ensure_upload_dir(), $errors);
+    if ($kept === null) { $error = $errors ? (string)$errors[0] : 'That picture could not be saved.'; return null; }
+    return $kept;
+}
+
+/**
+ * Ring the bell of everybody TAGGED in a message: "@Renata Ruiz" in the words.
+ *
+ * The names are the ones the Realm shows (linked person, else display name),
+ * which is what the picker in the chat box writes, so what can be typed is
+ * exactly what can be matched. Never the sender. Not for a raven: the other
+ * person's bell already rings for it.
+ *
+ * ⚠ ONE LINE PER SENDER AND PLACE UNTIL IT IS READ, like ravens. The line says
+ * who and where, never the words. A show's channel is named only as "a show's
+ * channel": the bell of somebody who is not on that show must not learn its name.
+ *
+ * Never throws, and never the reason a message is not sent.
+ */
+function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, bool $mayAnnounce): void {
+    try {
+        if (strpos($body, '@') === false || strpos($channel, 'dm:') === 0 || !function_exists('notify_add')) return;
+        $where = 'a channel';
+        if (strpos($channel, 'project:') === 0) {
+            $where = 'a show channel';
+        } else {
+            foreach (realm_channels($pdo, $mayAnnounce) as $c) {
+                if ($c['id'] === $channel) $where = (string)$c['name'];
+            }
+        }
+        $summary = $where . ' in the Realm';
+        $actor = realm_person_name($pdo, $fromUid);
+        $rows = $pdo->query('SELECT rp.user_id, u.crew_id, u.display_name, u.username, c.name AS crew_name
+                               FROM realm_people rp JOIN users u ON u.id = rp.user_id
+                          LEFT JOIN crew c ON c.id = u.crew_id')->fetchAll();
+        // Longest names first, and each match is taken out of the text before the
+        // next name is looked for: "@Renata Ruiz" must not also ring for a Renata.
+        $named = [];
+        foreach ($rows as $r) {
+            $named[] = $r + ['who' => trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username'])))];
+        }
+        usort($named, function ($a, $b) { return strlen($b['who']) <=> strlen($a['who']); });
+        $rest = $body;
+        foreach ($named as $r) {
+            $crew = (int)$r['crew_id'];
+            $name = (string)$r['who'];
+            if ($name === '' || stripos($rest, '@' . $name) === false) continue;
+            $rest = str_ireplace('@' . $name, ' ', $rest);
+            if ((int)$r['user_id'] === $fromUid || $crew <= 0) continue;
+            $q = $pdo->prepare("SELECT 1 FROM notifications WHERE crew_id = ? AND kind = 'tag' AND actor = ? AND summary = ? AND seen_at IS NULL LIMIT 1");
+            $q->execute([$crew, $actor, $summary]);
+            if ($q->fetchColumn()) continue;
+            notify_add($pdo, [$crew], ['kind' => 'tag', 'actor' => $actor, 'summary' => $summary]);
+        }
+    } catch (Throwable $e) {
+        // The message was kept; only the bell is silent.
     }
 }
