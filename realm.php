@@ -28,6 +28,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
+require_once __DIR__ . '/includes/realm_chat.php';
 require_login();
 
 $uid     = realm_user_id();
@@ -38,6 +39,8 @@ if ($ready && !$preview) {
     realm_enter($pdo, $uid);
     realm_sync_lands($pdo);
     $state = realm_state($pdo, $uid);
+    // Chat (stage 2). Null until migration 082 has run, and the page then draws no chat at all.
+    $state['chat'] = realm_chat_summary($pdo, $uid, can_edit());
 }
 $hasHouse = false;
 foreach (($state['people'] ?? []) as $p) {
@@ -110,6 +113,11 @@ foreach (($state['people'] ?? []) as $p) {
         <span>Drag the map, scroll to zoom</span>
       </div>
     </main>
+    <aside class="rchat" id="chat" aria-label="Conversation" hidden>
+      <div class="rchathead"><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
+      <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
+      <form class="rcomposer" id="chatForm"><input id="chatInput" autocomplete="off" maxlength="2000" aria-label="Message"><button class="rbtn rprimary" id="chatSend">Send</button></form>
+    </aside>
   </div>
   <div id="toasts" aria-live="polite"></div>
   <dialog id="lookDlg" aria-labelledby="lookTitle">

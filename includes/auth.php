@@ -559,7 +559,10 @@ function artist_may_post(): bool {
         // no user id is ever posted, realm_api.php takes it from the session.
         // The one id that can be sent is the house somebody walks to, and
         // realm_arrive() checks that door before letting them inside.
-        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive'],
+        // `say` (stage 2, migration 082): a message in a channel or a raven. The
+        // sender is the session's own account; realm_channel_access() decides
+        // which conversations that account may write in.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

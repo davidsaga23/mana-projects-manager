@@ -5255,3 +5255,24 @@ see it just yet."
   in too.
 - **To open it up, empty the list.** The switch then decides again, as for every other feature.
   Do not add roles or a second mechanism: the switch already does that.
+
+## 2026-11-12 — The Realm's chat: read from anywhere, ravens for two, and the bell
+
+David, once stage 1 was live and he was standing in Renata's office.
+
+- **Channels are read and written from anywhere** (David: "I agree"). The face-to-face rule covers
+  praise, trades and a voice chat with one person; written chat is the Discord way. Walking into a
+  place is for presence and voice, and opens that place's conversation as a convenience.
+- **One table, `realm_messages`, keyed by a channel name**: `announcements`, `tavern`, `council`,
+  `project:<id>` (by project, not by land, so a show keeps its chat if it moves) and `dm:<a>:<b>`
+  with the lower user id first. `realm_channel_access()` in `includes/realm_chat.php` is the one
+  answer to "may this person read or write here", and every chat request passes through it.
+- **A raven is for the two people in it and nobody else**, admins included. Reading somebody
+  else's ravens is not a feature that exists.
+- **A raven for somebody away rings Anima's bell** (David: "let's try it"). Only when the other
+  person is not in the Realm, and once per sender until read, so one conversation is one line. The
+  bell carries the sender's name and never the words. New bell kind `raven` (the ENUM in 082).
+- **How it stays light on the hosting.** An open conversation asks for anything new every 3
+  seconds and stops while the window is hidden. Everything else learns of unread messages from the
+  25-second heartbeat. Nothing is held open.
+- **Kept forever.** No 90-day limit: that is the thing David dislikes about free Slack.
