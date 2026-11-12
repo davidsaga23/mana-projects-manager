@@ -1403,6 +1403,7 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 2. Chat | Channels (Tavern, announcements, one per active show), ravens between people, unread counts, ravens in the bell | **Built 2026-11-12**, migration 082 |
 | 2b. Chat, the rest | Pictures in messages and tagging people: **built 2026-11-12**, migration 083. Speech bubbles in rooms: built the same day. The Herald side panel and knocks in the bell: not built |  |
 | 2c. Focus desk | Your open work with a Start button on Anima's own timer, the door sealing itself during a focus block, the clock in the top bar, music made in the browser. Then, the same day: the way in moved to the bookshelf in your own house, and the music became a lofi loop | **Built 2026-11-12**, no migration |
+| 2d. Task details | Each task in the task window shows its status (in the status's colour) and due date, hours logged and a link into Anima; the status can be changed there by My tasks' own rules, now shared in `includes/own_status.php` | **Built 2026-11-12**, no migration |
 | 3. Voice | Voice tables for up to 5, knock to be let in, "Summon the Council" opening a saved Google Meet link | Not built |
 | 4. Mana and praise | Streak mana, praise, private gold, clothes, accessories and pets, gifting and swapping, all face to face | Not built |
 | 5. The app | Install on Windows with start-up, desktop notifications and sounds, then a phone layout and phone notifications | Not built |

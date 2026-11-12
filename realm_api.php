@@ -55,10 +55,16 @@ if (!realm_available($pdo)) {
 // POST focus=start&task=p:12|t:34    start Anima's timer on one of their own
 // POST focus=stop                    stop it, logging the time as My tasks would
 // POST focus=settle                  a focus block ran out: log it, start the break
+// POST task_status=<status id>&task=p:12|t:34
+//                                    set the status of one of their own, by My tasks' rules
+//
+// ⚠ task_status IS ITS OWN FIELD, not a fourth word for `focus`, because two
+// lists are keyed on the field: artist_may_post() (who may send it) and
+// FEATURE_POSTS (the "Set the status of my own task" switch).
 //
 // The timer code and the card list are only loaded for these requests; the
 // heartbeat and chat never need them.
-if (isset($_GET['focus']) || isset($_POST['focus'])) {
+if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status'])) {
     $said = '';
     $bad = '';
     try {
@@ -66,12 +72,15 @@ if (isset($_GET['focus']) || isset($_POST['focus'])) {
         require_once __DIR__ . '/includes/mailer.php';
         require_once __DIR__ . '/includes/tickets.php';
         require_once __DIR__ . '/includes/timelog.php';
+        require_once __DIR__ . '/includes/own_status.php';   // the rules My tasks changes a status by
         $crewId = realm_crew_id($pdo, $uid);
         $why = realm_focus_ready($pdo, $crewId);
-        if ($why === '' && isset($_POST['focus'])) {
-            $what = (string)$_POST['focus'];
+        if ($why === '' && (isset($_POST['focus']) || isset($_POST['task_status']))) {
+            $what = isset($_POST['task_status']) ? 'status' : (string)$_POST['focus'];
             try {
-                if ($what === 'start') {
+                if ($what === 'status') {
+                    $said = realm_focus_set_status($pdo, $uid, $crewId, (string)($_POST['task'] ?? ''), (string)$_POST['task_status']);
+                } elseif ($what === 'start') {
                     $said = realm_focus_start($pdo, $uid, $crewId, (string)($_POST['task'] ?? ''));
                 } elseif ($what === 'stop') {
                     $said = stop_timer($pdo, $crewId, $uid);
@@ -81,9 +90,12 @@ if (isset($_GET['focus']) || isset($_POST['focus'])) {
             } catch (PDOException $e) {
                 // A PDOException IS a RuntimeException, and its message is the
                 // database's own words: not something to print on the desk.
-                $bad = 'The clock could not be changed. Try again in a moment.';
+                $bad = $what === 'status' ? 'The status could not be saved. Try again in a moment.'
+                                          : 'The clock could not be changed. Try again in a moment.';
             } catch (RuntimeException $e) {
-                // The timer's own refusals ("That task is not assigned to you.").
+                // The timer's own refusals ("That task is not assigned to you."),
+                // and the status rules' ("You can set your own work to In progress
+                // or Pending review. Any other status is set by Production.").
                 $bad = $e->getMessage();
             }
             // The door follows the clock, so it is only touched when the clock
