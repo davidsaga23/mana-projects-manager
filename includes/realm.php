@@ -223,7 +223,8 @@ function realm_arrive(PDO $pdo, int $uid, string $place, bool $inside): string {
         if ($inside && $owner !== $uid) {
             if ($row['age'] === null || (int)$row['age'] > REALM_ONLINE_SECONDS) return 'Nobody is home.';
             if ($row['door'] === 'sealed') return 'That door is sealed. They are not to be disturbed.';
-            if ($row['door'] !== 'open') return 'That door is ajar. Knocking arrives with voice chat.';
+            // Ajar: only somebody the owner has just let in (migration 084).
+            if ($row['door'] !== 'open' && !realm_has_pass($pdo, $uid, $owner)) return 'That door is ajar. Knock, and wait to be let in.';
         }
     } else {
         return 'That is not a place in the Realm.';
@@ -284,5 +285,120 @@ function realm_state(PDO $pdo, int $uid): array {
         $people = [];
     }
     return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => realm_lands($pdo),
-            'idle_minutes' => REALM_IDLE_MINUTES, 'slots' => REALM_SLOTS];
+            'idle_minutes' => REALM_IDLE_MINUTES, 'slots' => REALM_SLOTS,
+            'knocks' => realm_knock_news($pdo, $uid)];
+}
+
+// ---- knocking (migration 084) -------------------------------------------------
+// David, 2026-11-12: "when a door is ajar, let's open the option to knock".
+//
+// Somebody standing at an ajar door knocks; the owner sees who it is and answers
+// "Let in" or "Not now"; being let in walks the visitor inside. A door that is
+// open needs no knock and a sealed one takes none.
+//
+// ⚠ FACE TO FACE. A knock is only taken from somebody whose character is
+// standing at that door (their `place` is that house). It is not a way to ping
+// somebody from across the map: that is what a raven is for.
+//
+// ⚠ THE ANSWER IS THE OWNER'S ALONE. realm_knock_answer() matches the knock to
+// the session's own account, so nobody can let themselves in.
+
+/** How long a knock waits for an answer, in seconds. */
+const REALM_KNOCK_SECONDS = 120;
+/** How long being let in lasts, in minutes. */
+const REALM_KNOCK_PASS_MINUTES = 10;
+
+/** Has migration 084 arrived? Asked once per request; never throws. */
+function realm_knocks_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $pdo->query('SELECT 1 FROM realm_knocks LIMIT 1');
+        return $ok = true;
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/** Knock on $owner's door. Returns '' when the knock was made, or the sentence to show. */
+function realm_knock(PDO $pdo, int $uid, int $owner): string {
+    if (!realm_knocks_available($pdo)) return 'Knocking needs a database update first. An administrator opens migrate.php once.';
+    if ($owner === $uid) return 'That is your own door.';
+    $q = $pdo->prepare('SELECT door, house_slot, TIMESTAMPDIFF(SECOND, last_ping, NOW()) AS age FROM realm_people WHERE user_id = ?');
+    $q->execute([$owner]);
+    $row = $q->fetch();
+    if (!$row || $row['house_slot'] === null) return 'Nobody lives there.';
+    if ($row['age'] === null || (int)$row['age'] > REALM_ONLINE_SECONDS) return 'Nobody is home.';
+    if ($row['door'] === 'sealed') return 'That door is sealed. They are not to be disturbed.';
+    if ($row['door'] === 'open') return 'The door is open. Walk in.';
+    $q = $pdo->prepare('SELECT place FROM realm_people WHERE user_id = ?');
+    $q->execute([$uid]);
+    if ((string)$q->fetchColumn() !== 'user:' . $owner) return 'Walk up to the door first.';
+    $pdo->prepare('DELETE FROM realm_knocks WHERE from_user = ? AND to_user = ?')->execute([$uid, $owner]);
+    $pdo->prepare("INSERT INTO realm_knocks (from_user, to_user, status, created_at) VALUES (?, ?, 'waiting', NOW())")->execute([$uid, $owner]);
+    return '';
+}
+
+/** Answer a knock on your own door. Returns '' when answered, or the sentence to show. */
+function realm_knock_answer(PDO $pdo, int $uid, int $knockId, bool $let): string {
+    if (!realm_knocks_available($pdo)) return 'Knocking needs a database update first.';
+    $u = $pdo->prepare("UPDATE realm_knocks SET status = ?, answered_at = NOW() WHERE id = ? AND to_user = ? AND status = 'waiting'");
+    $u->execute([$let ? 'in' : 'no', $knockId, $uid]);
+    return $u->rowCount() === 1 ? '' : 'That knock has already been answered, or they walked away.';
+}
+
+/** Has $owner let $uid in during the last REALM_KNOCK_PASS_MINUTES? Never throws. */
+function realm_has_pass(PDO $pdo, int $uid, int $owner): bool {
+    if (!realm_knocks_available($pdo)) return false;
+    try {
+        $q = $pdo->prepare("SELECT 1 FROM realm_knocks WHERE from_user = ? AND to_user = ? AND status = 'in'
+                               AND answered_at > DATE_SUB(NOW(), INTERVAL " . REALM_KNOCK_PASS_MINUTES . " MINUTE) LIMIT 1");
+        $q->execute([$uid, $owner]);
+        return (bool)$q->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * What this person needs to know about knocks right now:
+ *   for_me  who is waiting at my door: [{id, from, name}]
+ *   mine    my own latest knock: {to, status} where status is waiting, in, no
+ *           or gone (nobody answered in time); null when there is nothing recent
+ *   ready   false until migration 084 has run
+ * Sent with the map, with the unread counts and with every chat answer, so a
+ * knock is seen within a few seconds whatever the person is doing in the Realm.
+ */
+function realm_knock_news(PDO $pdo, int $uid): array {
+    $out = ['ready' => realm_knocks_available($pdo), 'for_me' => [], 'mine' => null];
+    if (!$out['ready']) return $out;
+    try {
+        $q = $pdo->prepare("SELECT k.id, k.from_user, u.display_name, u.username, c.name AS crew_name
+                              FROM realm_knocks k JOIN users u ON u.id = k.from_user
+                         LEFT JOIN crew c ON c.id = u.crew_id
+                             WHERE k.to_user = ? AND k.status = 'waiting'
+                               AND k.created_at > DATE_SUB(NOW(), INTERVAL " . REALM_KNOCK_SECONDS . " SECOND)
+                          ORDER BY k.id");
+        $q->execute([$uid]);
+        foreach ($q->fetchAll() as $r) {
+            $out['for_me'][] = ['id' => (int)$r['id'], 'from' => (int)$r['from_user'],
+                                'name' => trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username'])))];
+        }
+        $q = $pdo->prepare('SELECT to_user, status, TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age,
+                                   TIMESTAMPDIFF(MINUTE, answered_at, NOW()) AS answered
+                              FROM realm_knocks WHERE from_user = ? ORDER BY id DESC LIMIT 1');
+        $q->execute([$uid]);
+        $m = $q->fetch();
+        if ($m) {
+            $status = (string)$m['status'];
+            if ($status === 'waiting' && (int)$m['age'] > REALM_KNOCK_SECONDS) $status = 'gone';
+            $old = $status === 'waiting' ? false
+                 : ($status === 'gone' ? (int)$m['age'] > REALM_KNOCK_SECONDS + 60
+                                       : (int)$m['answered'] >= REALM_KNOCK_PASS_MINUTES);
+            if (!$old) $out['mine'] = ['to' => (int)$m['to_user'], 'status' => $status];
+        }
+    } catch (Throwable $e) {
+        // No news rather than a failed map.
+    }
+    return $out;
 }

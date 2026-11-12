@@ -62,6 +62,9 @@ small { color: var(--muted); font-size: .84rem; }
 .rmsghead { display: flex; gap: 8px; align-items: baseline; }
 .rmsgbody { white-space: pre-wrap; }
 .rempty { color: var(--muted); }
+.rimglink { cursor: zoom-in; }
+dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
+.rpic img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto 12px; border-radius: 6px; }
 .rimg { display: block; max-width: 100%; max-height: 240px; border-radius: 6px; margin-top: 4px; }
 .rtag { color: var(--mana); }
 .rtag.is-me { background: var(--candle); color: var(--night); border-radius: 3px; padding: 0 3px; }
