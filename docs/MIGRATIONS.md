@@ -145,6 +145,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 078 | every_show_has_every_status | ⏳ **Every show gets every default status it is missing** (David, 2026-11-06: FCM had no "Complete", so Reviews could not approve there). Adds only: nothing renamed or removed; "Completed" is skipped where a show already has "Complete". Data only, re-runnable. Until it runs, Reviews still accepts "Completed" as "Complete", but a show missing a status entirely keeps its warning. |
 | 079 | notify_review | ⏳ **A bell for review notes** (`notifications.kind` gains `review`). Until it runs, the bell a review note rings for the task's followers is written as a mention ("mentioned you on") instead of "left review notes on". |
 | 080 | log_reminders | ⏳ **Reminders to log time** (`log_reminders`, `log_reminder_recipients`; `notifications.kind` gains `reminder`). Until it runs, the 5 pm pop-up still works, but Log reminders cannot send one and no reminder rings the bell. |
+| 081 | realm | ⏳ **The Realm, stage 1** (`realm_people`, `realm_lands`). Until it runs, `realm.php` says the update is waiting and draws nothing; the rest of Anima is untouched. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

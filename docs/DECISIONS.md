@@ -5190,3 +5190,50 @@ who enters them and where the page lives: "the Realm streak will read from it".
 - **Default people on the grid** are those on a running show (Staffing positions or show
   membership), so the Artists pool's long tail stays off it; *Everybody in Anima* is one choice away.
 - **Styles in `assets/days_off.css`**, not `assets/style.css`, which nearly every feature edits.
+
+## 2026-11-12 — The Realm: what was settled before stage 1 was built
+
+David, across one long conversation, with a clickable mock-up in between. Recorded here so the
+later stages do not reopen it.
+
+- **Where it lives.** Inside Anima: `realm.php`, `realm_api.php`, `includes/realm.php`,
+  `assets/realm.{js,css}`. Not a second app and not a subfolder, because every gate in
+  `includes/auth.php` and `includes/features.php` knows a screen by its file name at the root.
+  `realm.anima-mana.com` is pointed at the SAME folder as Anima in cPanel, so logins, people and
+  the database are shared; `index.php` sends that address to the Realm. People sign in once more
+  there, because a browser does not share a login between two domains.
+- **Internal only, about 20 people at once, never clients.** One switch, `realm`, off for every
+  role until it is ready and locked off for clients.
+- **One village, shows as landscape.** Everybody's house is in one place whatever shows they are on;
+  each active show takes one of five lands and gives it back when it stops being active. A show's
+  name is shown only to somebody who may see that show (the 2026-11-04 rule), others see "Another
+  show".
+- **A house appears when its owner first opens the Realm**, on the lowest free plot, and never
+  moves. 26 plots (`REALM_SLOTS`, matched by `PLOTS` in `assets/realm.js`); more can be added.
+- **A character on the map means online.** Resting after 25 minutes (David's number), away when the
+  page is closed. The heartbeat is one request every 25 seconds per person, which is also how
+  everybody else's position arrives. Nothing is ever held open: the hosting cannot.
+- **Others see where you ARRIVED, never the walk.** Decided for load, and kept as the rule.
+- **Doors: open, ajar, sealed.** Going inside somebody's house needs an open door and the owner
+  home, checked on the server as well as the screen. Ajar means knock, which arrives with voice.
+- **Face to face.** Praise, trading items and a voice chat with one person happen only when the two
+  characters are close or in that person's office (David, 2026-11-12). Stage 1 stores `place` and
+  `inside` for exactly this; the later stages must check them.
+- **Always the real login.** Not available inside "view as": it would stand the previewed person at
+  their door.
+- **The look.** Pixel art in the manner of an old handheld RPG, all drawn by `assets/realm.js` and
+  our own; the studio's artists may replace it. Colours are roles on `:root` in `assets/realm.css`,
+  separate from `assets/style.css`; the canvas palette is in the script because a canvas cannot read
+  a stylesheet. No font or script is loaded from another site.
+- **Mana and gold (stage 4, not built).** Mana comes from the daily time-logging streak (working
+  days only, late logging counts until noon the next day, read `crew_days_off_between()` and the
+  studio holidays), is capped at 5 and is spent only on praising others. Gold is private, in whole
+  coins, from approved work, praise received and one coin per full week of logging; it buys
+  clothes, accessories and pets, which can be gifted or swapped. Gold itself cannot be handed over.
+  Never linked to pay.
+- **Slack (stages 6 and 7, not built).** Mirror the channels during a changeover and replace Slack
+  if the Realm feels comfortable, including on phones for David and the other leaders. A direct
+  message is visible only to the two people in it. Slack's API terms on keeping copies of messages
+  (May and October 2025) must be read before the Realm is relied on as an archive.
+- **Open:** Anima already calls the board "Spell", so praise "spells" need another word
+  ("blessings" was proposed; David has not answered).
