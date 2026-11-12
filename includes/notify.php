@@ -10,6 +10,9 @@
  *   assigned  a task was handed to you
  *   status    a task you follow moved
  *
+ * Since added: review (review notes on your version, 079) and reminder (log
+ * your time, 080; includes/log_reminders.php).
+ *
  * ⚠ NOTHING IN HERE MAY THROW. Every writer below sits in the middle of a save
  * — a status change, an assignment, a posted comment — and a bell that cannot
  * be written must never be the reason somebody's work is not. So notify_add()
@@ -106,10 +109,14 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status', 'review'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder'], true)) return 0;
     // 'review' arrives with migration 079 (the column is an ENUM). Until then a
     // review note still rings, as a mention: late wording beats a silent bell.
     if ($kind === 'review' && !notify_kind_review_ready($pdo)) $kind = 'mention';
+    // 'reminder' (log your time, migration 080) has no fallback: "mentioned you
+    // on" would be untrue, and the pop-up is the reminder itself. Until 080
+    // runs the reminder simply does not ring.
+    if ($kind === 'reminder' && !enum_has_value($pdo, 'notifications', 'kind', 'reminder')) return 0;
 
     try {
         $ins = $pdo->prepare(
@@ -227,6 +234,7 @@ function notify_verb(string $kind): string {
         'assigned' => 'assigned you',
         'status'   => 'moved',
         'review'   => 'left review notes on',
+        'reminder' => 'asked you to log',     // + "your time for Tue 11 Nov" (080)
     ];
     return $words[$kind] ?? 'changed';
 }

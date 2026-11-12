@@ -253,6 +253,13 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
     </div>
   </div>
 <?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
+<?php // THE "LOG YOUR TIME" POP-UP (David, 2026-11-11; includes/log_reminders.php).
+      // Only a script tag here: it asks log_reminder_api.php every few minutes
+      // and the server decides the rest, so the page pays nothing more. Not
+      // while viewing as somebody: their reminder is theirs to put away. ?>
+<?php if ($fa('log_reminders') && !in_preview() && isset($pdo) && $pdo instanceof PDO && (int)(effective_crew_id($pdo) ?? 0) > 0): ?>
+<script defer src="assets/log-reminder.js<?= asset_ver('log-reminder.js') ?>" data-css="assets/log-reminder.css<?= asset_ver('log-reminder.css') ?>"></script>
+<?php endif; ?>
 <?php if (in_preview()): ?>
   <?php
   // ⚠ DRAWN OUTSIDE EVERY is_admin() CHECK ON THIS PAGE. While a preview is

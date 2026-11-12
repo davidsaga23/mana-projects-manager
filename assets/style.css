@@ -4213,6 +4213,7 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .bell-assigned { background: var(--warn); }
 .bell-status   { background: var(--ok); }
 .bell-review   { background: var(--warn, #F5B041); }
+.bell-reminder { background: var(--warn, #F5B041); }   /* log your time (080) */
 
 .bell-what { line-height: 1.45; }
 .bell-when { white-space: nowrap; font-size: 11px; padding-top: 1px; }

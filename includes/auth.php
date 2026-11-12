@@ -542,6 +542,12 @@ function artist_may_post(): bool {
         // effective_crew_id() and nothing the form sends can name another
         // person. Name and email are not in that form at all.
         'home.php' => ['save_profile'],
+        // dismiss / snooze: putting away the "log your time" pop-up (David,
+        // 2026-11-11, migration 080). ⚠ THE ASKER'S OWN ONLY: the person is
+        // effective_crew_id() from the session, a snooze lives in their own
+        // session, and the one id that can be posted (an admin's reminder) is
+        // matched against their own crew id in log_reminder_dismiss()'s WHERE.
+        'log_reminder_api.php' => ['dismiss', 'snooze'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
