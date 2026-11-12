@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: a name in the People list opens your ravens with them *(no migration)*
+
+**Asked by David**, pointing at Renata's name in the list while she was away: "clicking here
+should automatically open the ravens with Renata".
+
+- **Clicking anybody in the People list opens your ravens with them**, whether or not anything is
+  unread and whether or not they are in the Realm. It still finds their house on the map.
+- Your own name selects your house, as before.
+
 ## 2026-11-12 — The Realm: a focus desk, with the timer and soft music *(no migration)*
 
 **Asked by David:** "how can I change to in focus time? I think we should play a soft music while
