@@ -5239,3 +5239,19 @@ later stages do not reopen it.
   (May and October 2025) must be read before the Realm is relied on as an archive.
 - **Open:** Anima already calls the board "Spell", so praise "spells" need another word
   ("blessings" was proposed; David has not answered).
+
+## 2026-11-12 — The Realm is hard-coded to David and Renata while it is tested
+
+David, the day stage 1 went live: "can you hard code the access to realm only to Renata and myself
+for the time being? Jorik and Tim have access because they're admins but they are not suppose to
+see it just yet."
+
+- `REALM_TESTERS` in `includes/features.php` names who has the Realm. While it names anybody it
+  **overrides the `realm` switch in both directions**: an admin does not get it, and a named person
+  gets it whatever their role and whatever Users, Access says (Renata is not an admin, and the role
+  answer is off). Clients stay out whatever their name.
+- **Matched on first name** (linked person, display name or login), not user ids, because the ids
+  differ between the two hosts. Loose on purpose; a second David or Renata with a login would get
+  in too.
+- **To open it up, empty the list.** The switch then decides again, as for every other feature.
+  Do not add roles or a second mechanism: the switch already does that.
