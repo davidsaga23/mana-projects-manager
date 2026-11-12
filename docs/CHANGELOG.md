@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The bell refreshes itself, for everybody *(no migration)*
+
+**Asked by David:** the bell "only refreshes when a page loads ... Can we change that behavior to
+be more real-time and get those notifications?"
+
+- **The bell beside your name now updates every 30 seconds without a reload**, and the moment you
+  come back to the tab: the count, and the list inside. For every kind of notification
+  (assignments, mentions, status changes, review notes, reminders, ravens) and for everybody.
+- **Asking marks nothing read.** Only opening the bell does, as before.
+- **The list is not redrawn while the bell is open**, so a row cannot move under the cursor.
+- A page in a background tab does not ask.
+- One side effect: on Users, "Last seen" now counts a page left open and in front as that person
+  being here (it used to need a click).
 ## 2026-11-12 — The Realm: characters say what they write, in a speech bubble *(no migration)*
 
 **Asked by David:** "when two or more characters are in the same space inside a house or project,
