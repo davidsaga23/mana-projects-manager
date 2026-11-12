@@ -676,7 +676,7 @@ function keyTick(ts) {
 document.addEventListener('keydown',function (e) {
   S.touched = true;
   var t = e.target, is = function (q) { return t && t.matches && t.matches(q); };
-  if (is('input,select,textarea') || $('lookDlg').open) return;
+  if (is('input,select,textarea') || $('lookDlg').open || ($('focusDlg') && $('focusDlg').open)) return;
   if (S.inside) { if (e.key==='Escape') leave(); return; }
   if (e.key.indexOf('Arrow')===0) { e.preventDefault(); if (S.walk) { S.walk = null; renderCard(); } held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); }
   else if (e.key==='Enter' && is('.bld')) { e.preventDefault(); select(t.getAttribute('data-sel'),false); }
@@ -687,6 +687,7 @@ window.addEventListener('blur',function () { held.clear(); });
 document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
+  musicWake(t);
   if (t.closest('#chatAttach')) { if ($('chatFile')) $('chatFile').click(); }
   else if (t.closest('[data-unpick]')) setPick(null);
   else if ((b = t.closest('[data-tag]'))) sugPick(+b.getAttribute('data-tag'));
@@ -701,6 +702,10 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-zoom]'))) { var z = b.getAttribute('data-zoom'), v = S.view, cx = v.x+v.w/2, cy = v.y+v.h/2; if (z==='in') zoomAt(.72,cx,cy); else if (z==='out') zoomAt(1.39,cx,cy); else setView(z==='village'?VILLAGE:FULL); }
   else if ((b = t.closest('[data-door]'))) send({set_door:b.getAttribute('data-door')});
   else if (t.closest('#lookBtn')) openLook();
+  else if (t.closest('#focusBtn')) openFocus();
+  else if ((b = t.closest('[data-focusstart]'))) focusDo({focus:'start',task:b.getAttribute('data-focusstart')});
+  else if (t.closest('[data-focusstop]')) focusDo({focus:'stop'});
+  else if (t.closest('[data-focusclose]')) $('focusDlg').close();
   else if ((b = t.closest('[data-pick]'))) { LOOK[b.getAttribute('data-pick')] = b.getAttribute('data-val'); renderLook(); }
   else if (t.closest('[data-lookcancel]')) $('lookDlg').close();
 });
@@ -878,6 +883,166 @@ function renderLook() {
 function openLook() { var m = me(); if (!m) return; LOOK = {cloak:m.cloak,hat:m.hat,pet:m.pet,house_kind:m.kind}; renderLook(); $('lookDlg').showModal(); }
 $('lookForm').addEventListener('submit',function (e) { e.preventDefault(); $('lookDlg').close(); send({set_look:1,cloak:LOOK.cloak,hat:LOOK.hat,pet:LOOK.pet,house_kind:LOOK.house_kind}); });
 
+/* ---------- the focus desk ----------
+   David, 2026-11-12: "how can I change to in focus time? I think we should play a soft music while
+   on focus and maybe list all the pending tasks you have in anima? With the option to start the
+   clock."
+
+   THERE IS NO CLOCK IN THIS FILE. Start and Stop ask the server, which starts and stops Anima's own
+   timer (includes/realm_focus.php, includes/timelog.php), the one My tasks shows. What runs here is
+   only the readout: the server says how many seconds are left, this counts them down between
+   answers, and asks again every minute so the two never drift far. When a focus block reaches zero
+   the page asks the server to settle it (log the block, begin the break) ONCE; if the page is shut
+   instead, My tasks settles it the next time anybody looks, so no minutes depend on this tab.
+
+   The desk is also the top bar's button: with a clock running it reads "Focus 18:42", so the time
+   is in sight with the desk shut. */
+var FO = {data:null,at:0,busy:false,seq:0,settled:'',zero:false,err:''};
+function clockWords(s) { s = Math.max(0,Math.floor(s)); var h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h?h+':'+(m<10?'0':'')+m:m)+':'+(x<10?'0':'')+x; }
+function focusNow() { return FO.data && FO.data.ready ? FO.data.now : null; }
+function onBreak(n) { return !!n && (n.phase==='short_break' || n.phase==='long_break'); }
+/* Seconds left in the phase, or, for a plain timer with no end, seconds run so far. */
+function focusLeft() { var n = focusNow(); if (!n) return 0; var gone = Math.max(0,Math.floor((Date.now()-FO.at)/1000)); return n.remaining===null ? n.elapsed+gone : Math.max(0,n.remaining-gone); }
+function focusTask(key) { var l = (FO.data && FO.data.tasks)||[]; for (var i = 0; i < l.length; i++) if (l[i].key===key) return l[i]; return null; }
+function renderFocus() {
+  var top = $('focusNow'), list = $('focusList'); if (!top) return;
+  var d = FO.data, n = focusNow(), brk = onBreak(n), left = focusLeft(), h = '';
+  $('focusMusic').hidden = !(d && d.ready && (window.AudioContext || window.webkitAudioContext));
+  if (!d || !d.ready) { top.innerHTML = '<p class="rfidle">'+esc(d ? d.why : (FO.err || 'Opening the desk…'))+'</p>'; list.innerHTML = ''; return; }
+  if (n) {
+    var t = focusTask(n.key), hint = n.phase==='focus' ? (left ? 'Your door is sealed until this block ends. Stopping early logs the minutes so far.' : 'This block is over.')
+      : brk ? (left ? 'A break is not logged. Your door is open again.' : 'The break is over. Start the next block when you are ready.')
+      : 'Counting up. Stopping logs the time.';
+    h = '<div class="rfnow '+(brk?'is-break':'is-focus')+'"><small class="rfphase">'+esc(n.label)+(n.since?', since '+esc(n.since):'')+'</small><b>'+esc(t?t.title:'Work started in My tasks')+'</b>'+(t&&t.show?'<small>'+esc(t.show)+'</small>':'')
+      +'<span class="rfclock" id="focusClock">'+clockWords(left)+'</span><small>'+hint+'</small><div class="racts">'
+      +(brk ? '<button type="button" class="rbtn rprimary rsmall" data-focusstart="'+esc(n.key)+'">Start the next focus block</button><button type="button" class="rbtn rsmall" data-focusstop="1">End the cycle</button>'
+            : '<button type="button" class="rbtn rprimary rsmall" data-focusstop="1">Stop and log</button>')+'</div></div>';
+  } else h = '<p class="rfidle">No clock is running. Press Start on something below. It starts Anima\'s own timer, the one My tasks shows, and seals your door until the focus block ends.</p>';
+  top.innerHTML = h;
+  h = '<h3 class="rfhead">Your open work</h3>';
+  if (!d.tasks.length) h += '<p class="rfidle">Nothing is assigned to you right now. Tasks and cards given to you in Anima appear here.</p>';
+  else { h += '<div class="rflist">';
+    d.tasks.forEach(function (k) { var mine = !!n && n.key===k.key, sub = [k.show,k.due?'due '+k.due:''].filter(Boolean).join(', ');
+      h += '<div class="rftask'+(mine?' is-on':'')+'"><div><b>'+esc(k.title)+'</b>'+(sub?'<small>'+esc(sub)+'</small>':'')+'</div>'
+        +(mine ? '<small>'+(brk?'On a break':'Running')+'</small>' : '<button type="button" class="rbtn rsmall" data-focusstart="'+esc(k.key)+'"'+(n?' title="This stops and logs the one already running"':'')+'>Start</button>')+'</div>'; });
+    h += '</div>'; }
+  list.innerHTML = h;
+}
+/* Once a second: the readout in the desk and on the top bar, the music, and the settle at zero. */
+function focusTick() {
+  var n = focusNow(), left = focusLeft(), btn = $('focusBtn'), ck = $('focusClock');
+  if (btn) { btn.textContent = n ? (onBreak(n)?'Break ':n.phase==='focus'?'Focus ':'Timer ')+clockWords(left) : 'Focus desk';
+    btn.classList.toggle('is-focus',!!n && !onBreak(n)); btn.classList.toggle('is-break',onBreak(n)); }
+  if (ck) ck.textContent = clockWords(left);
+  musicSync();
+  if (!n || n.remaining===null || left > 0) return;
+  if (!FO.zero) { FO.zero = true; renderFocus(); }
+  /* ONCE per block: `settled` remembers which block was handed in, so a server that could not log it
+     is not asked again every second. It is cleared when the server next reports time left. */
+  var sig = n.key+'|'+n.since;
+  if (n.phase==='focus' && FO.settled!==sig && !FO.busy) { FO.settled = sig; focusDo({focus:'settle'}); }
+}
+function focusTake(j, seq, acted) {
+  if (seq!==FO.seq) return;
+  FO.busy = false;
+  if (!j) { if (!FO.data) { FO.err = 'The focus desk could not be reached. Try again in a moment.'; renderFocus(); } return; }
+  if (j.said) toast(j.said);
+  if (j.error) { toast(j.error); if (!FO.data) FO.err = j.error; }
+  if (j.focus) {
+    var was = focusNow();
+    FO.data = j.focus; FO.at = Date.now(); FO.zero = false;
+    var n = focusNow();
+    if (!n || n.phase!=='focus' || n.remaining > 0) FO.settled = '';
+    if (was && was.phase==='focus' && onBreak(n)) musicChime();
+  }
+  renderFocus(); focusTick();
+  /* My own door has just sealed or opened: fetch the map again so it is redrawn now, not at the next beat. */
+  if (acted) send({ping:1,active:1});
+}
+function focusAsk() {
+  if (FO.busy) return; var seq = ++FO.seq;
+  fetch(R.api+'?focus=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(function (j) { focusTake(j,seq,false); }).catch(function () { focusTake(null,seq,false); });
+}
+function focusDo(fields) {
+  if (FO.busy) return; FO.busy = true; var seq = ++FO.seq, body = new URLSearchParams();
+  Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
+  fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(function (j) { focusTake(j,seq,true); })
+    .catch(function () { focusTake(null,seq,false); toast('That did not reach Anima. Try again.'); });
+}
+function openFocus() { var d = $('focusDlg'); if (!d || d.open) return; renderFocus(); d.showModal(); focusAsk(); }
+
+/* THE MUSIC (the same request: "a soft music while on focus"). Made here, by the browser's own sound
+   engine: no audio file, nothing to license, nothing loaded from another site (the rule at the top
+   of realm.php). A slow chord of eight soft voices behind a filter, each swelling and fading at its
+   own pace, the chord changing every half minute, and now and then one quiet bell note. No beat.
+
+   IT PLAYS ONLY DURING A FOCUS BLOCK, and only with the switch on: it fades in when one starts and
+   out when it stops or becomes a break, where two bell notes mark the end. Browsers refuse sound
+   until the person has clicked something, so the sound engine is only ever woken inside a click
+   (musicWake); a block already running when the page opens starts playing at the first click.
+   The switch and the volume are remembered on this computer. */
+var MU = {on:true,vol:.5,ctx:null,rig:null};
+try { if (localStorage.getItem('realmMusic')==='0') MU.on = false; var mv = parseFloat(localStorage.getItem('realmMusicVol')); if (mv >= 0 && mv <= 1) MU.vol = mv; } catch (e) { /* A private window may refuse; the defaults stand. */ }
+function musicSave() { try { localStorage.setItem('realmMusic',MU.on?'1':'0'); localStorage.setItem('realmMusicVol',String(MU.vol)); } catch (e) { /* Then it is simply not remembered. */ } }
+/* D, G, B minor, A: four chords that sit easily one after another, low and close together. */
+var CHORDS = [[146.83,220,329.63,369.99],[98,146.83,246.94,329.63],[123.47,185,220,293.66],[110,164.81,220,293.66]];
+var BELLS = [587.33,659.25,739.99,880,987.77];
+function musicLevel() { return MU.vol*MU.vol*.6; }
+/* Called inside a click, and nowhere else. */
+function musicWake(t) {
+  var AC = window.AudioContext || window.webkitAudioContext, n = focusNow();
+  if (!AC || !MU.on || !((n && n.phase==='focus') || t.closest('[data-focusstart]'))) return;
+  try { if (!MU.ctx) MU.ctx = new AC(); if (MU.ctx.state==='suspended') MU.ctx.resume(); } catch (e) { MU.ctx = null; }
+}
+function musicBell(out, f, loud) {
+  var ctx = MU.ctx, t = ctx.currentTime, o = ctx.createOscillator(), v = ctx.createGain();
+  o.type = 'sine'; o.frequency.value = f;
+  v.gain.setValueAtTime(0,t); v.gain.linearRampToValueAtTime(loud,t+.04); v.gain.exponentialRampToValueAtTime(.0001,t+3.6);
+  o.connect(v); v.connect(out); o.start(t); o.stop(t+3.7); o.onended = function () { v.disconnect(); };
+}
+function musicStart() {
+  var ctx = MU.ctx; if (!ctx || MU.rig || ctx.state!=='running') return;
+  var t = ctx.currentTime, rig = {live:[],voices:[],chord:0,change:0,bell:0};
+  rig.master = ctx.createGain(); rig.master.gain.setValueAtTime(0,t); rig.master.gain.setTargetAtTime(musicLevel(),t,1.4); rig.master.connect(ctx.destination);
+  var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = .4; lp.connect(rig.master);
+  var sweep = ctx.createOscillator(), depth = ctx.createGain(); sweep.frequency.value = .03; depth.gain.value = 300; sweep.connect(depth); depth.connect(lp.frequency); sweep.start(); rig.live.push(sweep);
+  CHORDS[0].forEach(function (f, i) {
+    var vg = ctx.createGain(); vg.gain.value = .1; vg.connect(lp);
+    var swell = ctx.createOscillator(), sd = ctx.createGain(); swell.frequency.value = .05+i*.017; sd.gain.value = .06; swell.connect(sd); sd.connect(vg.gain); swell.start(); rig.live.push(swell);
+    rig.voices.push([-5,5].map(function (cents, k) { var o = ctx.createOscillator(); o.type = k?'triangle':'sine'; o.frequency.value = f; o.detune.value = cents; o.connect(vg); o.start(); rig.live.push(o); return o; }));
+  });
+  rig.change = setInterval(function () { rig.chord = (rig.chord+1)%CHORDS.length; var at = ctx.currentTime;
+    rig.voices.forEach(function (pair, i) { pair.forEach(function (o) { o.frequency.setTargetAtTime(CHORDS[rig.chord][i],at,1.8); }); }); },28000);
+  (function ring() { rig.bell = setTimeout(function () { musicBell(rig.master,BELLS[Math.floor(Math.random()*BELLS.length)],.07); ring(); },9000+Math.random()*14000); })();
+  MU.rig = rig;
+}
+function musicStop() {
+  var rig = MU.rig, ctx = MU.ctx; if (!rig) return; MU.rig = null;
+  clearInterval(rig.change); clearTimeout(rig.bell);
+  var t = ctx.currentTime; rig.master.gain.cancelScheduledValues(t); rig.master.gain.setTargetAtTime(0,t,.5);
+  setTimeout(function () { rig.live.forEach(function (o) { try { o.stop(); } catch (e) { /* already stopped */ } }); rig.master.disconnect(); },2800);
+}
+/* The block is over: two bell notes, falling. Only where the music has been playing. */
+function musicChime() {
+  var ctx = MU.ctx; if (!MU.on || !ctx || ctx.state!=='running') return;
+  var out = ctx.createGain(); out.gain.value = musicLevel(); out.connect(ctx.destination);
+  musicBell(out,880,.16); setTimeout(function () { musicBell(out,587.33,.16); },450); setTimeout(function () { out.disconnect(); },5200);
+}
+function musicSync() {
+  var n = focusNow(), want = MU.on && !!n && n.phase==='focus' && focusLeft() > 0;
+  if (want && !MU.rig) musicStart(); else if (!want && MU.rig) musicStop();
+}
+if ($('focusBody')) {
+  $('focusBody').innerHTML = '<div id="focusNow"></div><div id="focusList"></div>'
+    +'<div class="rmusic" id="focusMusic" hidden><label><input type="checkbox" id="musicOn"> Music while you focus</label><label>Volume <input type="range" id="musicVol" min="0" max="100" step="1"></label><small>A soft sound made by this page. It plays only during a focus block.</small></div>'
+    +'<div class="rdacts"><a class="rbtn" href="mytasks.php">Open My tasks</a><button type="button" class="rbtn" data-focusclose="1">Close</button></div>';
+  $('musicOn').checked = MU.on; $('musicVol').value = Math.round(MU.vol*100);
+  $('musicOn').addEventListener('change',function () { MU.on = this.checked; musicSave(); musicWake(this); musicSync(); });
+  $('musicVol').addEventListener('input',function () { MU.vol = this.value/100; musicSave(); if (MU.rig) MU.rig.master.gain.setTargetAtTime(musicLevel(),MU.ctx.currentTime,.1); });
+}
+
 /* ---------- start ---------- */
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
@@ -890,6 +1055,12 @@ setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({pi
 /* With no conversation open, ask for unread counts every 8 seconds. An open conversation already
    brings them every 3. Not asked while the window is hidden. */
 setInterval(askUnread,8000);
+/* The focus desk: the readout every second, the server's word every minute and whenever the window
+   comes back into view. On a page with no desk in it, none of this runs. */
+if ($('focusBtn') && $('focusNow')) {
+  focusAsk(); setInterval(focusTick,1000); setInterval(function () { if (!document.hidden) focusAsk(); },60000);
+  document.addEventListener('visibilitychange',function () { if (!document.hidden) focusAsk(); });
+}
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
 window.addEventListener('resize',function () { draw(); });
 })();

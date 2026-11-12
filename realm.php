@@ -68,6 +68,7 @@ foreach (($state['people'] ?? []) as $p) {
       <button type="button" data-door="sealed" aria-pressed="false">Sealed</button>
     </span>
   </span>
+  <button type="button" class="rbtn" id="focusBtn">Focus desk</button>
   <button type="button" class="rbtn" id="lookBtn">Your character</button>
   <?php endif; ?>
 </header>
@@ -122,6 +123,10 @@ foreach (($state['people'] ?? []) as $p) {
     </aside>
   </div>
   <div id="toasts" aria-live="polite"></div>
+  <dialog id="focusDlg" aria-labelledby="focusTitle">
+    <h2 id="focusTitle">Focus desk</h2>
+    <div id="focusBody"></div>
+  </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">
     <h2 id="lookTitle">Your character and house</h2>
     <form id="lookForm" method="dialog"></form>
