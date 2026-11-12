@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm is open to David and Renata only, for now *(no migration)*
+
+**Asked by David:** "can you hard code the access to realm only to Renata and myself for the time
+being? Jorik and Tim have access because they're admins but they are not suppose to see it just yet."
+
+- **Only David and Renata have the Realm**, admins included: no button in the top bar and no page
+  for anybody else. The list is `REALM_TESTERS` in `includes/features.php`.
+- **The Realm switch on Users, Access does nothing while that list has names in it.** Emptying the
+  list hands the Realm back to the switch (admins always, others by role or by person).
+
 ## 2026-11-12 — The Realm, stage 1: the studio as a village *(migration 081)*
 
 **Asked by David:** "an epic fantasy office space where we can hang out, visit other artist's

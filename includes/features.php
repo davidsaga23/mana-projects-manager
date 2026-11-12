@@ -95,11 +95,12 @@ const FEATURES = [
     'own_statement' => ['label' => 'My own artist statement', 'group' => 'Every day', 'note' => 'what they should invoice; their own only',
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 0], 'locked' => ['client']],
     // The Realm (David, 2026-11-12), migration 081. OFF FOR EVERY ROLE TO BEGIN
-    // WITH: there is no staging, so it is tested on live by admins (who always
-    // have every switch) and by whoever is switched on by name on Users, and
-    // opened to a whole role when it is ready. Never for clients: "This is an
-    // internal development so no clients allowed."
-    'realm'         => ['label' => 'The Realm: the studio village', 'group' => 'Every day', 'note' => 'still being built; switch on by person to test',
+    // WITH: there is no staging, so it is tested on live. ⚠ WHILE REALM_TESTERS
+    // (below) NAMES ANYBODY, THIS ROW DECIDES NOTHING: only those people have
+    // the Realm, admins included. Once that list is emptied this row is the
+    // rule again: admins always, others by role or by person. Never for
+    // clients: "This is an internal development so no clients allowed."
+    'realm'         => ['label' => 'The Realm: the studio village', 'group' => 'Every day', 'note' => 'being tested: only David and Renata for now, whatever is set here',
                         'on' => ['editor' => 0, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['client']],
 
     // ---- the whole studio --------------------------------------------------
@@ -359,9 +360,66 @@ function feature_user_changes(int $userId): array {
     return $cache[$userId] = $out;
 }
 
+/**
+ * WHO MAY SEE THE REALM WHILE IT IS BEING TESTED. First names, lower case.
+ *
+ * David, 2026-11-12, the day stage 1 went live: "can you hard code the access to
+ * realm only to Renata and myself for the time being? Jorik and Tim have access
+ * because they're admins but they are not suppose to see it just yet."
+ *
+ * ⚠ THIS OVERRIDES EVERYTHING ELSE ABOUT THE `realm` SWITCH, in both directions.
+ * An admin has every other switch without being asked; not this one. And the
+ * people named here have it whatever their role and whatever Users, Access says,
+ * because Renata is not an admin and the role answer is "off". While the list
+ * has anybody in it, the switch on the Users screen does nothing for the Realm.
+ *
+ * TO OPEN IT UP: empty this list (`[]`). The Realm then follows the switch like
+ * every other feature: admins always, everybody else by role or by person.
+ *
+ * Matched on the FIRST NAME of the account's linked person, display name or
+ * login, so it needs no user ids, which differ between the two hosts. That is
+ * loose on purpose and safe while the list is two people at a small studio; a
+ * second David or Renata with a login would get in too.
+ */
+const REALM_TESTERS = ['david', 'renata'];
+
+/** Is this account one of REALM_TESTERS? Cached per user id; never throws. */
+function realm_tester(int $userId): bool {
+    static $cache = [];
+    if ($userId <= 0) return false;
+    if (isset($cache[$userId])) return $cache[$userId];
+    $names = [];
+    if ($userId === (int)($_SESSION['user_id'] ?? 0)) {
+        $names[] = (string)($_SESSION['display_name'] ?? '');
+        $names[] = (string)($_SESSION['username'] ?? '');
+    }
+    try {
+        $pdo = $GLOBALS['pdo'] ?? null;
+        if ($pdo instanceof PDO) {
+            $q = $pdo->prepare('SELECT u.display_name, u.username, c.name AS crew_name
+                                  FROM users u LEFT JOIN crew c ON c.id = u.crew_id
+                                 WHERE u.id = ?');
+            $q->execute([$userId]);
+            foreach (($q->fetch() ?: []) as $v) $names[] = (string)$v;
+        }
+    } catch (Throwable $e) {
+        // users.crew_id is not there on a very old database; the session names still answer.
+    }
+    foreach ($names as $n) {
+        $first = strtolower((string)(preg_split('/[\s@._-]+/', trim($n))[0] ?? ''));
+        if ($first !== '' && in_array($first, REALM_TESTERS, true)) return $cache[$userId] = true;
+    }
+    return $cache[$userId] = false;
+}
+
 /** The answer for a given account and role (used by feature_on() and by the Users screen). */
 function feature_for_user(string $key, int $userId, string $role): bool {
     if (!isset(FEATURES[$key])) return false;
+    // The Realm while it is being tested: the named people and nobody else, an
+    // admin included. See REALM_TESTERS. Clients stay out whatever their name.
+    if ($key === 'realm' && count(REALM_TESTERS) > 0) {
+        return $role !== 'client' && realm_tester($userId);
+    }
     if ($role === 'admin') return true;
     if (feature_locked($key, $role)) return (bool)(FEATURES[$key]['on'][$role] ?? 0);
     $mine = feature_user_changes($userId);
