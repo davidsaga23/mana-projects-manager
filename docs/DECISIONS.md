@@ -5200,8 +5200,10 @@ later stages do not reopen it.
   `assets/realm.{js,css}`. Not a second app and not a subfolder, because every gate in
   `includes/auth.php` and `includes/features.php` knows a screen by its file name at the root.
   `realm.anima-mana.com` is pointed at the SAME folder as Anima in cPanel, so logins, people and
-  the database are shared; `index.php` sends that address to the Realm. People sign in once more
-  there, because a browser does not share a login between two domains.
+  the database are shared; `index.php` sends that address to the Realm. Anima itself is at
+  `anima-mana.com` (the old `mana.davidsaga.com` is a legacy deployment), so the Realm is tested at
+  `anima-mana.com/realm.php`. On the subdomain people sign in once more, because the login cookie
+  belongs to one address; widening it to the whole domain is a later choice.
 - **Internal only, about 20 people at once, never clients.** One switch, `realm`, off for every
   role until it is ready and locked off for clients.
 - **One village, shows as landscape.** Everybody's house is in one place whatever shows they are on;
