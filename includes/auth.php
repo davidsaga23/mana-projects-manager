@@ -562,7 +562,9 @@ function artist_may_post(): bool {
         // `say` (stage 2, migration 082): a message in a channel or a raven. The
         // sender is the session's own account; realm_channel_access() decides
         // which conversations that account may write in.
-        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say'],
+        // `focus` (2026-11-12): start or stop Anima's own timer from the Realm.
+        // realm_focus_start() checks the task is the asker's, as mytasks.php does.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'focus'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
