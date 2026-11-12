@@ -19,6 +19,8 @@
 // POST set_door=open|ajar|sealed
 // POST set_look=1&cloak=&hat=&pet=&house_kind=
 // POST arrive=<place>&inside=0|1
+// POST knock=<owner's user id>            knock on an ajar door you are standing at
+// POST answer_knock=<knock id>&let=0|1    answer a knock on your own door
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -62,7 +64,8 @@ $mayAnnounce = can_edit();
 // watching for it. Somebody with no conversation open now asks this every few
 // seconds instead; it is one small query and touches nothing.
 if (isset($_GET['unread'])) {
-    echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : []]);
+    echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : [],
+                      'knocks' => realm_knock_news($pdo, $uid)]);
     exit;
 }
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
@@ -107,7 +110,7 @@ if ($channel !== '') {
             }
         }
         $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
-                   'unread' => realm_unread($pdo, $uid, $mayAnnounce)];
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid)];
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {
@@ -125,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = realm_set_door($pdo, $uid, (string)$_POST['set_door']);
         } elseif (isset($_POST['set_look'])) {
             $error = realm_set_look($pdo, $uid, $_POST);
+        } elseif (isset($_POST['knock'])) {
+            $error = realm_knock($pdo, $uid, (int)$_POST['knock']);
+        } elseif (isset($_POST['answer_knock'])) {
+            $error = realm_knock_answer($pdo, $uid, (int)$_POST['answer_knock'], (string)($_POST['let'] ?? '0') === '1');
         } elseif (isset($_POST['arrive'])) {
             $error = realm_arrive($pdo, $uid, (string)$_POST['arrive'], (string)($_POST['inside'] ?? '0') === '1');
         } else {

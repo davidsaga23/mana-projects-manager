@@ -562,7 +562,9 @@ function artist_may_post(): bool {
         // `say` (stage 2, migration 082): a message in a channel or a raven. The
         // sender is the session's own account; realm_channel_access() decides
         // which conversations that account may write in.
-        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say'],
+        // `knock` and `answer_knock` (2026-11-12, migration 084): knocking on an
+        // ajar door you are standing at, and answering a knock on your own.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
