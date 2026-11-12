@@ -717,6 +717,16 @@ function askUnread() {
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) takeUnread(j.unread); }).catch(function () {});
 }
+/* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
+   house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
+function spokenHere(ch) {
+  if (!S.inside) return false;
+  if (ch===chanFor(S.inside)) return true;
+  var m = /^dm:(\d+):(\d+)$/.exec(ch);
+  if (!m || S.inside!=='user:'+ST.me) return false;
+  var o = person(+m[1]===ST.me ? +m[2] : +m[1]);
+  return !!(o && o.inside && o.place===S.inside && o.state!=='away');
+}
 function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) { if (k!==CH.open) n += u[k]; }); document.title = (n?'('+n+') ':'')+'Anima Realm'; }
 function msgHTML(m) { return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div><div class="rmsgbody">'+esc(m.body)+'</div></div>'; }
 function chatTake(j) {
@@ -726,7 +736,7 @@ function chatTake(j) {
   if (!j.ok) { closeChat(); return; }
   if (j.channel!==CH.open) return;
   var box = $('chatMsgs'), stick = box.scrollHeight-box.scrollTop-box.clientHeight < 60, fresh = j.messages.filter(function (m) { return m.id > CH.last; });
-  if (fresh.length && CH.last && S.inside && j.channel===chanFor(S.inside)) {
+  if (fresh.length && CH.last && spokenHere(j.channel)) {
     fresh.forEach(function (m) { BUB[m.user] = {text:m.body,until:Date.now()+BUBBLE_MS}; });
     draw(); setTimeout(draw,BUBBLE_MS+100);
   }
