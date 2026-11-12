@@ -21,7 +21,9 @@ executing them, and flag anything destructive or irreversible before doing it.
 **Anima** (internally "mana-projects-manager", live as "Anima | Project manager") is a
 **multi-project production tracking platform for a small animation studio** — Mana Animation
 Studio. Mana runs several shows at once (recent ones: FCM / "FC Mobile", MSD, Doomsday, a 2D
-motion comic). The app is in real daily use at **<https://mana.davidsaga.com>**.
+motion comic). The app is in real daily use at **<https://anima-mana.com>**
+(David, 2026-11-12; the older `mana.davidsaga.com` is a legacy deployment, see
+`docs/HOSTING_MIGRATION.md`).
 
 It is, at heart, a **tracker**: it stores numbers, dates, names, statuses and files, and every
 screen is a form, a table, a grid or a chart. It is deliberately **not** a media/video app — it
