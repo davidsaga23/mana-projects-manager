@@ -1391,3 +1391,24 @@ one DB" + separate finance DB), a single shared app install, rather than a share
 rewrite. A plan document may exist at `/mnt/project-files/selling/selling-the-app-plan.md` (outside
 this repo). **This is a different product, not the internal studio tool — don't expand it unless
 David revives it, and if he does, start a fresh thread.**
+
+## The Realm — built in stages (started 2026-11-12)
+
+The studio as a village: see `docs/DECISIONS.md`, 2026-11-12, for what was settled. Each stage is
+its own pull request behind the `realm` switch, and waits for David's go-ahead.
+
+| Stage | What it adds | State |
+|---|---|---|
+| 1. The village | Map, houses, online / resting / away, door status, walking, going inside, your character | **Built 2026-11-12**, migration 081 |
+| 2. Chat | Channels (Tavern, announcements, one per active show), ravens between people, unread counts, small images, the Herald side panel, ravens and knocks in the bell | Not built |
+| 3. Voice | Voice tables for up to 5, knock to be let in, "Summon the Council" opening a saved Google Meet link | Not built |
+| 4. Mana and praise | Streak mana, praise, private gold, clothes, accessories and pets, gifting and swapping, all face to face | Not built |
+| 5. The app | Install on Windows with start-up, desktop notifications and sounds, then a phone layout and phone notifications | Not built |
+| 6. Slack bridge | Channels mirrored both ways, images kept, history past 90 days, DMs private to the two people | Not built |
+| 7. Leaving Slack | Slack switched off once the leaders are comfortable on their phones | David's call |
+
+Known limits of stage 1, on purpose: no walking about inside a room; the village holds 26 houses;
+other people move on the map every 25 seconds, not live; the art is drawn by code.
+
+To watch when it goes live: how the shared hosting copes with one request per person every 25
+seconds. Chat (stage 2) will ask more often, so this is the measurement that decides how.

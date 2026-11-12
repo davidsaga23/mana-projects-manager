@@ -94,6 +94,13 @@ const FEATURES = [
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 1]],
     'own_statement' => ['label' => 'My own artist statement', 'group' => 'Every day', 'note' => 'what they should invoice; their own only',
                         'on' => ['editor' => 1, 'supervisor' => 1, 'artist' => 1, 'client' => 0], 'locked' => ['client']],
+    // The Realm (David, 2026-11-12), migration 081. OFF FOR EVERY ROLE TO BEGIN
+    // WITH: there is no staging, so it is tested on live by admins (who always
+    // have every switch) and by whoever is switched on by name on Users, and
+    // opened to a whole role when it is ready. Never for clients: "This is an
+    // internal development so no clients allowed."
+    'realm'         => ['label' => 'The Realm: the studio village', 'group' => 'Every day', 'note' => 'still being built; switch on by person to test',
+                        'on' => ['editor' => 0, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['client']],
 
     // ---- the whole studio --------------------------------------------------
     'studio_tasks'  => ['label' => 'Studio Tasks: see', 'group' => 'The whole studio',
@@ -194,6 +201,8 @@ const FEATURE_SCRIPTS = [
     'history_quotas.php'  => 'quotas',
     'users.php'           => 'users',
     'log_reminders.php'   => 'log_reminder_send',
+    'realm.php'           => 'realm',
+    'realm_api.php'       => 'realm',
     // Admins read anybody's; anybody else their own (statement.php decides whose).
     'statement.php'       => 'own_statement',
     // project tabs

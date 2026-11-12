@@ -14,6 +14,31 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm, stage 1: the studio as a village *(migration 081)*
+
+**Asked by David:** "an epic fantasy office space where we can hang out, visit other artist's
+offices, request meetings so they open up a voice chat ... something that mixes the fantasy world
+of magic the gathering/lord of the rings, with slack/discord."
+
+- **A new full-screen page, `realm.php`** (a "Realm" button in the top bar): a pixel-art map with
+  one village holding everybody's house, and each active show as a piece of landscape around it
+  (peaks, wood, ashlands, lake, moor). Land with no show lies under a mist with a signpost.
+- **A character on the map means that person is here now.** Resting (dimmed, with a Z) after 25
+  minutes without touching the page; away (dark house, no character) once the page is closed.
+- **Door status on every house**: open, ajar or sealed, shown on the door itself, by a lantern
+  above it and in the list of people. You set your own from the top bar.
+- **Walking**: arrow keys, or click a building and choose Walk there or Teleport. Houses, water and
+  the peaks are solid, and a character behind a building is covered by it.
+- **Going inside**: your character walks in through the door and the view changes to the room,
+  showing who is there. From the map, the heads of whoever is inside show above the building.
+  Somebody else's house can be entered only while their door is open and they are home.
+- **Your character**: cloak colour, headwear, companion and the kind of house, from "Your character".
+- **A smoke plume** rises from the house of anybody whose Pomodoro is in a focus phase.
+- **Off for every role to begin with** (Users, Access, "The Realm: the studio village"). Admins
+  always have it; switch it on by person to test, by role when it is ready. Never for clients.
+- **No chat, voice, praise or Slack yet.** Those are the next stages; see `docs/ROADMAP.md`.
+- **Until migration 081 runs**, the page says the update is waiting and draws nothing.
+
 ## 2026-11-12 — Days off: a Bookings tab for everybody's days away *(no migration)*
 
 **Asked by David:** "let's create a calendar for days off so anima can register those days", and

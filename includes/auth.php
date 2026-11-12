@@ -554,6 +554,12 @@ function artist_may_post(): bool {
         // session, and the one id that can be posted (an admin's reminder) is
         // matched against their own crew id in log_reminder_dismiss()'s WHERE.
         'log_reminder_api.php' => ['dismiss', 'snooze'],
+        // The Realm (David, 2026-11-12, migration 081): the heartbeat, and a
+        // person's own door, look and whereabouts. ⚠ THE ASKER'S OWN ROW ONLY:
+        // no user id is ever posted, realm_api.php takes it from the session.
+        // The one id that can be sent is the house somebody walks to, and
+        // realm_arrive() checks that door before letting them inside.
+        'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
