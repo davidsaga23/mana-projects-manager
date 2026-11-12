@@ -14,6 +14,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: a conversation can be laid over the map *(no migration)*
+
+**Asked by David:** "can you have an arrow pointing left at the middle of the chat bar so there's an
+option to extend it over the map?"
+
+- **A handle on the conversation's left edge**, half way down, with an arrow pointing left. Click
+  it and the conversation takes the map's place, so there is far more room to read and write. The
+  arrow then points right, and a second click brings the map back.
+- **The lists stay**: channels, people and places are still on the left, so you can switch
+  conversation without narrowing first. Clicking a person's house or a place in the lists brings
+  the map back, since that click is about the map.
+- **Wide, the words keep to a readable column** in the middle instead of running the full width of
+  a large screen, and pictures may show taller.
+- **Your choice is remembered** on that computer, for the next conversation and the next visit.
+- **The arrow keys do nothing while the map is covered**, so your character never walks, enters a
+  house or leaves a room where you cannot see it.
+- On a phone-width screen there is no handle: the conversation is already full width there.
+
 ## 2026-11-12 — The Realm: each task shows its status and due date, and the status can be changed there *(no migration)*
 
 **Asked by David**, with a picture of the Production tasks table on My tasks: "work on how tasks

@@ -5476,3 +5476,32 @@ and due date".
   running on is approved from the Realm, it leaves the list and the clock panel names it "Work
   started in My tasks" until the clock is stopped. A status set by hand can still be overwritten by
   the next Plaky import, as before.
+
+## 2026-11-12 — The conversation over the map
+
+**David:** "can you have an arrow pointing left at the middle of the chat bar so there's an option to
+extend it over the map?" (with a screenshot, the left edge of the open conversation circled).
+
+- **Wide means the conversation takes the map's whole place, and the lists stay.** Not a panel
+  half over the map: that would leave the zoom buttons, the house card or the bar inside a room
+  peeking out from under it, reachable or not depending on the screen. The map's panel is taken
+  out of the layout (`.chat-wide` on `.rapp`, in `assets/realm.css`) and comes back whole; the
+  canvas is repainted by the existing `draw()`, which takes its size from its box.
+- **No key reaches the map while it is away.** `mapAway()` in `assets/realm.js` stops the document
+  key handler first, so the arrows cannot walk the character, Enter cannot go into a house and
+  Escape cannot leave a room unseen. It asks the page whether the map is really gone, not the
+  setting, so a narrow screen (where wide changes nothing) keeps its keys.
+- **Picking a house or a place in the lists narrows the conversation again**, because that click
+  is about the map. Picking a person opens their ravens and stays wide.
+- **The choice is remembered in the browser** (`localStorage`, `realmChatWide`), not in the
+  database: it is about this screen, and a second computer may want the other answer. Closing a
+  conversation does not forget it; the next one opens the same way.
+- **A reading column, not a stretched one.** Wide, the messages and the writing box keep to a
+  centred column of at most 900px, a message to about 74 characters a line, and a picture may be
+  420px tall instead of 240. The head (title and Close) stays edge to edge so Close does not move.
+- **The handle is a real button** with `aria-expanded` and a label that says what it will do
+  ("Make the conversation wider" / "narrower"). Its fill is solid: half of it lies over the map.
+- **Known limits:** while wide, things that live on the map are out of reach until you narrow
+  again (speech bubbles in a room, the bookshelf that opens Your tasks, the Leave button of a
+  room). Notices, knocks, the picture viewer and Your character are unaffected. There is no
+  dragging to an in-between width.
