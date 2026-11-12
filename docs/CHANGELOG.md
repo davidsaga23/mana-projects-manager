@@ -33,6 +33,21 @@ clock."
   another site. A switch and a volume in the desk, remembered on that computer. Two bell notes mark
   the end of a block.
 - Still only for the Realm's testers (David and Renata).
+## 2026-11-12 — The Realm: knock on an ajar door, and pictures open inside the Realm *(migration 084)*
+
+**Asked by David:** "when a door is ajar, let's open the option to knock", and "the visualization of
+the images in a chat should happen inside the realm not in a blank tab".
+
+- **Knock**: standing at a door that is ajar, the card's button is Knock. The owner gets a notice,
+  "Renata is knocking at your door", with **Let in** and **Not now**. Being let in walks you inside.
+- **Face to face**: a knock is only taken from somebody standing at that door. A raven is the way
+  to reach somebody from elsewhere.
+- **A knock waits two minutes.** Unanswered, the visitor is told there was no answer. Being let in
+  lasts ten minutes, so stepping out and back needs no second knock.
+- **Somebody knocking counts on the Realm button** in Anima's top bar, with unread ravens.
+- **A picture in chat opens in a viewer inside the Realm** (click it; Close, Escape or a click
+  beside it shuts it), not in a new browser tab.
+- **Until migration 084 runs**, an ajar door's card says knocking needs a database update.
 
 ## 2026-11-12 — The Realm: speech bubbles no longer cover each other *(no migration)*
 

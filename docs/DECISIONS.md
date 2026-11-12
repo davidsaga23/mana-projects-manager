@@ -5338,6 +5338,26 @@ David: "let's also allow images and tagging people possible in all chats".
   show does not learn its name. New bell kind `tag`.
 - **Not done:** several pictures in one message, and deleting a message or its picture.
 
+## 2026-11-12 — Knocking, brought forward from the voice stage
+
+David: "when a door is ajar, let's open the option to knock". Knocking had been planned as part of
+voice ("ajar: knock, and they open, and you talk"). He wanted the knock now, on its own; voice will
+attach to the same moment later.
+
+- **`realm_knocks`**: one row per knock, `waiting` then `in` or `no`. Knocking again replaces the
+  earlier knock between the same two people. Nothing cleans the table: a knock is simply too old
+  after `REALM_KNOCK_SECONDS` (120), and being let in lasts `REALM_KNOCK_PASS_MINUTES` (10).
+- **Face to face, checked on the server.** `realm_knock()` only takes a knock from somebody whose
+  `place` is that house. `realm_arrive()` lets somebody into an ajar house only with a fresh pass
+  (`realm_has_pass()`), so the screen cannot be talked round.
+- **The answer is the owner's alone**: `realm_knock_answer()` matches the knock to the session's
+  own account.
+- **Knock news travels with everything**: the map, the unread counts (`?unread=1`) and every chat
+  answer carry it, so it is seen within seconds whatever the person is doing in the Realm, and
+  `assets/realm-nudge.js` adds it to the count on the Realm button elsewhere in Anima.
+- **What was already true when the page loaded is not news.** A pass from five minutes ago does not
+  announce itself or walk the visitor in on a reload.
+- **Pictures open in a viewer inside the Realm** (David, same day), a `<dialog>` made on first use.
 ## 2026-11-12 — The Realm's focus desk
 
 David: "how can I change to in focus time? I think we should play a soft music while on focus and

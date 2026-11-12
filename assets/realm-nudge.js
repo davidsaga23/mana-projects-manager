@@ -28,6 +28,8 @@
         if (!j || !j.ok) return;
         var n = 0, u = j.unread || {};
         Object.keys(u).forEach(function (k) { n += Number(u[k]) || 0; });
+        // Somebody knocking at your door in the Realm counts too (migration 084).
+        if (j.knocks && j.knocks.for_me) n += j.knocks.for_me.length;
         show(n);
       })
       .catch(function () { /* the next ask may succeed */ });

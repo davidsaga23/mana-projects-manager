@@ -103,7 +103,7 @@ function mayEnter(id) {
   if (!o.owner || o.owner.me) return '';
   if (o.owner.state === 'away') return 'Nobody is home.';
   if (o.owner.door === 'sealed') return 'The door is sealed. They are not to be disturbed.';
-  if (o.owner.door !== 'open') return 'The door is ajar. Knocking arrives with voice chat.';
+  if (o.owner.door !== 'open' && !PASS[o.owner.id]) return 'The door is ajar. Knock, and wait to be let in.';
   return '';
 }
 
@@ -542,7 +542,12 @@ function renderCard() {
   if (S.walk) { h = '<div class="rcard"><b>Walking to '+esc(title(S.walk.id))+'…</b><div class="racts"><button type="button" class="rbtn rsmall" data-tele="'+esc(S.walk.id)+'">Teleport instead</button></div></div>'; }
   else if (o) {
     var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')) : 'A place to meet. Chat and voice arrive in the next stages.';
-    var btn = S.here===id ? '<button type="button" class="rbtn rprimary rsmall" data-enter="'+esc(id)+'"'+(why?' disabled':'')+'>Go inside</button>' : '<button type="button" class="rbtn rprimary rsmall" data-walk="'+esc(id)+'">Walk there</button><button type="button" class="rbtn rsmall" data-tele="'+esc(id)+'">Teleport</button>';
+    /* At an ajar door, with nobody having let me in yet, the button is Knock. */
+    var ajar = o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.door==='ajar' && !PASS[o.owner.id];
+    var waiting = ajar && KN.mine && KN.mine.to===o.owner.id && KN.mine.status==='waiting';
+    if (ajar) why = waiting ? 'Knocking. Waiting for '+firstName(o.owner.name)+' to answer.' : (KN.ready ? 'The door is ajar. Knock, and wait to be let in.' : 'The door is ajar. Knocking needs a database update first.');
+    var btn = S.here===id && ajar ? '<button type="button" class="rbtn rprimary rsmall" data-knock="'+o.owner.id+'"'+((waiting||!KN.ready)?' disabled':'')+'>'+(waiting?'Knocking…':'Knock')+'</button>' :
+      S.here===id ? '<button type="button" class="rbtn rprimary rsmall" data-enter="'+esc(id)+'"'+(why?' disabled':'')+'>Go inside</button>' : '<button type="button" class="rbtn rprimary rsmall" data-walk="'+esc(id)+'">Walk there</button><button type="button" class="rbtn rsmall" data-tele="'+esc(id)+'">Teleport</button>';
     h = '<div class="rcard"><b>'+esc(title(id))+'</b><small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
   }
   slot.innerHTML = h;
@@ -581,6 +586,7 @@ function applyState(st) {
   if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
   if (fresh) takeUnread(fresh);
+  takeKnocks(st.knocks);
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -676,7 +682,7 @@ function keyTick(ts) {
 document.addEventListener('keydown',function (e) {
   S.touched = true;
   var t = e.target, is = function (q) { return t && t.matches && t.matches(q); };
-  if (is('input,select,textarea') || $('lookDlg').open || ($('focusDlg') && $('focusDlg').open)) return;
+  if (is('input,select,textarea') || $('lookDlg').open || ($('picDlg') && $('picDlg').open) || ($('focusDlg') && $('focusDlg').open)) return;
   if (S.inside) { if (e.key==='Escape') leave(); return; }
   if (e.key.indexOf('Arrow')===0) { e.preventDefault(); if (S.walk) { S.walk = null; renderCard(); } held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); }
   else if (e.key==='Enter' && is('.bld')) { e.preventDefault(); select(t.getAttribute('data-sel'),false); }
@@ -688,7 +694,11 @@ document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
   musicWake(t);
-  if (t.closest('#chatAttach')) { if ($('chatFile')) $('chatFile').click(); }
+  if ((b = t.closest('.rimglink'))) { e.preventDefault(); showPicture(b.getAttribute('href'),(b.querySelector('img')||{}).alt); }
+  else if (t.closest('[data-picclose]')) { if ($('picDlg')) $('picDlg').close(); }
+  else if ((b = t.closest('[data-knock]'))) send({knock:b.getAttribute('data-knock')});
+  else if ((b = t.closest('[data-knockanswer]'))) { send({answer_knock:b.getAttribute('data-knockanswer'),let:b.getAttribute('data-let')}); var box = b.closest('[data-knockbox]'); if (box) box.remove(); }
+  else if (t.closest('#chatAttach')) { if ($('chatFile')) $('chatFile').click(); }
   else if (t.closest('[data-unpick]')) setPick(null);
   else if ((b = t.closest('[data-tag]'))) sugPick(+b.getAttribute('data-tag'));
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
@@ -749,7 +759,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) takeUnread(j.unread); }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -760,6 +770,42 @@ function spokenHere(ch) {
   if (!m || S.inside!=='user:'+ST.me) return false;
   var o = person(+m[1]===ST.me ? +m[2] : +m[1]);
   return !!(o && o.inside && o.place===S.inside && o.state!=='away');
+}
+/* KNOCKING (David, 2026-11-12: "when a door is ajar, let's open the option to knock"), migration
+   084. I knock at an ajar door I am standing at; the owner gets a notice with Let in and Not now;
+   being let in walks me inside. PASS is who has let me in; KN.mine is my own latest knock, and
+   KN.shown the knocks on my door I have already been told about. */
+var PASS = {}, KN = {ready:false,mine:null,shown:{},first:true};
+function knockNotice(q) {
+  var t = document.createElement('div'); t.className = 'rtoast is-link'; t.setAttribute('data-knockbox',q.id);
+  t.innerHTML = '<b>'+esc(firstName(q.name))+' is knocking at your door</b><div class="racts"><button type="button" class="rbtn rprimary rsmall" data-knockanswer="'+q.id+'" data-let="1">Let in</button><button type="button" class="rbtn rsmall" data-knockanswer="'+q.id+'" data-let="0">Not now</button></div>';
+  $('toasts').appendChild(t); setTimeout(function () { t.remove(); },120000);
+}
+function takeKnocks(k) {
+  if (!k) return;
+  KN.ready = !!k.ready;
+  (k.for_me || []).forEach(function (q) { if (!KN.shown[q.id]) { KN.shown[q.id] = true; knockNotice(q); } });
+  var m = k.mine || null, was = KN.mine, changed = !!m && (!was || was.to!==m.to || was.status!==m.status);
+  KN.mine = m;
+  if (m && m.status==='in') PASS[m.to] = true;
+  /* What was already true when the page loaded is not news: no message, and no walking in by itself. */
+  if (changed && !KN.first) {
+    var o = person(m.to), nm = o ? firstName(o.name) : 'They';
+    if (m.status==='in') { toast(nm+' opened the door.'); if (S.here==='user:'+m.to && !S.inside) goInside('user:'+m.to); }
+    else if (m.status==='no') toast(nm+' cannot talk right now.');
+    else if (m.status==='gone') toast('No answer from '+nm+'.');
+  }
+  KN.first = false;
+  if (changed || (was && !m)) renderCard();
+}
+/* A PICTURE OPENS INSIDE THE REALM (David, 2026-11-12: "the visualization of the images in a chat
+   should happen inside the realm not in a blank tab"). One viewer, made the first time it is needed. */
+function showPicture(src, alt) {
+  var d = $('picDlg');
+  if (!d) { d = document.createElement('dialog'); d.id = 'picDlg'; d.className = 'rpic'; d.innerHTML = '<img id="picImg" alt=""><div class="rdacts"><button type="button" class="rbtn rprimary" data-picclose="1">Close</button></div>'; document.body.appendChild(d);
+    d.addEventListener('click',function (e) { if (e.target===d) d.close(); }); }
+  $('picImg').src = src; $('picImg').alt = alt || 'Picture';
+  if (d.showModal) { if (!d.open) d.showModal(); } else window.open(src,'_blank');
 }
 function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) { if (k!==CH.open) n += u[k]; }); document.title = (n?'('+n+') ':'')+'Anima Realm'; }
 /* The words of a message, with every tagged name ("@Renata Ruiz") made to stand out, mine most of
@@ -792,6 +838,7 @@ function chatTake(j) {
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
+  takeKnocks(j.knocks);
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
