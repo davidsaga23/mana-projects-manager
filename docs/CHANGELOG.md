@@ -27,6 +27,14 @@ can decide which one to work on". And of the music: "can we try something more l
   Somebody with no house yet keeps a "Your tasks" button, since they have no shelf.
 - **The music is now a lofi loop**: mellow chords, a soft bass, a slow dusty beat, record crackle.
   Still made by the page itself, with the same switch and volume.
+## 2026-11-12 — The Realm: a name in the People list opens your ravens with them *(no migration)*
+
+**Asked by David**, pointing at Renata's name in the list while she was away: "clicking here
+should automatically open the ravens with Renata".
+
+- **Clicking anybody in the People list opens your ravens with them**, whether or not anything is
+  unread and whether or not they are in the Realm. It still finds their house on the map.
+- Your own name selects your house, as before.
 
 ## 2026-11-12 — The Realm: a focus desk, with the timer and soft music *(no migration)*
 
