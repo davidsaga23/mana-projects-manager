@@ -14,6 +14,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm, stage 2: written chat and ravens *(migration 082)*
+
+**Asked by David:** "what's the next step? I'd like to see if we can open a chat or a voice chat".
+Chat first: a voice call needs the same message delivery, and chat can be tried by one person alone.
+
+- **Channels**, listed above the people: Announcements, The Tavern, Council Hall, and one for each
+  show that holds a land. Read and written from anywhere, without walking there ("the Discord way").
+- **Announcements** is read by everybody and written by Production and admins.
+- **A show's channel** is listed only for people who may see that show.
+- **Ravens**: a conversation between two people, opened with "Send a raven" on a person's house.
+  Only those two can read it; there is no admin override.
+- **Unread counts** beside each channel and each person, and in the browser tab's title.
+- **Walking into a place opens its conversation**: a place's channel, or ravens with a house's owner.
+- **A raven for somebody who is not in the Realm rings Anima's bell** ("Renata sent you a raven in
+  the Realm"), once per sender until it is read. The bell says who, never what.
+- **Until migration 082 runs**, the Realm works as before with no chat in it.
+- **Not in this step:** the Herald news panel, images in messages, and knocks. Still limited to
+  David and Renata (`REALM_TESTERS`).
+
 ## 2026-11-12 — The Realm is open to David and Renata only, for now *(no migration)*
 
 **Asked by David:** "can you hard code the access to realm only to Renata and myself for the time
