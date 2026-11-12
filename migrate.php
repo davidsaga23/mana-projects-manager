@@ -177,7 +177,7 @@ foreach ($fin['files'] ?? [] as $f) if ($f[1] !== 'applied') $finWaiting++;
     <?php if (!$fin['baseline']): ?>
       <p class="flash flash-warn">The finance database does not have its first tables yet. Import
         <code>finance_install.sql</code> by hand once (it is part of setting finance up), then come back.</p>
-    <?php elseif ($finWaiting > 0 && $fin['rights'] === false): ?>
+    <?php elseif ($finWaiting > 0 && $fin['rights'] === false && ($finRun === null || !$finRun['error'])): ?>
       <p class="flash flash-warn"><?= e(finance_rights_message()) ?></p>
     <?php endif; ?>
 
