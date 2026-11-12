@@ -4854,6 +4854,7 @@ body.rv-open { overflow: hidden; }
 .home-missing a { margin-left: 8px; }
 .home-shows td { vertical-align: top; }
 .home-refs { white-space: nowrap; }
+.home-refs .row-btn { margin: 2px 4px 2px 0; }
 .home-invoice tfoot th { text-align: right; }
 
 /* --- the person / slot page, in two columns (David, 2026-10-29) ---------- */
