@@ -35,7 +35,10 @@ and flag anything destructive before doing it. Deep context is in `START_HERE.md
 - **Take the next migration number only when merging** (check `migrations/` on `origin/master`);
   two sessions both claiming `070` is the usual collision.
 - **Finance DB is separate:** reached only through `includes/money.php`; changes are
-  `finance_install_NN.sql` files David imports by hand in phpMyAdmin. Say so explicitly.
+  `finance_install_NN.sql` files in the repo root, applied from the **Finance database updates**
+  section of `migrate.php` (since 2026-11-11, no more phpMyAdmin). A new file also needs its
+  schema check in `finance_migration_checks()` in `includes/money.php`, and takes the next number
+  only when merging, like main migrations. Say in the PR that David must apply it.
 - Never change real data (rates, frame counts, statuses) to "fix" a report unless David asks.
 
 ## Money rules (David, 2026-10-28 — detail in `docs/DECISIONS.md`)

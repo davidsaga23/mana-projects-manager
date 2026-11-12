@@ -1293,6 +1293,13 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 
 ## Asked for on 2026-11-11
 
+### Finance database updates from migrate.php — BUILT 2026-11-11 (no migration)
+
+David: *"why do I need to paste so many codes to the DB when we used to do it through the migration
+system?"* `finance_install_NN.sql` files now apply from `migrate.php` → Finance database updates;
+ones imported by hand are recognised and recorded, never re-run. Needs the finance MySQL user to have
+CREATE, ALTER and INDEX (the page says so if not). See DECISIONS, 2026-11-11.
+
 ### ✅ An invoice template — BUILT 2026-11-11
 
 David: *"let's put on the roadmap an invoice template"*, then *"Let's work on the invoice template now"*.

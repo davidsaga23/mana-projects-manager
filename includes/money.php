@@ -1037,6 +1037,404 @@ function fmt_money(?float $rate, string $unit = 'day', string $currency = 'USD')
     return number_format($rate, 2) . ' ' . $currency . ' · ' . $per;
 }
 
+/* ===========================================================================
+ * FINANCE DATABASE UPDATES: finance_install_NN.sql through migrate.php
+ * ===========================================================================
+ *
+ * David, 2026-11-11: "why do I need to paste so many codes to the DB when we
+ * used to do it through the migration system?" Until then every change to the
+ * finance database was a finance_install_NN.sql file David pasted into
+ * phpMyAdmin by hand, because migrate.php only knows the production
+ * connection. That connection has no rights here (the top of this file), and
+ * rule 1 says nothing outside this file opens this one, so the runner lives
+ * HERE and migrate.php only asks it questions.
+ *
+ * WHAT IS RUN: finance_install_02.sql upward, in number order. The bare
+ * finance_install.sql is the baseline that creates the database's first
+ * tables; it belongs to setting finance up at all (a new database, a new
+ * user, the config block) and stays a by-hand step.
+ *
+ * HOW IT KNOWS WHAT IS DONE: a small `finance_migrations` table in the finance
+ * database, one row per file, like schema_migrations on the production side.
+ * It did not exist while 02 to 17 were being pasted in, so every file also has
+ * a SCHEMA CHECK below: the tables and columns it adds. A file whose every
+ * check is already true was imported by hand; it is recorded as "found already
+ * in place" and NEVER run again. That matters: most of these files ADD COLUMN,
+ * which fails a second time, and 09 rewrites invoice statuses.
+ *
+ * A file where SOME checks pass and others do not was half-imported. It is not
+ * run (it might fail, or run its data steps twice) and nothing after it runs
+ * either, because the files build on each other. The page shows what is
+ * missing and offers "mark as done" for when David knows better.
+ *
+ * A NEW FILE (19 onward) needs an entry in finance_migration_checks() too. A
+ * file without one is still run, but only the tracking table protects it from
+ * running twice, and a copy pasted in by hand could never be recognised. Write
+ * new files so a second run is harmless where you can (CREATE TABLE IF NOT
+ * EXISTS), and add the check anyway.
+ *
+ * RIGHTS: the finance user may have been given only SELECT/INSERT/UPDATE/
+ * DELETE. These files need CREATE, ALTER and INDEX. The rights are read BEFORE
+ * anything runs (finance_schema_rights()), so a missing grant is a plain
+ * message saying what to tick in cPanel, never a file left half-applied.
+ */
+
+/**
+ * What each file adds, so a hand import can be recognised.
+ *
+ * 'table.column' means that column exists. 'table.column~word' means the
+ * column's type lists word (an ENUM gaining a value); 'table.column!word'
+ * means it must NOT (09 takes 'received' out of the invoice statuses).
+ */
+function finance_migration_checks(): array {
+    return [
+        'finance_install_02.sql' => ['project_budgets.project_id', 'invoices.id'],
+        // 02 was later rewritten to include these two columns, so on a database
+        // built from the newer 02 this file is "already in place" and never
+        // runs, which is right: it would fail with "duplicate column".
+        'finance_install_03.sql' => ['invoices.step_id', 'invoices.step_name'],
+        'finance_install_04.sql' => ['hire_quotes.hire_id', 'crew_terms.contract_status',
+                                     'crew_terms.contract_signed_date', 'crew_terms_log.contract_signed_date'],
+        'finance_install_05.sql' => ['project_expenses.id'],
+        'finance_install_06.sql' => ['crew_terms.rate_unit~second', 'hire_quotes.rate_unit~second'],
+        'finance_install_07.sql' => ['project_budgets.revenue_amount'],
+        'finance_install_08.sql' => ['kickoff_finance_snapshots.kickoff_id'],
+        'finance_install_09.sql' => ['invoices.status~expected', 'invoices.status!received'],
+        'finance_install_10.sql' => ['budget_changes.id'],
+        'finance_install_11.sql' => ['project_fx_rates.project_id', 'project_fx_rates_log.id'],
+        'finance_install_12.sql' => ['invoice_headers.id', 'invoices.header_id'],
+        'finance_install_13.sql' => ['position_terms.id', 'position_terms_log.id'],
+        'finance_install_14.sql' => ['position_done.id', 'position_done_log.id'],
+        'finance_install_15.sql' => ['invoices.position_crew_id'],
+        'finance_install_16.sql' => ['budget_requests.id'],
+        'finance_install_17.sql' => ['crew_terms.monthly_salary', 'crew_terms_log.monthly_salary'],
+        // The invoice template (PR #200), claimed while this was being built.
+        'finance_install_18.sql' => ['invoice_details.crew_id'],
+    ];
+}
+
+/** finance_install_02.sql … the highest, in number order. Names only. */
+function finance_migration_files(): array {
+    $names = [];
+    foreach (glob(__DIR__ . '/../finance_install_*.sql') ?: [] as $f) {
+        $n = basename($f);
+        if (preg_match('/^finance_install_(\d+)\.sql$/', $n, $m) && (int)$m[1] >= 2) {
+            $names[(int)$m[1]] = $n;
+        }
+    }
+    ksort($names);
+    return array_values($names);
+}
+
+/**
+ * The files recorded in finance_migrations, as [filename => row]. Empty while
+ * the table does not exist, which is the state before the first run.
+ */
+function finance_migrations_recorded(PDO $db): array {
+    try {
+        $rows = $db->query('SELECT filename, applied_at, applied_by, how FROM finance_migrations')->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+    $out = [];
+    foreach ($rows as $r) $out[$r['filename']] = $r;
+    return $out;
+}
+
+/**
+ * Every column of every table in the finance database, as
+ * ['table.column' => lower-case column type]. ONE query rather than a SHOW
+ * per table; DATABASE() is the finance database on this connection.
+ */
+function finance_schema_columns(PDO $db): array {
+    $out = [];
+    $q = $db->query(
+        'SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()'
+    );
+    foreach ($q->fetchAll() as $r) {
+        $out[$r['TABLE_NAME'] . '.' . $r['COLUMN_NAME']] = strtolower((string)$r['COLUMN_TYPE']);
+    }
+    return $out;
+}
+
+/** Is one check true against the schema? See finance_migration_checks(). */
+function finance_check_passes(string $check, array $cols): bool {
+    if (preg_match('/^([A-Za-z0-9_]+\.[A-Za-z0-9_]+)([~!])(.+)$/', $check, $m)) {
+        if (!isset($cols[$m[1]])) return false;
+        $has = strpos($cols[$m[1]], "'" . strtolower($m[3]) . "'") !== false;
+        return $m[2] === '~' ? $has : !$has;
+    }
+    return isset($cols[$check]);
+}
+
+/**
+ * May the finance user change tables? true, false, or null when MySQL would
+ * not say (then we just try, and a refusal is still reported in plain words).
+ *
+ * Read from SHOW GRANTS, which every user may run about themself. Lines look
+ * like "GRANT SELECT, INSERT, ... ON `db`.* TO ..." or "GRANT ALL PRIVILEGES
+ * ON ...". Asked BEFORE running anything: with CREATE but not ALTER, a file
+ * like 04 would make its new table and then be refused on its first ALTER,
+ * leaving it half-applied. Better not to start.
+ */
+function finance_schema_rights(PDO $db): ?bool {
+    try {
+        $lines = $db->query('SHOW GRANTS FOR CURRENT_USER()')->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        return null;
+    }
+    $have = [];
+    foreach ($lines as $l) {
+        if (!preg_match('/^GRANT\s+(.+?)\s+ON\s+/i', (string)$l, $m)) continue;
+        if (stripos($m[1], 'ALL PRIVILEGES') !== false) return true;
+        foreach (explode(',', $m[1]) as $p) $have[strtoupper(trim($p))] = true;
+    }
+    return isset($have['CREATE'], $have['ALTER'], $have['INDEX']);
+}
+
+/**
+ * Where every finance update stands. Admin only: an empty array otherwise,
+ * like everything in this file.
+ *
+ * Returns ['ok' => bool, 'error' => ?string, 'baseline' => bool,
+ *          'rights' => ?bool, 'files' => [[name, state, detail], ...]].
+ * state is one of:
+ *   applied   recorded in finance_migrations
+ *   found     not recorded, but everything it adds is already there
+ *             (imported by hand): will be recorded, never run
+ *   pending   nothing it adds is there yet: will be run
+ *   partial   some of it is there and some not: blocked, needs a look
+ */
+function finance_migration_status(bool $withRights = true): array {
+    if (!can_see_money()) return [];
+    $res = ['ok' => false, 'error' => null, 'baseline' => false, 'rights' => null, 'files' => []];
+    if (!finance_configured()) {
+        $res['error'] = 'Finance is not set up on this site (no finance_db block in config.php), '
+                      . 'so there is nothing to update.';
+        return $res;
+    }
+    try {
+        $db = finance_db();
+        if (!$db) { $res['error'] = 'The finance database could not be opened.'; return $res; }
+        $cols = finance_schema_columns($db);
+        $recorded = finance_migrations_recorded($db);
+        if ($withRights) $res['rights'] = finance_schema_rights($db);
+    } catch (Throwable $e) {
+        $res['error'] = $e->getMessage();
+        return $res;
+    }
+    $res['ok'] = true;
+    $res['baseline'] = isset($cols['crew_terms.crew_id']);
+
+    $checks = finance_migration_checks();
+    foreach (finance_migration_files() as $name) {
+        if (isset($recorded[$name])) {
+            $r = $recorded[$name];
+            $how = ['ran' => 'Applied here', 'found' => 'Imported by hand earlier, found in place',
+                    'marked' => 'Marked as done by hand'][$r['how']] ?? 'Applied';
+            $res['files'][] = [$name, 'applied',
+                $how . ' · ' . $r['applied_at'] . ($r['applied_by'] ? ' · ' . $r['applied_by'] : '')];
+            continue;
+        }
+        $list = $checks[$name] ?? [];
+        $missing = [];
+        foreach ($list as $c) if (!finance_check_passes($c, $cols)) $missing[] = $c;
+        if ($list && !$missing) {
+            $res['files'][] = [$name, 'found', 'Already in the database (imported by hand). Will be recorded, not run'];
+        } elseif (count($missing) === count($list)) {
+            $res['files'][] = [$name, 'pending', 'Will be applied'];
+        } else {
+            $res['files'][] = [$name, 'partial',
+                'Only partly in the database, missing ' . implode(', ', $missing)
+                . '. Not run, so nothing is added twice. Ask Claude to look, or mark it as done if you know it is'];
+        }
+    }
+    return $res;
+}
+
+/**
+ * How many finance updates are waiting, for the banner in includes/header.php.
+ *
+ * That file runs on EVERY page, so this must be cheap and must never throw.
+ * Cheap: 0 at once for anyone who is not an admin or when finance is not set
+ * up, and the answer is kept in the session for ten minutes, so an admin
+ * clicking around opens the finance database for this once every ten minutes,
+ * not on every page; migrate.php forgets it after any change. Never throws:
+ * any failure counts as 0. A banner is not the place to report a broken
+ * finance connection; the finance screens already do that, loudly.
+ */
+function finance_pending_count(): int {
+    try {
+        if (!can_see_money() || !finance_configured()) return 0;
+        $now = time();
+        $c = $_SESSION['finance_pending'] ?? null;
+        if (is_array($c) && isset($c['n'], $c['at']) && $now - (int)$c['at'] < 600) return (int)$c['n'];
+
+        $n = 0;
+        $st = finance_migration_status(false);
+        if (!empty($st['ok'])) {
+            foreach ($st['files'] as $f) if ($f[1] !== 'applied') $n++;
+        }
+        $_SESSION['finance_pending'] = ['n' => $n, 'at' => $now];
+        return $n;
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/** Forget the banner's cached count (after migrate.php has changed things). */
+function finance_pending_forget(): void {
+    unset($_SESSION['finance_pending']);
+}
+
+/**
+ * Was this MySQL saying "you are not allowed to"? 1142 table command denied,
+ * 1044 access denied to the database, 1227 needs a privilege, 1143 column
+ * command denied.
+ */
+function finance_is_rights_error(Throwable $e): bool {
+    if ($e instanceof PDOException && isset($e->errorInfo[1])) {
+        return in_array((int)$e->errorInfo[1], [1044, 1142, 1143, 1227], true);
+    }
+    return (bool)preg_match('/command denied|access denied/i', $e->getMessage());
+}
+
+/** The fix for missing rights, in plain words: which grant to add, and where. */
+function finance_rights_message(): string {
+    global $config;
+    $f = $config['finance_db'] ?? [];
+    $user = (string)($f['db_user'] ?? 'the finance user');
+    $name = (string)($f['db_name'] ?? 'the finance database');
+    return 'The finance database user (' . $user . ') may read and write data but not change tables, '
+         . 'so Anima cannot apply these updates yet. To allow it: cPanel → MySQL Databases → '
+         . '"Add User To Database", choose ' . $user . ' and ' . $name . ', tick CREATE, ALTER and INDEX '
+         . '(or ALL PRIVILEGES), then Make Changes, and come back here.';
+}
+
+/** The tracking table, created on the first run. */
+function finance_migrations_ensure_table(PDO $db): void {
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS finance_migrations (
+           filename VARCHAR(100) NOT NULL PRIMARY KEY,
+           applied_at DATETIME NOT NULL,
+           applied_by VARCHAR(100) DEFAULT NULL,
+           how VARCHAR(10) NOT NULL DEFAULT 'ran'
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    );
+}
+
+/** how: 'ran' (applied here), 'found' (hand import detected), 'marked' (David said so). */
+function finance_migration_record(PDO $db, string $name, string $how, string $who): void {
+    $db->prepare(
+        'INSERT INTO finance_migrations (filename, applied_at, applied_by, how) VALUES (?, NOW(), ?, ?)
+         ON DUPLICATE KEY UPDATE filename = filename'
+    )->execute([$name, $who !== '' ? $who : null, $how]);
+}
+
+/**
+ * Apply every waiting finance update, in order. Admin only.
+ *
+ *   found    recorded as 'found', not run
+ *   pending  each statement run; recorded as 'ran' once ALL succeed
+ *   partial  stops the run there: nothing after it is attempted
+ *   a failed statement stops the run too, and says which statement
+ *
+ * Returns ['error' => ?string, 'files' => [[name, state, detail], ...]] with
+ * state applied / recorded / skipped / failed / not attempted, the same words
+ * as the production table on migrate.php. MySQL commits table changes at once,
+ * so like the production runner a failed file can be left half-done; the
+ * detail says which statement failed.
+ *
+ * $split is migrate.php's split_sql_statements(): one splitter for both
+ * databases, so a file means the same thing to each.
+ */
+function finance_apply_migrations(callable $split, string $who): array {
+    $out = ['error' => null, 'files' => []];
+    if (!can_see_money()) { $out['error'] = 'Administrators only.'; return $out; }
+
+    $st = finance_migration_status();
+    if (empty($st['ok'])) { $out['error'] = $st['error'] ?? 'The finance database could not be read.'; return $out; }
+    if (!$st['baseline']) {
+        $out['error'] = 'The finance database does not have its first tables yet (finance_install.sql). '
+                      . 'That one is part of setting finance up and is still imported by hand.';
+        return $out;
+    }
+    // Anything to do at all needs the rights: even recording a hand import
+    // needs the tracking table, and creating that needs CREATE.
+    $todo = false;
+    foreach ($st['files'] as $f) if ($f[1] !== 'applied') $todo = true;
+    if ($todo && $st['rights'] === false) {
+        $out['error'] = finance_rights_message();
+        return $out;
+    }
+    $db = finance_db();
+
+    try {
+        finance_migrations_ensure_table($db);
+    } catch (Throwable $e) {
+        $out['error'] = finance_is_rights_error($e) ? finance_rights_message()
+                      : 'Could not create the finance_migrations table: ' . $e->getMessage();
+        return $out;
+    }
+
+    $stopped = false;
+    foreach ($st['files'] as [$name, $state, $detail]) {
+        if ($state === 'applied') { $out['files'][] = [$name, 'skipped', $detail]; continue; }
+        if ($stopped) {
+            $out['files'][] = [$name, 'not attempted', 'Skipped because an earlier update stopped the run'];
+            continue;
+        }
+        if ($state === 'partial') {
+            $stopped = true;
+            $out['files'][] = [$name, 'failed', $detail];
+            continue;
+        }
+        try {
+            if ($state === 'found') {
+                finance_migration_record($db, $name, 'found', $who);
+                $out['files'][] = [$name, 'recorded', 'Already in the database (imported by hand). Recorded, not run'];
+                continue;
+            }
+            $sql = @file_get_contents(__DIR__ . '/../' . $name);
+            if ($sql === false) throw new RuntimeException('Could not read the file.');
+            $stmts = $split($sql);
+            foreach ($stmts as $i => $stmt) {
+                try {
+                    $db->exec($stmt);
+                } catch (Throwable $e) {
+                    if (finance_is_rights_error($e)) $out['error'] = finance_rights_message();
+                    throw new RuntimeException('Statement ' . ($i + 1) . ' failed: ' . $e->getMessage(), 0, $e);
+                }
+            }
+            finance_migration_record($db, $name, 'ran', $who);
+            $out['files'][] = [$name, 'applied', count($stmts) . ' statement(s) executed'];
+        } catch (Throwable $e) {
+            $stopped = true;
+            $out['files'][] = [$name, 'failed', $e->getMessage()];
+        }
+    }
+    return $out;
+}
+
+/**
+ * "This one is done, stop offering it": for a file the schema checks cannot
+ * vouch for (a half-imported one David has since finished by hand, or a new
+ * file with no check). Records it without running it.
+ */
+function finance_mark_migration_done(string $name, string $who): ?string {
+    if (!can_see_money()) return 'Administrators only.';
+    if (!in_array($name, finance_migration_files(), true)) return 'There is no such finance update file.';
+    try {
+        $db = finance_db();
+        if (!$db) return 'The finance database could not be opened.';
+        finance_migrations_ensure_table($db);
+        finance_migration_record($db, $name, 'marked', $who);
+    } catch (Throwable $e) {
+        return finance_is_rights_error($e) ? finance_rights_message() : $e->getMessage();
+    }
+    return null;
+
 /* --------------------------------------------------------------------------
  * WHO IS INVOICING, AND WHERE THE MONEY GOES (finance_install_18).
  *
@@ -1123,7 +1521,7 @@ function save_own_invoice_details(int $crewId, string $crewName, array $in, stri
     } catch (PDOException $e) {
         error_log('[Anima invoice details] ' . $e->getMessage());
         throw new RuntimeException('Your details could not be saved: the finance database needs update '
-                                 . 'finance_install_18 first. Ask David.');
+                                 . 'finance_install_18 first (migrate.php → Finance database updates). Ask David.');
     }
     return 'Invoice details saved.';
 }

@@ -1,7 +1,7 @@
 -- finance_install_18 — the details a freelancer's invoice carries (the invoice template).
 --
--- FINANCE DATABASE. Import by hand in phpMyAdmin, into the finance database,
--- once — never through migrate.php, which only knows the production database.
+-- FINANCE DATABASE. Applied from migrate.php → Finance database updates (or by
+-- hand in phpMyAdmin, into the finance database, once).
 --
 -- David, 2026-11-11: "Let's work on the invoice template now." Anima fills in
 -- each freelancer's monthly invoice from the days they logged (invoice.php);

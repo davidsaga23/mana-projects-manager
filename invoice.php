@@ -166,8 +166,8 @@ require __DIR__ . '/includes/header.php';
     <?php if (!finance_configured()): ?>
       <p class="muted small">The finance database is not set up, so these details cannot be saved yet.</p>
     <?php elseif (!$details['ready']): ?>
-      <p class="muted small">These details can be saved once David imports finance update 18
-        (finance_install_18.sql). Until then the invoice prints without them.</p>
+      <p class="muted small">These details can be saved once David applies finance update 18 on the
+        database updates page (migrate.php). Until then the invoice prints without them.</p>
     <?php else: ?>
       <p class="muted small">Saved in Anima's finance records, which only you and the studio's administrators
         can see. They go on every invoice you make here.</p>

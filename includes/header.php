@@ -4,6 +4,21 @@ $pageTitle = $pageTitle ?? 'Anima | Project manager';
 // $pdo is in scope here because every page requires db.php before this file.
 $pendingMigrations = (isset($pdo) && $pdo instanceof PDO && is_admin())
     ? pending_migration_count($pdo) : 0;
+// ...plus the FINANCE database's updates, which apply from migrate.php too
+// since 2026-11-11. Admins only, counted inside includes/money.php (the only
+// file that may open that connection), kept in the session for ten minutes so
+// it is not a second database connection on every page, and never able to
+// throw: any trouble counts as 0 (see finance_pending_count()).
+$pendingFinance = 0;
+if (is_admin()) {
+    try {
+        require_once __DIR__ . '/money.php';
+        $pendingFinance = finance_pending_count();
+    } catch (Throwable $e) {
+        $pendingFinance = 0;
+    }
+}
+$pendingMigrations += $pendingFinance;
 // The My tasks nav badge — how many active cards are mine, and whether any is
 // new since I last looked. Drawn for whoever is signed in; cheap enough to run
 // on every page (see mytasks_badge()).
