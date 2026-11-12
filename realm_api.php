@@ -25,6 +25,8 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
+require_once __DIR__ . '/includes/realm_chat.php';
+require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_login_json();
 
 header('Content-Type: application/json');
@@ -41,6 +43,50 @@ if (in_preview()) {
 }
 if (!realm_available($pdo)) {
     echo json_encode(['ok' => false, 'error' => 'The Realm needs a database update first. An administrator opens migrate.php once.']);
+    exit;
+}
+
+// ---- chat (stage 2, migration 082) ------------------------------------------
+// GET  chat=<channel>&after=<id>           what was said, and marks it read
+// POST say=<channel>&body=...&after=<id>   say something, then the same answer
+//
+// Answered here, apart from the map: an open conversation asks every few
+// seconds and has no use for where everybody is standing.
+$mayAnnounce = can_edit();
+$channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
+if ($channel !== '') {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $may = realm_channel_access($pdo, $uid, $channel, $mayAnnounce);
+        if (!$may['read']) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'That conversation is not yours to read.']);
+            exit;
+        }
+        $said = '';
+        if (isset($_POST['say'])) {
+            if (!$may['post']) {
+                $said = 'Only Production can write in Announcements.';
+            } else {
+                $said = realm_say($pdo, $uid, $channel, (string)($_POST['body'] ?? ''));
+                if ($said === '' && preg_match('/^dm:(\d+):(\d+)$/', $channel, $m) === 1) {
+                    realm_raven_bell($pdo, $uid, (int)$m[1] === $uid ? (int)$m[2] : (int)$m[1]);
+                }
+            }
+        }
+        $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
+        $messages = realm_messages($pdo, $uid, $channel, $after);
+        if ($messages) realm_mark_read($pdo, $uid, $channel, (int)$messages[count($messages) - 1]['id']);
+        $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce)];
+        if ($said !== '') $answer['error'] = $said;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Chat could not be reached. Try again in a moment.']);
+    }
     exit;
 }
 
@@ -64,5 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $state = realm_state($pdo, $uid);
+$state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);

@@ -472,8 +472,14 @@ function whereWords(p) {
 }
 function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
-  var h = '<div><h2>People</h2><div class="rrows">';
-  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span><small>'+esc(whereWords(p))+'</small></button>'; });
+  var h = '', un = unread();
+  if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
+    ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
+      h += '<button type="button" class="rrow'+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"><span class="rhash">#</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>'; });
+    h += '</div></div>'; }
+  var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
+  h += '<div><h2>People</h2><div class="rrows">';
+  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
   if (!ppl.length) h += '<small style="padding:0 8px">Nobody has a house yet.</small>';
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
@@ -487,7 +493,7 @@ function renderCard() {
   else if (o) {
     var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')) : 'A place to meet. Chat and voice arrive in the next stages.';
     var btn = S.here===id ? '<button type="button" class="rbtn rprimary rsmall" data-enter="'+esc(id)+'"'+(why?' disabled':'')+'>Go inside</button>' : '<button type="button" class="rbtn rprimary rsmall" data-walk="'+esc(id)+'">Walk there</button><button type="button" class="rbtn rsmall" data-tele="'+esc(id)+'">Teleport</button>';
-    h = '<div class="rcard"><b>'+esc(title(id))+'</b><small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
+    h = '<div class="rcard"><b>'+esc(title(id))+'</b><small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
   }
   slot.innerHTML = h;
 }
@@ -504,7 +510,7 @@ function renderDoor() {
   Array.prototype.forEach.call(seg.querySelectorAll('button'),function (b) { b.setAttribute('aria-pressed',String(!!m && m.door===b.dataset.door)); b.disabled = !m; });
   var lb = $('lookBtn'); if (lb) lb.disabled = !m;
 }
-function renderAll() { $('overlay').innerHTML = overlay(); bindMap(); renderSide(); renderCard(); renderInside(); renderDoor(); draw(); }
+function renderAll() { $('overlay').innerHTML = overlay(); bindMap(); renderSide(); renderCard(); renderInside(); renderDoor(); badge(); draw(); }
 function toast(msg) { var t = document.createElement('div'); t.className = 'rtoast'; t.textContent = msg; $('toasts').appendChild(t); setTimeout(function () { t.remove(); },6000); }
 
 /* ---------- taking in what the server says ---------- */
@@ -575,7 +581,7 @@ function goInside(id) {
   S.sel = null; renderCard();
   play(420,function (k) { S.pos = {x:from.x+(to.x-from.x)*k,y:from.y+(to.y-from.y)*k}; S.enter = k*.9; },function () {
     play(220,function (k) { S.fade = k; },function () {
-      S.enter = null; S.inside = id; S.pos = from; renderInside(); renderSide();
+      S.enter = null; S.inside = id; S.pos = from; renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
       play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
       send({arrive:id,inside:1});
     });
@@ -625,7 +631,9 @@ window.addEventListener('blur',function () { held.clear(); });
 document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
-  if ((b = t.closest('[data-sel]'))) { if (justDragged) return; select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
+  if ((b = t.closest('[data-chat]'))) openChat(b.getAttribute('data-chat'));
+  else if (t.closest('[data-chatclose]')) closeChat();
+  else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
   else if ((b = t.closest('[data-walk]'))) walkTo(b.getAttribute('data-walk'));
   else if ((b = t.closest('[data-tele]'))) teleport(b.getAttribute('data-tele'));
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
@@ -636,6 +644,67 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#lookBtn')) openLook();
   else if ((b = t.closest('[data-pick]'))) { LOOK[b.getAttribute('data-pick')] = b.getAttribute('data-val'); renderLook(); }
   else if (t.closest('[data-lookcancel]')) $('lookDlg').close();
+});
+
+/* ---------- chat (stage 2, migration 082) ----------
+   Channels are read from anywhere ("the Discord way", agreed 2026-11-12); a raven is a conversation
+   between two people. An open conversation asks for anything new every 3 seconds and stops asking
+   while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
+   ST.chat is null until the migration has run, and then none of this draws. */
+var CH = {open:null,last:0,timer:0,busy:false,seen:false};
+function unread() { return (ST.chat && ST.chat.unread) || {}; }
+function dmId(a, b) { return 'dm:'+Math.min(a,b)+':'+Math.max(a,b); }
+function chanTitle(id) {
+  var m = /^dm:(\d+):(\d+)$/.exec(id);
+  if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
+  var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
+  return c ? c.name : 'Chat';
+}
+/* The conversation that belongs to a building: a place's channel, or ravens with a house's owner. */
+function chanFor(placeId) {
+  if (!ST.chat) return null;
+  if (placeId==='tavern' || placeId==='council') return placeId;
+  var m = /^land:(.+)$/.exec(placeId);
+  if (m) { var l = ST.lands.filter(function (x) { return x.land===m[1]; })[0]; return l && l.project_id ? 'project:'+l.project_id : null; }
+  m = /^user:(\d+)$/.exec(placeId);
+  return m && +m[1]!==ST.me ? dmId(ST.me,+m[1]) : null;
+}
+function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) { if (k!==CH.open) n += u[k]; }); document.title = (n?'('+n+') ':'')+'Anima Realm'; }
+function msgHTML(m) { return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div><div class="rmsgbody">'+esc(m.body)+'</div></div>'; }
+function chatTake(j) {
+  CH.busy = false;
+  if (!j) return;
+  if (j.error) toast(j.error);
+  if (!j.ok) { closeChat(); return; }
+  if (j.channel!==CH.open) return;
+  var box = $('chatMsgs'), stick = box.scrollHeight-box.scrollTop-box.clientHeight < 60, fresh = j.messages.filter(function (m) { return m.id > CH.last; });
+  if (fresh.length) { if (!CH.last) box.innerHTML = ''; box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen) box.scrollTop = box.scrollHeight; }
+  else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
+  CH.seen = true;
+  $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post; $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
+  if (j.unread && ST.chat) { ST.chat.unread = j.unread; renderSide(); badge(); }
+}
+function chatAsk() {
+  if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last,{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
+}
+function openChat(id) {
+  if (!ST.chat || !id || !$('chat')) return;
+  if (CH.open===id) { $('chatInput').focus(); return; }
+  CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false;
+  $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
+  clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
+}
+function closeChat() { CH.open = null; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
+/* Guarded: a page drawn before chat existed has no form, and must not stop the map over it. */
+if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
+  e.preventDefault();
+  var inp = $('chatInput'), body = inp.value.trim(); if (!body || !CH.open) return;
+  inp.value = ''; CH.busy = true;
+  var f = new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last);
+  fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; inp.value = body; toast('That message was not sent. Try again.'); });
 });
 
 /* ---------- your character ---------- */

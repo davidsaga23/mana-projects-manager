@@ -50,6 +50,22 @@ small { color: var(--muted); font-size: .84rem; }
 .rdot.ajar { border-color: var(--candle); }
 .rdot.sealed { border-radius: 1px; transform: rotate(45deg); background: var(--ember); border-color: var(--ember); }
 
+.rapp.with-chat { grid-template-columns: 230px minmax(0, 1fr) 320px; }
+.rchat { background: var(--dusk); border-radius: 10px; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.rchat[hidden] { display: none; }
+.rchathead { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--ridge); }
+.rchathead h2 { font: 700 1.1rem var(--display); color: var(--candle); }
+.rmsgs { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.rmsg { background: var(--night); border-radius: 8px; padding: 6px 10px; max-width: 92%; align-self: flex-start; overflow-wrap: anywhere; }
+.rmsg.is-mine { align-self: flex-end; background: var(--ridge); }
+.rmsghead { display: flex; gap: 8px; align-items: baseline; }
+.rmsgbody { white-space: pre-wrap; }
+.rempty { color: var(--muted); }
+.rcomposer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--ridge); }
+.rcomposer input { flex: 1; min-width: 0; background: var(--win); border: 1px solid var(--ridge); border-radius: 6px; padding: 7px 10px; }
+.rbadge { margin-left: auto; background: var(--mana); color: var(--night); border-radius: 9px; font-size: .74rem; font-weight: 700; padding: 0 6px; }
+.rhash { color: var(--muted); width: 10px; }
+
 .rmain { background: var(--dusk); border-radius: 10px; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .rmapbox { position: relative; flex: 1; min-height: 320px; overflow: hidden; border-radius: 10px 10px 0 0; }
 .rmapbox canvas, .rmapbox svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -94,7 +110,8 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
 
 @media (max-width: 860px) {
   html, body { height: auto; }
-  .rapp { grid-template-columns: minmax(0, 1fr); }
+  .rapp, .rapp.with-chat { grid-template-columns: minmax(0, 1fr); }
+  .rchat { min-height: 50vh; }
   .rside .rrows { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
   .rrow { width: auto; background: var(--night); }
   .rrow small { margin-left: 4px; }
