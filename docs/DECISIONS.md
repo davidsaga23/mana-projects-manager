@@ -5746,3 +5746,23 @@ shop and the word for praise were NOT discussed before he said so; they are open
   swapping and what happens if one person walks away; what can and cannot change hands; whether an
   inventory is private; the shop, prices and rare things; limits on praising the same person.
 - **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
+
+## 2026-11-13 — Praise and exchange: David's answers after the first version
+
+Same thread, after PR 229 was open.
+
+- **The readings are confirmed** (David: "ok"): a "week" is five working days in a row; a day can
+  be logged until noon of the next working day; a brand-new purse looks back 8 days.
+- **The rules are shown in the chest** (David: "let's also add the mana and gold rules when they
+  open their own chest"). Three short lists under the balance: how you earn mana, how you earn gold,
+  good to know. The cap and the length of a week are printed from the server's numbers.
+- **What can change hands** (David: "not exchangable are all the free starters, but anything you
+  paid for is exchangable"). Anything bought with gold can be given or swapped; the free library
+  cannot. Gold itself still cannot be handed over. Nothing is built for this yet, because nobody
+  owns anything until there is a shop.
+- **The shop and prices get their own thread** (David: "let's open a new thread for that").
+- **Still open:** whether a gift must be accepted; what happens to a swap when one person walks
+  away; whether praise received can ever be traded (proposed: no); whether the list of what you own
+  is private (proposed: yes, others see only what you wear and what stands in your office); whether
+  "on time" should be judged by the day of delivery instead of the day of approval; whether on time
+  means a second coin.

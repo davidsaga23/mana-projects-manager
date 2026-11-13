@@ -29,7 +29,8 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
   logged until noon of the next working day. Weekends, studio holidays and booked days off neither
   earn nor break the run.
 - **Gold is counted now**, and the chest shows it: one coin for every five working days logged in a
-  row, and one coin the first time each person praises you in a week. Only you see your chest.
+  row, and one coin the first time each person praises you in a week. Only you see your chest,
+  and it lists the rules for earning mana and gold under your balance.
 - **Approved work pays too** (David, 2026-11-13: "1 gold for each approved, and if you approved on
   time based on the task due dates you receive 1 mana and 1 gold"). Each task of yours that is
   approved gives 1 gold, and 1 mana as well when it is approved on or before its due date. A task
