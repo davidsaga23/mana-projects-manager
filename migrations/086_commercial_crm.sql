@@ -1,4 +1,4 @@
--- 085 — Commercial: the CRM (leads, contacts, activity, proposals, quotes).
+-- 086 — Commercial: the CRM (leads, contacts, activity, proposals, quotes).
 --
 -- David, 2026-11-12, with a prototype he built as a claude.ai artifact: "can we
 -- incorporate this to anima?" Settled the same day: the MAIN database (not the

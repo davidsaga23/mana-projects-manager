@@ -1,6 +1,6 @@
 <?php
 /**
- * COMMERCIAL: the studio's CRM (migration 085). Leads, their contacts and
+ * COMMERCIAL: the studio's CRM (migration 086). Leads, their contacts and
  * activity, proposals and quotes, and every rule about how they move.
  *
  * David, 2026-11-12: "can we incorporate this to anima?", with a prototype he
@@ -52,7 +52,7 @@ const CRM_CHANNELS = ['Email', 'Phone', 'Networking', 'LinkedIn', 'Referral', 'O
 /** How many activities a lead shows, newest first (the prototype's cap). Older ones stay in the table. */
 const CRM_MAX_ACTIVITIES = 300;
 
-/** Have the tables arrived (migration 085)? Never throws. */
+/** Have the tables arrived (migration 086)? Never throws. */
 function crm_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
