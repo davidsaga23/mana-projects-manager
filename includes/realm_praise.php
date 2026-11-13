@@ -1,5 +1,5 @@
 <?php
-// The Realm — mana, gold and praise (migration 087).
+// The Realm — mana, gold and praise (migration 088).
 //
 // David, 2026-11-12: "people should be able to praise with a spell or something
 // people doing a good job". He chose TWO POOLS that day:
@@ -86,7 +86,7 @@ const REALM_PRAISE_NEWS_SECONDS = 120;
 /** How far back a brand-new purse looks, in days, so a first visit is not empty-handed. */
 const REALM_PURSE_LOOK_BACK = 8;
 
-/** Has migration 087 arrived? Asked once per request; never throws. */
+/** Has migration 088 arrived? Asked once per request; never throws. */
 function realm_praise_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -334,7 +334,7 @@ function realm_praise_sql(string $where): string {
 }
 
 /**
- * What travels with the map, for everybody: has 087 run, the asker's OWN mana
+ * What travels with the map, for everybody: has 088 run, the asker's OWN mana
  * (so the button can say whether they have any), and the praises of the last
  * two minutes, which is how the others see one happen. Praise is public.
  * One small read, no time-log work. Never throws.

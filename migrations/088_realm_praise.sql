@@ -1,4 +1,4 @@
--- 087 — The Realm: mana, gold and praise.
+-- 088 — The Realm: mana, gold and praise.
 --
 -- David, 2026-11-12: "people should be able to praise with a spell or something
 -- people doing a good job", with two pools: mana, which is only for praising

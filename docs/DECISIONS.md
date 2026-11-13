@@ -5641,6 +5641,54 @@ theirs and others bio and profile from Anima, and update it."
 - **Not verified:** PHP was never run (the files parse, and the two libraries were compared by a
   script); the real profile save and picture upload; Safari, Firefox and phones; dragging by touch.
 
+## 2026-11-13 — Walking inside rooms, and others seeing you walk everywhere
+
+David: "let's also have the option for the avatars to move freely inside each house". Asked two
+things before the shared part was built, he answered "Yes, same room rule", and then: "let's make
+see other people walk a feature across the board".
+
+- **This replaces the 2026-11-12 rule "only where they have arrived".** That rule was about load,
+  not about taste, so the load is what the design is built round (below). `place` and `inside`
+  are unchanged and still decide everything that is allowed.
+- **One spot per person** (`realm_people.spot_x`, `spot_y`, migration 087), in the units of
+  wherever they are: the room's (240 by 160) inside, the map's (1600 by 1000) outside. NULL means
+  "has not walked since arriving", and arriving anywhere sets it back to NULL.
+- **A spot is for show and grants nothing.** David kept "in the same room" as the meaning of face
+  to face. The server holds a spot to the room's floor or the map's edges and to the sender's own
+  row, and nothing reads one to decide what somebody may do. It does not check furniture or water:
+  a made-up spot can only draw the sender's own character somewhere odd. "Standing next to
+  somebody" can be given a meaning later; it has none now.
+- **How the load is kept small.**
+  - Sending: the walker's page posts `stand` when they stop, and at most once every 2 seconds on
+    the way. Standing still sends nothing.
+  - Receiving adds no request of its own. Spots come back with the unread counts, an open
+    conversation, the voice beat, the heartbeat and the walker's own `stand`.
+  - The one change in pace: the unread counts are asked every 3 seconds instead of every 8 while
+    you share a room with somebody, or for 15 seconds after anybody you can see has moved.
+  - In numbers. Five people in one room make about 2 requests a second today (about 7 if all five
+    are in voice). Walking adds 0.5 a second for each person who is actually walking, so 2.5 at
+    the very worst, and nothing while they stand and talk. On the map, with N people there and no
+    conversation open, somebody walking raises the unread asking from N/8 to N/3 a second while
+    it lasts: for 20 people, from 2.5 to about 6.7. A quiet village asks exactly what it did.
+  - If the hosting struggles: raise the 2 seconds, the 3 seconds, or drop the map half and keep
+    rooms. All three are single numbers in `assets/realm.js` ("seeing each other walk").
+- **Nobody is drawn AT a spot.** Each character walks from where your page last drew it to where
+  it now is, round the furniture or the houses, and faster if it is far behind (never more than 4
+  seconds). So others are a little behind and never jump.
+- **Solid means the foot of a thing**: the bottom 10 units, the same rule decorating uses to tell
+  whether two things share the ground. That is what lets a character stand behind a tall thing.
+  The meeting places' furniture was part of one picture; it is now separate pieces (`PROPS`).
+- **Small choices made without asking.** You come in just above the door. People who have not
+  walked since coming in stand side by side at the door (before 087: the old seats). The first
+  time on each computer a notice says a room can be walked in. Enter opens the thing you stand
+  next to; nothing opens by merely walking past. If furniture lands where you stand, you are put
+  on the nearest free spot. A character behind the back wall's furniture can be reached by click
+  only if there is floor to stand on.
+- **Not done:** meaning for "close"; sitting on chairs; seeing somebody walk through a door (they
+  appear at the door); checking furniture on the server.
+- **Not verified:** PHP was never run (the block checker passes and the deploy's `php -l` is the
+  backstop). Two real people in one room were never tried: the second person was played by a
+  stand-in page. Phones and touch, Safari and Firefox. The real load on the hosting.
 ## 2026-11-13 — Praise in the Realm: the rules, and what the first version leaves out
 
 David, in the thread opened to "discuss how spell praise and collectibles can be exchanged". Four
@@ -5659,7 +5707,7 @@ shop and the word for praise were NOT discussed before he said so; they are open
 - **Four kinds: Craft, Help, Idea, Rescue** (David: "sounds good"). None is about speed or hours.
 - **It lands at once**; the receiver does not accept or refuse a praise.
 - **Stored** in `realm_purse` (mana, gold, the run of logged days, the last day counted) and
-  `realm_praise` (every praise, kept for good), migration 087. Rules in `includes/realm_praise.php`,
+  `realm_praise` (every praise, kept for good), migration 088. Rules in `includes/realm_praise.php`,
   screen in `assets/realm_praise.js`, which is its own file: `assets/realm.js` only gained four
   hooks on `window.REALM` (`onState`, `openGold`, `profExtra`, and it lends `toast` and `send`).
 - **A purse is read only for the session's own account.** There is no request that takes somebody

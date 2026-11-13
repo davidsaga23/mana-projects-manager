@@ -42,7 +42,7 @@ if ($ready && !$preview) {
     $state = realm_state($pdo, $uid);
     // Chat (stage 2). Null until migration 082 has run, and the page then draws no chat at all.
     $state['chat'] = realm_chat_summary($pdo, $uid, can_edit());
-    // Mana, gold and praise (migration 087). Opening the Realm is when the time log is counted.
+    // Mana, gold and praise (migration 088). Opening the Realm is when the time log is counted.
     realm_purse($pdo, $uid);
     $state['praise'] = realm_praise_news($pdo, $uid);
 }
@@ -176,7 +176,7 @@ foreach (($state['people'] ?? []) as $p) {
     };
   </script>
   <script src="assets/realm.js<?= asset_ver('realm.js') ?>"></script>
-  <?php /* Praise, mana and gold (migration 087): its own file, so the map's script stays as it was. */ ?>
+  <?php /* Praise, mana and gold (migration 088): its own file, so the map's script stays as it was. */ ?>
   <script src="assets/realm_praise.js<?= asset_ver('realm_praise.js') ?>"></script>
 <?php endif; ?>
 </body>
