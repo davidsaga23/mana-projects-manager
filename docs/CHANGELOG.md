@@ -14,7 +14,6 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-<<<<<<< HEAD
 ## 2026-11-13 — The Realm: what is always in a show's camp *(migration 091)*
 
 **Asked by David:** "for all the project camps, let's always have the following: A bar with the
@@ -53,7 +52,6 @@ Decorate is also available but only one item per person."
   a database update.
 - **Not verified:** PHP was never run; real show data was never seen; nobody could log in to try
   it on live. Tried in a stand-in page with made-up data.
-=======
 ## 2026-11-13 — The Realm: what somebody says is in front of the names of things *(no migration)*
 
 **Reported by David**, with a picture of "Your tasks" and "Your profile" sitting on top of a speech
@@ -61,7 +59,6 @@ bubble: "let's make sure the names of the objects are behind the dialogues".
 
 - **A speech bubble now covers the name of the bookshelf, the chest or the portrait** where it
   reaches it. The name comes back when the bubble goes. The thing itself still works when clicked.
->>>>>>> 7ca345cccedd1d166996e0dd52a61791b554ae17
 ## 2026-11-12 — Commercial: the CRM *(migration 089)*
 
 **Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
