@@ -582,8 +582,12 @@ function artist_may_post(): bool {
         // portrait in their house. ⚠ THE SAME WRITE AS home.php ABOVE, on a second
         // screen: home_save_profile() with the session's own linked person, never
         // an id from the form.
+        // `praise` (2026-11-13, migration 087): praising somebody, which spends
+        // one of the asker's own mana. ⚠ THE ID POSTED IS WHO IS PRAISED, never
+        // who gives: realm_praise_give() takes the giver from the session, and
+        // refuses unless the two characters are in the same place right now.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status', 'voice', 'save_room', 'save_profile'],
+                            'task_status', 'voice', 'save_room', 'save_profile', 'praise'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

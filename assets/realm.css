@@ -365,3 +365,39 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
   .rrow small { margin-left: 4px; }
   .rmapbox { min-height: 62vh; }
 }
+
+/* ---------- praise, mana and gold (David, 2026-11-13, migration 087; assets/realm_praise.js) ----------
+   The four kinds each take one of the roles above, so a kind is told by its colour as well as its
+   name: Craft the primary blue, Help the green, Idea the gold, Rescue the red. */
+.rpraisebtn { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border-color: var(--warn); box-shadow: var(--shadow-pop); }
+.rmapbox.is-deco .rpraisebtn { display: none; }
+.rpips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.rpip { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--primary-border); }
+.rpip.is-on { background: var(--primary); border-color: var(--primary); }
+.rpfield { display: flex; flex-direction: column; gap: 6px; }
+.rpfield > span { font-weight: 600; }
+.rpfield small, #praiseForm > small { color: var(--muted); }
+#praiseForm select, #praiseForm input { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 7px 9px; font: inherit; }
+#praiseForm input[hidden] { display: none; }
+.rchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rchip { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border-strong); border-radius: 999px; padding: 4px 13px; cursor: pointer; font: inherit; }
+.rchip:hover { border-color: var(--primary); }
+.rchip.is-on { background: var(--primary-tint); border-color: var(--primary); color: var(--text); font-weight: 600; }
+.rchip.is-help.is-on { background: var(--ok-tint); border-color: var(--ok); }
+.rchip.is-idea.is-on { background: var(--warn-tint); border-color: var(--warn); }
+.rchip.is-rescue.is-on { background: var(--danger-tint); border-color: var(--danger); }
+.rkind { font-style: normal; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 1px 9px; border: 1px solid var(--primary); color: var(--primary); background: var(--primary-tint); white-space: nowrap; }
+.rkind.is-help { border-color: var(--ok); color: var(--ok); background: var(--ok-tint); }
+.rkind.is-idea { border-color: var(--warn); color: var(--warn-strong); background: var(--warn-tint); }
+.rkind.is-rescue { border-color: var(--danger); color: var(--danger); background: var(--danger-tint); }
+.rtoast.rpraised { border-color: var(--primary); gap: 5px; }
+.rtoast.rpraised.is-help { border-color: var(--ok); }
+.rtoast.rpraised.is-idea { border-color: var(--warn); }
+.rtoast.rpraised.is-rescue { border-color: var(--danger); }
+.rtoast.rpraised small { color: var(--muted); }
+.rmana { display: flex; align-items: center; gap: 8px; }
+.rkeeps { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.rkeeps h3 { font-size: 15px; font-weight: 700; margin: 0; }
+.rkeeps ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow: auto; }
+.rkeeps li small { color: var(--faint); white-space: nowrap; }
+#praiseBody { display: contents; }
