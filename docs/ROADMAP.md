@@ -1425,3 +1425,17 @@ full table: watch the hosting during the first real calls.
 Seeing each other walk (2026-11-13) adds half a request a second per person who is walking, and
 makes the unread counts come every 3 seconds instead of 8 while there is movement to watch: watch
 the hosting the first time several people wander the map at once.
+
+## Commercial (the CRM) — BUILT 2026-11-12 (migration 089)
+
+Ported from David's prototype: Prospects, Pipeline, Follow-ups, Clients, Proposals and Quotes, with
+CSV import and export, behind the "Commercial" switch (admins only). Decisions in DECISIONS.md,
+2026-11-12. Left for later, from the prototype's own list:
+
+- **Gmail sync**: count the emails sent to each contact and update their last touch and the
+  outreach numbers. Server side, through Google's API with each person's own sign-in. The tables
+  are ready (per-contact `last_contact_at`, activity `type` and `contact_id`).
+- A client's proposals and quotes inside the Clients drawer.
+- PDF export of a quote.
+- Reminders for overdue follow-ups (the bell is the obvious place).
+

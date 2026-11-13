@@ -40,6 +40,34 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
   counting of time logs and the face to face check need David and Renata on the live site.
 
+## 2026-11-12 — Commercial: the CRM *(migration 089)*
+
+**Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
+
+- **A Commercial button in the top bar**, with six tabs: **Prospects** (every company at Contacted,
+  its people listed under it, and an outreach summary for 7, 30 or 90 days or all time),
+  **Pipeline** (Interested and later, grouped by stage, Won and Lost folded, a stage strip that
+  filters), **Follow-ups** (Overdue, Today, Next 7 days, Later, Not set, with +1d and +1w),
+  **Clients** (one row per company), **Proposals** (a board you drag cards across) and **Quotes**
+  (line items, discount and tax, numbered Q-2026-001 and on).
+- **A strip of five figures** on every tab (prospects, open pipeline, weighted forecast, won this
+  quarter with win rate, overdue follow-ups) that follows the filters. Filters are remembered per
+  person, in their browser.
+- **The rules, kept exactly:** one lead per company with many contacts; stage odds of 5, 25, 50, 75,
+  100 and 0 percent; every stage change logged; a proposal marked Sent moves a Contacted or
+  Interested lead to Proposal; a quote marked Approved sets the deal value; logging an email, call,
+  networking or meeting sets the last-touch date.
+- **CSV import and export.** Upload or paste; columns matched by name; rows grouped by company; a
+  company already here gets the new people; anyone already saved is skipped; a preview before
+  anything is saved. Export writes one row per contact in the same format.
+- **Who:** the new "Commercial" switch on Users → Access. **Administrators only** to begin with;
+  Production can be switched on later, by role or by person. Everybody who can open it can edit.
+- **Sales, not show budgets.** These are what the studio is selling. Nothing here reads or changes
+  a show's budget, costs or the finance database, and a won deal does not create a project. USD
+  throughout.
+- **Not in this version:** Gmail sync (the contacts and activity are ready for it), a client's
+  proposals and quotes inside Clients, PDF quotes, reminders for overdue follow-ups.
+
 ## 2026-11-13 — The Realm: share your screen in a call *(migration 088)*
 
 **Asked by David:** "let's discuss the option to share your screen while in a voice chat", then,
@@ -78,6 +106,7 @@ after the choices were talked through, "Yes, build it".
   and there is no Share screen button.
 
 ---
+
 ## 2026-11-13 — The Realm: "Join call" instead of "Join voice" *(no migration)*
 
 **Asked by David:** "let's change 'Join voice' for 'Join call'".
@@ -92,6 +121,7 @@ after the choices were talked through, "Yes, build it".
 - **Not verified:** PHP was never run; the browser side was checked in a stand-in copy of the page.
 
 ---
+
 ## 2026-11-13 — The Realm: walk around inside a room, and see each other walk *(migration 087)*
 
 **Asked by David:** "let's also have the option for the avatars to move freely inside each house".
@@ -117,6 +147,7 @@ across the board".
   Where exactly you stand is for show and decides nothing.
 - **Until migration 087 runs** you can walk inside a room but only you see it, and everybody else
   stands where they stood before.
+
 
 ## 2026-11-12 — The Realm: decorate your office, with a chest and a portrait *(migration 086)*
 
@@ -145,6 +176,7 @@ they can see theirs and others bio and profile from Anima, and update it."
   needs a database update; the chest and the portrait work straight away.
 
 ---
+
 ## 2026-11-12 — The Realm: voice in every room *(migration 085)*
 
 **Asked by David:** "let's start working on the voice chats".
