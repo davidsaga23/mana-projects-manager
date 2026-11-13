@@ -595,8 +595,19 @@ function artist_may_post(): bool {
         // sent, realm_camp_open() finds its show and asks may_see_project(), and
         // the row written is the session's own. Taking out somebody else's thing
         // is refused in realm_camp_remove() unless can_edit().
+        // `buy` (2026-11-13, migration 092): buying from the merchant in the
+        // Tavern with the asker's OWN gold. ⚠ NO ID TO FORGE: realm_shop_buy()
+        // takes the buyer from the session, checks they are inside the Tavern,
+        // and takes the coins in the statement that checks there are enough.
+        // `offer`, `offer_answer` (2026-11-13, migration 092): giving or swapping
+        // a thing bought from the merchant. ⚠ THE ACTOR IS THE SESSION'S OWN
+        // ACCOUNT: the ids posted are the other person and the offer.
+        // realm_offer_make() gives only what the asker owns, face to face, and
+        // realm_offer_answer() lets an offer be answered only by the person it
+        // was made to and agreed only by the person who made it.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing'],
+                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
+                            'buy', 'offer', 'offer_answer'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

@@ -36,10 +36,15 @@ var PAL = {out:'#141a28',grassA:'#2e6b4b',grassB:'#2a6446',tuft:'#43906a',tuftD:
   win:'#ffd36e',winD:'#2a3350',door:'#4a3020',skin:'#f3d3b0',cheek:'#f0a898',mouth:'#b06a58',hair:'#5a3a26',fur:'#9aa1b4',owl:'#a58b6a',owlL:'#c9b08a',boot:'#3a2a20',
   smoke:'#c9d1e0',glow:'#e2b35c',shadow:'rgba(0,0,0,.28)',mist:'rgba(176,186,206,.3)',dim:'rgba(0,0,0,.16)',lift:'rgba(255,255,255,.12)',veil:'#191919',ground:'#101010',
   text:'#ededed',textMuted:'rgba(255,255,255,.6)',primary:'#5fb2ff',primaryBorder:'rgba(95,178,255,.45)',plate:'rgba(16,16,16,.88)',ok:'#26fe89',warn:'#f0c33c',danger:'#ff6b6b'};
-var TINT = {candle:'#ffc66b',mana:'#5fb2ff',spell:'#26fe89',ember:'#ff7a59',violet:'#b592ff',rose:'#ff8fb3',teal:'#4fd6c8'};
-var CLOAKS = {candle:'Gold',mana:'Blue',spell:'Green',ember:'Ember',violet:'Violet',rose:'Rose',teal:'Teal'};
-var HATS = {none:'Bare',hat:'Pointed hat',hood:'Hood'};
-var PETS = {none:'None',owl:'Owl',cat:'Cat'};
+var TINT = {candle:'#ffc66b',mana:'#5fb2ff',spell:'#26fe89',ember:'#ff7a59',violet:'#b592ff',rose:'#ff8fb3',teal:'#4fd6c8',starry:'#3d4494'};
+var CLOAKS = {candle:'Gold',mana:'Blue',spell:'Green',ember:'Ember',violet:'Violet',rose:'Rose',teal:'Teal',starry:'Starry'};
+var HATS = {none:'Bare',hat:'Pointed hat',hood:'Hood',crown:'Crown',cap:'Feathered cap'};
+var PETS = {none:'None',owl:'Owl',cat:'Cat',fox:'Fox',dragon:'Small dragon'};
+/* WHAT THE MERCHANT SELLS TO WEAR (David, 2026-11-13, migration 092). The same ids as REALM_SHOP in
+   includes/realm_shop.php, which holds the prices and is the lock: this list only tells the screen
+   which of the choices above are bought, so that it never offers one as free. The three office
+   things the merchant sells are marked gold in THINGS, further down. */
+var PAID = {crown:1,cap:1,fox:1,dragon:1,starry:1};
 var KINDS = {study:'Cottage',tower:'Tower',forge:'Forge'};
 var DOORS = {open:'Door open',ajar:'Door ajar',sealed:'Sealed'};
 var HIT = {tower:[22,122],study:[32,68],forge:[38,80],tavern:[58,80],hall:[58,80],tent:[30,62]};
@@ -73,6 +78,10 @@ var B = {}, BLIST = [];
 
 function person(id) { for (var i = 0; i < ST.people.length; i++) if (ST.people[i].id === id) return ST.people[i]; return null; }
 function me() { return person(ST.me); }
+/* What I own, and what a thing costs: ST.shop travels with the map and is about me alone. Before
+   migration 092 I own nothing and no price is known. */
+function owns(id) { return !!(ST.shop && ST.shop.owned && ST.shop.owned.indexOf(id) >= 0); }
+function price(id) { var it = ST.shop && ST.shop.items && ST.shop.items[id]; return it ? +it[1] : 0; }
 function firstName(n) { return String(n).split(' ')[0]; }
 
 /* Every building on the map, by the same id the server uses for a place. */
@@ -326,15 +335,27 @@ function sprite(c, x, y, L, bob) {
   var body = [[-6,-2,4,2,PAL.boot],[2,-2,4,2,PAL.boot],[-9,-12,18,10,col],[-7,-20,14,8,col],[-7,-33,14,13,PAL.skin]];
   if (L.hat==='hat') body.push([-12,-36,24,3,col],[-7,-42,14,6,col],[-5,-47,10,5,col],[-2,-52,6,5,col],[1,-55,3,3,col]);
   else if (L.hat==='hood') body.push([-8,-37,16,5,col],[-9,-33,3,14,col],[6,-33,3,14,col]);
+  /* The merchant's two: a crown worn on the hair, and a cap in the cloak's colour with a feather. */
+  else if (L.hat==='crown') body.push([-7,-36,14,4,PAL.hair],[-6,-40,12,4,TINT.candle],[-6,-43,2,3,TINT.candle],[-1,-44,2,4,TINT.candle],[4,-43,2,3,TINT.candle]);
+  else if (L.hat==='cap') body.push([-8,-38,16,5,col],[-11,-34,15,2,col],[5,-45,2,7,PAL.hot],[7,-48,2,6,PAL.hot]);
   else body.push([-7,-36,14,4,PAL.hair]);
   PS(body);
   A(-9,-4,18,2,cd); A(-1,-20,2,16,cd); A(-7,-20,2,8,cl); A(-9,-12,2,8,cl); A(5,-18,2,6,cd); A(7,-10,2,6,cd); A(-1,-20,2,2,PAL.win);
   A(-4,-27,2,3,o); A(2,-27,2,3,o); A(-4,-27,1,1,PAL.hot); A(2,-27,1,1,PAL.hot); A(-6,-24,2,1,PAL.cheek); A(4,-24,2,1,PAL.cheek); A(-1,-23,2,1,PAL.mouth);
   if (L.hat==='hat') { A(-7,-38,14,2,PAL.win); A(-7,-42,2,4,cl); A(-5,-47,2,5,cl); A(-12,-36,24,1,cl); }
   else if (L.hat==='hood') { A(-8,-37,16,1,cl); A(-9,-33,1,14,cl); }
+  else if (L.hat==='crown') { A(-7,-32,2,4,PAL.hair); A(5,-32,2,4,PAL.hair); A(-6,-40,12,1,PAL.hot); A(-6,-37,12,1,PAL.glow); A(-1,-39,2,2,TINT.ember); A(-5,-39,1,1,TINT.mana); A(4,-39,1,1,TINT.mana); }
+  else if (L.hat==='cap') { A(-8,-38,16,1,cl); A(-8,-34,16,1,cd); A(5,-33,2,3,PAL.hair); A(6,-45,1,6,TINT.ember); A(8,-48,1,5,TINT.ember); }
   else { A(-7,-32,2,4,PAL.hair); A(5,-32,2,4,PAL.hair); A(-5,-36,4,1,shade(PAL.hair,35)); }
+  /* The starry cloak is midnight blue with a few stars and a small moon on it. */
+  if (L.cloak==='starry') { A(-6,-9,1,1,PAL.hot); A(4,-7,1,1,PAL.hot); A(-4,-16,1,1,PAL.hot); A(5,-15,1,1,PAL.hot); A(-3,-5,1,1,PAL.hot); A(2,-12,2,2,TINT.candle); A(3,-12,1,1,PAL.hot); }
   if (L.pet==='owl') { PS([[12,-15,11,14,PAL.owl],[12,-17,2,2,PAL.owl],[21,-17,2,2,PAL.owl]]); A(14,-6,7,4,PAL.owlL); A(13,-12,4,4,PAL.hot); A(18,-12,4,4,PAL.hot); A(14,-11,2,2,o); A(19,-11,2,2,o); A(17,-8,2,2,PAL.win); }
   else if (L.pet==='cat') { PS([[13,-9,12,8,PAL.fur],[12,-15,9,7,PAL.fur],[12,-18,3,3,PAL.fur],[18,-18,3,3,PAL.fur],[25,-16,2,9,PAL.fur]]); A(14,-13,2,2,PAL.win); A(18,-13,2,2,PAL.win); A(16,-11,1,1,PAL.cheek); A(15,-4,8,2,shade(PAL.fur,-30)); }
+  /* The merchant's two companions. */
+  else if (L.pet==='fox') { var fx = '#e8823a'; PS([[13,-9,11,8,fx],[11,-16,10,8,fx],[11,-19,3,3,fx],[18,-19,3,3,fx],[24,-14,4,13,fx]]);
+    A(24,-14,4,3,PAL.wall); A(14,-11,4,3,PAL.wall); A(15,-11,2,1,o); A(13,-14,2,2,o); A(17,-14,2,2,o); A(15,-6,5,5,PAL.wall); A(12,-18,1,2,shade(fx,-60)); A(19,-18,1,2,shade(fx,-60)); }
+  else if (L.pet==='dragon') { var dg = '#58b368', dl = shade(dg,55); PS([[22,-18,6,8,dl],[13,-10,10,9,dg],[12,-18,9,8,dg],[12,-21,2,3,PAL.wall],[19,-21,2,3,PAL.wall],[23,-5,5,3,dg]]);
+    A(23,-17,1,6,dg); A(25,-17,1,5,dg); A(15,-7,6,6,PAL.lavaL); A(15,-5,6,1,PAL.glow); A(15,-3,6,1,PAL.glow); A(13,-15,2,2,PAL.win); A(18,-15,2,2,PAL.win); A(14,-15,1,2,o); A(19,-15,1,2,o); A(14,-12,1,1,o); A(18,-12,1,1,o); A(27,-5,2,2,TINT.ember); }
 }
 /* Resting: a small Z over the head. */
 function zed(c, x, y) { c.fillStyle = PAL.out; c.fillRect(x+7,y-63,9,9); c.fillStyle = PAL.hot; c.fillRect(x+8,y-62,7,1); c.fillRect(x+8,y-56,7,1); for (var i = 0; i < 5; i++) c.fillRect(x+13-i,y-61+i,2,1); }
@@ -397,7 +418,8 @@ function roomArt(kind, tint) {
    somebody standing behind a barrel is covered by it, as a house covers them on the map.
    [what, x, y, width, height], the top left corner in the room's own units. */
 var PROPS = {
-  tavern:[['bar',24,46,192,20],['keg',28,100,22,26],['keg',190,100,22,26]],
+  /* The stall is the merchant's (David, 2026-11-13: the shop is "a merchant in the Tavern"). */
+  tavern:[['bar',24,46,192,20],['keg',28,100,22,26],['keg',190,100,22,26],['stall',158,64,36,34]],
   hall:[['slab',70,74,100,10]]
   /* A show's camp (the tent) has no row here since 2026-11-13: what stands in it is a list of
      things, as in a house (CAMP_FIX and everybody's one decoration), so that the same code keeps
@@ -407,6 +429,11 @@ function propArt(id) {
   var x;
   if (id==='bar') { parts([[0,8,192,12,PAL.wood]]); P1(0,8,192,2,shade(PAL.wood,35)); for (x = 10; x < 186; x += 22) { parts([[x,0,6,8,PAL.wall]]); P1(x,0,6,2,PAL.win); } }
   else if (id==='keg') { parts([[0,0,22,26,PAL.wood]]); P1(0,6,22,2,PAL.iron); P1(0,18,22,2,PAL.iron); }
+  /* The merchant behind a small counter: a violet hat, a teal coat, and wares laid out in front. */
+  else if (id==='stall') { parts([[11,13,14,10,TINT.teal],[12,3,12,11,PAL.skin],[10,0,16,5,TINT.violet]]);
+    P1(10,0,16,1,shade(TINT.violet,45)); P1(17,1,2,3,TINT.candle); P1(14,8,2,3,PAL.out); P1(20,8,2,3,PAL.out); P1(14,8,1,1,PAL.hot); P1(20,8,1,1,PAL.hot); P1(13,11,2,1,PAL.cheek); P1(21,11,2,1,PAL.cheek); P1(15,12,6,3,PAL.wall); P1(17,15,2,7,shade(TINT.teal,-55)); P1(11,13,2,9,shade(TINT.teal,45));
+    parts([[0,21,36,13,PAL.wood]]); P1(0,21,36,2,shade(PAL.wood,35)); P1(4,25,28,7,TINT.ember); P1(4,25,28,1,shade(TINT.ember,45)); P1(15,26,6,5,TINT.candle); P1(16,27,4,1,PAL.hot); P1(17,28,2,2,PAL.glow);
+    parts([[3,15,4,6,TINT.spell]]); P1(4,13,2,2,PAL.wall); P1(3,15,1,3,PAL.hot); parts([[28,17,6,4,TINT.candle]]); P1(28,15,1,2,TINT.candle); P1(30,15,2,2,TINT.candle); P1(33,15,1,2,TINT.candle); P1(30,18,2,2,TINT.ember); }
   else if (id==='slab') { parts([[0,0,100,10,PAL.marble]]); P1(0,8,100,2,PAL.marbleD); }
 }
 var PSTAMP = {};
@@ -472,8 +499,9 @@ function paintBubble(c, b) {
 
    ⚠ THINGS IS ALSO IN includes/realm_room.php (REALM_ROOM_THINGS), which decides whether a room may
    be saved. The sizes MUST match. z is where it goes, y the height a wall thing hangs at, max how
-   many one room may hold, req why it cannot be removed, gold that it is for sale later. A thing
-   marked gold is shown in the library and cannot be placed: gold is stage 4, and no price is set. */
+   many one room may hold, req why it cannot be removed, gold that the merchant in the Tavern sells it
+   (migration 092). A thing marked gold is shown in the library with its price, and can be placed
+   only by somebody who owns it; the server asks the same (realm_room_save). */
 var THINGS = {
   shelf:{n:'Bookshelf',z:'wall',w:40,h:32,y:14,max:1,req:'it holds your tasks'},
   portrait:{n:'Portrait',z:'wall',w:18,h:22,y:16,max:1,req:'it opens your profile'},
@@ -627,7 +655,13 @@ function placeHot(o, lay, s, ox, oy) {
     if (h[1]==='portrait') { var say = o.owner.me ? 'Your profile' : firstName(o.owner.name), tag = $('portraitTag');
       if (tag && tag.textContent!==say) { tag.textContent = say; b.setAttribute('aria-label',o.owner.me?'Your profile, in the portrait':'The profile of '+o.owner.name+', in the portrait'); } }
   });
+  /* The merchant's stall in the Tavern gets the same kind of button. */
+  var mb = $('shopBtn'), pr = o ? stallOf(o) : null;
+  if (mb) { mb.hidden = !pr; mb.classList.toggle('is-near',!!pr && RM.near==='shopBtn');
+    if (pr) { mb.style.left = (ox+(pr[1]-1)*s)/k+'px'; mb.style.top = (oy+(pr[2]-1)*s)/k+'px'; mb.style.width = (pr[3]+2)*s/k+'px'; mb.style.height = (pr[4]+2)*s/k+'px'; } }
 }
+/* Where the merchant stands in the room `o`, or null: only a meeting place has one. */
+function stallOf(o) { var l = (o && !o.owner && PROPS[o.kind]) || [], i; for (i = 0; i < l.length; i++) if (l[i][0]==='stall') return l[i]; return null; }
 function paintThing(c, it, o) {
   /* In a camp a decoration carries who stood it there (it[3]) and wears that person's colour. */
   var who = it[3] ? person(it[3]) : null, st = thingStamp(it[0],who ? who.cloak : o.tint), h = o.owner ? HOME[o.owner.id] : null;
@@ -714,6 +748,10 @@ function roomSettle() {
    placeHot(): the shelf and the chest only in my own house, a portrait in anybody's. */
 function roomNear(o) {
   var best = null, lay = !o || DECO.on ? null : o.owner ? roomOf(o.owner.id) : campInfo(o.id) ? campLay(o.id) : null;
+  /* In the Tavern: am I standing at the merchant's counter? */
+  var pr = (o && !DECO.on) ? stallOf(o) : null;
+  if (pr && $('shopBtn')) { var sx = Math.max(pr[1]-RM.x,0,RM.x-pr[1]-pr[3]), sy = Math.max(pr[2]+pr[4]-10-RM.y,0,RM.y-pr[2]-pr[4]);
+    if (sx <= 12 && sy <= 9) return 'shopBtn'; }
   if (!lay) return null;
   HOT.forEach(function (h) {
     /* A house answers with its three, a camp with its own three (h[3]). */
@@ -956,7 +994,7 @@ function drawRoom(c, cw, ch) {
 function tagsUnderBubbles(cv, placed, s, ox, oy) {
   if (!cv || !cv.getBoundingClientRect) return;
   var k = Math.min(2,window.devicePixelRatio||1), at = cv.getBoundingClientRect();
-  HOT.forEach(function (h) {
+  HOT.concat([['shopBtn']]).forEach(function (h) {
     var b = $(h[0]), tag = b && b.querySelector('span'), under = false; if (!tag) return;
     if (!b.hidden) { var r = tag.getBoundingClientRect();
       placed.forEach(function (p) { var x = at.left+(ox+(p.bx-1)*s)/k, y = at.top+(oy+(p.by-1)*s)/k, w = (p.w+2)*s/k, hh = (p.h+2)*s/k;
@@ -1009,8 +1047,10 @@ function renderDeco() {
     if (THINGS[id].fix) return;
     /* Small things are shown at twice their size, big ones at their own, so the row stays low. */
     var x = THINGS[id], n = decoCount(id), full = n >= x.max, k = (x.h > 22 || x.w > 32) ? 1 : 2;
-    h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+((x.gold||full)?' aria-disabled="true"':'')+' title="'+esc(x.gold?'For sale later, with gold':full?(x.max===1?'Already in the room':'No more of these fit the rules'):'Add to the room')+'">'
-      +'<canvas data-thumb="'+id+'" data-k="'+k+'" width="'+(x.w+2)*k+'" height="'+(x.h+7)*k+'" style="width:'+(x.w+2)*k+'px;height:'+(x.h+7)*k+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'Costs gold, later':x.req?'In every house':n+' of '+x.max)+'</small></button>';
+    /* What the merchant sells shows its price until it is mine; then it is a thing like any other. */
+    var sale = x.gold && !owns(id), cost = price(id);
+    h += '<button type="button" class="rthing'+(sale?' is-gold':'')+'" data-decoadd="'+id+'"'+((sale||full)?' aria-disabled="true"':'')+' title="'+esc(sale?'The merchant in the Tavern sells this':full?(x.max===1?'Already in the room':'No more of these fit the rules'):'Add to the room')+'">'
+      +'<canvas data-thumb="'+id+'" data-k="'+k+'" width="'+(x.w+2)*k+'" height="'+(x.h+7)*k+'" style="width:'+(x.w+2)*k+'px;height:'+(x.h+7)*k+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(sale?(cost?cost+' coins, at the merchant':'At the merchant'):x.req?'In every house':(x.gold?'Yours, ':'')+n+' of '+x.max)+'</small></button>';
   });
   bar.innerHTML = h+'</div>'; bar.hidden = false;
   decoThumbs(bar);
@@ -1019,7 +1059,9 @@ function renderDeco() {
 /* A new thing goes to the first free spot: along the wall, or row by row down the floor. */
 function decoAdd(id) {
   var t = THINGS[id], items = DECO.lay.items, x, y; if (!t || t.fix) return;
-  if (t.gold) { toast(t.n+' is bought with gold, and gold has not arrived in the Realm yet.'); return; }
+  /* What the merchant sells stands only in the office of somebody who owns it, never in a camp. */
+  if (t.gold && DECO.camp) { toast('What the merchant sells is for your own office, not for a camp.'); return; }
+  if (t.gold && !owns(id)) { toast('The merchant in the Tavern sells the '+t.n.toLowerCase()+(price(id)?' for '+price(id)+' coins':'')+'. Once it is yours, it is here.'); return; }
   if (DECO.camp) { /* One each (David, 2026-11-13). The server refuses a second as well. */
     if (t.req) return;
     if (campMine() >= 0) { DECO.sel = campMine(); toast('You already have one thing in this camp. Take it out first to choose another.'); renderDeco(); draw(); return; } }
@@ -1234,8 +1276,8 @@ function renderCampDeco(bar) {
   Object.keys(THINGS).forEach(function (id) {
     var x = THINGS[id]; if (x.fix || x.req) return;
     var has = mine && mine[0]===id, off = x.gold || (mine && !has), sc = (x.h > 22 || x.w > 32) ? 1 : 2;
-    h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+(off?' aria-disabled="true"':'')+' title="'+esc(x.gold?'For sale later, with gold':has?'This is your thing in the camp':mine?'You already have one thing here':'Stand it in the camp')+'">'
-      +'<canvas data-thumb="'+id+'" data-k="'+sc+'" width="'+(x.w+2)*sc+'" height="'+(x.h+7)*sc+'" style="width:'+(x.w+2)*sc+'px;height:'+(x.h+7)*sc+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'Costs gold, later':has?'Yours':'Free')+'</small></button>';
+    h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+(off?' aria-disabled="true"':'')+' title="'+esc(x.gold?'What the merchant sells is for your own office':has?'This is your thing in the camp':mine?'You already have one thing here':'Stand it in the camp')+'">'
+      +'<canvas data-thumb="'+id+'" data-k="'+sc+'" width="'+(x.w+2)*sc+'" height="'+(x.h+7)*sc+'" style="width:'+(x.w+2)*sc+'px;height:'+(x.h+7)*sc+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'For an office only':has?'Yours':'Free')+'</small></button>';
   });
   bar.innerHTML = h+'</div>'; bar.hidden = false;
   decoThumbs(bar);
@@ -1537,6 +1579,7 @@ function renderInside() {
   /* A show's camp: its four fixtures for somebody on the show, one sentence for anybody else. */
   var land = campOf(o.id), k = land ? CAMP[land] : null, mayDeco = (o.owner && o.owner.me) || (k && !k.closed);
   var hint = (o.owner && o.owner.me) ? ' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.' : !k ? '' : k.closed ? ' This camp belongs to a show you are not on, so its boards are covered.' : ' Click the bar, the scroll, the calendar or the board, or walk up to one and press Enter.';
+  if (stallOf(o)) hint = ' The merchant sells things for gold: walk up and press Enter, or click.';
   bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', '))+(hint?'.':''):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
   /* The shared screen sits under this bar, however many lines the bar takes. */
   shareShow();
@@ -1736,6 +1779,8 @@ document.addEventListener('click',function (e) {
     else { SH.hide = sa==='hide'; renderInside(); } }
   else if (t.closest('[data-leave]')) leave();
   else if (t.closest('#chestBtn')) openGold();
+  /* The merchant's counter is assets/realm_shop.js. */
+  else if (t.closest('#shopBtn')) { if (R.openShop) R.openShop(); }
   else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
   else if (t.closest('#slayBtn')) campWin('slay');
   else if (t.closest('#scrollBtn')) campWin('brief');
@@ -1824,7 +1869,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -1904,6 +1949,8 @@ function chatTake(j) {
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
   takeKnocks(j.knocks);
+  /* Offers of a gift or a swap ride on the same answers as knocks (assets/realm_trade.js). */
+  if (R.onOffers) R.onOffers(j.offers);
   /* While I am in voice my own once-a-second request brings a fresher list than this one. */
   if (!VO.on) takeVoiceRoom(j.voice);
   takeSpots(j.spots);
@@ -1990,13 +2037,20 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
 
 /* ---------- your character ---------- */
 var LOOK = {};
-function seg(label, key, opts) { return '<div class="rpick"><span>'+label+'</span><span class="rseg">'+Object.keys(opts).map(function (v) { return '<button type="button" data-pick="'+key+'" data-val="'+v+'" aria-pressed="'+(LOOK[key]===v)+'">'+opts[v]+'</button>'; }).join('')+'</span></div>'; }
+/* WHAT THE MERCHANT SELLS CAN BE TRIED ON (David, 2026-11-13: the things for sale are shown here
+   with their price). A choice that is not mine yet is marked with its price; picking it shows it on
+   the character, says where it is sold, and Save waits until it is put back. The server refuses it
+   as well (realm_set_look). */
+function lookSale(key, v) { return key!=='house_kind' && PAID[v] && !owns(v); }
+function seg(label, key, opts) { return '<div class="rpick"><span>'+label+'</span><span class="rseg">'+Object.keys(opts).map(function (v) { var sale = lookSale(key,v); return '<button type="button"'+(sale?' class="is-sale" title="The merchant in the Tavern sells this"':'')+' data-pick="'+key+'" data-val="'+v+'" aria-pressed="'+(LOOK[key]===v)+'">'+opts[v]+(sale?' <i>'+(price(v)||'gold')+'</i>':'')+'</button>'; }).join('')+'</span></div>'; }
 function renderLook() {
-  $('lookForm').innerHTML = '<div class="rlook"><canvas id="charcv" class="rchar" width="120" height="120" role="img" aria-label="Your character"></canvas><div class="rpicks">'+seg('Cloak','cloak',CLOAKS)+seg('Head','hat',HATS)+seg('Companion','pet',PETS)+seg('House','house_kind',KINDS)+'</div></div><small>Your roof takes the colour of your cloak, so your house and your character match.</small><div class="rdacts"><button type="button" class="rbtn" data-lookcancel="1">Cancel</button><button class="rbtn rprimary">Save</button></div>';
+  var names = {cloak:CLOAKS,hat:HATS,pet:PETS}, tried = ['cloak','hat','pet'].filter(function (k) { return lookSale(k,LOOK[k]); });
+  var note = tried.length ? '<small class="rtry">You are trying on '+tried.map(function (k) { var v = LOOK[k]; return 'the '+esc(names[k][v].toLowerCase())+(k==='cloak'?' cloak':'')+(price(v)?' ('+price(v)+' coins)':''); }).join(' and ')+'. The merchant in the Tavern sells '+(tried.length > 1?'them':'it')+'. Pick something of yours to save.</small>' : '';
+  $('lookForm').innerHTML = '<div class="rlook"><canvas id="charcv" class="rchar" width="120" height="120" role="img" aria-label="Your character"></canvas><div class="rpicks">'+seg('Cloak','cloak',CLOAKS)+seg('Head','hat',HATS)+seg('Companion','pet',PETS)+seg('House','house_kind',KINDS)+'</div></div><small>Your roof takes the colour of your cloak, so your house and your character match.</small>'+note+'<div class="rdacts"><button type="button" class="rbtn" data-lookcancel="1">Cancel</button><button class="rbtn rprimary"'+(tried.length?' disabled':'')+'>Save</button></div>';
   var c = $('charcv').getContext('2d'); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,120,120); c.setTransform(2,0,0,2,0,0); sprite(c,22,58,LOOK,0);
 }
 function openLook() { var m = me(); if (!m) return; LOOK = {cloak:m.cloak,hat:m.hat,pet:m.pet,house_kind:m.kind}; renderLook(); $('lookDlg').showModal(); }
-$('lookForm').addEventListener('submit',function (e) { e.preventDefault(); $('lookDlg').close(); send({set_look:1,cloak:LOOK.cloak,hat:LOOK.hat,pet:LOOK.pet,house_kind:LOOK.house_kind}); });
+$('lookForm').addEventListener('submit',function (e) { e.preventDefault(); if (['cloak','hat','pet'].some(function (k) { return lookSale(k,LOOK[k]); })) return; $('lookDlg').close(); send({set_look:1,cloak:LOOK.cloak,hat:LOOK.hat,pet:LOOK.pet,house_kind:LOOK.house_kind}); });
 
 /* ---------- the focus desk ----------
    David, 2026-11-12: "how can I change to in focus time? I think we should play a soft music while
@@ -2814,6 +2868,14 @@ window.addEventListener('pagehide',function () {
 /* ---------- start ---------- */
 /* What assets/realm_praise.js borrows: the notices and the one way of asking the server. */
 R.toast = toast; R.toastHome = toastHome; R.send = send;
+/* What assets/realm_shop.js borrows: the two drawings, so the counter shows the very pictures the
+   map uses, and a way to say "this is now mine", so the library and Your character know at once. */
+R.sprite = sprite; R.thingStamp = thingStamp;
+R.shopOwned = function (list) { if (ST.shop && list) { ST.shop.owned = list; if (DECO.on) renderDeco(); } };
+/* What assets/realm_trade.js borrows: after a thing has changed hands, ask for the map again (what
+   I own and what everybody wears) and, standing in my own office, for my room (a thing I gave away
+   has been taken out of it). */
+R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
 var mine = me(), home = (mine && B[mine.place]) ? mine.place : (mine ? 'user:'+mine.id : 'tavern'), hs = spot(home);
@@ -2875,7 +2937,7 @@ setInterval(function () {
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */
-if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],['portraitBtn','portraitTag','Profile','A profile, in the portrait']].forEach(function (h) {
+if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],['portraitBtn','portraitTag','Profile','A profile, in the portrait'],['shopBtn','shopTag','Merchant','The merchant, who sells things for gold']].forEach(function (h) {
   var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
   b.setAttribute('aria-label',h[3]); b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
 });

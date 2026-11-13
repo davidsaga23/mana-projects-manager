@@ -34,6 +34,50 @@ left?"
   had been let in), you are stood outside it instead.
 ---
 
+## 2026-11-13 — The Realm: the merchant in the Tavern, giving and swapping, and a starting purse *(migration 092, needs 090)*
+
+**Asked by David:** "let's open a new thread for that" (the shop and prices), then, after the
+choices were put to him a few at a time: "Agree to all three", "yeah let's move forward", "Yes,
+build it".
+
+- **A merchant stands in the Tavern.** Walk up to the counter and press Enter, or click. The window
+  shows your own coins and eight things, each with its picture and price. You buy there and nowhere
+  else; the server checks you are inside the Tavern.
+- **Eight things, three prices.** 5 coins: the shield and swords, the crown, the feathered cap.
+  12 coins: the crystal ball, the fox, the starry cloak. 25 coins: the throne, the small dragon.
+  The crown, the cap, the fox, the dragon and the starry cloak are new drawings; the three office
+  things were already drawn and waiting. Everything that was free stays free.
+- **Buying asks first**: "Buy the throne for 25 coins? This cannot be undone." One of each per
+  person, no selling back, nothing runs out and nothing is limited.
+- **What you buy is yours for good.** Office things are then in the Decorate library ("Yours"),
+  clothes and companions in Your character. Until then both places show the price and say "at the
+  merchant", and Your character lets you try a thing on without being able to save it.
+- **Private.** The chest now lists what you own, under your coins. Nobody else can see your coins
+  or your list, only what you wear and what stands in your office.
+- **Giving and swapping** (David: "let's build the giving and swapping"). While somebody stands
+  where you are and you own something from the merchant, a "Give or swap" button appears. A gift:
+  the other person accepts or says no thanks. A swap: the other person chooses one of their own
+  things to give back, and you agree or not; nothing moves until both have. Only bought things
+  change hands, face to face, one of each still holds, and a thing that leaves you comes off your
+  character and out of your office. Only the two of you see any of it. An offer ends after five
+  minutes, or if one of you walks away.
+- **Everybody starts with 5 gold and 5 mana** (David: "let's also start with 5 gold and 5 mana for
+  all the new people landing in the realm", "includeing renata and myself"). Given once to every
+  person, the next time their chest or the Realm is opened after migration 092 has run. Gold went
+  live while this was being built, so it is a mark on each purse: purses that already exist get
+  it too, on top of what they hold (mana stops at 5).
+- **Not in this version:** things drawn by the studio's artists, new things arriving with a notice.
+- **Built on PR 229** (gold, migration 090), which was merged on 2026-11-13.
+- **Bought things do not stand in a show's camp**, only in your own office (my choice; camps
+  arrived from another pull request while this was built).
+- **Not verified:** PHP was never run here. The screen was tried against a pretend server
+  (buying, refusing, trying on, placing the throne, the chest, and a gift and a swap between two
+  pretend people); real coins, the Tavern check, the one-of-each rule in the database, things
+  really changing hands and coming off a character need David and Renata on the live site.
+  Saying no thanks, calling an offer off and walking away mid-offer were not tried at all.
+
+---
+
 ## 2026-11-13 — The Realm: praise, mana and gold, first version *(migration 090)*
 
 **Asked by David:** "people should be able to praise with a spell or something people doing a good
@@ -59,6 +103,7 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
   things, the Herald, and a keepsake drawn in the office. The chest says there is nothing to buy yet.
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
   counting of time logs and the face to face check need David and Renata on the live site.
+
 
 ## 2026-11-13 — The Realm: what is always in a show's camp *(migration 091)*
 

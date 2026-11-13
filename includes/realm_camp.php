@@ -166,7 +166,7 @@ function realm_camp_fits(string $thing, int $x, int $y, array $others, string &$
     $why = 'That is not a thing from the library.';
     if (!isset(REALM_ROOM_THINGS[$thing])) return null;
     [$zone, $w, $h, $hang, , $always, $gold] = REALM_ROOM_THINGS[$thing];
-    if ($gold) { $why = 'That one is bought with gold, and gold has not arrived yet.'; return null; }
+    if ($gold) { $why = 'What the merchant sells is for your own office, not for a camp.'; return null; }
     if ($always) { $why = 'The bookshelf, the chest and the portrait belong in a house.'; return null; }
     if ($zone === 'wall') $y = $hang;
     $why = 'That would stand outside the camp.';

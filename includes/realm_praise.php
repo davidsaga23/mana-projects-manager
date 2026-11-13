@@ -85,6 +85,21 @@ const REALM_PRAISE_NOTE = 160;
 const REALM_PRAISE_NEWS_SECONDS = 120;
 /** How far back a brand-new purse looks, in days, so a first visit is not empty-handed. */
 const REALM_PURSE_LOOK_BACK = 8;
+/**
+ * THE STARTING PURSE. David, 2026-11-13: "let's also start with 5 gold and 5
+ * mana for all the new people landing in the realm", and, asked who that
+ * covers: "includeing renata and myself".
+ *
+ * Given ONCE to every person, by realm_purse(), and marked in the column
+ * realm_purse.started (migration 092). ⚠ It is a mark on the purse and not
+ * something a new purse is created with, because gold went live before this
+ * was written: David's and Renata's purses already existed, and so may a purse
+ * made by a praise received before somebody's first visit. A purse that is not
+ * marked gets the coins the next time its owner's purse is brought up to date,
+ * whenever it was made. Until 092 has run nobody gets them.
+ */
+const REALM_START_GOLD = 5;
+const REALM_START_MANA = 5;
 
 /** Has migration 090 arrived? Asked once per request; never throws. */
 function realm_praise_available(PDO $pdo): bool {
@@ -101,7 +116,7 @@ function realm_praise_available(PDO $pdo): bool {
 
 /**
  * Bring $uid's purse up to date with their time log, then return it:
- *   ['ready', 'linked', 'mana', 'gold', 'streak', 'cap', 'every']
+ *   ['ready', 'linked', 'mana', 'gold', 'streak', 'cap', 'every', 'start_gold', 'start_mana']
  *
  * Every working day since `counted_to` is looked at once, oldest first:
  *   - a weekend, a studio holiday or a booked day off is passed over;
@@ -117,7 +132,9 @@ function realm_praise_available(PDO $pdo): bool {
  */
 function realm_purse(PDO $pdo, int $uid): array {
     $out = ['ready' => realm_praise_available($pdo), 'linked' => false, 'mana' => 0, 'gold' => 0, 'streak' => 0,
-            'cap' => REALM_MANA_CAP, 'every' => REALM_GOLD_EVERY];
+            'cap' => REALM_MANA_CAP, 'every' => REALM_GOLD_EVERY,
+            // What everybody starts with; 0 until migration 092 has run, so the chest does not promise it early.
+            'start_gold' => 0, 'start_mana' => 0];
     if (!$out['ready'] || $uid <= 0) return $out;
     $began = false;
     try {
@@ -138,6 +155,17 @@ function realm_purse(PDO $pdo, int $uid): array {
         $mana   = min(REALM_MANA_CAP, max(0, (int)$row['mana']));
         $gold   = max(0, (int)$row['gold']);
         $streak = max(0, (int)$row['streak']);
+        // The starting purse, once (see REALM_START_GOLD). Inside the lock on this
+        // row, so two tabs opening together cannot both be given it.
+        $starting = array_key_exists('started', $row) && (int)$row['started'] === 0;
+        if (array_key_exists('started', $row)) {
+            $out['start_gold'] = REALM_START_GOLD;
+            $out['start_mana'] = min(REALM_MANA_CAP, REALM_START_MANA);
+        }
+        if ($starting) {
+            $gold += REALM_START_GOLD;
+            $mana  = min(REALM_MANA_CAP, $mana + REALM_START_MANA);
+        }
         $counted = $row['counted_to'] !== null ? (string)$row['counted_to']
                  : (new DateTime($today))->modify('-' . REALM_PURSE_LOOK_BACK . ' days')->format('Y-m-d');
 
@@ -180,6 +208,7 @@ function realm_purse(PDO $pdo, int $uid): array {
         }
         $pdo->prepare('UPDATE realm_purse SET mana = ?, gold = ?, streak = ?, counted_to = ?, updated_at = NOW() WHERE user_id = ?')
             ->execute([$mana, $gold, $streak, $counted, $uid]);
+        if ($starting) $pdo->prepare('UPDATE realm_purse SET started = 1 WHERE user_id = ?')->execute([$uid]);
         // Approved work, counted after the time log so the two never undo each other.
         if ($crewId > 0 && array_key_exists('approvals_to', $row)) {
             $paid = realm_purse_approvals($pdo, $crewId, $row['approvals_to'] !== null ? (int)$row['approvals_to'] : null, $today);
@@ -297,6 +326,7 @@ function realm_praise_give(PDO $pdo, int $uid, int $to, string $kind, string $no
         $q->execute([$uid, $to]);
         $coin = $q->fetchColumn() ? 0 : 1;
         if ($coin) {
+            // A purse made here is not marked as started, so its owner still gets the starting coins.
             $pdo->prepare('INSERT INTO realm_purse (user_id, gold, updated_at) VALUES (?, 1, NOW())
                            ON DUPLICATE KEY UPDATE gold = gold + 1, updated_at = NOW()')->execute([$to]);
         }
