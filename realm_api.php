@@ -354,7 +354,7 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
 //      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
-// GET  search=<words>&before=<id>          search every conversation I may read (migration 093)
+// GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
 // GET  chat=<channel>&at=<message id>      open a conversation at a found message
 //
 // Answered here, apart from the map: an open conversation asks every few

@@ -1,4 +1,4 @@
--- 093 — The Realm: search across all chat history.
+-- 094 — The Realm: search across all chat history.
 --
 -- David, 2026-11-13: the studio is on Slack's free plan and loses everything
 -- older than 90 days. Every Realm message is kept here, so it can be searched

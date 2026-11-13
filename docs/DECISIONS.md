@@ -6043,3 +6043,27 @@ forward"); how a swap works step by step is my design, below.
   asked; easy to open later.
 - **Not verified:** PHP was never run. A gift and a swap were tried between two pretend people;
   saying no, calling an offer off, an offer running out and walking away were not tried.
+
+## 2026-11-13 — Searching the Realm's chat
+
+**Asked by David**: "search across all chat history". Losing Slack history after 90 days is one of
+the studio's main complaints; every Realm message is already kept in `realm_messages`.
+
+- **David's choices:** the box sits at the **top of the side panel** (not inside a conversation),
+  and searches **"all channels and dms"**. No filters for now (by channel, by person, has a
+  picture were offered); each is cheap to add later.
+- **Where it may look is decided on the server**, in `includes/realm_search.php`
+  (`realm_search_places()`): the channels `realm_channels()` gives the person, plus one raven per
+  other person living in the Realm, which is exactly what `realm_channel_access()` would open. The
+  query is limited to that list, so a message from somebody else's raven cannot be in the answer.
+- **Speed:** migration 094 adds a FULLTEXT index. Until it runs, every word is matched with LIKE,
+  newest first, 31 rows at most. With it, the index narrows the rows and LIKE still checks every
+  word. Words the index cannot hold (under three letters, or InnoDB stop words like "the") only use
+  LIKE, because a stop word required by the index would find nothing.
+- **Opening at a message reuses `realm_messages()` unchanged:** `?chat=<channel>&at=<id>` only
+  works out an `after` about twenty messages earlier (`realm_search_start()`), so the page comes
+  back exactly as a normal poll would, with whatever else other features add to a message, and the
+  open conversation keeps polling for newer ones from there.
+- **Not verified:** PHP and MySQL were never run (no PHP on this machine); tried in a static mock
+  of the page with a pretend server. A result inside a thread (replies are being built in another
+  branch) opens the conversation without lighting the message, and says so.

@@ -17,7 +17,7 @@
 // The list is built first and the query is limited to it, so a message from a
 // conversation that is not theirs can never be in the answer.
 //
-// ⚠ IT MUST STAY QUICK WITH YEARS OF MESSAGES. Migration 093 adds a FULLTEXT
+// ⚠ IT MUST STAY QUICK WITH YEARS OF MESSAGES. Migration 094 adds a FULLTEXT
 // index on the words. Until it has run (and for words the index cannot hold:
 // shorter than three letters, or very common ones like "the"), every word is
 // matched with LIKE, newest first, 30 at a time. That is slower on a big table,
@@ -33,7 +33,7 @@ const REALM_SEARCH_PAGE = 30;
 /** How many words of a search are used. More is ignored. */
 const REALM_SEARCH_WORDS = 6;
 
-/** Has migration 093 added the FULLTEXT index? Asked once per request; never throws. */
+/** Has migration 094 added the FULLTEXT index? Asked once per request; never throws. */
 function realm_search_indexed(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -110,7 +110,7 @@ function realm_search(PDO $pdo, int $uid, string $q, bool $mayAnnounce, int $bef
         $args[] = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $w) . '%';
     }
 
-    // With migration 093, the index narrows the rows first. Only words it can
+    // With migration 094, the index narrows the rows first. Only words it can
     // hold are given to it: letters and digits only, three or more of them, and
     // not one of InnoDB's default stop words (a stop word marked "+" would make
     // the whole search find nothing). The LIKEs above still decide.

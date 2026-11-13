@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: search every conversation *(migration 094, optional for speed)*
+
+**Asked by David**: search across all chat history, "all channels and dms". The studio is on
+Slack's free plan and loses everything older than 90 days; every Realm message is kept in Anima,
+so it can be found again forever.
+
+- **A search box at the top of the side panel.** Typing a word or two lists the matching messages,
+  newest first: who, where (the channel, or "Ravens with Renata Ruiz"), when (with the year once it
+  is not this year), and the line with the words marked. 30 at a time, with **Older results** below.
+- **Clicking a result opens that conversation at that message**, lit up for a moment, with about
+  twenty messages above it; newer messages keep arriving below as usual.
+- **Only conversations you can read**: the shared channels, the show channels you may see, and your
+  own ravens. Decided on the server; nobody's ravens but your own, admins included.
+- Escape, or emptying the box, brings back Channels, People and Places.
+- **Migration 094** adds a search index to the messages so it stays quick over years. The search
+  works before it runs, just more slowly on a big history.
+
 ## 2026-11-13 — The Realm: small animations *(no migration)*
 
 **Asked by David**: "let's create some basic animations for when you: teleport, open a chest, access
