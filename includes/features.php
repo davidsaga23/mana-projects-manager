@@ -125,7 +125,7 @@ const FEATURES = [
     // David, 2026-11-05: Historic quotas for Admin and Production.
     'quotas'        => ['label' => 'Historic quotas', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
-    // Commercial, the CRM (David, 2026-11-12, migration 088): leads, proposals
+    // Commercial, the CRM (David, 2026-11-12, migration 089): leads, proposals
     // and quotes. "Admins only" to begin with, so Production starts OFF and can
     // be switched on here, by role or by person. ⚠ SALES FIGURES, not a show's
     // budget or cost (see includes/crm.php), which is why this may be a switch

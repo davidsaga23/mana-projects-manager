@@ -118,7 +118,7 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
 
 // ---- voice (David, 2026-11-12, migration 085) --------------------------------
 // POST voice=join&place=<room>            join the voice chat of the room I am inside
-// POST voice=poll&sid=<n>&muted=0|1&out=<JSON>
+// POST voice=poll&sid=<n>&muted=0|1&share=0|1&out=<JSON>
 //                                         once a second while in voice: I am still
 //                                         here, deliver these signals, give me mine
 // POST voice=leave&sid=<n>                leave it
@@ -152,7 +152,10 @@ if (isset($_POST['voice'])) {
             $answer = $none;
         } elseif ($what === 'poll') {
             $out = json_decode((string)($_POST['out'] ?? '[]'), true);
-            $answer = realm_voice_poll($pdo, $uid, $sid, (string)($_POST['muted'] ?? '0') === '1', is_array($out) ? $out : []);
+            // `share` (migration 088): "I am sharing my screen", a request the server grants
+            // to one person per room. See realm_voice_poll().
+            $answer = realm_voice_poll($pdo, $uid, $sid, (string)($_POST['muted'] ?? '0') === '1', is_array($out) ? $out : [],
+                                       (string)($_POST['share'] ?? '0') === '1');
         } else {
             $answer = $none;
         }

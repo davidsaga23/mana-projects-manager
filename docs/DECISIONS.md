@@ -5703,6 +5703,52 @@ David: "let's change 'Join voice' for 'Join call'".
   connection that could not be made): it means Google Meet or similar, outside the Realm.
 - **Entries above this one keep "voice"**, as written that day.
 
+## 2026-11-13 — Sharing a screen in a call: one at a time, on its own lines
+
+David: "let's discuss the option to share your screen while in a voice chat". The choices were put
+to him a few at a time; his answers are quoted. Then: "Yes, build it".
+
+- **What it is for: 2 to 5 people looking at a still thing together.** Asked whether that was the
+  need, with playing footage sent to Reviews and big meetings to Meet: "Yeah for sharing screen".
+  Everything about quality follows from this.
+- **One sharer at a time** ("One at a time"). The server decides: `share=1` on the once-a-second
+  request is a request, granted only while nobody else on the room's list holds the screen
+  (`realm_voice_poll()`); the list marks at most one person, the earliest `share_since`. A browser
+  that asked and is not the one marked stops and says who was first.
+- **A large panel over the room** ("I agree"), under the room's bar, with Back to the room and
+  Full screen. "On the wall" as a thing to walk up to was left for later: too small to read.
+- **Only the people in the call see it; a late joiner sees it at once; it stops when the sharer
+  leaves the call or the room** ("Yes"). Nothing extra enforces the ending: leaving the call
+  deletes the `realm_voice` row and walking out takes the person off the room's list.
+- **The sharer picks anything the browser offers**: "They can share the whole window if they
+  want". So there is no warning and no steering towards a window. The browser's own picker asks
+  every time and a page cannot answer it.
+- **A marker that cannot be missed** ("yes to the marker"): a red band across the top of the page
+  for as long as the browser is capturing, with Stop sharing on it. It is shown from the moment
+  capture starts, before the server has granted the room's place, because that is when the screen
+  starts being read.
+- **No sound from the screen** ("Sounds good"), and nothing is recorded or stored anywhere.
+- **The picture travels on its own one-way lines, not on the sound's** (my decision). For each
+  viewer the sharer opens a second browser-to-browser line carrying only the picture, set up with
+  its own notes (`soffer`, `sanswer`, `sice`) through the same request. A screen that cannot get
+  through never costs anybody the sound, and the sound's lines stay as they were built: made once,
+  offered by the smaller id. Here the sharer always offers.
+- **Sharp and slow** (my numbers, to be changed after a real test): at most 1280 by 720, 5 pictures
+  a second, about 1 megabit per viewer, so about 4 megabits of upload in a full call. `shareCap()`
+  and the picker's limits in `shareStart()` in `assets/realm.js`.
+- **The longest set-up note went from 12000 to 30000 characters** (`REALM_SIGNAL_MAX`): a picture
+  offer measured about 5000 in the test browser and can be twice that.
+- **Not built:** taking over from the current sharer (David has not chosen between "at once" and
+  "they press Stop first"), sound from a shared tab, a relay for strict networks.
+- **Still open with David:** whether any client contract restricts showing their material in a
+  call or names the tools it may pass through. It does not change the code; it decides whether
+  people are told which shows not to share.
+- **Not verified:** PHP was never run. In a stand-in page with the real script and three people
+  in three tabs: sharing, the panel and the band, Back to the room and Show screen, stopping, two
+  people pressing Share together, a late joiner, the sharer walking out, the line for somebody not
+  in the call, and no button without the migration. Never tried: the browser's real picker and a
+  real screen, two computers on two networks, a weak upload, Firefox, Safari, phones watching.
+
 ## 2026-11-12 — Commercial: the CRM lives in the main database, admins only, and counts sales, not cost
 
 David, with a CRM he prototyped as a claude.ai artifact: "can we incorporate this to anima?"
