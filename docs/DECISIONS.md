@@ -5640,3 +5640,47 @@ theirs and others bio and profile from Anima, and update it."
   are drawn faint and speech bubbles are not shown.
 - **Not verified:** PHP was never run (the files parse, and the two libraries were compared by a
   script); the real profile save and picture upload; Safari, Firefox and phones; dragging by touch.
+
+## 2026-11-13 — Praise in the Realm: the rules, and what the first version leaves out
+
+David, in the thread opened to "discuss how spell praise and collectibles can be exchanged". Four
+choices were put to him and he answered each, then said "Let's build it". Gifting, swapping, the
+shop and the word for praise were NOT discussed before he said so; they are open, below.
+
+- **Where: the same place, anywhere** (David: "I agree"). Inside the same room, or both standing at
+  the same spot on the map. Not only the receiver's office, which would have made praise rare.
+  `realm_praise_give()` checks `place` and `inside` for both people and that both are online.
+- **Cost and reward** (David: "Agree"). The giver spends 1 mana. The receiver always gets a
+  keepsake, and 1 gold coin only for the first praise from the same person in a week, so two people
+  cannot praise each other in a loop to make gold, and a sincere second praise is never refused.
+- **What it says** (David: "It could be the work, it could be just kudos from a default menu"). A
+  line is required; it is one of three ready-made lines per kind or the giver's own words. A link to
+  a shot or task in Anima was NOT built: the giver can name the work in the line.
+- **Four kinds: Craft, Help, Idea, Rescue** (David: "sounds good"). None is about speed or hours.
+- **It lands at once**; the receiver does not accept or refuse a praise.
+- **Stored** in `realm_purse` (mana, gold, the run of logged days, the last day counted) and
+  `realm_praise` (every praise, kept for good), migration 087. Rules in `includes/realm_praise.php`,
+  screen in `assets/realm_praise.js`, which is its own file: `assets/realm.js` only gained four
+  hooks on `window.REALM` (`onState`, `openGold`, `profExtra`, and it lends `toast` and `send`).
+- **A purse is read only for the session's own account.** There is no request that takes somebody
+  else's id, no list of balances and no ranking. A praise shown to others never says whether it
+  carried a coin.
+- **The time log is counted when the Realm is opened, when the chest is opened and before a
+  praise**, never on the heartbeat. A brand-new purse looks back 8 days, so a first visit is not
+  empty-handed.
+- **My readings, to confirm with David:** "1 week" is five working days in a row, counted on the
+  run; "noon the next day" is noon of the next working day, so Friday can be logged on Monday
+  morning; the week for the gold rule is Monday to Sunday; somebody whose login is not linked to a
+  person earns no mana and cannot praise, but can be praised.
+- **What others see is a notice, not an effect on the map.** A burst over the character and a
+  keepsake drawn in the office were talked about; neither is built, because another session is
+  rebuilding how rooms are drawn (walking inside) and both belong in that drawing code.
+- **Gold from approved work is not built.** David said gold comes from it and gave no amount. To
+  decide with him, with care: a coin per approval is the part most easily read as a productivity
+  score.
+- **The word is plain "praise"** on every screen. Anima's task board is called Spell; "blessing"
+  was proposed and David has not chosen.
+- **Open, not yet discussed with David:** giving a thing to somebody and whether they must accept;
+  swapping and what happens if one person walks away; what can and cannot change hands; whether an
+  inventory is private; the shop, prices and rare things; limits on praising the same person.
+- **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
