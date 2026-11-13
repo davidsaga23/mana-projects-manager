@@ -14,7 +14,12 @@
 //     Council Hall, a show's war room. A house still needs its door open, or a
 //     knock and being let in; that is realm_arrive()'s job and is not repeated.
 //   * NOBODY IS HEARD BY SURPRISE. Walking into a room never opens a microphone.
-//     Each person presses Join voice.
+//     Each person presses Join call.
+//
+// THE WORD PEOPLE READ IS "CALL". David, 2026-11-13: "let's change 'Join voice'
+// for 'Join call'". Every sentence shown on screen says call; the code, the
+// tables and the request field keep the word voice, which is not worth a
+// migration to rename.
 //
 // ⚠ THE SOUND NEVER COMES THROUGH HERE. It travels straight from one browser to
 // another, encrypted by the browsers (WebRTC). This file only keeps the list of
@@ -146,10 +151,10 @@ function realm_voice_here(PDO $pdo, int $uid): ?array {
  */
 function realm_voice_join(PDO $pdo, int $uid, string $place): array {
     $no = function (string $why): array { return ['why' => $why, 'sid' => 0]; };
-    if (!realm_voice_available($pdo)) return $no('Voice needs a database update first. An administrator opens migrate.php once.');
+    if (!realm_voice_available($pdo)) return $no('Calls need a database update first. An administrator opens migrate.php once.');
     $room = realm_voice_room_of($pdo, $uid);
     if ($room === '' || ($place !== '' && $place !== $room)) {
-        if ($place === '') return $no('Go inside a room first. Voice is for people in the same room.');
+        if ($place === '') return $no('Go inside a room first. A call is for people in the same room.');
         $why = realm_arrive($pdo, $uid, $place, true);
         if ($why !== '') return $no($why);
         $room = $place;
@@ -159,7 +164,7 @@ function realm_voice_join(PDO $pdo, int $uid, string $place): array {
         if ($p['id'] !== $uid) $others++;
     }
     if ($others >= REALM_VOICE_CAP) {
-        return $no('This table is full, ' . REALM_VOICE_CAP . ' people are already talking. For a bigger meeting, use a video call.');
+        return $no('This call is full, ' . REALM_VOICE_CAP . ' people are already talking. For a bigger meeting, use a video call.');
     }
     $sid = random_int(1, 2147483647);
     $pdo->prepare('INSERT INTO realm_voice (user_id, place, session, muted, joined_at, last_seen) VALUES (?, ?, ?, 0, NOW(), NOW())
@@ -205,16 +210,16 @@ function realm_voice_leave(PDO $pdo, int $uid, int $sid): void {
  */
 function realm_voice_poll(PDO $pdo, int $uid, int $sid, bool $muted, array $out): array {
     $gone = function (string $why): array { return ['in' => false, 'why' => $why, 'people' => [], 'signals' => []]; };
-    if (!realm_voice_available($pdo)) return $gone('Voice needs a database update first.');
+    if (!realm_voice_available($pdo)) return $gone('Calls need a database update first.');
     $q = $pdo->prepare('SELECT place, session FROM realm_voice WHERE user_id = ?');
     $q->execute([$uid]);
     $row = $q->fetch();
     if (!$row) return $gone('');
-    if ((int)$row['session'] !== $sid) return $gone('Your voice moved to another window.');
+    if ((int)$row['session'] !== $sid) return $gone('Your call moved to another window.');
     $place = (string)$row['place'];
     if (realm_voice_room_of($pdo, $uid) !== $place) {
         realm_voice_leave($pdo, $uid, $sid);
-        return $gone('You left the room, so you left its voice chat.');
+        return $gone('You left the room, so you left its call.');
     }
     $pdo->prepare('UPDATE realm_voice SET last_seen = NOW(), muted = ? WHERE user_id = ? AND session = ?')
         ->execute([$muted ? 1 : 0, $uid, $sid]);
