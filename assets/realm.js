@@ -401,7 +401,7 @@ function fxTick() {
   fxraf = 0; var now = Date.now();
   FX = FX.filter(function (e) { return now-e.t0 < FXMS[e.k]; });
   draw();
-  if (FX.length || talkingNow()) fxWake();
+  if (FX.length || talkingNow() || beastOut()) fxWake();
 }
 function talkingNow() { var now = Date.now(); for (var k in VO.talk) if (VO.talk[k] > now) return true; return false; }
 /* A four-pointed star, outlined like everything else in the Realm. */
@@ -465,6 +465,200 @@ function fxPaint(c, room) {
 }
 /* Where everybody was last drawn, so a thing that happens TO somebody can be shown over them. */
 var LASTAT = {}, MT = null;
+
+/* ---------- the creatures of the lands ----------
+   David, 2026-11-13: "let's also add a creature to defeat per land/project. An ogre in the forest,
+   a dragon in the volcan, etc. They can peak or come out once in a while (not at the same time) so
+   people can see them."
+   So every land that has a show on it has a creature of its own: an ogre in the Wood, a yeti over
+   the Peaks, a dragon in the Ashlands, a serpent in the Lake, a wraith on the Moor. Every 30 to 90
+   seconds ONE of them, on a land picked at random (never the same one twice running), rises from
+   where it hides (behind the trees, behind the tallest peak, out of the lava, out of the water,
+   out of the ground), roars, flaps or splashes for a few seconds, and sinks back. Rare and short on
+   purpose: a surprise, not a screensaver. An unclaimed land is mist with a sign and has no creature.
+   How it is drawn: one entry in the map's list of things sorted by how far down they stand, so
+   whatever stands in front of it (the pines, the mountain) covers it; and clipped at the line it
+   rises from, so it comes OUT of the water or the lava instead of floating above it. Each creature
+   is two pictures (resting, acting) painted once, like the houses. While one is out the map is
+   repainted on every frame through the effects clock (fxWake), and goes back to its slow beat after.
+   NOBODY SEES THEM WITH LESS MOTION ASKED FOR (prefers-reduced-motion, `calm`): nothing is scheduled.
+
+   DEFEATING THEM (David, 2026-11-13, chose "weakens with tasks"): a creature is as healthy as its
+   show is unfinished. The server sends each claimed land a stage, `sky.beast`, worked out with the
+   land's weather from the very numbers of the camp's slaying bar (tasks approved out of all of them,
+   includes/realm_weather.php), in quarters only, never a count:
+     0  under a quarter done   healthy, as drawn
+     1  a quarter              scratched, a plaster on its face
+     2  half                   a bandage round its head too
+     3  three quarters         worn out: it only half rises, and no longer roars, flaps or splashes
+     4  every task approved    DEFEATED: it lies on its land for good, knocked out, stars over its
+                               head, and never comes out to peek again. Everybody can see it; with
+                               reduced motion it lies there just the same, the stars standing still.
+   A land whose stage has not arrived (the field is missing before that change is live) counts as 0. */
+var BEASTS = {
+  /* `head` and `body` are where the plaster, the bandage and the scratches go, from its feet. `len`
+     is how tall it is, which is how long it is once it lies down. */
+  wood:{name:'ogre',x:1186,y:212,rise:62,len:58,head:[0,-55],body:[-2,-30],art:ogreArt},
+  peaks:{name:'yeti',x:335,y:178,z:291,rise:58,len:56,head:[0,-53],body:[-4,-28],art:yetiArt},
+  ash:{name:'dragon',x:1386,y:648,z:800,rise:66,len:66,head:[4,-59],body:[0,-26],art:dragonArt},
+  lake:{name:'serpent',x:380,y:830,rise:60,len:60,head:[2,-57],body:[8,-26],art:serpentArt},
+  moor:{name:'wraith',x:930,y:212,rise:24,len:66,head:[0,-62],body:[-4,-26],art:wraithArt,ghost:true}
+};
+var BEAST = {on:null,t0:0,dur:7200,last:'',timer:0,st:{}};
+/* How beaten a land's creature is, 0 (healthy) to 4 (defeated); see above. */
+function beastStage(land) {
+  var l = (ST.lands||[]).filter(function (x) { return x.land === land; })[0];
+  var n = l && l.claimed && l.sky ? Math.floor(+l.sky.beast||0) : 0;
+  return Math.max(0,Math.min(4,n));
+}
+function ogreArt(a) {
+  var sk = '#86a35a', skD = '#627a40', skL = '#a9c47a', i;
+  parts([[-11,-16,8,16,skD],[3,-16,8,16,skD],[-15,-42,30,28,sk],[-21,-40,7,22,sk],[-22,-20,8,6,skD],[-9,-56,18,15,sk],[-12,-52,4,5,sk],[8,-52,4,5,sk]]
+    .concat(a ? [[12,-66,6,26,sk],[10,-86,10,22,PAL.wood]] : [[13,-40,6,16,sk],[12,-26,8,6,skD],[15,-50,4,24,PAL.wood],[13,-64,8,15,PAL.wood]]));
+  P1(-15,-42,2,28,skL); P1(9,-42,6,28,skD); P1(-10,-36,18,14,skL); P1(-2,-30,2,2,skD);
+  parts([[-14,-18,28,6,PAL.wood]]); for (i = -12; i < 14; i += 5) P1(i,-14,2,2,PAL.woodD);
+  var cx = a ? 10 : 13, cy = a ? -86 : -64; for (i = 0; i < 3; i++) P1(cx+1+i*3,cy+2+(i%2)*5,2,2,PAL.woodD);
+  P1(-9,-56,18,2,skL); P1(-3,-58,6,2,PAL.out);
+  P1(-7,-52,5,2,skD); P1(2,-52,5,2,skD); P1(-6,-50,3,2,PAL.win); P1(3,-50,3,2,PAL.win); P1(-5,-50,1,2,PAL.out); P1(4,-50,1,2,PAL.out);
+  if (a) { P1(-5,-46,10,4,'#5a1f24'); P1(-5,-46,2,2,PAL.hot); P1(3,-46,2,2,PAL.hot); } else { P1(-5,-45,10,1,PAL.out); P1(-5,-47,2,2,PAL.hot); P1(3,-47,2,2,PAL.hot); }
+}
+function yetiArt(a) {
+  var f = PAL.snow, fD = PAL.snowD, fc = '#6b7fae', fcD = '#4d5f8f', i;
+  parts([[-11,-12,9,12,f],[2,-12,9,12,f],[-15,-40,30,30,f],[-10,-54,20,16,f]]
+    .concat(a ? [[-23,-62,7,24,f],[16,-62,7,24,f]] : [[-21,-38,7,24,f],[14,-38,7,24,f]]));
+  P1(5,-40,10,30,fD); P1(4,-54,6,16,fD); for (i = 0; i < 6; i++) P1(-12+i*5,-34+(i%2)*9,2,3,fD);
+  if (a) { P1(-23,-62,7,3,fcD); P1(16,-62,7,3,fcD); } else { P1(-21,-17,7,3,fcD); P1(14,-17,7,3,fcD); }
+  parts([[-7,-50,14,10,fc]]); P1(-7,-50,14,2,fcD); P1(-5,-48,2,2,PAL.out); P1(3,-48,2,2,PAL.out); P1(-5,-48,1,1,PAL.hot); P1(3,-48,1,1,PAL.hot);
+  if (a) { P1(-4,-44,8,4,'#5a1f24'); P1(-4,-44,1,2,PAL.hot); P1(3,-44,1,2,PAL.hot); } else P1(-3,-43,6,1,fcD);
+  parts([[-13,-60,3,8,PAL.owlL],[-15,-63,3,4,PAL.owlL],[10,-60,3,8,PAL.owlL],[12,-63,3,4,PAL.owlL]]);
+  P1(-5,-48,2,2,PAL.win); P1(3,-48,2,2,PAL.win);
+}
+/* Two triangles of wing, hanging (resting) or thrown up (the flap). */
+function wingArt(up, col, rib) {
+  for (var s = -1; s <= 1; s += 2) for (var r = 0; r < 22; r++) {
+    var w = Math.round(up ? (22-r)*1.6+3 : r*1.4+3), y = up ? -74+r : -48+r, x0 = s<0 ? -6-w : 6;
+    P1(x0-1,y-1,w+2,3,PAL.out); }
+  for (s = -1; s <= 1; s += 2) for (r = 0; r < 22; r++) {
+    w = Math.round(up ? (22-r)*1.6+3 : r*1.4+3); y = up ? -74+r : -48+r; x0 = s<0 ? -6-w : 6;
+    P1(x0,y,w,1,col); if (r%5===2) P1(s<0?x0:x0+w-Math.min(w,8),y,Math.min(w,8),1,rib); }
+}
+function dragonArt(a) {
+  var col = '#c4473a', colD = '#8e2f30', colL = '#e86d55', bel = '#f0b064', i;
+  wingArt(a,colD,col);
+  parts([[-6,-46,12,46,col],[-6,-60,22,14,col],[14,-56,10,10,col]].concat(a ? [[8,-46,16,5,col]] : []));
+  for (i = 0; i < 5; i++) parts([[-10,-40+i*8,4,4,colD]]);
+  P1(-2,-46,6,46,bel); for (i = -42; i < 0; i += 5) P1(-2,i,6,1,shade(bel,-40)); P1(-6,-60,22,2,colL);
+  P1(-4,-66,3,6,'#e9dcc0'); P1(1,-65,3,5,'#e9dcc0'); P1(-4,-66,3,1,PAL.out); P1(1,-65,3,1,PAL.out);
+  P1(4,-56,4,4,PAL.win); P1(6,-55,2,3,PAL.out); P1(21,-54,2,2,PAL.out);
+  if (a) { P1(10,-47,14,2,'#5a1f24'); P1(14,-47,2,1,PAL.hot); P1(20,-47,2,1,PAL.hot); } else P1(12,-48,12,1,PAL.out);
+}
+function serpentArt(a) {
+  var col = '#3a9c8a', colD = '#2a6f63', colL = '#62c7b0', bel = '#cfe8a6', i;
+  parts([[-38,-7,14,7,col],[-36,-11,10,4,col],[-20,-9,13,9,col],[-18,-13,9,4,col],[4,-46,10,46,col]]
+    .concat(a ? [[-8,-64,22,11,col],[-10,-53,14,4,col]] : [[-10,-58,24,12,col]]));
+  P1(-36,-11,10,2,colL); P1(-18,-13,9,2,colL); P1(4,-46,3,46,colL); P1(11,-46,3,46,colD);
+  for (i = 0; i < 6; i++) parts([[14,-42+i*7,3,4,TINT.violet]]);
+  var hy = a ? -64 : -58; P1(-8,hy,20,2,colL); P1(0,hy+3,4,3,PAL.win); P1(1,hy+4,2,2,PAL.out); P1(-8,hy+5,2,1,PAL.out);
+  parts([[8,hy-4,3,4,TINT.violet],[12,hy-3,3,3,TINT.violet]]);
+  if (a) { P1(-8,hy+11,18,2,'#5a1f24'); P1(-6,hy+11,1,2,PAL.hot); P1(-2,hy+11,1,2,PAL.hot); } else P1(-8,hy+8,12,1,colD);
+  for (i = -40; i < 0; i += 6) P1(6,i,4,2,bel);
+}
+function wraithArt(a) {
+  var rb = '#4d4670', rbD = '#3a3456', rbL = '#7a6fa8', ey = '#9cf6ff', r, x;
+  for (r = 0; r < 44; r++) { var hw = 9+Math.round(r*.32), y = -44+r; P1(-hw-1,y,hw*2+2,1,PAL.out); }
+  for (r = 0; r < 44; r++) { hw = 9+Math.round(r*.32); y = -44+r; P1(-hw,y,hw*2,1,rb); P1(-hw,y,2,1,rbL); P1(hw-4,y,4,1,rbD); }
+  for (x = -22; x < 22; x += 4) if (hsh(x,5,1) < .6) g.clearRect(x,-2-Math.floor(hsh(x,6,2)*5),3,8);
+  parts(a ? [[-26,-46,12,6,rb],[14,-46,12,6,rb]] : [[-16,-38,6,16,rb],[10,-38,6,16,rb]]);
+  for (r = 0; r < 22; r++) { hw = Math.min(10,2+Math.round(r*.5)); P1(-hw-1,-66+r,hw*2+2,1,PAL.out); }
+  for (r = 0; r < 22; r++) { hw = Math.min(10,2+Math.round(r*.5)); P1(-hw,-66+r,hw*2,1,rb); P1(-hw,-66+r,2,1,rbL); }
+  if (a) { P1(-29,-46,3,1,PAL.marble); P1(-29,-43,3,1,PAL.marble); P1(26,-46,3,1,PAL.marble); P1(26,-43,3,1,PAL.marble); }
+  else { P1(-16,-22,2,3,PAL.marble); P1(-13,-22,2,3,PAL.marble); P1(11,-22,2,3,PAL.marble); P1(14,-22,2,3,PAL.marble); }
+  P1(-6,-55,12,11,PAL.out); P1(-4,-52,2,2,ey); P1(2,-52,2,2,ey); if (a) P1(-2,-48,4,3,ey);
+}
+/* Who comes out next, and when. Picked when it is time, so a land claimed meanwhile is in the draw. */
+function beastNext(ms) { clearTimeout(BEAST.timer); BEAST.timer = setTimeout(function () { beastStart(); },ms==null ? 30000+Math.random()*60000 : ms); }
+function beastStart(want) {
+  var lands = (ST.lands||[]).filter(function (l) { return l.claimed && BEASTS[l.land] && LANDS[l.land] && beastStage(l.land) < 4; }).map(function (l) { return l.land; });
+  if (want) lands = lands.indexOf(want) >= 0 ? [want] : [];
+  else if (document.hidden || S.inside) lands = [];
+  else if (lands.length > 1) lands = lands.filter(function (n) { return n !== BEAST.last; });
+  if (calm || !lands.length) { beastNext(); return; }
+  BEAST.on = BEAST.last = lands[Math.floor(Math.random()*lands.length)]; BEAST.t0 = Date.now();
+  fxWake(); beastNext(BEAST.dur+30000+Math.random()*60000);
+}
+/* Still out? (Its land may have been given up while it was showing: then it is simply gone.) */
+function beastOut() {
+  if (!BEAST.on) return false;
+  var l = (ST.lands||[]).filter(function (x) { return x.land === BEAST.on; })[0];
+  if (Date.now()-BEAST.t0 >= BEAST.dur || !l || !l.claimed || beastStage(BEAST.on) >= 4) BEAST.on = null;
+  return !!BEAST.on;
+}
+function beastItem() { if (!beastOut()) return null; var b = BEASTS[BEAST.on]; return {x:b.x,y:b.z||b.y,beast:BEAST.on}; }
+function beastPaint(c, land) {
+  var b = BEASTS[land], now = Date.now(), k = (now-BEAST.t0)/BEAST.dur, i, p;
+  var ease = function (t) { t = Math.max(0,Math.min(1,t)); return t*t*(3-2*t); };
+  var hp = beastStage(land), up = k < .16 ? ease(k/.16) : k > .84 ? ease((1-k)/.16) : 1, act = hp < 3 && ((k > .34 && k < .52) || (k > .62 && k < .72)) ? 1 : 0;
+  /* Worn out (three quarters done): it only gets halfway up, and sways instead of roaring. */
+  if (hp >= 3) up *= .55;
+  var st = beastStamp(land,act), bob = (b.ghost || land==='lake') ? Math.round(Math.sin(now/260)*2) : 0, dy = Math.round((1-up)*b.rise)+bob, sx = hp >= 3 ? Math.round(Math.sin(now/500)) : 0;
+  /* The wraith is not clipped: it floats a little above the moor and fades in and out instead. */
+  c.save(); if (b.ghost) { c.globalAlpha = .85*Math.max(up,hp >= 3 ? .5 : 0); dy -= 6; } else { c.beginPath(); c.rect(b.x-60,b.y-120,120,120); c.clip(); }
+  c.drawImage(st.cv,b.x+sx-st.ox,b.y+dy-st.oy);
+  beastHurt(c,b,hp,b.x+sx,b.y+dy+(land==='lake'&&act?-6:0));
+  c.restore(); c.globalAlpha = 1;
+  if (hp >= 3) { c.globalAlpha = .9; c.fillStyle = PAL.out; c.fillRect(b.x+b.head[0]+9,b.y+dy+b.head[1]-3,4,5); c.fillStyle = PAL.waterL; c.fillRect(b.x+b.head[0]+10,b.y+dy+b.head[1]-2,2,3); c.globalAlpha = 1; }
+  /* What it does while it is out: rings on the water, fire, the lava stirred, a cold mist. */
+  var px = function (x, y, w, h, col) { c.fillStyle = col; c.fillRect(Math.round(x),Math.round(y),w,h); };
+  if (land==='lake') { var rr = 14+((now/40)%18);
+    for (i = 0; i < 16; i++) { var an = i*Math.PI/8; px(b.x-6+Math.cos(an)*rr,b.y+Math.sin(an)*rr*.3,3,1,PAL.waterL); }
+    if (act) for (i = 0; i < 6; i++) { p = ((now/500)+i/6)%1; px(b.x-10+i*5+Math.sin(i)*4,b.y-4-Math.sin(p*3.14)*16,2,2,i%2?PAL.waterL:PAL.hot); } }
+  if (land==='ash') { for (i = 0; i < 5; i++) { p = ((now/700)+i/5)%1; c.globalAlpha = 1-p; px(b.x-22+i*10,b.y-2-p*10,3,3,i%2?PAL.lava:PAL.lavaL); } c.globalAlpha = 1;
+    if (act) for (i = 0; i < 14; i++) { p = ((now/300)+i/14)%1; var fx2 = b.x+24+p*42, fy = b.y-52+Math.sin(i*1.7+now/90)*p*7;
+      c.globalAlpha = p < .5 ? 1 : 2-p*2; px(fx2-3,fy-3,7-Math.round(p*3),6-Math.round(p*3),PAL.out); px(fx2-2,fy-2,5-Math.round(p*3),4-Math.round(p*3),p < .3 ? PAL.hot : p < .6 ? PAL.lavaL : PAL.lava); }
+    c.globalAlpha = 1; }
+  if (land==='moor') { c.globalAlpha = .45*up; for (i = 0; i < 7; i++) { p = ((now/1600)+i/7)%1; px(b.x-30+i*9,b.y-4-p*8,8,3,PAL.smoke); } c.globalAlpha = 1; }
+  if (land==='wood' && act) for (i = 0; i < 4; i++) { p = ((now/400)+i/4)%1; c.globalAlpha = 1-p; px(b.x-30-i*4,b.y-60-p*14+i*6,4,1,PAL.hot); px(b.x+26+i*4,b.y-60-p*14+i*6,4,1,PAL.hot); }
+  c.globalAlpha = 1;
+}
+function beastStamp(land, a) {
+  var b = BEASTS[land];
+  if (!BEAST.st[land]) BEAST.st[land] = [0,1].map(function (n) { return stamp(100,112,50,104,function () { b.art(n); }); });
+  return BEAST.st[land][a];
+}
+/* The marks of the work done on it, painted over the creature at (x, y), its feet. */
+function beastHurt(c, b, hp, x, y) {
+  if (hp < 1) return;
+  var px = function (xx, yy, w, h, col) { c.fillStyle = col; c.fillRect(Math.round(xx),Math.round(yy),w,h); }, hx = x+b.head[0], hy = y+b.head[1], bx = x+b.body[0], by = y+b.body[1], i;
+  /* Three scratches across the body. */
+  for (i = 0; i < 5; i++) { px(bx-6+i,by-4+i,1,1,'#b0303a'); px(bx-2+i,by-6+i,1,1,'#b0303a'); px(bx+2+i,by-4+i,1,1,'#b0303a'); }
+  /* A plaster on the cheek. */
+  px(hx+2,hy+4,7,4,PAL.out); px(hx+3,hy+5,5,2,PAL.wallD); px(hx+5,hy+5,1,2,PAL.wall);
+  if (hp < 2) return;
+  /* A bandage round the head, its knot sticking out at the side. */
+  px(hx-10,hy-4,20,5,PAL.out); px(hx-9,hy-3,18,3,PAL.marble); px(hx-9,hy-1,18,1,PAL.marbleD);
+  px(hx+9,hy-6,5,4,PAL.out); px(hx+10,hy-5,3,2,PAL.marble); px(hx+3,hy-3,2,2,'#b0303a');
+}
+/* A defeated creature lies on its land: its picture turned on its side, feet towards the camp, and
+   stars going round its head. Turning a picture a quarter round moves no pixel off the grid. */
+function beastDownItems() {
+  var out = [];
+  (ST.lands||[]).forEach(function (l) { var b = BEASTS[l.land]; if (b && l.claimed && LANDS[l.land] && beastStage(l.land) >= 4) out.push({x:b.x,y:b.z||b.y,beastDown:l.land}); });
+  return out;
+}
+function beastDownPaint(c, land) {
+  var b = BEASTS[land], st = beastStamp(land,0), cx = Math.round(b.x+b.len/2), cy = b.y-(land==='lake'?7:10), i;
+  c.save();
+  if (land==='lake') { c.beginPath(); c.rect(b.x-80,b.y-80,160,80); c.clip(); }
+  if (b.ghost) c.globalAlpha = .6;
+  c.translate(cx,cy); c.rotate(-Math.PI/2); c.drawImage(st.cv,-st.ox,-st.oy);
+  c.restore(); c.globalAlpha = 1;
+  /* The head is now at the far end from its feet; the stars go round over it (they stand still for
+     somebody who asked for less motion, and the map only repaints on its slow beat anyway). */
+  var hx = cx-b.len+10, hy = cy-20, t = calm ? 0 : Date.now()/700;
+  for (i = 0; i < 3; i++) { var an = t+i*2.09; star(c,Math.round(hx+Math.cos(an)*11),Math.round(hy+Math.sin(an)*4),TINT.candle); }
+}
+/* For trying it out by hand (and in the test page): REALM.beastNow('wood') calls that one now. */
+R.beastNow = function (land) { beastStart(land); };
 function puff(c, x, y, f, big) { for (var i = 0; i < 3; i++) { var ph = (f+i*3)%9, s = (big?6:4)+Math.floor(ph/3)*2; c.globalAlpha = .75*(1-ph/9); c.fillStyle = PAL.smoke; c.fillRect(x+ph,y-ph*(big?6:4),s,s); } c.globalAlpha = 1; }
 /* Who is INSIDE a building, as a row of small heads above its roof. */
 function heads(c, o, list) {
@@ -1612,9 +1806,13 @@ function draw() {
       list.push({x:Math.round(gl.x),y:Math.round(gl.y),who:q.p,bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+n)%4===0?2:0,idle:q.p.state==='idle'}); });
     var mx = Math.round(S.pos.x), myy = Math.round(S.pos.y), moving = S.walk||held.size, en = S.enter;
     list.push({x:mx,y:myy,who:my,bob:moving?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
+    var bz = beastItem(); if (bz) list.push(bz);
+    beastDownItems().forEach(function (d) { if (d.x>x0&&d.x<x1&&d.y>y0&&d.y<y1) list.push(d); });
     list.sort(function (a, b) { return a.y-b.y; });
     for (i = 0; i < list.length; i++) { var it = list[i];
       if (it.st) { c.drawImage(it.st.cv,it.x-it.st.ox,it.y-(it.lift||0)-it.st.oy); continue; }
+      if (it.beast) { beastPaint(c,it.beast); continue; }
+      if (it.beastDown) { beastDownPaint(c,it.beastDown); continue; }
       if (it.mine) { if (en) c.globalAlpha = Math.max(0,1-en); c.fillStyle = PAL.win; c.fillRect(mx-13,myy+2,26,2); c.fillRect(mx-13,myy,2,2); c.fillRect(mx+11,myy,2,2); }
       if (it.idle) c.globalAlpha = .6;
       sprite(c,it.x,it.y,it.who,it.bob); c.globalAlpha = 1;
@@ -1625,7 +1823,7 @@ function draw() {
        inside that name's patch only, so they are in front of the name and nothing else changes. */
     var labs = mapLabels(c);
     list.forEach(function (it) {
-      if (it.st) return;
+      if (it.st || it.beast || it.beastDown) return;
       labs.forEach(function (lb) {
         if (it.x+30 < lb.x || it.x-16 > lb.x+lb.w || it.y+4 < lb.y || it.y-60 > lb.y+lb.h) return;
         c.save(); c.beginPath(); c.rect(lb.x,lb.y,lb.w,lb.h); c.clip();
@@ -3412,5 +3610,7 @@ if ($('mapbox')) {
   setInterval(function () { if (WHO.id!==null && !$('whoTip').hidden) { whoFill(WHO.id); whoPlace(); } },20000);
 }
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
+/* The first creature comes out sooner than the rest, so somebody who just arrived may catch one. */
+if (!calm && $('mapcv')) beastNext(20000+Math.random()*25000);
 window.addEventListener('resize',function () { draw(); shareShow(); });
 })();

@@ -35,6 +35,26 @@ the channel; long channels get unreadable without them".
 - Files: `includes/realm_chat.php`, `realm_api.php`, `realm.php`, `assets/realm.js`,
   `assets/realm.css`, one line each in `assets/realm_react.js` and `includes/realm_search.php`.
 
+## 2026-11-13 — The Realm: a creature in every show's land *(no migration)*
+
+**Asked by David**: "let's also add a creature to defeat per land/project. An ogre in the forest,
+a dragon in the volcan, etc. They can peak or come out once in a while (not at the same time) so
+people can see them."
+
+- Each land with a show on it has its own creature, drawn in the Realm's pixel style: an **ogre**
+  in the Wood, a **yeti** over the Peaks, a **dragon** out of the Ashlands' lava, a **serpent** in
+  the Lake and a **wraith** on the Moor.
+- Every 30 to 90 seconds **one** of them (a random land, never the same one twice running) rises
+  from behind the trees, over the tallest peak, out of the lava or the water, roars, flaps or
+  splashes for a few seconds, and sinks back. The first one comes 20 to 45 seconds after arriving.
+- None on an unclaimed land (still mist and a sign), none while the tab is hidden or you are inside
+  a building, and none at all for somebody who asked their computer for reduced motion.
+- **Defeating them** (David chose "weakens with tasks"): as the show's tasks are approved its
+  creature is scratched with a plaster on its face (a quarter done), bandaged (half), worn out, only
+  half rising and no longer roaring (three quarters), and when every task is approved it **lies
+  defeated** on its land for good, stars over its head, for everybody to see. The stage comes with
+  the land's weather from the server (`sky.beast`); until that change is live every creature is healthy.
+
 ## 2026-11-13 — The Realm: search every conversation *(migration 094, optional for speed)*
 
 **Asked by David**: search across all chat history, "all channels and dms". The studio is on
