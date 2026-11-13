@@ -38,6 +38,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
+require_once __DIR__ . '/includes/realm_search.php';
 require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passes accept_upload()
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_once __DIR__ . '/includes/realm_focus.php';
@@ -353,11 +354,13 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
 //      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
-// Threads (migration 094):
+// Threads (migration 095):
 // GET  chat=<channel>&thread=<id>&after=   a thread: its first message and replies, marks it read
 // GET  chat=<channel>&from=<id>&after=     a channel, with `threads`: reply counts from message <id> on
 // POST say=<channel>&thread=<id>&also=0|1  reply in a thread, and maybe also to the channel
 // GET  threads=1                           the threads I follow (the "Threads" row)
+// GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
+// GET  chat=<channel>&at=<message id>      open a conversation at a found message
 // POST react=<message id>&emoji=<key>&after=<id>&from=<id>
 //                                          give or take back my reaction (migration
 //                                          093), then the same answer as chat=
@@ -382,7 +385,7 @@ if (isset($_GET['unread'])) {
                       'offers' => realm_offer_news($pdo, $uid)]);
     exit;
 }
-// GET threads=1: the threads I follow, the latest reply first (migration 094).
+// GET threads=1: the threads I follow, the latest reply first (migration 095).
 // What the "Threads" row in the channel list opens; an open list asks every few
 // seconds, like a conversation. Only places I may read are in it.
 if (isset($_GET['threads'])) {
@@ -400,6 +403,22 @@ if (isset($_GET['threads'])) {
     }
     exit;
 }
+// GET search=<words>: David, 2026-11-13, "all channels and dms". Which
+// conversations are searched is decided in includes/realm_search.php from the
+// session's own account, never from anything the page sends.
+if (isset($_GET['search'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $found = realm_search($pdo, $uid, (string)$_GET['search'], $mayAnnounce, max(0, (int)($_GET['before'] ?? 0)));
+        echo json_encode(['ok' => true] + $found);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The search could not be run. Try again in a moment.']);
+    }
+    exit;
+}
 // ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
 // message is really in, so the access check below is asked about the right
 // conversation whatever id is posted.
@@ -411,7 +430,7 @@ if (isset($_POST['react']) && $channel === '') {
     echo json_encode(['ok' => true, 'error' => 'That message is no longer there.']);
     exit;
 }
-// Threads (migration 094): with thread=<id> the request is about that message's
+// Threads (migration 095): with thread=<id> the request is about that message's
 // thread, in the same channel. Checked below, after the channel itself.
 $thread = max(0, (int)($_POST['thread'] ?? ($_GET['thread'] ?? 0)));
 if ($channel !== '') {
@@ -457,6 +476,8 @@ if ($channel !== '') {
         }
         if ($reactTo > 0) $said = realm_react($pdo, $uid, $reactTo, (string)($_POST['emoji'] ?? ''));
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
+        // Opened from a search result: start a little before the found message.
+        if ($after === 0 && $thread === 0 && isset($_GET['at'])) $after = realm_search_start($pdo, $channel, (int)$_GET['at']);
         $messages = realm_messages($pdo, $uid, $channel, $after, $thread);
         if ($messages) {
             $lastSeen = (int)$messages[count($messages) - 1]['id'];
@@ -471,7 +492,8 @@ if ($channel !== '') {
         // The open channel's threads: how many replies each has, from the first
         // message the page is showing (`from`) on, so the counts under them stay fresh.
         $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
-        if ($from === 0 && $after === 0 && $messages) $from = (int)$messages[0]['id'];
+        // (Opened from a search result, `after` is not 0 on the first answer, and `from` not sent yet.)
+        if ($from === 0 && $messages) $from = (int)$messages[0]['id'];
         $answer = ['ok' => true, 'channel' => $channel, 'thread' => $thread, 'messages' => $messages, 'can_post' => $may['post'],
                    'threads' => $thread > 0 ? [] : realm_thread_counts($pdo, $channel, $from),
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),

@@ -104,7 +104,7 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after, int $th
           . ($threads ? 'm.parent_id, m.also_channel, pm.body AS parent_body' : 'NULL AS parent_id, 0 AS also_channel, NULL AS parent_body');
     $from = ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id'
           . ($threads ? ' LEFT JOIN realm_messages pm ON pm.id = m.parent_id' : '');
-    // THREADS (migration 094). The channel shows its own messages and the replies
+    // THREADS (migration 095). The channel shows its own messages and the replies
     // that were also sent to it; a thread shows its first message and its replies.
     $args = [$channel];
     $where = ' WHERE m.channel = ?';
@@ -138,7 +138,7 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after, int $th
             'image' => (string)($r['image'] ?? '') !== '',
             'at'   => realm_chat_when($t),
             'mine' => (int)$r['user_id'] === $uid,
-            // Threads (migration 094): the message this one replies to, 0 for none;
+            // Threads (migration 095): the message this one replies to, 0 for none;
             // whether the reply was also sent to the channel; and, for such a reply,
             // the start of what it answers, so the channel can say so.
             'parent' => (int)($r['parent_id'] ?? 0),
@@ -163,7 +163,7 @@ function realm_chat_snippet(string $body): string {
     return $body;
 }
 
-// ---- threads (migration 094) -------------------------------------------------
+// ---- threads (migration 095) -------------------------------------------------
 // David, 2026-11-13, chose threads: "reply to one message without flooding the
 // channel; long channels get unreadable without them". Decided with him the same
 // day: threads in channels AND ravens; a reply may also be sent to the channel
@@ -174,7 +174,7 @@ function realm_chat_snippet(string $body): string {
 // One level only: a reply has no replies. A reply keeps its parent's channel, so
 // who may read it is exactly who may read the channel (realm_channel_access()).
 
-/** Has migration 094 arrived? Asked once per request; never throws. */
+/** Has migration 095 arrived? Asked once per request; never throws. */
 function realm_threads_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -320,7 +320,7 @@ function realm_say(PDO $pdo, int $uid, string $channel, string $body, ?array $im
         array_push($cols, 'image', 'image_name', 'image_mime');
         array_push($vals, $image['stored'], $image['name'], $image['mime']);
     }
-    // A reply in a thread (migration 094). The caller has checked the parent
+    // A reply in a thread (migration 095). The caller has checked the parent
     // with realm_thread_parent_ok(); here it is only written down.
     if ($parent > 0) {
         array_push($cols, 'parent_id', 'also_channel');
@@ -357,7 +357,7 @@ function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce, ?array &$threads = 
     try {
         $ids = array_column(realm_channels($pdo, $mayAnnounce), 'id');
         $marks = implode(',', array_fill(0, count($ids), '?'));
-        // Threads (migration 094): a reply kept in its thread is not a message of
+        // Threads (migration 095): a reply kept in its thread is not a message of
         // the channel; it is counted below, and only for those who follow it.
         $sql = 'SELECT m.channel, COUNT(*) AS n
                   FROM realm_messages m
@@ -387,7 +387,7 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     $unread = realm_unread($pdo, $uid, $mayAnnounce, $tunread);
     return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => $unread,
             'images' => realm_chat_images($pdo),
-            // Threads (migration 094): may messages be replied to, and what is new in the ones I follow.
+            // Threads (migration 095): may messages be replied to, and what is new in the ones I follow.
             'threads' => realm_threads_available($pdo), 'tunread' => $tunread];
 }
 

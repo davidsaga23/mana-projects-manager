@@ -96,7 +96,7 @@ function react(id, k) {
   NOW[id] = rs.filter(function (r) { return r.n > 0; }); paint();
   HOLD = Date.now()+4000;
   var f = new URLSearchParams(); f.append('react', id); f.append('emoji', k); f.append('after', CH.last); f.append('from', CH.first);
-  // Inside a thread (migration 094) the answer must be about that thread, or realm.js sets it aside.
+  // Inside a thread (migration 095) the answer must be about that thread, or realm.js sets it aside.
   if (CH.thread) f.append('thread', CH.thread);
   fetch(R.api, {method:'POST', body:f, credentials:'same-origin', headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); })

@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-13 — The Realm: threads in chat *(migration 094)*
+## 2026-11-13 — The Realm: threads in chat *(migration 095)*
 
 **Asked by David**, who chose threads for the Realm's chat: "reply to one message without flooding
 the channel; long channels get unreadable without them".
@@ -29,11 +29,28 @@ the channel; long channels get unreadable without them".
   number, show "2 new" under the message, and gather in a new **Threads** row at the top of the
   channel list, which lists them latest first. Other people's threads light nothing up.
 - **Pictures, tags and reactions work in replies** as in messages; a tag in a thread rings the bell
-  as before.
-- **Needs migration 094** (`parent_id` and `also_channel` on `realm_messages`, and
+  as before. **A search result inside a thread** opens that thread.
+- **Needs migration 095** (`parent_id` and `also_channel` on `realm_messages`, and
   `realm_thread_reads`). Until David runs it the chat looks exactly as before.
 - Files: `includes/realm_chat.php`, `realm_api.php`, `realm.php`, `assets/realm.js`,
-  `assets/realm.css`, one line in `assets/realm_react.js`.
+  `assets/realm.css`, one line each in `assets/realm_react.js` and `includes/realm_search.php`.
+
+## 2026-11-13 — The Realm: search every conversation *(migration 094, optional for speed)*
+
+**Asked by David**: search across all chat history, "all channels and dms". The studio is on
+Slack's free plan and loses everything older than 90 days; every Realm message is kept in Anima,
+so it can be found again forever.
+
+- **A search box at the top of the side panel.** Typing a word or two lists the matching messages,
+  newest first: who, where (the channel, or "Ravens with Renata Ruiz"), when (with the year once it
+  is not this year), and the line with the words marked. 30 at a time, with **Older results** below.
+- **Clicking a result opens that conversation at that message**, lit up for a moment, with about
+  twenty messages above it; newer messages keep arriving below as usual.
+- **Only conversations you can read**: the shared channels, the show channels you may see, and your
+  own ravens. Decided on the server; nobody's ravens but your own, admins included.
+- Escape, or emptying the box, brings back Channels, People and Places.
+- **Migration 094** adds a search index to the messages so it stays quick over years. The search
+  works before it runs, just more slowly on a big history.
 
 ## 2026-11-13 — The Realm: a building's card shows all round it, and nobody walks off the map *(no migration)*
 

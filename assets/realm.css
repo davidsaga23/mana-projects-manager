@@ -148,6 +148,30 @@ small { color: var(--muted); font-size: 13px; }
 .rrow > span:not(.rhash) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rrow small { margin-left: auto; overflow: hidden; text-overflow: ellipsis; color: var(--faint); }
 .rrow.is-away { color: var(--faint); }
+/* Search across every conversation (David, 2026-11-13; assets/realm.js FIND). The lists and the
+   results take turns in the same panel; [hidden] must win over their display. */
+.rsidelists { display: flex; flex-direction: column; gap: 16px; }
+.rsidelists[hidden], .rsearchres[hidden], .rsearch[hidden] { display: none; }
+/* The box stays at the top while a long list of results scrolls under it. */
+.rsearch { position: sticky; top: -14px; z-index: 1; margin: -14px 0 0; padding: 14px 2px 8px; background: var(--surface); }
+.rsearch input { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; color: var(--text); transition: border-color var(--ease); }
+.rsearch input::placeholder { color: var(--faint); }
+.rsearch input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.rfoundlist { display: flex; flex-direction: column; gap: 2px; }
+.rfound { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-sm); padding: 7px 10px; cursor: pointer; color: var(--text-2); transition: background-color var(--ease); }
+.rfound:hover, .rfound:focus-visible { background: var(--row-hover); color: var(--text); }
+.rfoundhead { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; }
+.rfoundhead b { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); white-space: nowrap; }
+.rfoundwhere { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--primary); }
+.rfoundhead small { margin-left: auto; white-space: nowrap; color: var(--faint); }
+.rfoundbody { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rfoundbody i { color: var(--faint); }
+.rfound mark, .rmsg mark { background: var(--warn-tint); color: var(--warn-strong); border-radius: 3px; padding: 0 1px; }
+.rfoundmore { margin: 8px 10px 0; }
+.rfoundnote { padding: 4px 10px; color: var(--muted); font-size: 13px; }
+/* The message a result opened, lit up for a moment. */
+.rmsg { transition: box-shadow .6s ease, border-color .6s ease; }
+.rmsg.is-found { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn-tint), 0 0 18px var(--warn-tint); transition: none; }
 .rhash { color: var(--faint); width: 10px; }
 .rdot { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--faint); display: inline-block; }
 .rdot.open { background: var(--ok); border-color: var(--ok); }
@@ -269,7 +293,7 @@ small { color: var(--muted); font-size: 13px; }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .rcomposer[hidden], .ralso[hidden], .rback[hidden] { display: none; }
 
-/* THREADS (David, 2026-11-13), migration 094. "Reply in thread" shows on a message when it is
+/* THREADS (David, 2026-11-13), migration 095. "Reply in thread" shows on a message when it is
    pointed at or reached with the keyboard, and always on a touch screen, which cannot point. The
    line under a message with replies opens its thread; in the thread, the first message stands apart. */
 /* margin-right keeps it clear of the reactions button on the message's top-right corner (.rreactadd). */

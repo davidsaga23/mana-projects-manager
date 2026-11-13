@@ -111,7 +111,16 @@ foreach (($state['people'] ?? []) as $p) {
   </main>
 <?php else: ?>
   <div class="rapp">
-    <nav class="rside" id="side" aria-label="People and places"></nav>
+    <nav class="rside" aria-label="People and places">
+      <?php /* Search across every conversation (David, 2026-11-13: "all channels and dms").
+               Outside #side, because #side is redrawn every few seconds and would lose what
+               is being typed. assets/realm.js shows it once chat exists. */ ?>
+      <form class="rsearch" id="search" role="search" hidden>
+        <input type="search" id="searchInput" autocomplete="off" maxlength="200" placeholder="Search messages" aria-label="Search all your conversations">
+      </form>
+      <div class="rsearchres" id="searchRes" hidden aria-live="polite"></div>
+      <div class="rsidelists" id="side"></div>
+    </nav>
     <main class="rmain">
       <?php if (!$hasHouse): ?>
         <p class="rwarn">Every plot in the village is taken, so you have no house yet. You can still walk around. Tell David, more plots can be added.</p>
@@ -150,7 +159,7 @@ foreach (($state['people'] ?? []) as $p) {
       <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
       <div class="rsuggest" id="chatSuggest" hidden></div>
       <div class="rpicked" id="chatPicked" hidden></div>
-      <?php // Threads (migration 094): a reply may also go to the channel, as in Slack (David, 2026-11-13). ?>
+      <?php // Threads (migration 095): a reply may also go to the channel, as in Slack (David, 2026-11-13). ?>
       <label class="ralso" id="chatAlsoRow" hidden><input type="checkbox" id="chatAlso"> <span id="chatAlsoText">Also send to the channel</span></label>
       <form class="rcomposer" id="chatForm"><input type="file" id="chatFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden><button type="button" class="rbtn" id="chatAttach" title="Add a picture, up to 5 MB" aria-label="Add a picture" hidden>+</button><input id="chatInput" autocomplete="off" maxlength="2000" aria-label="Message"><button class="rbtn rprimary" id="chatSend">Send</button></form>
     </aside>

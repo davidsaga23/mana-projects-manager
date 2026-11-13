@@ -1,4 +1,4 @@
--- 094 — The Realm's chat: threads.
+-- 095 — The Realm's chat: threads.
 --
 -- David, 2026-11-13, chose threads for the Realm's chat: "reply to one message
 -- without flooding the channel; long channels get unreadable without them".
