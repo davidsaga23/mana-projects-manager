@@ -891,7 +891,10 @@ function drawRoom(c, cw, ch) {
   var lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : land ? campLay(o.id) : null);
   /* While decorating, the library lies along the bottom, so the room is fitted into what is left. */
   var k = Math.min(2,window.devicePixelRatio||1), bar = deco ? $('decoBar') : null, pad = bar ? (bar.offsetHeight+12)*k : 0;
-  var s = Math.max(1,Math.min(cw/240,(ch-70-pad)/160)), ox = Math.round((cw-240*s)/2), oy = Math.round((ch-pad-160*s)/2+30), f = S.frame;
+  /* In a camp the slaying bar is the top strip of the picture, and it is there to be seen at a
+     glance: so the room is fitted BELOW the bar that names the room, however tall that has wrapped. */
+  var ib = land ? $('insideBar') : null, top = ib && !ib.hidden ? (ib.offsetTop+ib.offsetHeight+6)*k : 0;
+  var s = Math.max(1,Math.min(cw/240,(ch-Math.max(70,top+8*k)-pad)/160)), ox = Math.round((cw-240*s)/2), oy = Math.max(Math.round(top),Math.round((ch-pad-160*s)/2+30)), f = S.frame;
   RT = {s:s,ox:ox,oy:oy};
   placeHot(deco?null:o,lay,s,ox,oy);
   c.setTransform(s,0,0,s,ox,oy);
@@ -1490,7 +1493,7 @@ function renderInside() {
   /* A show's camp: its four fixtures for somebody on the show, one sentence for anybody else. */
   var land = campOf(o.id), k = land ? CAMP[land] : null, mayDeco = (o.owner && o.owner.me) || (k && !k.closed);
   var hint = (o.owner && o.owner.me) ? ' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.' : !k ? '' : k.closed ? ' This camp belongs to a show you are not on, so its boards are covered.' : ' Click the bar, the scroll, the calendar or the board, or walk up to one and press Enter.';
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', '))+(hint?'.':''):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -2535,7 +2538,8 @@ if ($('mapbox')) { [['slayBtn','','','How much of the show is finished, on the s
     b.setAttribute('aria-label',h[3]); if (h[1]) b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
   });
   setInterval(function () { if (S.inside && campOf(S.inside) && !DECO.on && !document.hidden) campAsk(S.inside); },45000);
-  if ($('campDlg')) $('campDlg').addEventListener('close',function () { clearInterval(CW.timer); CW.kind = null; CW.data = null; });
+  /* The window shut. (If it was opened again in the same breath, it is a new window and is left alone.) */
+  if ($('campDlg')) $('campDlg').addEventListener('close',function () { if ($('campDlg').open) return; clearInterval(CW.timer); CW.kind = null; CW.data = null; });
 }
 if ($('focusBtn') && $('focusNow')) {
   var shelf = document.createElement('button'); shelf.type = 'button'; shelf.id = 'shelfBtn'; shelf.className = 'rshelf'; shelf.hidden = true;

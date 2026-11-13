@@ -428,7 +428,7 @@ dialog.rcamp.is-tracking { width: min(1180px, calc(100% - 32px)); }
 .rtlegend em.is-ready { color: var(--ok); background: var(--ok-tint); }
 .rtlegend em.is-blocked { color: var(--warn); background: var(--warn-tint); }
 .rtchip { display: inline-block; flex: none; width: 15px; height: 15px; border-radius: 3px; background: var(--muted); vertical-align: middle; }
-.rtchip.is-none { background: none; border: 1px dashed var(--border-strong); }
+.rtchip.is-none { background: none; border: 1px dashed var(--faint); }
 .rtdash { display: inline-block; width: 15px; text-align: center; font-style: normal; color: var(--faint); }
 .rtwrap { max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
 .rtrack { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
