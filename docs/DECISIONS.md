@@ -5531,3 +5531,53 @@ like if the speaker was broken. Let's ... fix it".
   silently for a few seconds and then end themselves. The snare and hat are still made of filtered
   hiss, by design; if those also read as noise, the next step is to drop the hat and soften the
   snare further.
+
+## 2026-11-12 — My house: decorating your office, the chest and the portrait
+
+David, opening the "My house" thread, having been told what was planned and not built (decorating,
+keepsakes, gold, artists drawing their own houses, walking inside): "yeah let's create all of those
+but let's start with decorate my office. Let's all start with the same basic look and they can
+modify it from a library of free and opt to buy new stuff. All of them should have at least these:
+Book shelf: for tasks. Treasure chest: to check their gold. A portrait in the wall: so they can see
+theirs and others bio and profile from Anima, and update it."
+
+- **One starting room for everybody**, and the kind of house (Cottage, Tower, Forge) is now only
+  the outside. The three fixed interiors are gone; the tower's telescope and the forge's hearth and
+  anvil are in the library for anybody.
+- **A room is a list of things and where they stand**, plus wall, floor and rug. One row per person
+  in `realm_rooms` (migration 085), the list kept as JSON because it is always read and written
+  whole. Somebody with no row has the starting room.
+- **The library is in two places that must match**: `REALM_ROOM_THINGS` in
+  `includes/realm_room.php` (decides whether a room may be saved) and `THINGS` in `assets/realm.js`
+  (draws each thing). The same rule as `REALM_SLOTS` and `PLOTS`. A thing needs a line in both.
+- **Things are dragged freely, snapped to 2 units**, not chosen for fixed spots. My choice: "decorate"
+  reads as arranging, and fixed spots would have been a form. Wall things hang at their own height
+  and only slide along the wall. Two floor things may not stand on the same ground, counting only
+  the bottom 10 units of each, so a tall thing can rise behind a low one. A thing dropped where it
+  does not fit goes back, so the working copy can always be saved. The server checks all of it again.
+- **The bookshelf, the chest and the portrait are in every house exactly once**: they can be moved,
+  never removed. Each is a see-through button laid over the drawing (`placeHot()`), as the shelf
+  already was. The shelf and the chest answer only in your own house; a portrait in anybody's.
+- **"Opt to buy" is shown, not built.** Three things are marked gold and appear in the library as
+  "Costs gold, later"; the server refuses them. **No prices are set**: David has not given any, and
+  gold itself is stage 4. Owning a bought thing will need its own table when gold arrives.
+- **The chest shows words, not a number.** Nothing is counted yet, so it says there is no gold and
+  repeats what was agreed about gold on 2026-11-12 (earned from approved work, praise received and
+  a full week of logging; private; never linked to pay).
+- **The portrait is Anima's own profile**, the one on Home (migration 075). Nothing is copied. The
+  three profile functions were lifted word for word from `includes/home.php` into
+  `includes/profile.php`, because Home's file loads the money code and the Realm never opens the
+  finance connection. Saving from the Realm calls `home_save_profile()` with the session's own
+  linked person; the field is in `artist_may_post()` and asks Home's switch in `FEATURE_POSTS`.
+- **What others see in a portrait: name, role, bio and picture. Not the phone or the email**, which
+  are shown only to the person themselves. My reading: David said "bio and profile", and contact
+  details were not named. To confirm with him.
+- **The owner's real picture is drawn in the frame**, shrunk to 14 by 18 dots; with no picture the
+  frame shows a small figure in the owner's cloak colour.
+- **A visitor's view refreshes with the heartbeat** (every 25 seconds), by asking for that one room
+  again. Rooms are not in the map's state, which everybody receives every 25 seconds.
+- **Not done:** buying anything, keepsakes from praise, artists drawing their own things, walking
+  inside a room, and more than one of the three fixed pieces. While decorating, people in the room
+  are drawn faint and speech bubbles are not shown.
+- **Not verified:** PHP was never run (the files parse, and the two libraries were compared by a
+  script); the real profile save and picture upload; Safari, Firefox and phones; dragging by touch.
