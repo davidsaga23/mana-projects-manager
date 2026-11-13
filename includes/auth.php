@@ -605,9 +605,14 @@ function artist_may_post(): bool {
         // realm_offer_make() gives only what the asker owns, face to face, and
         // realm_offer_answer() lets an offer be answered only by the person it
         // was made to and agreed only by the person who made it.
+        // `react` (2026-11-13, migration 093): an emoji reaction on a chat
+        // message, the asker's own. ⚠ THE ID POSTED IS THE MESSAGE: realm_api.php
+        // looks up the channel that message is in and asks
+        // realm_channel_access() before anything is written, so a raven can only
+        // be reacted to by its two people.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
                             'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
-                            'buy', 'offer', 'offer_answer'],
+                            'buy', 'offer', 'offer_answer', 'react'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

@@ -195,6 +195,8 @@ foreach (($state['people'] ?? []) as $p) {
   <script src="assets/realm_shop.js<?= asset_ver('realm_shop.js') ?>"></script>
   <?php /* Giving and swapping what was bought, face to face (the same migration). */ ?>
   <script src="assets/realm_trade.js<?= asset_ver('realm_trade.js') ?>"></script>
+  <?php /* Emoji reactions on chat messages (migration 093): its own file, like the three above. */ ?>
+  <script src="assets/realm_react.js<?= asset_ver('realm_react.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>
