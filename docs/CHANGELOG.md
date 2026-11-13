@@ -14,6 +14,36 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: voice in every room *(migration 085)*
+
+**Asked by David:** "let's start working on the voice chats".
+
+- **The people inside the same room can talk.** A house, the Tavern, the Council Hall, a show's war
+  room: one rule everywhere. Up to five at a table ("I think is fine 3-5 people talking
+  informally"). A house still needs its door open, or a knock and being let in.
+- **Nobody is heard by surprise.** Walking in never opens a microphone. The room's bar has **Join
+  voice**; the browser asks for the microphone the first time. Once in: **Mute** and **Leave
+  voice**. Walking out of the room, or the door closing on a visitor, hangs up.
+- **You can see it.** A small microphone beside each character who is in voice (struck through in
+  red while muted), green with a ring at the feet while that person is speaking. On the map, a
+  green line under the head of anybody in voice inside a building, and "2 inside, 2 in voice" in
+  Places to meet.
+- **The sound goes straight from one browser to another**, encrypted by the browsers. It never
+  passes through Anima's server and nothing is recorded.
+- **One outside service, agreed by David:** to find each other across different networks each
+  browser asks Google's free address-lookup service what its own internet address is. No sound and
+  nothing of Anima's goes to it, and it is only contacted while somebody is in voice.
+- **Plain messages when it cannot work:** microphone blocked, no microphone, a browser too old, a
+  full table, and a connection that could not be made (tried twice, then said, with what to do).
+- **Load:** somebody in voice asks the server once a second; a five-person call is about five
+  small requests a second in total, and nobody outside a call pays anything.
+- **Not in this version:** "Summon the Council" (the saved Google Meet link for bigger meetings),
+  a relay for strict networks, desktop notifications and sounds.
+- **Not verified:** PHP never run; real microphones, two real computers on two networks, and the
+  hosting under once-a-second requests are all untested. See `docs/DECISIONS.md`.
+- **Database:** migration 085 (`realm_voice`, `realm_signals`). Until it runs, Join voice is greyed
+  out and says voice needs a database update; the rest of the Realm is unchanged.
+
 ## 2026-11-12 — The Realm: the focus music no longer crackles *(no migration)*
 
 **Reported by David:** "there's a bit of noise in the lo-fi music, it sounds like if the speaker

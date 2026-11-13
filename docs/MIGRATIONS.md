@@ -149,6 +149,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 082 | realm_chat | ⏳ **The Realm, stage 2: chat** (`realm_messages`, `realm_reads`; `notifications.kind` gains `raven`). Until it runs, the Realm works as before with no channels or ravens in it, and no raven rings the bell. |
 | 083 | realm_chat_images | ⏳ **The Realm's chat: pictures and tagging** (`realm_messages` gains `image`, `image_name`, `image_mime`; `notifications.kind` gains `tag`). Until it runs, chat works as before: no button to add a picture, and tagging somebody does not ring their bell. |
 | 084 | realm_knocks | ⏳ **The Realm: knocking on an ajar door** (`realm_knocks`). Until it runs, an ajar door cannot be entered and its card says knocking needs a database update; everything else in the Realm is unchanged. |
+| 085 | realm_voice | ⏳ **The Realm: voice in a room** (`realm_voice`, `realm_signals`). Until it runs, the Join voice button in a room is greyed out and says voice needs a database update; everything else in the Realm is unchanged. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

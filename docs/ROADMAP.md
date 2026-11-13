@@ -1404,7 +1404,8 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 2b. Chat, the rest | Pictures in messages and tagging people: **built 2026-11-12**, migration 083. Speech bubbles in rooms: built the same day. The Herald side panel and knocks in the bell: not built |  |
 | 2c. Focus desk | Your open work with a Start button on Anima's own timer, the door sealing itself during a focus block, the clock in the top bar, music made in the browser. Then, the same day: the way in moved to the bookshelf in your own house, and the music became a lofi loop | **Built 2026-11-12**, no migration |
 | 2d. Task details | Each task in the task window shows its status (in the status's colour) and due date, hours logged and a link into Anima; the status can be changed there by My tasks' own rules, now shared in `includes/own_status.php` | **Built 2026-11-12**, no migration |
-| 3. Voice | Voice tables for up to 5, knock to be let in, "Summon the Council" opening a saved Google Meet link | Not built |
+| 3. Voice | Voice for up to 5 people inside the same room, in every room, by pressing Join voice; mute, who is speaking, straight from browser to browser. Knocking was built earlier (migration 084) | **Built 2026-11-12**, migration 085, waiting for David's go-ahead and a first real test with two people |
+| 3b. Voice, the rest | "Summon the Council" opening a saved Google Meet link for bigger meetings; a relay (TURN) if two real people cannot connect; choosing a microphone | Not built |
 | 4. Mana and praise | Streak mana, praise, private gold, clothes, accessories and pets, gifting and swapping, all face to face | Not built |
 | 5. The app | Install on Windows with start-up, desktop notifications and sounds, then a phone layout and phone notifications | Not built |
 | 6. Slack bridge | Channels mirrored both ways, images kept, history past 90 days, DMs private to the two people | Not built |
@@ -1415,3 +1416,5 @@ other people move on the map every 25 seconds, not live; the art is drawn by cod
 
 To watch when it goes live: how the shared hosting copes with one request per person every 25
 seconds. Chat (stage 2) will ask more often, so this is the measurement that decides how.
+Voice (stage 3) asks once a second per person in a call, so about five requests a second for a
+full table: watch the hosting during the first real calls.
