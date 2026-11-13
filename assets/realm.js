@@ -1671,7 +1671,7 @@ function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
   if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
-    /* Threads (migration 093): the threads I follow, with what is new in them (David, 2026-11-13). */
+    /* Threads (migration 094): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
     ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
@@ -1956,7 +1956,7 @@ document.addEventListener('click',function (e) {
    ST.chat is null until the migration has run, and then none of this draws. */
 var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false,thread:0,from:'',first:0};
 /* THREADS (David, 2026-11-13: "reply to one message without flooding the channel; long channels
-   get unreadable without them"), migration 093. CH.thread is the message whose thread the panel
+   get unreadable without them"), migration 094. CH.thread is the message whose thread the panel
    shows (0: the channel itself); CH.from is where its back arrow returns ('' the channel, THREADS
    the list); CH.first the first message the channel shows, so the server counts replies from
    there on. CH.open is THREADS while the panel lists the threads I follow. TH.unread is what is

@@ -353,7 +353,7 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
 //      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
-// Threads (migration 093):
+// Threads (migration 094):
 // GET  chat=<channel>&thread=<id>&after=   a thread: its first message and replies, marks it read
 // GET  chat=<channel>&from=<id>&after=     a channel, with `threads`: reply counts from message <id> on
 // POST say=<channel>&thread=<id>&also=0|1  reply in a thread, and maybe also to the channel
@@ -377,7 +377,7 @@ if (isset($_GET['unread'])) {
                       'offers' => realm_offer_news($pdo, $uid)]);
     exit;
 }
-// GET threads=1: the threads I follow, the latest reply first (migration 093).
+// GET threads=1: the threads I follow, the latest reply first (migration 094).
 // What the "Threads" row in the channel list opens; an open list asks every few
 // seconds, like a conversation. Only places I may read are in it.
 if (isset($_GET['threads'])) {
@@ -396,7 +396,7 @@ if (isset($_GET['threads'])) {
     exit;
 }
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
-// Threads (migration 093): with thread=<id> the request is about that message's
+// Threads (migration 094): with thread=<id> the request is about that message's
 // thread, in the same channel. Checked below, after the channel itself.
 $thread = max(0, (int)($_POST['thread'] ?? ($_GET['thread'] ?? 0)));
 if ($channel !== '') {

@@ -252,7 +252,7 @@ small { color: var(--muted); font-size: 13px; }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .rcomposer[hidden], .ralso[hidden], .rback[hidden] { display: none; }
 
-/* THREADS (David, 2026-11-13), migration 093. "Reply in thread" shows on a message when it is
+/* THREADS (David, 2026-11-13), migration 094. "Reply in thread" shows on a message when it is
    pointed at or reached with the keyboard, and always on a touch screen, which cannot point. The
    line under a message with replies opens its thread; in the thread, the first message stands apart. */
 .rreply { margin-left: auto; background: none; border: 0; padding: 0 2px; font: inherit; font-size: 12px; color: var(--primary); cursor: pointer; opacity: 0; transition: opacity var(--ease); }
