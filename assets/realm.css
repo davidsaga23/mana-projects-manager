@@ -292,6 +292,10 @@ small { color: var(--muted); font-size: 13px; }
 .rcomposer input::placeholder { color: var(--faint); }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .rcomposer[hidden], .ralso[hidden], .rback[hidden] { display: none; }
+/* The way back from a thread: a wide, drawn arrow (David, 2026-11-13: "wider arrow to go back
+   please"), not the small text arrow it was. */
+.rbtn.rback { display: inline-flex; align-items: center; justify-content: center; min-width: 46px; padding: 5px 10px; }
+.rback svg { display: block; }
 
 /* THREADS (David, 2026-11-13), migration 095. "Reply in thread" shows on a message when it is
    pointed at or reached with the keyboard, and always on a touch screen, which cannot point. The
