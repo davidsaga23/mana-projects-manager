@@ -9,9 +9,10 @@
    the canvas carries only the labels and the click areas. All the art is drawn by this code and is our
    own; the studio's artists can replace any of it later.
 
-   WHAT OTHER PEOPLE SEE OF YOU. Only where you ARRIVED ("let's start only where they have arrived"):
-   walking is yours alone and nothing is sent until you stop at a building or go inside. That keeps the
-   load on the shared hosting to one small request per person every 25 seconds.
+   WHAT OTHER PEOPLE SEE OF YOU. At first only where you ARRIVED ("let's start only where they have
+   arrived", 2026-11-12). Since 2026-11-13 they see you WALK, on the map and inside a room ("let's
+   make see other people walk a feature across the board"): see "seeing each other walk" below, which
+   also says what it costs the shared hosting and how that is kept small.
 
    A CHARACTER ON THE MAP MEANS THAT PERSON IS HERE NOW. Resting (dimmed, with a Z) after 25 minutes
    without touching the page; away (dark house, no character) once the page is closed. */
@@ -383,13 +384,33 @@ function roomArt(kind, tint) {
       [40,180].forEach(function (wx) { parts([[wx,18,20,18,PAL.winD]]); P1(wx+4,22,1,1,PAL.hot); P1(wx+13,29,1,1,PAL.hot); P1(wx+9,18,1,18,PAL.wood); P1(wx,26,20,1,PAL.wood); }); }
     parts([[84,84,72,34,col]]); P1(88,88,64,26,shade(col,-45)); P1(92,92,56,18,col);
     P1(108,150,24,4,PAL.glow);
-    if (kind==='tavern') { parts([[24,54,192,12,PAL.wood]]); P1(24,54,192,2,shade(PAL.wood,35)); for (x = 34; x < 210; x += 22) { parts([[x,46,6,8,PAL.wall]]); P1(x,46,6,2,PAL.win); }
-      [[28,100],[190,100]].forEach(function (t) { parts([[t[0],t[1],22,26,PAL.wood]]); P1(t[0],t[1]+6,22,2,PAL.iron); P1(t[0],t[1]+18,22,2,PAL.iron); }); }
-    else if (kind==='hall') { parts([[70,74,100,10,PAL.marble]]); P1(70,82,100,2,PAL.marbleD); [[26,14],[204,14]].forEach(function (b) { parts([[b[0],b[1],10,30,col]]); P1(b[0]+3,b[1]+8,4,4,PAL.hot); }); }
-    else { parts([[96,70,48,12,PAL.wood]]); P1(100,72,40,8,PAL.wall); P1(108,74,8,2,TINT.ember); P1(122,75,10,2,TINT.mana); parts([[28,110,18,14,PAL.wood],[196,112,16,12,PAL.wood]]); }
+    /* What stands on the floor (the bar, the barrels, the tables) is NOT painted here any more: see
+       PROPS below. Only what hangs on the wall is. */
+    if (kind==='hall') [[26,14],[204,14]].forEach(function (b) { parts([[b[0],b[1],10,30,col]]); P1(b[0]+3,b[1]+8,4,4,PAL.hot); });
   });
   return ROOMS[key];
 }
+/* THE FURNITURE OF A MEETING PLACE (David, 2026-11-13: "let's also have the option for the avatars to
+   move freely inside each house"). It used to be part of the room's one picture. Now that people
+   walk about, each piece is its own small picture, so that it can stop a character and so that
+   somebody standing behind a barrel is covered by it, as a house covers them on the map.
+   [what, x, y, width, height], the top left corner in the room's own units. */
+var PROPS = {
+  tavern:[['bar',24,46,192,20],['keg',28,100,22,26],['keg',190,100,22,26]],
+  hall:[['slab',70,74,100,10]],
+  tent:[['plans',96,70,48,12],['box',28,110,18,14],['boxS',196,112,16,12]]
+};
+function propArt(id) {
+  var x;
+  if (id==='bar') { parts([[0,8,192,12,PAL.wood]]); P1(0,8,192,2,shade(PAL.wood,35)); for (x = 10; x < 186; x += 22) { parts([[x,0,6,8,PAL.wall]]); P1(x,0,6,2,PAL.win); } }
+  else if (id==='keg') { parts([[0,0,22,26,PAL.wood]]); P1(0,6,22,2,PAL.iron); P1(0,18,22,2,PAL.iron); }
+  else if (id==='slab') { parts([[0,0,100,10,PAL.marble]]); P1(0,8,100,2,PAL.marbleD); }
+  else if (id==='plans') { parts([[0,0,48,12,PAL.wood]]); P1(4,2,40,8,PAL.wall); P1(12,4,8,2,TINT.ember); P1(26,5,10,2,TINT.mana); }
+  else if (id==='box') parts([[0,0,18,14,PAL.wood]]);
+  else if (id==='boxS') parts([[0,0,16,12,PAL.wood]]);
+}
+var PSTAMP = {};
+function propStamp(pr) { return PSTAMP[pr[0]] || (PSTAMP[pr[0]] = stamp(pr[3]+2,pr[4]+2,1,1,function () { propArt(pr[0]); })); }
 /* SPEECH BUBBLES (David, 2026-11-12): "when two or more characters are in the same space inside a
    house or project, let's make the avatars 'say' the text they sent through chat in a dialogue
    bubble". BUB holds the last thing each person said in the room I am standing in, by user id, and
@@ -556,6 +577,8 @@ function roomTake(r) {
     var cv = document.createElement('canvas'); cv.width = 14; cv.height = 18;
     var sc = Math.max(14/im.width,18/im.height), w = im.width*sc, hh = im.height*sc; cv.getContext('2d').drawImage(im,(14-w)/2,(18-hh)*.3,w,hh); h.pic = cv; draw(); };
     im.src = h.src; }
+  /* The room I am standing in changed: nothing may now be where my feet are. */
+  if (S.inside==='user:'+r.owner) { roomSettle(); RM.near = roomNear(B[S.inside]); }
   draw();
 }
 function roomAsk(id) {
@@ -583,7 +606,7 @@ function placeHot(o, lay, s, ox, oy) {
   HOT.forEach(function (h) {
     var b = $(h[0]), it = null; if (!b) return;
     if (o && o.owner && lay && (o.owner.me || !h[2])) lay.items.forEach(function (x) { if (x[0]===h[1]) it = x; });
-    b.hidden = !it; if (!it) return;
+    b.hidden = !it; b.classList.toggle('is-near',!!it && RM.near===h[0]); if (!it) return;
     var t = THINGS[h[1]];
     b.style.left = (ox+(it[1]-1)*s)/k+'px'; b.style.top = (oy+(it[2]-1)*s)/k+'px'; b.style.width = (t.w+2)*s/k+'px'; b.style.height = (t.h+2)*s/k+'px';
     if (h[1]==='portrait') { var say = o.owner.me ? 'Your profile' : firstName(o.owner.name), tag = $('portraitTag');
@@ -595,8 +618,256 @@ function paintThing(c, it, o) {
   c.drawImage(st.cv,it[1]-st.ox,it[2]-st.oy);
   if (it[0]==='portrait' && h && h.pic) c.drawImage(h.pic,it[1]+2,it[2]+2);
 }
+/* Where somebody stands when this page has not been told: the places people took before anybody
+   could walk in a room. Mine is no longer one of them. */
 var SEATS = [[120,132],[86,126],[154,126],[60,134],[180,134],[100,112],[140,112],[46,118],[194,118]];
 var DECO = {on:false,lay:null,sel:-1,drag:null,bad:false}, RT = null;
+
+/* ---------- walking inside a room (David, 2026-11-13) ----------
+   "Let's also have the option for the avatars to move freely inside each house."
+
+   Inside a room my character now walks as it does on the map: the arrow keys, or a click on the
+   floor, which finds a way round the furniture. Everything is in the room's own units, 240 by 160,
+   and a position is where the FEET are.
+
+   WHAT IS SOLID. The walls, and the foot of every thing that stands on the floor: the same bottom
+   10 units decorating already uses to decide whether two things are on the same ground (foot()). So
+   a character can step BEHIND a tall thing and be covered by it, and never stands inside one. In a
+   meeting place the solid things are PROPS. Things on the wall and the rug stop nobody.
+
+   THE DOOR is the strip of light at the bottom of the room. Walking onto it leaves the room, as
+   Escape and Leave room do. You come in just above it.
+
+   WALKING UP TO SOMETHING. The bookshelf, the chest and the portrait still answer a click. Standing
+   next to one lights its frame, and Enter opens it. */
+var FLOOR = {x0:18,x1:222,y0:58,y1:148}, DOORWAY = {x0:110,x1:130,y1:156,out:152,come:[120,142]}, ROOM_SPEED = 80;
+var RM = {x:120,y:142,walk:null,raf:0,lt:0,near:null,leaving:false};
+/* What stands on the floor of the room `o`: its foot (x,y,w,h) and `by`, the line it is sorted by. */
+function roomSolids(o) {
+  var out = [];
+  if (!o) return out;
+  if (o.owner) roomOf(o.owner.id).items.forEach(function (it) { var t = THINGS[it[0]]; if (t.z!=='floor') return; var ft = foot(it); out.push({x:ft[0],y:ft[1],w:ft[2],h:ft[3],by:it[2]+t.h}); });
+  else (PROPS[o.kind]||[]).forEach(function (pr) { var d = Math.min(10,pr[4]); out.push({x:pr[1],y:pr[2]+pr[4]-d,w:pr[3],h:d,by:pr[2]+pr[4]}); });
+  return out;
+}
+/* May a pair of feet stand at x,y? A character is 14 wide and 4 deep where it touches the ground. */
+function roomFree(x, y, sol) {
+  var door = x >= DOORWAY.x0 && x <= DOORWAY.x1 && y > FLOOR.y1 && y <= DOORWAY.y1;
+  if (!door && (x < FLOOR.x0 || x > FLOOR.x1 || y < FLOOR.y0 || y > FLOOR.y1)) return false;
+  for (var i = 0; i < sol.length; i++) { var q = sol[i]; if (x+7 > q.x && x-7 < q.x+q.w && y > q.y && y-4 < q.y+q.h) return false; }
+  return true;
+}
+function roomClear(a, b, sol) { var n = Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/2), k; for (k = 1; k <= n; k++) if (!roomFree(a.x+(b.x-a.x)*k/n,a.y+(b.y-a.y)*k/n,sol)) return false; return true; }
+/* The way on foot across the room, round whatever is solid, as a few straight stretches. A spot
+   that cannot be stood on (the middle of a table) gives the way to the nearest spot that can, so a
+   click on a thing walks up to it. Squares of 4 units; an empty list when there is nowhere to go. */
+function roomRoute(from, to, sol) {
+  var W = 60, H = 40, C = 4, ok = new Uint8Array(W*H), prev = new Int32Array(W*H), i, j, x, y, d, h;
+  var cell = function (p) { return Math.max(0,Math.min(H-1,Math.floor(p.y/C)))*W+Math.max(0,Math.min(W-1,Math.floor(p.x/C))); };
+  var mid = function (k) { return {x:(k%W)*C+2,y:Math.floor(k/W)*C+2}; };
+  for (i = 0; i < W*H; i++) { prev[i] = -1; var m = mid(i); ok[i] = roomFree(m.x,m.y,sol) ? 1 : 0; }
+  var s = cell(from), t = cell(to), q = [s], best = s, bd = 1e9, D = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  prev[s] = s;
+  for (h = 0; h < q.length && prev[t] < 0; h++) { i = q[h]; x = i%W; y = (i-x)/W;
+    for (d = 0; d < 8; d++) { var nx = x+D[d][0], ny = y+D[d][1]; j = ny*W+nx;
+      if (nx<0||ny<0||nx>=W||ny>=H||prev[j]>=0||!ok[j]) continue;
+      /* No cutting a corner between two solid squares. */
+      if (d > 3 && (!ok[y*W+nx] || !ok[ny*W+x])) continue;
+      prev[j] = i; q.push(j); } }
+  for (h = 0; h < q.length; h++) { var c = mid(q[h]), dd = Math.hypot(c.x-to.x,c.y-to.y); if (dd < bd) { bd = dd; best = q[h]; } }
+  var exact = prev[t] >= 0 && roomFree(to.x,to.y,sol), end = exact ? t : best, path = exact ? [{x:to.x,y:to.y}] : [], k;
+  if (!exact && end===s) return [];
+  for (k = end; k!==s; k = prev[k]) path.push(mid(k));
+  path.reverse();
+  /* Straighten it: from where I am, head for the farthest point I can reach in a straight line. */
+  var out = [], cur = from; i = 0;
+  while (i < path.length) { j = path.length-1; while (j > i && !roomClear(cur,path[j],sol)) j--; out.push(path[j]); cur = path[j]; i = j+1; }
+  return out;
+}
+/* Something solid is where I stand (the owner moved a table, or furnished the doorway): step to the
+   nearest free spot, so nobody is ever shut inside a thing. */
+function roomSettle() {
+  if (!S.inside) return;
+  var sol = roomSolids(B[S.inside]), best = null, bd = 1e9, x, y;
+  if (roomFree(RM.x,RM.y,sol)) return;
+  for (y = FLOOR.y0; y <= FLOOR.y1; y += 2) for (x = FLOOR.x0; x <= FLOOR.x1; x += 2) { var d = Math.hypot(x-RM.x,y-RM.y); if (d < bd && roomFree(x,y,sol)) { bd = d; best = [x,y]; } }
+  if (best) { RM.x = best[0]; RM.y = best[1]; RM.walk = null; }
+}
+/* Which of the bookshelf, the chest and the portrait am I standing next to? The same rule as
+   placeHot(): the shelf and the chest only in my own house, a portrait in anybody's. */
+function roomNear(o) {
+  var best = null;
+  if (!o || !o.owner || DECO.on) return null;
+  HOT.forEach(function (h) {
+    if ((!o.owner.me && h[2]) || !$(h[0])) return;
+    roomOf(o.owner.id).items.forEach(function (it) {
+      if (it[0]!==h[1]) return;
+      var t = THINGS[it[0]], near;
+      if (t.z==='wall') near = RM.y <= 70 && RM.x >= it[1]-6 && RM.x <= it[1]+t.w+6;
+      else { var ft = foot(it), ax = Math.max(ft[0]-RM.x,0,RM.x-ft[0]-ft[2]), ay = Math.max(ft[1]-RM.y,0,RM.y-ft[1]-ft[3]); near = ax <= 12 && ay <= 9; }
+      if (near) best = h[0];
+    });
+  });
+  return best;
+}
+/* I have just come in: stand at the door. */
+function roomCome() {
+  RM.x = DOORWAY.come[0]; RM.y = DOORWAY.come[1]; RM.walk = null; RM.near = null; RM.leaving = false; held.clear(); roomSettle(); spotSpace();
+  /* Said once on each computer, since nothing on the screen says a room can be walked in. */
+  try { if (!localStorage.getItem('realmWalkTip')) { localStorage.setItem('realmWalkTip','1'); toast('You can walk around in here. Use the arrow keys, or click the floor. Walk onto the light at the bottom to leave.'); } } catch (e) { /* A private window may refuse; then it is simply not said. */ }
+}
+/* After every step: the door leaves the room, and the thing I am next to lights up. True when I left. */
+function roomMoved() {
+  if (RM.y >= DOORWAY.out) { RM.walk = null; leave(); return true; }
+  RM.near = roomNear(B[S.inside]); spotDirty();
+  return false;
+}
+function roomWalk(to) {
+  if (!S.inside || DECO.on || RM.leaving) return;
+  var path = roomRoute({x:RM.x,y:RM.y},to,roomSolids(B[S.inside]));
+  if (!path.length) return;
+  /* Somebody who asked for less motion is put there, as on the map. */
+  if (calm) { var e = path[path.length-1]; RM.x = e.x; RM.y = e.y; RM.walk = null; if (!roomMoved()) draw(); return; }
+  RM.walk = {path:path,i:0}; RM.lt = 0;
+  if (!RM.raf) RM.raf = requestAnimationFrame(roomTick);
+}
+function roomTick(ts) {
+  var w = RM.walk; if (!w || !S.inside || RM.leaving) { RM.raf = 0; RM.walk = null; return; }
+  var st = RM.lt ? ROOM_SPEED*Math.min(.05,(ts-RM.lt)/1000) : 0; RM.lt = ts;
+  while (st > 0 && w.i < w.path.length) { var p = w.path[w.i], dx = p.x-RM.x, dy = p.y-RM.y, d = Math.hypot(dx,dy);
+    if (d<=st) { RM.x = p.x; RM.y = p.y; st -= d; w.i++; } else { RM.x += dx/d*st; RM.y += dy/d*st; st = 0; } }
+  if (w.i >= w.path.length) RM.walk = null;
+  if (roomMoved()) { RM.raf = 0; return; }
+  draw();
+  RM.raf = RM.walk ? requestAnimationFrame(roomTick) : 0;
+}
+/* One step with the arrow keys, sliding along whatever is in the way. */
+function roomStep(dx, dy, dt) {
+  if (DECO.on || RM.leaving || !B[S.inside]) return;
+  var sol = roomSolids(B[S.inside]), n = Math.hypot(dx,dy), st = ROOM_SPEED*dt, nx = RM.x+dx/n*st, ny = RM.y+dy/n*st;
+  RM.walk = null;
+  if (roomFree(nx,ny,sol)) { RM.x = nx; RM.y = ny; } else if (dx && roomFree(nx,RM.y,sol)) RM.x = nx; else if (dy && roomFree(RM.x,ny,sol)) RM.y = ny;
+  if (!roomMoved()) draw();
+}
+/* A click on the room: walk there. A click on the door walks out through it. */
+if ($('mapbox')) $('mapbox').addEventListener('click',function (e) {
+  if (!S.inside || DECO.on || !RT || RM.leaving || e.target!==$('mapcv')) return;
+  var p = roomPoint(e); if (p.x < 0 || p.x > 240 || p.y < 0 || p.y > 164) return;
+  if (p.y > 146 && p.x > 100 && p.x < 140) roomWalk({x:120,y:DOORWAY.out+2});
+  else roomWalk({x:Math.max(FLOOR.x0,Math.min(FLOOR.x1,p.x)),y:Math.max(FLOOR.y0,Math.min(FLOOR.y1,p.y))});
+});
+/* Who is in the room `o` with me, the owner first: the order the seats are given in. */
+function roomPeople(o) {
+  var list = [];
+  if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) list.push(o.owner);
+  ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && list.indexOf(p) < 0) list.push(p); });
+  return list.slice(0,SEATS.length-1);
+}
+/* Where one of them stands: the spot they walked to, if they have walked since they came in. If
+   not, they are still by the door, side by side so that nobody hides anybody. Before migration 087
+   nothing is known, and everybody takes the old seats. */
+function standOf(p, i) {
+  var sp = SP.ready ? SP.at[p.id] : null, n = i+1;
+  if (sp) return {x:sp[0],y:sp[1]};
+  if (SP.ready) return {x:DOORWAY.come[0]+(n%2?-1:1)*Math.ceil(n/2)*22,y:DOORWAY.come[1]};
+  return {x:SEATS[n][0],y:SEATS[n][1]};
+}
+
+/* ---------- seeing each other walk (David, 2026-11-13, migration 087) ----------
+   Asked whether the others in a room should see you walk: "Yes". Then: "let's make see other people
+   walk a feature across the board", so it is the same on the village map.
+
+   SENDING. My page sends the spot I stand on (POST stand) when I stop, and at most once every 2
+   seconds while I am on the way. Standing still sends nothing at all.
+
+   RECEIVING costs no request of its own. Where the others stand comes back with what this page asks
+   anyway: the unread counts, an open conversation, the voice beat, the heartbeat, and my own `stand`.
+   The one change: the unread counts are asked every 3 seconds instead of every 8 while I share a
+   room with somebody, or for 15 seconds after anybody I can see has moved. A quiet village asks
+   exactly what it asked before.
+
+   SHOWING. A spot arrives a second or three late and in jumps, so nobody is drawn AT the spot: each
+   character walks from where this page last drew them to where they now are, round the furniture or
+   the houses, as my own does (glide). They are therefore a little behind, and never teleport.
+
+   A SPOT IS FOR SHOW. Nothing here or on the server uses one to decide what anybody may do; David
+   kept "in the same room" as the rule for praise, trades and voice the same day. */
+var SP = {ready:false,at:{},dirty:false,last:0,timer:0,sent:'',hot:0,sig:'',n:0};
+var OTH = {}, oraf = 0, olt = 0;
+/* What the server says about the people I can see: {at: the room I am in or '' for the map,
+   who: [[id, x, y, place], ...]}, x and y null for somebody who has not walked since arriving. Null
+   before migration 087; absent from an answer that does not carry it. */
+function takeSpots(sp) {
+  if (sp === undefined) return;
+  if (!sp || !sp.who) { SP.ready = false; return; }
+  SP.ready = true;
+  /* An answer that was on its way while I walked through a door is about the other side of it. */
+  if (sp.at !== (S.inside || '')) return;
+  var at = {}, sig = [], changed = false;
+  sp.who.forEach(function (r) {
+    var p = person(r[0]); if (!p || p.me) return;
+    at[p.id] = r[1] === null ? null : [+r[1],+r[2]]; sig.push(r.join(','));
+    /* Somebody the map still has elsewhere has just walked in, or out: this is the newer word. */
+    if (S.inside ? (p.place!==S.inside || !p.inside) : (!!r[3] && (p.inside || p.place!==r[3]))) { p.place = S.inside || r[3]; p.inside = !!S.inside; changed = true; }
+    if (p.state==='away') { p.state = 'online'; changed = true; }
+  });
+  SP.at = at; sig = sig.sort().join(';');
+  if (sig!==SP.sig) { SP.sig = sig; SP.hot = Date.now()+15000; }
+  if (changed) { renderSide(); renderInside(); }
+  draw();
+}
+/* Where to draw somebody whose spot is tx,ty in `space` ('map', or a room's id): on the way there
+   from wherever this page drew them last. */
+function glide(id, tx, ty, space) {
+  var o = OTH[id];
+  if (!o || o.space!==space || calm) o = OTH[id] = {x:tx,y:ty,tx:tx,ty:ty,path:null,i:0,v:0,space:space};
+  else if (o.tx!==tx || o.ty!==ty) {
+    var from = {x:o.x,y:o.y}, to = {x:tx,y:ty}, path = space==='map' ? route(from,to) : roomRoute(from,to,roomSolids(B[space])), len = 0, a = from, k;
+    if (!path || !path.length) path = [to];
+    /* Always end exactly where they are, even if this page thinks a table is there. */
+    k = path[path.length-1]; if (k.x!==tx || k.y!==ty) path.push(to);
+    for (k = 0; k < path.length; k++) { len += Math.hypot(path[k].x-a.x,path[k].y-a.y); a = path[k]; }
+    /* At a walk, or faster when they are far behind: nobody takes more than 4 seconds to catch up. */
+    o.tx = tx; o.ty = ty; o.path = path; o.i = 0; o.v = Math.max(space==='map'?230:ROOM_SPEED,len/4);
+    if (!oraf) { olt = 0; oraf = requestAnimationFrame(othTick); }
+  }
+  o.n = SP.n;
+  return o;
+}
+function othTick(ts) {
+  var dt = olt ? Math.min(.1,(ts-olt)/1000) : 0, any = false; olt = ts;
+  Object.keys(OTH).forEach(function (id) {
+    var o = OTH[id]; if (!o.path) return;
+    var st = o.v*dt;
+    while (st > 0 && o.i < o.path.length) { var p = o.path[o.i], dx = p.x-o.x, dy = p.y-o.y, d = Math.hypot(dx,dy);
+      if (d<=st) { o.x = p.x; o.y = p.y; st -= d; o.i++; } else { o.x += dx/d*st; o.y += dy/d*st; st = 0; } }
+    if (o.i >= o.path.length) o.path = null; else any = true;
+  });
+  draw();
+  oraf = any ? requestAnimationFrame(othTick) : 0;
+}
+/* I moved. The spot goes out by itself, at the pace described above. */
+function spotDirty() {
+  if (!SP.ready) return;
+  /* The first word of a walk goes a second in, not at the first step, which says next to nothing. */
+  if (!SP.dirty && Date.now()-SP.last > 2000) SP.last = Date.now()-1000;
+  SP.dirty = true;
+  if (!SP.timer) SP.timer = setTimeout(spotFlush,250);
+}
+function spotFlush() {
+  SP.timer = 0; if (!SP.dirty || !SP.ready) return;
+  var moving = S.inside ? (!!RM.walk || held.size > 0) : (!!S.walk || held.size > 0), wait = SP.last+(moving?2000:600)-Date.now();
+  if (wait > 0 || RM.leaving || S.enter!==null) { SP.timer = setTimeout(spotFlush,250); return; }
+  var x = Math.round(S.inside?RM.x:S.pos.x), y = Math.round(S.inside?RM.y:S.pos.y), key = (S.inside||'')+'|'+x+','+y, body = new URLSearchParams();
+  SP.dirty = false; SP.last = Date.now();
+  if (key===SP.sent) return;
+  SP.sent = key; body.append('stand',x+','+y);
+  fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) takeSpots(j.spots); })
+    .catch(function () { /* The next step sends a newer one. */ });
+}
+/* I went through a door: what I knew of the other side of it is no use on this one. */
+function spotSpace() { SP.at = {}; SP.sig = ''; SP.dirty = false; SP.sent = ''; }
 function drawRoom(c, cw, ch) {
   var o = B[S.inside]; if (!o) { placeHot(null); return; }
   var home = !!o.owner, deco = home && o.owner.me && DECO.on, lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : null);
@@ -608,38 +879,43 @@ function drawRoom(c, cw, ch) {
   c.setTransform(s,0,0,s,ox,oy);
   /* Back to front: whatever stands lower on the floor is nearer, and covers what is behind it. */
   var order = [];
-  if (!home) c.drawImage(roomArt(o.kind,o.tint).cv,0,0);
+  if (!home) { c.drawImage(roomArt(o.kind,o.tint).cv,0,0); (PROPS[o.kind]||[]).forEach(function (pr) { order.push({y:pr[2]+pr[4],prop:pr}); }); }
   else {
     c.drawImage(homeArt(lay,o.tint).cv,0,0);
     lay.items.forEach(function (it) { if (THINGS[it[0]].z==='wall') paintThing(c,it,o); else order.push({y:it[2]+THINGS[it[0]].h,it:it}); });
   }
-  var list = [];
-  if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) list.push(o.owner);
-  ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && list.indexOf(p) < 0) list.push(p); });
-  var my = me()||{cloak:'mana',hat:'none',pet:'none'};
-  list.slice(0,SEATS.length-1).forEach(function (p, i) { order.push({y:SEATS[i+1][1],p:p,st:SEATS[i+1],bob:(f+i)%4===0?2:0}); });
-  order.push({y:SEATS[0][1],p:my,st:SEATS[0],bob:0,mine:true});
+  /* The way out, wide enough to stand on. */
+  c.fillStyle = PAL.glow; c.fillRect(106,150,28,8); c.fillStyle = PAL.hot; c.fillRect(110,155,20,3);
+  var my = me()||{cloak:'mana',hat:'none',pet:'none'}, who = [], walking = !!RM.walk || held.size > 0;
+  roomPeople(o).forEach(function (p, i) { var at = standOf(p,i), gl = glide(p.id,at.x,at.y,o.id); who.push({p:p,x:Math.round(gl.x),y:Math.round(gl.y),bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+i)%4===0?2:0}); });
+  who.push({p:my,x:Math.round(RM.x),y:Math.round(RM.y),bob:walking?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
+  who.forEach(function (d) { order.push(d); });
   order.sort(function (a, b) { return (a.y-b.y) || ((a.p?1:0)-(b.p?1:0)); });
   order.forEach(function (d) {
     if (d.it) { c.setTransform(s,0,0,s,ox,oy); paintThing(c,d.it,o); return; }
-    var px = Math.round(d.st[0]/.9), py = Math.round(d.st[1]/.9), idle = !d.mine && d.p.state==='idle';
+    if (d.prop) { c.setTransform(s,0,0,s,ox,oy); var ps = propStamp(d.prop); c.drawImage(ps.cv,d.prop[1]-ps.ox,d.prop[2]-ps.oy); return; }
+    var px = Math.round(d.x/.9), py = Math.round(d.y/.9), idle = !d.mine && d.p.state==='idle';
     c.setTransform(s*.9,0,0,s*.9,ox,oy);
     /* While decorating, people are faint, so the furniture behind them can be seen and picked. */
-    c.globalAlpha = deco ? .3 : idle ? .6 : 1; sprite(c,px,py,d.p,d.bob); c.globalAlpha = 1;
+    c.globalAlpha = deco ? .3 : idle ? .6 : 1;
+    /* The mark under my own feet, as on the map, so I can tell which one I am moving. */
+    if (d.mine && !deco) { c.fillStyle = PAL.win; c.fillRect(px-13,py+2,26,2); c.fillRect(px-13,py,2,2); c.fillRect(px+11,py,2,2); }
+    sprite(c,px,py,d.p,d.bob); c.globalAlpha = 1;
     if (idle && !deco) zed(c,px,py);
   });
   c.setTransform(s,0,0,s,ox,oy);
-  /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). */
-  list.slice(0,SEATS.length-1).forEach(function (p, i) { if (p.voice) voiceMark(c,SEATS[i+1][0],SEATS[i+1][1],isTalking(p.id),!!p.muted,f); });
-  if (VO.on) voiceMark(c,SEATS[0][0],SEATS[0][1],isTalking(ST.me),VO.muted,f);
+  /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
+     drawn where that person stands, so it goes with them when they walk. */
+  who.forEach(function (d) { if (d.mine ? VO.on : d.p.voice) voiceMark(c,d.x,d.y,isTalking(d.mine?ST.me:d.p.id),d.mine?VO.muted:!!d.p.muted,f); });
   if (deco) {
     if (DECO.sel >= 0 && lay.items[DECO.sel]) { var it = lay.items[DECO.sel], t = THINGS[it[0]], x0 = it[1]-3, y0 = it[2]-3, w = t.w+6, h = t.h+6;
       c.fillStyle = DECO.bad ? TINT.ember : TINT.mana; c.fillRect(x0,y0,w,1); c.fillRect(x0,y0+h-1,w,1); c.fillRect(x0,y0,1,h); c.fillRect(x0+w-1,y0,1,h); }
     return;
   }
-  var now = Date.now(), boxes = [], say = function (uid, st) { var b = BUB[uid]; if (b && b.until > now) { var box = bubbleBox(c,st[0],st[1]-60,b.text); box.until = b.until; boxes.push(box); } };
-  list.slice(0,SEATS.length-1).forEach(function (p, i) { say(p.id,SEATS[i+1]); });
-  say(ST.me,SEATS[0]);
+  /* A bubble sits over its speaker's head and follows them. Near the back wall it would leave the
+     picture, so it is held just inside the top and may then cover the top of a hat. */
+  var now = Date.now(), boxes = [];
+  who.forEach(function (d) { var b = BUB[d.mine?ST.me:d.p.id]; if (b && b.until > now) { var box = bubbleBox(c,d.x,d.y-60,b.text); box.by = Math.max(-24,box.by); box.until = b.until; boxes.push(box); } });
   /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
   placeBubbles(boxes).sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
 }
@@ -653,13 +929,13 @@ function copyLay(l) { return {wall:l.wall,floor:l.floor,rug:l.rug,items:l.items.
 function decoStart() {
   var m = me(); if (!m || S.inside!=='user:'+m.id || DECO.on) return;
   if (HOME[m.id] && !HOME[m.id].ready) { toast('Decorating needs a database update first. An administrator opens migrate.php once.'); return; }
-  DECO = {on:true,lay:copyLay(roomOf(m.id)),sel:-1,drag:null,bad:false};
+  DECO = {on:true,lay:copyLay(roomOf(m.id)),sel:-1,drag:null,bad:false}; RM.walk = null; RM.near = null; held.clear();
   $('mapbox').classList.add('is-deco'); renderInside(); renderDeco(); draw();
 }
 function decoEnd() {
   if (!DECO.on) return;
   DECO.on = false; DECO.drag = null; var b = $('decoBar'); if (b) { b.hidden = true; b.innerHTML = ''; }
-  $('mapbox').classList.remove('is-deco'); renderInside(); draw();
+  $('mapbox').classList.remove('is-deco'); roomSettle(); RM.near = roomNear(B[S.inside]); renderInside(); draw();
 }
 function decoCount(id) { return DECO.lay.items.filter(function (it) { return it[0]===id; }).length; }
 function dseg(label, key) { var o = STYLES[key]; return '<span class="rdecopick"><span>'+label+'</span><span class="rseg">'+Object.keys(o).map(function (v) { return '<button type="button" data-decostyle="'+key+'" data-val="'+v+'" aria-pressed="'+(DECO.lay[key]===v)+'">'+o[v]+'</button>'; }).join('')+'</span></span>'; }
@@ -811,13 +1087,17 @@ function draw() {
   if (cv.width!==cw || cv.height!==ch) { cv.width = cw; cv.height = ch; }
   var c = cv.getContext('2d'), v = S.view, s = Math.max(cw/v.w,ch/v.h), ox = (cw-v.w*s)/2-v.x*s, oy = (ch-v.h*s)/2-v.y*s, f = S.frame, i;
   c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch);
+  SP.n++;
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
     placeHot(null);
     c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
-    w.out.forEach(function (q, n) { list.push({x:q.x,y:q.y,who:q.p,bob:(f+n)%4===0?2:0,idle:q.p.state==='idle'}); });
+    /* Each of the others is drawn on the way to their spot (glide), or to where the map stands
+       somebody who has not walked since arriving. */
+    w.out.forEach(function (q, n) { var sp = SP.ready ? SP.at[q.p.id] : null, gl = glide(q.p.id,sp?sp[0]:q.x,sp?sp[1]:q.y,'map');
+      list.push({x:Math.round(gl.x),y:Math.round(gl.y),who:q.p,bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+n)%4===0?2:0,idle:q.p.state==='idle'}); });
     var mx = Math.round(S.pos.x), myy = Math.round(S.pos.y), moving = S.walk||held.size, en = S.enter;
     list.push({x:mx,y:myy,who:my,bob:moving?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
     list.sort(function (a, b) { return a.y-b.y; });
@@ -837,6 +1117,8 @@ function draw() {
     if (!en) { var ay = myy-70-(f%2)*2; c.fillStyle = PAL.out; c.fillRect(mx-6,ay-1,12,5); c.fillRect(mx-4,ay+4,8,3); c.fillRect(mx-2,ay+7,4,2);
       c.fillStyle = PAL.win; c.fillRect(mx-5,ay,10,3); c.fillRect(mx-3,ay+3,6,2); c.fillRect(mx-1,ay+5,2,2); }
   }
+  /* Whoever was not drawn this time has left what I can see; if they come back they are simply there. */
+  Object.keys(OTH).forEach(function (id) { if (OTH[id].n!==SP.n) delete OTH[id]; });
   if (S.fade > 0) { c.setTransform(1,0,0,1,0,0); c.globalAlpha = Math.min(1,S.fade); c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch); c.globalAlpha = 1; }
 }
 
@@ -907,7 +1189,7 @@ function renderInside() {
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Click the bookshelf, the chest or the portrait.':'')+'</span><span class="rgrow"></span>'+voiceBar(o)+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.':'')+'</span><span class="rgrow"></span>'+voiceBar(o)+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -944,12 +1226,13 @@ function applyState(st) {
   if (land!==SIG.land) { SIG.land = land; buildWorld(); }
   if (house!==SIG.house) { SIG.house = house; buildHouses(); }
   if (S.sel && !B[S.sel]) S.sel = null;
-  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { voiceStop(true); S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
+  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { voiceStop(true); S.inside = null; RM.walk = null; spotSpace(); var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
   /* Standing in somebody else's house: ask for their room again, so a change of theirs shows. */
   if (S.inside && B[S.inside] && B[S.inside].owner && !B[S.inside].owner.me) roomAsk(B[S.inside].owner.id);
   if (fresh) takeUnread(fresh);
   takeKnocks(st.knocks);
+  takeSpots(st.spots);
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -980,7 +1263,7 @@ function route(from, to) {
 }
 var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* I stopped at a building: now, and only now, the others are told where I am. */
-function arrived(id) { S.walk = null; var s = spot(id); S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderCard(); renderSide(); draw(); send({arrive:id,inside:0}); }
+function arrived(id) { S.walk = null; SP.dirty = false; var s = spot(id); S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderCard(); renderSide(); draw(); send({arrive:id,inside:0}); }
 function walkTo(id) {
   var t = spot(id); if (!t) return;
   var path = calm ? null : route(S.pos,t);
@@ -994,7 +1277,7 @@ function tick(ts) {
   while (st > 0 && w.i < w.path.length) { var p = w.path[w.i], dx = p.x-S.pos.x, dy = p.y-S.pos.y, d = Math.hypot(dx,dy);
     if (d<=st) { S.pos = {x:p.x,y:p.y}; st -= d; w.i++; } else { S.pos = {x:S.pos.x+dx/d*st,y:S.pos.y+dy/d*st}; st = 0; } }
   if (w.i >= w.path.length) { S.raf = 0; arrived(w.id); return; }
-  follow(); draw(); S.raf = requestAnimationFrame(tick);
+  spotDirty(); follow(); draw(); S.raf = requestAnimationFrame(tick);
 }
 function teleport(id) { if (!spot(id)) return; arrived(id); }
 /* A short animation driven by the clock: fn gets 0..1, done runs at the end. */
@@ -1006,18 +1289,18 @@ function goInside(id) {
   S.sel = null; renderCard();
   play(420,function (k) { S.pos = {x:from.x+(to.x-from.x)*k,y:from.y+(to.y-from.y)*k}; S.enter = k*.9; },function () {
     play(220,function (k) { S.fade = k; },function () {
-      S.enter = null; S.inside = id; S.pos = from; if (o.owner) roomAsk(o.owner.id); renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
+      S.enter = null; S.inside = id; S.pos = from; roomCome(); if (o.owner) roomAsk(o.owner.id); renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
       play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
       send({arrive:id,inside:1});
     });
   });
 }
 function leave() {
-  if (!S.inside) return; var id = S.inside; BUB = {}; decoEnd();
+  if (!S.inside || RM.leaving) return; var id = S.inside; BUB = {}; decoEnd(); RM.leaving = true; RM.walk = null; held.clear();
   /* Voice is face to face: walking out of the room hangs up. */
   voiceStop(true);
   play(220,function (k) { S.fade = k; },function () {
-    S.inside = null; var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
+    S.inside = null; RM.leaving = false; spotSpace(); var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
     play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
     send({arrive:id,inside:0});
   });
@@ -1035,12 +1318,14 @@ window.addEventListener('pointerup',function () { if (drag && drag.moved) { just
 function select(id, center) { if (!B[id]) return; S.sel = id; if (center && !S.inside) { var o = B[id]; setView({x:o.x-S.view.w/2,y:o.y-40-S.view.h/2,w:S.view.w}); } renderCard(); renderSide(); }
 function nearest() { var best = null, bd = 36; BLIST.forEach(function (o) { var t = spot(o.id), d = Math.hypot(t.x-S.pos.x,t.y-S.pos.y); if (d < bd) { bd = d; best = o.id; } }); return best; }
 function keyTick(ts) {
-  if (!held.size || S.inside) { kraf = 0; klt = 0; return; }
+  if (!held.size) { kraf = 0; klt = 0; if (S.inside) draw(); return; }
   var dt = klt ? Math.min(.05,(ts-klt)/1000) : 0; klt = ts;
   var dx = (held.has('ArrowRight')?1:0)-(held.has('ArrowLeft')?1:0), dy = (held.has('ArrowDown')?1:0)-(held.has('ArrowUp')?1:0);
+  /* Inside a room the same keys walk the room (roomStep), and nothing is said to the map. */
+  if (S.inside) { if (dx || dy) roomStep(dx,dy,dt); kraf = requestAnimationFrame(keyTick); return; }
   if (dx || dy) { var n = Math.hypot(dx,dy), st = 230*dt, nx = Math.max(20,Math.min(1580,S.pos.x+dx/n*st)), ny = Math.max(40,Math.min(990,S.pos.y+dy/n*st)), stuck = !canStand(S.pos.x,S.pos.y);
     S.pos = (stuck||canStand(nx,ny))?{x:nx,y:ny}:canStand(nx,S.pos.y)?{x:nx,y:S.pos.y}:canStand(S.pos.x,ny)?{x:S.pos.x,y:ny}:S.pos;
-    follow(); draw();
+    spotDirty(); follow(); draw();
     var at = nearest(); if (at!==S.here) { S.here = at; S.sel = at; renderCard(); renderSide(); if (at) send({arrive:at,inside:0}); } }
   kraf = requestAnimationFrame(keyTick);
 }
@@ -1050,9 +1335,18 @@ document.addEventListener('keydown',function (e) {
   /* With the conversation laid over the map (the handle on its edge) the map is not on screen, so
      no key may walk the character, enter a house or leave a room where nobody can see it happen. */
   if (mapAway()) { held.clear(); return; }
-  if (is('input,select,textarea') || document.querySelector('dialog[open]')) return;
+  /* Going into a room puts the cursor in the message box, ready to type. While that box is empty
+     the arrow keys have nothing to do in it, so they walk the character instead of doing nothing. */
+  var arrow = e.key.indexOf('Arrow')===0, walkFromBox = arrow && S.inside && !DECO.on && is('#chatInput') && !t.value && !SUG.list.length;
+  if ((is('input,select,textarea') && !walkFromBox) || document.querySelector('dialog[open]')) return;
   if (S.inside && DECO.on) { decoKey(e); return; }
-  if (S.inside) { if (e.key==='Escape') leave(); return; }
+  if (S.inside) {
+    if (e.key==='Escape') leave();
+    else if (arrow) { e.preventDefault(); if (!RM.leaving) { held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); } }
+    /* Enter beside the bookshelf, the chest or the portrait opens it, as a click on it does. */
+    else if (e.key==='Enter' && RM.near && $(RM.near) && !is('button,a')) { e.preventDefault(); $(RM.near).click(); }
+    return;
+  }
   if (e.key.indexOf('Arrow')===0) { e.preventDefault(); if (S.walk) { S.walk = null; renderCard(); } held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); }
   else if (e.key==='Enter' && is('.bld')) { e.preventDefault(); select(t.getAttribute('data-sel'),false); }
   else if (e.key==='Enter' && S.here && !is('button,a')) goInside(S.here);
@@ -1167,7 +1461,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -1249,6 +1543,7 @@ function chatTake(j) {
   takeKnocks(j.knocks);
   /* While I am in voice my own once-a-second request brings a fresher list than this one. */
   if (!VO.on) takeVoiceRoom(j.voice);
+  takeSpots(j.spots);
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
@@ -1727,7 +2022,7 @@ function voiceBeat() {
   voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,out:JSON.stringify(out)}).then(function (j) {
     if (!VO.on || VO.sid!==sid) return;
     if (!j || !j.ok || !j.voice) { missed(); return; }
-    VO.busy = 0; VO.misses = 0; voiceTake(j);
+    VO.busy = 0; VO.misses = 0; voiceTake(j); if (VO.on) takeSpots(j.spots);
     if (VO.on && VO.out.length) voiceBeat();
   }).catch(function () { if (VO.on && VO.sid===sid) missed(); });
 }
@@ -1909,8 +2204,16 @@ applyState(ST);
    everybody else is. `active` is whether I touched the page since the last one. */
 setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); },25000);
 /* With no conversation open, ask for unread counts every 8 seconds. An open conversation already
-   brings them every 3. Not asked while the window is hidden. */
-setInterval(askUnread,8000);
+   brings them every 3. Not asked while the window is hidden.
+   The same answer says where the people I can see are standing (takeSpots), so it is asked every 3
+   seconds instead while that is worth watching: I share a room with somebody, or somebody I can
+   see has moved in the last 15 seconds. Voice brings its own every second, and then this waits. */
+var beatN = 0;
+setInterval(function () {
+  beatN++;
+  var watch = SP.ready && !VO.on && ((S.inside && B[S.inside] && roomPeople(B[S.inside]).length > 0) || Date.now() < SP.hot);
+  if (beatN%(watch?3:8)===0) askUnread();
+},1000);
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */

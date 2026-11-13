@@ -274,6 +274,8 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
    drawn shelf (placed by assets/realm.js), with a small tag under it so it reads as something to click. */
 .rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
 .rshelf:hover, .rshelf:focus-visible { border-color: var(--primary); }
+/* Lit while your character stands next to it (assets/realm.js, roomNear): Enter opens it. */
+.rshelf.is-near { border-color: var(--primary); }
 .rshelf span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 1px 8px; font: 700 12px var(--body); font-variant-numeric: tabular-nums; }
 /* ---- your office (David, 2026-11-12) ----
    The chest and the portrait wear the shelf's see-through button. While decorating, those buttons
