@@ -28,8 +28,11 @@ people can see them."
   splashes for a few seconds, and sinks back. The first one comes 20 to 45 seconds after arriving.
 - None on an unclaimed land (still mist and a sign), none while the tab is hidden or you are inside
   a building, and none at all for somebody who asked their computer for reduced motion.
-- **Not yet:** defeating them. How a creature weakens as the show's tasks are finished is David's
-  call and comes as a follow-up.
+- **Defeating them** (David chose "weakens with tasks"): as the show's tasks are approved its
+  creature is scratched with a plaster on its face (a quarter done), bandaged (half), worn out, only
+  half rising and no longer roaring (three quarters), and when every task is approved it **lies
+  defeated** on its land for good, stars over its head, for everybody to see. The stage comes with
+  the land's weather from the server (`sky.beast`); until that change is live every creature is healthy.
 
 ## 2026-11-13 — The Realm: sending jumps to the bottom, and rooms say "Exit" *(no migration)*
 
