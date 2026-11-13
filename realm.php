@@ -119,6 +119,9 @@ foreach (($state['people'] ?? []) as $p) {
         </div>
         <div id="cardslot"></div>
         <div class="rinside" id="insideBar" hidden></div>
+        <?php /* The library, along the bottom of your own room while you decorate it (David,
+                 2026-11-12: "they can modify it from a library"). Filled by assets/realm.js. */ ?>
+        <div class="rdeco" id="decoBar" hidden></div>
       </div>
       <div class="rlegend">
         <span><i class="rdot open"></i>Door open, walk in</span>
@@ -146,6 +149,17 @@ foreach (($state['people'] ?? []) as $p) {
   <dialog id="focusDlg" aria-labelledby="focusTitle">
     <h2 id="focusTitle">Your library</h2>
     <div id="focusBody"></div>
+  </dialog>
+  <?php /* The chest and the portrait in a house (David, 2026-11-12): "Treasure chest: to check their
+           gold. A portrait in the wall: so they can see theirs and others bio and profile from
+           Anima, and update it." Both are filled by assets/realm.js. */ ?>
+  <dialog id="goldDlg" aria-labelledby="goldTitle">
+    <h2 id="goldTitle">Your treasure</h2>
+    <div id="goldBody"></div>
+  </dialog>
+  <dialog id="profDlg" aria-labelledby="profTitle">
+    <h2 id="profTitle">Profile</h2>
+    <div id="profBody"></div>
   </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">
     <h2 id="lookTitle">Your character and house</h2>

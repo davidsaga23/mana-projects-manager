@@ -275,6 +275,40 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
 .rshelf:hover, .rshelf:focus-visible { border-color: var(--primary); }
 .rshelf span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 5px; white-space: nowrap; background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 1px 8px; font: 700 12px var(--body); font-variant-numeric: tabular-nums; }
+/* ---- your office (David, 2026-11-12) ----
+   The chest and the portrait wear the shelf's see-through button. While decorating, those buttons
+   are away, the room can be dragged on, and the library lies along the bottom of the room. */
+.rmapbox.is-deco canvas { touch-action: none; cursor: grab; }
+.rdeco { position: absolute; left: 12px; right: 12px; bottom: 12px; max-height: 48%; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); }
+.rdeco[hidden] { display: none; }
+.rdecohead, .rdecorow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.rdecohead b { font-size: 16px; }
+.rdecopick { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.rdecolib { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+.rthing { flex: none; min-width: 96px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; cursor: pointer; transition: background-color var(--ease), border-color var(--ease); }
+.rthing:hover { background: var(--primary-tint); border-color: var(--primary); }
+/* .rmapbox canvas stretches the map over its box; a thing in the library is its own small picture. */
+.rmapbox .rthing canvas { position: static; inset: auto; flex: none; image-rendering: pixelated; }
+.rthing span { font-weight: 600; white-space: nowrap; }
+.rthing small { font-size: 12px; white-space: nowrap; }
+.rthing[aria-disabled="true"] { cursor: default; }
+.rthing[aria-disabled="true"]:hover { background: var(--surface-2); border-color: var(--border); }
+.rthing[aria-disabled="true"] canvas { opacity: .45; }
+.rthing.is-gold small { color: var(--warn); }
+.rgold { font-size: 26px; color: var(--warn-strong); }
+#goldBody, #profBody { display: flex; flex-direction: column; gap: 12px; }
+#goldBody p, #profBody p { margin: 0; }
+.rprof { display: flex; align-items: center; gap: 14px; }
+.rprofpic { width: 84px; height: 84px; flex: none; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface-2); object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 700; color: var(--muted); }
+.rprofwho { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rprofwho b { font-size: 17px; }
+.rprofbio { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 10px 12px; max-height: 40vh; overflow: auto; overflow-wrap: anywhere; }
+.rprofbio.is-none { color: var(--faint); }
+.rprofform label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); }
+.rprofform label.rcheck { flex-direction: row; align-items: center; gap: 8px; }
+.rprofform input:not([type=file]):not([type=checkbox]), .rprofform textarea { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; resize: vertical; }
+.rprofform input:focus-visible, .rprofform textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.rprofform input[type=checkbox] { accent-color: var(--primary); }
 #focusBody { display: flex; flex-direction: column; gap: 14px; }
 .rfidle { color: var(--muted); }
 .rfnow { background: var(--surface-2); border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }

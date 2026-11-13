@@ -259,7 +259,9 @@ const FEATURE_POSTS = [
                             ['field', 'overhead_log', 'time_log']],
     // The Realm's task list changes a status by My tasks' rules, so it asks the
     // same switch. Nothing else posted to realm_api.php is listed: no '*' line.
-    'realm_api.php'     => [['field', 'task_status', 'own_status']],
+    // save_profile (2026-11-12) is Home's own profile form reached through the
+    // portrait in a Realm house, so it asks Home's switch.
+    'realm_api.php'     => [['field', 'task_status', 'own_status'], ['field', 'save_profile', 'home']],
     'bugs.php'          => [['field', 'report_bug', 'bug_report'], ['*', '', 'bugs_list']],
     'alltasks.php'      => [['*', '', 'studio_tasks_edit']],
     'artists.php'       => [['*', '', 'artists_edit']],
