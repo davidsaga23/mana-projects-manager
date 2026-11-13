@@ -310,6 +310,14 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 #focusBtn.is-break { border-color: var(--ok); color: var(--text); }
 /* The bookshelf in your own house is the way in to your tasks: a see-through button laid over the
    drawn shelf (placed by assets/realm.js), with a small tag under it so it reads as something to click. */
+/* Who is working on what: the card over a character (assets/realm.js, "who is working on what"). */
+.rwhotip { position: absolute; z-index: 6; max-width: min(260px, calc(100% - 12px)); padding: 7px 10px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); font-size: 13px; line-height: 1.3; }
+.rwhotip[hidden] { display: none; }
+.rwhotip b { font-weight: 600; }
+.rwhotip .rwhotask { color: var(--text); }
+.rwhotip small { color: var(--muted); }
+.rwhotip a { font-size: 12px; margin-top: 2px; }
 .rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
 .rshelf:hover, .rshelf:focus-visible { border-color: var(--primary); }
 /* Lit while your character stands next to it (assets/realm.js, roomNear): Enter opens it. */
