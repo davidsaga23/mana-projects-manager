@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: the names of things in a room sit behind the characters *(no migration)*
+
+**Asked by David**, with a picture of "Timeline" and its blue frame drawn across his character in a
+camp: "let's make these stay behind the character".
+
+- **The name tags in a room (Your tasks, Your gold, Your profile, Brief, Timeline, Tracking,
+  Merchant) and the blue frame round the thing you stand next to are now part of the picture.** A
+  character standing in front of one covers it; a speech bubble covers it too.
+- Clicking a thing, pressing Enter next to it and reaching it with Tab work as before.
+
 ## 2026-11-13 — The Realm: a wider arrow back from a thread *(no migration)*
 
 **Asked by David**: "wider arrow to go back please". The back button at the top of a thread is now a
