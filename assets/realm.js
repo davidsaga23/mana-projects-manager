@@ -920,7 +920,27 @@ function drawRoom(c, cw, ch) {
   var now = Date.now(), boxes = [];
   who.forEach(function (d) { var b = BUB[d.mine?ST.me:d.p.id]; if (b && b.until > now) { var box = bubbleBox(c,d.x,d.y-60,b.text); box.by = Math.max(-24,box.by); box.until = b.until; boxes.push(box); } });
   /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
-  placeBubbles(boxes).sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
+  var placed = placeBubbles(boxes);
+  placed.sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
+  tagsUnderBubbles(c.canvas,placed,s,ox,oy);
+}
+/* WHAT SOMEBODY SAYS GOES IN FRONT OF THE NAME OF A THING (David, 2026-11-13, with a picture of
+   "Your tasks" and "Your profile" sitting on top of a speech bubble: "let's make sure the names of
+   the objects are behind the dialogues"). The bubbles are painted on the canvas; the names are tags
+   on the see-through buttons laid over the bookshelf, the chest and the portrait, and anything on
+   the page is always above anything painted. So a name that a bubble reaches is put away for as long
+   as the bubble is up, which is what "behind it" looks like, and comes back when the bubble goes.
+   The button itself stays where it is and still works. */
+function tagsUnderBubbles(cv, placed, s, ox, oy) {
+  if (!cv || !cv.getBoundingClientRect) return;
+  var k = Math.min(2,window.devicePixelRatio||1), at = cv.getBoundingClientRect();
+  HOT.forEach(function (h) {
+    var b = $(h[0]), tag = b && b.querySelector('span'), under = false; if (!tag) return;
+    if (!b.hidden) { var r = tag.getBoundingClientRect();
+      placed.forEach(function (p) { var x = at.left+(ox+(p.bx-1)*s)/k, y = at.top+(oy+(p.by-1)*s)/k, w = (p.w+2)*s/k, hh = (p.h+2)*s/k;
+        if (r.left < x+w && x < r.right && r.top < y+hh && y < r.bottom) under = true; }); }
+    tag.style.visibility = under ? 'hidden' : '';
+  });
 }
 
 /* ---------- decorating (David, 2026-11-12) ----------
