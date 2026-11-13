@@ -41,6 +41,8 @@ require_once __DIR__ . '/realm_voice.php';
 require_once __DIR__ . '/realm_shop.php';
 // Giving and swapping what was bought (the same migration).
 require_once __DIR__ . '/realm_trade.php';
+// Each show's sky over its land (no migration): weather and fireworks, read from Anima.
+require_once __DIR__ . '/realm_weather.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;
@@ -429,7 +431,15 @@ function realm_state(PDO $pdo, int $uid): array {
     } catch (Throwable $e) {
         $people = [];
     }
-    return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => realm_lands($pdo),
+    // Each claimed land carries its sky (includes/realm_weather.php): the same
+    // for everybody, worked out at most every REALM_SKY_SECONDS for the studio.
+    $lands = realm_lands($pdo);
+    $skies = realm_skies($pdo);
+    foreach ($lands as &$l) {
+        $l['sky'] = ($l['claimed'] && isset($skies[$l['land']])) ? $skies[$l['land']] : realm_sky_none();
+    }
+    unset($l);
+    return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => $lands,
             'idle_minutes' => REALM_IDLE_MINUTES, 'slots' => REALM_SLOTS,
             'knocks' => realm_knock_news($pdo, $uid),
             // Where the people I can see are standing (migration 087); null before it.

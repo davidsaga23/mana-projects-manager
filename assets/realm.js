@@ -384,7 +384,7 @@ function zed(c, x, y) {
    NOTHING MOVES FOR SOMEBODY WHO ASKED FOR LESS MOTION (prefers-reduced-motion): fx() does nothing
    at all then, as the rest of the Realm already does (`calm`). */
 var FX = [], fxraf = 0;
-var FXMS = {poof:460,land:460,chest:900,shelf:800,portrait:760,praise:1500};
+var FXMS = {poof:460,land:460,chest:900,shelf:800,portrait:760,praise:1500,firework:1400};
 function fx(kind, x, y, col) {
   if (calm || !FXMS[kind]) return;
   FX.push({k:kind,x:x,y:y,col:col||TINT.mana,t0:Date.now(),room:!!S.inside});
@@ -444,6 +444,20 @@ function fxPaint(c, room) {
         c.fillStyle = PAL.out; c.fillRect(px-1,py-1,6,7); c.fillStyle = PAL.win; c.fillRect(px,py,4,5); c.fillStyle = PAL.hot; c.fillRect(px,py+2,4,1); }
       c.globalAlpha = 1; return;
     }
+    if (e.k==='firework') {
+      /* A show's fireworks (each show's sky, below): a spark climbs from the camp, then bursts into
+         two rings that spread, sink a little and fade. (e.x, e.y) is where it bursts. Drawn large,
+         because a camp is usually seen from across the whole map. */
+      if (k < .28) { p = k/.28; py = Math.round(e.y+80-p*80);
+        c.fillStyle = PAL.out; c.fillRect(Math.round(e.x)-3,py-3,7,14); c.fillStyle = PAL.hot; c.fillRect(Math.round(e.x)-2,py-2,5,11);
+        return; }
+      p = (k-.28)/.72;
+      c.globalAlpha = Math.max(0,1-p*p);
+      for (i = 0; i < 20; i++) { var fa = i*Math.PI/(i<12?6:4)+(i<12?0:.4), fr = (i<12?8+Math.sqrt(p)*52:5+Math.sqrt(p)*28), sz = i<12?7:5;
+        px = Math.round(e.x+Math.cos(fa)*fr); py = Math.round(e.y+Math.sin(fa)*fr+p*p*22);
+        c.fillStyle = PAL.out; c.fillRect(px-(sz>>1)-1,py-(sz>>1)-1,sz+2,sz+2); c.fillStyle = i<12 ? e.col : PAL.hot; c.fillRect(px-(sz>>1),py-(sz>>1),sz,sz); }
+      c.globalAlpha = 1; return;
+    }
     if (e.k==='portrait') {
       /* A light sweeps across the frame, the way a glass does when you step in front of it. */
       c.globalAlpha = Math.max(0,.85-Math.abs(k-.5)*1.3);
@@ -461,6 +475,104 @@ function fxPaint(c, room) {
       c.globalAlpha = Math.max(0,1-p*p);
       star(c,px,py,e.col); }
     c.globalAlpha = 1;
+  });
+}
+/* ---------- each show's sky (David, 2026-11-13) ----------
+   "Shows that react to production": the land a show has claimed shows the state of that show at a
+   glance. The server works it out (includes/realm_weather.php) and every land in ST.lands carries
+   `sky`: {w: clear|cloud|rain|storm, cheer: a task approved in the last hour, mile: 25|50|75|100
+   crossed today, or 0}. What David chose that day:
+     * the weather is Anima's own pace verdict for the show (the breakdown grid's green, amber, red):
+       clear, clouds, rain; a storm when the delivery date has passed with work still open;
+     * small fireworks over the camp while work is being approved, a big burst and a banner for the
+       rest of the day when the show crosses a quarter;
+     * everybody sees every sky.
+   For somebody who asked for less motion (`calm`) the clouds and rain stand still, there is no
+   lightning and no fireworks; the banner still flies, because it is a picture, not a movement. */
+var SKYW = {clear:'Clear skies, on pace',cloud:'Clouds, a little behind pace',rain:'Rain, well behind pace',storm:'A storm: past delivery with work still open'};
+function skyOf(id) {
+  var m = /^land:(\w+)$/.exec(id||''); if (!m) return null;
+  var l = ST.lands.filter(function (x) { return x.land===m[1]; })[0];
+  return l && l.claimed && l.sky ? l.sky : null;
+}
+function skyWords(id) { var k = skyOf(id); return k ? (SKYW[k.w]||'')+(k.mile?(k.mile===100?'. Every task approved today!':'. Crossed '+k.mile+'% today'):'')+(k.cheer?'. Work approved within the hour':'') : ''; }
+/* A cloud of three pixel puffs, outlined like everything else, its belly a shade darker. */
+function cloud(c, x, y, w, col, belly) {
+  var r = [[-w/2,0,w,10],[-w/2+5,-6,Math.round(w*.45),9],[Math.round(-w/2+w*.38),-11,Math.round(w*.42),13]], i;
+  c.fillStyle = PAL.out; for (i = 0; i < 3; i++) c.fillRect(Math.round(x+r[i][0])-2,Math.round(y+r[i][1])-2,r[i][2]+4,r[i][3]+4);
+  c.fillStyle = col; for (i = 0; i < 3; i++) c.fillRect(Math.round(x+r[i][0]),Math.round(y+r[i][1]),r[i][2],r[i][3]);
+  c.fillStyle = belly; c.fillRect(Math.round(x-w/2),Math.round(y+7),w,3);
+}
+/* The gloom on the ground goes on straight after the ground, under the buildings and people. */
+function skyShade(c) {
+  ST.lands.forEach(function (l) {
+    var L = LANDS[l.land], k = l.claimed && l.sky; if (!L || !k || (k.w!=='rain' && k.w!=='storm')) return;
+    c.globalAlpha = k.w==='storm' ? .26 : .14; c.fillStyle = PAL.out;
+    c.beginPath(); c.ellipse(L.mist[0],L.mist[1],L.mist[2],L.mist[3],0,0,Math.PI*2); c.fill(); c.globalAlpha = 1;
+  });
+}
+/* Clouds, rain, lightning and the banner, over everything else on the map. */
+function skyPaint(c, f) {
+  ST.lands.forEach(function (l) {
+    var L = LANDS[l.land], k = l.claimed && l.sky; if (!L || !k) return;
+    var x = L.camp[0], y = L.camp[1], top = y-118, i;
+    if (k.w!=='clear') {
+      var dark = k.w==='storm', col = dark ? '#5d6479' : k.w==='rain' ? PAL.stone : PAL.smoke, belly = dark ? '#454b5e' : k.w==='rain' ? PAL.stoneD : PAL.snowD;
+      var drift = function (n) { return calm ? 0 : Math.round(Math.sin(f/12+n*2.1)*4); };
+      if (k.w!=='cloud') {
+        /* Rain falls from under the clouds to the roof of the camp, slanting with the wind. */
+        var n = dark ? 24 : 14, span = 86;
+        c.fillStyle = PAL.waterL; c.globalAlpha = .9;
+        for (i = 0; i < n; i++) { var ph = calm ? (i*.37)%1 : (f*.22+i*.37)%1, rx = Math.round(x-52+(i*29)%104-ph*8), ry = Math.round(top+12+ph*span);
+          c.fillRect(rx,ry,2,5); c.fillRect(rx-1,ry+5,2,4); }
+        c.globalAlpha = 1;
+      }
+      if (dark && !calm && f%19 < 2) {
+        /* Now and then a bolt, and the land flashes with it. */
+        c.globalAlpha = .18; c.fillStyle = PAL.hot; c.beginPath(); c.ellipse(L.mist[0],L.mist[1],L.mist[2],L.mist[3],0,0,Math.PI*2); c.fill(); c.globalAlpha = 1;
+        var bx = x+((f*7)%40)-20, pts = [[0,0],[-6,14],[2,16],[-5,34],[6,18],[-1,16],[4,0]];
+        c.fillStyle = PAL.out; c.fillRect(bx-4,top+8,10,40);
+        c.fillStyle = PAL.win; for (i = 0; i < pts.length-1; i++) { var a = pts[i], b = pts[i+1], s, st = 6;
+          for (s = 0; s <= st; s++) c.fillRect(Math.round(bx+a[0]+(b[0]-a[0])*s/st)-1,Math.round(top+10+a[1]+(b[1]-a[1])*s/st),3,3); }
+      }
+      cloud(c,x-22+drift(0),top,64,col,belly);
+      if (k.w!=='cloud') cloud(c,x+30+drift(1),top+8,56,col,belly);
+      if (dark) cloud(c,x-62+drift(2),top+14,50,col,belly);
+    }
+    if (k.mile) {
+      /* The banner: a pennant in the show's colour on a pole beside the camp, for the rest of the day. */
+      var px = x+40, py = y-56, tint = TINT[{peaks:'mana',wood:'violet',ash:'ember',lake:'teal',moor:'rose'}[l.land]]||TINT.candle, txt = k.mile===100 ? 'DONE!' : k.mile+'%';
+      c.fillStyle = PAL.out; c.fillRect(px-2,py-2,5,60); c.fillStyle = PAL.wood; c.fillRect(px-1,py,3,56);
+      c.fillStyle = PAL.out; c.fillRect(px+1,py,40,18); c.fillRect(px+41,py+4,6,10);
+      c.fillStyle = tint; c.fillRect(px+2,py+2,37,14); c.fillRect(px+39,py+5,5,8);
+      c.font = 'bold 11px "Courier New", monospace'; c.textAlign = 'center'; c.fillStyle = PAL.out; c.fillText(txt,px+21,py+13); c.textAlign = 'start';
+      c.fillStyle = PAL.hot; c.fillRect(px-1,py-4,3,3);
+    }
+  });
+}
+/* Fireworks while work is being approved: every couple of seconds, over each camp that has
+   approvals within the hour, one may go up. Only on the map and only while the page is looked at. */
+function skyCheer() {
+  if (calm || S.inside || document.hidden || !ST || !ST.lands) return;
+  ST.lands.forEach(function (l) {
+    var L = LANDS[l.land]; if (!L || !l.claimed || !l.sky || !l.sky.cheer || Math.random() < .45) return;
+    fx('firework',L.camp[0]-60+Math.random()*120,L.camp[1]-140-Math.random()*40,TINT[['candle','rose','spell','mana','violet'][Math.floor(Math.random()*5)]]);
+  });
+}
+/* A milestone gets one big volley for each person, the first time they are on the map to see it
+   that day. Remembered in this browser only; a second browser simply shows it again. */
+function skyNews() {
+  if (!ST || !ST.lands || S.inside || document.hidden) return;
+  ST.lands.forEach(function (l) {
+    var L = LANDS[l.land]; if (!L || !l.claimed || !l.sky || !l.sky.mile) return;
+    var key = 'realmMile:'+l.land+':'+new Date().toDateString()+':'+l.sky.mile, seen = false;
+    try { seen = localStorage.getItem(key)==='1'; localStorage.setItem(key,'1'); } catch (e) { /* no storage: shown on every visit */ }
+    if (seen) return;
+    if (l.project_id) toast(l.name+(l.sky.mile===100?' has every task approved!':' crossed '+l.sky.mile+'% approved today!'));
+    if (calm) return;
+    for (var i = 0; i < 9; i++) setTimeout(function () {
+      fx('firework',L.camp[0]-90+Math.random()*180,L.camp[1]-130-Math.random()*70,TINT[['candle','rose','spell','mana','violet','teal'][Math.floor(Math.random()*6)]]);
+    },i*330);
   });
 }
 /* Where everybody was last drawn, so a thing that happens TO somebody can be shown over them. */
@@ -1603,7 +1715,7 @@ function draw() {
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
     placeHot(null);
-    c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
+    c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0); skyShade(c);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
     /* Each of the others is drawn on the way to their spot (glide), or to where the map stands
@@ -1638,6 +1750,7 @@ function draw() {
       heads(c,o,w.inside[o.id]||[]);
     });
     puff(c,1380,636,f,true);
+    skyPaint(c,f);
     fxPaint(c,false);
     /* The arrow is always on top, so you can find yourself when a house covers you. */
     if (!en) { var ay = myy-70-(f%2)*2; c.fillStyle = PAL.out; c.fillRect(mx-6,ay-1,12,5); c.fillRect(mx-4,ay+4,8,3); c.fillRect(mx-2,ay+7,4,2);
@@ -1661,7 +1774,7 @@ function overlay() {
   BLIST.forEach(function (o) {
     var hw = HIT[o.kind][0], ht = HIT[o.kind][1];
     if (o.place) {
-      h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(o.name)+', a place to meet"><rect class="hit" x="'+(o.x-hw-10)+'" y="'+(o.y-ht)+'" width="'+(hw*2+20)+'" height="'+(ht+50)+'" rx="4"/></g>';
+      h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(o.name)+', a place to meet'+(skyWords(o.id)?'. '+esc(skyWords(o.id)):'')+'"><rect class="hit" x="'+(o.x-hw-10)+'" y="'+(o.y-ht)+'" width="'+(hw*2+20)+'" height="'+(ht+50)+'" rx="4"/></g>';
       return; }
     var d = o.lit ? o.door : '';
     h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(title(o.id))+(d?', '+DOORS[d]:', away')+'"><rect class="hit" x="'+(o.x-hw)+'" y="'+(o.y-ht)+'" width="'+(hw*2)+'" height="'+(ht+24)+'" rx="4"/></g>';
@@ -1695,7 +1808,7 @@ function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
   if (S.walk) { h = '<div class="rcard"><b>Walking to '+esc(title(S.walk.id))+'…</b><div class="racts"><button type="button" class="rbtn rsmall" data-tele="'+esc(S.walk.id)+'">Teleport instead</button></div></div>'; }
   else if (o) {
-    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Go inside to talk, in writing or in a call.';
+    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : (skyWords(id) ? skyWords(id)+'. ' : '')+'A place to meet. Go inside to talk, in writing or in a call.';
     /* At an ajar door, with nobody having let me in yet, the button is Knock. */
     var ajar = o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.door==='ajar' && !PASS[o.owner.id];
     var waiting = ajar && KN.mine && KN.mine.to===o.owner.id && KN.mine.status==='waiting';
@@ -1764,6 +1877,7 @@ function applyState(st) {
   /* Praise, mana and gold live in assets/realm_praise.js; it is told whenever the map changes. */
   if (R.onState) R.onState(ST);
   takeSpots(st.spots);
+  skyNews();
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -3144,5 +3258,6 @@ if ($('focusBtn') && $('focusNow')) {
   document.addEventListener('visibilitychange',function () { if (!document.hidden) focusAsk(); });
 }
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
+if (!calm) setInterval(skyCheer,1800);
 window.addEventListener('resize',function () { draw(); shareShow(); });
 })();
