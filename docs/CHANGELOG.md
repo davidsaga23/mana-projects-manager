@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: a creature in every show's land *(no migration)*
+
+**Asked by David**: "let's also add a creature to defeat per land/project. An ogre in the forest,
+a dragon in the volcan, etc. They can peak or come out once in a while (not at the same time) so
+people can see them."
+
+- Each land with a show on it has its own creature, drawn in the Realm's pixel style: an **ogre**
+  in the Wood, a **yeti** over the Peaks, a **dragon** out of the Ashlands' lava, a **serpent** in
+  the Lake and a **wraith** on the Moor.
+- Every 30 to 90 seconds **one** of them (a random land, never the same one twice running) rises
+  from behind the trees, over the tallest peak, out of the lava or the water, roars, flaps or
+  splashes for a few seconds, and sinks back. The first one comes 20 to 45 seconds after arriving.
+- None on an unclaimed land (still mist and a sign), none while the tab is hidden or you are inside
+  a building, and none at all for somebody who asked their computer for reduced motion.
+- **Not yet:** defeating them. How a creature weakens as the show's tasks are finished is David's
+  call and comes as a follow-up.
+
 ## 2026-11-13 — The Realm: small animations *(no migration)*
 
 **Asked by David**: "let's create some basic animations for when you: teleport, open a chest, access
