@@ -14,6 +14,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: names behind the characters, and a reload keeps your place *(no migration)*
+
+**Reported by David**, with a picture of "Renata" and "The Tavern" written across the characters
+standing there: "these names should be behind the characters".
+
+- **A character standing in front of a house's name or a place's name plate now covers it.** The
+  names, the door marks beside them and the plates are painted as part of the map.
+- A name still lights up blue when you point at its building, and buildings are clicked as before.
+- The big land names (a show's name, "Anima Village") are unchanged and still sit on top.
+
+**Asked by David**: "is it possible when you reload to be kept in the same spot or house where you
+left?"
+
+- **Reloading the Realm puts you back where you were**: in the same room, at the same place in it,
+  or at the same spot on the map. It used to stand you outside the last door you arrived at.
+- Remembered in the browser, per person, for 12 hours; after that you start at your own door.
+- If the room's door no longer lets you in (it was sealed, the owner left, or it is ajar and you
+  had been let in), you are stood outside it instead.
+
 ## 2026-11-13 — The Realm: what is always in a show's camp *(migration 091)*
 
 **Asked by David:** "for all the project camps, let's always have the following: A bar with the
