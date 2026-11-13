@@ -40,6 +40,14 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
   counting of time logs and the face to face check need David and Renata on the live site.
 
+
+## 2026-11-13 — The Realm: what somebody says is in front of the names of things *(no migration)*
+
+**Reported by David**, with a picture of "Your tasks" and "Your profile" sitting on top of a speech
+bubble: "let's make sure the names of the objects are behind the dialogues".
+
+- **A speech bubble now covers the name of the bookshelf, the chest or the portrait** where it
+  reaches it. The name comes back when the bubble goes. The thing itself still works when clicked.
 ## 2026-11-12 — Commercial: the CRM *(migration 089)*
 
 **Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
