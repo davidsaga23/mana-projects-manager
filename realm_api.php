@@ -215,6 +215,75 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
     exit;
 }
 
+// ---- a show's camp (David, 2026-11-13, migration 089) --------------------------
+// GET  camp=<land>                    the camp: the slaying bar's numbers, the
+//                                     decorations, which windows I may open
+// GET  camp=<land>&brief=1            the scroll: the show's Brief
+// GET  camp=<land>&timeline=1         the calendar: the show's timeline, compact
+// GET  camp=<land>&tracking=1&scope=shot|asset|project
+//                                     the board: the show's production tracking
+// POST camp_thing=<land>&thing=&x=&y= stand my ONE thing in the camp, or move it
+// POST camp_thing=<land>&remove=<user id, or 0 for my own>
+//                                     take a thing out (somebody else's: Production only)
+//
+// ⚠ A LAND IS SENT, NEVER A SHOW. realm_camp_open() finds the show that holds
+// the land and asks may_see_project(); the id used below is always that one.
+// ⚠ ANIMA'S SWITCHES ARE ASKED HERE for each window ('brief', 'timeline',
+// 'production'), so a screen switched off for somebody cannot be read through a
+// camp. Everything is read only except `camp_thing`, the one field named in
+// artist_may_post(), which writes the session's own row (or deletes another's
+// only for can_edit()).
+if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
+    try {
+        require_once __DIR__ . '/includes/realm_camp.php';
+        $land = isset($_POST['camp_thing']) ? (string)$_POST['camp_thing'] : (string)$_GET['camp'];
+        $why = '';
+        $show = realm_camp_open($pdo, $land, $why);
+        if ($show === null) {
+            echo json_encode(['ok' => false, 'error' => $why, 'camp' => ['land' => $land, 'closed' => true]]);
+            exit;
+        }
+        $pid = (int)$show['id'];
+        $on  = fn(string $k): bool => !function_exists('feature_on') || feature_on($k);
+        $off = fn(string $what): string => $what . ' is switched off for your account. Production can turn it on for you on the Users page.';
+        if (isset($_GET['brief'])) {
+            echo json_encode($on('brief') ? ['ok' => true, 'brief' => realm_camp_brief($pdo, $pid)]
+                                          : ['ok' => false, 'error' => $off('The Brief')]);
+            exit;
+        }
+        if (isset($_GET['timeline'])) {
+            $full = $on('timeline');
+            echo json_encode(($full || REALM_CAMP_TIMELINE_WITHOUT_SWITCH === 'milestones')
+                ? ['ok' => true, 'timeline' => realm_camp_timeline($pdo, $show, $full)]
+                : ['ok' => false, 'error' => $off('The Timeline')]);
+            exit;
+        }
+        if (isset($_GET['tracking'])) {
+            echo json_encode($on('production') ? ['ok' => true, 'tracking' => realm_camp_tracking($pdo, $pid, (string)($_GET['scope'] ?? ''))]
+                                               : ['ok' => false, 'error' => $off('Production tracking')]);
+            exit;
+        }
+        $bad = '';
+        if (isset($_POST['camp_thing'])) {
+            try {
+                $bad = isset($_POST['remove'])
+                    ? realm_camp_remove($pdo, $uid, $pid, (int)$_POST['remove'], can_edit())
+                    : realm_camp_place($pdo, $uid, $pid, (string)($_POST['thing'] ?? ''), (int)($_POST['x'] ?? 0), (int)($_POST['y'] ?? 0));
+            } catch (Throwable $e) {
+                $bad = 'That could not be saved. Try again in a moment.';
+            }
+        }
+        $answer = ['ok' => true, 'camp' => realm_camp_answer($pdo, $uid, $land, $show,
+                       ['brief' => $on('brief'), 'timeline' => $on('timeline'), 'production' => $on('production')], can_edit())];
+        if ($bad !== '') { $answer['error'] = $bad; $answer['saved'] = false; }
+        elseif (isset($_POST['camp_thing'])) $answer['saved'] = true;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The camp could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+
 // ---- chat (stage 2, migration 082) ------------------------------------------
 // GET  chat=<channel>&after=<id>           what was said, and marks it read
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer

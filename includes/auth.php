@@ -582,8 +582,13 @@ function artist_may_post(): bool {
         // portrait in their house. ⚠ THE SAME WRITE AS home.php ABOVE, on a second
         // screen: home_save_profile() with the session's own linked person, never
         // an id from the form.
+        // `camp_thing` (2026-11-13, migration 089): the ONE thing each person may
+        // stand in a show's camp. ⚠ NO SHOW ID AND NO OWNER TO FORGE: a land is
+        // sent, realm_camp_open() finds its show and asks may_see_project(), and
+        // the row written is the session's own. Taking out somebody else's thing
+        // is refused in realm_camp_remove() unless can_edit().
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status', 'voice', 'save_room', 'save_profile'],
+                            'task_status', 'voice', 'save_room', 'save_profile', 'camp_thing'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
