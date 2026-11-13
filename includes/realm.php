@@ -369,6 +369,110 @@ function realm_spots(PDO $pdo, int $uid): ?array {
     return $out;
 }
 
+// ---- what somebody is working on --------------------------------------------
+// David, 2026-11-13: point at a character on the map, or in a room, to see the
+// task they have the clock running on. Asked how far that goes, he chose
+// "Everyone in the Realm" (every person in the Realm sees everybody's), and,
+// when nobody's clock is running, "Just their name".
+//
+// ⚠ READ ONLY. This reads Anima's one timer (time_timers, migrations 043 and
+// 048: one row per person, the clock My tasks and the focus desk start) and
+// today's time log. It never writes either: a look at somebody is not a reason
+// to touch their hours.
+//
+// ⚠ NO NEW POLLING. It rides on the state the heartbeat already fetches, so it
+// is as fresh as the characters' positions (25 s); the page counts the minutes
+// on between two heartbeats.
+
+/**
+ * The clock running for each person, keyed by crew id.
+ *
+ * Each value:
+ *   title  the step and the shot or asset ('Lighting, FCM_sh020'), or the card's title
+ *   show   the project's name
+ *   mins   minutes on that task today: what is already logged today, plus the
+ *          clock now running if it counts (a plain timer or a focus block; a
+ *          break is not work and logs nothing)
+ *   tick   true when the page should keep adding minutes to `mins`
+ *   brk    'Short break' / 'Long break' during a Pomodoro break, else ''
+ *   link   where Anima shows it: the task in Spell, or the card. Anima's own
+ *          page decides what the viewer may see there.
+ *
+ * An empty list on a database without timers, or if anything fails: the map
+ * then shows names only, as it did before.
+ */
+function realm_clocks(PDO $pdo): array {
+    $out = [];
+    try {
+        if (!function_exists('column_exists') || !column_exists($pdo, 'time_timers', 'crew_id')) return [];
+        $phase = column_exists($pdo, 'time_timers', 'phase');
+        $rows = $pdo->query(
+            'SELECT t.crew_id, t.progress_id, t.ticket_id, t.project_id, ' . ($phase ? 't.phase' : 'NULL') . ' AS phase,
+                    TIMESTAMPDIFF(SECOND, t.started_at, NOW()) AS run_s,
+                    p.name AS project_name, pr.step_id, pr.item_key, ps.name AS step_name,
+                    s.episode, s.shot_code, a.name AS asset_name, tk.title AS ticket_title
+               FROM time_timers t
+               JOIN projects p ON p.id = t.project_id
+          LEFT JOIN progress pr ON pr.id = t.progress_id
+          LEFT JOIN pipeline_steps ps ON ps.id = pr.step_id
+          LEFT JOIN shots  s ON s.id = pr.shot_id
+          LEFT JOIN assets a ON a.id = pr.asset_id
+          LEFT JOIN tickets tk ON tk.id = t.ticket_id'
+        )->fetchAll();
+        if (!$rows) return [];
+        // Today's logged minutes per person and task, in its own try: a missing
+        // or odd time log still leaves the task itself to show.
+        $today = [];
+        try {
+            foreach ($pdo->query('SELECT crew_id, progress_id, ticket_id, SUM(minutes) AS m
+                                    FROM time_logs WHERE log_date = CURDATE()
+                                GROUP BY crew_id, progress_id, ticket_id') as $l) {
+                $k = (int)$l['crew_id'] . ':' . ($l['progress_id'] !== null ? 'p' . (int)$l['progress_id'] : 't' . (int)$l['ticket_id']);
+                $today[$k] = (int)$l['m'];
+            }
+        } catch (Throwable $e) {
+            $today = [];
+        }
+        foreach ($rows as $r) {
+            $crew = (int)$r['crew_id'];
+            $isTask = $r['progress_id'] !== null;
+            if ($isTask) {
+                $what = (string)($r['shot_code'] ?? '') !== ''
+                    ? shot_label_safe($r['episode'], $r['shot_code'])
+                    : (string)($r['asset_name'] ?? '');
+                $title = trim((string)$r['step_name'] . ($what !== '' ? ', ' . $what : ''));
+                $link = 'spell.php?project=' . (int)$r['project_id']
+                      . '&open=' . rawurlencode((int)$r['step_id'] . ':' . (string)$r['item_key']);
+            } else {
+                $title = (string)($r['ticket_title'] ?? '');
+                $link = $r['ticket_id'] !== null ? 'ticket.php?id=' . (int)$r['ticket_id'] : '';
+            }
+            $ph = (string)($r['phase'] ?? '');
+            $brk = $ph === 'short_break' ? 'Short break' : ($ph === 'long_break' ? 'Long break' : '');
+            $run = $brk === '' ? max(0, (int)$r['run_s']) : 0;
+            $k = $crew . ':' . ($isTask ? 'p' . (int)$r['progress_id'] : 't' . (int)$r['ticket_id']);
+            $out[$crew] = [
+                'title' => $title !== '' ? $title : 'A task',
+                'show'  => (string)$r['project_name'],
+                'mins'  => (int)($today[$k] ?? 0) + intdiv($run, 60),
+                'tick'  => $brk === '',
+                'brk'   => $brk,
+                'link'  => $link,
+            ];
+        }
+    } catch (Throwable $e) {
+        return [];
+    }
+    return $out;
+}
+
+/** shot_label() (includes/functions.php) when it is loaded, the same words otherwise. */
+function shot_label_safe($episode, $shotCode): string {
+    if (function_exists('shot_label')) return shot_label($episode, $shotCode);
+    $ep = trim((string)$episode); $sh = trim((string)$shotCode);
+    return $sh === '' ? '' : ($ep !== '' ? $ep . '_' . $sh : $sh);
+}
+
 /**
  * Everything the map draws: every person with a house, and the five lands.
  *
@@ -381,9 +485,11 @@ function realm_spots(PDO $pdo, int $uid): ?array {
  * the timer Anima already runs (migrations 043 and 048). Nothing is written to
  * it. `voice` is true while they are in the voice chat of the room they are
  * inside, and `muted` while their microphone is off there (migration 085). Clients and switched-off accounts are never listed.
+ * `work` is the task their clock is running on (realm_clocks()), or null.
  */
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
+    $clocks = realm_clocks($pdo);
     try {
         $timer = function_exists('column_exists') && column_exists($pdo, 'time_timers', 'phase');
         // In voice (migration 085): a fresh voice row that names the room the person is in.
@@ -391,7 +497,7 @@ function realm_state(PDO $pdo, int $uid): array {
         $sql = 'SELECT rp.user_id, rp.house_slot, rp.house_kind, rp.door, rp.place, rp.inside, rp.cloak, rp.hat, rp.pet,
                        TIMESTAMPDIFF(SECOND, rp.last_ping, NOW()) AS ping_age,
                        TIMESTAMPDIFF(MINUTE, rp.last_active, NOW()) AS idle_min,
-                       u.display_name, u.username, c.name AS crew_name, ' . ($timer ? 't.phase' : 'NULL') . ' AS phase,
+                       u.display_name, u.username, u.crew_id AS crew_ref, c.name AS crew_name, ' . ($timer ? 't.phase' : 'NULL') . ' AS phase,
                        ' . ($voice ? 'rv.user_id' : 'NULL') . ' AS v_user, ' . ($voice ? 'rv.muted' : '0') . ' AS v_muted
                   FROM realm_people rp
                   JOIN users u ON u.id = rp.user_id
@@ -424,6 +530,7 @@ function realm_state(PDO $pdo, int $uid): array {
                 'hat'    => realm_look_known('hat', (string)$r['hat']) ? (string)$r['hat'] : 'none',
                 'pet'    => realm_look_known('pet', (string)$r['pet']) ? (string)$r['pet'] : 'none',
                 'me'     => $id === $uid,
+                'work'   => $clocks[(int)$r['crew_ref']] ?? null,
             ];
         }
     } catch (Throwable $e) {
