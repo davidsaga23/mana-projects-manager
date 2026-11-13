@@ -162,6 +162,59 @@ if (isset($_POST['voice'])) {
     exit;
 }
 
+// ---- a house's room, and the portrait in it (David, 2026-11-12, migration 086) --
+// GET  room=<owner's user id>        that person's room, to draw it
+// POST save_room=<the room as JSON>  the asker's OWN room, after decorating
+// GET  profile=<owner's user id>     the profile behind the portrait
+// POST save_profile=1&phone=&bio=&remove_photo=0|1 (+ a file field `photo`)
+//                                    the asker's OWN profile, by Home's rules
+//
+// ⚠ NEITHER SAVE TAKES AN ID. The room is the session's own account
+// (realm_room_save), and the profile is the person that account is linked to
+// (realm_crew_id), saved by home_save_profile(), the very function Home calls.
+// Both fields are in artist_may_post(); save_profile also asks Home's switch in
+// FEATURE_POSTS, so somebody whose Home is off cannot edit a profile from here.
+if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']) || isset($_POST['save_profile'])) {
+    try {
+        require_once __DIR__ . '/includes/realm_room.php';
+        if (isset($_GET['room']) || isset($_POST['save_room'])) {
+            $bad = isset($_POST['save_room']) ? realm_room_save($pdo, $uid, (string)$_POST['save_room']) : '';
+            $room = realm_room_answer($pdo, $uid, isset($_POST['save_room']) ? $uid : (int)$_GET['room']);
+            $answer = $room === null ? ['ok' => false, 'error' => 'There is no house there.'] : ['ok' => true, 'room' => $room];
+            if ($bad !== '') { $answer['error'] = $bad; $answer['saved'] = false; }
+            elseif (isset($_POST['save_room'])) $answer['saved'] = true;
+            echo json_encode($answer);
+            exit;
+        }
+        $bad = '';
+        $said = '';
+        if (isset($_POST['save_profile'])) {
+            require_once __DIR__ . '/includes/profile.php';
+            $crewId = realm_crew_id($pdo, $uid);
+            if ($crewId <= 0) {
+                $bad = 'Your login is not linked to a person yet, so there is no profile to fill in.';
+            } else {
+                try {
+                    $said = home_save_profile($pdo, $crewId, $_POST, $_FILES['photo'] ?? null, !empty($_POST['remove_photo']));
+                } catch (PDOException $e) {
+                    // The database's own words are not for the screen (see the focus desk above).
+                    $bad = 'Your profile could not be saved. Try again in a moment.';
+                } catch (RuntimeException $e) {
+                    // Home's own refusals: a phone number with letters in it, a file that is not a picture.
+                    $bad = $e->getMessage();
+                }
+            }
+        }
+        $profile = realm_profile($pdo, $uid, isset($_POST['save_profile']) ? $uid : (int)$_GET['profile']);
+        $answer = $profile === null ? ['ok' => false, 'error' => 'There is nobody living there.'] : ['ok' => true, 'profile' => $profile, 'said' => $said];
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'That could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+
 // ---- chat (stage 2, migration 082) ------------------------------------------
 // GET  chat=<channel>&after=<id>           what was said, and marks it read
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer

@@ -125,7 +125,7 @@ const FEATURES = [
     // David, 2026-11-05: Historic quotas for Admin and Production.
     'quotas'        => ['label' => 'Historic quotas', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
-    // Commercial, the CRM (David, 2026-11-12, migration 086): leads, proposals
+    // Commercial, the CRM (David, 2026-11-12, migration 087): leads, proposals
     // and quotes. "Admins only" to begin with, so Production starts OFF and can
     // be switched on here, by role or by person. ⚠ SALES FIGURES, not a show's
     // budget or cost (see includes/crm.php), which is why this may be a switch
@@ -269,7 +269,9 @@ const FEATURE_POSTS = [
                             ['field', 'overhead_log', 'time_log']],
     // The Realm's task list changes a status by My tasks' rules, so it asks the
     // same switch. Nothing else posted to realm_api.php is listed: no '*' line.
-    'realm_api.php'     => [['field', 'task_status', 'own_status']],
+    // save_profile (2026-11-12) is Home's own profile form reached through the
+    // portrait in a Realm house, so it asks Home's switch.
+    'realm_api.php'     => [['field', 'task_status', 'own_status'], ['field', 'save_profile', 'home']],
     'bugs.php'          => [['field', 'report_bug', 'bug_report'], ['*', '', 'bugs_list']],
     'alltasks.php'      => [['*', '', 'studio_tasks_edit']],
     'artists.php'       => [['*', '', 'artists_edit']],

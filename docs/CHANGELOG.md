@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-12 — Commercial: the CRM *(migration 086)*
+## 2026-11-12 — Commercial: the CRM *(migration 087)*
 
 **Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
 
@@ -41,6 +41,34 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   throughout.
 - **Not in this version:** Gmail sync (the contacts and activity are ready for it), a client's
   proposals and quotes inside Clients, PDF quotes, reminders for overdue follow-ups.
+
+## 2026-11-12 — The Realm: decorate your office, with a chest and a portrait *(migration 086)*
+
+**Asked by David:** "let's start with decorate my office. Let's all start with the same basic look
+and they can modify it from a library of free and opt to buy new stuff. All of them should have at
+least these: Book shelf: for tasks. Treasure chest: to check their gold. A portrait in the wall: so
+they can see theirs and others bio and profile from Anima, and update it."
+
+- **Everybody's office starts the same**: two windows, a bookshelf, a portrait, a desk, a chest and
+  a rug in your cloak's colour. Cottage, Tower and Forge are now only the outside of a house.
+- **Decorate**, a button at the top of your own house. Drag a thing to move it, or pick it and use
+  the arrow keys. Add things from the library along the bottom, remove what you do not want, and
+  choose the wall, the floor and the rug. Nothing changes for anybody until you press Save.
+- **The library has 20 free things** (windows, banners, a clock, wall candles, a potion shelf, a
+  map, a hearth, a desk, armchairs, a table, plants, barrels, crates, candle stands, an anvil, a
+  telescope, a cauldron) and **three marked "Costs gold, later"** (a shield and swords, a crystal
+  ball, a throne), which cannot be placed until gold exists.
+- **Three things are in every house and cannot be removed**, only moved: the **bookshelf** (your
+  tasks, as before), the **treasure chest** (your gold) and the **portrait** (your profile).
+- **The chest** says there is no gold yet, and how it will be earned and spent when it arrives.
+- **The portrait** opens the profile from Anima's Home: name, role, bio and picture. In somebody
+  else's house you see theirs; in your own you can change your phone, bio and picture, and it
+  changes on Home too. Your picture shows inside the frame on the wall.
+- **Visitors see your office as you saved it.** Only you can change it.
+- **Needs migration 086.** Until it runs every house shows the starting room and Decorate says it
+  needs a database update; the chest and the portrait work straight away.
+
+---
 
 ## 2026-11-12 — The Realm: voice in every room *(migration 085)*
 
