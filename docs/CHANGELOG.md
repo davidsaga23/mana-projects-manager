@@ -45,6 +45,25 @@ go off the map, let's restrict that".
   close, the one whose door is nearer wins.
 - **Characters can no longer walk off the edge of the map.** The whole figure, its arrow and its
   companion stay in the picture.
+
+---
+
+## 2026-11-13 — The Realm: point at somebody to see what they are working on *(no migration)*
+
+**Asked by David**: point at a character on the Realm map, or in a room, to see the task they have
+the clock running on.
+
+- **Hover a character** (or **tap** one on a phone or tablet) and a small card opens over their head:
+  their name, the task ("Lighting, FCM_sh020" or a card's title), the show, and the time on that task
+  **today** ("1 h 20 today": what is already logged today plus the clock now running). During a
+  Pomodoro break it says "Short break" or "Long break" instead. **Open in Anima** opens the task in
+  Spell, or the card; Anima's own page still decides what you may see there.
+- **Everyone in the Realm sees everybody's** task (David's choice). Somebody with **no clock running
+  shows just their name.**
+- **Read only.** It reads the timer My tasks and the focus desk already run, and today's time log;
+  it never changes either. It rides on the heartbeat the map already sends every 25 s, so nothing new
+  is asked of the server; the card counts the minutes on between heartbeats.
+
 ---
 
 ## 2026-11-13 — The Realm: sending jumps to the bottom, and rooms say "Exit" *(no migration)*

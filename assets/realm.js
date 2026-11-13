@@ -72,7 +72,7 @@ var PLOTS = (function () {
 })();
 
 /* ---------- state ---------- */
-var ST = R.state;
+var ST = R.state; if (ST) ST.got = Date.now();
 var S = {view:{x:FULL.x,y:FULL.y,w:FULL.w,h:FULL.h},pos:{x:800,y:640},here:null,inside:null,sel:null,walk:null,frame:0,fade:0,touched:true,raf:0,lt:0,enter:null};
 var B = {}, BLIST = [];
 
@@ -464,7 +464,7 @@ function fxPaint(c, room) {
   });
 }
 /* Where everybody was last drawn, so a thing that happens TO somebody can be shown over them. */
-var LASTAT = {};
+var LASTAT = {}, MT = null;
 
 /* ---------- the creatures of the lands ----------
    David, 2026-11-13: "let's also add a creature to defeat per land/project. An ogre in the forest,
@@ -1288,7 +1288,7 @@ function drawRoom(c, cw, ch) {
     if (d.mine && !deco) { c.fillStyle = PAL.win; c.fillRect(px-13,py+2,26,2); c.fillRect(px-13,py,2,2); c.fillRect(px+11,py,2,2); }
     sprite(c,px,py,d.p,d.bob); c.globalAlpha = 1;
     if (idle && !deco) zed(c,px,py);
-    LASTAT[d.p.id] = {x:d.x,y:d.y,room:true};
+    LASTAT[d.p.id] = {x:d.x,y:d.y,room:true,n:SP.n};
   });
   c.setTransform(s,0,0,s,ox,oy);
   /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
@@ -1796,7 +1796,7 @@ function draw() {
   SP.n++;
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
-    placeHot(null);
+    placeHot(null); MT = {s:s,ox:ox,oy:oy};
     c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
@@ -1817,7 +1817,7 @@ function draw() {
       if (it.idle) c.globalAlpha = .6;
       sprite(c,it.x,it.y,it.who,it.bob); c.globalAlpha = 1;
       if (it.idle) zed(c,it.x,it.y);
-      LASTAT[it.who.id] = {x:it.x,y:it.y,room:false};
+      LASTAT[it.who.id] = {x:it.x,y:it.y,room:false,n:SP.n};
     }
     /* Names go on after the buildings, then every character standing across one is painted again
        inside that name's patch only, so they are in front of the name and nothing else changes. */
@@ -1844,6 +1844,7 @@ function draw() {
   /* Whoever was not drawn this time has left what I can see; if they come back they are simply there. */
   Object.keys(OTH).forEach(function (id) { if (OTH[id].n!==SP.n) delete OTH[id]; });
   if (S.fade > 0) { c.setTransform(1,0,0,1,0,0); c.globalAlpha = Math.min(1,S.fade); c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch); c.globalAlpha = 1; }
+  whoPlace();
 }
 
 /* ---------- labels and click areas ---------- */
@@ -1947,7 +1948,7 @@ function applyState(st) {
   if (!st || !st.people) return;
   var fresh = st.chat && st.chat.unread, was = ST && ST.chat && ST.chat.unread;
   if (st.chat && was) st.chat.unread = was;
-  ST = st; rebuildBuildings();
+  ST = st; ST.got = Date.now(); rebuildBuildings();
   var land = ST.people.map(function (p) { return p.slot+p.kind; }).join(',')+'|'+ST.lands.map(function (l) { return l.claimed?1:0; }).join('');
   var house = BLIST.map(function (o) { return o.id+o.kind+o.tint+(o.lit?1:0)+(o.door||''); }).join(',');
   if (land!==SIG.land) { SIG.land = land; buildWorld(); }
@@ -3340,6 +3341,81 @@ if ($('focusBtn') && $('focusNow')) {
   shelf.setAttribute('aria-label','Your tasks, on the bookshelf'); shelf.innerHTML = '<span id="shelfTag">Your tasks</span>'; $('mapbox').appendChild(shelf);
   focusAsk(); setInterval(focusTick,1000); setInterval(function () { if (!document.hidden) focusAsk(); },60000);
   document.addEventListener('visibilitychange',function () { if (!document.hidden) focusAsk(); });
+}
+/* ---------- who is working on what ----------
+   David, 2026-11-13: point at a character on the map, or in a room, to see the task they have the
+   clock running on. He chose that everyone in the Realm sees everybody's, and that somebody with no
+   clock running shows just their name. The server sends it with the state the heartbeat already
+   fetches (`work`, realm_clocks() in includes/realm.php), so nothing new is asked for here.
+
+   The characters are painted on the canvas, so there is nothing to hover: the pointer is tested
+   against where each one was drawn THIS time (LASTAT, with `n` the draw it belongs to), in map units
+   on the map (MT) and room units in a room (RT), the same sums draw() makes. A mouse shows the card
+   on hovering and it stays while the pointer is on the character or the card, so its link can be
+   clicked; a finger shows it on a tap, and a tap anywhere else puts it away. */
+var WHO = {id:null,el:null,hide:0};
+function whoBox() { var el = $('whoTip'); if (!el && $('mapbox')) { el = document.createElement('div'); el.id = 'whoTip'; el.className = 'rwhotip'; el.hidden = true;
+  el.addEventListener('pointerenter',function () { clearTimeout(WHO.hide); });
+  el.addEventListener('pointerleave',function (e) { if (e.pointerType==='mouse') whoLater(); });
+  $('mapbox').appendChild(el); } return el; }
+/* From the pointer to map or room units, and back to the box's own pixels. */
+function whoK() { var cv = $('mapcv'), r = cv.getBoundingClientRect(); return {r:r,k:r.width ? cv.width/r.width : 1}; }
+function whoT() { return S.inside ? RT : MT; }
+function whoHit(e) {
+  var t = whoT(); if (!t || DECO.on) return null;
+  var g = whoK(), x = ((e.clientX-g.r.left)*g.k-t.ox)/t.s, y = ((e.clientY-g.r.top)*g.k-t.oy)/t.s;
+  /* A character is about 24 wide and 52 tall above its feet; in a room it is drawn at 0.9 of that. */
+  var z = S.inside ? .9 : 1, best = null, by = -1e9;
+  Object.keys(LASTAT).forEach(function (id) { var a = LASTAT[id];
+    if (a.n!==SP.n || !!a.room!==!!S.inside) return;
+    if (x < a.x-12*z || x > a.x+12*z || y < a.y-52*z || y > a.y+3*z) return;
+    if (a.y > by) { by = a.y; best = +id; } });   /* the nearer one, lower on the ground, wins */
+  return best;
+}
+function whoTime(m) { m = Math.max(0,Math.floor(m)); var h = Math.floor(m/60), r = m%60; return h ? h+' h'+(r?' '+(r<10?'0':'')+r:'') : m+' min'; }
+function whoFill(id) {
+  var p = person(id), el = whoBox(); if (!p || !el) return false;
+  var w = p.work, h = '<b>'+esc(p.name)+(p.me?' (you)':'')+'</b>';
+  if (w) {
+    var mins = w.mins + (w.tick ? (Date.now()-(ST.got||Date.now()))/60000 : 0);
+    h += '<span class="rwhotask">'+esc(w.title)+'</span><small>'+esc(w.show)
+      +(w.brk ? ' &middot; '+esc(w.brk) : mins >= 1 ? ' &middot; '+esc(whoTime(mins))+' today' : ' &middot; just started')+'</small>'
+      +(w.link ? '<a href="'+esc(w.link)+'" target="_blank" rel="noopener">Open in Anima</a>' : '');
+  }
+  el.innerHTML = h; el.classList.toggle('is-bare',!w);
+  return true;
+}
+function whoShow(id) { clearTimeout(WHO.hide); if (WHO.id!==id || $('whoTip').hidden) { if (!whoFill(id)) return; WHO.id = id; $('whoTip').hidden = false; } whoPlace(); }
+function whoGone() { clearTimeout(WHO.hide); WHO.id = null; var el = $('whoTip'); if (el) el.hidden = true; }
+function whoLater() { clearTimeout(WHO.hide); WHO.hide = setTimeout(whoGone,280); }
+/* Above the head, kept inside the box. Gone if that person is no longer drawn here. */
+function whoPlace() {
+  var el = $('whoTip'); if (!el || el.hidden || WHO.id===null) return;
+  var a = LASTAT[WHO.id], t = whoT();
+  if (!a || a.n!==SP.n || !!a.room!==!!S.inside || !t || DECO.on) { whoGone(); return; }
+  var g = whoK(), z = S.inside ? .9 : 1, bx = (a.x*t.s+t.ox)/g.k, by = ((a.y-56*z)*t.s+t.oy)/g.k, box = $('mapbox');
+  var w = el.offsetWidth, hh = el.offsetHeight, l = Math.max(6,Math.min(box.clientWidth-w-6,bx-w/2)), tp = by-hh-6;
+  if (tp < 6) tp = ((a.y+6)*t.s+t.oy)/g.k;   /* no room above: under the feet instead */
+  el.style.left = Math.round(l)+'px'; el.style.top = Math.round(tp)+'px';
+}
+if ($('mapbox')) {
+  $('mapbox').addEventListener('pointermove',function (e) {
+    if (e.pointerType!=='mouse' || e.buttons) return;
+    if (e.target.closest && e.target.closest('#whoTip')) return;
+    var id = whoHit(e);
+    if (id!==null) whoShow(id); else if (WHO.id!==null) whoLater();
+  });
+  $('mapbox').addEventListener('pointerleave',function (e) { if (e.pointerType==='mouse') whoLater(); });
+  var whoTap = null;
+  $('mapbox').addEventListener('pointerdown',function (e) { whoTap = e.pointerType==='mouse' ? null : {x:e.clientX,y:e.clientY}; });
+  $('mapbox').addEventListener('pointerup',function (e) {
+    var d = whoTap; whoTap = null;
+    if (!d || Math.hypot(e.clientX-d.x,e.clientY-d.y) > 8) return;   /* a drag of the map, not a tap */
+    if (e.target.closest && e.target.closest('#whoTip')) return;
+    var id = whoHit(e); if (id!==null) whoShow(id); else whoGone();
+  });
+  /* The minutes go on while the card is open; the heartbeat brings a new clock every 25 s. */
+  setInterval(function () { if (WHO.id!==null && !$('whoTip').hidden) { whoFill(WHO.id); whoPlace(); } },20000);
 }
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
 /* The first creature comes out sooner than the rest, so somebody who just arrived may catch one. */
