@@ -11,6 +11,13 @@
 //     daily your time log for 1 week you win a gold coin (no cap)", and praise
 //     received gives gold too.
 //
+// APPROVED WORK (David, 2026-11-13): "let's keep 1 gold for each approved, and if
+// you approved on time based on the task due dates you receive 1 mana and 1
+// gold". So each task of yours that is approved gives 1 gold, and one approved
+// on or before its due date gives 1 mana as well. Read from progress_log, the
+// record every status change already writes; nothing is added to the board, the
+// review queue or My tasks. See realm_purse_approvals().
+//
 // The rules of a praise, agreed with David on 2026-11-13:
 //   * FACE TO FACE, anywhere: the two characters are in the same place, inside
 //     the same room or standing at the same spot on the map. Checked HERE, from
@@ -36,8 +43,7 @@
 // read through includes/absences.php, whose own includes define the money
 // functions but open no connection; nothing here calls them.
 //
-// NOT BUILT YET, and said so on the screen where it matters: gold from approved
-// work (David has not said how much), anything to spend gold on, gifting and
+// NOT BUILT YET, and said so on the screen where it matters: anything to spend gold on, gifting and
 // swapping, the Herald, and a keepsake drawn in the office. The word for praise
 // is "praise" (David, 2026-11-13: "Keep praise"): Anima's task board is already
 // called Spell.
@@ -48,6 +54,14 @@
 //   * "noon the next day" is noon of the next WORKING day, so Friday can still
 //     be logged on Monday morning.
 //   * The week for the gold rule is Monday to Sunday.
+//   * On time gives 1 gold and 1 mana in all, not 2 gold: REALM_GOLD_ON_TIME is
+//     the one number to change if David meant a second coin.
+//   * "On time" is the day of the approval against the task's scheduled end
+//     date. A task with no due date gives the coin and no mana.
+//   * A task pays once: approved, sent back and approved again is one coin.
+//   * Statuses that arrive through an import do not pay, or loading a show's
+//     history would hand out hundreds of coins in one go.
+//   * Tickets are not counted: they have no approval.
 //   * Somebody whose login is not linked to a person has no time log, so earns
 //     no mana and cannot praise, but can be praised.
 
@@ -56,6 +70,11 @@ require_once __DIR__ . '/realm_chat.php';    // realm_person_name()
 
 /** The most mana anybody holds. David, 2026-11-12. */
 const REALM_MANA_CAP = 5;
+/** Gold for a task approved late or with no due date, and for one approved on time. */
+const REALM_GOLD_APPROVED = 1;
+const REALM_GOLD_ON_TIME  = 1;
+/** Mana for a task approved on or before its due date. */
+const REALM_MANA_ON_TIME  = 1;
 /** Working days in a row that earn one gold coin. */
 const REALM_GOLD_EVERY = 5;
 /** The kinds of praise, id => name. assets/realm_praise.js has the same four. */
@@ -113,7 +132,7 @@ function realm_purse(PDO $pdo, int $uid): array {
         $pdo->prepare('INSERT IGNORE INTO realm_purse (user_id, updated_at) VALUES (?, NOW())')->execute([$uid]);
         $pdo->beginTransaction();
         $began = true;
-        $q = $pdo->prepare('SELECT mana, gold, streak, counted_to FROM realm_purse WHERE user_id = ? FOR UPDATE');
+        $q = $pdo->prepare('SELECT * FROM realm_purse WHERE user_id = ? FOR UPDATE');
         $q->execute([$uid]);
         $row = $q->fetch();
         $mana   = min(REALM_MANA_CAP, max(0, (int)$row['mana']));
@@ -161,12 +180,74 @@ function realm_purse(PDO $pdo, int $uid): array {
         }
         $pdo->prepare('UPDATE realm_purse SET mana = ?, gold = ?, streak = ?, counted_to = ?, updated_at = NOW() WHERE user_id = ?')
             ->execute([$mana, $gold, $streak, $counted, $uid]);
+        // Approved work, counted after the time log so the two never undo each other.
+        if ($crewId > 0 && array_key_exists('approvals_to', $row)) {
+            $paid = realm_purse_approvals($pdo, $crewId, $row['approvals_to'] !== null ? (int)$row['approvals_to'] : null, $today);
+            if ($paid !== null) {
+                $gold += $paid['gold'];
+                $mana  = min(REALM_MANA_CAP, $mana + $paid['mana']);
+                $pdo->prepare('UPDATE realm_purse SET mana = ?, gold = ?, approvals_to = ? WHERE user_id = ?')
+                    ->execute([$mana, $gold, $paid['to'], $uid]);
+            }
+        }
         $pdo->commit();
         $out['mana'] = $mana; $out['gold'] = $gold; $out['streak'] = $streak;
     } catch (Throwable $e) {
         if ($began && $pdo->inTransaction()) $pdo->rollBack();
     }
     return $out;
+}
+
+/**
+ * What $crewId has earned from approved work since the line `$after` of
+ * progress_log: ['gold', 'mana', 'to' => the last line looked at], or null when
+ * it could not be read, in which case nothing is paid and nothing is marked as
+ * counted.
+ *
+ * A line counts when it moved a task into an approved status, the task is
+ * assigned to this person (as its one assignee or as one of several), it did not
+ * come from an import, and the same task has no earlier approval: a task pays
+ * once. On time means the approval's day is on or before the task's scheduled
+ * end date.
+ *
+ * With `$after` null (a purse that has never counted approvals) it looks back
+ * REALM_PURSE_LOOK_BACK days, like the time log does.
+ *
+ * ⚠ READ ONLY. The mana here is added by the caller, which holds the cap.
+ */
+function realm_purse_approvals(PDO $pdo, int $crewId, ?int $after, string $today): ?array {
+    try {
+        // Read first, so a line written while the query runs is counted next time, not skipped.
+        $to = (int)$pdo->query('SELECT COALESCE(MAX(id), 0) FROM progress_log')->fetchColumn();
+        $since = $after !== null ? 'pl.id > ?' : 'pl.log_date >= ?';
+        $arg   = $after !== null ? $after
+               : (new DateTime($today))->modify('-' . REALM_PURSE_LOOK_BACK . ' days')->format('Y-m-d');
+        $q = $pdo->prepare(
+            "SELECT pl.id, pl.log_date,
+                    (SELECT MAX(sc.end_date) FROM schedule sc
+                      WHERE sc.step_id = pl.step_id AND sc.item_key = pl.item_key) AS due
+               FROM progress_log pl
+               JOIN progress pr ON pr.project_id = pl.project_id AND pr.step_id = pl.step_id AND pr.item_key = pl.item_key
+              WHERE pl.change_type = 'approved' AND pl.source <> 'import' AND pl.id <= ? AND $since
+                AND (pr.crew_id = ? OR EXISTS (SELECT 1 FROM progress_crew pc
+                                                WHERE pc.progress_id = pr.id AND pc.crew_id = ?))
+                AND NOT EXISTS (SELECT 1 FROM progress_log e
+                                 WHERE e.project_id = pl.project_id AND e.step_id = pl.step_id
+                                   AND e.item_key = pl.item_key AND e.change_type = 'approved' AND e.id < pl.id)"
+        );
+        $q->execute([$to, $arg, $crewId, $crewId]);
+        $gold = 0;
+        $mana = 0;
+        foreach ($q->fetchAll() as $r) {
+            $onTime = $r['due'] !== null && (string)$r['log_date'] <= (string)$r['due'];
+            $gold += $onTime ? REALM_GOLD_ON_TIME : REALM_GOLD_APPROVED;
+            if ($onTime) $mana += REALM_MANA_ON_TIME;
+        }
+        return ['gold' => $gold, 'mana' => $mana, 'to' => $to];
+    } catch (Throwable $e) {
+        // A table this reads is missing or shaped differently on this host: pay nothing rather than guess.
+        return null;
+    }
 }
 
 /**

@@ -10,8 +10,9 @@
 -- realm_purse: one row per person, what they hold. `mana` is at most 5.
 -- `streak` is how many working days in a row they have logged their time, and
 -- `counted_to` is the last day that has been looked at, so each day is counted
--- once however often the Realm is opened. Nobody but the owner is ever shown a
--- purse.
+-- once however often the Realm is opened. `approvals_to` does the same for
+-- approved work: the last line of progress_log that has been counted. Nobody
+-- but the owner is ever shown a purse.
 --
 -- realm_praise: one row per praise given, kept for good: it is the line others
 -- see when it happens and the keepsake in the receiver's profile. `gold` is 1
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS realm_purse (
   gold        INT NOT NULL DEFAULT 0,
   streak      INT NOT NULL DEFAULT 0,
   counted_to  DATE DEFAULT NULL,
+  approvals_to INT DEFAULT NULL,
   updated_at  DATETIME DEFAULT NULL,
   PRIMARY KEY (user_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

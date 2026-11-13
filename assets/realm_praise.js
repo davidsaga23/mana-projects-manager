@@ -146,7 +146,7 @@ R.openGold = function (d, body) {
           ? '<p>'+(p.streak ? 'You have logged your time '+p.streak+' working '+(p.streak === 1 ? 'day' : 'days')+' in a row. '+left+' more '+(left === 1 ? 'day' : 'days')+' for the next coin.'
                             : 'Log your time today to start a run. Every working day you log gives 1 mana, and every '+p.every+' in a row gives 1 gold coin.')+'</p>'
           : '<p>Your login is not linked to a person yet, so there is no time log to earn from. An administrator links it on the Users page.</p>')
-        +'<p>A day can be logged until noon of the next working day. Weekends, holidays and booked days off do not break a run. You also get a coin the first time each person praises you in a week.</p>'
+        +'<p>A day can be logged until noon of the next working day. Weekends, holidays and booked days off do not break a run. </p><p>Each task of yours that is approved gives 1 gold coin, and 1 mana as well when it is approved by its due date. You also get a coin the first time each person praises you in a week.</p>'
         +'<p>There is nothing to buy yet: clothes, companions and things for your office are coming. Your gold is private, nobody else can see it, and it never has anything to do with pay.</p>'+close;
     })
     .catch(function () { body.innerHTML = '<p>The chest could not be opened. Try again in a moment.</p>'+close; });
