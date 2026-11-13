@@ -151,6 +151,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 084 | realm_knocks | ⏳ **The Realm: knocking on an ajar door** (`realm_knocks`). Until it runs, an ajar door cannot be entered and its card says knocking needs a database update; everything else in the Realm is unchanged. |
 | 085 | realm_voice | ⏳ **The Realm: voice in a room** (`realm_voice`, `realm_signals`). Until it runs, the Join voice button in a room is greyed out and says voice needs a database update; everything else in the Realm is unchanged. |
 | 086 | realm_rooms | ⏳ **The Realm: decorating your office** (`realm_rooms`, one row per person, the room as JSON). Until it runs every house shows the starting room and Decorate says it needs a database update; the chest and the portrait work without it. |
+| 087 | realm_spots | ⏳ **The Realm: seeing each other walk** (`realm_people` gains `spot_x`, `spot_y`). Until it runs you can walk around inside a room but only you see it; everybody else stands where they stood before. |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |

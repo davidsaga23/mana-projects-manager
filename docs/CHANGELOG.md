@@ -14,6 +14,32 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: walk around inside a room, and see each other walk *(migration 087)*
+
+**Asked by David:** "let's also have the option for the avatars to move freely inside each house".
+Asked whether the others should see it: "Yes", then "let's make see other people walk a feature
+across the board".
+
+- **Inside any room your character walks**, in every house and every place to meet: the arrow keys,
+  or click a spot on the floor and it finds its way round the furniture.
+- **Walls and furniture are solid**, including whatever an owner placed when decorating. You can
+  step behind a tall thing and it covers you, as a house does on the map. The bar, barrels and
+  tables of the Tavern, the Council Hall and the war rooms now behave the same way.
+- **The door is the way out.** Walk onto the strip of light at the bottom of the room and you
+  leave. Escape and Leave room still work. You come in at the door, not at a fixed seat.
+- **What belongs to a person follows them:** the speech bubble, the voice mark and speaking ring,
+  the resting Z, the companion, and a small mark under your own feet.
+- **The bookshelf, the chest and the portrait** still answer a click. Standing next to one lights
+  its frame, and Enter opens it.
+- **While the message box is empty, the arrow keys walk** instead of doing nothing in the box.
+- **Others see you walk, in rooms and on the village map** (needs migration 087). Your character
+  is shown walking to where you are, one to three seconds behind. Somebody arriving at a building
+  or walking into your room now shows within seconds instead of at the next 25-second heartbeat.
+- **"In the same room" is still the rule** for voice, and for praise and trades when they come.
+  Where exactly you stand is for show and decides nothing.
+- **Until migration 087 runs** you can walk inside a room but only you see it, and everybody else
+  stands where they stood before.
+
 ## 2026-11-12 — The Realm: decorate your office, with a chest and a portrait *(migration 086)*
 
 **Asked by David:** "let's start with decorate my office. Let's all start with the same basic look
