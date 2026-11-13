@@ -353,6 +353,11 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
 //      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
+// Threads (migration 093):
+// GET  chat=<channel>&thread=<id>&after=   a thread: its first message and replies, marks it read
+// GET  chat=<channel>&from=<id>&after=     a channel, with `threads`: reply counts from message <id> on
+// POST say=<channel>&thread=<id>&also=0|1  reply in a thread, and maybe also to the channel
+// GET  threads=1                           the threads I follow (the "Threads" row)
 //
 // Answered here, apart from the map: an open conversation asks every few
 // seconds and has no use for where everybody is standing.
@@ -362,15 +367,38 @@ $mayAnnounce = can_edit();
 // arriving with the 25-second heartbeat, which reads as broken when you are
 // watching for it. Somebody with no conversation open now asks this every few
 // seconds instead; it is one small query and touches nothing.
+$tunread = [];
 if (isset($_GET['unread'])) {
-    echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : [],
+    echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce, $tunread) : [],
+                      'tunread' => $tunread,
                       'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
                       'spots' => realm_spots($pdo, $uid),
                       // Offers of a gift or a swap ride here too, like knocks, so they are seen in seconds.
                       'offers' => realm_offer_news($pdo, $uid)]);
     exit;
 }
+// GET threads=1: the threads I follow, the latest reply first (migration 093).
+// What the "Threads" row in the channel list opens; an open list asks every few
+// seconds, like a conversation. Only places I may read are in it.
+if (isset($_GET['threads'])) {
+    if (!realm_chat_available($pdo) || !realm_threads_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Threads need a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $list = realm_threads_list($pdo, $uid, $mayAnnounce);
+        echo json_encode(['ok' => true, 'list' => $list, 'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread,
+                          'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
+                          'spots' => realm_spots($pdo, $uid), 'offers' => realm_offer_news($pdo, $uid)]);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Threads could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
+// Threads (migration 093): with thread=<id> the request is about that message's
+// thread, in the same channel. Checked below, after the channel itself.
+$thread = max(0, (int)($_POST['thread'] ?? ($_GET['thread'] ?? 0)));
 if ($channel !== '') {
     if (!realm_chat_available($pdo)) {
         echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
@@ -381,6 +409,15 @@ if ($channel !== '') {
         if (!$may['read']) {
             http_response_code(403);
             echo json_encode(['ok' => false, 'error' => 'That conversation is not yours to read.']);
+            exit;
+        }
+        // ⚠ THE THREAD MUST BE A MESSAGE OF THIS CHANNEL. The channel was checked
+        // just above; this stops a thread id from another channel (a raven between
+        // two other people, say) being read or answered through one I may read.
+        if ($thread > 0 && !realm_thread_parent_ok($pdo, $channel, $thread)) {
+            echo json_encode(['ok' => false, 'error' => realm_threads_available($pdo)
+                ? 'That thread is not here any more.'
+                : 'Threads need a database update first. An administrator opens migrate.php once.']);
             exit;
         }
         $said = '';
@@ -394,7 +431,8 @@ if ($channel !== '') {
                 if (isset($_FILES['image']) && (int)($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
                     $image = realm_take_image($pdo, $_FILES['image'], $said);
                 }
-                if ($said === '') $said = realm_say($pdo, $uid, $channel, (string)($_POST['body'] ?? ''), $image);
+                if ($said === '') $said = realm_say($pdo, $uid, $channel, (string)($_POST['body'] ?? ''), $image,
+                                                    $thread, (string)($_POST['also'] ?? '0') === '1');
                 if ($said === '' && preg_match('/^dm:(\d+):(\d+)$/', $channel, $m) === 1) {
                     realm_raven_bell($pdo, $uid, (int)$m[1] === $uid ? (int)$m[2] : (int)$m[1]);
                 } elseif ($said === '') {
@@ -403,16 +441,24 @@ if ($channel !== '') {
             }
         }
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
-        $messages = realm_messages($pdo, $uid, $channel, $after);
+        $messages = realm_messages($pdo, $uid, $channel, $after, $thread);
         if ($messages) {
-            realm_mark_read($pdo, $uid, $channel, (int)$messages[count($messages) - 1]['id']);
+            $lastSeen = (int)$messages[count($messages) - 1]['id'];
+            // Reading a thread marks the thread read, not the channel.
+            if ($thread > 0) realm_mark_thread_read($pdo, $uid, $thread, $lastSeen);
+            else realm_mark_read($pdo, $uid, $channel, $lastSeen);
             // Read here, so it is no longer news in Anima's bell.
             if (preg_match('/^dm:(\d+):(\d+)$/', $channel, $dm) === 1) {
                 realm_raven_bell_clear($pdo, $uid, (int)$dm[1] === $uid ? (int)$dm[2] : (int)$dm[1]);
             }
         }
-        $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
-                   'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid),
+        // The open channel's threads: how many replies each has, from the first
+        // message the page is showing (`from`) on, so the counts under them stay fresh.
+        $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
+        if ($from === 0 && $after === 0 && $messages) $from = (int)$messages[0]['id'];
+        $answer = ['ok' => true, 'channel' => $channel, 'thread' => $thread, 'messages' => $messages, 'can_post' => $may['post'],
+                   'threads' => $thread > 0 ? [] : realm_thread_counts($pdo, $channel, $from),
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
                    'offers' => realm_offer_news($pdo, $uid)];
         if ($said !== '') $answer['error'] = $said;

@@ -97,23 +97,38 @@ function realm_channel_access(PDO $pdo, int $uid, string $channel, bool $mayAnno
  * came after that id. Oldest first, ready to print. The caller has already
  * checked realm_channel_access().
  */
-function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array {
+function realm_messages(PDO $pdo, int $uid, string $channel, int $after, int $thread = 0): array {
+    $threads = realm_threads_available($pdo);
     $cols = 'm.id, m.user_id, m.body, m.created_at, u.display_name, u.username, c.name AS crew_name, '
-          . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image';
-    $from = ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id';
+          . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image, '
+          . ($threads ? 'm.parent_id, m.also_channel, pm.body AS parent_body' : 'NULL AS parent_id, 0 AS also_channel, NULL AS parent_body');
+    $from = ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id'
+          . ($threads ? ' LEFT JOIN realm_messages pm ON pm.id = m.parent_id' : '');
+    // THREADS (migration 093). The channel shows its own messages and the replies
+    // that were also sent to it; a thread shows its first message and its replies.
+    $args = [$channel];
+    $where = ' WHERE m.channel = ?';
+    if ($threads && $thread > 0) {
+        $where .= ' AND (m.id = ? OR m.parent_id = ?)';
+        $args[] = $thread;
+        $args[] = $thread;
+    } elseif ($threads) {
+        $where .= ' AND (m.parent_id IS NULL OR m.also_channel = 1)';
+    }
     if ($after > 0) {
-        $q = $pdo->prepare('SELECT ' . $cols . $from . ' WHERE m.channel = ? AND m.id > ? ORDER BY m.id LIMIT 200');
-        $q->execute([$channel, $after]);
+        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' AND m.id > ? ORDER BY m.id LIMIT 200');
+        $q->execute(array_merge($args, [$after]));
         $rows = $q->fetchAll();
     } else {
-        $q = $pdo->prepare('SELECT ' . $cols . $from . ' WHERE m.channel = ? ORDER BY m.id DESC LIMIT ' . REALM_CHAT_PAGE);
-        $q->execute([$channel]);
+        // A thread opens whole (up to 200 replies); a channel opens on its latest page.
+        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' ORDER BY m.id DESC LIMIT ' . ($thread > 0 ? 200 : REALM_CHAT_PAGE));
+        $q->execute($args);
         $rows = array_reverse($q->fetchAll());
     }
-    $today = date('Y-m-d');
     $out = [];
     foreach ($rows as $r) {
         $t = strtotime((string)$r['created_at']);
+        $parentBody = (string)($r['parent_body'] ?? '');
         $out[] = [
             'id'   => (int)$r['id'],
             'user' => (int)$r['user_id'],
@@ -121,8 +136,169 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array 
             'body' => (string)$r['body'],
             // True when realm_image.php?id=<this id> has a picture to serve.
             'image' => (string)($r['image'] ?? '') !== '',
-            'at'   => date('Y-m-d', $t) === $today ? date('H:i', $t) : date('j M, H:i', $t),
+            'at'   => realm_chat_when($t),
             'mine' => (int)$r['user_id'] === $uid,
+            // Threads (migration 093): the message this one replies to, 0 for none;
+            // whether the reply was also sent to the channel; and, for such a reply,
+            // the start of what it answers, so the channel can say so.
+            'parent' => (int)($r['parent_id'] ?? 0),
+            'also'   => (int)($r['also_channel'] ?? 0) === 1,
+            'about'  => (int)($r['also_channel'] ?? 0) === 1 ? realm_chat_snippet($parentBody) : '',
+        ];
+    }
+    return $out;
+}
+
+/** A time as the chat prints it: "10:42" today, "12 Nov, 10:42" before. */
+function realm_chat_when(int $t): string {
+    return date('Y-m-d', $t) === date('Y-m-d') ? date('H:i', $t) : date('j M, H:i', $t);
+}
+
+/** The start of a message, to name it in one line. A picture alone is "a picture". */
+function realm_chat_snippet(string $body): string {
+    $body = trim(preg_replace('/\s+/', ' ', $body) ?? '');
+    if ($body === '') return 'a picture';
+    if (function_exists('mb_strlen') && mb_strlen($body) > 80) return mb_substr($body, 0, 78) . '…';
+    if (!function_exists('mb_strlen') && strlen($body) > 80) return substr($body, 0, 78) . '…';
+    return $body;
+}
+
+// ---- threads (migration 093) -------------------------------------------------
+// David, 2026-11-13, chose threads: "reply to one message without flooding the
+// channel; long channels get unreadable without them". Decided with him the same
+// day: threads in channels AND ravens; a reply may also be sent to the channel
+// with a tick box, as in Slack; and a thread you started or replied in is one
+// you FOLLOW: its new replies count in that channel's number and in a "Threads"
+// row of their own. Other people's threads light nothing up.
+//
+// One level only: a reply has no replies. A reply keeps its parent's channel, so
+// who may read it is exactly who may read the channel (realm_channel_access()).
+
+/** Has migration 093 arrived? Asked once per request; never throws. */
+function realm_threads_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        if (!function_exists('column_exists') || !column_exists($pdo, 'realm_messages', 'parent_id')) return $ok = false;
+        $pdo->query('SELECT 1 FROM realm_thread_reads LIMIT 1');
+        return $ok = true;
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/** Is $parent a message of this channel that may carry a thread (not itself a reply)? */
+function realm_thread_parent_ok(PDO $pdo, string $channel, int $parent): bool {
+    if ($parent <= 0 || !realm_threads_available($pdo)) return false;
+    $q = $pdo->prepare('SELECT 1 FROM realm_messages WHERE id = ? AND channel = ? AND parent_id IS NULL');
+    $q->execute([$parent, $channel]);
+    return (bool)$q->fetchColumn();
+}
+
+/**
+ * How many replies each thread in this channel has, and when the last came:
+ * parent id => ['n' => count, 'at' => time]. Only threads whose first message is
+ * $from or later, which is what the open channel is showing. Never throws.
+ */
+function realm_thread_counts(PDO $pdo, string $channel, int $from): array {
+    $out = [];
+    if ($from <= 0 || !realm_threads_available($pdo)) return $out;
+    try {
+        $q = $pdo->prepare('SELECT parent_id, COUNT(*) AS n, MAX(created_at) AS last_at FROM realm_messages
+                             WHERE parent_id >= ? AND channel = ? GROUP BY parent_id');
+        $q->execute([$from, $channel]);
+        foreach ($q->fetchAll() as $r) {
+            $out[(string)(int)$r['parent_id']] = ['n' => (int)$r['n'], 'at' => realm_chat_when(strtotime((string)$r['last_at']))];
+        }
+    } catch (Throwable $e) {
+        $out = [];
+    }
+    return $out;
+}
+
+/** This person has seen the thread up to $lastId. Only ever moves forward. */
+function realm_mark_thread_read(PDO $pdo, int $uid, int $parent, int $lastId): void {
+    if ($lastId <= 0 || $parent <= 0) return;
+    try {
+        $pdo->prepare('INSERT INTO realm_thread_reads (user_id, parent_id, last_id) VALUES (?, ?, ?)
+                       ON DUPLICATE KEY UPDATE last_id = GREATEST(last_id, VALUES(last_id))')
+            ->execute([$uid, $parent, $lastId]);
+    } catch (Throwable $e) {
+        // The count stays a little high until the next read; nothing is lost.
+    }
+}
+
+/**
+ * The SQL that says "this person may read the channel in column $col": the shared
+ * channels they may open, and their own ravens. With the values it needs.
+ */
+function realm_channel_filter(PDO $pdo, int $uid, bool $mayAnnounce, string $col): array {
+    $ids = array_column(realm_channels($pdo, $mayAnnounce), 'id');
+    $marks = implode(',', array_fill(0, count($ids), '?'));
+    return ['(' . $col . ' IN (' . $marks . ') OR ' . $col . ' LIKE ? OR ' . $col . ' LIKE ?)',
+            array_merge($ids, ['dm:' . $uid . ':%', 'dm:%:' . $uid])];
+}
+
+/**
+ * New replies in the threads this person follows (started, or replied in):
+ * a list of ['channel', 'parent', 'n']. Replies also sent to the channel are not
+ * counted here: the channel's own count already has them. Never throws.
+ */
+function realm_thread_unread(PDO $pdo, int $uid, bool $mayAnnounce): array {
+    $out = [];
+    if (!realm_threads_available($pdo)) return $out;
+    try {
+        [$may, $vals] = realm_channel_filter($pdo, $uid, $mayAnnounce, 'm.channel');
+        $q = $pdo->prepare('SELECT m.channel, m.parent_id, COUNT(*) AS n
+                              FROM realm_messages m
+                         LEFT JOIN realm_thread_reads t ON t.user_id = ? AND t.parent_id = m.parent_id
+                             WHERE m.parent_id IS NOT NULL AND m.also_channel = 0
+                               AND m.id > COALESCE(t.last_id, 0)
+                               AND (m.user_id IS NULL OR m.user_id <> ?)
+                               AND (EXISTS (SELECT 1 FROM realm_messages p WHERE p.id = m.parent_id AND p.user_id = ?)
+                                 OR EXISTS (SELECT 1 FROM realm_messages s WHERE s.parent_id = m.parent_id AND s.user_id = ?))
+                               AND ' . $may . '
+                          GROUP BY m.channel, m.parent_id');
+        $q->execute(array_merge([$uid, $uid, $uid, $uid], $vals));
+        foreach ($q->fetchAll() as $r) {
+            $out[] = ['channel' => (string)$r['channel'], 'parent' => (int)$r['parent_id'], 'n' => (int)$r['n']];
+        }
+    } catch (Throwable $e) {
+        $out = [];
+    }
+    return $out;
+}
+
+/**
+ * The threads this person follows, the latest reply first: what the "Threads"
+ * row opens. Only threads with at least one reply, in places they may still read.
+ */
+function realm_threads_list(PDO $pdo, int $uid, bool $mayAnnounce): array {
+    if (!realm_threads_available($pdo)) return [];
+    [$may, $vals] = realm_channel_filter($pdo, $uid, $mayAnnounce, 'p.channel');
+    $q = $pdo->prepare('SELECT p.id, p.channel, p.body, p.user_id, u.display_name, u.username, c.name AS crew_name,
+                               COUNT(r.id) AS n, MAX(r.id) AS last_id, MAX(r.created_at) AS last_at
+                          FROM realm_messages p
+                          JOIN realm_messages r ON r.parent_id = p.id
+                     LEFT JOIN users u ON u.id = p.user_id
+                     LEFT JOIN crew c ON c.id = u.crew_id
+                         WHERE p.parent_id IS NULL
+                           AND (p.user_id = ? OR EXISTS (SELECT 1 FROM realm_messages s WHERE s.parent_id = p.id AND s.user_id = ?))
+                           AND ' . $may . '
+                      GROUP BY p.id, p.channel, p.body, p.user_id, u.display_name, u.username, c.name
+                      ORDER BY last_id DESC
+                         LIMIT 40');
+    $q->execute(array_merge([$uid, $uid], $vals));
+    $out = [];
+    foreach ($q->fetchAll() as $r) {
+        $out[] = [
+            'parent'  => (int)$r['id'],
+            'channel' => (string)$r['channel'],
+            'name'    => $r['user_id'] === null ? 'Somebody who left' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username']))),
+            'mine'    => (int)$r['user_id'] === $uid,
+            'about'   => realm_chat_snippet((string)$r['body']),
+            'n'       => (int)$r['n'],
+            'at'      => realm_chat_when(strtotime((string)$r['last_at'])),
         ];
     }
     return $out;
@@ -133,18 +309,28 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after): array 
  * $image is what realm_take_image() returned, or null; a message with a picture
  * may have no words.
  */
-function realm_say(PDO $pdo, int $uid, string $channel, string $body, ?array $image = null): string {
+function realm_say(PDO $pdo, int $uid, string $channel, string $body, ?array $image = null, int $parent = 0, bool $also = false): string {
     $body = trim(str_replace("\r\n", "\n", $body));
     if ($body === '' && $image === null) return 'There was nothing to send.';
     if (function_exists('mb_substr')) $body = mb_substr($body, 0, REALM_MESSAGE_MAX);
     else $body = substr($body, 0, REALM_MESSAGE_MAX);
+    $cols = ['channel', 'user_id', 'body'];
+    $vals = [$channel, $uid, $body];
     if ($image !== null) {
-        $pdo->prepare('INSERT INTO realm_messages (channel, user_id, body, image, image_name, image_mime, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())')
-            ->execute([$channel, $uid, $body, $image['stored'], $image['name'], $image['mime']]);
-        return '';
+        array_push($cols, 'image', 'image_name', 'image_mime');
+        array_push($vals, $image['stored'], $image['name'], $image['mime']);
     }
-    $pdo->prepare('INSERT INTO realm_messages (channel, user_id, body, created_at) VALUES (?, ?, ?, NOW())')
-        ->execute([$channel, $uid, $body]);
+    // A reply in a thread (migration 093). The caller has checked the parent
+    // with realm_thread_parent_ok(); here it is only written down.
+    if ($parent > 0) {
+        array_push($cols, 'parent_id', 'also_channel');
+        array_push($vals, $parent, $also ? 1 : 0);
+    }
+    $pdo->prepare('INSERT INTO realm_messages (' . implode(', ', $cols) . ', created_at) VALUES ('
+                  . implode(', ', array_fill(0, count($vals), '?')) . ', NOW())')
+        ->execute($vals);
+    // Writing in a thread is reading it: what came before my reply is not news to me.
+    if ($parent > 0) realm_mark_thread_read($pdo, $uid, $parent, (int)$pdo->lastInsertId());
     return '';
 }
 
@@ -165,17 +351,21 @@ function realm_mark_read(PDO $pdo, int $uid, string $channel, int $lastId): void
  * Only channels they may read are counted, and never their own messages.
  * Never throws: an empty answer is "nothing unread".
  */
-function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce): array {
+function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce, ?array &$threads = null): array {
     $out = [];
+    $threads = [];
     try {
         $ids = array_column(realm_channels($pdo, $mayAnnounce), 'id');
         $marks = implode(',', array_fill(0, count($ids), '?'));
+        // Threads (migration 093): a reply kept in its thread is not a message of
+        // the channel; it is counted below, and only for those who follow it.
         $sql = 'SELECT m.channel, COUNT(*) AS n
                   FROM realm_messages m
              LEFT JOIN realm_reads r ON r.user_id = ? AND r.channel = m.channel
                  WHERE m.id > COALESCE(r.last_id, 0)
                    AND (m.user_id IS NULL OR m.user_id <> ?)
-                   AND (m.channel IN (' . $marks . ') OR m.channel LIKE ? OR m.channel LIKE ?)
+                   AND (m.channel IN (' . $marks . ') OR m.channel LIKE ? OR m.channel LIKE ?)'
+                   . (realm_threads_available($pdo) ? ' AND (m.parent_id IS NULL OR m.also_channel = 1)' : '') . '
               GROUP BY m.channel';
         $q = $pdo->prepare($sql);
         $q->execute(array_merge([$uid, $uid], $ids, ['dm:' . $uid . ':%', 'dm:%:' . $uid]));
@@ -183,14 +373,22 @@ function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce): array {
     } catch (Throwable $e) {
         $out = [];
     }
+    // New replies in threads I follow count in their channel's number too
+    // (David, 2026-11-13: "both", the channel's number and the Threads row).
+    $threads = realm_thread_unread($pdo, $uid, $mayAnnounce);
+    foreach ($threads as $t) $out[$t['channel']] = ($out[$t['channel']] ?? 0) + $t['n'];
     return $out;
 }
 
 /** What the page needs to draw the channel list: the channels and the unread counts. */
 function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     if (!realm_chat_available($pdo)) return null;
-    return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => realm_unread($pdo, $uid, $mayAnnounce),
-            'images' => realm_chat_images($pdo)];
+    $tunread = [];
+    $unread = realm_unread($pdo, $uid, $mayAnnounce, $tunread);
+    return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => $unread,
+            'images' => realm_chat_images($pdo),
+            // Threads (migration 093): may messages be replied to, and what is new in the ones I follow.
+            'threads' => realm_threads_available($pdo), 'tunread' => $tunread];
 }
 
 /**

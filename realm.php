@@ -146,10 +146,12 @@ foreach (($state['people'] ?? []) as $p) {
                lays the conversation over the map and back; assets/realm.js keeps its label, and
                which way the arrow points is assets/realm.css. */ ?>
       <button type="button" class="rwide" id="chatWide" aria-expanded="false" aria-label="Make the conversation wider" title="Make the conversation wider"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><path d="M8 2 2 8l6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="rchathead"><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
+      <div class="rchathead"><button type="button" class="rbtn rsmall rback" id="chatBack" hidden aria-label="Back" title="Back">&larr;</button><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
       <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
       <div class="rsuggest" id="chatSuggest" hidden></div>
       <div class="rpicked" id="chatPicked" hidden></div>
+      <?php // Threads (migration 093): a reply may also go to the channel, as in Slack (David, 2026-11-13). ?>
+      <label class="ralso" id="chatAlsoRow" hidden><input type="checkbox" id="chatAlso"> <span id="chatAlsoText">Also send to the channel</span></label>
       <form class="rcomposer" id="chatForm"><input type="file" id="chatFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden><button type="button" class="rbtn" id="chatAttach" title="Add a picture, up to 5 MB" aria-label="Add a picture" hidden>+</button><input id="chatInput" autocomplete="off" maxlength="2000" aria-label="Message"><button class="rbtn rprimary" id="chatSend">Send</button></form>
     </aside>
   </div>
