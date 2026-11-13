@@ -6149,3 +6149,25 @@ How it was built, and why:
 - **No new polling.** Edits/deletions ride on the 3-second poll of an open conversation; reminders
   ring on the bell's 30-second poll (`notify_poll.php`) and on the Realm's heartbeat, once each.
 - Reminder times are the server's clock (the studio's time zone in `config.php`).
+
+## 2026-11-13 — Moving an invoice to another project
+
+David: *"can we add a new button in the edit to change this invoice to another project?"*
+- **In place, never delete and recreate.** Only `project_id`, `project_code`, the position
+  (`step_id`, `step_name`, `position_crew_id`), the note and `updated_by` change. Its id, monthly
+  invoice (`header_id`), amount, currency, sender, dates, status and paid date stay, so nothing that
+  points at it breaks, and every report that reads invoices by project follows on its own.
+- **The sender never changes**: whoever sent it still sent it. When the new position is somebody
+  else's, `position_crew_id` says whose, as on the edit form (finance_install_15). If the sender is
+  not on the new show, the panel says so and still allows it (their statement for that show lists it).
+- **A monthly invoice line moves alone.** The header has no project; its printed total is the
+  whole invoice's, and its status and paid date are copied to every line wherever the line is, so a
+  move changes neither.
+- **Currency**: the invoice keeps its own currency; each show counts it at its own fixed rate. The
+  panel shows both dollar figures. A show with no rate for it yet fixes one the first time its
+  Finance page is opened, as for any invoice.
+- **Recorded twice**: appended to the invoice's note, because that is where David reads it on the
+  Invoices tab, and in `invoice_moves` (finance_install_19), because a note can be typed over and a
+  record should not be. The log is optional: without it the move still happens.
+- **Admins only** (`can_see_money()`, on the admin-only finance page), after a confirmation panel
+  and a browser confirm.

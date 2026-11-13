@@ -14,6 +14,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
+
+**Asked by David**: "can we add a new button in the edit to change this invoice to another project?"
+In an invoice's **edit** row on Finance → a project → **Invoices**, **Move to another project…** opens a
+confirmation panel: pick the show, then the position on it (the sender's own positions first, then
+somebody else's, a whole step, or unattached), then **Move**. The panel says, before anything changes:
+that only this line moves when it is part of a monthly invoice (the invoice's total, status and paid
+date stay), when the sender is not on the new show, the amount in dollars at each show's own fixed
+rate when it is not in USD, and when its period comes from the timeline.
+
+The invoice is **updated in place**: amount, currency, sender, reference, document link, dates,
+status, paid date and note all stay; only the project and position change. Every page that reads
+invoices by project (totals, Final balance, the projection's Actual, statements, the hub) follows.
+The move is added to the invoice's note ("Moved from FCM · Layout by David, 2026-11-13.") and, once
+**finance_install_19** is applied from migrate.php → Finance database updates, to a move log
+(`invoice_moves`). Without it the move still works and the page says the log was not written.
+Files: `includes/invoice_move.php` (new), `finance_project.php`, `includes/money.php`,
+`assets/style.css`, `finance_install_19.sql`.
+
 ## 2026-11-13 — The Realm: Slack's bar over a message *(migration 096)*
 
 **Asked by David**, with a screenshot of Slack: "let's add these same features from slack so the
