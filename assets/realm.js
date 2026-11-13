@@ -2306,6 +2306,7 @@ function chatTake(j) {
   if (fresh.length) { if (!CH.last) { box.innerHTML = ''; CH.first = fresh[0].id; } box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen || CH.jump) box.scrollTop = box.scrollHeight; }
   if (CH.jump && j.messages) { CH.jump = false; box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
+  if (FIND.jump) findLand(fresh);
   CH.seen = true;
   /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
   if (R.onChat) R.onChat(j);
@@ -2321,7 +2322,7 @@ function chatTake(j) {
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
-  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first,{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(FIND.jump && !CH.last ? '&at='+FIND.jump : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
 }
 function openChat(id) {
@@ -2404,6 +2405,109 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; CH.jump = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
 });
+
+/* ---------- search (David, 2026-11-13: "all channels and dms") ----------
+   The studio is on Slack's free plan and loses everything older than 90 days; every Realm message is
+   kept, so it can all be found again. A box at the top of the side panel: typing a word or two lists
+   the matching messages, newest first, in place of the lists below it; clicking one opens that
+   conversation at that message, lit up for a moment. Escape, or emptying the box, brings the lists
+   back.
+   ⚠ WHICH CONVERSATIONS ARE SEARCHED IS DECIDED ON THE SERVER (includes/realm_search.php), from the
+   real login: this only sends the words. Nothing here can widen it.
+   The box and the results live outside #side, which is redrawn every few seconds. */
+var FIND = {q:'',timer:0,seq:0,list:[],more:false,busy:false,jump:0};
+function findMarks(text) {
+  /* Escaped first; then every searched word is marked in one pass, so a mark is never put inside
+     another one or inside the escaping. */
+  var h = esc(text), words = FIND.q.toLowerCase().split(/\s+/).filter(function (w) { return w.length; })
+    .map(function (w) { return esc(w).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); });
+  if (!words.length) return h;
+  words.sort(function (a, b) { return b.length-a.length; });
+  return h.replace(new RegExp('('+words.join('|')+')','gi'),'<mark>$1</mark>');
+}
+function findDraw(note) {
+  var box = $('searchRes'), h = '';
+  if (!box) return;
+  if (FIND.list.length) {
+    h += '<div class="rfoundlist">'+FIND.list.map(function (m) {
+      return '<button type="button" class="rfound" data-found="'+esc(m.channel)+'" data-mid="'+m.id+'"><span class="rfoundhead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></span><span class="rfoundwhere">'+esc(m.where)+'</span>'+
+        '<span class="rfoundbody">'+(m.snippet ? findMarks(m.snippet) : '<i>A picture</i>')+(m.image && m.snippet ? ' <i>(with a picture)</i>' : '')+'</span></button>';
+    }).join('')+'</div>';
+    if (FIND.more) h += '<button type="button" class="rbtn rsmall rfoundmore" data-findmore="1"'+(FIND.busy?' disabled':'')+'>'+(FIND.busy?'Looking…':'Older results')+'</button>';
+  } else if (!note) note = FIND.busy ? 'Looking…' : 'Nothing found. Every conversation you can read was searched.';
+  if (note) h += '<p class="rfoundnote">'+esc(note)+'</p>';
+  box.innerHTML = '<h2>Messages</h2>'+h;
+}
+function findShow(on) {
+  if (!$('searchRes')) return;
+  $('searchRes').hidden = !on; $('side').hidden = on;
+}
+function findAsk(older) {
+  var q = FIND.q, seq = ++FIND.seq, before = older && FIND.list.length ? FIND.list[FIND.list.length-1].id : 0;
+  FIND.busy = true; if (older) findDraw(); else { FIND.list = []; FIND.more = false; findDraw(); }
+  fetch(R.api+'?search='+encodeURIComponent(q)+(before?'&before='+before:''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      /* An answer to words that have since been changed is dropped: only the latest counts. */
+      if (seq!==FIND.seq) return;
+      FIND.busy = false;
+      if (!j || !j.ok) { FIND.list = []; FIND.more = false; findDraw((j && j.error) || 'The search could not be run. Try again in a moment.'); return; }
+      FIND.list = (older ? FIND.list : []).concat(j.results || []); FIND.more = !!j.more; findDraw(j.note || '');
+    })
+    .catch(function () { if (seq!==FIND.seq) return; FIND.busy = false; findDraw('The search could not be run. Try again in a moment.'); });
+}
+function findTyped() {
+  var q = $('searchInput').value.trim();
+  clearTimeout(FIND.timer);
+  if (q===FIND.q && q) return;
+  FIND.q = q;
+  if (!q) { FIND.seq++; FIND.list = []; findShow(false); return; }
+  findShow(true);
+  if (q.replace(/\s+/g,'').length < 2) { FIND.seq++; FIND.list = []; FIND.more = false; findDraw('Type at least two letters.'); return; }
+  /* A short pause after the last key, so a word is not searched for letter by letter. */
+  FIND.timer = setTimeout(function () { findAsk(false); },300);
+}
+function findClear() { if (!$('searchInput')) return; $('searchInput').value = ''; findTyped(); }
+/* Open the conversation a result is in, at that message. A conversation that is already open is
+   opened again, so it starts at the found message rather than wherever it was. */
+function findOpen(channel, id) {
+  FIND.jump = id;
+  if (CH.open===channel) CH.open = null;
+  openChat(channel);
+}
+/* The conversation opened from a result has drawn its first page: bring the found message into
+   view and light it up. When it is not on that page (it may have been in a reply, or removed), the
+   conversation simply stays where it opened. */
+function findLand(fresh) {
+  var id = FIND.jump, box = $('chatMsgs'), i = -1, el;
+  FIND.jump = 0;
+  fresh.forEach(function (m, k) { if (m.id===id) i = k; });
+  /* Each message carries its id (added with reactions, PR 238). Failing that, the page was drawn
+     from empty, so its messages are the box's children in the same order. */
+  el = box.querySelector('.rmsg[data-msg="'+id+'"]') || (i >= 0 && box.children.length===fresh.length ? box.children[i] : null);
+  if (!el) { toast('That message could not be shown in the conversation.'); return; }
+  el.classList.add('is-found');
+  el.scrollIntoView({block:'center'});
+  setTimeout(function () { el.classList.remove('is-found'); },2600);
+}
+if ($('search') && ST.chat) {
+  $('search').hidden = false;
+  $('searchInput').addEventListener('input',findTyped);
+  $('searchInput').addEventListener('keydown',function (e) {
+    if (e.key==='Escape') { e.preventDefault(); findClear(); this.blur(); }
+  });
+  /* Enter searches at once, without the pause. */
+  $('search').addEventListener('submit',function (e) {
+    e.preventDefault(); clearTimeout(FIND.timer);
+    var q = $('searchInput').value.trim(); if (q.replace(/\s+/g,'').length < 2) return;
+    FIND.q = q; findShow(true); findAsk(false);
+  });
+  $('searchRes').addEventListener('click',function (e) {
+    var b = e.target.closest('[data-found]');
+    if (b) { findOpen(b.getAttribute('data-found'),+b.getAttribute('data-mid')); return; }
+    if (e.target.closest('[data-findmore]') && !FIND.busy) findAsk(true);
+  });
+}
 
 /* ---------- your character ---------- */
 var LOOK = {};
