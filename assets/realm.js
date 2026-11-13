@@ -1402,6 +1402,19 @@ function drawRoom(c, cw, ch) {
     if (idle && !deco) zed(c,px,py);
     LASTAT[d.p.id] = {x:d.x,y:d.y,room:true,n:SP.n};
   });
+  /* The names of the things in the room and the frame round the one I am next to go on now, and
+     anybody standing in front of one is painted again over it (roomTags, below). */
+  if (!deco) { var tags = roomTags(c);
+    if (tags.length) who.forEach(function (d) {
+      var px = Math.round(d.x/.9), py = Math.round(d.y/.9), foot = oy+d.y*s, x0 = ox+(d.x-12)*s, x1 = ox+(d.x+28)*s, y0 = oy+(d.y-58)*s, y1 = oy+(d.y+4)*s;
+      tags.forEach(function (t) {
+        if (foot < t.base || x1 < t.x || x0 > t.x+t.w || y1 < t.y || y0 > t.y+t.h) return;
+        c.save(); c.setTransform(1,0,0,1,0,0); c.beginPath(); c.rect(t.x,t.y,t.w,t.h); c.clip();
+        c.setTransform(s*.9,0,0,s*.9,ox,oy); if (!d.mine && d.p.state==='idle') c.globalAlpha = .6;
+        sprite(c,px,py,d.p,d.bob); c.restore();
+      });
+    });
+  }
   c.setTransform(s,0,0,s,ox,oy);
   /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
      drawn where that person stands, so it goes with them when they walk. */
@@ -1422,25 +1435,40 @@ function drawRoom(c, cw, ch) {
   /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
   var placed = placeBubbles(boxes);
   placed.sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
-  tagsUnderBubbles(c.canvas,placed,s,ox,oy);
 }
-/* WHAT SOMEBODY SAYS GOES IN FRONT OF THE NAME OF A THING (David, 2026-11-13, with a picture of
-   "Your tasks" and "Your profile" sitting on top of a speech bubble: "let's make sure the names of
-   the objects are behind the dialogues"). The bubbles are painted on the canvas; the names are tags
-   on the see-through buttons laid over the bookshelf, the chest and the portrait, and anything on
-   the page is always above anything painted. So a name that a bubble reaches is put away for as long
-   as the bubble is up, which is what "behind it" looks like, and comes back when the bubble goes.
-   The button itself stays where it is and still works. */
-function tagsUnderBubbles(cv, placed, s, ox, oy) {
-  if (!cv || !cv.getBoundingClientRect) return;
-  var k = Math.min(2,window.devicePixelRatio||1), at = cv.getBoundingClientRect();
+/* THE NAMES OF THINGS IN A ROOM ARE PAINTED, BEHIND THE PEOPLE (David, 2026-11-13, with a picture of
+   "Timeline" and its blue frame drawn across his character in a camp: "let's make these stay behind
+   the character"). The bookshelf, chest, portrait, scroll, calendar, board and the merchant are
+   see-through buttons laid over the room, so they can be clicked and reached with the keyboard; their
+   name tags and the frame used to be part of those buttons, and anything on the page is always above
+   anything painted. Now the buttons stay, invisible (assets/realm.css), and this paints what they used
+   to show, in the same colours and size: the name under the thing, and the frame while I stand next
+   to it (is-near), point at it or reach it with Tab. drawRoom() then paints anybody standing IN FRONT
+   of the thing (feet lower than its bottom edge) again over it, and a speech bubble, painted later
+   still, covers a name by itself; that last part replaces the old trick of hiding a name under a bubble.
+   Works in device pixels, as the buttons are placed (placeHot). Each box returned: where the paint
+   went, and `base`, the thing's bottom edge, for the in-front test. */
+function roomTags(c) {
+  var k = Math.min(2,window.devicePixelRatio||1), out = [], cs = window.getComputedStyle ? getComputedStyle(document.documentElement) : null;
+  var prim = (cs && cs.getPropertyValue('--primary').trim()) || PAL.primary, onp = (cs && cs.getPropertyValue('--on-primary').trim()) || PAL.ground, font = (cs && cs.getPropertyValue('--body').trim()) || 'sans-serif';
+  var rr = function (x, y, w, h, r) { c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); };
+  c.save(); c.setTransform(1,0,0,1,0,0);
   HOT.concat([['shopBtn']]).forEach(function (h) {
-    var b = $(h[0]), tag = b && b.querySelector('span'), under = false; if (!tag) return;
-    if (!b.hidden) { var r = tag.getBoundingClientRect();
-      placed.forEach(function (p) { var x = at.left+(ox+(p.bx-1)*s)/k, y = at.top+(oy+(p.by-1)*s)/k, w = (p.w+2)*s/k, hh = (p.h+2)*s/k;
-        if (r.left < x+w && x < r.right && r.top < y+hh && y < r.bottom) under = true; }); }
-    tag.style.visibility = under ? 'hidden' : '';
+    var b = $(h[0]); if (!b || b.hidden) return;
+    var x = parseFloat(b.style.left)*k, y = parseFloat(b.style.top)*k, w = parseFloat(b.style.width)*k+4*k, hh = parseFloat(b.style.height)*k+4*k;
+    if (!(w > 0 && hh > 0)) return;
+    var lit = b.classList.contains('is-near') || b.matches(':hover') || b.matches(':focus-visible');
+    if (lit) { c.lineWidth = 2*k; c.strokeStyle = prim; rr(x+k,y+k,w-2*k,hh-2*k,4*k); c.stroke(); out.push({x:x,y:y,w:w,h:hh,base:y+hh}); }
+    var tag = b.querySelector('span'), text = tag ? tag.textContent : '';
+    if (!text) return;
+    c.font = '700 '+Math.round(12*k)+'px '+font; c.textAlign = 'center'; c.textBaseline = 'middle';
+    var pw = c.measureText(text).width+16*k, ph = 17*k, tx = x+w/2-pw/2, ty = y+hh+5*k;
+    c.fillStyle = prim; rr(tx,ty,pw,ph,4*k); c.fill();
+    c.fillStyle = onp; c.fillText(text,x+w/2,ty+ph/2+.5*k);
+    out.push({x:tx,y:ty,w:pw,h:ph,base:y+hh});
   });
+  c.restore(); c.textAlign = 'start'; c.textBaseline = 'alphabetic';
+  return out;
 }
 
 /* ---------- decorating (David, 2026-11-12) ----------
@@ -3627,6 +3655,7 @@ setInterval(function () {
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */
+if ($('mapbox')) ['pointerover','pointerout','focusin','focusout'].forEach(function (ev) { $('mapbox').addEventListener(ev,function (e) { if (S.inside && e.target.closest && e.target.closest('.rshelf')) draw(); }); });
 if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],['portraitBtn','portraitTag','Profile','A profile, in the portrait'],['shopBtn','shopTag','Merchant','The merchant, who sells things for gold']].forEach(function (h) {
   var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
   b.setAttribute('aria-label',h[3]); b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);

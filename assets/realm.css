@@ -374,6 +374,12 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rwhotip small { color: var(--muted); }
 .rwhotip a { font-size: 12px; margin-top: 2px; }
 .rshelf { position: absolute; background: none; border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer; }
+/* The name tags and the frame are PAINTED in the room now, behind whoever stands in front of them
+   (roomTags in assets/realm.js, David 2026-11-13). The button stays as the click area and for the
+   keyboard; its own frame and tag are kept invisible so they are not drawn twice, over the people.
+   The tag stays in the page for the button's name. */
+.rshelf, .rshelf:hover, .rshelf:focus-visible, .rshelf.is-near { border-color: transparent !important; outline: none; }
+.rshelf span { visibility: hidden; }
 .rshelf:hover, .rshelf:focus-visible { border-color: var(--primary); }
 /* Lit while your character stands next to it (assets/realm.js, roomNear): Enter opens it. */
 .rshelf.is-near { border-color: var(--primary); }
