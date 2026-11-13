@@ -363,10 +363,12 @@ function whereabouts() {
 }
 
 /* ---------- inside a building ---------- */
+/* The meeting places: one drawn picture each. A person's own house is drawn by homeArt() below, from
+   what they have put in it. */
 var ROOMS = {};
 function roomArt(kind, tint) {
   var key = kind+tint; if (ROOMS[key]) return ROOMS[key];
-  var col = TINT[tint]||TINT.candle, tent = kind==='tent', stonef = kind==='hall'||kind==='tower';
+  var col = TINT[tint]||TINT.candle, tent = kind==='tent', stonef = kind==='hall';
   ROOMS[key] = stamp(240,160,0,0,function () {
     var x, y, i;
     P1(0,0,240,160,PAL.out);
@@ -379,14 +381,7 @@ function roomArt(kind, tint) {
       [40,180].forEach(function (wx) { parts([[wx,18,20,18,PAL.winD]]); P1(wx+4,22,1,1,PAL.hot); P1(wx+13,29,1,1,PAL.hot); P1(wx+9,18,1,18,PAL.wood); P1(wx,26,20,1,PAL.wood); }); }
     parts([[84,84,72,34,col]]); P1(88,88,64,26,shade(col,-45)); P1(92,92,56,18,col);
     P1(108,150,24,4,PAL.glow);
-    if (kind==='study') { parts([[100,14,40,32,PAL.wood]]); for (i = 0; i < 3; i++) { P1(102,18+i*10,36,7,PAL.woodD); for (x = 0; x < 8; x++) P1(103+x*4,19+i*10,3,6,[TINT.mana,TINT.ember,TINT.spell,TINT.candle][(x+i)%4]); }
-      parts([[24,62,46,14,PAL.wood]]); parts([[30,54,3,8,PAL.wall]]); P1(30,51,3,3,PAL.win); parts([[44,58,14,5,PAL.wall]]); }
-    else if (kind==='tower') { [[90,14],[124,14]].forEach(function (b) { parts([[b[0],b[1],26,32,PAL.wood]]); for (i = 0; i < 3; i++) for (x = 0; x < 5; x++) P1(b[0]+2+x*5,b[1]+3+i*10,4,7,[TINT.violet,TINT.mana,TINT.rose][(x+i)%3]); });
-      parts([[188,60,4,26,PAL.wood],[176,56,26,6,PAL.iron]]); P1(198,57,4,4,PAL.win); }
-    else if (kind==='forge') { parts([[66,14,22,32,PAL.wood]]); for (i = 0; i < 3; i++) { P1(68,18+i*10,18,7,PAL.woodD); for (x = 0; x < 4; x++) P1(69+x*4,19+i*10,3,6,[TINT.ember,TINT.candle,TINT.mana,TINT.spell][(x+i)%4]); }
-      parts([[92,12,56,40,PAL.stoneD],[102,24,36,28,PAL.lava]]); P1(108,32,24,20,PAL.lavaL); P1(115,40,10,12,PAL.hot);
-      parts([[40,104,20,8,PAL.iron],[34,98,32,6,PAL.iron]]); parts([[184,96,20,22,PAL.wood]]); P1(184,102,20,2,PAL.iron); P1(184,112,20,2,PAL.iron); }
-    else if (kind==='tavern') { parts([[24,54,192,12,PAL.wood]]); P1(24,54,192,2,shade(PAL.wood,35)); for (x = 34; x < 210; x += 22) { parts([[x,46,6,8,PAL.wall]]); P1(x,46,6,2,PAL.win); }
+    if (kind==='tavern') { parts([[24,54,192,12,PAL.wood]]); P1(24,54,192,2,shade(PAL.wood,35)); for (x = 34; x < 210; x += 22) { parts([[x,46,6,8,PAL.wall]]); P1(x,46,6,2,PAL.win); }
       [[28,100],[190,100]].forEach(function (t) { parts([[t[0],t[1],22,26,PAL.wood]]); P1(t[0],t[1]+6,22,2,PAL.iron); P1(t[0],t[1]+18,22,2,PAL.iron); }); }
     else if (kind==='hall') { parts([[70,74,100,10,PAL.marble]]); P1(70,82,100,2,PAL.marbleD); [[26,14],[204,14]].forEach(function (b) { parts([[b[0],b[1],10,30,col]]); P1(b[0]+3,b[1]+8,4,4,PAL.hot); }); }
     else { parts([[96,70,48,12,PAL.wood]]); P1(100,72,40,8,PAL.wall); P1(108,74,8,2,TINT.ember); P1(122,75,10,2,TINT.mana); parts([[28,110,18,14,PAL.wood],[196,112,16,12,PAL.wood]]); }
@@ -437,40 +432,371 @@ function paintBubble(c, b) {
   c.fillStyle = PAL.hot; c.fillRect(b.bx,b.by,b.w,b.h); c.fillRect(b.x-1,b.by+b.h,3,Math.max(3,tail));
   c.fillStyle = PAL.out; b.lines.forEach(function (l, i) { c.fillText(l,b.bx+4,b.by+3+i*9); });
 }
-/* THE LIBRARY (David, 2026-11-12, circling the bookshelf in his own house: "let's change the focus
-   button to this library where all our 'tasks' will be. If you click on that shelf you'll see all
-   your tasks and you can decide which one to work on"). The shelf in YOUR OWN house is the way in
-   to your tasks; nobody else's shelf does anything. Where the books stand in each kind of house, in
-   the room's own units: the canvas cannot be clicked piece by piece, so a see-through button is
-   laid exactly over the shelf each time the room is drawn. */
-var SHELF = {study:[99,13,42,34],tower:[89,13,62,34],forge:[65,13,24,34]};
-function placeShelf(o, s, ox, oy) {
-  var b = $('shelfBtn'); if (!b) return;
-  var r = o && o.owner && o.owner.me ? SHELF[o.kind] : null;
-  b.hidden = !r; if (!r) return;
+/* ---------- a person's own room (David, 2026-11-12, migration 085) ----------
+   "Let's start with decorate my office. Let's all start with the same basic look and they can modify
+   it from a library of free and opt to buy new stuff. All of them should have at least these: Book
+   shelf: for tasks. Treasure chest: to check their gold. A portrait in the wall: so they can see
+   theirs and others bio and profile from Anima, and update it."
+
+   A house's room is no longer one fixed picture per kind of house. It is a list of THINGS and where
+   each stands, plus three choices (wall, floor, rug), kept per person by includes/realm_room.php.
+   Cottage, Tower and Forge are now only the outside. Everybody starts with ROOM_START.
+
+   THREE THINGS ARE IN EVERY HOUSE and can be moved but never removed: the bookshelf (your tasks), the
+   chest (your gold) and the portrait (the profile from Anima's Home). A see-through button is laid
+   over each one every time the room is drawn (placeHot), because a canvas cannot be clicked piece by
+   piece. The shelf and the chest answer only in YOUR OWN house; a portrait answers in anybody's.
+
+   ⚠ THINGS IS ALSO IN includes/realm_room.php (REALM_ROOM_THINGS), which decides whether a room may
+   be saved. The sizes MUST match. z is where it goes, y the height a wall thing hangs at, max how
+   many one room may hold, req why it cannot be removed, gold that it is for sale later. A thing
+   marked gold is shown in the library and cannot be placed: gold is stage 4, and no price is set. */
+var THINGS = {
+  shelf:{n:'Bookshelf',z:'wall',w:40,h:32,y:14,max:1,req:'it holds your tasks'},
+  portrait:{n:'Portrait',z:'wall',w:18,h:22,y:16,max:1,req:'it opens your profile'},
+  window:{n:'Window',z:'wall',w:20,h:18,y:18,max:4},
+  banner:{n:'Banner',z:'wall',w:12,h:28,y:13,max:3},
+  clock:{n:'Clock',z:'wall',w:12,h:22,y:16,max:1},
+  sconce:{n:'Wall candle',z:'wall',w:6,h:12,y:22,max:4},
+  potions:{n:'Potion shelf',z:'wall',w:22,h:12,y:22,max:2},
+  map:{n:'Map',z:'wall',w:26,h:18,y:18,max:1},
+  hearth:{n:'Hearth',z:'wall',w:56,h:40,y:12,max:1},
+  trophy:{n:'Shield and swords',z:'wall',w:22,h:22,y:16,max:1,gold:1},
+  chest:{n:'Treasure chest',z:'floor',w:22,h:16,max:1,req:'it keeps your gold'},
+  desk:{n:'Desk',z:'floor',w:46,h:22,max:1},
+  chair:{n:'Armchair',z:'floor',w:18,h:22,max:2},
+  table:{n:'Table',z:'floor',w:30,h:18,max:1},
+  plant:{n:'Plant',z:'floor',w:12,h:20,max:4},
+  barrel:{n:'Barrel',z:'floor',w:16,h:20,max:3},
+  crate:{n:'Crate',z:'floor',w:16,h:14,max:3},
+  candle:{n:'Candle stand',z:'floor',w:8,h:24,max:3},
+  anvil:{n:'Anvil',z:'floor',w:32,h:14,max:1},
+  telescope:{n:'Telescope',z:'floor',w:26,h:30,max:1},
+  cauldron:{n:'Cauldron',z:'floor',w:22,h:20,max:1},
+  orb:{n:'Crystal ball',z:'floor',w:14,h:22,max:1,gold:1},
+  throne:{n:'Throne',z:'floor',w:22,h:34,max:1,gold:1}
+};
+var STYLES = {wall:{plaster:'Plaster',stone:'Stone',timber:'Timber'},floor:{planks:'Planks',flags:'Flagstones',checker:'Checker'},rug:{classic:'Square',round:'Round',none:'No rug'}};
+/* The room everybody starts with. includes/realm_room.php holds the same one (realm_room_default). */
+var ROOM_START = {wall:'plaster',floor:'planks',rug:'classic',items:[['window',36,18],['shelf',100,14],['portrait',152,16],['window',190,18],['desk',22,58],['chest',186,64]]};
+
+/* One thing, its top left corner at 0,0. col is the owner's cloak colour, which a few things wear. */
+function thingArt(id, col) {
+  var i, x, W = PAL.wood, WD = PAL.woodD, I = PAL.iron;
+  if (id==='shelf') { parts([[0,0,40,32,W]]); for (i = 0; i < 3; i++) { P1(2,4+i*10,36,7,WD); for (x = 0; x < 8; x++) P1(3+x*4,5+i*10,3,6,[TINT.mana,TINT.ember,TINT.spell,TINT.candle][(x+i)%4]); } P1(0,0,40,1,shade(W,35)); }
+  else if (id==='portrait') { parts([[0,0,18,22,PAL.glow]]); P1(0,0,18,1,PAL.hot); P1(0,21,18,1,shade(PAL.glow,-45)); P1(2,2,14,18,PAL.winD);
+    P1(4,13,10,7,col); P1(6,6,6,7,PAL.skin); P1(6,5,6,2,PAL.hair); P1(7,9,1,1,PAL.out); P1(10,9,1,1,PAL.out); }
+  else if (id==='window') { parts([[0,0,20,18,PAL.winD]]); P1(4,4,1,1,PAL.hot); P1(13,11,1,1,PAL.hot); P1(16,3,1,1,PAL.hot); P1(9,0,1,18,W); P1(0,8,20,1,W); }
+  else if (id==='banner') { parts([[0,0,12,2,W],[1,2,10,22,col],[1,24,4,4,col],[7,24,4,4,col]]); P1(1,2,10,2,shade(col,45)); P1(1,20,10,2,shade(col,-45)); P1(4,9,4,4,PAL.hot); P1(5,10,2,2,shade(col,-45)); }
+  else if (id==='clock') { parts([[0,0,12,22,W]]); P1(0,0,12,1,shade(W,35)); P1(2,2,8,8,PAL.wall); P1(5,3,1,4,PAL.out); P1(5,6,3,1,PAL.out); P1(3,12,6,8,WD); P1(5,13,2,4,PAL.glow); P1(4,17,4,2,PAL.win); }
+  else if (id==='sconce') { parts([[2,6,2,5,I],[0,10,6,2,I]]); parts([[2,2,2,4,PAL.wall]]); P1(2,0,2,2,PAL.win); P1(2,1,1,1,PAL.hot); }
+  else if (id==='potions') { parts([[0,9,22,3,W]]); parts([[2,3,4,6,TINT.spell],[9,2,4,7,TINT.violet],[16,4,4,5,TINT.ember]]); P1(3,1,2,2,PAL.wall); P1(10,0,2,2,PAL.wall); P1(17,2,2,2,PAL.wall); P1(2,3,1,3,PAL.hot); P1(9,2,1,3,PAL.hot); P1(16,4,1,2,PAL.hot); }
+  else if (id==='map') { parts([[0,0,26,18,PAL.wall]]); P1(0,0,26,2,W); P1(0,16,26,2,W); P1(3,4,9,6,PAL.grassA); P1(5,10,5,3,PAL.grassA); P1(14,7,8,6,PAL.grassA); P1(12,5,2,7,PAL.water); P1(16,4,3,2,PAL.rock); P1(6,6,1,1,PAL.out); P1(8,8,1,1,PAL.out); P1(10,9,1,1,PAL.out); P1(17,9,2,2,TINT.ember); }
+  else if (id==='hearth') { parts([[0,0,56,40,PAL.stoneD],[10,12,36,28,PAL.lava]]); for (i = 5; i < 40; i += 6) { P1(0,i,10,1,shade(PAL.stoneD,-22)); P1(46,i,10,1,shade(PAL.stoneD,-22)); } P1(0,0,56,3,PAL.stone); P1(0,3,56,1,shade(PAL.stoneD,-22));
+    P1(16,20,24,20,PAL.lavaL); P1(23,28,10,12,PAL.hot); P1(12,36,32,4,WD); P1(16,34,10,3,W); P1(30,35,10,2,W); }
+  else if (id==='trophy') { for (i = 0; i < 20; i++) { P1(i,i,3,3,PAL.out); P1(19-i,i,3,3,PAL.out); } for (i = 0; i < 20; i++) { P1(i+1,i+1,1,1,PAL.marble); P1(20-i,i+1,1,1,PAL.marble); }
+    parts([[5,4,12,10,TINT.candle],[7,14,8,3,TINT.candle],[9,17,4,2,TINT.candle]]); P1(5,4,12,2,PAL.hot); P1(10,4,2,15,TINT.ember); P1(5,9,12,2,TINT.ember); }
+  else if (id==='chest') { parts([[0,5,22,11,W],[0,0,22,6,WD]]); P1(0,0,22,1,shade(W,35)); P1(3,0,2,16,PAL.glow); P1(17,0,2,16,PAL.glow); P1(0,6,22,1,PAL.out); P1(9,5,4,5,PAL.win); P1(10,7,2,2,PAL.out); P1(0,14,22,2,shade(W,-30)); }
+  else if (id==='desk') { parts([[0,8,46,14,W]]); P1(0,8,46,2,shade(W,35)); P1(0,17,46,5,WD); P1(3,17,3,5,PAL.out); P1(40,17,3,5,PAL.out); parts([[6,2,3,6,PAL.wall]]); P1(6,0,3,2,PAL.win); P1(7,0,1,1,PAL.hot); parts([[20,5,14,5,PAL.wall]]); P1(22,7,8,1,PAL.wallD); }
+  else if (id==='chair') { parts([[2,0,14,13,WD],[0,8,4,10,W],[14,8,4,10,W],[2,11,14,8,col],[1,18,3,4,WD],[14,18,3,4,WD]]); P1(4,2,10,9,shade(col,-45)); P1(2,11,14,2,shade(col,45)); P1(0,8,4,1,shade(W,35)); P1(14,8,4,1,shade(W,35)); }
+  else if (id==='table') { parts([[12,7,6,9,WD],[7,15,16,3,WD],[0,0,30,8,W]]); P1(0,0,30,2,shade(W,35)); P1(0,6,30,2,WD); parts([[19,-4,5,5,PAL.wall]]); P1(20,-4,3,1,TINT.ember); }
+  else if (id==='plant') { parts([[4,2,4,11,PAL.pine],[0,5,4,7,PAL.pine],[8,4,4,8,PAL.pine],[2,12,8,8,TINT.ember]]); P1(4,2,2,6,PAL.pineL); P1(0,5,2,3,PAL.pineL); P1(9,5,2,5,PAL.pineD); P1(2,12,8,2,shade(TINT.ember,45)); P1(8,14,2,6,shade(TINT.ember,-55)); }
+  else if (id==='barrel') { parts([[0,0,16,20,W]]); P1(2,0,2,20,shade(W,30)); P1(11,0,4,20,WD); P1(0,4,16,2,I); P1(0,14,16,2,I); P1(0,0,16,1,shade(W,35)); }
+  else if (id==='crate') { parts([[0,0,16,14,W]]); P1(0,0,16,2,WD); P1(0,12,16,2,WD); P1(0,0,2,14,WD); P1(14,0,2,14,WD); for (i = 0; i < 10; i++) P1(3+i,2+i,2,1,WD); }
+  else if (id==='candle') { parts([[3,6,2,16,I],[0,21,8,3,I],[1,5,6,2,I]]); parts([[3,2,2,3,PAL.wall]]); P1(3,0,2,2,PAL.win); P1(3,1,1,1,PAL.hot); }
+  else if (id==='anvil') { parts([[6,6,20,8,I],[0,0,32,6,I]]); P1(0,0,32,1,PAL.stoneD); P1(10,6,12,2,PAL.out); P1(6,12,20,2,shade(I,-20)); }
+  else if (id==='telescope') { parts([[12,5,4,25,W],[6,27,16,3,WD],[0,0,26,6,I]]); P1(0,0,26,1,PAL.stoneD); P1(22,1,4,4,PAL.win); P1(23,2,2,2,PAL.hot); P1(12,5,1,22,shade(W,35)); }
+  else if (id==='cauldron') { parts([[2,6,18,12,I],[0,4,22,3,I],[4,18,3,2,I],[15,18,3,2,I]]); P1(2,4,18,2,TINT.spell); P1(5,4,4,1,PAL.hot); P1(3,8,2,8,PAL.stoneD); parts([[6,0,2,2,TINT.spell]]); parts([[13,1,2,2,TINT.spell]]); }
+  else if (id==='orb') { parts([[4,14,6,6,W],[1,19,12,3,WD]]); parts([[3,1,8,13,TINT.violet],[1,3,12,9,TINT.violet]]); P1(4,3,3,3,PAL.hot); P1(9,9,3,3,shade(TINT.violet,-55)); }
+  else if (id==='throne') { parts([[3,0,16,24,TINT.candle],[0,14,4,14,PAL.glow],[18,14,4,14,PAL.glow],[0,20,22,8,TINT.candle],[2,28,4,6,PAL.glow],[16,28,4,6,PAL.glow]]); P1(5,3,12,16,TINT.ember); P1(4,20,14,5,TINT.ember); P1(3,0,16,2,PAL.hot); P1(10,0,2,2,TINT.mana); }
+}
+/* Each thing is painted once per colour and kept. A table's cup stands 5 units above its box, so
+   every picture has that much room above it. */
+var TSTAMP = {};
+function thingStamp(id, tint) { var k = id+'|'+tint, t = THINGS[id]; return TSTAMP[k] || (TSTAMP[k] = stamp(t.w+2,t.h+7,1,6,function () { thingArt(id,TINT[tint]||TINT.candle); })); }
+/* The empty room: floor, back wall and rug, by the owner's three choices. */
+var HOMES = {};
+function homeArt(lay, tint) {
+  var key = lay.wall+lay.floor+lay.rug+tint; if (HOMES[key]) return HOMES[key];
+  var col = TINT[tint]||TINT.candle;
+  HOMES[key] = stamp(240,160,0,0,function () {
+    var x, y, r, fl = lay.floor, wl = lay.wall;
+    P1(0,0,240,160,PAL.out);
+    if (fl==='checker') { for (y = 52, r = 0; y < 150; y += 14, r++) for (x = 10; x < 230; x += 22) P1(x,y,22,Math.min(14,150-y),((x-10)/22+r)%2?PAL.marbleD:PAL.stoneD); }
+    else { var base = fl==='flags'?PAL.cobble:PAL.wood, seam = fl==='flags'?PAL.stoneD:PAL.woodD; P1(10,52,220,98,base);
+      for (y = 52, r = 0; y < 150; y += 10, r++) { P1(10,y,220,1,seam); for (x = 10+(r%2?11:0); x < 230; x += 22) P1(x,y,1,Math.min(10,150-y),seam); } }
+    if (wl==='stone') { P1(10,10,220,42,PAL.stone); for (y = 16, r = 0; y < 44; y += 6, r++) { P1(10,y,220,1,shade(PAL.stone,-20)); for (x = 10+(r%2?9:0); x < 230; x += 18) P1(x,y,1,6,shade(PAL.stone,-20)); } P1(10,44,220,8,PAL.stoneD); }
+    else if (wl==='timber') { P1(10,10,220,42,shade(PAL.wood,18)); for (x = 10; x < 230; x += 11) P1(x,10,1,34,PAL.woodD); P1(10,44,220,8,PAL.woodD); }
+    else { P1(10,10,220,42,PAL.wall); P1(10,44,220,8,PAL.wallD); }
+    P1(10,10,220,3,PAL.wood); P1(10,44,220,1,PAL.wood);
+    if (lay.rug==='classic') { parts([[84,84,72,34,col]]); P1(88,88,64,26,shade(col,-45)); P1(92,92,56,18,col); }
+    else if (lay.rug==='round') { for (y = 0; y < 38; y++) { var hw = Math.round(38*Math.sqrt(1-Math.pow((y-18.5)/19,2))); P1(120-hw-1,82+y,hw*2+2,1,PAL.out); }
+      for (y = 0; y < 38; y++) { var h2 = Math.round(38*Math.sqrt(1-Math.pow((y-18.5)/19,2))), h3 = Math.max(0,h2-6); P1(120-h2,82+y,h2*2,1,col); if (y > 4 && y < 33) P1(120-h3,82+y,h3*2,1,shade(col,-45)); } }
+    P1(108,150,24,4,PAL.glow);
+  });
+  return HOMES[key];
+}
+/* What is known of each person's room, by their user id. Asked when somebody walks in, and again
+   with each heartbeat while standing in somebody else's house, so a change shows without leaving. */
+var HOME = {};
+function cleanLay(l) {
+  if (!l || !l.items || !l.items.length) return ROOM_START;
+  var ok = l.items.every(function (it) { return it && THINGS[it[0]]; });
+  return ok ? {wall:STYLES.wall[l.wall]?l.wall:'plaster',floor:STYLES.floor[l.floor]?l.floor:'planks',rug:STYLES.rug[l.rug]?l.rug:'classic',items:l.items.map(function (it) { return [it[0],+it[1],+it[2]]; })} : ROOM_START;
+}
+function roomOf(id) { return (HOME[id] && HOME[id].lay) || ROOM_START; }
+function roomTake(r) {
+  if (!r || !r.owner) return;
+  var old = HOME[r.owner]||{}, h = {lay:cleanLay(r.layout),ready:!!r.ready,src:r.portrait||'',pic:(old.src===(r.portrait||''))?old.pic:null};
+  HOME[r.owner] = h;
+  /* The owner's real picture goes in the frame, shrunk to the frame's 14 by 18 dots. */
+  if (h.src && !h.pic) { var im = new Image(); im.onload = function () {
+    var cv = document.createElement('canvas'); cv.width = 14; cv.height = 18;
+    var sc = Math.max(14/im.width,18/im.height), w = im.width*sc, hh = im.height*sc; cv.getContext('2d').drawImage(im,(14-w)/2,(18-hh)*.3,w,hh); h.pic = cv; draw(); };
+    im.src = h.src; }
+  draw();
+}
+function roomAsk(id) {
+  fetch(R.api+'?room='+encodeURIComponent(id),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j && j.room) { roomTake(j.room); if (S.inside) renderInside(); } })
+    .catch(function () { /* The starting room is drawn until an answer comes. */ });
+}
+/* The same three rules includes/realm_room.php checks on save: inside the room, a wall thing clear of
+   its neighbour, and no two floor things on the same ground (only the bottom 10 units of a thing
+   count, so a tall one may rise behind a low one). */
+function foot(it) { var t = THINGS[it[0]], f = Math.min(10,t.h); return [it[1],it[2]+t.h-f,t.w,f]; }
+function clash(a, b) {
+  var ta = THINGS[a[0]], tb = THINGS[b[0]]; if (ta.z!==tb.z) return false;
+  if (ta.z==='wall') return a[1] < b[1]+tb.w+2 && b[1] < a[1]+ta.w+2;
+  var p = foot(a), q = foot(b); return p[0] < q[0]+q[2] && q[0] < p[0]+p[2] && p[1] < q[1]+q[3] && q[1] < p[1]+p[3];
+}
+function inRoom(it) { var t = THINGS[it[0]]; return it[1] >= 12 && it[1] <= 228-t.w && (t.z==='wall' ? it[2]===t.y : (it[2]+t.h >= 60 && it[2]+t.h <= 148)); }
+function fits(items, i) { if (!inRoom(items[i])) return false; for (var k = 0; k < items.length; k++) if (k!==i && clash(items[i],items[k])) return false; return true; }
+
+/* The three ways in. [button, thing, only in my own house]. */
+var HOT = [['shelfBtn','shelf',true],['chestBtn','chest',true],['portraitBtn','portrait',false]];
+function placeHot(o, lay, s, ox, oy) {
   var k = Math.min(2,window.devicePixelRatio||1);
-  b.style.left = (ox+r[0]*s)/k+'px'; b.style.top = (oy+r[1]*s)/k+'px'; b.style.width = r[2]*s/k+'px'; b.style.height = r[3]*s/k+'px';
+  HOT.forEach(function (h) {
+    var b = $(h[0]), it = null; if (!b) return;
+    if (o && o.owner && lay && (o.owner.me || !h[2])) lay.items.forEach(function (x) { if (x[0]===h[1]) it = x; });
+    b.hidden = !it; if (!it) return;
+    var t = THINGS[h[1]];
+    b.style.left = (ox+(it[1]-1)*s)/k+'px'; b.style.top = (oy+(it[2]-1)*s)/k+'px'; b.style.width = (t.w+2)*s/k+'px'; b.style.height = (t.h+2)*s/k+'px';
+    if (h[1]==='portrait') { var say = o.owner.me ? 'Your profile' : firstName(o.owner.name), tag = $('portraitTag');
+      if (tag && tag.textContent!==say) { tag.textContent = say; b.setAttribute('aria-label',o.owner.me?'Your profile, in the portrait':'The profile of '+o.owner.name+', in the portrait'); } }
+  });
+}
+function paintThing(c, it, o) {
+  var st = thingStamp(it[0],o.tint), h = HOME[o.owner.id];
+  c.drawImage(st.cv,it[1]-st.ox,it[2]-st.oy);
+  if (it[0]==='portrait' && h && h.pic) c.drawImage(h.pic,it[1]+2,it[2]+2);
 }
 var SEATS = [[120,132],[86,126],[154,126],[60,134],[180,134],[100,112],[140,112],[46,118],[194,118]];
+var DECO = {on:false,lay:null,sel:-1,drag:null,bad:false}, RT = null;
 function drawRoom(c, cw, ch) {
-  var o = B[S.inside]; if (!o) { placeShelf(null); return; }
-  var rm = roomArt(o.kind,o.tint), s = Math.max(1,Math.min(cw/240,(ch-70)/160)), ox = Math.round((cw-240*s)/2), oy = Math.round((ch-160*s)/2+30), f = S.frame;
-  placeShelf(o,s,ox,oy);
-  c.setTransform(s,0,0,s,ox,oy); c.drawImage(rm.cv,0,0);
+  var o = B[S.inside]; if (!o) { placeHot(null); return; }
+  var home = !!o.owner, deco = home && o.owner.me && DECO.on, lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : null);
+  /* While decorating, the library lies along the bottom, so the room is fitted into what is left. */
+  var k = Math.min(2,window.devicePixelRatio||1), bar = deco ? $('decoBar') : null, pad = bar ? (bar.offsetHeight+12)*k : 0;
+  var s = Math.max(1,Math.min(cw/240,(ch-70-pad)/160)), ox = Math.round((cw-240*s)/2), oy = Math.round((ch-pad-160*s)/2+30), f = S.frame;
+  RT = {s:s,ox:ox,oy:oy};
+  placeHot(deco?null:o,lay,s,ox,oy);
+  c.setTransform(s,0,0,s,ox,oy);
+  /* Back to front: whatever stands lower on the floor is nearer, and covers what is behind it. */
+  var order = [];
+  if (!home) c.drawImage(roomArt(o.kind,o.tint).cv,0,0);
+  else {
+    c.drawImage(homeArt(lay,o.tint).cv,0,0);
+    lay.items.forEach(function (it) { if (THINGS[it[0]].z==='wall') paintThing(c,it,o); else order.push({y:it[2]+THINGS[it[0]].h,it:it}); });
+  }
   var list = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) list.push(o.owner);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && list.indexOf(p) < 0) list.push(p); });
   var my = me()||{cloak:'mana',hat:'none',pet:'none'};
-  c.setTransform(s*.9,0,0,s*.9,ox,oy);
-  list.slice(0,SEATS.length-1).forEach(function (p, i) { var st = SEATS[i+1]; if (p.state==='idle') c.globalAlpha = .6; sprite(c,Math.round(st[0]/.9),Math.round(st[1]/.9),p,(f+i)%4===0?2:0); c.globalAlpha = 1; if (p.state==='idle') zed(c,Math.round(st[0]/.9),Math.round(st[1]/.9)); });
-  sprite(c,Math.round(SEATS[0][0]/.9),Math.round(SEATS[0][1]/.9),my,0);
+  list.slice(0,SEATS.length-1).forEach(function (p, i) { order.push({y:SEATS[i+1][1],p:p,st:SEATS[i+1],bob:(f+i)%4===0?2:0}); });
+  order.push({y:SEATS[0][1],p:my,st:SEATS[0],bob:0,mine:true});
+  order.sort(function (a, b) { return (a.y-b.y) || ((a.p?1:0)-(b.p?1:0)); });
+  order.forEach(function (d) {
+    if (d.it) { c.setTransform(s,0,0,s,ox,oy); paintThing(c,d.it,o); return; }
+    var px = Math.round(d.st[0]/.9), py = Math.round(d.st[1]/.9), idle = !d.mine && d.p.state==='idle';
+    c.setTransform(s*.9,0,0,s*.9,ox,oy);
+    /* While decorating, people are faint, so the furniture behind them can be seen and picked. */
+    c.globalAlpha = deco ? .3 : idle ? .6 : 1; sprite(c,px,py,d.p,d.bob); c.globalAlpha = 1;
+    if (idle && !deco) zed(c,px,py);
+  });
   c.setTransform(s,0,0,s,ox,oy);
+  if (deco) {
+    if (DECO.sel >= 0 && lay.items[DECO.sel]) { var it = lay.items[DECO.sel], t = THINGS[it[0]], x0 = it[1]-3, y0 = it[2]-3, w = t.w+6, h = t.h+6;
+      c.fillStyle = DECO.bad ? TINT.ember : TINT.mana; c.fillRect(x0,y0,w,1); c.fillRect(x0,y0+h-1,w,1); c.fillRect(x0,y0,1,h); c.fillRect(x0+w-1,y0,1,h); }
+    return;
+  }
   var now = Date.now(), boxes = [], say = function (uid, st) { var b = BUB[uid]; if (b && b.until > now) { var box = bubbleBox(c,st[0],st[1]-60,b.text); box.until = b.until; boxes.push(box); } };
   list.slice(0,SEATS.length-1).forEach(function (p, i) { say(p.id,SEATS[i+1]); });
   say(ST.me,SEATS[0]);
   /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
   placeBubbles(boxes).sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
-  return list;
+}
+
+/* ---------- decorating (David, 2026-11-12) ----------
+   Only in your own house. The room on screen becomes a working copy: things are dragged (or picked
+   and moved with the arrow keys), added from the library along the bottom, and removed. Nothing is
+   sent until Save, and Cancel or leaving the house throws the copy away. A thing dropped where it
+   does not fit goes back to where it was, so the copy can always be saved. */
+function copyLay(l) { return {wall:l.wall,floor:l.floor,rug:l.rug,items:l.items.map(function (i) { return i.slice(); })}; }
+function decoStart() {
+  var m = me(); if (!m || S.inside!=='user:'+m.id || DECO.on) return;
+  if (HOME[m.id] && !HOME[m.id].ready) { toast('Decorating needs a database update first. An administrator opens migrate.php once.'); return; }
+  DECO = {on:true,lay:copyLay(roomOf(m.id)),sel:-1,drag:null,bad:false};
+  $('mapbox').classList.add('is-deco'); renderInside(); renderDeco(); draw();
+}
+function decoEnd() {
+  if (!DECO.on) return;
+  DECO.on = false; DECO.drag = null; var b = $('decoBar'); if (b) { b.hidden = true; b.innerHTML = ''; }
+  $('mapbox').classList.remove('is-deco'); renderInside(); draw();
+}
+function decoCount(id) { return DECO.lay.items.filter(function (it) { return it[0]===id; }).length; }
+function dseg(label, key) { var o = STYLES[key]; return '<span class="rdecopick"><span>'+label+'</span><span class="rseg">'+Object.keys(o).map(function (v) { return '<button type="button" data-decostyle="'+key+'" data-val="'+v+'" aria-pressed="'+(DECO.lay[key]===v)+'">'+o[v]+'</button>'; }).join('')+'</span></span>'; }
+function renderDeco() {
+  var bar = $('decoBar'); if (!bar || !DECO.on) return;
+  var it = DECO.lay.items[DECO.sel], t = it ? THINGS[it[0]] : null, keep = bar.querySelector('.rdecolib'), left = keep ? keep.scrollLeft : 0;
+  var h = '<div class="rdecohead"><b>Decorating your office</b><small>Drag a thing to move it, or pick it and use the arrow keys.</small><span class="rgrow"></span>'
+    +'<button type="button" class="rbtn rsmall" data-decoreset="1">Starting room</button><button type="button" class="rbtn rsmall" data-decocancel="1">Cancel</button><button type="button" class="rbtn rprimary rsmall" data-decosave="1">Save</button></div>'
+    +'<div class="rdecorow">'+dseg('Wall','wall')+dseg('Floor','floor')+dseg('Rug','rug')+'</div>'
+    +'<div class="rdecorow rdecosel"><button type="button" class="rbtn rsmall" data-deconext="1">Pick the next thing</button>'
+    +(t ? '<span>Picked: <b>'+esc(t.n)+'</b></span>'+(t.req ? '<small>This one stays in every house, '+esc(t.req)+'.</small>' : '<button type="button" class="rbtn rsmall" data-decoremove="1">Remove it</button>') : '<small>Nothing is picked.</small>')+'</div>'
+    +'<div class="rdecolib" role="group" aria-label="The library">';
+  Object.keys(THINGS).forEach(function (id) {
+    /* Small things are shown at twice their size, big ones at their own, so the row stays low. */
+    var x = THINGS[id], n = decoCount(id), full = n >= x.max, k = (x.h > 22 || x.w > 32) ? 1 : 2;
+    h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+((x.gold||full)?' aria-disabled="true"':'')+' title="'+esc(x.gold?'For sale later, with gold':full?(x.max===1?'Already in the room':'No more of these fit the rules'):'Add to the room')+'">'
+      +'<canvas data-thumb="'+id+'" data-k="'+k+'" width="'+(x.w+2)*k+'" height="'+(x.h+7)*k+'" style="width:'+(x.w+2)*k+'px;height:'+(x.h+7)*k+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'Costs gold, later':x.req?'In every house':n+' of '+x.max)+'</small></button>';
+  });
+  bar.innerHTML = h+'</div>'; bar.hidden = false;
+  var m = me(), tint = m ? m.cloak : 'mana';
+  Array.prototype.forEach.call(bar.querySelectorAll('canvas[data-thumb]'),function (cv) { var c = cv.getContext('2d'); var k = +cv.getAttribute('data-k'); c.imageSmoothingEnabled = false; c.setTransform(k,0,0,k,0,0); c.drawImage(thingStamp(cv.getAttribute('data-thumb'),tint).cv,0,0); });
+  var lib = bar.querySelector('.rdecolib'); if (lib) lib.scrollLeft = left;
+}
+/* A new thing goes to the first free spot: along the wall, or row by row down the floor. */
+function decoAdd(id) {
+  var t = THINGS[id], items = DECO.lay.items, x, y; if (!t) return;
+  if (t.gold) { toast(t.n+' is bought with gold, and gold has not arrived in the Realm yet.'); return; }
+  if (decoCount(id) >= t.max) { /* Already there: pick it, so it can be found and moved. */
+    for (x = 0; x < items.length; x++) if (items[x][0]===id) { DECO.sel = x; break; } renderDeco(); draw(); return; }
+  var it = [id,12,t.z==='wall'?t.y:0]; items.push(it);
+  var ys = t.z==='wall' ? [t.y] : [78-t.h,100-t.h,122-t.h,144-t.h,66-t.h,90-t.h,112-t.h,134-t.h];
+  for (y = 0; y < ys.length; y++) for (x = 12; x <= 228-t.w; x += 2) { it[1] = x; it[2] = ys[y]; if (fits(items,items.length-1)) { DECO.sel = items.length-1; renderDeco(); draw(); return; } }
+  items.pop(); toast('There is no free spot for that. Move or remove something first.');
+}
+function decoRemove() {
+  var it = DECO.lay.items[DECO.sel]; if (!it || THINGS[it[0]].req) return;
+  DECO.lay.items.splice(DECO.sel,1); DECO.sel = -1; renderDeco(); draw();
+}
+function decoSave() {
+  var m = me(); if (!m) return;
+  send({save_room:JSON.stringify(DECO.lay)}).then(function (j) {
+    if (!j) { toast('Your office could not be saved. Try again in a moment.'); return; }
+    if (j.room) roomTake(j.room);
+    if (j.saved) { decoEnd(); toast('Your office is saved.'); }
+  });
+}
+function roomPoint(e) { var cv = $('mapcv'), r = cv.getBoundingClientRect(), k = cv.width/r.width; return {x:((e.clientX-r.left)*k-RT.ox)/RT.s,y:((e.clientY-r.top)*k-RT.oy)/RT.s}; }
+/* The thing under the pointer: a floor thing before a wall thing, the nearest floor thing first. */
+function decoHit(p) {
+  var best = -1, rank = -1;
+  DECO.lay.items.forEach(function (it, i) { var t = THINGS[it[0]];
+    if (p.x < it[1]-1 || p.x > it[1]+t.w+1 || p.y < it[2]-1 || p.y > it[2]+t.h+1) return;
+    var d = t.z==='floor' ? 1000+it[2]+t.h : 1; if (d > rank) { rank = d; best = i; } });
+  return best;
+}
+function decoMove(i, x, y) {
+  var it = DECO.lay.items[i], t = THINGS[it[0]];
+  it[1] = Math.max(12,Math.min(228-t.w,Math.round(x/2)*2));
+  it[2] = t.z==='wall' ? t.y : Math.max(60-t.h,Math.min(148-t.h,Math.round(y/2)*2));
+}
+if ($('mapbox')) $('mapbox').addEventListener('pointerdown',function (e) {
+  if (!DECO.on || !RT || (e.target.closest && e.target.closest('.rdeco,.rinside,button'))) return;
+  var p = roomPoint(e), i = decoHit(p); DECO.sel = i; DECO.bad = false;
+  if (i >= 0) { var it = DECO.lay.items[i]; DECO.drag = {i:i,dx:p.x-it[1],dy:p.y-it[2],from:[it[1],it[2]]}; e.preventDefault(); }
+  renderDeco(); draw();
+});
+window.addEventListener('pointermove',function (e) {
+  var d = DECO.drag; if (!DECO.on || !d) return;
+  var p = roomPoint(e); decoMove(d.i,p.x-d.dx,p.y-d.dy); DECO.bad = !fits(DECO.lay.items,d.i); draw();
+});
+function decoDrop() {
+  var d = DECO.drag; if (!d) return;
+  if (DECO.bad) { var it = DECO.lay.items[d.i]; it[1] = d.from[0]; it[2] = d.from[1]; toast('Something is already there, so it went back to where it was.'); }
+  DECO.drag = null; DECO.bad = false; draw();
+}
+window.addEventListener('pointerup',decoDrop);
+window.addEventListener('pointercancel',decoDrop);
+/* The keys while decorating: arrows move the picked thing two units (eight with Shift), Delete
+   removes it, Escape leaves decorating without saving. A move that does not fit is not made. */
+function decoKey(e) {
+  if (e.key==='Escape') { e.preventDefault(); decoEnd(); toast('Nothing was changed.'); return; }
+  var it = DECO.lay.items[DECO.sel]; if (!it) return;
+  if (e.key==='Delete') { e.preventDefault(); decoRemove(); return; }
+  var dx = e.key==='ArrowRight' ? 1 : e.key==='ArrowLeft' ? -1 : 0, dy = e.key==='ArrowDown' ? 1 : e.key==='ArrowUp' ? -1 : 0; if (!dx && !dy) return;
+  e.preventDefault();
+  var st = e.shiftKey ? 8 : 2, was = [it[1],it[2]]; decoMove(DECO.sel,it[1]+dx*st,it[2]+dy*st);
+  if (!fits(DECO.lay.items,DECO.sel)) { it[1] = was[0]; it[2] = was[1]; }
+  draw();
+}
+
+/* ---------- the chest and the portrait ---------- */
+/* THE CHEST (David, 2026-11-12: "Treasure chest: to check their gold"). Gold is stage 4 and nothing
+   is counted yet, so the chest says so and says what was agreed about gold that day, rather than
+   showing a number nobody has earned. */
+function openGold() {
+  var d = $('goldDlg'); if (!d || d.open) return;
+  $('goldBody').innerHTML = '<p class="rgold"><b>No gold yet</b></p><p>Gold has not arrived in the Realm. When it does, you will earn it from approved work, from praise you receive, and one coin for every full week of logged time.</p>'
+    +'<p>It will buy clothes, accessories, companions and things for your office, which can be given away or swapped. Your gold is private, and it never has anything to do with pay.</p>'
+    +'<div class="rdacts"><button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
+  d.showModal();
+}
+/* THE PORTRAIT (David, 2026-11-12: "so they can see theirs and others bio and profile from Anima, and
+   update it"). The profile is Anima's own, the one on Home: nothing is copied. Somebody else's shows
+   the name, role, bio and picture; your own also shows your email and phone, and can be changed. */
+var PROF = null;
+function profView() {
+  var p = PROF, body = $('profBody'); if (!body || !p) return;
+  $('profTitle').textContent = p.mine ? 'Your profile' : p.name;
+  var h = '<div class="rprof">'+(p.photo ? '<img class="rprofpic" src="'+esc(p.photo)+'" alt="">' : '<span class="rprofpic" aria-hidden="true">'+esc(p.name.charAt(0).toUpperCase())+'</span>')
+    +'<div class="rprofwho"><b>'+esc(p.name)+'</b>'+(p.role?'<small>'+esc(p.role)+'</small>':'')+(p.mine&&p.email?'<small>'+esc(p.email)+'</small>':'')+(p.mine&&p.phone?'<small>'+esc(p.phone)+'</small>':'')+'</div></div>'
+    +(p.bio ? '<p class="rprofbio">'+esc(p.bio).replace(/\n/g,'<br>')+'</p>' : '<p class="rprofbio is-none">'+(p.mine?'You have not written a bio yet.':'No bio written yet.')+'</p>')
+    +(p.mine ? '<small>'+(p.why ? esc(p.why) : 'Others see your name, role, bio and picture. Your email and phone are shown only to you here.')+'</small>' : '')
+    +'<div class="rdacts">'+(p.can_edit?'<button type="button" class="rbtn" data-profedit="1">Edit your profile</button>':'')+'<button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
+  body.innerHTML = h;
+}
+function profEdit() {
+  var p = PROF, body = $('profBody'); if (!body || !p || !p.can_edit) return;
+  body.innerHTML = '<form id="profForm" class="rprofform"><label>Phone<input name="phone" maxlength="50" value="'+esc(p.phone||'')+'" autocomplete="tel"></label>'
+    +'<label>About you<textarea name="bio" rows="5" maxlength="2000">'+esc(p.bio||'')+'</textarea></label>'
+    +'<label>Profile picture <small>JPG, PNG, GIF or WebP</small><input type="file" name="photo" accept="image/png,image/jpeg,image/gif,image/webp"></label>'
+    +(p.photo?'<label class="rcheck"><input type="checkbox" name="remove_photo" value="1"> Remove the picture you have now</label>':'')
+    +'<small>This is the same profile as on Home in Anima. Saving here changes it there too.</small>'
+    +'<div class="rdacts"><button type="button" class="rbtn" data-profcancel="1">Cancel</button><button class="rbtn rprimary" id="profSave">Save</button></div></form>';
+  $('profForm').addEventListener('submit',function (e) {
+    e.preventDefault(); var fd = new FormData(this), btn = $('profSave'); fd.append('save_profile','1'); btn.disabled = true;
+    fetch(R.api,{method:'POST',body:fd,credentials:'same-origin',headers:{'Accept':'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || j.error || !j.profile) { btn.disabled = false; toast((j && j.error) || 'Your profile could not be saved. Try again in a moment.'); return; }
+        PROF = j.profile; profView(); toast(j.said || 'Profile saved.'); roomAsk(PROF.id);
+      })
+      .catch(function () { btn.disabled = false; toast('Your profile could not be saved. Try again in a moment.'); });
+  });
+}
+function openProfile(id) {
+  var d = $('profDlg'); if (!d || d.open || !id) return;
+  PROF = null; $('profTitle').textContent = 'Profile'; $('profBody').innerHTML = '<p class="rprofbio is-none">Opening…</p><div class="rdacts"><button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
+  d.showModal();
+  fetch(R.api+'?profile='+encodeURIComponent(id),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j && j.profile) { PROF = j.profile; profView(); } else { d.close(); toast((j && j.error) || 'That profile could not be opened. Try again in a moment.'); } })
+    .catch(function () { d.close(); toast('That profile could not be opened. Try again in a moment.'); });
 }
 
 /* ---------- the frame ---------- */
@@ -482,7 +808,7 @@ function draw() {
   c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch);
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
-    placeShelf(null);
+    placeHot(null);
     c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
@@ -575,7 +901,7 @@ function renderInside() {
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Your tasks are on the bookshelf.':'')+'</span><span class="rgrow"></span><button type="button" class="rbtn rprimary" data-leave="1">Leave</button>';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Click the bookshelf, the chest or the portrait.':'')+'</span><span class="rgrow"></span>'+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave</button>';
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -614,6 +940,8 @@ function applyState(st) {
   if (S.sel && !B[S.sel]) S.sel = null;
   if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
+  /* Standing in somebody else's house: ask for their room again, so a change of theirs shows. */
+  if (S.inside && B[S.inside] && B[S.inside].owner && !B[S.inside].owner.me) roomAsk(B[S.inside].owner.id);
   if (fresh) takeUnread(fresh);
   takeKnocks(st.knocks);
 }
@@ -672,14 +1000,14 @@ function goInside(id) {
   S.sel = null; renderCard();
   play(420,function (k) { S.pos = {x:from.x+(to.x-from.x)*k,y:from.y+(to.y-from.y)*k}; S.enter = k*.9; },function () {
     play(220,function (k) { S.fade = k; },function () {
-      S.enter = null; S.inside = id; S.pos = from; renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
+      S.enter = null; S.inside = id; S.pos = from; if (o.owner) roomAsk(o.owner.id); renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
       play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
       send({arrive:id,inside:1});
     });
   });
 }
 function leave() {
-  if (!S.inside) return; var id = S.inside; BUB = {};
+  if (!S.inside) return; var id = S.inside; BUB = {}; decoEnd();
   play(220,function (k) { S.fade = k; },function () {
     S.inside = null; var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
     play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
@@ -714,7 +1042,8 @@ document.addEventListener('keydown',function (e) {
   /* With the conversation laid over the map (the handle on its edge) the map is not on screen, so
      no key may walk the character, enter a house or leave a room where nobody can see it happen. */
   if (mapAway()) { held.clear(); return; }
-  if (is('input,select,textarea') || $('lookDlg').open || ($('picDlg') && $('picDlg').open) || ($('focusDlg') && $('focusDlg').open)) return;
+  if (is('input,select,textarea') || document.querySelector('dialog[open]')) return;
+  if (S.inside && DECO.on) { decoKey(e); return; }
   if (S.inside) { if (e.key==='Escape') leave(); return; }
   if (e.key.indexOf('Arrow')===0) { e.preventDefault(); if (S.walk) { S.walk = null; renderCard(); } held.add(e.key); if (!kraf) kraf = requestAnimationFrame(keyTick); }
   else if (e.key==='Enter' && is('.bld')) { e.preventDefault(); select(t.getAttribute('data-sel'),false); }
@@ -746,6 +1075,19 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
   else if (t.closest('[data-close]')) { S.sel = null; renderCard(); renderSide(); }
   else if (t.closest('[data-leave]')) leave();
+  else if (t.closest('#chestBtn')) openGold();
+  else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
+  else if ((b = t.closest('[data-dlgclose]'))) { var dl = b.closest('dialog'); if (dl) dl.close(); }
+  else if (t.closest('[data-profedit]')) profEdit();
+  else if (t.closest('[data-profcancel]')) profView();
+  else if (t.closest('[data-deco]')) decoStart();
+  else if (t.closest('[data-decosave]')) decoSave();
+  else if (t.closest('[data-decocancel]')) decoEnd();
+  else if (t.closest('[data-decoreset]')) { DECO.lay = copyLay(ROOM_START); DECO.sel = -1; renderDeco(); draw(); }
+  else if (t.closest('[data-decoremove]')) decoRemove();
+  else if (t.closest('[data-deconext]')) { DECO.sel = (DECO.sel+1)%DECO.lay.items.length; renderDeco(); draw(); }
+  else if ((b = t.closest('[data-decostyle]'))) { DECO.lay[b.getAttribute('data-decostyle')] = b.getAttribute('data-val'); renderDeco(); draw(); }
+  else if ((b = t.closest('[data-decoadd]'))) decoAdd(b.getAttribute('data-decoadd'));
   else if ((b = t.closest('[data-zoom]'))) { var z = b.getAttribute('data-zoom'), v = S.view, cx = v.x+v.w/2, cy = v.y+v.h/2; if (z==='in') zoomAt(.72,cx,cy); else if (z==='out') zoomAt(1.39,cx,cy); else setView(z==='village'?VILLAGE:FULL); }
   else if ((b = t.closest('[data-door]'))) send({set_door:b.getAttribute('data-door')});
   else if (t.closest('#lookBtn')) openLook();
@@ -999,7 +1341,7 @@ $('lookForm').addEventListener('submit',function (e) { e.preventDefault(); $('lo
    the page asks the server to settle it (log the block, begin the break) ONCE; if the page is shut
    instead, My tasks settles it the next time anybody looks, so no minutes depend on this tab.
 
-   THE WAY IN IS THE BOOKSHELF in your own house (placeShelf, above). The top bar shows a button only
+   THE WAY IN IS THE BOOKSHELF in your own house (placeHot, above). The top bar shows a button only
    while a clock is running: it reads "Focus 18:42", so the time is in sight, and can be stopped,
    from anywhere in the village. Somebody with no house yet has no shelf, so for them the button
    stays, reading "Your tasks". */
@@ -1247,6 +1589,11 @@ setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({pi
 setInterval(askUnread,8000);
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
+/* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */
+if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],['portraitBtn','portraitTag','Profile','A profile, in the portrait']].forEach(function (h) {
+  var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
+  b.setAttribute('aria-label',h[3]); b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
+});
 if ($('focusBtn') && $('focusNow')) {
   var shelf = document.createElement('button'); shelf.type = 'button'; shelf.id = 'shelfBtn'; shelf.className = 'rshelf'; shelf.hidden = true;
   shelf.setAttribute('aria-label','Your tasks, on the bookshelf'); shelf.innerHTML = '<span id="shelfTag">Your tasks</span>'; $('mapbox').appendChild(shelf);

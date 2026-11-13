@@ -571,8 +571,14 @@ function artist_may_post(): bool {
         // third screen: the FIELD is permitted here; WHOSE row it may touch is
         // checked in includes/own_status.php, the very functions mytasks.php
         // calls, and the two-status limit is status_self_serve(), as there.
+        // `save_room` (2026-11-12, migration 085): how they decorated their own
+        // house. ⚠ NO ID TO FORGE: realm_room_save() writes the session's own row.
+        // `save_profile` (same day): their own phone, bio and picture, from the
+        // portrait in their house. ⚠ THE SAME WRITE AS home.php ABOVE, on a second
+        // screen: home_save_profile() with the session's own linked person, never
+        // an id from the form.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status'],
+                            'task_status', 'save_room', 'save_profile'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
