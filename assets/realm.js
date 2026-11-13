@@ -1072,6 +1072,12 @@ function drawRoom(c, cw, ch) {
   if (land) slayPaint(c,land);
   /* The way out, wide enough to stand on. */
   c.fillStyle = PAL.glow; c.fillRect(106,150,28,8); c.fillStyle = PAL.hot; c.fillRect(110,155,20,3);
+  /* THE DOORWAY SAYS "EXIT" (David, 2026-11-13, with a picture of the lit doorway at the bottom of
+     his room: "add the exit name here in each room's door"). A small plate on the floor just inside
+     it, in every room, painted before the people so somebody standing on it covers it. */
+  c.font = 'bold 7px "Courier New", monospace'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.fillStyle = PAL.plate; c.fillRect(107,139,26,10); c.lineWidth = .75; c.strokeStyle = PAL.primaryBorder; c.strokeRect(107.4,139.4,25.2,9.2);
+  c.fillStyle = PAL.primary; c.fillText('Exit',120,146.5); c.textAlign = 'start';
   var my = me()||{cloak:'mana',hat:'none',pet:'none'}, who = [], walking = !!RM.walk || held.size > 0;
   roomPeople(o).forEach(function (p, i) { var at = standOf(p,i), gl = glide(p.id,at.x,at.y,o.id); who.push({p:p,x:Math.round(gl.x),y:Math.round(gl.y),bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+i)%4===0?2:0}); });
   who.push({p:my,x:Math.round(RM.x),y:Math.round(RM.y),bob:walking?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
@@ -1970,7 +1976,8 @@ document.addEventListener('click',function (e) {
    between two people. An open conversation asks for anything new every 3 seconds and stops asking
    while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
    ST.chat is null until the migration has run, and then none of this draws. */
-var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false};
+/* first: the first message on screen, so the reactions asked for are those of the messages shown. */
+var CH = {open:null,last:0,first:0,timer:0,busy:false,seen:false,wide:false};
 /* THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at the middle of the
    chat bar so there's an option to extend it over the map"). The handle on the conversation's left
    edge lays it over the map, for room to read and write, and brings it back. The choice is kept
@@ -2084,7 +2091,7 @@ function rich(body) {
 }
 function msgHTML(m) {
   var pic = m.image ? '<a class="rimglink" href="realm_image.php?id='+m.id+'" target="_blank" rel="noopener"><img class="rimg" src="realm_image.php?id='+m.id+'" alt="Picture from '+esc(m.name)+'" loading="lazy"></a>' : '';
-  return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
+  return '<div class="rmsg'+(m.mine?' is-mine':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
 }
 function chatTake(j) {
   CH.busy = false;
@@ -2097,9 +2104,12 @@ function chatTake(j) {
     fresh.forEach(function (m) { BUB[m.user] = {text:m.body || '(a picture)',until:Date.now()+BUBBLE_MS}; });
     draw(); setTimeout(draw,BUBBLE_MS+100);
   }
-  if (fresh.length) { if (!CH.last) box.innerHTML = ''; box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen) box.scrollTop = box.scrollHeight; }
+  if (fresh.length) { if (!CH.last) { box.innerHTML = ''; CH.first = fresh[0].id; } box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen || CH.jump) box.scrollTop = box.scrollHeight; }
+  if (CH.jump && j.messages) { CH.jump = false; box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
   CH.seen = true;
+  /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
+  if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
@@ -2112,13 +2122,13 @@ function chatTake(j) {
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
-  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last,{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first,{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
 }
 function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
   if (CH.open===id) { $('chatInput').focus(); return; }
-  CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
+  CH.open = id; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
 }
@@ -2183,11 +2193,17 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
   var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open) return;
   inp.value = ''; CH.busy = true; sugClose(); setPick(null);
+  /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end
+     of the conversation (the bottom) so we can see what's the last thing we sent"). Before, the list
+     only followed new messages if you were already near the bottom, so after scrolling up to read,
+     your own message landed out of sight. Now it jumps down at once, and again when the answer with
+     your message arrives (chatTake reads CH.jump). */
+  CH.jump = true; var mb = $('chatMsgs'); if (mb) mb.scrollTop = mb.scrollHeight;
   /* A picture travels as a file, so the message goes as a form with parts; words alone go as before. */
-  var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last);
+  var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last); f.append('from',CH.first);
   if (pic) f.append('image',pic,pic.name || 'pasted-image.png');
   fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
+    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; CH.jump = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
 });
 
 /* ---------- your character ---------- */
@@ -3041,6 +3057,9 @@ R.shopOwned = function (list) { if (ST.shop && list) { ST.shop.owned = list; if 
    has been taken out of it). */
 /* What assets/realm_praise.js borrows: the fan of stars over somebody who has just been praised. */
 R.fxAt = fxAt;
+/* What assets/realm_react.js borrows: the open conversation (which one, what is on screen) and the
+   one place an answer about it is taken in, so a reaction's answer is drawn like any other. */
+R.chat = CH; R.chatTake = chatTake;
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
