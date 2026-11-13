@@ -5864,3 +5864,81 @@ they can see the production tracking, to see all the shots and their status in t
 - **Not verified:** PHP was never run (the block checker passes and the deploy's `php -l` is the
   backstop). Real show data was never seen: a show with an unusual pipeline, a very long brief or
   a thousand shots. Nobody could log in. Phones and touch, Safari and Firefox. The real load.
+
+## 2026-11-13 — Praise in the Realm: the rules, and what the first version leaves out
+
+David, in the thread opened to "discuss how spell praise and collectibles can be exchanged". Four
+choices were put to him and he answered each, then said "Let's build it". Gifting, swapping, the
+shop and the word for praise were NOT discussed before he said so; they are open, below.
+
+- **Where: the same place, anywhere** (David: "I agree"). Inside the same room, or both standing at
+  the same spot on the map. Not only the receiver's office, which would have made praise rare.
+  `realm_praise_give()` checks `place` and `inside` for both people and that both are online.
+- **Cost and reward** (David: "Agree"). The giver spends 1 mana. The receiver always gets a
+  keepsake, and 1 gold coin only for the first praise from the same person in a week, so two people
+  cannot praise each other in a loop to make gold, and a sincere second praise is never refused.
+- **What it says** (David: "It could be the work, it could be just kudos from a default menu"). A
+  line is required; it is one of three ready-made lines per kind or the giver's own words. A link to
+  a shot or task in Anima was NOT built: the giver can name the work in the line.
+- **Four kinds: Craft, Help, Idea, Rescue** (David: "sounds good"). None is about speed or hours.
+- **It lands at once**; the receiver does not accept or refuse a praise.
+- **Stored** in `realm_purse` (mana, gold, the run of logged days, the last day counted) and
+  `realm_praise` (every praise, kept for good), migration 090. Rules in `includes/realm_praise.php`,
+  screen in `assets/realm_praise.js`, which is its own file: `assets/realm.js` only gained four
+  hooks on `window.REALM` (`onState`, `openGold`, `profExtra`, and it lends `toast` and `send`).
+- **A purse is read only for the session's own account.** There is no request that takes somebody
+  else's id, no list of balances and no ranking. A praise shown to others never says whether it
+  carried a coin.
+- **The time log is counted when the Realm is opened, when the chest is opened and before a
+  praise**, never on the heartbeat. A brand-new purse looks back 8 days, so a first visit is not
+  empty-handed.
+- **My readings, to confirm with David:** "1 week" is five working days in a row, counted on the
+  run; "noon the next day" is noon of the next working day, so Friday can be logged on Monday
+  morning; the week for the gold rule is Monday to Sunday; somebody whose login is not linked to a
+  person earns no mana and cannot praise, but can be praised.
+- **What others see is a notice, not an effect on the map.** A burst over the character and a
+  keepsake drawn in the office were talked about; neither is built, because another session is
+  rebuilding how rooms are drawn (walking inside) and both belong in that drawing code.
+- **Approved work** (David, 2026-11-13, after the first version was built): "let's keep 1 gold for
+  each approved, and if you approved on time based on the task due dates you receive 1 mana and 1
+  gold". Built as `realm_purse_approvals()`: it reads `progress_log`, the record every status change
+  already writes, when the purse is brought up to date. No hook was added to the board, the review
+  queue or My tasks. `realm_purse.approvals_to` is the last log line counted.
+  - **My readings, to confirm with David:** on time gives 1 gold and 1 mana in all, not 2 gold
+    (`REALM_GOLD_ON_TIME` is the one number to change); "on time" compares the day of the approval
+    with the task's scheduled end date, and a task with no due date gives the coin and no mana; the
+    coin goes to whoever the task is assigned to, each of them when there are several; a task pays
+    once, so approved, sent back and approved again is one coin; statuses that arrive through an
+    import do not pay, or loading a show's history would hand out hundreds of coins; tickets are not
+    counted, they have no approval.
+  - **Raised with David, not decided:** the approval's day depends on how fast the reviewer is, so
+    an artist who delivered on time can miss the mana. Judging by the day the work was delivered
+    would be fairer. And this is the rule most easily read as a productivity score; it stays
+    private, in the chest, and is never ranked.
+- **The word is "praise"** on every screen (David, 2026-11-13, asked to choose between praise,
+  blessing and spell: "Keep praise"). Anima's task board is called Spell, so a praise is never
+  called a spell. This closes the question left open on 2026-11-12.
+- **Open, not yet discussed with David:** giving a thing to somebody and whether they must accept;
+  swapping and what happens if one person walks away; what can and cannot change hands; whether an
+  inventory is private; the shop, prices and rare things; limits on praising the same person.
+- **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
+
+## 2026-11-13 — Praise and exchange: David's answers after the first version
+
+Same thread, after PR 229 was open.
+
+- **The readings are confirmed** (David: "ok"): a "week" is five working days in a row; a day can
+  be logged until noon of the next working day; a brand-new purse looks back 8 days.
+- **The rules are shown in the chest** (David: "let's also add the mana and gold rules when they
+  open their own chest"). Three short lists under the balance: how you earn mana, how you earn gold,
+  good to know. The cap and the length of a week are printed from the server's numbers.
+- **What can change hands** (David: "not exchangable are all the free starters, but anything you
+  paid for is exchangable"). Anything bought with gold can be given or swapped; the free library
+  cannot. Gold itself still cannot be handed over. Nothing is built for this yet, because nobody
+  owns anything until there is a shop.
+- **The shop and prices get their own thread** (David: "let's open a new thread for that").
+- **Still open:** whether a gift must be accepted; what happens to a swap when one person walks
+  away; whether praise received can ever be traded (proposed: no); whether the list of what you own
+  is private (proposed: yes, others see only what you wear and what stands in your office); whether
+  "on time" should be judged by the day of delivery instead of the day of approval; whether on time
+  means a second coin.

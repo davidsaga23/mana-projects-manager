@@ -29,6 +29,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
+require_once __DIR__ . '/includes/realm_praise.php';
 require_login();
 
 $uid     = realm_user_id();
@@ -41,6 +42,9 @@ if ($ready && !$preview) {
     $state = realm_state($pdo, $uid);
     // Chat (stage 2). Null until migration 082 has run, and the page then draws no chat at all.
     $state['chat'] = realm_chat_summary($pdo, $uid, can_edit());
+    // Mana, gold and praise (migration 090). Opening the Realm is when the time log is counted.
+    realm_purse($pdo, $uid);
+    $state['praise'] = realm_praise_news($pdo, $uid);
 }
 $hasHouse = false;
 foreach (($state['people'] ?? []) as $p) {
@@ -181,6 +185,8 @@ foreach (($state['people'] ?? []) as $p) {
     };
   </script>
   <script src="assets/realm.js<?= asset_ver('realm.js') ?>"></script>
+  <?php /* Praise, mana and gold (migration 090): its own file, so the map's script stays as it was. */ ?>
+  <script src="assets/realm_praise.js<?= asset_ver('realm_praise.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

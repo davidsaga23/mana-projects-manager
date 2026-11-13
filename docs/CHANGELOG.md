@@ -14,6 +14,32 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: praise, mana and gold, first version *(migration 090)*
+
+**Asked by David:** "people should be able to praise with a spell or something people doing a good
+job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let's build it".
+
+- **Praise somebody standing where you are.** A Praise button appears on the map when another
+  person is in the same place as you, inside the same room or at the same spot outside. Choose who,
+  what for (Craft, Help, Idea or Rescue) and a line: one of the ready-made ones, or your own, which
+  can name the work.
+- **It costs 1 mana and lands at once.** Everybody in the Realm sees a notice within seconds, and
+  the praise is kept in the receiver's profile (the portrait in their house), with a count per kind.
+- **Mana comes from logging your time**: one for each working day you log, up to 5. A day can be
+  logged until noon of the next working day. Weekends, studio holidays and booked days off neither
+  earn nor break the run.
+- **Gold is counted now**, and the chest shows it: one coin for every five working days logged in a
+  row, and one coin the first time each person praises you in a week. Only you see your chest,
+  and it lists the rules for earning mana and gold under your balance.
+- **Approved work pays too** (David, 2026-11-13: "1 gold for each approved, and if you approved on
+  time based on the task due dates you receive 1 mana and 1 gold"). Each task of yours that is
+  approved gives 1 gold, and 1 mana as well when it is approved on or before its due date. A task
+  pays once, and statuses loaded by an import do not pay.
+- **Not in this version:** anything to buy with gold, giving and swapping
+  things, the Herald, and a keepsake drawn in the office. The chest says there is nothing to buy yet.
+- **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
+  counting of time logs and the face to face check need David and Renata on the live site.
+
 ## 2026-11-13 — The Realm: what is always in a show's camp *(migration 091)*
 
 **Asked by David:** "for all the project camps, let's always have the following: A bar with the
