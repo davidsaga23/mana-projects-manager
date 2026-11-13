@@ -1405,6 +1405,7 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 2c. Focus desk | Your open work with a Start button on Anima's own timer, the door sealing itself during a focus block, the clock in the top bar, music made in the browser. Then, the same day: the way in moved to the bookshelf in your own house, and the music became a lofi loop | **Built 2026-11-12**, no migration |
 | 2d. Task details | Each task in the task window shows its status (in the status's colour) and due date, hours logged and a link into Anima; the status can be changed there by My tasks' own rules, now shared in `includes/own_status.php` | **Built 2026-11-12**, no migration |
 | 2e. My house | Decorating your office from a library, the same starting room for everybody, a treasure chest (gold, not counted yet) and a portrait that opens the Anima profile. Three library things are marked "Costs gold, later" | **Built 2026-11-12**, migration 086 |
+| 2f. Walking in rooms | Walk inside every room with the keys or a click, solid walls and furniture, the door leaves. Others see you walk, in rooms and on the map, a second or three behind; "in the same room" stays the rule for face to face | **Built 2026-11-13**, migration 087, waiting for David's go-ahead |
 | 3. Voice | Voice for up to 5 people inside the same room, in every room, by pressing Join voice; mute, who is speaking, straight from browser to browser. Knocking was built earlier (migration 084) | **Built 2026-11-12**, migration 085, waiting for David's go-ahead and a first real test with two people |
 | 3b. Voice, the rest | "Summon the Council" opening a saved Google Meet link for bigger meetings; a relay (TURN) if two real people cannot connect; choosing a microphone | Not built |
 | 4. Mana and praise | Streak mana, praise, private gold, clothes, accessories and pets, gifting and swapping, all face to face. For the house: prices and buying for the library, keepsakes from praise shown in the office, artists drawing their own things (David, 2026-11-12: "let's create all of those") | Not built |
@@ -1412,15 +1413,18 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 6. Slack bridge | Channels mirrored both ways, images kept, history past 90 days, DMs private to the two people | Not built |
 | 7. Leaving Slack | Slack switched off once the leaders are comfortable on their phones | David's call |
 
-Known limits of stage 1, on purpose: no walking about inside a room; the village holds 26 houses;
-other people move on the map every 25 seconds, not live; the art is drawn by code.
+Known limits of stage 1, on purpose: the village holds 26 houses; the art is drawn by code.
+(Walking about inside a room, and seeing other people walk, arrived on 2026-11-13.)
 
 To watch when it goes live: how the shared hosting copes with one request per person every 25
 seconds. Chat (stage 2) will ask more often, so this is the measurement that decides how.
 Voice (stage 3) asks once a second per person in a call, so about five requests a second for a
 full table: watch the hosting during the first real calls.
+Seeing each other walk (2026-11-13) adds half a request a second per person who is walking, and
+makes the unread counts come every 3 seconds instead of 8 while there is movement to watch: watch
+the hosting the first time several people wander the map at once.
 
-## Commercial (the CRM) — BUILT 2026-11-12 (migration 087)
+## Commercial (the CRM) — BUILT 2026-11-12 (migration 088)
 
 Ported from David's prototype: Prospects, Pipeline, Follow-ups, Clients, Proposals and Quotes, with
 CSV import and export, behind the "Commercial" switch (admins only). Decisions in DECISIONS.md,
@@ -1432,3 +1436,4 @@ CSV import and export, behind the "Commercial" switch (admins only). Decisions i
 - A client's proposals and quotes inside the Clients drawer.
 - PDF export of a quote.
 - Reminders for overdue follow-ups (the bell is the obvious place).
+

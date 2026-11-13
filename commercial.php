@@ -1,5 +1,5 @@
 <?php
-// COMMERCIAL: the studio's CRM, in six tabs (migration 087).
+// COMMERCIAL: the studio's CRM, in six tabs (migration 088).
 //
 // David, 2026-11-12: "can we incorporate this to anima?", about the CRM he
 // prototyped as a claude.ai artifact. The prototype put these views in a
@@ -51,7 +51,7 @@ $views = [
   <h2 class="wizard-title">Commercial</h2>
   <div class="empty-state">
     <p><strong>Commercial needs a database update before it can open.</strong></p>
-    <p class="muted">Update 087 adds the tables for leads, contacts, proposals and quotes.
+    <p class="muted">Update 088 adds the tables for leads, contacts, proposals and quotes.
       <?php if (is_admin()): ?><a href="migrate.php">Open Migrations to apply it →</a><?php else: ?>Ask an administrator to apply it.<?php endif; ?></p>
   </div>
 <?php else: ?>

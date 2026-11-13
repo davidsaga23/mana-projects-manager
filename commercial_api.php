@@ -28,7 +28,7 @@ function crm_out(array $data, int $code = 200): void {
 }
 
 if (!crm_allowed()) crm_out(['ok' => false, 'error' => "Commercial isn't open to your account."], 403);
-if (!crm_available($pdo)) crm_out(['ok' => false, 'error' => 'Commercial needs database update 087. An administrator can apply it from Migrations.'], 503);
+if (!crm_available($pdo)) crm_out(['ok' => false, 'error' => 'Commercial needs database update 088. An administrator can apply it from Migrations.'], 503);
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
