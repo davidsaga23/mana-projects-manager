@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-13 — The Realm: the merchant in the Tavern *(migration 091, needs 090)*
+## 2026-11-13 — The Realm: the merchant in the Tavern, giving and swapping, and a starting purse *(migration 091, needs 090)*
 
 **Asked by David:** "let's open a new thread for that" (the shop and prices), then, after the
 choices were put to him a few at a time: "Agree to all three", "yeah let's move forward", "Yes,
@@ -34,12 +34,23 @@ build it".
   merchant", and Your character lets you try a thing on without being able to save it.
 - **Private.** The chest now lists what you own, under your coins. Nobody else can see your coins
   or your list, only what you wear and what stands in your office.
-- **Not in this version:** giving a thing to somebody and swapping (agreed, next build), things
-  drawn by the studio's artists, new things arriving with a notice.
+- **Giving and swapping** (David: "let's build the giving and swapping"). While somebody stands
+  where you are and you own something from the merchant, a "Give or swap" button appears. A gift:
+  the other person accepts or says no thanks. A swap: the other person chooses one of their own
+  things to give back, and you agree or not; nothing moves until both have. Only bought things
+  change hands, face to face, one of each still holds, and a thing that leaves you comes off your
+  character and out of your office. Only the two of you see any of it. An offer ends after five
+  minutes, or if one of you walks away.
+- **Everybody starts with 5 gold and 5 mana** (David: "let's also start with 5 gold and 5 mana for
+  all the new people landing in the realm", "includeing renata and myself"). Given once, when a
+  purse is first opened. Nobody had a purse before this, so that is everybody.
+- **Not in this version:** things drawn by the studio's artists, new things arriving with a notice.
 - **Depends on PR 229** (gold, migration 090). This cannot go live before that one.
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server
-  (buying, refusing, trying on, placing the throne, the chest); real coins, the Tavern check and
-  the one-of-each rule in the database need David and Renata on the live site.
+  (buying, refusing, trying on, placing the throne, the chest, and a gift and a swap between two
+  pretend people); real coins, the Tavern check, the one-of-each rule in the database, things
+  really changing hands and coming off a character need David and Renata on the live site.
+  Saying no thanks, calling an offer off and walking away mid-offer were not tried at all.
 
 ---
 

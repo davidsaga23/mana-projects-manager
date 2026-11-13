@@ -5914,3 +5914,43 @@ then "Yes, build it".
   notice; whether praise received can ever be traded (proposed: no); whether "on time" is judged
   by delivery or approval.
 - **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
+
+## 2026-11-13 — Giving and swapping, and the starting purse
+
+David, the same thread, after the shop was built: "let's build the giving and swapping, let's also
+start with 5 gold and 5 mana for all the new people landing in the realm", and then "includeing
+renata and myself". The rules of an exchange are the ones he agreed with the shop ("yeah let's move
+forward"); how a swap works step by step is my design, below.
+
+- **Only what the merchant sells changes hands**, face to face: the same place, both inside or both
+  outside, both with the page open, as for a praise. Asked when the offer is made and again at the
+  moment things move, so if one of them has walked away nothing moves.
+- **A gift must be accepted.** The receiver sees a notice with Accept and No thanks.
+- **A swap, in three steps, because what somebody owns is private.** The one who starts cannot pick
+  from the other's things. A offers one thing "for a swap"; B answers by choosing one of their own
+  to give back; A sees it and agrees. Only then do both things move, in one transaction. This is
+  what "both press agree" became.
+- **One of each still holds.** A thing cannot be offered to somebody who already has one, and the
+  giver is told so. ⚠ That is the one fact about another person's list that is ever given away; it
+  cannot be avoided without letting the offer fail silently.
+- **A thing that leaves comes off**, in the same transaction: off the old owner's character
+  (headwear and companion to none, a cloak to the colour a new person is given) and out of their
+  stored room (`realm_owned_strip()`). If that cannot be done, the exchange is undone.
+- **An offer lasts five minutes from its last step**, and making a new one ends your earlier one.
+- **Only the two people see an offer or how it ended.** Nothing is announced to the village,
+  unlike a praise: who owns what is private.
+- **No gold moves in an exchange**, and nothing can be sold back, so gold still cannot pass from
+  one person to another.
+- **Stored** in `realm_offers`, added to migration 091 (not yet run, so one migration, not two).
+  Rules in `includes/realm_trade.php`, screen in `assets/realm_trade.js`. Offers travel with the
+  map, the unread counts and every chat answer, like knocks, so they are seen in a few seconds.
+- **The starting purse: 5 gold and 5 mana, once, for everybody.** `REALM_START_GOLD` and
+  `REALM_START_MANA` in `includes/realm_praise.php`. Nobody had a purse when this was written
+  (migration 090 had not run), so David and Renata get it like everybody else, the first time
+  their purse is opened. `realm_purse_open()` is now the only place a purse is created: a praise
+  received before somebody's first visit used to create an empty one, and would have cost them the
+  starting coins. The chest's rules say "Everybody starts with 5 coins and 5 mana".
+- **My reading, to confirm with David:** 5 mana is also the most anybody holds, so a new person
+  starts full and the mana of their first logged days is not added until they have praised.
+- **Not verified:** PHP was never run. A gift and a swap were tried between two pretend people;
+  saying no, calling an offer off, an offer running out and walking away were not tried.
