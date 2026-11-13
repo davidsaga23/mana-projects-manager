@@ -14,6 +14,47 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-12 — The Realm: the focus music no longer crackles *(no migration)*
+
+**Reported by David:** "there's a bit of noise in the lo-fi music, it sounds like if the speaker
+was broken. Let's ... fix it".
+
+- **What it was:** the lofi loop had a "record crackle" layer under it. Measured, it was about
+  thirty sharp clicks a second, nearly as loud as the loudest note in the music, and it skipped the
+  filter that softens everything else. That is what a torn speaker sounds like. Nothing was
+  actually overloading: no sound ever went past full scale.
+- **The crackle is gone**, not turned down.
+- **The kick drum is gentler.** It was more than twice as loud as the chords and dipped very low,
+  the kind of thump a laptop speaker rattles on. It is now about level with the chords and the
+  bass. The snare is a little softer and duller too.
+- **Every note and drum hit now starts and ends at silence**, so none can click, and the music
+  passes a rumble filter and a safety limiter before the volume. At the top of the slider it peaks
+  at about half of full scale, so no setting can distort.
+- **The numbers, before and after** (30 to 60 seconds of the real code rendered in a browser, top
+  volume): biggest sudden jump between two samples 0.43 of full scale before, 0.04 after; sudden
+  jumps about 58 a second before, 1 to 2 after (those are the snare's own soft hiss); peak 0.70
+  before, 0.45 after. At the default volume there are now none at all.
+- **Not verified:** nobody has listened to it. The measurements say the fault is gone; whether it
+  is pleasant to work to is for David's ears on the live site.
+
+## 2026-11-12 — The Realm: a conversation can be laid over the map *(no migration)*
+
+**Asked by David:** "can you have an arrow pointing left at the middle of the chat bar so there's an
+option to extend it over the map?"
+
+- **A handle on the conversation's left edge**, half way down, with an arrow pointing left. Click
+  it and the conversation takes the map's place, so there is far more room to read and write. The
+  arrow then points right, and a second click brings the map back.
+- **The lists stay**: channels, people and places are still on the left, so you can switch
+  conversation without narrowing first. Clicking a person's house or a place in the lists brings
+  the map back, since that click is about the map.
+- **Wide, the words keep to a readable column** in the middle instead of running the full width of
+  a large screen, and pictures may show taller.
+- **Your choice is remembered** on that computer, for the next conversation and the next visit.
+- **The arrow keys do nothing while the map is covered**, so your character never walks, enters a
+  house or leaves a room where you cannot see it.
+- On a phone-width screen there is no handle: the conversation is already full width there.
+
 ## 2026-11-12 — The Realm: each task shows its status and due date, and the status can be changed there *(no migration)*
 
 **Asked by David**, with a picture of the Production tasks table on My tasks: "work on how tasks

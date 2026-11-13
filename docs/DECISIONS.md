@@ -5476,3 +5476,58 @@ and due date".
   running on is approved from the Realm, it leaves the list and the clock panel names it "Work
   started in My tasks" until the clock is stopped. A status set by hand can still be overwritten by
   the next Plaky import, as before.
+
+## 2026-11-12 — The conversation over the map
+
+**David:** "can you have an arrow pointing left at the middle of the chat bar so there's an option to
+extend it over the map?" (with a screenshot, the left edge of the open conversation circled).
+
+- **Wide means the conversation takes the map's whole place, and the lists stay.** Not a panel
+  half over the map: that would leave the zoom buttons, the house card or the bar inside a room
+  peeking out from under it, reachable or not depending on the screen. The map's panel is taken
+  out of the layout (`.chat-wide` on `.rapp`, in `assets/realm.css`) and comes back whole; the
+  canvas is repainted by the existing `draw()`, which takes its size from its box.
+- **No key reaches the map while it is away.** `mapAway()` in `assets/realm.js` stops the document
+  key handler first, so the arrows cannot walk the character, Enter cannot go into a house and
+  Escape cannot leave a room unseen. It asks the page whether the map is really gone, not the
+  setting, so a narrow screen (where wide changes nothing) keeps its keys.
+- **Picking a house or a place in the lists narrows the conversation again**, because that click
+  is about the map. Picking a person opens their ravens and stays wide.
+- **The choice is remembered in the browser** (`localStorage`, `realmChatWide`), not in the
+  database: it is about this screen, and a second computer may want the other answer. Closing a
+  conversation does not forget it; the next one opens the same way.
+- **A reading column, not a stretched one.** Wide, the messages and the writing box keep to a
+  centred column of at most 900px, a message to about 74 characters a line, and a picture may be
+  420px tall instead of 240. The head (title and Close) stays edge to edge so Close does not move.
+- **The handle is a real button** with `aria-expanded` and a label that says what it will do
+  ("Make the conversation wider" / "narrower"). Its fill is solid: half of it lies over the map.
+- **Known limits:** while wide, things that live on the map are out of reach until you narrow
+  again (speech bubbles in a room, the bookshelf that opens Your tasks, the Leave button of a
+  room). Notices, knocks, the picture viewer and Your character are unaffected. There is no
+  dragging to an in-between width.
+
+## 2026-11-12 — The focus music has no crackle, and how its sound is kept clean
+
+David, the same day the lofi loop went live: "there's a bit of noise in the lo-fi music, it sounds
+like if the speaker was broken. Let's ... fix it".
+
+- **No "record crackle", no hiss bed, no deliberate distortion.** The lofi version had a crackle
+  layer for character. Rendered and measured, it was about thirty clicks a second at up to 0.38 of
+  full scale beside music peaking at 0.48, and it went round the low-pass filter. A person working
+  hears that as a fault, not as texture. The lofi character now comes only from the slow tempo,
+  the chords, the dull filter and the slight tape waver. Do not add a noise layer back without
+  David hearing it first.
+- **The order of the chain is the rule** (`musicStart` in `assets/realm.js`): voices, low-pass
+  2.4 kHz, high-pass 38 Hz, limiter, volume, speakers. The limiter (a `DynamicsCompressorNode`) is
+  a safety net: it adds some gain of its own, which `MUSIC_TOP` accounts for. Top of the slider
+  peaks near 0.45 of full scale. Anybody adding a voice measures again.
+- **The kick sits level with the chords and bass** (it was 7 dB above them) and sweeps 110 to
+  52 Hz, not 120 to 45, for small speakers.
+- **How it was measured, since no session can listen:** the music code was taken as text from
+  `assets/realm.js` in a local test page and rendered with an `OfflineAudioContext`, each layer
+  alone and together; peak, samples at full scale, largest sample-to-sample jump and RMS were
+  read from the result. The test page is not in the repository.
+- **Known limits:** unheard by a person. Notes already booked when the music stops play out
+  silently for a few seconds and then end themselves. The snare and hat are still made of filtered
+  hiss, by design; if those also read as noise, the next step is to drop the hat and soften the
+  snare further.

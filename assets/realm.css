@@ -191,11 +191,25 @@ small { color: var(--muted); font-size: 13px; }
 .freeland { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 8; opacity: .85; }
 
 /* ---- a conversation ---- */
-.rchat { display: flex; flex-direction: column; }
+/* --chat-pad is the space left and right of the messages and the writing box. It is a name so
+   that the wide conversation (below) can turn it into a centred reading column in one place. */
+.rchat { display: flex; flex-direction: column; position: relative; --chat-pad: 14px; }
 .rchat[hidden] { display: none; }
+/* THE HANDLE THAT LAYS THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at
+   the middle of the chat bar so there's an option to extend it over the map"). A tab on the panel's
+   left edge, half way down, astride the border so it reads as part of the panel and is easy to hit.
+   Its fill is solid, never a tint: half of it lies over the map. */
+.rwide {
+  position: absolute; left: -13px; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 26px; height: 60px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: var(--surface); color: var(--primary); border: 1px solid var(--primary-border); border-radius: var(--radius);
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+}
+.rwide:hover { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.rwide svg { display: block; }
 .rchathead { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border-soft); }
 .rchathead h2 { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rmsgs { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rmsgs { flex: 1; min-height: 0; overflow: auto; padding: 12px var(--chat-pad); display: flex; flex-direction: column; gap: 8px; }
 .rmsg { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 7px 11px; max-width: 92%; align-self: flex-start; overflow-wrap: anywhere; }
 .rmsg.is-mine { align-self: flex-end; background: var(--primary-tint); border-color: var(--primary-border); }
 .rmsghead { display: flex; gap: 8px; align-items: baseline; }
@@ -207,14 +221,31 @@ small { color: var(--muted); font-size: 13px; }
 .rimg { display: block; max-width: 100%; max-height: 240px; border-radius: var(--radius-sm); margin-top: 4px; }
 .rtag { color: var(--primary); font-weight: 600; }
 .rtag.is-me { background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 0 4px; }
-.rsuggest { display: flex; flex-direction: column; gap: 1px; margin: 0 14px; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.rsuggest { display: flex; flex-direction: column; gap: 1px; margin: 0 var(--chat-pad); padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); }
 .rsuggest[hidden], .rpicked[hidden] { display: none; }
-.rpicked { display: flex; align-items: center; gap: 8px; padding: 8px 14px 0; color: var(--muted); font-size: 13px; }
+.rpicked { display: flex; align-items: center; gap: 8px; padding: 8px var(--chat-pad) 0; color: var(--muted); font-size: 13px; }
 .rpicked span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rcomposer { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border-soft); }
+.rcomposer { display: flex; gap: 8px; padding: 12px var(--chat-pad); border-top: 1px solid var(--border-soft); }
 .rcomposer input:not([type=file]) { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; transition: border-color var(--ease); }
 .rcomposer input::placeholder { color: var(--faint); }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* THE WIDE CONVERSATION. The handle puts .chat-wide on .rapp, and the conversation then takes the
+   map's place: the lists stay, so a channel or a person is still one click away, and the map is
+   taken out altogether rather than half covered, so none of its controls (zoom, the house card,
+   the bar inside a room) is left peeking out from under the chat. assets/realm.js stops the arrow
+   keys walking your character while the map is away.
+   The words do not run the full width of a large screen: the messages and the writing box keep to
+   one centred column of at most 900px, a message to a readable line, and a picture may be taller.
+   Only above 860px: below that the panels are stacked and the conversation is full width already. */
+@media (min-width: 861px) {
+  .rapp.with-chat.chat-wide { grid-template-columns: 236px minmax(0, 1fr); }
+  .rapp.with-chat.chat-wide .rmain { display: none; }
+  .rapp.with-chat.chat-wide .rchat { --chat-pad: max(14px, calc((100% - 900px) / 2)); }
+  .rapp.with-chat.chat-wide .rwide svg { transform: rotate(180deg); }
+  .rapp.with-chat.chat-wide .rmsg { max-width: min(92%, 74ch); }
+  .rapp.with-chat.chat-wide .rimg { max-height: 420px; }
+}
 
 /* ---- notices, and the windows that open over the page ---- */
 #toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; width: min(350px, calc(100% - 36px)); z-index: 20; }
@@ -294,6 +325,7 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
   html, body { height: auto; }
   .rapp, .rapp.with-chat { grid-template-columns: minmax(0, 1fr); }
   .rchat { min-height: 50vh; }
+  .rwide { display: none; }
   .rside .rrows { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
   .rrow { width: auto; background: var(--surface-2); }
   .rrow small { margin-left: 4px; }
