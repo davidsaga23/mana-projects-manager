@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: "Reply in thread" is an icon *(no migration)*
+
+**Asked by David**: "let's add an icon like in slack instead of text here". The words on a message
+are now a small speech-bubble button on its top edge, beside the reactions button, shown while the
+pointer is over the message. Its tooltip still says "Reply in thread". Files: `assets/realm.js`,
+`assets/realm.css`.
+
 ## 2026-11-13 — The Realm: each show's sky reacts to production *(no migration)*
 
 **Asked by David**: "shows that react to production", so the state of every show can be seen at a

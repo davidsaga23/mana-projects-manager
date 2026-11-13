@@ -2422,7 +2422,7 @@ function msgHTML(m) {
      has; a reply that was also sent to the channel says what it answers. In a thread, the first
      message is drawn apart from its replies. */
   var top = !m.parent && threadsOn(), inThread = !!CH.thread;
-  var reply = top && !inThread ? '<button type="button" class="rreply" data-thread="'+m.id+'" title="Reply in thread">Reply in thread</button>' : '';
+  var reply = top && !inThread ? '<button type="button" class="rreply" data-thread="'+m.id+'" title="Reply in thread" aria-label="Reply in thread"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 6h6M5 8.2h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>' : '';
   var from = m.parent && m.also ? (inThread ? '<small class="rthrfrom">Also sent to the channel</small>' : '<button type="button" class="rthrfrom" data-thread="'+m.parent+'">Replied in a thread: &ldquo;'+esc(m.about)+'&rdquo;</button>') : '';
   var foot = top && !inThread ? '<div class="rthrslot" data-thrslot="'+m.id+'">'+thrFoot(m.id)+'</div>' : '';
   var h = '<div class="rmsg'+(m.mine?' is-mine':'')+(inThread && m.id===CH.thread?' is-parent':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small>'+reply+'</div>'+from+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+foot+'</div>';
