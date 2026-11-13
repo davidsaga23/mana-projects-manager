@@ -5021,3 +5021,9 @@ body.rv-open { overflow: hidden; }
 .row-actions .payments-pay button.row-btn-go { background: var(--primary); color: var(--on-primary); }
 .row-actions .payments-pay button.row-btn-go:hover { background: var(--primary-hover); }
 .payments-note { display: inline-block; max-width: 220px; }
+
+/* Moving an invoice to another project (includes/invoice_move.php, 2026-11-13). */
+.invoice-move-pick, .invoice-move-confirm { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.invoice-move-pick label, .invoice-move-confirm label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; color: var(--muted); }
+.invoice-move-pick button, .invoice-move-confirm button { margin: 0; }
+.invoice-move-notes { margin: 12px 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
