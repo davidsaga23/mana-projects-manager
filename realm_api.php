@@ -38,6 +38,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
+require_once __DIR__ . '/includes/realm_search.php';
 require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passes accept_upload()
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_once __DIR__ . '/includes/realm_focus.php';
@@ -353,6 +354,8 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
 //      (+ a file field `image`, one picture, migration 083)
 // GET  unread=1                            only the unread counts
+// GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
+// GET  chat=<channel>&at=<message id>      open a conversation at a found message
 // POST react=<message id>&emoji=<key>&after=<id>&from=<id>
 //                                          give or take back my reaction (migration
 //                                          093), then the same answer as chat=
@@ -373,6 +376,22 @@ if (isset($_GET['unread'])) {
                       'spots' => realm_spots($pdo, $uid),
                       // Offers of a gift or a swap ride here too, like knocks, so they are seen in seconds.
                       'offers' => realm_offer_news($pdo, $uid)]);
+    exit;
+}
+// GET search=<words>: David, 2026-11-13, "all channels and dms". Which
+// conversations are searched is decided in includes/realm_search.php from the
+// session's own account, never from anything the page sends.
+if (isset($_GET['search'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $found = realm_search($pdo, $uid, (string)$_GET['search'], $mayAnnounce, max(0, (int)($_GET['before'] ?? 0)));
+        echo json_encode(['ok' => true] + $found);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The search could not be run. Try again in a moment.']);
+    }
     exit;
 }
 // ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
@@ -419,6 +438,8 @@ if ($channel !== '') {
         }
         if ($reactTo > 0) $said = realm_react($pdo, $uid, $reactTo, (string)($_POST['emoji'] ?? ''));
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
+        // Opened from a search result: start a little before the found message.
+        if ($after === 0 && isset($_GET['at'])) $after = realm_search_start($pdo, $channel, (int)$_GET['at']);
         $messages = realm_messages($pdo, $uid, $channel, $after);
         if ($messages) {
             realm_mark_read($pdo, $uid, $channel, (int)$messages[count($messages) - 1]['id']);
