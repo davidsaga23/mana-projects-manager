@@ -14,6 +14,35 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: the merchant in the Tavern *(migration 091, needs 090)*
+
+**Asked by David:** "let's open a new thread for that" (the shop and prices), then, after the
+choices were put to him a few at a time: "Agree to all three", "yeah let's move forward", "Yes,
+build it".
+
+- **A merchant stands in the Tavern.** Walk up to the counter and press Enter, or click. The window
+  shows your own coins and eight things, each with its picture and price. You buy there and nowhere
+  else; the server checks you are inside the Tavern.
+- **Eight things, three prices.** 5 coins: the shield and swords, the crown, the feathered cap.
+  12 coins: the crystal ball, the fox, the starry cloak. 25 coins: the throne, the small dragon.
+  The crown, the cap, the fox, the dragon and the starry cloak are new drawings; the three office
+  things were already drawn and waiting. Everything that was free stays free.
+- **Buying asks first**: "Buy the throne for 25 coins? This cannot be undone." One of each per
+  person, no selling back, nothing runs out and nothing is limited.
+- **What you buy is yours for good.** Office things are then in the Decorate library ("Yours"),
+  clothes and companions in Your character. Until then both places show the price and say "at the
+  merchant", and Your character lets you try a thing on without being able to save it.
+- **Private.** The chest now lists what you own, under your coins. Nobody else can see your coins
+  or your list, only what you wear and what stands in your office.
+- **Not in this version:** giving a thing to somebody and swapping (agreed, next build), things
+  drawn by the studio's artists, new things arriving with a notice.
+- **Depends on PR 229** (gold, migration 090). This cannot go live before that one.
+- **Not verified:** PHP was never run here. The screen was tried against a pretend server
+  (buying, refusing, trying on, placing the throne, the chest); real coins, the Tavern check and
+  the one-of-each rule in the database need David and Renata on the live site.
+
+---
+
 ## 2026-11-13 — The Realm: praise, mana and gold, first version *(migration 090)*
 
 **Asked by David:** "people should be able to praise with a spell or something people doing a good

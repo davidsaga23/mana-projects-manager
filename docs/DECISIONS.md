@@ -5859,3 +5859,58 @@ Same thread, after PR 229 was open.
   is private (proposed: yes, others see only what you wear and what stands in your office); whether
   "on time" should be judged by the day of delivery instead of the day of approval; whether on time
   means a second coin.
+
+## 2026-11-13 — The Realm's shop: a merchant, eight things, three prices
+
+David, in the thread he asked for ("let's open a new thread for that"). The choices were put to him
+a few at a time, each with a recommendation. He answered "Agree to all three" (where, what,
+prices), "yeah let's move forward" (scarcity, owning, giving, what goes in the first build), and
+then "Yes, build it".
+
+- **Where: a merchant in the Tavern.** Not a new building (more drawing, kept for later if the shop
+  earns it) and not only a button in a list. It gives gold a place, and it fits the Realm's habit
+  that things happen face to face. The buyer must be inside the Tavern, checked on the server
+  (`realm_shop_buy()`). The things for sale also show, with their price, in the Decorate library
+  and in Your character, which send you to the merchant, so nobody has to hunt for them.
+- **What: eight things to begin with**, because every new thing is drawn in code. The three office
+  things already drawn and marked gold (shield and swords, crystal ball, throne), two headwear
+  (crown, feathered cap), two companions (fox, small dragon) and one cloak (starry). Everything
+  that was free stays free.
+- **Prices: 5, 12 and 25 coins.** Set against what a steady artist earns (about 3 to 10 coins a
+  week), and against the people who approve work instead of delivering it (David, Tim, Renata,
+  Production), who earn perhaps 1 to 3 a week from logging and praise: nobody should be shut out.
+  Small 5: crown, feathered cap, shield and swords. Medium 12: crystal ball, fox, starry cloak.
+  Grand 25: throne, small dragon. All eight cost 96 coins, three to four months for a steady
+  artist. Which thing got which price was my proposal; David did not change it.
+- **No scarcity.** Nothing runs out, nothing is limited in number, nothing is taken away. In a
+  studio of 20, "only three thrones exist" turns a toy into a contest, and there is no ranking in
+  the Realm. New things may arrive now and then with a notice.
+- **One of each per person.** The unique key on `realm_owned` holds it.
+- **No undo and no selling back.** If a thing could be sold back, one person could buy it, give it
+  away, and the other sell it for the coins: gold handed over by another route, which David ruled
+  out on 2026-11-12. So the merchant asks before taking anything, and that is the only way back.
+- **Private.** What somebody owns is read only for the session's own account, like the purse:
+  there is no request that takes somebody else's id. Others see what you wear and what stands in
+  your office. This closes "whether the list of what you own is private" (yes).
+- **Stored** in `realm_owned` (migration 091): one line per thing owned, with who holds it, how it
+  reached them (`got`: bought today, gift and swap later), who it came from and what was paid.
+  Rules in `includes/realm_shop.php`, which holds the prices (`REALM_SHOP`); the screen is sent
+  them. The counter is its own file, `assets/realm_shop.js`. `assets/realm.js` draws the merchant
+  (a piece of the Tavern's furniture, `PROPS`), the five new pieces, and marks what is the
+  merchant's (`PAID`, and `gold` in `THINGS`).
+- **Ownership is checked where a thing is used**, not only at the counter: `realm_set_look()`
+  refuses a bought piece that is not yours, and `realm_room_save()` refuses a bought thing that is
+  not yours. Reading a stored room does not check, because the reader is usually not the owner.
+- **Agreed for the next build, not built:** a gift must be accepted; a swap happens only when both
+  press agree in the same place, and if one walks away nothing moves; a bought thing stays
+  exchangeable whoever holds it, and comes off the old owner's character and out of their office
+  when it leaves them. ⚠ That last part must be written with giving: nothing does it today.
+- **Small choices made without asking.** The merchant stands to the right of the Tavern's rug.
+  The starry cloak is midnight blue, and so is its owner's roof, since a roof takes the cloak's
+  colour. The feathered cap takes the cloak's colour, like the pointed hat and the hood. A thing
+  can be tried on in Your character and Save waits until it is put back. The chest lists what you
+  own. Coins earned since the purse was last counted are counted before a purchase.
+- **Still open:** things drawn by the studio's artists (a later stage); new things arriving with a
+  notice; whether praise received can ever be traded (proposed: no); whether "on time" is judged
+  by delivery or approval.
+- **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
