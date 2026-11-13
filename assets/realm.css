@@ -166,7 +166,7 @@ small { color: var(--muted); font-size: 13px; }
 .rinside[hidden] { display: none; }
 .rinside h2 { font-size: 18px; font-weight: 700; }
 .rinside span { color: var(--muted); }
-/* Voice in a room (2026-11-12): Join voice, or Mute and Leave voice, and who is talking. The dot is
+/* Voice in a room (2026-11-12): Join call, or Mute and Leave call, and who is talking. The dot is
    green while my microphone is live and red while I am muted, the same two roles a door uses. */
 .rinside .rvoice { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .rvoice small { color: var(--muted); }
