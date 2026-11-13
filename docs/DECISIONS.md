@@ -6058,6 +6058,17 @@ typing 'ok'"). Built as:
 - **The POST names a message, never a channel**: `realm_api.php` looks up the message's own channel
   and asks `realm_channel_access()` before writing, so ravens stay between their two people.
 
+## 2026-11-13 — The Realm: who sees what somebody is working on
+
+David asked to point at a character in the Realm and see the task their clock is running on. Asked
+who may see it, he chose **everyone in the Realm** (artists see each other's tasks, as they already
+can on Anima's boards), and, for somebody with no clock running, **just their name** (no "Not on the
+clock" line, so nobody is singled out for being off the clock). The figure shown is the minutes on
+that task **today**, logged plus running, rather than the length of the current Pomodoro block, which
+restarts every 25 minutes. Read only; it travels with the existing heartbeat state (`work` on each
+person, `realm_clocks()` in `includes/realm.php`). If the Realm opens beyond the testers, revisit
+whether artists should see each other's tasks.
+
 ## 2026-11-13 — Searching the Realm's chat
 
 **Asked by David**: "search across all chat history". Losing Slack history after 90 days is one of
