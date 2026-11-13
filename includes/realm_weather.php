@@ -43,12 +43,13 @@ const REALM_SKY_SECONDS = 90;
 
 /** A clear sky, no fireworks: what every land shows when anything goes wrong. */
 function realm_sky_none(): array {
-    return ['w' => 'clear', 'cheer' => false, 'mile' => 0];
+    return ['w' => 'clear', 'cheer' => false, 'mile' => 0, 'beast' => 0];
 }
 
 /**
  * The sky over every claimed land: [land => ['w' => clear|cloud|rain|storm,
- * 'cheer' => approved in the last hour, 'mile' => 25|50|75|100 crossed today, or 0]].
+ * 'cheer' => approved in the last hour, 'mile' => 25|50|75|100 crossed today, or 0,
+ * 'beast' => 0..4, how far the show's creature is beaten (PR 240)]].
  * Never throws; a land it cannot work out is simply clear.
  */
 function realm_skies(PDO $pdo): array {
@@ -123,6 +124,11 @@ function realm_skies_now(PDO $pdo, ?string $today = null): array {
 function realm_sky_for(int $done, int $total, ?string $start, ?string $due, ?array $log, string $today): array {
     $sky = realm_sky_none();
     if ($total <= 0) return $sky;   // nothing to count yet: nothing to judge
+
+    // The show's creature (PR 240, David 2026-11-13: it weakens as tasks are
+    // approved). A quarter band, never a count: 0 below 25%, 1 from 25%, 2 from
+    // 50%, 3 from 75%, 4 when every task is approved (defeated).
+    $sky['beast'] = $done >= $total ? 4 : max(0, min(3, (int)floor($done / $total * 4)));
 
     // The weather: the grid's own verdict, then the storm the grid has no colour for.
     if ($due !== null && $due < $today && $done < $total) {
