@@ -24,6 +24,9 @@
 // ⚠ ALWAYS THE REAL LOGIN, as in includes/realm.php: the caller passes
 // realm_user_id(), and realm_api.php refuses to run inside a preview.
 
+// Channels people make themselves, public or private (migration 096).
+require_once __DIR__ . '/realm_made.php';
+
 /** The longest message that is kept. Longer is cut, not refused. */
 const REALM_MESSAGE_MAX = 2000;
 /** How many messages a conversation shows when it is opened. */
@@ -50,8 +53,15 @@ function realm_dm_channel(int $a, int $b): string {
 /**
  * The shared channels this person may open, in the order the list shows them.
  * Ravens are not in here: they are listed against the people, not as channels.
+ *
+ * Channels people made (migration 096, includes/realm_made.php) come last: the
+ * public ones, and the private ones this person is IN. ⚠ EVERY PRIVACY CHECK IN
+ * CHAT ASKS THIS LIST, so a private channel missing from it is unreadable,
+ * uncounted and unsearchable for that person. $uid is the real login (0 asks
+ * the session). Archived channels only with $archived: they are left out of the
+ * list and the counts, but stay readable and searchable.
  */
-function realm_channels(PDO $pdo, bool $mayAnnounce): array {
+function realm_channels(PDO $pdo, bool $mayAnnounce, int $uid = 0, bool $archived = false): array {
     $out = [
         ['id' => 'announcements', 'name' => 'Announcements', 'post' => $mayAnnounce],
         ['id' => 'tavern',        'name' => 'The Tavern',    'post' => true],
@@ -65,7 +75,8 @@ function realm_channels(PDO $pdo, bool $mayAnnounce): array {
     } catch (Throwable $e) {
         // The three shared places still work.
     }
-    return $out;
+    if ($uid <= 0 && function_exists('realm_user_id')) $uid = realm_user_id();
+    return array_merge($out, realm_made_channels($pdo, $uid, $archived));
 }
 
 /**
@@ -86,8 +97,14 @@ function realm_channel_access(PDO $pdo, int $uid, string $channel, bool $mayAnno
         $q->execute([$uid === $a ? $b : $a]);
         return $q->fetchColumn() ? ['read' => true, 'post' => true] : $no;
     }
-    foreach (realm_channels($pdo, $mayAnnounce) as $c) {
-        if ($c['id'] === $channel) return ['read' => true, 'post' => (bool)$c['post']];
+    // Archived made channels too (migration 096): a search result must still
+    // open. Nobody writes in one, and `why` says so.
+    foreach (realm_channels($pdo, $mayAnnounce, $uid, true) as $c) {
+        if ($c['id'] === $channel) {
+            $may = ['read' => true, 'post' => (bool)$c['post']];
+            if (!empty($c['archived'])) $may['why'] = 'This channel is archived. Its messages are kept, but nobody writes in it any more.';
+            return $may;
+        }
     }
     return $no;
 }
@@ -233,7 +250,7 @@ function realm_mark_thread_read(PDO $pdo, int $uid, int $parent, int $lastId): v
  * channels they may open, and their own ravens. With the values it needs.
  */
 function realm_channel_filter(PDO $pdo, int $uid, bool $mayAnnounce, string $col): array {
-    $ids = array_column(realm_channels($pdo, $mayAnnounce), 'id');
+    $ids = array_column(realm_channels($pdo, $mayAnnounce, $uid), 'id');
     $marks = implode(',', array_fill(0, count($ids), '?'));
     return ['(' . $col . ' IN (' . $marks . ') OR ' . $col . ' LIKE ? OR ' . $col . ' LIKE ?)',
             array_merge($ids, ['dm:' . $uid . ':%', 'dm:%:' . $uid])];
@@ -355,7 +372,7 @@ function realm_unread(PDO $pdo, int $uid, bool $mayAnnounce, ?array &$threads = 
     $out = [];
     $threads = [];
     try {
-        $ids = array_column(realm_channels($pdo, $mayAnnounce), 'id');
+        $ids = array_column(realm_channels($pdo, $mayAnnounce, $uid), 'id');
         $marks = implode(',', array_fill(0, count($ids), '?'));
         // Threads (migration 095): a reply kept in its thread is not a message of
         // the channel; it is counted below, and only for those who follow it.
@@ -385,7 +402,9 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     if (!realm_chat_available($pdo)) return null;
     $tunread = [];
     $unread = realm_unread($pdo, $uid, $mayAnnounce, $tunread);
-    return ['channels' => realm_channels($pdo, $mayAnnounce), 'unread' => $unread,
+    return ['channels' => realm_channels($pdo, $mayAnnounce, $uid), 'unread' => $unread,
+            // May channels be made yet (migration 096)? The "+" beside CHANNELS says so if not.
+            'make' => realm_made_available($pdo),
             'images' => realm_chat_images($pdo),
             // Threads (migration 095): may messages be replied to, and what is new in the ones I follow.
             'threads' => realm_threads_available($pdo), 'tunread' => $tunread];
@@ -522,10 +541,16 @@ function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, b
         if (strpos($channel, 'project:') === 0) {
             $where = 'a show channel';
         } else {
-            foreach (realm_channels($pdo, $mayAnnounce) as $c) {
-                if ($c['id'] === $channel) $where = (string)$c['name'];
+            foreach (realm_channels($pdo, $mayAnnounce, $fromUid) as $c) {
+                // A made channel of a show is named like the show's own channel,
+                // for the same reason (migration 096).
+                if ($c['id'] === $channel) $where = !empty($c['show']) ? 'a show channel' : (string)$c['name'];
             }
         }
+        // ⚠ A PRIVATE CHANNEL RINGS ONLY ITS MEMBERS (migration 096). Somebody
+        // outside it who is tagged hears nothing: their bell must not learn the
+        // channel exists. null means any channel that is not private.
+        $only = realm_made_ring_only($pdo, $channel);
         $summary = $where . ' in the Realm';
         $actor = realm_person_name($pdo, $fromUid);
         $rows = $pdo->query('SELECT rp.user_id, u.crew_id, u.display_name, u.username, c.name AS crew_name
@@ -545,6 +570,7 @@ function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, b
             if ($name === '' || stripos($rest, '@' . $name) === false) continue;
             $rest = str_ireplace('@' . $name, ' ', $rest);
             if ((int)$r['user_id'] === $fromUid || $crew <= 0) continue;
+            if ($only !== null && !in_array((int)$r['user_id'], $only, true)) continue;
             $q = $pdo->prepare("SELECT 1 FROM notifications WHERE crew_id = ? AND kind = 'tag' AND actor = ? AND summary = ? AND seen_at IS NULL LIMIT 1");
             $q->execute([$crew, $actor, $summary]);
             if ($q->fetchColumn()) continue;

@@ -31,6 +31,7 @@
 // POST offer_answer=<offer id>&say=accept|decline|agree|cancel&item=
 //                                         the next step of an offer I made or was made (includes/realm_trade.php)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
+// POST channel=new|rename|members|archive|leave  make or change a chat channel (further down, migration 096)
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -419,6 +420,43 @@ if (isset($_GET['search'])) {
     }
     exit;
 }
+// ---- channels people make (David, 2026-11-13, migration 096) ---------------
+// POST channel=new&name=&private=0|1&show=<project id, 0 for studio-wide>&members=3,7
+// POST channel=rename&id=ch:<n>&name=
+// POST channel=members&id=ch:<n>&add=3,7&remove=9     (a private channel only)
+// POST channel=archive&id=ch:<n>
+// POST channel=leave&id=ch:<n>                        (leave a private channel I am in)
+// The answer is the channel list again (`chat`), and, for a channel that is
+// still mine to read, its `info`. The rules, and who may do what, are in
+// includes/realm_made.php. ⚠ `channel` IS IN artist_may_post(): the actor is the
+// session's own account, and every id is looked up as that account sees it, so
+// a private channel somebody is not in cannot be named, changed or left.
+if (isset($_POST['channel'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $what = (string)$_POST['channel'];
+        $id = (string)($_POST['id'] ?? '');
+        $bad = '';
+        if ($what === 'new') {
+            $made = realm_made_create($pdo, $uid, (string)($_POST['name'] ?? ''), (string)($_POST['private'] ?? '0') === '1',
+                                      max(0, (int)($_POST['show'] ?? 0)), (string)($_POST['members'] ?? ''));
+            $bad = (string)($made['error'] ?? '');
+            $id = (string)($made['id'] ?? '');
+        } else {
+            $bad = realm_made_change($pdo, $uid, $id, $what, $_POST);
+        }
+        $answer = ['ok' => true, 'chat' => realm_chat_summary($pdo, $uid, $mayAnnounce)];
+        if ($id !== '' && ($info = realm_made_info($pdo, $uid, $id)) !== null) { $answer['id'] = $id; $answer['info'] = $info; }
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The channel could not be saved. Try again in a moment.']);
+    }
+    exit;
+}
 // ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
 // message is really in, so the access check below is asked about the right
 // conversation whatever id is posted.
@@ -457,7 +495,8 @@ if ($channel !== '') {
         $said = '';
         if (isset($_POST['say'])) {
             if (!$may['post']) {
-                $said = 'Only Production can write in Announcements.';
+                // An archived channel says so (migration 096); otherwise it is Announcements.
+                $said = (string)($may['why'] ?? 'Only Production can write in Announcements.');
             } else {
                 // One picture may come with the words (migration 083). A refused
                 // picture refuses the whole message, so nothing half-arrives.
@@ -499,6 +538,9 @@ if ($channel !== '') {
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
                    'offers' => realm_offer_news($pdo, $uid)];
+        // A channel somebody made (migration 096): its name, lock, members and
+        // whether I may change it, for the head of the conversation.
+        if (realm_made_num($channel) > 0) $answer['chan'] = realm_made_info($pdo, $uid, $channel);
         // Reactions (migration 093): only once the table exists, so the page
         // knows whether to offer them. A first page starts at its own first message.
         if (realm_reactions_available($pdo)) {
