@@ -1268,6 +1268,20 @@ function campWin(kind) {
   $('campBody').innerHTML = '<p class="rcnote">Opening…</p>'+campFoot('','','');
   d.showModal();
   if (kind==='slay') { campSlay(); return; }
+  /* THE WHOLE TIMELINE (David, 2026-11-13, with a picture of the Timeline's general chart: "let's
+     bring the whole timeline as the attachment, the whole widget"). For somebody whose Timeline
+     switch is on, the calendar is that very chart: Anima's Timeline page in a frame, in its
+     embedded view (timeline.php?embed=1), which draws the chart and its milestones and lets
+     nothing be moved. It is the same code as the Timeline, so it cannot differ from it, and the
+     page itself asks again whether this person may see it. Current when opened; not reloaded
+     while open, because a reload would throw away the zoom and the place scrolled to. */
+  if (kind==='timeline' && k.timeline_whole) {
+    d.className = 'rcamp is-timeline is-whole';
+    $('campBody').innerHTML = '<iframe class="rcframe" title="The timeline of '+esc(k.name)+'" src="timeline.php?project='+(+k.project_id)+'&amp;embed=1"></iframe>'
+      +'<p class="rcnote">This is the show&#39;s Timeline as it stands in Anima. Nothing can be moved from here.</p>'
+      +campFoot('timeline.php?project='+(+k.project_id),'timeline.php?','Open the full Timeline in Anima');
+    return;
+  }
   campWinAsk();
   /* Current when opened, then asked again while it stays open: every minute, the calendar every two
      (it is the heaviest to work out). Never while the tab is hidden. */

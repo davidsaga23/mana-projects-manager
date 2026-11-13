@@ -253,6 +253,12 @@ function realm_camp_answer(PDO $pdo, int $uid, string $land, array $project, arr
             'can' => ['brief' => !empty($can['brief']), 'production' => !empty($can['production']),
                       // The calendar opens for somebody without the switch only if David chose the reduced view.
                       'timeline' => !empty($can['timeline']) || REALM_CAMP_TIMELINE_WITHOUT_SWITCH === 'milestones'],
+            // With the Timeline switch on, the calendar is Anima's own Timeline
+            // chart in a frame (David, 2026-11-13: "let's bring the whole timeline
+            // as the attachment, the whole widget"): timeline.php?embed=1, which
+            // asks the switch and the show again itself. Without it, the reduced
+            // view below, if David chose that.
+            'timeline_whole' => !empty($can['timeline']),
             'may_clear' => $mayClear,
             'progress' => realm_camp_progress($pdo, $project),
             'things' => realm_camp_things($pdo, (int)$project['id'], $uid)];
@@ -305,7 +311,10 @@ function realm_camp_brief(PDO $pdo, int $projectId): array {
 }
 
 /**
- * THE CALENDAR: the show's timeline, small enough for a window.
+ * THE CALENDAR, REDUCED: what somebody WITHOUT the Timeline switch is given, if
+ * David chose that (REALM_CAMP_TIMELINE_WITHOUT_SWITCH). Somebody with the
+ * switch sees the Timeline's own chart instead (timeline.php?embed=1, framed by
+ * assets/realm.js), and this is not asked for them.
  *
  * timeline_picture() is what timeline.php draws from, so nothing is scheduled
  * or worked out a second time here: this only keeps the parts a compact view

@@ -223,7 +223,18 @@ if ($versionId > 0) {
 // live rows, so a drag there would save into the CURRENT plan, putting today's
 // bar back where it sat last week, while the person dragging believes they are
 // only looking. Nothing is quieter or worse than that.
-$editable = can_edit_area('timeline') && $version === null;
+//
+// ⚠ NOR IN THE EMBEDDED VIEW (?embed=1). David, 2026-11-13, of the calendar in a
+// show's camp in the Realm, with a picture of this page's general chart: "let's
+// bring the whole timeline as the attachment, the whole widget". So the camp
+// shows THIS page in a frame, not a second drawing of it: the same bars, arrows,
+// milestones, today line, zoom and downloads, from the same code. Embedded, the
+// page draws only that chart and its milestones, without Anima's top bar, and
+// nothing on it can be moved or changed, by anybody: a camp is for looking.
+// Who may open it is decided exactly as for the full page (require_login():
+// the Timeline switch and whether the account is on the show).
+$embed    = isset($_GET['embed']);
+$editable = can_edit_area('timeline') && $version === null && !$embed;
 
 // Progress recorded by hand on a step (migration 036). Until it has run the step
 // editor shows its progress box switched off, with the reason, rather than
@@ -240,6 +251,9 @@ $filterSteps = $pic['steps'];
 $episodes    = $pic['episodes'];
 $episodic    = !empty($pic['episodic']);
 $undated     = $pic['undated'];
+// The embedded view is the general chart alone: the detailed schedule is not
+// sent to the page at all.
+if ($embed) $tasks = [];
 
 $versions = $tvReady ? timeline_versions($pdo, $projectId) : [];
 
@@ -261,18 +275,38 @@ $crewList = $editable ? $pdo->query(
 $stale       = false;
 $freshCount  = 0;
 $storedCount = count($tasks);
-if ($version === null) {
+if ($version === null && !$embed) {
     $fresh      = build_schedule($pdo, $project);
     $freshCount = count($fresh['tasks']);
     $stale      = $freshCount !== $storedCount;
 }
 
 $pageTitle = 'Timeline · ' . $project['name'] . ($version !== null ? ' · ' . $version['label'] : '');
-require __DIR__ . '/includes/header.php';
+if (!$embed) require __DIR__ . '/includes/header.php';
 ?>
-
+<?php if ($embed): ?>
+<?php // The embedded view has its own small head instead of includes/header.php:
+      // no top bar, bell, tour or reminders inside a frame, and nothing that
+      // header loads for them. Only layout is set here; every colour is still
+      // assets/style.css's. ?>
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?= e($pageTitle) ?></title>
+<link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
+<style>
+  .tl-embed .wrap { padding: 10px 12px; }
+  .tl-embed .tl-section { margin: 0; }
+  .tl-embed .tl-chart { max-height: none; }
+  .tl-embed .empty-state a { display: none; }
+</style>
+</head>
+<body class="tl-embed">
+<div class="wrap">
+<?php else: ?>
 <?php project_nav($project, 'timeline'); ?>
 <h2 class="wizard-title">Timeline</h2>
+<?php endif; ?>
 
 <?php // A SAVED VERSION IS DRAWN ON WARM PAPER (.tl-page-old), from here to the
       // foot of the page, so it cannot be mistaken for the plan being worked on.
@@ -286,7 +320,7 @@ require __DIR__ . '/includes/header.php';
       // One bar above both charts, because a version is both charts. On an old
       // version it becomes the banner that says so, with the way back beside
       // the picker rather than somewhere else on the page. ?>
-<?php if ($tvReady): ?>
+<?php if ($tvReady && !$embed): ?>
   <div class="tl-versions<?= $version !== null ? ' is-old' : '' ?>">
     <?php if ($version !== null): ?>
       <div class="tl-version-msg">
@@ -335,7 +369,7 @@ require __DIR__ . '/includes/header.php';
       <?php endif; ?>
     </span>
   </div>
-<?php elseif (can_edit_area('timeline')): ?>
+<?php elseif (can_edit_area('timeline') && !$embed): ?>
   <p class="muted small">Saving versions of this timeline needs database update <strong>035</strong>.
     <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
 <?php endif; ?>
@@ -377,7 +411,14 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php else: ?>
 
-<?php if ($undated && $version === null): ?>
+<?php if ($undated && $embed): ?>
+  <p class="muted small">
+    <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no dates yet, so
+    <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn:
+    <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
+      if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
+  </p>
+<?php elseif ($undated && $version === null): ?>
   <div class="flash flash-warn">
     <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no start or
     deadline yet, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn below:

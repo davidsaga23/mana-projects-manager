@@ -387,6 +387,9 @@ dialog.rcamp { width: min(560px, calc(100% - 32px)); max-height: calc(100% - 32p
 dialog.rcamp.is-brief { width: min(680px, calc(100% - 32px)); }
 dialog.rcamp.is-timeline { width: min(940px, calc(100% - 32px)); }
 dialog.rcamp.is-tracking { width: min(1180px, calc(100% - 32px)); }
+/* The calendar for somebody with the Timeline switch: Anima's own Timeline chart, in a frame. */
+dialog.rcamp.is-whole { width: min(1500px, calc(100% - 32px)); }
+.rcframe { display: block; width: 100%; height: min(70vh, 760px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
 #campBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 #campBody p { margin: 0; }
 .rcnote { color: var(--muted); font-size: 13px; }
