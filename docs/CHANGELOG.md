@@ -28,6 +28,42 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - **Not verified:** PHP was never run; the browser side was checked in a stand-in copy of the page.
 
 ---
+## 2026-11-13 — The Realm: what is always in a show's camp *(migration 089)*
+
+**Asked by David:** "for all the project camps, let's always have the following: A bar with the
+finished tasks and the progress for 'slaying' the project. A kind of papyrus on the wall so they
+can see live the brief of that project. A calendar to visualize the timeline. A checkbox list so
+they can see the production tracking, to see all the shots and their status in the checkbox.
+Decorate is also available but only one item per person."
+
+- **The slaying bar** runs across the top of every camp: a sword, a bar that fills green as tasks
+  are finished and stays red for what is left, a dragon's head at the far end, and the numbers
+  beside it (248/400). Click it for the percentage and how many are to go. It is the same count as
+  the show's progress capsule on the project list: tasks approved out of all tasks.
+- **The scroll** opens the show's Brief on paper: the client, the ask, the deliverables, the
+  references (web addresses become links), the notes and the attached files by name, with a
+  button to the full Brief in Anima. The client's contact is not shown.
+- **The calendar** opens the show's timeline, small: a bar per dated step with how much is
+  delivered, the milestones, today, the delivery date and the working days left, with a button to
+  the full Timeline.
+- **The board** opens Production tracking as Anima draws it: a row per shot, a small square per
+  step in the status's colour, a dash where a step does not apply, the DONE count, the legend of
+  the show's own statuses, and the three phases (Pre-production, Production, Post-production).
+  The header and the shot names stay put while a long show scrolls.
+- **One decoration each.** Decorate in a camp offers the house library; each person may stand one
+  thing, move it and take it out. Nobody can touch somebody else's, except that Production and
+  admins can take any out. The fixtures cannot be moved or covered.
+- **Read only.** Nothing in a camp changes a status, a date or the brief.
+- **Who sees it.** Only somebody who may see the show; each window only while its own switch in
+  Anima (Brief, Timeline, Production tracking) is on for them. Somebody from another show can
+  still walk into the tent and sees the furniture with one sentence, and no data.
+- **Waiting on David:** what the calendar shows an artist, whose Timeline switch is off by
+  default. Until he decides it is closed for them (see `docs/DECISIONS.md`).
+- **Until migration 089 runs** every camp has its fixtures and windows, and Decorate says it needs
+  a database update.
+- **Not verified:** PHP was never run; real show data was never seen; nobody could log in to try
+  it on live. Tried in a stand-in page with made-up data.
+
 ## 2026-11-13 — The Realm: walk around inside a room, and see each other walk *(migration 087)*
 
 **Asked by David:** "let's also have the option for the avatars to move freely inside each house".

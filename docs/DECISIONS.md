@@ -5702,3 +5702,70 @@ David: "let's change 'Join voice' for 'Join call'".
 - **"Use a video call" stays** in the two messages that send people elsewhere (a full call, a
   connection that could not be made): it means Google Meet or similar, outside the Realm.
 - **Entries above this one keep "voice"**, as written that day.
+
+## 2026-11-13 — What is always in a show's camp
+
+**Asked by David:** "for all the project camps, let's always have the following: A bar with the
+finished tasks and the progress for 'slaying' the project. A kind of papyrus on the wall so they
+can see live the brief of that project. A calendar to visualize the timeline. A checkbox list so
+they can see the production tracking, to see all the shots and their status in the checkbox
+(attached). Decorate is also available but only one item per person."
+
+- **Four fixtures, in every camp, that nobody can move:** the slaying bar over the back wall, the
+  scroll (Brief), the calendar (Timeline) and the board (Production tracking). The map table stays
+  on the floor; the two crates left to make room for decorations. The fixtures are things in the
+  house library's own list (`THINGS`, the `camp_` rows, and `CAMP_FIX`; `REALM_CAMP_FIXED` in
+  `includes/realm_camp.php`), so the house's code draws them, puts a button over each, makes them
+  solid, and keeps decorations off them. No second system.
+- **Anima's own numbers, never a copy.** Each window calls the function its screen calls:
+  `projects_overall_pct()` for the bar, `timeline_picture()` for the calendar, `build_grid()` for
+  the board; the Brief is read from the same two tables `brief.php` reads. Nothing is stored in
+  the Realm, so a camp cannot disagree with Anima.
+- **Which progress figure.** The bar uses the count behind the progress capsule on the project
+  list (tasks approved out of all tasks, three queries), which hands its rows to
+  `dashboard_overall()`, the one place a show becomes a percentage. The Dashboard's own route
+  (`dashboard_steps()`) runs several queries per step and would be asked every 45 seconds by
+  everybody in a camp. The two can differ only on a show with progress rows left behind by a step
+  whose scope was changed, which is the case the Dashboard corrects for.
+- **The show is never taken from the browser.** A request names a land; the server finds the show
+  on that land in `realm_lands` and asks `may_see_project()` first, every time.
+- **Anima's switches hold.** The scroll asks `brief`, the board asks `production`, the calendar
+  asks `timeline`. A window whose switch is off does not open and its data is not sent.
+- **⚠ OPEN, David's to decide: the calendar for artists.** Artists have "Timeline: see" off by
+  default, and he asked for a calendar in every camp. Three ways: (a) a reduced view for them, the
+  delivery date and the milestones only, no step bars; (b) closed for them; (c) he turns Timeline
+  on for artists. Built: (a) and (b), chosen by one word, `REALM_CAMP_TIMELINE_WITHOUT_SWITCH` in
+  `includes/realm_camp.php`. It ships as (b) 'closed', which is what the switch means today, so
+  nothing is shown that he has not agreed to. Recommended: (a).
+- **No money, and no client contact.** No budget, rate, cost or invoice is read and
+  `includes/money.php` is never loaded. The Brief's "who to call" field is left out: he asked for
+  the ask, the deliverables and the references, and a phone number is not for a room. Who is on
+  each task (the tracking grid's names, the schedule's people) is not sent either.
+- **Read only.** The only thing a camp writes is a person's own decoration.
+- **"Live" means asked again, gently.** The hosting cannot hold a connection open. The bar and the
+  decorations: every 45 seconds while you stand in a camp (three small queries and one more). An
+  open window: once when opened, then every 60 seconds, the calendar every 120 because
+  `timeline_picture()` is the heaviest (several queries per step). Nothing while the tab is
+  hidden, and nothing for anybody who is not in a camp.
+- **One decoration each** (migration 089, `realm_camp_things`, keyed by show and person, so a
+  second cannot exist; a different thing sent while one stands is refused in words). Anything in
+  the house library that is free, except the bookshelf, the chest and the portrait, which belong
+  to a house. It wears its owner's colour.
+- **Proposed, and built: Production and admins can take out anybody's thing** (`can_edit()`), so
+  a camp can be tidied. Nobody else can touch another person's.
+- **When somebody leaves the show** their thing stays in the camp, as something they left behind,
+  until they or Production take it out; they can no longer move it, because they can no longer
+  open the camp. **When a show stops being active** its camp leaves the map; the rows are kept by
+  show and come back with it. A switched-off account's thing is not drawn.
+- **Somebody from another show** can still walk into the tent (that was already so) and sees the
+  furniture, no bar, no buttons, and one sentence saying the boards are covered.
+- **Small choices made without asking.** The bar is the top strip of the room, with its numbers
+  painted beside it, and the room is fitted below the bar that names the room so it is never
+  covered. The board opens on Production (shots) when the show has shots, else Pre-production.
+  Group rows (episodes) are drawn only when there is more than one. Attached files are links,
+  no thumbnails, so a camp never downloads a full picture to draw a small one.
+- **Not done:** a real dragon; thumbnails of attachments; the donuts and per-step counters of the
+  Production tracking screen; the detailed schedule (who does what, when) in the calendar.
+- **Not verified:** PHP was never run (the block checker passes and the deploy's `php -l` is the
+  backstop). Real show data was never seen: a show with an unusual pipeline, a very long brief or
+  a thousand shots. Nobody could log in. Phones and touch, Safari and Firefox. The real load.
