@@ -166,6 +166,13 @@ small { color: var(--muted); font-size: 13px; }
 .rinside[hidden] { display: none; }
 .rinside h2 { font-size: 18px; font-weight: 700; }
 .rinside span { color: var(--muted); }
+/* Voice in a room (2026-11-12): Join voice, or Mute and Leave voice, and who is talking. The dot is
+   green while my microphone is live and red while I am muted, the same two roles a door uses. */
+.rinside .rvoice { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.rvoice small { color: var(--muted); }
+.rvoice .rbtn[aria-pressed="true"] { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
+.rlive { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
+.rlive.is-muted { background: var(--danger); }
 .rlegend { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 9px 16px; color: var(--faint); font-size: 13px; border-top: 1px solid var(--border-soft); }
 .rlegend span { display: inline-flex; align-items: center; gap: 6px; }
 

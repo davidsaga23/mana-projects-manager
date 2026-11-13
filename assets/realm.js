@@ -346,7 +346,9 @@ function heads(c, o, list) {
   c.fillStyle = PAL.out; c.fillRect(x-1,y-1,w+2,18); c.fillStyle = PAL.veil; c.fillRect(x,y,w,16); c.fillStyle = PAL.out; if (!below) c.fillRect(o.x-2,y+17,4,3);
   for (i = 0; i < n; i++) { var p = list[i], hx = x+4+i*13;
     c.fillStyle = PAL.skin; c.fillRect(hx,y+5,10,8); c.fillStyle = p.hat==='none'?PAL.hair:(TINT[p.cloak]||TINT.mana); c.fillRect(hx-1,y+2,12,4);
-    c.fillStyle = PAL.out; c.fillRect(hx+2,y+8,2,2); c.fillRect(hx+6,y+8,2,2); }
+    c.fillStyle = PAL.out; c.fillRect(hx+2,y+8,2,2); c.fillRect(hx+6,y+8,2,2);
+    /* A green line under a head: that person is in the room's voice chat. */
+    if (p.voice) { c.fillStyle = TINT.spell; c.fillRect(hx,y+14,10,1); } }
 }
 /* Where everybody but me stands on the map, and who is inside what. */
 function whereabouts() {
@@ -432,7 +434,7 @@ function paintBubble(c, b) {
   c.fillStyle = PAL.hot; c.fillRect(b.bx,b.by,b.w,b.h); c.fillRect(b.x-1,b.by+b.h,3,Math.max(3,tail));
   c.fillStyle = PAL.out; b.lines.forEach(function (l, i) { c.fillText(l,b.bx+4,b.by+3+i*9); });
 }
-/* ---------- a person's own room (David, 2026-11-12, migration 085) ----------
+/* ---------- a person's own room (David, 2026-11-12, migration 086) ----------
    "Let's start with decorate my office. Let's all start with the same basic look and they can modify
    it from a library of free and opt to buy new stuff. All of them should have at least these: Book
    shelf: for tasks. Treasure chest: to check their gold. A portrait in the wall: so they can see
@@ -627,6 +629,9 @@ function drawRoom(c, cw, ch) {
     if (idle && !deco) zed(c,px,py);
   });
   c.setTransform(s,0,0,s,ox,oy);
+  /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). */
+  list.slice(0,SEATS.length-1).forEach(function (p, i) { if (p.voice) voiceMark(c,SEATS[i+1][0],SEATS[i+1][1],isTalking(p.id),!!p.muted,f); });
+  if (VO.on) voiceMark(c,SEATS[0][0],SEATS[0][1],isTalking(ST.me),VO.muted,f);
   if (deco) {
     if (DECO.sel >= 0 && lay.items[DECO.sel]) { var it = lay.items[DECO.sel], t = THINGS[it[0]], x0 = it[1]-3, y0 = it[2]-3, w = t.w+6, h = t.h+6;
       c.fillStyle = DECO.bad ? TINT.ember : TINT.mana; c.fillRect(x0,y0,w,1); c.fillRect(x0,y0+h-1,w,1); c.fillRect(x0,y0,1,h); c.fillRect(x0+w-1,y0,1,h); }
@@ -877,14 +882,15 @@ function renderSide() {
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
   BLIST.forEach(function (o) { if (!o.place) return; var n = (w.inside[o.id]||[]).length + (S.inside===o.id?1:0);
-    h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside</small>':'')+'</button>'; });
+    var nv = voiceOthers(o.id).length + (VO.on && S.inside===o.id?1:0);
+    h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in voice':'')+'</small>':'')+'</button>'; });
   $('side').innerHTML = h+'</div></div>';
 }
 function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
   if (S.walk) { h = '<div class="rcard"><b>Walking to '+esc(title(S.walk.id))+'…</b><div class="racts"><button type="button" class="rbtn rsmall" data-tele="'+esc(S.walk.id)+'">Teleport instead</button></div></div>'; }
   else if (o) {
-    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Chat and voice arrive in the next stages.';
+    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Go inside to talk, in writing or by voice.';
     /* At an ajar door, with nobody having let me in yet, the button is Knock. */
     var ajar = o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.door==='ajar' && !PASS[o.owner.id];
     var waiting = ajar && KN.mine && KN.mine.to===o.owner.id && KN.mine.status==='waiting';
@@ -901,7 +907,7 @@ function renderInside() {
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Click the bookshelf, the chest or the portrait.':'')+'</span><span class="rgrow"></span>'+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave</button>';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Click the bookshelf, the chest or the portrait.':'')+'</span><span class="rgrow"></span>'+voiceBar(o)+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -938,7 +944,7 @@ function applyState(st) {
   if (land!==SIG.land) { SIG.land = land; buildWorld(); }
   if (house!==SIG.house) { SIG.house = house; buildHouses(); }
   if (S.sel && !B[S.sel]) S.sel = null;
-  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
+  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { voiceStop(true); S.inside = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
   /* Standing in somebody else's house: ask for their room again, so a change of theirs shows. */
   if (S.inside && B[S.inside] && B[S.inside].owner && !B[S.inside].owner.me) roomAsk(B[S.inside].owner.id);
@@ -1008,6 +1014,8 @@ function goInside(id) {
 }
 function leave() {
   if (!S.inside) return; var id = S.inside; BUB = {}; decoEnd();
+  /* Voice is face to face: walking out of the room hangs up. */
+  voiceStop(true);
   play(220,function (k) { S.fade = k; },function () {
     S.inside = null; var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
     play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
@@ -1054,7 +1062,7 @@ window.addEventListener('blur',function () { held.clear(); });
 document.addEventListener('click',function (e) {
   S.touched = true;
   var t = e.target.closest ? e.target : e.target.parentNode, b;
-  musicWake(t);
+  musicWake(t); voiceWake();
   /* A name in the People list opens your ravens with that person (David, 2026-11-12: "clicking
      here should automatically open the ravens with Renata"), whether or not anything is unread and
      whether or not they are here, and still finds their house on the map. */
@@ -1074,6 +1082,7 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-tele]'))) teleport(b.getAttribute('data-tele'));
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
   else if (t.closest('[data-close]')) { S.sel = null; renderCard(); renderSide(); }
+  else if ((b = t.closest('[data-voice]'))) { var vw = b.getAttribute('data-voice'); if (vw==='join') voiceJoin(); else if (vw==='mute') voiceMute(); else voiceStop(true); }
   else if (t.closest('[data-leave]')) leave();
   else if (t.closest('#chestBtn')) openGold();
   else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
@@ -1158,7 +1167,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -1238,6 +1247,8 @@ function chatTake(j) {
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
   takeKnocks(j.knocks);
+  /* While I am in voice my own once-a-second request brings a fresher list than this one. */
+  if (!VO.on) takeVoiceRoom(j.voice);
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
@@ -1592,6 +1603,300 @@ if ($('focusBody')) {
   $('musicOn').addEventListener('change',function () { MU.on = this.checked; musicSave(); musicWake(this); musicSync(); });
   $('musicVol').addEventListener('input',function () { MU.vol = this.value/100; musicSave(); if (MU.rig) MU.rig.master.gain.setTargetAtTime(musicLevel(),MU.ctx.currentTime,.1); });
 }
+
+/* ---------- voice (migration 085) ----------
+   David, 2026-11-12: "let's start working on the voice chats". The people INSIDE the same room can
+   talk, up to five ("I think is fine 3-5 people talking informally"), in every room. It is face to
+   face ("the avatars should be close or in that person's office"): leaving the room leaves the
+   voice chat, and so does a door closing on a visitor.
+
+   NOBODY IS HEARD BY SURPRISE. Walking in never opens the microphone. Each person presses Join
+   voice; the browser then asks for the microphone, once per browser.
+
+   THE SOUND GOES STRAIGHT FROM BROWSER TO BROWSER (WebRTC), one direct line to each other person in
+   voice, which is fine for five. It never passes through Anima. To find each other across different
+   networks each browser asks an address-lookup service (STUN) what its own internet address is:
+   Google's free one, agreed by David that day, named by the server in ST.voice.ice. There is no
+   relay, so two people on strict networks may fail to connect; that is tried twice and then said.
+
+   THE HOSTING CANNOT HOLD A CONNECTION OPEN, so the set-up notes two browsers exchange (an offer,
+   an answer, network addresses) go through realm_api.php: while I am in voice, and only then, this
+   page asks once a second (voiceBeat). That one request says I am still here, hands over my notes,
+   and brings back the notes for me and the list of who is in voice in the room.
+
+   WHO CALLS WHOM. For any two people the one with the SMALLER user id makes the offer and the other
+   waits for it, so two browsers never call each other at the same moment. Every Join gets a fresh
+   number from the server (`sid`); when somebody's number changes they have rejoined, and the line
+   to them is rebuilt. Every line has its own tag (`cid`), so a late note for an earlier attempt is
+   dropped instead of confusing the current one.
+
+   VO.peers is one entry per other person: {pc the line, ok whether sound can flow, el the hidden
+   player their voice comes out of, an what measures their loudness for the speaking mark}. */
+var VO = {on:false,joining:false,sid:0,place:null,stream:null,ctx:null,mine:null,peers:{},out:[],busy:0,timer:0,meter:0,flush:0,
+  muted:false,talk:{},talkSig:'',tries:{},dead:{},seen:{},misses:0,cid:0,asked:0,blocked:false};
+function voiceReady() { return !!(ST.voice && ST.voice.ready); }
+function voiceCan() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
+function voicePost(fields) {
+  var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
+  return fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}}).then(function (r) { return r.json(); });
+}
+/* Is this person in voice, as far as this page knows? Myself I know for certain. */
+function inVoice(p) { return p.me || p.id===ST.me ? VO.on : !!p.voice; }
+function isMuted(p) { return p.me || p.id===ST.me ? VO.muted : !!p.muted; }
+function isTalking(id) { return (VO.talk[id]||0) > Date.now(); }
+/* The others in voice in the room `id`. */
+function voiceOthers(id) { return ST.people.filter(function (p) { return !p.me && p.voice && p.inside && p.place===id && p.state!=='away'; }); }
+/* Fresh word on who is in voice in the room I am in: every second from my own voice request, or
+   every few seconds with the unread counts and chat. The map's own copy is up to 25 seconds old. */
+function takeVoiceRoom(list) {
+  if (!list || !S.inside) return;
+  var idx = {}, changed = false;
+  list.forEach(function (r) { idx[r.id] = r; });
+  ST.people.forEach(function (p) {
+    if (p.me) return;
+    var r = idx[p.id];
+    /* Somebody the map still has elsewhere has just walked in: the list is the newer word. */
+    if (r && (p.place!==S.inside || !p.inside)) { p.place = S.inside; p.inside = true; if (p.state==='away') p.state = 'online'; changed = true; }
+    if (p.place!==S.inside) return;
+    var v = !!r, m = !!(r && r.muted);
+    if (!!p.voice!==v || !!p.muted!==m) { p.voice = v; p.muted = m; changed = true; }
+  });
+  if (changed) { renderInside(); renderSide(); draw(); }
+}
+function micWords(e) {
+  var n = e && e.name;
+  if (n==='NotAllowedError' || n==='SecurityError') return 'The microphone is blocked for this site. Click the padlock beside the address, allow the microphone, then press Join voice again.';
+  if (n==='NotFoundError' || n==='OverconstrainedError') return 'No microphone was found. Plug one in, then press Join voice again.';
+  return 'The microphone could not be opened. Close any other app that is using it, then press Join voice again.';
+}
+function voiceJoin() {
+  if (VO.on || VO.joining || !S.inside) return;
+  if (!voiceReady()) { toast('Voice needs a database update first. An administrator opens migrate.php once.'); return; }
+  if (!voiceCan()) { toast('This browser cannot do voice chat. Use a current Chrome, Edge, Firefox or Safari.'); return; }
+  var place = S.inside, mine = ++VO.asked; VO.joining = true; renderInside();
+  var fail = function (msg) { VO.joining = false; voiceQuiet(); if (msg) toast(msg); renderInside(); };
+  navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false}).then(function (stream) {
+    /* This answer is for an earlier press (they walked out and pressed again): let it go. */
+    if (mine!==VO.asked || VO.on) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+    VO.stream = stream;
+    /* They walked out while the browser was asking about the microphone. */
+    if (S.inside!==place) { fail(''); return; }
+    voicePost({voice:'join',place:place}).then(function (j) {
+      var v = j && j.voice;
+      if (mine!==VO.asked) { if (v && v.in) voicePost({voice:'leave',sid:v.sid}).catch(function () {}); return; }
+      if (!j || !j.ok || !v || !v.in) { fail((j && j.error) || 'Voice could not be reached. Try again in a moment.'); return; }
+      if (S.inside!==place) { voicePost({voice:'leave',sid:v.sid}).catch(function () {}); fail(''); return; }
+      VO.joining = false; VO.on = true; VO.sid = v.sid; VO.place = place; VO.muted = false; VO.misses = 0; VO.busy = 0; VO.out = [];
+      VO.tries = {}; VO.dead = {}; VO.seen = {}; VO.talk = {};
+      voiceEars();
+      VO.timer = setInterval(voiceBeat,1000); VO.meter = setInterval(voiceMeter,150);
+      voiceTake(j); renderInside(); renderSide(); draw();
+    }).catch(function () { if (mine===VO.asked) fail('Voice could not be reached. Try again in a moment.'); });
+  },function (e) { if (mine===VO.asked) fail(micWords(e)); });
+}
+/* Let go of everything on this computer: the lines, the microphone, the timers. Tells nobody. */
+function voiceQuiet() {
+  clearInterval(VO.timer); clearInterval(VO.meter); clearTimeout(VO.flush); VO.timer = VO.meter = VO.flush = 0;
+  Object.keys(VO.peers).forEach(function (k) { voiceDrop(+k); });
+  if (VO.stream) VO.stream.getTracks().forEach(function (t) { t.stop(); });
+  if (VO.ctx) { try { VO.ctx.close(); } catch (e) { /* already closed */ } }
+  VO.on = false; VO.sid = 0; VO.place = null; VO.stream = null; VO.ctx = null; VO.mine = null; VO.out = []; VO.busy = 0; VO.talk = {}; VO.talkSig = ''; VO.muted = false;
+}
+/* Leave voice. `tell` is false when the server is the one that said so. */
+function voiceStop(tell) {
+  if (!VO.on && !VO.joining) return;
+  if (VO.on && tell) voicePost({voice:'leave',sid:VO.sid}).catch(function () { /* the server notices within 15 seconds anyway */ });
+  VO.joining = false; VO.asked++; voiceQuiet(); renderInside(); renderSide(); draw();
+}
+/* Queue a note for somebody, and send it within a fifth of a second instead of at the next beat:
+   that is what makes a line come up in about two seconds, not five. */
+function voiceOut(to, kind, body) {
+  VO.out.push({to:to,kind:kind,body:JSON.stringify(body)});
+  if (!VO.flush) VO.flush = setTimeout(function () { VO.flush = 0; voiceBeat(); },200);
+}
+/* The once-a-second request. It keeps running while the window is hidden: a call goes on when
+   somebody switches to another tab, and browsers do not slow a page that holds a live call. */
+function voiceBeat() {
+  if (!VO.on) return;
+  /* One at a time; but a request that never comes back must not stop the beat for good. */
+  if (VO.busy && Date.now()-VO.busy < 8000) return;
+  var out = VO.out, sid = VO.sid; VO.out = []; VO.busy = Date.now();
+  var missed = function () { VO.busy = 0; VO.out = out.concat(VO.out).slice(-40);
+    if (++VO.misses >= 20) { voiceStop(false); toast('Voice lost touch with Anima, so you left the voice chat. Check your connection, then press Join voice again.'); } };
+  voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,out:JSON.stringify(out)}).then(function (j) {
+    if (!VO.on || VO.sid!==sid) return;
+    if (!j || !j.ok || !j.voice) { missed(); return; }
+    VO.busy = 0; VO.misses = 0; voiceTake(j);
+    if (VO.on && VO.out.length) voiceBeat();
+  }).catch(function () { if (VO.on && VO.sid===sid) missed(); });
+}
+/* What the server answered: am I still in, who else is, and the notes for me. The list is read
+   BEFORE the notes, so a line to somebody who rejoined is taken down before their new offer lands. */
+function voiceTake(j) {
+  var v = j.voice;
+  if (!v.in) { voiceStop(false); if (v.why) toast(v.why); return; }
+  var idx = {};
+  (v.people||[]).forEach(function (r) { idx[r.id] = r; });
+  Object.keys(VO.peers).forEach(function (k) { if (!idx[k]) voiceDrop(+k); });
+  Object.keys(VO.seen).forEach(function (k) { if (!idx[k]) { delete VO.seen[k]; delete VO.tries[k]; delete VO.dead[k]; } });
+  (v.people||[]).forEach(function (r) {
+    if (r.id===ST.me) return;
+    var P = VO.peers[r.id];
+    if (P && P.sid!==r.sid) { voiceDrop(r.id); P = null; }
+    if (VO.seen[r.id]!==r.sid) { VO.seen[r.id] = r.sid; VO.tries[r.id] = 0; delete VO.dead[r.id]; }
+    if (!P && ST.me < r.id && !VO.dead[r.id]) voiceCall(r);
+  });
+  takeVoiceRoom(v.people||[]);
+  (v.signals||[]).forEach(voiceSignal);
+}
+/* A line to one person. Whether sound can flow is watched here: a line that fails, or that drops
+   and does not come back in six seconds, or that never comes up in twenty, is taken down. */
+function voicePeer(id, sid, cid) {
+  var pc = new RTCPeerConnection({iceServers:(ST.voice && ST.voice.ice)||[]});
+  var P = {id:id,sid:sid,cid:cid,pc:pc,pend:[],set:false,ok:false,el:null,src:null,an:null,buf:null,wait:0};
+  VO.peers[id] = P;
+  VO.stream.getTracks().forEach(function (t) { pc.addTrack(t,VO.stream); });
+  pc.onicecandidate = function (e) { if (e.candidate && VO.peers[id]===P) voiceOut(id,'ice',{c:cid,d:e.candidate}); };
+  pc.ontrack = function (e) { if (VO.peers[id]===P) voiceHear(P,(e.streams && e.streams[0]) || new MediaStream([e.track])); };
+  var watch = function () {
+    if (VO.peers[id]!==P) return;
+    var s = pc.connectionState || pc.iceConnectionState;
+    if (s==='connected' || s==='completed') { clearTimeout(P.wait); P.wait = 0; if (!P.ok) { P.ok = true; VO.tries[id] = 0; renderInside(); } }
+    else if (s==='failed') voiceFail(P);
+    else if (s==='disconnected' && P.ok) { P.ok = false; renderInside(); clearTimeout(P.wait); P.wait = setTimeout(function () { voiceFail(P); },6000); }
+  };
+  pc.onconnectionstatechange = watch; pc.oniceconnectionstatechange = watch;
+  P.wait = setTimeout(function () { voiceFail(P); },20000);
+  renderInside();
+  return P;
+}
+/* I have the smaller id, so I make the offer. */
+function voiceCall(r) {
+  var P = voicePeer(r.id,r.sid,ST.me+'.'+(++VO.cid)+'.'+Date.now());
+  P.pc.createOffer().then(function (o) { return P.pc.setLocalDescription(o); })
+    .then(function () { if (VO.peers[r.id]===P) voiceOut(r.id,'offer',{c:P.cid,d:P.pc.localDescription.sdp}); })
+    .catch(function () { voiceFail(P); });
+}
+function voicePend(P) { P.pend.forEach(function (d) { P.pc.addIceCandidate(d).catch(function () { /* one address fewer */ }); }); P.pend = []; }
+/* A note from somebody in the room. The server has already checked they are in voice here. */
+function voiceSignal(s) {
+  var b; try { b = JSON.parse(s.body); } catch (e) { return; }
+  if (!b || !b.c || !VO.on) return;
+  var P = VO.peers[s.from];
+  if (s.kind==='offer') {
+    /* Offers only ever come from the smaller id (see WHO CALLS WHOM); anything else is ignored. */
+    if (s.from > ST.me || typeof b.d!=='string') return;
+    if (P) voiceDrop(s.from);
+    delete VO.dead[s.from];
+    P = voicePeer(s.from,s.sid,b.c);
+    P.pc.setRemoteDescription({type:'offer',sdp:b.d}).then(function () { P.set = true; voicePend(P); return P.pc.createAnswer(); })
+      .then(function (a) { return P.pc.setLocalDescription(a); })
+      .then(function () { if (VO.peers[s.from]===P) voiceOut(s.from,'answer',{c:P.cid,d:P.pc.localDescription.sdp}); })
+      .catch(function () { voiceFail(P); });
+    return;
+  }
+  if (!P || P.cid!==b.c || P.sid!==s.sid) return;
+  if (s.kind==='answer') { if (P.set || typeof b.d!=='string') return; P.pc.setRemoteDescription({type:'answer',sdp:b.d}).then(function () { P.set = true; voicePend(P); }).catch(function () { voiceFail(P); }); }
+  else if (s.kind==='ice' && b.d) { if (P.set) P.pc.addIceCandidate(b.d).catch(function () { /* one address fewer */ }); else P.pend.push(b.d); }
+}
+/* Their voice arrived. It plays through a hidden player (a browser stays silent otherwise), and a
+   meter listens to it for the speaking mark. */
+function voiceHear(P, stream) {
+  if (!P.el) { P.el = document.createElement('audio'); P.el.autoplay = true; }
+  P.el.srcObject = stream;
+  var pr = P.el.play();
+  if (pr && pr.catch) pr.catch(function () { if (!VO.blocked) { VO.blocked = true; toast('Click anywhere on the page to hear the others.'); } });
+  if (VO.ctx && !P.an) { try { P.src = VO.ctx.createMediaStreamSource(stream); P.an = VO.ctx.createAnalyser(); P.an.fftSize = 512; P.src.connect(P.an); } catch (e) { P.an = null; } }
+}
+function voiceDrop(id) {
+  var P = VO.peers[id]; if (!P) return;
+  delete VO.peers[id]; delete VO.talk[id]; clearTimeout(P.wait);
+  P.pc.onicecandidate = P.pc.ontrack = P.pc.onconnectionstatechange = P.pc.oniceconnectionstatechange = null;
+  try { P.pc.close(); } catch (e) { /* already closed */ }
+  if (P.el) { try { P.el.pause(); } catch (e) { /* nothing was playing */ } P.el.srcObject = null; }
+  if (P.src) { try { P.src.disconnect(); } catch (e) { /* the sound engine is already shut */ } }
+}
+/* A line could not be made or was lost. The first time it is simply made again (by whoever has the
+   smaller id, at the next beat); the second time the screen says so and stops trying, until one of
+   the two leaves voice and joins again. */
+function voiceFail(P) {
+  if (VO.peers[P.id]!==P) return;
+  var id = P.id, who = person(id), n = VO.tries[id] = (VO.tries[id]||0)+1;
+  voiceDrop(id);
+  if (n >= 2 && !VO.dead[id]) { VO.dead[id] = true;
+    toast('Your voice could not connect with '+(who?firstName(who.name):'somebody')+'. One of you is probably on a network that blocks direct calls. Try another network, or use a video call.'); }
+  renderInside();
+}
+/* The meters: my own microphone and each voice that arrives, for the speaking mark only. Nothing is
+   recorded and nothing is sent anywhere. */
+function voiceEars() {
+  var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  try { VO.ctx = new AC(); if (VO.ctx.state==='suspended') VO.ctx.resume();
+    var src = VO.ctx.createMediaStreamSource(VO.stream), an = VO.ctx.createAnalyser(); an.fftSize = 512; src.connect(an); VO.mine = {src:src,an:an,buf:null};
+  } catch (e) { VO.ctx = null; VO.mine = null; }
+}
+function voiceLoud(m) {
+  if (!m || !m.an) return 0;
+  if (!m.buf) m.buf = new Uint8Array(m.an.fftSize);
+  m.an.getByteTimeDomainData(m.buf);
+  for (var i = 0, t = 0; i < m.buf.length; i++) { var d = (m.buf[i]-128)/128; t += d*d; }
+  return Math.sqrt(t/m.buf.length);
+}
+function voiceMeter() {
+  if (!VO.on) return;
+  var now = Date.now(), sig = '';
+  if (!VO.muted && voiceLoud(VO.mine) > .02) VO.talk[ST.me] = now+450;
+  Object.keys(VO.peers).forEach(function (k) { if (voiceLoud(VO.peers[k]) > .02) VO.talk[k] = now+450; });
+  Object.keys(VO.talk).forEach(function (k) { if (VO.talk[k] > now) sig += k+','; });
+  if (sig!==VO.talkSig) { VO.talkSig = sig; draw(); }
+}
+function voiceMute() {
+  if (!VO.on) return;
+  VO.muted = !VO.muted;
+  VO.stream.getAudioTracks().forEach(function (t) { t.enabled = !VO.muted; });
+  if (VO.muted) delete VO.talk[ST.me];
+  renderInside(); draw();
+}
+/* A browser that refused to play sound until a click: this is the click. */
+function voiceWake() {
+  if (!VO.on) return;
+  if (VO.ctx && VO.ctx.state==='suspended') { try { VO.ctx.resume(); } catch (e) { /* the marks stay still, the voices still play */ } }
+  if (!VO.blocked) return; VO.blocked = false;
+  Object.keys(VO.peers).forEach(function (k) { var el = VO.peers[k].el; if (el) { var pr = el.play(); if (pr && pr.catch) pr.catch(function () { VO.blocked = true; }); } });
+}
+/* The voice part of the room's bar: Join voice, or Mute and Leave voice, and who is talking. */
+function voiceBar(o) {
+  if (!ST.voice) return '';
+  if (!ST.voice.ready) return '<span class="rvoice"><button type="button" class="rbtn rsmall" disabled>Join voice</button><small>Voice needs a database update first.</small></span>';
+  var others = voiceOthers(o.id), cap = ST.voice.cap||5, h = '<span class="rvoice">';
+  if (VO.on) {
+    var names = others.map(function (p) { var P = VO.peers[p.id]; return firstName(p.name)+(VO.dead[p.id]?' (could not connect)':(P && P.ok)?'':' (connecting…)'); });
+    h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In voice with '+names.join(', ')+'.' : 'In voice. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')+'</small>'
+      +'<button type="button" class="rbtn rsmall" data-voice="mute" aria-pressed="'+VO.muted+'">'+(VO.muted?'Unmute':'Mute')+'</button>'
+      +'<button type="button" class="rbtn rsmall" data-voice="leave">Leave voice</button>';
+  } else {
+    var full = others.length >= cap, who = others.map(function (p) { return firstName(p.name); });
+    h += (others.length ? '<small>'+esc(full ? 'The voice table is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in voice.')+'</small>' : '')
+      +'<button type="button" class="rbtn rsmall" data-voice="join"'+((VO.joining||full)?' disabled':'')+'>'+(VO.joining?'Joining…':'Join voice')+'</button>';
+  }
+  return h+'</span>';
+}
+/* The mark on a character who is in voice, in the room's own units: a small microphone beside the
+   head, struck through in red while muted, and green with a ring at the feet while they speak. */
+function voiceMark(c, x, y, talking, muted, f) {
+  var bx = x-20, by = y-46, col = muted ? PAL.smoke : talking ? TINT.spell : PAL.hot, i;
+  if (talking) { c.fillStyle = TINT.spell; c.fillRect(x-12,y+1,24,2); c.fillRect(x-12,y-1,2,2); c.fillRect(x+10,y-1,2,2);
+    c.fillRect(bx-2,by+2,1,5); if (f%2) c.fillRect(bx-4,by+1,1,7); }
+  c.fillStyle = PAL.out; c.fillRect(bx,by,9,9); c.fillStyle = PAL.veil; c.fillRect(bx+1,by+1,7,7);
+  c.fillStyle = col; c.fillRect(bx+3,by+1,3,4); c.fillRect(bx+2,by+4,1,2); c.fillRect(bx+6,by+4,1,2); c.fillRect(bx+2,by+6,5,1); c.fillRect(bx+4,by+7,1,1);
+  if (muted) { c.fillStyle = TINT.ember; for (i = 0; i < 7; i++) c.fillRect(bx+1+i,by+7-i,1,1); }
+}
+/* Closing the page hangs up at once instead of after the server's 15 seconds. */
+window.addEventListener('pagehide',function () {
+  if (!VO.on) return;
+  try { var b = new URLSearchParams(); b.append('voice','leave'); b.append('sid',VO.sid); if (navigator.sendBeacon) navigator.sendBeacon(R.api,b); } catch (e) { /* the server notices by itself */ }
+  voiceQuiet();
+});
 
 /* ---------- start ---------- */
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });

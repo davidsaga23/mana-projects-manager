@@ -21,6 +21,7 @@
 // POST arrive=<place>&inside=0|1
 // POST knock=<owner's user id>            knock on an ajar door you are standing at
 // POST answer_knock=<knock id>&let=0|1    answer a knock on your own door
+// POST voice=join|poll|leave              voice in the room you are inside (further down)
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -114,7 +115,54 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
     exit;
 }
 
-// ---- a house's room, and the portrait in it (David, 2026-11-12, migration 085) --
+// ---- voice (David, 2026-11-12, migration 085) --------------------------------
+// POST voice=join&place=<room>            join the voice chat of the room I am inside
+// POST voice=poll&sid=<n>&muted=0|1&out=<JSON>
+//                                         once a second while in voice: I am still
+//                                         here, deliver these signals, give me mine
+// POST voice=leave&sid=<n>                leave it
+//
+// The sound itself never comes here: it goes from browser to browser. These
+// requests only keep the list of who is talking and pass the set-up notes
+// along; the rules are in includes/realm_voice.php.
+//
+// ⚠ ONE FIELD, `voice`, is what artist_may_post() names. Everything is about the
+// asker's own account; the one id that can be sent is a signal's recipient, and
+// realm_voice_poll() only delivers to somebody who is in voice in the same room.
+//
+// Answered here, apart from the map: it is asked every second by the few people
+// who are talking and must stay as light as it can be.
+if (isset($_POST['voice'])) {
+    $what = (string)$_POST['voice'];
+    $sid  = (int)($_POST['sid'] ?? 0);
+    $none = ['in' => false, 'why' => '', 'people' => [], 'signals' => []];
+    try {
+        if ($what === 'join') {
+            $joined = realm_voice_join($pdo, $uid, (string)($_POST['place'] ?? ''));
+            if ($joined['why'] !== '') {
+                echo json_encode(['ok' => true, 'voice' => $none, 'error' => $joined['why']]);
+                exit;
+            }
+            $sid = (int)$joined['sid'];
+            $answer = realm_voice_poll($pdo, $uid, $sid, false, []);
+            $answer['sid'] = $sid;
+        } elseif ($what === 'leave') {
+            realm_voice_leave($pdo, $uid, $sid);
+            $answer = $none;
+        } elseif ($what === 'poll') {
+            $out = json_decode((string)($_POST['out'] ?? '[]'), true);
+            $answer = realm_voice_poll($pdo, $uid, $sid, (string)($_POST['muted'] ?? '0') === '1', is_array($out) ? $out : []);
+        } else {
+            $answer = $none;
+        }
+        echo json_encode(['ok' => true, 'voice' => $answer]);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Voice could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+
+// ---- a house's room, and the portrait in it (David, 2026-11-12, migration 086) --
 // GET  room=<owner's user id>        that person's room, to draw it
 // POST save_room=<the room as JSON>  the asker's OWN room, after decorating
 // GET  profile=<owner's user id>     the profile behind the portrait
@@ -183,7 +231,7 @@ $mayAnnounce = can_edit();
 // seconds instead; it is one small query and touches nothing.
 if (isset($_GET['unread'])) {
     echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : [],
-                      'knocks' => realm_knock_news($pdo, $uid)]);
+                      'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid)]);
     exit;
 }
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
@@ -228,7 +276,8 @@ if ($channel !== '') {
             }
         }
         $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
-                   'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid)];
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid),
+                   'voice' => realm_voice_here($pdo, $uid)];
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {

@@ -1,5 +1,5 @@
 <?php
-// The Realm: the inside of a person's house, and what hangs in it (migration 085).
+// The Realm: the inside of a person's house, and what hangs in it (migration 086).
 //
 // David, 2026-11-12, in the "My house" thread: "let's start with decorate my
 // office. Let's all start with the same basic look and they can modify it from a
@@ -76,7 +76,7 @@ const REALM_ROOM_STYLES = [
 /** The most things one room may hold. Far more than fit; it only stops a made-up request. */
 const REALM_ROOM_MOST = 30;
 
-/** Has migration 085 run? Until it has, every room is the starting room. */
+/** Has migration 086 run? Until it has, every room is the starting room. */
 function realm_rooms_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;

@@ -1,4 +1,4 @@
--- 085 — The Realm: how each person has decorated the inside of their house.
+-- 086 — The Realm: how each person has decorated the inside of their house.
 --
 -- David, 2026-11-12, in the "My house" thread: "let's start with decorate my
 -- office. Let's all start with the same basic look and they can modify it from a
