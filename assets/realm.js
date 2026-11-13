@@ -9,9 +9,10 @@
    the canvas carries only the labels and the click areas. All the art is drawn by this code and is our
    own; the studio's artists can replace any of it later.
 
-   WHAT OTHER PEOPLE SEE OF YOU. Only where you ARRIVED ("let's start only where they have arrived"):
-   walking is yours alone and nothing is sent until you stop at a building or go inside. That keeps the
-   load on the shared hosting to one small request per person every 25 seconds.
+   WHAT OTHER PEOPLE SEE OF YOU. At first only where you ARRIVED ("let's start only where they have
+   arrived", 2026-11-12). Since 2026-11-13 they see you WALK, on the map and inside a room ("let's
+   make see other people walk a feature across the board"): see "seeing each other walk" below, which
+   also says what it costs the shared hosting and how that is kept small.
 
    A CHARACTER ON THE MAP MEANS THAT PERSON IS HERE NOW. Resting (dimmed, with a Z) after 25 minutes
    without touching the page; away (dark house, no character) once the page is closed. */
@@ -711,14 +712,14 @@ function roomNear(o) {
 }
 /* I have just come in: stand at the door. */
 function roomCome() {
-  RM.x = DOORWAY.come[0]; RM.y = DOORWAY.come[1]; RM.walk = null; RM.near = null; RM.leaving = false; held.clear(); roomSettle();
+  RM.x = DOORWAY.come[0]; RM.y = DOORWAY.come[1]; RM.walk = null; RM.near = null; RM.leaving = false; held.clear(); roomSettle(); spotSpace();
   /* Said once on each computer, since nothing on the screen says a room can be walked in. */
   try { if (!localStorage.getItem('realmWalkTip')) { localStorage.setItem('realmWalkTip','1'); toast('You can walk around in here. Use the arrow keys, or click the floor. Walk onto the light at the bottom to leave.'); } } catch (e) { /* A private window may refuse; then it is simply not said. */ }
 }
 /* After every step: the door leaves the room, and the thing I am next to lights up. True when I left. */
 function roomMoved() {
   if (RM.y >= DOORWAY.out) { RM.walk = null; leave(); return true; }
-  RM.near = roomNear(B[S.inside]);
+  RM.near = roomNear(B[S.inside]); spotDirty();
   return false;
 }
 function roomWalk(to) {
@@ -762,8 +763,111 @@ function roomPeople(o) {
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && list.indexOf(p) < 0) list.push(p); });
   return list.slice(0,SEATS.length-1);
 }
-/* Where one of them stands. */
-function standOf(p, i) { return {x:SEATS[i+1][0],y:SEATS[i+1][1]}; }
+/* Where one of them stands: the spot they walked to, if they have walked since they came in. If
+   not, they are still by the door, side by side so that nobody hides anybody. Before migration 087
+   nothing is known, and everybody takes the old seats. */
+function standOf(p, i) {
+  var sp = SP.ready ? SP.at[p.id] : null, n = i+1;
+  if (sp) return {x:sp[0],y:sp[1]};
+  if (SP.ready) return {x:DOORWAY.come[0]+(n%2?-1:1)*Math.ceil(n/2)*22,y:DOORWAY.come[1]};
+  return {x:SEATS[n][0],y:SEATS[n][1]};
+}
+
+/* ---------- seeing each other walk (David, 2026-11-13, migration 087) ----------
+   Asked whether the others in a room should see you walk: "Yes". Then: "let's make see other people
+   walk a feature across the board", so it is the same on the village map.
+
+   SENDING. My page sends the spot I stand on (POST stand) when I stop, and at most once every 2
+   seconds while I am on the way. Standing still sends nothing at all.
+
+   RECEIVING costs no request of its own. Where the others stand comes back with what this page asks
+   anyway: the unread counts, an open conversation, the voice beat, the heartbeat, and my own `stand`.
+   The one change: the unread counts are asked every 3 seconds instead of every 8 while I share a
+   room with somebody, or for 15 seconds after anybody I can see has moved. A quiet village asks
+   exactly what it asked before.
+
+   SHOWING. A spot arrives a second or three late and in jumps, so nobody is drawn AT the spot: each
+   character walks from where this page last drew them to where they now are, round the furniture or
+   the houses, as my own does (glide). They are therefore a little behind, and never teleport.
+
+   A SPOT IS FOR SHOW. Nothing here or on the server uses one to decide what anybody may do; David
+   kept "in the same room" as the rule for praise, trades and voice the same day. */
+var SP = {ready:false,at:{},dirty:false,last:0,timer:0,sent:'',hot:0,sig:'',n:0};
+var OTH = {}, oraf = 0, olt = 0;
+/* What the server says about the people I can see: {at: the room I am in or '' for the map,
+   who: [[id, x, y, place], ...]}, x and y null for somebody who has not walked since arriving. Null
+   before migration 087; absent from an answer that does not carry it. */
+function takeSpots(sp) {
+  if (sp === undefined) return;
+  if (!sp || !sp.who) { SP.ready = false; return; }
+  SP.ready = true;
+  /* An answer that was on its way while I walked through a door is about the other side of it. */
+  if (sp.at !== (S.inside || '')) return;
+  var at = {}, sig = [], changed = false;
+  sp.who.forEach(function (r) {
+    var p = person(r[0]); if (!p || p.me) return;
+    at[p.id] = r[1] === null ? null : [+r[1],+r[2]]; sig.push(r.join(','));
+    /* Somebody the map still has elsewhere has just walked in, or out: this is the newer word. */
+    if (S.inside ? (p.place!==S.inside || !p.inside) : (!!r[3] && (p.inside || p.place!==r[3]))) { p.place = S.inside || r[3]; p.inside = !!S.inside; changed = true; }
+    if (p.state==='away') { p.state = 'online'; changed = true; }
+  });
+  SP.at = at; sig = sig.sort().join(';');
+  if (sig!==SP.sig) { SP.sig = sig; SP.hot = Date.now()+15000; }
+  if (changed) { renderSide(); renderInside(); }
+  draw();
+}
+/* Where to draw somebody whose spot is tx,ty in `space` ('map', or a room's id): on the way there
+   from wherever this page drew them last. */
+function glide(id, tx, ty, space) {
+  var o = OTH[id];
+  if (!o || o.space!==space || calm) o = OTH[id] = {x:tx,y:ty,tx:tx,ty:ty,path:null,i:0,v:0,space:space};
+  else if (o.tx!==tx || o.ty!==ty) {
+    var from = {x:o.x,y:o.y}, to = {x:tx,y:ty}, path = space==='map' ? route(from,to) : roomRoute(from,to,roomSolids(B[space])), len = 0, a = from, k;
+    if (!path || !path.length) path = [to];
+    /* Always end exactly where they are, even if this page thinks a table is there. */
+    k = path[path.length-1]; if (k.x!==tx || k.y!==ty) path.push(to);
+    for (k = 0; k < path.length; k++) { len += Math.hypot(path[k].x-a.x,path[k].y-a.y); a = path[k]; }
+    /* At a walk, or faster when they are far behind: nobody takes more than 4 seconds to catch up. */
+    o.tx = tx; o.ty = ty; o.path = path; o.i = 0; o.v = Math.max(space==='map'?230:ROOM_SPEED,len/4);
+    if (!oraf) { olt = 0; oraf = requestAnimationFrame(othTick); }
+  }
+  o.n = SP.n;
+  return o;
+}
+function othTick(ts) {
+  var dt = olt ? Math.min(.1,(ts-olt)/1000) : 0, any = false; olt = ts;
+  Object.keys(OTH).forEach(function (id) {
+    var o = OTH[id]; if (!o.path) return;
+    var st = o.v*dt;
+    while (st > 0 && o.i < o.path.length) { var p = o.path[o.i], dx = p.x-o.x, dy = p.y-o.y, d = Math.hypot(dx,dy);
+      if (d<=st) { o.x = p.x; o.y = p.y; st -= d; o.i++; } else { o.x += dx/d*st; o.y += dy/d*st; st = 0; } }
+    if (o.i >= o.path.length) o.path = null; else any = true;
+  });
+  draw();
+  oraf = any ? requestAnimationFrame(othTick) : 0;
+}
+/* I moved. The spot goes out by itself, at the pace described above. */
+function spotDirty() {
+  if (!SP.ready) return;
+  /* The first word of a walk goes a second in, not at the first step, which says next to nothing. */
+  if (!SP.dirty && Date.now()-SP.last > 2000) SP.last = Date.now()-1000;
+  SP.dirty = true;
+  if (!SP.timer) SP.timer = setTimeout(spotFlush,250);
+}
+function spotFlush() {
+  SP.timer = 0; if (!SP.dirty || !SP.ready) return;
+  var moving = S.inside ? (!!RM.walk || held.size > 0) : (!!S.walk || held.size > 0), wait = SP.last+(moving?2000:600)-Date.now();
+  if (wait > 0 || RM.leaving || S.enter!==null) { SP.timer = setTimeout(spotFlush,250); return; }
+  var x = Math.round(S.inside?RM.x:S.pos.x), y = Math.round(S.inside?RM.y:S.pos.y), key = (S.inside||'')+'|'+x+','+y, body = new URLSearchParams();
+  SP.dirty = false; SP.last = Date.now();
+  if (key===SP.sent) return;
+  SP.sent = key; body.append('stand',x+','+y);
+  fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) takeSpots(j.spots); })
+    .catch(function () { /* The next step sends a newer one. */ });
+}
+/* I went through a door: what I knew of the other side of it is no use on this one. */
+function spotSpace() { SP.at = {}; SP.sig = ''; SP.dirty = false; SP.sent = ''; }
 function drawRoom(c, cw, ch) {
   var o = B[S.inside]; if (!o) { placeHot(null); return; }
   var home = !!o.owner, deco = home && o.owner.me && DECO.on, lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : null);
@@ -783,7 +887,7 @@ function drawRoom(c, cw, ch) {
   /* The way out, wide enough to stand on. */
   c.fillStyle = PAL.glow; c.fillRect(106,150,28,8); c.fillStyle = PAL.hot; c.fillRect(110,155,20,3);
   var my = me()||{cloak:'mana',hat:'none',pet:'none'}, who = [], walking = !!RM.walk || held.size > 0;
-  roomPeople(o).forEach(function (p, i) { var at = standOf(p,i); who.push({p:p,x:Math.round(at.x),y:Math.round(at.y),bob:(f+i)%4===0?2:0}); });
+  roomPeople(o).forEach(function (p, i) { var at = standOf(p,i), gl = glide(p.id,at.x,at.y,o.id); who.push({p:p,x:Math.round(gl.x),y:Math.round(gl.y),bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+i)%4===0?2:0}); });
   who.push({p:my,x:Math.round(RM.x),y:Math.round(RM.y),bob:walking?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
   who.forEach(function (d) { order.push(d); });
   order.sort(function (a, b) { return (a.y-b.y) || ((a.p?1:0)-(b.p?1:0)); });
@@ -983,13 +1087,17 @@ function draw() {
   if (cv.width!==cw || cv.height!==ch) { cv.width = cw; cv.height = ch; }
   var c = cv.getContext('2d'), v = S.view, s = Math.max(cw/v.w,ch/v.h), ox = (cw-v.w*s)/2-v.x*s, oy = (ch-v.h*s)/2-v.y*s, f = S.frame, i;
   c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled = false; c.globalAlpha = 1; c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch);
+  SP.n++;
   if (S.inside) { drawRoom(c,cw,ch); }
   else {
     placeHot(null);
     c.setTransform(s,0,0,s,ox,oy); c.drawImage(GROUND,0,0);
     var x0 = -ox/s-130, x1 = (cw-ox)/s+130, y0 = -oy/s-20, y1 = (ch-oy)/s+170, list = [], w = whereabouts(), my = me()||{cloak:'mana',hat:'none',pet:'none'};
     [OBJ,HOUSES].forEach(function (a) { for (var k = 0; k < a.length; k++) if (a[k].x>x0&&a[k].x<x1&&a[k].y>y0&&a[k].y<y1) list.push(a[k]); });
-    w.out.forEach(function (q, n) { list.push({x:q.x,y:q.y,who:q.p,bob:(f+n)%4===0?2:0,idle:q.p.state==='idle'}); });
+    /* Each of the others is drawn on the way to their spot (glide), or to where the map stands
+       somebody who has not walked since arriving. */
+    w.out.forEach(function (q, n) { var sp = SP.ready ? SP.at[q.p.id] : null, gl = glide(q.p.id,sp?sp[0]:q.x,sp?sp[1]:q.y,'map');
+      list.push({x:Math.round(gl.x),y:Math.round(gl.y),who:q.p,bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+n)%4===0?2:0,idle:q.p.state==='idle'}); });
     var mx = Math.round(S.pos.x), myy = Math.round(S.pos.y), moving = S.walk||held.size, en = S.enter;
     list.push({x:mx,y:myy,who:my,bob:moving?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
     list.sort(function (a, b) { return a.y-b.y; });
@@ -1009,6 +1117,8 @@ function draw() {
     if (!en) { var ay = myy-70-(f%2)*2; c.fillStyle = PAL.out; c.fillRect(mx-6,ay-1,12,5); c.fillRect(mx-4,ay+4,8,3); c.fillRect(mx-2,ay+7,4,2);
       c.fillStyle = PAL.win; c.fillRect(mx-5,ay,10,3); c.fillRect(mx-3,ay+3,6,2); c.fillRect(mx-1,ay+5,2,2); }
   }
+  /* Whoever was not drawn this time has left what I can see; if they come back they are simply there. */
+  Object.keys(OTH).forEach(function (id) { if (OTH[id].n!==SP.n) delete OTH[id]; });
   if (S.fade > 0) { c.setTransform(1,0,0,1,0,0); c.globalAlpha = Math.min(1,S.fade); c.fillStyle = PAL.ground; c.fillRect(0,0,cw,ch); c.globalAlpha = 1; }
 }
 
@@ -1116,12 +1226,13 @@ function applyState(st) {
   if (land!==SIG.land) { SIG.land = land; buildWorld(); }
   if (house!==SIG.house) { SIG.house = house; buildHouses(); }
   if (S.sel && !B[S.sel]) S.sel = null;
-  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { voiceStop(true); S.inside = null; RM.walk = null; var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
+  if (S.inside && (!B[S.inside] || mayEnter(S.inside))) { voiceStop(true); S.inside = null; RM.walk = null; spotSpace(); var s = spot(S.here)||S.pos; S.pos = {x:s.x,y:s.y}; toast('The door closed, so you are back outside.'); send({arrive:S.here||('user:'+ST.me),inside:0}); }
   renderAll();
   /* Standing in somebody else's house: ask for their room again, so a change of theirs shows. */
   if (S.inside && B[S.inside] && B[S.inside].owner && !B[S.inside].owner.me) roomAsk(B[S.inside].owner.id);
   if (fresh) takeUnread(fresh);
   takeKnocks(st.knocks);
+  takeSpots(st.spots);
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -1152,7 +1263,7 @@ function route(from, to) {
 }
 var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* I stopped at a building: now, and only now, the others are told where I am. */
-function arrived(id) { S.walk = null; var s = spot(id); S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderCard(); renderSide(); draw(); send({arrive:id,inside:0}); }
+function arrived(id) { S.walk = null; SP.dirty = false; var s = spot(id); S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderCard(); renderSide(); draw(); send({arrive:id,inside:0}); }
 function walkTo(id) {
   var t = spot(id); if (!t) return;
   var path = calm ? null : route(S.pos,t);
@@ -1166,7 +1277,7 @@ function tick(ts) {
   while (st > 0 && w.i < w.path.length) { var p = w.path[w.i], dx = p.x-S.pos.x, dy = p.y-S.pos.y, d = Math.hypot(dx,dy);
     if (d<=st) { S.pos = {x:p.x,y:p.y}; st -= d; w.i++; } else { S.pos = {x:S.pos.x+dx/d*st,y:S.pos.y+dy/d*st}; st = 0; } }
   if (w.i >= w.path.length) { S.raf = 0; arrived(w.id); return; }
-  follow(); draw(); S.raf = requestAnimationFrame(tick);
+  spotDirty(); follow(); draw(); S.raf = requestAnimationFrame(tick);
 }
 function teleport(id) { if (!spot(id)) return; arrived(id); }
 /* A short animation driven by the clock: fn gets 0..1, done runs at the end. */
@@ -1189,7 +1300,7 @@ function leave() {
   /* Voice is face to face: walking out of the room hangs up. */
   voiceStop(true);
   play(220,function (k) { S.fade = k; },function () {
-    S.inside = null; RM.leaving = false; var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
+    S.inside = null; RM.leaving = false; spotSpace(); var s = spot(id)||S.pos; S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = id; renderInside(); renderSide(); renderCard();
     play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
     send({arrive:id,inside:0});
   });
@@ -1214,7 +1325,7 @@ function keyTick(ts) {
   if (S.inside) { if (dx || dy) roomStep(dx,dy,dt); kraf = requestAnimationFrame(keyTick); return; }
   if (dx || dy) { var n = Math.hypot(dx,dy), st = 230*dt, nx = Math.max(20,Math.min(1580,S.pos.x+dx/n*st)), ny = Math.max(40,Math.min(990,S.pos.y+dy/n*st)), stuck = !canStand(S.pos.x,S.pos.y);
     S.pos = (stuck||canStand(nx,ny))?{x:nx,y:ny}:canStand(nx,S.pos.y)?{x:nx,y:S.pos.y}:canStand(S.pos.x,ny)?{x:S.pos.x,y:ny}:S.pos;
-    follow(); draw();
+    spotDirty(); follow(); draw();
     var at = nearest(); if (at!==S.here) { S.here = at; S.sel = at; renderCard(); renderSide(); if (at) send({arrive:at,inside:0}); } }
   kraf = requestAnimationFrame(keyTick);
 }
@@ -1350,7 +1461,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -1432,6 +1543,7 @@ function chatTake(j) {
   takeKnocks(j.knocks);
   /* While I am in voice my own once-a-second request brings a fresher list than this one. */
   if (!VO.on) takeVoiceRoom(j.voice);
+  takeSpots(j.spots);
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
@@ -1909,7 +2021,7 @@ function voiceBeat() {
   voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,out:JSON.stringify(out)}).then(function (j) {
     if (!VO.on || VO.sid!==sid) return;
     if (!j || !j.ok || !j.voice) { missed(); return; }
-    VO.busy = 0; VO.misses = 0; voiceTake(j);
+    VO.busy = 0; VO.misses = 0; voiceTake(j); if (VO.on) takeSpots(j.spots);
     if (VO.on && VO.out.length) voiceBeat();
   }).catch(function () { if (VO.on && VO.sid===sid) missed(); });
 }
@@ -2091,8 +2203,16 @@ applyState(ST);
    everybody else is. `active` is whether I touched the page since the last one. */
 setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); },25000);
 /* With no conversation open, ask for unread counts every 8 seconds. An open conversation already
-   brings them every 3. Not asked while the window is hidden. */
-setInterval(askUnread,8000);
+   brings them every 3. Not asked while the window is hidden.
+   The same answer says where the people I can see are standing (takeSpots), so it is asked every 3
+   seconds instead while that is worth watching: I share a room with somebody, or somebody I can
+   see has moved in the last 15 seconds. Voice brings its own every second, and then this waits. */
+var beatN = 0;
+setInterval(function () {
+  beatN++;
+  var watch = SP.ready && !VO.on && ((S.inside && B[S.inside] && roomPeople(B[S.inside]).length > 0) || Date.now() < SP.hot);
+  if (beatN%(watch?3:8)===0) askUnread();
+},1000);
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */

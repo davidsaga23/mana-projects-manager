@@ -22,6 +22,7 @@
 // POST knock=<owner's user id>            knock on an ajar door you are standing at
 // POST answer_knock=<knock id>&let=0|1    answer a knock on your own door
 // POST voice=join|poll|leave              voice in the room you are inside (further down)
+// POST stand=<x>,<y>                      the spot my character is standing on (further down)
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -155,10 +156,35 @@ if (isset($_POST['voice'])) {
         } else {
             $answer = $none;
         }
-        echo json_encode(['ok' => true, 'voice' => $answer]);
+        $reply = ['ok' => true, 'voice' => $answer];
+        // Where the others in the room stand rides on the beat (migration 087),
+        // so people who are talking see each other walk without a second request.
+        if ($what === 'poll') $reply['spots'] = realm_spots($pdo, $uid);
+        echo json_encode($reply);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'Voice could not be reached. Try again in a moment.']);
     }
+    exit;
+}
+
+// ---- where my character stands (David, 2026-11-13, migration 087) ------------
+// POST stand=<x>,<y>     two whole numbers, in the room's units or the map's
+//
+// "Let's make see other people walk a feature across the board." The walker's
+// page sends this when they stop, and at most every 2 seconds on the way.
+//
+// ⚠ THE ASKER'S OWN ROW, and a spot grants nothing: realm_stand() holds it to
+// the floor of the room they are really inside (or to the map), and nothing in
+// Anima reads it to decide what somebody may do. `stand` is in artist_may_post().
+//
+// Answered here, apart from the map, with only where the others stand: it is
+// sent often and has no use for the rest.
+if (isset($_POST['stand'])) {
+    $xy = explode(',', (string)$_POST['stand']);
+    if (count($xy) === 2 && is_numeric($xy[0]) && is_numeric($xy[1])) {
+        realm_stand($pdo, $uid, (int)round((float)$xy[0]), (int)round((float)$xy[1]));
+    }
+    echo json_encode(['ok' => true, 'spots' => realm_spots($pdo, $uid)]);
     exit;
 }
 
@@ -231,7 +257,8 @@ $mayAnnounce = can_edit();
 // seconds instead; it is one small query and touches nothing.
 if (isset($_GET['unread'])) {
     echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : [],
-                      'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid)]);
+                      'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
+                      'spots' => realm_spots($pdo, $uid)]);
     exit;
 }
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
@@ -277,7 +304,7 @@ if ($channel !== '') {
         }
         $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid),
-                   'voice' => realm_voice_here($pdo, $uid)];
+                   'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid)];
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {

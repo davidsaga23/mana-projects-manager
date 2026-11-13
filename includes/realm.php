@@ -19,6 +19,10 @@
 //     closed.
 //   * OTHERS SEE WHERE YOU ARRIVED, never the walk ("Let's start only where they
 //     have arrived"). So the only thing stored about movement is `place`.
+//     CHANGED BY DAVID ON 2026-11-13: "let's make see other people walk a feature
+//     across the board". Since migration 087 the spot a character is standing on
+//     is stored too (`spot_x`, `spot_y`), see "where a character stands" below.
+//     `place` and `inside` still decide everything that is ALLOWED.
 //   * THREE DOORS: open (walk in), ajar (knock, which arrives with voice),
 //     sealed (leave them be).
 //
@@ -80,7 +84,7 @@ function realm_enter(PDO $pdo, int $uid): void {
     try {
         $pdo->prepare('INSERT IGNORE INTO realm_people (user_id, house_kind, cloak, created_at) VALUES (?, ?, ?, NOW())')
             ->execute([$uid, REALM_KINDS[$uid % count(REALM_KINDS)], REALM_CLOAKS[$uid % count(REALM_CLOAKS)]]);
-        $pdo->prepare('UPDATE realm_people SET place = ?, inside = 0, last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
+        $pdo->prepare('UPDATE realm_people SET place = ?, inside = 0,' . realm_spot_reset($pdo) . ' last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
             ->execute(['user:' . $uid, $uid]);
 
         $q = $pdo->prepare('SELECT house_slot FROM realm_people WHERE user_id = ?');
@@ -232,9 +236,118 @@ function realm_arrive(PDO $pdo, int $uid, string $place, bool $inside): string {
     } else {
         return 'That is not a place in the Realm.';
     }
-    $pdo->prepare('UPDATE realm_people SET place = ?, inside = ?, last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
+    // Arriving forgets the spot: at a building you stand where the map puts
+    // you, and in a room you come in at the door, until you walk again.
+    $pdo->prepare('UPDATE realm_people SET place = ?, inside = ?,' . realm_spot_reset($pdo) . ' last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
         ->execute([$place, $inside ? 1 : 0, $uid]);
     return '';
+}
+
+// ---- where a character stands (migration 087) ---------------------------------
+// David, 2026-11-13: "let's also have the option for the avatars to move freely
+// inside each house", and then, asked whether the others should see it: "Yes",
+// and "let's make see other people walk a feature across the board". So it is
+// stored for the village map as well as for the rooms.
+//
+// One spot per person, in the units of wherever they are: the room's own
+// (240 by 160) while `inside` is 1, the map's (1600 by 1000) while it is 0.
+// NULL means "has not walked since arriving", and the screen then stands them
+// where it always did.
+//
+// ⚠ A SPOT IS FOR SHOW AND GRANTS NOTHING. Knocking, going inside, voice and
+// whatever comes later (praise, trades) are decided by `place` and `inside`
+// alone, as before; David kept "in the same room" as the rule that day. So a
+// made-up spot can only draw the sender's own character somewhere odd, and it
+// is still held to the floor of the room or the edges of the map.
+//
+// ⚠ THE LOAD, which is why David's first answer (2026-11-12) was "only where
+// they have arrived". The hosting cannot hold a connection open, so a spot is
+// sent by the walker (when they stop, and at most every 2 seconds on the way,
+// assets/realm.js) and read by the others on requests they ALREADY make: the
+// unread counts, an open conversation, the voice beat, the heartbeat. Nothing
+// here adds a request of its own for reading.
+
+/** The floor of a room and the walkable edges of the map. Must match FLOOR and keyTick() in assets/realm.js. */
+const REALM_ROOM_FLOOR = [18, 222, 58, 148];
+const REALM_MAP_EDGES  = [20, 1580, 40, 990];
+
+/** Has migration 087 arrived? Asked once per request; never throws. */
+function realm_spots_ready(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $pdo->query('SELECT spot_x, spot_y FROM realm_people LIMIT 1');
+        return $ok = true;
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/** The piece of an UPDATE that forgets the spot; empty until migration 087 has run. */
+function realm_spot_reset(PDO $pdo): string {
+    return realm_spots_ready($pdo) ? ' spot_x = NULL, spot_y = NULL,' : '';
+}
+
+/**
+ * The asker is standing at $x,$y. Their OWN row only, and only a spot that is
+ * on the floor of a room (when they are inside one) or within the map (when
+ * they are not): the row itself says which, in the WHERE. Anything else is
+ * dropped without a word, since a spot is never worth an error on the screen.
+ */
+function realm_stand(PDO $pdo, int $uid, int $x, int $y): void {
+    if (!realm_spots_ready($pdo)) return;
+    try {
+        [$rx0, $rx1, $ry0, $ry1] = REALM_ROOM_FLOOR;
+        [$mx0, $mx1, $my0, $my1] = REALM_MAP_EDGES;
+        $pdo->prepare('UPDATE realm_people SET spot_x = ?, spot_y = ?
+                        WHERE user_id = ?
+                          AND ((inside = 1 AND ? BETWEEN ? AND ? AND ? BETWEEN ? AND ?)
+                            OR (inside = 0 AND ? BETWEEN ? AND ? AND ? BETWEEN ? AND ?))')
+            ->execute([$x, $y, $uid, $x, $rx0, $rx1, $y, $ry0, $ry1, $x, $mx0, $mx1, $y, $my0, $my1]);
+    } catch (Throwable $e) {
+        // The next one corrects it.
+    }
+}
+
+/**
+ * Where the people the asker can SEE are standing:
+ *   at   the room the asker is inside, or '' when they are out on the map, so
+ *        the page can drop an answer that crossed with them going through a door
+ *   who  [[user id, x, y, place], ...]; x and y are null for somebody who has
+ *        not walked since they arrived
+ * Somebody inside a room sees the others in that same room; somebody out on the
+ * map sees the others out on the map. Only people whose page is open. `place`
+ * is sent so that somebody arriving at a building, or walking into the room, is
+ * seen within seconds rather than at the next 25-second heartbeat: it is what
+ * the map already shows everybody, only sooner.
+ * Null until migration 087 has run, so the screen knows to stand people where
+ * it always did. Never throws.
+ */
+function realm_spots(PDO $pdo, int $uid): ?array {
+    if (!realm_spots_ready($pdo)) return null;
+    $out = ['at' => '', 'who' => []];
+    try {
+        $q = $pdo->prepare('SELECT place, inside FROM realm_people WHERE user_id = ?');
+        $q->execute([$uid]);
+        $me = $q->fetch();
+        if (!$me) return $out;
+        $inside = (int)$me['inside'] === 1;
+        $out['at'] = $inside ? (string)$me['place'] : '';
+        $q = $pdo->prepare('SELECT user_id, spot_x, spot_y, place
+                              FROM realm_people
+                             WHERE user_id <> ? AND inside = ? AND (? = 0 OR place = ?)
+                               AND house_slot IS NOT NULL
+                               AND last_ping > DATE_SUB(NOW(), INTERVAL ' . REALM_ONLINE_SECONDS . ' SECOND)
+                          ORDER BY user_id');
+        $q->execute([$uid, $inside ? 1 : 0, $inside ? 1 : 0, (string)$me['place']]);
+        foreach ($q->fetchAll() as $r) {
+            $walked = $r['spot_x'] !== null && $r['spot_y'] !== null;
+            $out['who'][] = [(int)$r['user_id'], $walked ? (int)$r['spot_x'] : null, $walked ? (int)$r['spot_y'] : null, (string)$r['place']];
+        }
+    } catch (Throwable $e) {
+        // Nobody moves for a moment; the next answer corrects it.
+    }
+    return $out;
 }
 
 /**
@@ -299,6 +412,8 @@ function realm_state(PDO $pdo, int $uid): array {
     return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => realm_lands($pdo),
             'idle_minutes' => REALM_IDLE_MINUTES, 'slots' => REALM_SLOTS,
             'knocks' => realm_knock_news($pdo, $uid),
+            // Where the people I can see are standing (migration 087); null before it.
+            'spots' => realm_spots($pdo, $uid),
             // Voice: has migration 085 run, how many fit at a table, and the
             // address-lookup service the browsers ask (includes/realm_voice.php).
             'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice()]];
