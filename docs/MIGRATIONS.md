@@ -155,6 +155,7 @@ Applied status is "✅ applied" up to and including 046 (confirmed live), and "�
 | 088 | realm_share | ⏳ **The Realm: sharing a screen in a call** (`realm_voice` gains `sharing`, `share_since`). Until it runs calls work as before and there is no Share screen button. Run once; a second run stops with "Duplicate column name", which is harmless. |
 | 089 | commercial_crm | ⏳ **Commercial, the CRM** (`crm_leads`, `crm_contacts`, `crm_activities`, `crm_proposals`, `crm_quotes`, `crm_quote_items`). Until it runs, Commercial says it needs this update and shows nothing; the rest of Anima is untouched. |
 | 090 | realm_praise | ⏳ **The Realm: mana, gold and praise** (`realm_purse`, one row per person; `realm_praise`, one row per praise). Until it runs the Praise button does not appear and the chest says a database update is needed. |
+| 091 | realm_camp_things | ⏳ **The Realm: one decoration each in a show's camp** (`realm_camp_things`, one row per show and person). Until it runs every camp has its slaying bar, scroll, calendar and board, and Decorate says it needs a database update. *(090 is held by the open praise branch, so this took 091.)* |
 | 057 | progress_link | ⏳ **The Board's Link column** (`progress.link`) — a Replay or LucidLink address per task. The Board itself works without it; only that one column is switched off. |
 | 060 | notifications | ⏳ **The bell** beside your name (shares the number 060 with crew_absences; both run, they are recorded by filename). |
 | 061 | comment_files | ⏳ **Files on a Board comment.** |
