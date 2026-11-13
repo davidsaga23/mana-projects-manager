@@ -906,7 +906,10 @@ function drawRoom(c, cw, ch) {
   c.setTransform(s,0,0,s,ox,oy);
   /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
      drawn where that person stands, so it goes with them when they walk. */
-  who.forEach(function (d) { if (d.mine ? VO.on : d.p.voice) voiceMark(c,d.x,d.y,isTalking(d.mine?ST.me:d.p.id),d.mine?VO.muted:!!d.p.muted,f); });
+  var sw = shareWho();
+  who.forEach(function (d) { if (d.mine ? VO.on : d.p.voice) { voiceMark(c,d.x,d.y,isTalking(d.mine?ST.me:d.p.id),d.mine?VO.muted:!!d.p.muted,f);
+    /* A small screen on the other side of the head: this person is sharing theirs (shareMark). */
+    if (sw && sw===(d.mine?ST.me:d.p.id)) shareMark(c,d.x,d.y); } });
   if (deco) {
     if (DECO.sel >= 0 && lay.items[DECO.sel]) { var it = lay.items[DECO.sel], t = THINGS[it[0]], x0 = it[1]-3, y0 = it[2]-3, w = t.w+6, h = t.h+6;
       c.fillStyle = DECO.bad ? TINT.ember : TINT.mana; c.fillRect(x0,y0,w,1); c.fillRect(x0,y0+h-1,w,1); c.fillRect(x0,y0,1,h); c.fillRect(x0+w-1,y0,1,h); }
@@ -1205,11 +1208,13 @@ function renderCard() {
 }
 function renderInside() {
   var bar = $('insideBar'), box = $('mapbox'), o = B[S.inside];
-  box.classList.toggle('is-inside',!!o); bar.hidden = !o; if (!o) return;
+  box.classList.toggle('is-inside',!!o); bar.hidden = !o; if (!o) { shareShow(); return; }
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
   bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.':'')+'</span><span class="rgrow"></span>'+voiceBar(o)+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
+  /* The shared screen sits under this bar, however many lines the bar takes. */
+  shareShow();
 }
 function renderDoor() {
   var m = me(), seg = $('doorSeg'); if (!seg) return;
@@ -1397,6 +1402,9 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
   else if (t.closest('[data-close]')) { S.sel = null; renderCard(); renderSide(); }
   else if ((b = t.closest('[data-voice]'))) { var vw = b.getAttribute('data-voice'); if (vw==='join') voiceJoin(); else if (vw==='mute') voiceMute(); else voiceStop(true); }
+  else if ((b = t.closest('[data-share]'))) { var sa = b.getAttribute('data-share');
+    if (sa==='start') shareStart(); else if (sa==='stop') shareStop(); else if (sa==='full') shareFull();
+    else { SH.hide = sa==='hide'; renderInside(); } }
   else if (t.closest('[data-leave]')) leave();
   else if (t.closest('#chestBtn')) openGold();
   else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
@@ -1966,8 +1974,11 @@ function voiceOthers(id) { return ST.people.filter(function (p) { return !p.me &
    every few seconds with the unread counts and chat. The map's own copy is up to 25 seconds old. */
 function takeVoiceRoom(list) {
   if (!list || !S.inside) return;
-  var idx = {}, changed = false;
-  list.forEach(function (r) { idx[r.id] = r; });
+  var idx = {}, changed = false, sharer = 0;
+  list.forEach(function (r) { idx[r.id] = r; if (r.share) sharer = r.id; });
+  /* Who holds the screen (migration 088). A new sharer's screen is shown even to somebody who
+     had pressed "Back to the room" on the one before. */
+  if (sharer!==SH.who) { SH.who = sharer; SH.hide = false; changed = true; }
   ST.people.forEach(function (p) {
     if (p.me) return;
     var r = idx[p.id];
@@ -2012,6 +2023,8 @@ function voiceJoin() {
 }
 /* Let go of everything on this computer: the lines, the microphone, the timers. Tells nobody. */
 function voiceQuiet() {
+  /* A shared screen belongs to the call: leaving the call, by any road, ends it. */
+  shareQuiet();
   clearInterval(VO.timer); clearInterval(VO.meter); clearTimeout(VO.flush); VO.timer = VO.meter = VO.flush = 0;
   Object.keys(VO.peers).forEach(function (k) { voiceDrop(+k); });
   if (VO.stream) VO.stream.getTracks().forEach(function (t) { t.stop(); });
@@ -2036,19 +2049,20 @@ function voiceBeat() {
   if (!VO.on) return;
   /* One at a time; but a request that never comes back must not stop the beat for good. */
   if (VO.busy && Date.now()-VO.busy < 8000) return;
-  var out = VO.out, sid = VO.sid; VO.out = []; VO.busy = Date.now();
+  var out = VO.out, sid = VO.sid, sh = SH.want; VO.out = []; VO.busy = Date.now();
   var missed = function () { VO.busy = 0; VO.out = out.concat(VO.out).slice(-40);
     if (++VO.misses >= 20) { voiceStop(false); toast('The call lost touch with Anima, so you left it. Check your connection, then press Join call again.'); } };
-  voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,out:JSON.stringify(out)}).then(function (j) {
+  voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,share:sh?1:0,out:JSON.stringify(out)}).then(function (j) {
     if (!VO.on || VO.sid!==sid) return;
     if (!j || !j.ok || !j.voice) { missed(); return; }
-    VO.busy = 0; VO.misses = 0; voiceTake(j); if (VO.on) takeSpots(j.spots);
+    VO.busy = 0; VO.misses = 0; voiceTake(j,sh); if (VO.on) takeSpots(j.spots);
     if (VO.on && VO.out.length) voiceBeat();
   }).catch(function () { if (VO.on && VO.sid===sid) missed(); });
 }
 /* What the server answered: am I still in, who else is, and the notes for me. The list is read
-   BEFORE the notes, so a line to somebody who rejoined is taken down before their new offer lands. */
-function voiceTake(j) {
+   BEFORE the notes, so a line to somebody who rejoined is taken down before their new offer lands.
+   `asked` is true when the request this answers said "I am sharing my screen" (shareTake). */
+function voiceTake(j, asked) {
   var v = j.voice;
   if (!v.in) { voiceStop(false); if (v.why) toast(v.why); return; }
   var idx = {};
@@ -2063,6 +2077,7 @@ function voiceTake(j) {
     if (!P && ST.me < r.id && !VO.dead[r.id]) voiceCall(r);
   });
   takeVoiceRoom(v.people||[]);
+  shareTake(v.people||[],!!asked);
   (v.signals||[]).forEach(voiceSignal);
 }
 /* A line to one person. Whether sound can flow is watched here: a line that fails, or that drops
@@ -2098,6 +2113,8 @@ function voicePend(P) { P.pend.forEach(function (d) { P.pc.addIceCandidate(d).ca
 function voiceSignal(s) {
   var b; try { b = JSON.parse(s.body); } catch (e) { return; }
   if (!b || !b.c || !VO.on) return;
+  /* soffer, sanswer, sice: the notes for a shared screen's own line. */
+  if (String(s.kind).charAt(0)==='s') { shareSignal(s,b); return; }
   var P = VO.peers[s.from];
   if (s.kind==='offer') {
     /* Offers only ever come from the smaller id (see WHO CALLS WHOM); anything else is ignored. */
@@ -2187,12 +2204,22 @@ function voiceBar(o) {
   var others = voiceOthers(o.id), cap = ST.voice.cap||5, h = '<span class="rvoice">';
   if (VO.on) {
     var names = others.map(function (p) { var P = VO.peers[p.id]; return firstName(p.name)+(VO.dead[p.id]?' (could not connect)':(P && P.ok)?'':' (connecting…)'); });
-    h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In a call with '+names.join(', ')+'.' : 'In a call. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')+'</small>'
-      +'<button type="button" class="rbtn rsmall" data-voice="mute" aria-pressed="'+VO.muted+'">'+(VO.muted?'Unmute':'Mute')+'</button>'
+    /* The screen (migration 088): mine, somebody else's, or the button to share. One at a time,
+       so the button is not offered while somebody holds it. */
+    var sw = shareWho(), sb = '';
+    if (SH.want) sb = '<button type="button" class="rbtn rsmall" data-share="stop">Stop sharing</button>';
+    else if (sw) sb = SH.hide ? '<button type="button" class="rbtn rsmall" data-share="show">Show screen</button>' : '';
+    else if (shareReady() && shareCan()) sb = '<button type="button" class="rbtn rsmall" data-share="start"'+(SH.asking?' disabled':'')+'>Share screen</button>';
+    h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In a call with '+names.join(', ')+'.' : 'In a call. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')
+      +esc(SH.want ? ' You are sharing your screen.' : sw ? ' '+shareName(sw)+' is sharing a screen.' : '')+'</small>'
+      +'<button type="button" class="rbtn rsmall" data-voice="mute" aria-pressed="'+VO.muted+'">'+(VO.muted?'Unmute':'Mute')+'</button>'+sb
       +'<button type="button" class="rbtn rsmall" data-voice="leave">Leave call</button>';
   } else {
     var full = others.length >= cap, who = others.map(function (p) { return firstName(p.name); });
-    h += (others.length ? '<small>'+esc(full ? 'The call is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in a call.')+'</small>' : '')
+    /* Somebody in the room who has not joined is told a screen is up, and how to see it. */
+    var sees = others.filter(function (p) { return p.id===SH.who; })[0];
+    h += (others.length ? '<small>'+esc((full ? 'The call is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in a call.')
+      +(sees ? ' '+firstName(sees.name)+' is sharing a screen'+(full?'.':', join the call to see it.') : ''))+'</small>' : '')
       +'<button type="button" class="rbtn rsmall" data-voice="join"'+((VO.joining||full)?' disabled':'')+'>'+(VO.joining?'Joining…':'Join call')+'</button>';
   }
   return h+'</span>';
@@ -2206,6 +2233,241 @@ function voiceMark(c, x, y, talking, muted, f) {
   c.fillStyle = PAL.out; c.fillRect(bx,by,9,9); c.fillStyle = PAL.veil; c.fillRect(bx+1,by+1,7,7);
   c.fillStyle = col; c.fillRect(bx+3,by+1,3,4); c.fillRect(bx+2,by+4,1,2); c.fillRect(bx+6,by+4,1,2); c.fillRect(bx+2,by+6,5,1); c.fillRect(bx+4,by+7,1,1);
   if (muted) { c.fillStyle = TINT.ember; for (i = 0; i < 7; i++) c.fillRect(bx+1+i,by+7-i,1,1); }
+}
+/* ---------- sharing a screen in a call (migration 088) ----------
+   David, 2026-11-13: "let's discuss the option to share your screen while in a voice chat". What he
+   settled that day, each answered in the conversation:
+     * IT IS FOR LOOKING AT A STILL THING TOGETHER, 2 to 5 people: a board, a paused frame, a
+       timeline, a file. Footage that has to play goes to a Reviews link, a big meeting to Meet.
+     * ONE SHARER AT A TIME ("One at a time"). The server keeps it to one (realm_voice_poll).
+     * A LARGE PANEL OVER THE ROOM, with "Back to the room" and the call's bar still showing.
+     * ONLY THE PEOPLE IN THE CALL SEE IT, which by the face to face rule means people in the room.
+       Somebody who joins the call later sees it at once. It ends when the sharer presses Stop,
+       leaves the call, leaves the room or closes the page.
+     * WHAT IS SHARED IS THE SHARER'S CHOICE ("They can share the whole window if they want"): the
+       browser's own picker asks every time, a tab, a window or the whole screen. A page cannot
+       answer that picker or skip it.
+     * A MARKER THE SHARER CANNOT MISS ("yes to the marker"): the red band across the top.
+     * NO SOUND FROM THE SCREEN, and nothing is recorded.
+
+   THE PICTURE GOES STRAIGHT FROM THE SHARER'S BROWSER TO EACH VIEWER'S, like the sound, and never
+   through Anima. ⚠ IT TRAVELS ON ITS OWN LINES, NOT ON THE SOUND'S. For each viewer the sharer
+   opens a second, one-way line that carries only the picture, set up with its own kinds of note
+   (soffer, sanswer, sice) through the same once-a-second request. Two reasons: a screen that
+   cannot get through must never cost anybody the sound, and the sound's lines are made once and
+   never changed (WHO CALLS WHOM above), while here the SHARER always makes the offer.
+
+   THE COST IS THE SHARER'S UPLOAD: one copy per viewer, four in a full call. So the picture is
+   kept sharp and slow, right for reading text: at most 1280 by 720, 5 pictures a second, about
+   1 megabit per viewer (shareCap). Moving footage will look poor; that is the trade agreed.
+
+   SH.want: I have picked a screen and am asking for the room's one place. SH.on: the server gave
+   it to me. SH.peers: my line to each viewer. SH.who: who holds the screen, from the room's list
+   (takeVoiceRoom). SH.view: the line somebody else's screen reaches me on. SH.hide: I pressed
+   "Back to the room". Phones cannot share a screen (the browser has no picker there), so they get
+   no button, but they can watch. */
+var SH = {asking:false,want:false,on:false,stream:null,peers:{},tries:{},dead:{},seen:{},who:0,view:null,hide:false,cid:0,box:null,band:null};
+function shareReady() { return !!(ST.voice && ST.voice.share); }
+function shareCan() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
+/* Who holds the screen in the room I am in, or 0. Myself I know for certain. */
+function shareWho() { return SH.on ? ST.me : (SH.who && SH.who!==ST.me ? SH.who : 0); }
+function shareName(id) { var p = person(id); return p ? firstName(p.name) : 'Somebody'; }
+function shareStart() {
+  if (!VO.on || SH.want || SH.asking) return;
+  if (shareWho()) { toast(shareName(shareWho())+' is sharing a screen. One person shares at a time.'); return; }
+  var sid = VO.sid; SH.asking = true; renderInside();
+  /* The browser's own picker opens here, and only because this runs inside a click. */
+  navigator.mediaDevices.getDisplayMedia({video:{width:{max:1280},height:{max:720},frameRate:{max:5}},audio:false}).then(function (stream) {
+    SH.asking = false;
+    var t = stream.getVideoTracks()[0], late = !VO.on || VO.sid!==sid, taken = !late && shareWho();
+    /* They left the call while the picker was open, or somebody else got there first. */
+    if (!t || late || taken) { stream.getTracks().forEach(function (x) { x.stop(); }); if (taken) toast(shareName(taken)+' started sharing first, so your screen was not shared.'); renderInside(); return; }
+    /* "detail" asks the browser to keep text sharp and give up smoothness first. */
+    try { t.contentHint = 'detail'; } catch (e) { /* an older browser: it still shares */ }
+    /* The browser's own "Stop sharing" button, or the shared window being closed. */
+    t.onended = function () { if (SH.stream===stream) shareStop(); };
+    SH.stream = stream; SH.want = true; SH.on = false; SH.tries = {}; SH.dead = {}; SH.seen = {};
+    renderInside(); voiceBeat();
+  },function (e) {
+    SH.asking = false; renderInside();
+    var n = e && e.name, m = String((e && e.message)||'');
+    /* Closing the picker is not an error. A computer that forbids it is. */
+    if (n==='NotAllowedError' && /system/i.test(m)) toast('This computer is not letting the browser show your screen. On a Mac, open System Settings, Privacy and Security, Screen Recording, and allow this browser.');
+    else if (n!=='NotAllowedError' && n!=='AbortError') toast('The screen could not be shared. Try again, or pick a different window.');
+  });
+}
+/* Let go of my own share on this computer: the capture and the lines to the viewers. */
+function shareMine() {
+  var st = SH.stream;
+  SH.want = false; SH.on = false; SH.asking = false; SH.stream = null;
+  Object.keys(SH.peers).forEach(function (k) { shareDrop(+k); });
+  SH.tries = {}; SH.dead = {}; SH.seen = {};
+  if (st) st.getTracks().forEach(function (t) { t.onended = null; t.stop(); });
+}
+/* Everything about screens on this computer, mine or the one I am watching. Tells nobody. */
+function shareQuiet() { shareMine(); shareViewDrop(); SH.hide = false; shareShow(); }
+/* I stop sharing. The next request, sent at once, tells the server, and the others' panels close. */
+function shareStop() {
+  if (!SH.want && !SH.asking) return;
+  shareMine(); renderInside(); draw(); voiceBeat();
+}
+/* The room's list has arrived. `asked` is true when the request it answers said I am sharing:
+   only then is "the screen is not mine" a refusal, and not just an answer that crossed my click. */
+function shareTake(people, asked) {
+  var who = 0, idx = {}, was = SH.on;
+  people.forEach(function (r) { idx[r.id] = r; if (r.share) who = r.id; });
+  if (SH.want) {
+    if (who===ST.me) { if (!SH.on) { SH.on = true; renderInside(); draw(); } }
+    else if (asked) {
+      shareMine();
+      toast(was ? 'Your screen is no longer being shared.' : who ? shareName(who)+' started sharing first, so your screen was not shared.' : 'Your screen could not be shared. Try again in a moment.');
+      renderInside(); draw();
+    }
+  }
+  if (SH.on) {
+    Object.keys(SH.peers).forEach(function (k) { if (!idx[k]) shareDrop(+k); });
+    Object.keys(SH.seen).forEach(function (k) { if (!idx[k]) { delete SH.seen[k]; delete SH.tries[k]; delete SH.dead[k]; } });
+    people.forEach(function (r) {
+      if (r.id===ST.me) return;
+      var P = SH.peers[r.id];
+      /* They left the call and came back: a fresh line, and a fresh two tries. */
+      if (P && P.sid!==r.sid) { shareDrop(r.id); P = null; }
+      if (SH.seen[r.id]!==r.sid) { SH.seen[r.id] = r.sid; SH.tries[r.id] = 0; delete SH.dead[r.id]; }
+      /* Everybody on the list gets the screen, so a late joiner does too, with no click from me. */
+      if (!P && !SH.dead[r.id]) shareCall(r);
+    });
+  }
+  /* The screen I was watching is over, or its owner rejoined and will send a new one. */
+  var V = SH.view;
+  if (V && (V.id!==who || idx[V.id].sid!==V.sid)) { shareViewDrop(); shareShow(); }
+}
+/* Sharp and slow. Asked again once the line is up, because some browsers only take it then. */
+function shareCap(sender) {
+  try {
+    var p = sender.getParameters();
+    if (!p.encodings || !p.encodings.length) return;
+    p.encodings[0].maxBitrate = 1000000; p.encodings[0].maxFramerate = 5; p.degradationPreference = 'maintain-resolution';
+    var pr = sender.setParameters(p); if (pr && pr.catch) pr.catch(function () { /* the browser keeps its own limits */ });
+  } catch (e) { /* the browser keeps its own limits */ }
+}
+/* My line to one viewer. I always make the offer, whichever of us has the smaller id. */
+function shareCall(r) {
+  var id = r.id, cid = 's'+ST.me+'.'+(++SH.cid)+'.'+Date.now();
+  var pc = new RTCPeerConnection({iceServers:(ST.voice && ST.voice.ice)||[]});
+  var P = {id:id,sid:r.sid,cid:cid,pc:pc,pend:[],set:false,ok:false,wait:0};
+  SH.peers[id] = P;
+  var sender = pc.addTrack(SH.stream.getVideoTracks()[0],SH.stream);
+  pc.onicecandidate = function (e) { if (e.candidate && SH.peers[id]===P) voiceOut(id,'sice',{c:cid,d:e.candidate}); };
+  var watch = function () {
+    if (SH.peers[id]!==P) return;
+    var s = pc.connectionState || pc.iceConnectionState;
+    if (s==='connected' || s==='completed') { clearTimeout(P.wait); P.wait = 0; if (!P.ok) { P.ok = true; SH.tries[id] = 0; shareCap(sender); } }
+    else if (s==='failed') shareFail(P);
+    else if (s==='disconnected' && P.ok) { P.ok = false; clearTimeout(P.wait); P.wait = setTimeout(function () { shareFail(P); },6000); }
+  };
+  pc.onconnectionstatechange = watch; pc.oniceconnectionstatechange = watch;
+  P.wait = setTimeout(function () { shareFail(P); },20000);
+  pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
+    .then(function () { if (SH.peers[id]===P) { shareCap(sender); voiceOut(id,'soffer',{c:cid,d:pc.localDescription.sdp}); } })
+    .catch(function () { shareFail(P); });
+}
+function shareDrop(id) {
+  var P = SH.peers[id]; if (!P) return;
+  delete SH.peers[id]; clearTimeout(P.wait);
+  P.pc.onicecandidate = P.pc.onconnectionstatechange = P.pc.oniceconnectionstatechange = null;
+  try { P.pc.close(); } catch (e) { /* already closed */ }
+}
+/* My screen did not reach somebody. Once more at the next beat; the second time I am told, and
+   the others go on seeing it. The sound is on other lines and is not touched. */
+function shareFail(P) {
+  if (SH.peers[P.id]!==P) return;
+  var id = P.id, n = SH.tries[id] = (SH.tries[id]||0)+1;
+  shareDrop(id);
+  if (n >= 2 && !SH.dead[id]) { SH.dead[id] = true; toast('Your screen could not reach '+shareName(id)+'. One of you is probably on a network that blocks direct connections. The others can still see it.'); }
+}
+function shareViewDrop() {
+  var V = SH.view; if (!V) return;
+  SH.view = null;
+  V.pc.onicecandidate = V.pc.ontrack = V.pc.onconnectionstatechange = V.pc.oniceconnectionstatechange = null;
+  try { V.pc.close(); } catch (e) { /* already closed */ }
+}
+function shareIce(L, d) { if (L.set) L.pc.addIceCandidate(d).catch(function () { /* one address fewer */ }); else L.pend.push(d); }
+function sharePend(L) { L.set = true; L.pend.forEach(function (d) { L.pc.addIceCandidate(d).catch(function () { /* one address fewer */ }); }); L.pend = []; }
+/* A note about a screen. The server has already checked the sender is in this room's call. */
+function shareSignal(s, b) {
+  if (s.kind==='soffer') {
+    /* ⚠ ONLY FROM THE ONE THE SERVER SAYS HOLDS THE SCREEN. Anybody else's picture is not taken. */
+    if (s.from===ST.me || s.from!==SH.who || typeof b.d!=='string') return;
+    shareViewDrop();
+    var pc = new RTCPeerConnection({iceServers:(ST.voice && ST.voice.ice)||[]});
+    var V = {id:s.from,sid:s.sid,cid:b.c,pc:pc,pend:[],set:false,ok:false,bad:false,stream:null};
+    SH.view = V;
+    pc.onicecandidate = function (e) { if (e.candidate && SH.view===V) voiceOut(V.id,'sice',{c:V.cid,d:e.candidate}); };
+    pc.ontrack = function (e) { if (SH.view!==V) return; V.stream = (e.streams && e.streams[0]) || new MediaStream([e.track]); shareShow(); };
+    var watch = function () {
+      if (SH.view!==V) return;
+      var st = pc.connectionState || pc.iceConnectionState;
+      if (st==='connected' || st==='completed') { V.ok = true; V.bad = false; }
+      else if (st==='failed') { V.ok = false; V.bad = true; }
+      else if (st==='disconnected') V.ok = false;
+      shareShow();
+    };
+    pc.onconnectionstatechange = watch; pc.oniceconnectionstatechange = watch;
+    pc.setRemoteDescription({type:'offer',sdp:b.d}).then(function () { sharePend(V); return pc.createAnswer(); })
+      .then(function (a) { return pc.setLocalDescription(a); })
+      .then(function () { if (SH.view===V) voiceOut(V.id,'sanswer',{c:V.cid,d:pc.localDescription.sdp}); })
+      .catch(function () { if (SH.view===V) { V.bad = true; shareShow(); } });
+    shareShow();
+    return;
+  }
+  /* An answer or an address: for my line to that viewer if I am sharing, else for the line I watch on. */
+  var P = SH.peers[s.from], W = SH.view;
+  if (s.kind==='sanswer') {
+    if (!P || P.cid!==b.c || P.sid!==s.sid || P.set || typeof b.d!=='string') return;
+    P.pc.setRemoteDescription({type:'answer',sdp:b.d}).then(function () { sharePend(P); }).catch(function () { shareFail(P); });
+  } else if (s.kind==='sice' && b.d) {
+    if (P && P.cid===b.c && P.sid===s.sid) shareIce(P,b.d);
+    else if (W && W.id===s.from && W.cid===b.c) shareIce(W,b.d);
+  }
+}
+/* The two things on screen: the panel a viewer watches in, laid over the room under its bar, and
+   the band across the very top that tells the sharer, all the time, that their screen is out. */
+function shareDom() {
+  if (SH.box || !$('mapbox')) return;
+  var d = document.createElement('div'); d.className = 'rshare'; d.id = 'sharePanel'; d.hidden = true;
+  d.innerHTML = '<div class="rsharehead"><b id="shareTitle"></b><small id="shareNote"></small><span class="rgrow"></span>'
+    +'<button type="button" class="rbtn rsmall" data-share="full">Full screen</button><button type="button" class="rbtn rsmall" data-share="hide">Back to the room</button></div>'
+    +'<video id="shareVideo" autoplay playsinline muted></video>';
+  $('mapbox').appendChild(d); SH.box = d;
+  var b = document.createElement('div'); b.className = 'rsharing'; b.id = 'shareBand'; b.hidden = true; b.setAttribute('role','status');
+  b.innerHTML = '<i></i><b>You are sharing your screen</b><span>The people in this call can see what you picked.</span><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-share="stop">Stop sharing</button>';
+  document.body.insertBefore(b,document.body.firstChild); SH.band = b;
+}
+function shareShow() {
+  shareDom(); if (!SH.box) return;
+  var who = shareWho(), V = SH.view, vid = $('shareVideo');
+  var watching = VO.on && !!S.inside && !!who && who!==ST.me && !SH.hide, want = (watching && V && V.stream) || null;
+  /* The band is up from the moment the browser starts capturing, not from when the others see it. */
+  SH.band.hidden = !SH.want;
+  SH.box.hidden = !watching;
+  if ((vid.srcObject||null)!==want) { vid.srcObject = want; if (want) { var pr = vid.play(); if (pr && pr.catch) pr.catch(function () { /* it starts at the next click */ }); } }
+  if (!watching) { if (document.fullscreenElement===vid && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { /* it had already closed */ } } return; }
+  var bar = $('insideBar'); SH.box.style.top = (bar.offsetTop+bar.offsetHeight+8)+'px';
+  $('shareTitle').textContent = shareName(who)+'’s screen';
+  $('shareNote').textContent = (V && V.ok && V.stream) ? '' : (V && V.bad) ? 'This screen could not reach you. One of you is probably on a network that blocks direct connections.' : 'Connecting…';
+}
+function shareFull() {
+  var v = $('shareVideo'), go = v && (v.requestFullscreen || v.webkitRequestFullscreen);
+  if (!go) { toast('This browser cannot show it full screen.'); return; }
+  try { var pr = go.call(v); if (pr && pr.catch) pr.catch(function () { /* the browser said no */ }); } catch (e) { /* the browser said no */ }
+}
+/* The mark on a character who is sharing: a small screen beside the head, on the other side from
+   the microphone. */
+function shareMark(c, x, y) {
+  var bx = x+11, by = y-46;
+  c.fillStyle = PAL.out; c.fillRect(bx,by,11,8); c.fillRect(bx+4,by+8,3,1); c.fillRect(bx+2,by+9,7,1);
+  c.fillStyle = TINT.mana; c.fillRect(bx+1,by+1,9,6);
+  c.fillStyle = PAL.veil; c.fillRect(bx+2,by+5,7,1);
 }
 /* Closing the page hangs up at once instead of after the server's 15 seconds. */
 window.addEventListener('pagehide',function () {
@@ -2248,5 +2510,5 @@ if ($('focusBtn') && $('focusNow')) {
   document.addEventListener('visibilitychange',function () { if (!document.hidden) focusAsk(); });
 }
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
-window.addEventListener('resize',function () { draw(); });
+window.addEventListener('resize',function () { draw(); shareShow(); });
 })();
