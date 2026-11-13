@@ -203,7 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['version_action'])) {
 
 // Which timeline this page draws: the live one, or a saved version.
 $version   = null;
-$versionId = (int)($_GET['version'] ?? 0);
+// The embedded view (?embed=1, further down) is always the live timeline: it is
+// open to people without the Timeline switch, and saved versions are not for them.
+$versionId = isset($_GET['embed']) ? 0 : (int)($_GET['version'] ?? 0);
 if ($versionId > 0) {
     try {
         $version = $tvReady ? load_timeline_version($pdo, $projectId, $versionId) : null;
@@ -231,8 +233,11 @@ if ($versionId > 0) {
 // milestones, today line, zoom and downloads, from the same code. Embedded, the
 // page draws only that chart and its milestones, without Anima's top bar, and
 // nothing on it can be moved or changed, by anybody: a camp is for looking.
-// Who may open it is decided exactly as for the full page (require_login():
-// the Timeline switch and whether the account is on the show).
+// WHO MAY OPEN IT (David, 2026-11-13, asked whether artists, whose Timeline
+// switch is off, should see the whole chart in the camp too: "Yes, show
+// artists"): anybody who has the Realm and is on the show. require_login() asks
+// that for an embedded GET (feature_for_script() in includes/features.php)
+// instead of the Timeline switch, which still guards the full page and every save.
 $embed    = isset($_GET['embed']);
 $editable = can_edit_area('timeline') && $version === null && !$embed;
 

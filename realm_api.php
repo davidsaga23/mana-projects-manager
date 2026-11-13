@@ -248,7 +248,6 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
 // GET  camp=<land>                    the camp: the slaying bar's numbers, the
 //                                     decorations, which windows I may open
 // GET  camp=<land>&brief=1            the scroll: the show's Brief
-// GET  camp=<land>&timeline=1         the calendar: the show's timeline, compact
 // GET  camp=<land>&tracking=1&scope=shot|asset|project
 //                                     the board: the show's production tracking
 // POST camp_thing=<land>&thing=&x=&y= stand my ONE thing in the camp, or move it
@@ -257,9 +256,10 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
 //
 // ⚠ A LAND IS SENT, NEVER A SHOW. realm_camp_open() finds the show that holds
 // the land and asks may_see_project(); the id used below is always that one.
-// ⚠ ANIMA'S SWITCHES ARE ASKED HERE for each window ('brief', 'timeline',
+// ⚠ ANIMA'S SWITCHES ARE ASKED HERE for the scroll and the board ('brief',
 // 'production'), so a screen switched off for somebody cannot be read through a
-// camp. Everything is read only except `camp_thing`, the one field named in
+// camp. The calendar is not answered here at all: it is timeline.php?embed=1 in
+// a frame, open to everybody on the show (David, 2026-11-13: "Yes, show artists"). Everything is read only except `camp_thing`, the one field named in
 // artist_may_post(), which writes the session's own row (or deletes another's
 // only for can_edit()).
 if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
@@ -280,13 +280,6 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
                                           : ['ok' => false, 'error' => $off('The Brief')]);
             exit;
         }
-        if (isset($_GET['timeline'])) {
-            $full = $on('timeline');
-            echo json_encode(($full || REALM_CAMP_TIMELINE_WITHOUT_SWITCH === 'milestones')
-                ? ['ok' => true, 'timeline' => realm_camp_timeline($pdo, $show, $full)]
-                : ['ok' => false, 'error' => $off('The Timeline')]);
-            exit;
-        }
         if (isset($_GET['tracking'])) {
             echo json_encode($on('production') ? ['ok' => true, 'tracking' => realm_camp_tracking($pdo, $pid, (string)($_GET['scope'] ?? ''))]
                                                : ['ok' => false, 'error' => $off('Production tracking')]);
@@ -303,7 +296,7 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
             }
         }
         $answer = ['ok' => true, 'camp' => realm_camp_answer($pdo, $uid, $land, $show,
-                       ['brief' => $on('brief'), 'timeline' => $on('timeline'), 'production' => $on('production')], can_edit())];
+                       ['brief' => $on('brief'), 'production' => $on('production'), 'timeline' => $on('timeline')], can_edit())];
         if ($bad !== '') { $answer['error'] = $bad; $answer['saved'] = false; }
         elseif (isset($_POST['camp_thing'])) $answer['saved'] = true;
         echo json_encode($answer);

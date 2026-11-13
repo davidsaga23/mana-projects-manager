@@ -296,6 +296,19 @@ function feature_for_script(string $script): ?string {
     if ($script === 'bugs.php') {
         return ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['report_bug'])) ? 'bug_report' : 'bugs_list';
     }
+    // THE TIMELINE'S CHART IN A SHOW'S CAMP (David, 2026-11-13). The calendar in
+    // a camp in the Realm shows timeline.php's general chart in a frame, read
+    // only (timeline.php?embed=1). Asked whether artists, whose "Timeline: see"
+    // is off, should see that whole chart in the camp too: "Yes, show artists".
+    // So LOOKING at the embedded chart asks the Realm's switch, not the
+    // Timeline's: whoever has the Realm sees it in the camps of their shows.
+    // ⚠ ONLY THAT. A GET with ?embed, which prints one read-only chart. The full
+    // Timeline page, and every save on it, still ask 'timeline' and
+    // 'timeline_edit' as before, and the show itself is still checked below
+    // (may_see_project() in feature_gate_request()).
+    if ($script === 'timeline.php' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && isset($_GET['embed'])) {
+        return 'realm';
+    }
     return FEATURE_SCRIPTS[$script] ?? null;
 }
 

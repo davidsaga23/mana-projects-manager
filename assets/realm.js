@@ -1155,14 +1155,15 @@ function openProfile(id) {
    house's own code draws them, lays a see-through button over each (placeHot) and keeps decorations
    off them (fits). The slaying bar is painted over the back wall by slayPaint().
 
-   EVERYTHING SHOWN IS ANIMA'S OWN AND READ ONLY. A window asks realm_api.php when it opens and again
-   every minute while it stays open (the calendar every two); the bar and the decorations are asked
+   EVERYTHING SHOWN IS ANIMA'S OWN AND READ ONLY. The scroll and the board ask realm_api.php when
+   they open and again every minute while they stay open; the calendar is Anima's Timeline chart
+   itself, in a frame, as it stands when opened; the bar and the decorations are asked
    every 45 seconds while I stand in the camp. Nothing is pushed: the hosting cannot hold a
    connection open. Nothing here can change a status, a date or the brief.
 
    WHO SEES WHAT is decided by the server on every request (includes/realm_camp.php): only somebody
-   who may see the show, and each window only while its switch in Anima (Brief, Timeline, Production
-   tracking) is on for them. This file only draws what came back.
+   who may see the show; the scroll and the board only while their switch in Anima (Brief,
+   Production tracking) is on for them; the calendar for everybody on the show (David's choice). This file only draws what came back.
 
    ⚠ CAMP_FIX IS ALSO IN includes/realm_camp.php (REALM_CAMP_FIXED). The numbers MUST match. */
 var CAMP = {}, CAMP_FIX = [['camp_scroll',20,18],['camp_calendar',44,20],['camp_board',176,16],['camp_table',96,64]];
@@ -1264,9 +1265,6 @@ function campClear(uid) {
 }
 
 /* ---- the four windows ---- */
-var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function dayNum(d) { var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d||''); return m ? Math.round(Date.UTC(+m[1],+m[2]-1,+m[3])/864e5) : null; }
-function dayWords(d, year) { var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d||''); return m ? (+m[3])+' '+MON[+m[2]-1]+(year?' '+m[1]:'') : ''; }
 /* Text from Anima, escaped, with its web addresses made into links that open in a new tab. */
 function linked(t) {
   return esc(t).replace(/\bhttps?:\/\/(?:(?!&quot;|&#39;|&lt;|&gt;)[^\s<])+/g,function (u) {
@@ -1280,7 +1278,7 @@ function campFoot(url, start, label) {
 }
 function campWin(kind) {
   var d = $('campDlg'), k = campInfo(S.inside); if (!d || d.open || !k) return;
-  var sw = {brief:['brief','The Brief'],timeline:['timeline','The Timeline'],tracking:['production','Production tracking']}[kind];
+  var sw = {brief:['brief','The Brief'],tracking:['production','Production tracking']}[kind];
   if (sw && !(k.can && k.can[sw[0]])) { toast(sw[1]+' is switched off for your account. Production can turn it on for you on the Users page.'); return; }
   CW.kind = kind; CW.land = k.land; CW.scope = ''; CW.data = null; clearInterval(CW.timer);
   d.className = 'rcamp is-'+kind;
@@ -1289,26 +1287,27 @@ function campWin(kind) {
   d.showModal();
   if (kind==='slay') { campSlay(); return; }
   /* THE WHOLE TIMELINE (David, 2026-11-13, with a picture of the Timeline's general chart: "let's
-     bring the whole timeline as the attachment, the whole widget"). For somebody whose Timeline
-     switch is on, the calendar is that very chart: Anima's Timeline page in a frame, in its
-     embedded view (timeline.php?embed=1), which draws the chart and its milestones and lets
-     nothing be moved. It is the same code as the Timeline, so it cannot differ from it, and the
-     page itself asks again whether this person may see it. Current when opened; not reloaded
-     while open, because a reload would throw away the zoom and the place scrolled to. */
-  if (kind==='timeline' && k.timeline_whole) {
-    d.className = 'rcamp is-timeline is-whole';
+     bring the whole timeline as the attachment, the whole widget"). The calendar is that very
+     chart: Anima's Timeline page in a frame, in its embedded view (timeline.php?embed=1), which
+     draws the chart and its milestones and lets nothing be moved. It is the same code as the
+     Timeline, so it cannot differ from it. It is for everybody on the show, artists included
+     (asked the same day: "Yes, show artists"); the page itself asks whether this person has the
+     Realm and is on the show. Current when opened; not reloaded while open, because a reload
+     would throw away the zoom and the place scrolled to. */
+  if (kind==='timeline') {
+    d.className = 'rcamp is-timeline';
     $('campBody').innerHTML = '<iframe class="rcframe" title="The timeline of '+esc(k.name)+'" src="timeline.php?project='+(+k.project_id)+'&amp;embed=1"></iframe>'
       +'<p class="rcnote">This is the show&#39;s Timeline as it stands in Anima. Nothing can be moved from here.</p>'
-      +campFoot('timeline.php?project='+(+k.project_id),'timeline.php?','Open the full Timeline in Anima');
+      +campFoot(k.timeline_page ? 'timeline.php?project='+(+k.project_id) : '','timeline.php?','Open the full Timeline in Anima');
     return;
   }
   campWinAsk();
-  /* Current when opened, then asked again while it stays open: every minute, the calendar every two
-     (it is the heaviest to work out). Never while the tab is hidden. */
-  CW.timer = setInterval(function () { if (d.open && !document.hidden) campWinAsk(); },kind==='timeline'?120000:60000);
+  /* Current when opened, then asked again every minute while it stays open. Never while the tab
+     is hidden. */
+  CW.timer = setInterval(function () { if (d.open && !document.hidden) campWinAsk(); },60000);
 }
 function campWinAsk() {
-  var kind = CW.kind, d = $('campDlg'), seq = ++CW.seq; if (!kind || kind==='slay' || !d) return;
+  var kind = CW.kind, d = $('campDlg'), seq = ++CW.seq; if (!kind || kind==='slay' || kind==='timeline' || !d) return;
   var fail = function (why) { if (seq!==CW.seq || CW.kind!==kind || !d.open || CW.data) return; d.close(); toast(why || 'That could not be opened. Try again in a moment.'); };
   fetch(R.api+'?camp='+encodeURIComponent(CW.land)+'&'+kind+'=1'+(kind==='tracking' && CW.scope ? '&scope='+encodeURIComponent(CW.scope) : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); })
@@ -1322,7 +1321,7 @@ function campWinAsk() {
 /* Draw the open window again from what came back, keeping where the reader had scrolled to. */
 function campWinDraw() {
   var body = $('campBody'), sc = body.querySelector('.rcscroll'), top = sc ? sc.scrollTop : 0, left = sc ? sc.scrollLeft : 0;
-  body.innerHTML = CW.kind==='brief' ? campBrief(CW.data) : CW.kind==='timeline' ? campTimeline(CW.data) : campTracking(CW.data);
+  body.innerHTML = CW.kind==='brief' ? campBrief(CW.data) : campTracking(CW.data);
   sc = body.querySelector('.rcscroll'); if (sc) { sc.scrollTop = top; sc.scrollLeft = left; }
 }
 function campSlay() {
@@ -1347,41 +1346,6 @@ function campBrief(b) {
     h += '</div>'+(b.updated ? '<p class="rcnote">Last updated '+esc(b.updated)+'. Read only here.</p>' : '<p class="rcnote">Read only here.</p>');
   }
   return h+campFoot(b.url,'brief.php?','Open the full Brief in Anima');
-}
-/* THE CALENDAR: one bar per dated step against the dates, with today, the delivery and the
-   milestones marked. A step's colour is the show's own; its darker part is how much is delivered. */
-function campTimeline(t) {
-  var today = dayNum(t.today), del = dayNum(t.delivery), lo = null, hi = null, h, i;
-  var inc = function (n) { if (n===null) return; lo = lo===null ? n : Math.min(lo,n); hi = hi===null ? n : Math.max(hi,n); };
-  h = '<p class="rcmeta">'+(del===null ? 'No delivery date is set for this show yet.'
-    : del > today ? 'Delivery on <b>'+dayWords(t.delivery,true)+'</b>'+(t.days_left!==null ? ', '+(+t.days_left)+' working day'+(+t.days_left===1?'':'s')+' from today.' : '.')
-    : del===today ? 'Delivery is <b>today</b>.' : 'The delivery date, <b>'+dayWords(t.delivery,true)+'</b>, has passed.')+'</p>';
-  if (t.reduced) h += '<p class="rcnote">You see the delivery date and the milestones. The plan step by step is on the Timeline in Anima, which is switched off for your account.</p>';
-  t.steps.forEach(function (s) { inc(dayNum(s.start)); inc(dayNum(s.end)); });
-  t.milestones.forEach(function (m) { inc(dayNum(m.date)); });
-  if (lo===null) h += '<p class="rcnote">'+(t.reduced ? 'This show has no milestones yet.' : 'This show has no dated steps or milestones yet, so there is nothing to draw. Dates are set on the Timeline in Anima.')+'</p>';
-  else {
-    inc(today); inc(del); lo -= 2; hi += 2;
-    var span = hi-lo, pos = function (n) { return ((n-lo)/span*100).toFixed(2); }, ax = '', lines = '', dia = '', rows = '';
-    var d0 = new Date(lo*864e5), yy = d0.getUTCFullYear(), mm = d0.getUTCMonth()+1;
-    for (i = 0; i < 60; i++, mm++) { var n = Math.round(Date.UTC(yy,mm,1)/864e5); if (n > hi) break; var md = new Date(n*864e5);
-      ax += '<span class="rtlmon" style="left:'+pos(n)+'%">'+MON[md.getUTCMonth()]+(md.getUTCMonth()===0?' '+md.getUTCFullYear():'')+'</span>'; lines += '<i class="rtlline is-month" style="left:'+pos(n)+'%"></i>'; }
-    if (!ax) ax = '<span class="rtlmon" style="left:0">'+dayWords(new Date((lo+2)*864e5).toISOString(),false)+'</span>';
-    lines += '<i class="rtlline is-today" style="left:'+pos(today)+'%"></i>'+(del!==null ? '<i class="rtlline is-delivery" style="left:'+pos(del)+'%"></i>' : '');
-    ax += '<span class="rtlflag is-today" style="left:'+pos(today)+'%">Today</span>'+(del!==null ? '<span class="rtlflag is-delivery" style="left:'+pos(del)+'%">Delivery</span>' : '');
-    t.milestones.forEach(function (m) { var n = dayNum(m.date); if (n===null) return;
-      dia += '<i class="rtldia'+(n < today?' is-past':'')+'" style="left:'+pos(n)+'%" title="'+esc(m.name+', '+dayWords(m.date,true))+'"></i>'; });
-    rows = '<div class="rtlrow is-miles"><span class="rtlname">Milestones</span><div class="rtltrack">'+lines+dia+'</div></div>';
-    t.steps.forEach(function (s) { var a = dayNum(s.start), b = dayNum(s.end), col = hex(s.color), p = Math.max(0,Math.min(100,+s.progress||0)); if (a===null || b===null) return;
-      rows += '<div class="rtlrow"><span class="rtlname" title="'+esc(s.name+', '+s.scope)+'">'+esc(s.name)+(s.late?' <em>late</em>':'')+'</span><div class="rtltrack">'+lines
-        +'<span class="rtlbar" style="left:'+pos(a)+'%;width:'+((b-a+1)/span*100).toFixed(2)+'%" title="'+esc(s.name+', '+dayWords(s.start,false)+' to '+dayWords(s.end,true)+', '+p+'% delivered')+'"><u'+(col?' style="background:'+col+'"':'')+'></u><b style="width:'+p+'%'+(col?';background:'+col:'')+'"></b></span></div></div>'; });
-    h += '<div class="rtl"><div class="rtlrow is-axis"><span class="rtlname"></span><div class="rtltrack">'+ax+'</div></div><div class="rtlrows rcscroll">'+rows+'</div></div>';
-    if (!t.reduced) h += '<p class="rcnote">Each bar is a step of the pipeline as planned, and its solid part is how much has been delivered.'+(t.undated ? ' '+(+t.undated)+' step'+(+t.undated===1?' has':'s have')+' no dates yet, so '+(+t.undated===1?'it is':'they are')+' not drawn.' : '')+'</p>';
-    if (t.milestones.length) { h += '<ul class="rtlmiles">';
-      t.milestones.forEach(function (m) { var n = dayNum(m.date); h += '<li'+(n!==null && n < today?' class="is-past"':'')+'><b>'+esc(dayWords(m.date,true))+'</b><span>'+esc(m.name)+(m.step?' <small>'+esc(m.step)+'</small>':'')+'</span></li>'; });
-      h += '</ul>'; }
-  }
-  return h+campFoot(t.reduced ? '' : t.url,'timeline.php?','Open the full Timeline in Anima');
 }
 /* THE BOARD: production tracking as Anima's own screen draws it. A row per shot (or asset), a small
    square per step in the status's colour, a dash where the step does not apply, and the DONE count.

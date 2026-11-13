@@ -30,8 +30,13 @@
 // who is not on the show gets one sentence and no data, whatever they send.
 //
 // ⚠ ANIMA'S ACCESS SWITCHES HOLD HERE TOO. realm_api.php asks feature_on() for
-// 'brief', 'production' and 'timeline' before answering for each window, so a
-// screen that is switched off for somebody cannot be read through the Realm.
+// 'brief' and 'production' before answering for those windows, so a screen
+// that is switched off for somebody cannot be read through the Realm.
+// THE CALENDAR IS THE ONE EXCEPTION, AND IT IS DAVID'S (2026-11-13). It shows
+// the Timeline's own general chart in a frame (timeline.php?embed=1, read
+// only). Asked whether artists, whose Timeline switch is off, should see that
+// whole chart in the camp too: "Yes, show artists". So everybody who may see
+// the show sees it; the rule is in feature_for_script() (includes/features.php).
 //
 // ⚠ NOTHING HERE TOUCHES MONEY. No budget, rate, cost or invoice is read, and
 // includes/money.php is never loaded. The Brief's client CONTACT (who to call)
@@ -52,16 +57,6 @@ const REALM_CAMP_FIXED = [
     'camp_board'    => ['wall', 176, 16, 44, 30],
     'camp_table'    => ['floor', 96, 64, 48, 16],
 ];
-
-/**
- * What the calendar shows to somebody whose "Timeline: see" switch is OFF
- * (artists, by default):
- *   'closed'      nothing: the calendar says the Timeline is switched off.
- *   'milestones'  the delivery date and the milestones only, no step bars.
- * ⚠ DAVID'S TO DECIDE (asked 2026-11-13). It starts at 'closed', which is what
- * the switch means today, so that nothing is shown he has not agreed to.
- */
-const REALM_CAMP_TIMELINE_WITHOUT_SWITCH = 'closed';
 
 /** Has migration 091 run? Until it has, a camp has its fixtures and no decorations. */
 function realm_camp_available(PDO $pdo): bool {
@@ -242,23 +237,22 @@ function realm_camp_remove(PDO $pdo, int $uid, int $projectId, int $whose, bool 
 
 /**
  * What the screen needs to draw a camp: the show, the slaying bar's numbers,
- * the decorations, and which of the three windows this person may open.
- * $can is ['brief' => bool, 'timeline' => bool, 'production' => bool], Anima's
- * own switches as realm_api.php read them; $mayClear says whether this person
- * may take out somebody else's thing.
+ * the decorations, and which windows this person may open.
+ * $can is ['brief' => bool, 'production' => bool, 'timeline' => bool], Anima's
+ * own switches as realm_api.php read them. The calendar is open to everybody on
+ * the show (see the note at the top); 'timeline' only says whether to offer the
+ * way to the full Timeline page. $mayClear says whether this person may take out
+ * somebody else's thing.
  */
 function realm_camp_answer(PDO $pdo, int $uid, string $land, array $project, array $can, bool $mayClear): array {
     return ['land' => $land, 'project_id' => (int)$project['id'], 'name' => (string)$project['name'],
             'ready' => realm_camp_available($pdo),
             'can' => ['brief' => !empty($can['brief']), 'production' => !empty($can['production']),
-                      // The calendar opens for somebody without the switch only if David chose the reduced view.
-                      'timeline' => !empty($can['timeline']) || REALM_CAMP_TIMELINE_WITHOUT_SWITCH === 'milestones'],
-            // With the Timeline switch on, the calendar is Anima's own Timeline
-            // chart in a frame (David, 2026-11-13: "let's bring the whole timeline
-            // as the attachment, the whole widget"): timeline.php?embed=1, which
-            // asks the switch and the show again itself. Without it, the reduced
-            // view below, if David chose that.
-            'timeline_whole' => !empty($can['timeline']),
+                      // The calendar: Anima's own Timeline chart in a frame, for everybody on the show.
+                      'timeline' => true],
+            // The button to the FULL Timeline page is only drawn for somebody whose
+            // Timeline switch is on; the page would turn anybody else away.
+            'timeline_page' => !empty($can['timeline']),
             'may_clear' => $mayClear,
             'progress' => realm_camp_progress($pdo, $project),
             'things' => realm_camp_things($pdo, (int)$project['id'], $uid)];
@@ -308,51 +302,6 @@ function realm_camp_brief(PDO $pdo, int $projectId): array {
     $out['empty'] = $out['client'] === '' && $out['summary'] === '' && $out['deliverables'] === ''
                  && $out['reference'] === '' && $out['notes'] === '' && !$out['files'];
     return $out;
-}
-
-/**
- * THE CALENDAR, REDUCED: what somebody WITHOUT the Timeline switch is given, if
- * David chose that (REALM_CAMP_TIMELINE_WITHOUT_SWITCH). Somebody with the
- * switch sees the Timeline's own chart instead (timeline.php?embed=1, framed by
- * assets/realm.js), and this is not asked for them.
- *
- * timeline_picture() is what timeline.php draws from, so nothing is scheduled
- * or worked out a second time here: this only keeps the parts a compact view
- * needs. One bar per dated pipeline step (the plan, with the share delivered),
- * the milestones, the delivery date, today, and the working days left by
- * Anima's own calendar (weekends and the studio's holidays).
- *
- * $full is false for somebody whose Timeline switch is off and who is given
- * the reduced view (REALM_CAMP_TIMELINE_WITHOUT_SWITCH): then no step bars are
- * sent at all, only the delivery date and the milestones.
- *
- * Left out on purpose: who is on each task, the detailed schedule, the
- * milestones' notes and the step editor's sentences. Those are on the Timeline.
- */
-function realm_camp_timeline(PDO $pdo, array $project, bool $full): array {
-    require_once __DIR__ . '/timeline_versions.php';
-    $pid = (int)$project['id'];
-    $today = date('Y-m-d');
-    $delivery = !empty($project['delivery_date']) ? (string)$project['delivery_date'] : '';
-    $pic = timeline_picture($pdo, $project);
-    $steps = [];
-    if ($full) {
-        foreach ($pic['general'] as $g) {
-            $steps[] = ['name' => (string)$g['step_name'], 'scope' => (string)$g['scope'],
-                        'start' => (string)$g['start'], 'end' => (string)$g['end'],
-                        'progress' => (int)$g['progress'], 'color' => (string)$g['color'], 'late' => (int)$g['late'] === 1];
-        }
-    }
-    $marks = [];
-    foreach ($pic['milestones'] as $m) {
-        $marks[] = ['name' => (string)$m['name'], 'date' => (string)$m['date'], 'step' => $full ? (string)$m['step_name'] : ''];
-    }
-    return ['today' => $today, 'delivery' => $delivery,
-            'days_left' => ($delivery !== '' && $delivery > $today && function_exists('working_days_after'))
-                ? working_days_after($today, $delivery) : null,
-            'reduced' => !$full, 'steps' => $steps, 'milestones' => $marks,
-            'undated' => $full ? count($pic['undated']) : 0,
-            'url' => 'timeline.php?project=' . $pid];
 }
 
 /**
