@@ -571,8 +571,13 @@ function artist_may_post(): bool {
         // third screen: the FIELD is permitted here; WHOSE row it may touch is
         // checked in includes/own_status.php, the very functions mytasks.php
         // calls, and the two-status limit is status_self_serve(), as there.
+        // `voice` (2026-11-12, migration 085): joining, keeping up and leaving
+        // the voice chat of the room they are inside. ⚠ THE ASKER'S OWN SEAT
+        // ONLY: the account is the session's. The one id that can be sent is
+        // who a set-up note is for, and realm_voice_poll() delivers it only to
+        // somebody who is in voice in the very room the sender is inside.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status'],
+                            'task_status', 'voice'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

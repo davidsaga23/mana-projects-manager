@@ -30,6 +30,9 @@
 // ⚠ NOTHING HERE TOUCHES MONEY. No rate, budget or invoice is read, and the
 // finance connection is never opened.
 
+// Voice (migration 085) has its own file; the map needs it to say who is talking.
+require_once __DIR__ . '/realm_voice.php';
+
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;
 /** A heartbeat older than this many seconds means the page is closed. */
@@ -244,20 +247,26 @@ function realm_arrive(PDO $pdo, int $uid, string $place, bool $inside): string {
  *
  * `focus` is true while that person's Pomodoro is in a focus phase, read from
  * the timer Anima already runs (migrations 043 and 048). Nothing is written to
- * it. Clients and switched-off accounts are never listed.
+ * it. `voice` is true while they are in the voice chat of the room they are
+ * inside, and `muted` while their microphone is off there (migration 085). Clients and switched-off accounts are never listed.
  */
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
     try {
         $timer = function_exists('column_exists') && column_exists($pdo, 'time_timers', 'phase');
+        // In voice (migration 085): a fresh voice row that names the room the person is in.
+        $voice = realm_voice_available($pdo);
         $sql = 'SELECT rp.user_id, rp.house_slot, rp.house_kind, rp.door, rp.place, rp.inside, rp.cloak, rp.hat, rp.pet,
                        TIMESTAMPDIFF(SECOND, rp.last_ping, NOW()) AS ping_age,
                        TIMESTAMPDIFF(MINUTE, rp.last_active, NOW()) AS idle_min,
-                       u.display_name, u.username, c.name AS crew_name, ' . ($timer ? 't.phase' : 'NULL') . ' AS phase
+                       u.display_name, u.username, c.name AS crew_name, ' . ($timer ? 't.phase' : 'NULL') . ' AS phase,
+                       ' . ($voice ? 'rv.user_id' : 'NULL') . ' AS v_user, ' . ($voice ? 'rv.muted' : '0') . ' AS v_muted
                   FROM realm_people rp
                   JOIN users u ON u.id = rp.user_id
              LEFT JOIN crew c ON c.id = u.crew_id' . ($timer ? '
-             LEFT JOIN time_timers t ON t.crew_id = u.crew_id' : '') . "
+             LEFT JOIN time_timers t ON t.crew_id = u.crew_id' : '') . ($voice ? '
+             LEFT JOIN realm_voice rv ON rv.user_id = rp.user_id AND rv.place = rp.place
+                                     AND rv.last_seen > DATE_SUB(NOW(), INTERVAL ' . REALM_VOICE_SECONDS . ' SECOND)' : '') . "
                  WHERE rp.house_slot IS NOT NULL AND u.active = 1 AND u.role <> 'client'
               ORDER BY rp.house_slot";
         foreach ($pdo->query($sql) as $r) {
@@ -265,6 +274,7 @@ function realm_state(PDO $pdo, int $uid): array {
             $here = $r['ping_age'] !== null && (int)$r['ping_age'] <= REALM_ONLINE_SECONDS;
             $state = !$here ? 'away' : (($r['idle_min'] !== null && (int)$r['idle_min'] >= REALM_IDLE_MINUTES) ? 'idle' : 'online');
             $name = trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username'])));
+            $talks = $here && (int)$r['inside'] === 1 && $r['v_user'] !== null;
             $people[] = [
                 'id'     => $id,
                 'name'   => $name,
@@ -275,6 +285,8 @@ function realm_state(PDO $pdo, int $uid): array {
                 'place'  => ($here && (string)$r['place'] !== '') ? (string)$r['place'] : 'user:' . $id,
                 'inside' => $here && (int)$r['inside'] === 1,
                 'focus'  => $here && (string)$r['phase'] === 'focus',
+                'voice'  => $talks,
+                'muted'  => $talks && (int)$r['v_muted'] === 1,
                 'cloak'  => in_array($r['cloak'], REALM_CLOAKS, true) ? (string)$r['cloak'] : 'mana',
                 'hat'    => in_array($r['hat'], REALM_HATS, true) ? (string)$r['hat'] : 'none',
                 'pet'    => in_array($r['pet'], REALM_PETS, true) ? (string)$r['pet'] : 'none',
@@ -286,7 +298,10 @@ function realm_state(PDO $pdo, int $uid): array {
     }
     return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => realm_lands($pdo),
             'idle_minutes' => REALM_IDLE_MINUTES, 'slots' => REALM_SLOTS,
-            'knocks' => realm_knock_news($pdo, $uid)];
+            'knocks' => realm_knock_news($pdo, $uid),
+            // Voice: has migration 085 run, how many fit at a table, and the
+            // address-lookup service the browsers ask (includes/realm_voice.php).
+            'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice()]];
 }
 
 // ---- knocking (migration 084) -------------------------------------------------
