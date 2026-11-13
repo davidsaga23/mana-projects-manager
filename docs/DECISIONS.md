@@ -6057,3 +6057,17 @@ typing 'ok'"). Built as:
   conversation's 3-second poll, which carries the reactions of every message on screen.
 - **The POST names a message, never a channel**: `realm_api.php` looks up the message's own channel
   and asks `realm_channel_access()` before writing, so ravens stay between their two people.
+
+## 2026-11-13 — The Realm: each show's sky (David)
+
+Asked for "shows that react to production", David chose, among options put to him:
+- **What sets the sky:** "Anima's own rule": the breakdown grid's green / amber / red
+  (`cell_health()`), for the whole show. Clear, clouds, rain; a storm when delivery has passed with
+  work still open. Chosen over a fixed number of days to delivery, so a show far ahead does not get
+  clouds near the end, and the map never disagrees with Anima.
+- **Fireworks:** "Approvals today + milestones": small fireworks while tasks are approved (within
+  the hour), a banner and a big burst when the show crosses 25/50/75/100% approved that day.
+- **Who sees it:** "Everyone in the Realm". Only the mood is shared; the name of a show you are not
+  on stays hidden.
+Where a show stood this morning is estimated from today's status log (approvals less retakes); it
+only decides whether a banner flies. No migration: a milestone's big burst is remembered per browser.
