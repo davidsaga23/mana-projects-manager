@@ -416,7 +416,9 @@ function realm_state(PDO $pdo, int $uid): array {
             'spots' => realm_spots($pdo, $uid),
             // Voice: has migration 085 run, how many fit at a table, and the
             // address-lookup service the browsers ask (includes/realm_voice.php).
-            'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice()]];
+            // `share`: has migration 088 run, so a screen can be shared in a call.
+            'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice(),
+                        'share' => realm_share_available($pdo)]];
 }
 
 // ---- knocking (migration 084) -------------------------------------------------
