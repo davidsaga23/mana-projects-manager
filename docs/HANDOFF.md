@@ -120,6 +120,9 @@ browsers on different networks can reach each other. No sound and no Anima data 
 agreed to it on 2026-11-12 (`docs/DECISIONS.md`); it is one line, `realm_voice_ice()` in
 `includes/realm_voice.php`.
 
+A screen shared in a call (2026-11-13) travels the same way, browser to browser, and is never
+stored: Anima is still not a video tool, and the server only keeps who is sharing.
+
 ---
 
 ## 3. How it is deployed — READ BEFORE TOUCHING DEPLOY
