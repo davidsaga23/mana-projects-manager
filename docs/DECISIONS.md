@@ -5675,9 +5675,22 @@ shop and the word for praise were NOT discussed before he said so; they are open
 - **What others see is a notice, not an effect on the map.** A burst over the character and a
   keepsake drawn in the office were talked about; neither is built, because another session is
   rebuilding how rooms are drawn (walking inside) and both belong in that drawing code.
-- **Gold from approved work is not built.** David said gold comes from it and gave no amount. To
-  decide with him, with care: a coin per approval is the part most easily read as a productivity
-  score.
+- **Approved work** (David, 2026-11-13, after the first version was built): "let's keep 1 gold for
+  each approved, and if you approved on time based on the task due dates you receive 1 mana and 1
+  gold". Built as `realm_purse_approvals()`: it reads `progress_log`, the record every status change
+  already writes, when the purse is brought up to date. No hook was added to the board, the review
+  queue or My tasks. `realm_purse.approvals_to` is the last log line counted.
+  - **My readings, to confirm with David:** on time gives 1 gold and 1 mana in all, not 2 gold
+    (`REALM_GOLD_ON_TIME` is the one number to change); "on time" compares the day of the approval
+    with the task's scheduled end date, and a task with no due date gives the coin and no mana; the
+    coin goes to whoever the task is assigned to, each of them when there are several; a task pays
+    once, so approved, sent back and approved again is one coin; statuses that arrive through an
+    import do not pay, or loading a show's history would hand out hundreds of coins; tickets are not
+    counted, they have no approval.
+  - **Raised with David, not decided:** the approval's day depends on how fast the reviewer is, so
+    an artist who delivered on time can miss the mana. Judging by the day the work was delivered
+    would be fairer. And this is the rule most easily read as a productivity score; it stays
+    private, in the chest, and is never ranked.
 - **The word is "praise"** on every screen (David, 2026-11-13, asked to choose between praise,
   blessing and spell: "Keep praise"). Anima's task board is called Spell, so a praise is never
   called a spell. This closes the question left open on 2026-11-12.

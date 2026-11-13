@@ -30,7 +30,11 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
   earn nor break the run.
 - **Gold is counted now**, and the chest shows it: one coin for every five working days logged in a
   row, and one coin the first time each person praises you in a week. Only you see your chest.
-- **Not in this version:** anything to buy with gold, gold from approved work, giving and swapping
+- **Approved work pays too** (David, 2026-11-13: "1 gold for each approved, and if you approved on
+  time based on the task due dates you receive 1 mana and 1 gold"). Each task of yours that is
+  approved gives 1 gold, and 1 mana as well when it is approved on or before its due date. A task
+  pays once, and statuses loaded by an import do not pay.
+- **Not in this version:** anything to buy with gold, giving and swapping
   things, the Herald, and a keepsake drawn in the office. The chest says there is nothing to buy yet.
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
   counting of time logs and the face to face check need David and Renata on the live site.
