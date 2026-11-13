@@ -12,6 +12,7 @@
    - Buying asks first: "This cannot be undone." There is no selling back, because a thing that
      could be sold back would let gold pass from one person to another through a gift.
    - What I own, for the chest (chestExtra, asked for by assets/realm_praise.js).
+   Giving and swapping what was bought is assets/realm_trade.js.
 
    PRIVATE. My coins and my list are asked for with no id, and nobody else's ever is. Others see
    what I wear and what stands in my office, nothing more. Never linked to pay. */
@@ -82,7 +83,7 @@ function draw() {
     h += '<li class="rshopitem'+(own ? ' is-mine' : '')+(SHOP.asking === x.id ? ' is-asking' : '')+'"><canvas data-shoppic="'+x.id+'" width="120" height="120" role="img" aria-label="'+esc(x.n)+'"></canvas>'
       +'<span class="rshopname"><b>'+esc(x.n)+'</b><small>'+esc(x.what)+'</small></span><span class="rshopcost">'+(own ? '' : coins(c))+'</span><span class="rshopact">'+act+'</span></li>';
   });
-  body.innerHTML = h+'</ul><small class="rshopnote">One of each. What you buy is yours for good: it cannot be sold back. Office things are then in Decorate, clothes and companions in Your character.</small>'+close;
+  body.innerHTML = h+'</ul><small class="rshopnote">One of each. What you buy cannot be sold back, but it can be given to somebody or swapped, face to face. Office things are then in Decorate, clothes and companions in Your character.</small>'+close;
   pictures();
 }
 /* Each picture is the map's own drawing: a thing as it stands in an office, or my character
@@ -112,6 +113,8 @@ function buy(id, btn) {
   });
 }
 R.openShop = open;
+/* What assets/realm_trade.js borrows: the names of the things, and what I own. */
+R.shop = {item:itemOf, kind:kind, owned:function () { return SHOP.ready ? SHOP.owned.slice() : []; }};
 
 /* The map says what I own with every beat; the window is drawn again only when that changed, so a
    question being answered is not wiped by the heartbeat. */

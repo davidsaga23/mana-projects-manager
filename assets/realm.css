@@ -444,3 +444,12 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rseg button.is-sale i { font-style: normal; font-size: 12px; color: var(--warn-strong); border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; margin-left: 2px; }
 .rtry { color: var(--warn-strong); }
 dialog .rseg { flex-wrap: wrap; }
+
+/* Giving and swapping (assets/realm_trade.js): the button sits above Praise, the notices carry buttons. */
+.rtradebtn { position: absolute; right: 12px; bottom: 58px; background: var(--surface); box-shadow: var(--shadow-pop); }
+.rtradebtn.is-low { bottom: 12px; }
+.rmapbox.is-deco .rtradebtn { display: none; }
+#tradeBody { display: contents; }
+.rtoast.roffer { display: flex; flex-direction: column; gap: 6px; border-color: var(--primary); }
+.rtoast.roffer span { color: var(--text-2); }
+.rtoast.roffer .racts { display: flex; flex-wrap: wrap; gap: 6px; }

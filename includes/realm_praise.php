@@ -85,6 +85,15 @@ const REALM_PRAISE_NOTE = 160;
 const REALM_PRAISE_NEWS_SECONDS = 120;
 /** How far back a brand-new purse looks, in days, so a first visit is not empty-handed. */
 const REALM_PURSE_LOOK_BACK = 8;
+/**
+ * What a brand-new purse holds. David, 2026-11-13: "let's also start with 5 gold
+ * and 5 mana for all the new people landing in the realm", and, asked who that
+ * covers: "includeing renata and myself". Nobody had a purse before this was
+ * written, so everybody is new: each person gets it once, when their purse is
+ * first opened (realm_purse_open), and never again.
+ */
+const REALM_START_GOLD = 5;
+const REALM_START_MANA = 5;
 
 /** Has migration 090 arrived? Asked once per request; never throws. */
 function realm_praise_available(PDO $pdo): bool {
@@ -100,8 +109,20 @@ function realm_praise_available(PDO $pdo): bool {
 }
 
 /**
+ * Make sure $id has a purse, holding the starting gold and mana if it is new.
+ * ⚠ THE ONLY PLACE A PURSE IS CREATED. A purse made anywhere else would start
+ * empty and its owner would miss the starting coins for good: a praise received
+ * before somebody's first visit used to do exactly that.
+ * INSERT IGNORE: a purse that exists is left as it is. May throw; callers catch.
+ */
+function realm_purse_open(PDO $pdo, int $id): void {
+    $pdo->prepare('INSERT IGNORE INTO realm_purse (user_id, mana, gold, updated_at) VALUES (?, ?, ?, NOW())')
+        ->execute([$id, min(REALM_MANA_CAP, REALM_START_MANA), REALM_START_GOLD]);
+}
+
+/**
  * Bring $uid's purse up to date with their time log, then return it:
- *   ['ready', 'linked', 'mana', 'gold', 'streak', 'cap', 'every']
+ *   ['ready', 'linked', 'mana', 'gold', 'streak', 'cap', 'every', 'start_gold', 'start_mana']
  *
  * Every working day since `counted_to` is looked at once, oldest first:
  *   - a weekend, a studio holiday or a booked day off is passed over;
@@ -117,7 +138,8 @@ function realm_praise_available(PDO $pdo): bool {
  */
 function realm_purse(PDO $pdo, int $uid): array {
     $out = ['ready' => realm_praise_available($pdo), 'linked' => false, 'mana' => 0, 'gold' => 0, 'streak' => 0,
-            'cap' => REALM_MANA_CAP, 'every' => REALM_GOLD_EVERY];
+            'cap' => REALM_MANA_CAP, 'every' => REALM_GOLD_EVERY,
+            'start_gold' => REALM_START_GOLD, 'start_mana' => min(REALM_MANA_CAP, REALM_START_MANA)];
     if (!$out['ready'] || $uid <= 0) return $out;
     $began = false;
     try {
@@ -129,7 +151,7 @@ function realm_purse(PDO $pdo, int $uid): array {
         $now   = (string)$clock['n'];
         $today = (string)$clock['d'];
 
-        $pdo->prepare('INSERT IGNORE INTO realm_purse (user_id, updated_at) VALUES (?, NOW())')->execute([$uid]);
+        realm_purse_open($pdo, $uid);
         $pdo->beginTransaction();
         $began = true;
         $q = $pdo->prepare('SELECT * FROM realm_purse WHERE user_id = ? FOR UPDATE');
@@ -297,8 +319,9 @@ function realm_praise_give(PDO $pdo, int $uid, int $to, string $kind, string $no
         $q->execute([$uid, $to]);
         $coin = $q->fetchColumn() ? 0 : 1;
         if ($coin) {
-            $pdo->prepare('INSERT INTO realm_purse (user_id, gold, updated_at) VALUES (?, 1, NOW())
-                           ON DUPLICATE KEY UPDATE gold = gold + 1, updated_at = NOW()')->execute([$to]);
+            // Somebody praised before their first visit still starts with the starting coins.
+            realm_purse_open($pdo, $to);
+            $pdo->prepare('UPDATE realm_purse SET gold = gold + 1, updated_at = NOW() WHERE user_id = ?')->execute([$to]);
         }
         $pdo->prepare('INSERT INTO realm_praise (from_user, to_user, kind, note, gold, created_at) VALUES (?, ?, ?, ?, ?, NOW())')
             ->execute([$uid, $to, $kind, $note, $coin]);

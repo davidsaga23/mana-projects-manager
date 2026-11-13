@@ -1536,7 +1536,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -1616,6 +1616,8 @@ function chatTake(j) {
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
   takeKnocks(j.knocks);
+  /* Offers of a gift or a swap ride on the same answers as knocks (assets/realm_trade.js). */
+  if (R.onOffers) R.onOffers(j.offers);
   /* While I am in voice my own once-a-second request brings a fresher list than this one. */
   if (!VO.on) takeVoiceRoom(j.voice);
   takeSpots(j.spots);
@@ -2537,6 +2539,10 @@ R.toast = toast; R.toastHome = toastHome; R.send = send;
    map uses, and a way to say "this is now mine", so the library and Your character know at once. */
 R.sprite = sprite; R.thingStamp = thingStamp;
 R.shopOwned = function (list) { if (ST.shop && list) { ST.shop.owned = list; if (DECO.on) renderDeco(); } };
+/* What assets/realm_trade.js borrows: after a thing has changed hands, ask for the map again (what
+   I own and what everybody wears) and, standing in my own office, for my room (a thing I gave away
+   has been taken out of it). */
+R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
 var mine = me(), home = (mine && B[mine.place]) ? mine.place : (mine ? 'user:'+mine.id : 'tavern'), hs = spot(home);

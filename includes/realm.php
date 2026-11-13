@@ -39,6 +39,8 @@ require_once __DIR__ . '/realm_voice.php';
 // The merchant (migration 091): what can be bought, and what each person owns.
 // Only a list and a few small functions; nothing runs when it is loaded.
 require_once __DIR__ . '/realm_shop.php';
+// Giving and swapping what was bought (the same migration).
+require_once __DIR__ . '/realm_trade.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;

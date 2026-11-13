@@ -156,6 +156,8 @@ R.openGold = function (d, body) {
         +'<li>1 mana when a task of yours is approved on or before its due date.</li>'
         +'<li>You hold at most '+p.cap+'. Mana is only for praising others, and a praise costs 1.</li></ul>'
         +'<h3>How you earn gold</h3><ul>'
+        /* David, 2026-11-13: "let's also start with 5 gold and 5 mana for all the new people". */
+        +(p.start_gold ? '<li>Everybody starts with '+p.start_gold+' coins and '+p.start_mana+' mana.</li>' : '')
         +'<li>1 coin for every '+p.every+' working days in a row that you log your time.</li>'
         +'<li>1 coin for each task of yours that is approved.</li>'
         +'<li>1 coin the first time each person praises you in a week.</li></ul>'
@@ -163,7 +165,7 @@ R.openGold = function (d, body) {
         +'<li>A day can be logged until noon of the next working day.</li>'
         +'<li>Weekends, holidays and booked days off do not break a run. A missed working day starts it again.</li>'
         +(R.chestExtra && R.chestExtra()
-          ? '<li>Gold is spent at the merchant in the Tavern. One of each, and a purchase cannot be undone or sold back.</li><li>Gold cannot be handed to somebody else.</li>'
+          ? '<li>Gold is spent at the merchant in the Tavern. One of each, and a purchase cannot be undone or sold back.</li><li>What you bought can be given to somebody or swapped, face to face. Gold itself cannot be handed over.</li>'
           : '<li>Gold cannot be handed to somebody else. There is nothing to buy yet: clothes, companions and things for your office are coming.</li>')
         +'<li>Your gold is private, nobody else can see it, and it never has anything to do with pay.</li></ul></div>'+close;
     })

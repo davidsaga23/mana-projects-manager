@@ -39,11 +39,10 @@
 // CLOAKS, each with its drawing. The PRICES are only here; the screen is sent
 // them. A thing added here and not drawn there shows as nothing.
 //
-// NOT BUILT YET, agreed for the build after this one: giving a thing to
-// somebody (they must accept), swapping (both press agree in the same place),
-// and taking a thing off its old owner's character and out of their office
-// when it leaves them. realm_owned is shaped for it: one line per thing, with
-// who holds it and how they got it, so a gift is that line changing hands.
+// GIVING AND SWAPPING are in includes/realm_trade.php. realm_owned is one line
+// per thing, with who holds it and how they got it, so a gift is that line
+// changing hands; the thing is taken off its old owner's character and out of
+// their office in the same transaction.
 //
 // ⚠ NOTHING HERE IS ABOUT PAY. No rate, salary or invoice is read or written,
 // and the finance connection is never opened.

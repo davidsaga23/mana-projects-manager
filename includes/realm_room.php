@@ -112,8 +112,8 @@ function realm_room_default(): array {
  *     $owned is the list of what the SAVER owns (realm_owned). It is null when
  *     a stored room is only being read to be drawn: that room passed this rule
  *     when it was saved, and the reader is usually not the owner.
- *     ⚠ When giving and swapping are built, a thing that leaves its owner must
- *     be taken out of their stored room there; reading does not look.
+ *     A thing that is given away or swapped is taken out of its old owner's
+ *     stored room when it leaves them (realm_owned_strip, realm_trade.php).
  */
 function realm_room_check($in, string &$why, ?array $owned = null): ?array {
     $why = 'That room could not be read. Try again.';
