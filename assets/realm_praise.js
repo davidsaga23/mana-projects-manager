@@ -1,4 +1,4 @@
-/* The Realm: praise, mana and gold (David, 2026-11-12 and 2026-11-13, migration 088).
+/* The Realm: praise, mana and gold (David, 2026-11-12 and 2026-11-13, migration 090).
 
    The rules are in includes/realm_praise.php and are checked there; this file only shows them.
    It is its own file so that the map's script (assets/realm.js) stays as it was: that one hands

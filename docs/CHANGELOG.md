@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-13 — The Realm: praise, mana and gold, first version *(migration 088)*
+## 2026-11-13 — The Realm: praise, mana and gold, first version *(migration 090)*
 
 **Asked by David:** "people should be able to praise with a spell or something people doing a good
 job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let's build it".
@@ -40,6 +40,44 @@ job" (2026-11-12), and on 2026-11-13, after agreeing the rules of a praise: "Let
 - **Not verified:** PHP was never run here. The screen was tried against a pretend server; the real
   counting of time logs and the face to face check need David and Renata on the live site.
 
+## 2026-11-13 — The Realm: share your screen in a call *(migration 088)*
+
+**Asked by David:** "let's discuss the option to share your screen while in a voice chat", then,
+after the choices were talked through, "Yes, build it".
+
+- **Share screen**, a button in the room's bar once you are in a call. The browser asks what to
+  show, every time: a tab, a window or the whole screen. That choice is the sharer's ("They can
+  share the whole window if they want").
+- **It is for looking at a still thing together**, 2 to 5 people: a board, a paused frame, a
+  timeline, a file. The picture is kept sharp and slow (up to 1280 by 720, 5 pictures a second),
+  so text reads well and playing footage looks poor. Footage goes to a Reviews link, a big meeting
+  to Google Meet.
+- **One person at a time.** While somebody shares, nobody else is offered the button. If two press
+  it in the same second, the first holds the screen and the other is told who was first.
+- **Where it shows:** a large panel over the room, under the room's bar, with **Full screen** and
+  **Back to the room** (then **Show screen** in the bar brings it back). A small screen is drawn
+  beside the sharer's character.
+- **Only the people in the call see it.** Somebody who joins the call later sees it within a few
+  seconds. Somebody in the room who has not joined reads "Renata is sharing a screen, join the
+  call to see it."
+- **It ends** when the sharer presses Stop sharing (in the bar, on the red band, or the browser's
+  own button), leaves the call, leaves the room or closes the page.
+- **The sharer cannot miss it:** a red band across the top of the page, "You are sharing your
+  screen", with Stop sharing on it, for as long as the screen is out.
+- **No sound from the screen, and nothing is recorded.** The picture goes straight from the
+  sharer's browser to each viewer's, like the sound, and never through Anima's server.
+- **If it cannot get through** to one person, the sharer is told who, the others keep seeing it,
+  and the sound is not affected: the picture travels on its own lines.
+- **Computers only for sharing.** A phone has no Share screen button; it can watch.
+- **Not in this version:** taking over from the current sharer (they press Stop first), and sound
+  from a shared tab.
+- **Not verified:** PHP was never run. A real screen, two real people on two networks, a weak
+  upload, Firefox and Safari are all untested; three stand-in people in one browser were. See
+  `docs/DECISIONS.md`.
+- **Database:** migration 088 (two columns on `realm_voice`). Until it runs calls work as before
+  and there is no Share screen button.
+
+---
 ## 2026-11-13 — The Realm: "Join call" instead of "Join voice" *(no migration)*
 
 **Asked by David:** "let's change 'Join voice' for 'Join call'".

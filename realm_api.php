@@ -22,7 +22,7 @@
 // POST knock=<owner's user id>            knock on an ajar door you are standing at
 // POST answer_knock=<knock id>&let=0|1    answer a knock on your own door
 // POST voice=join|poll|leave              voice in the room you are inside (further down)
-// POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 088)
+// POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 090)
 // GET  purse=1                            the asker's OWN mana and gold
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 
@@ -119,7 +119,7 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
     exit;
 }
 
-// ---- the purse (David, 2026-11-12, migration 088) -----------------------------
+// ---- the purse (David, 2026-11-12, migration 090) -----------------------------
 // GET purse=1    the asker's own mana and gold, brought up to date with their
 //                time log first.
 //
@@ -132,7 +132,7 @@ if (isset($_GET['purse'])) {
 
 // ---- voice (David, 2026-11-12, migration 085) --------------------------------
 // POST voice=join&place=<room>            join the voice chat of the room I am inside
-// POST voice=poll&sid=<n>&muted=0|1&out=<JSON>
+// POST voice=poll&sid=<n>&muted=0|1&share=0|1&out=<JSON>
 //                                         once a second while in voice: I am still
 //                                         here, deliver these signals, give me mine
 // POST voice=leave&sid=<n>                leave it
@@ -166,7 +166,10 @@ if (isset($_POST['voice'])) {
             $answer = $none;
         } elseif ($what === 'poll') {
             $out = json_decode((string)($_POST['out'] ?? '[]'), true);
-            $answer = realm_voice_poll($pdo, $uid, $sid, (string)($_POST['muted'] ?? '0') === '1', is_array($out) ? $out : []);
+            // `share` (migration 088): "I am sharing my screen", a request the server grants
+            // to one person per room. See realm_voice_poll().
+            $answer = realm_voice_poll($pdo, $uid, $sid, (string)($_POST['muted'] ?? '0') === '1', is_array($out) ? $out : [],
+                                       (string)($_POST['share'] ?? '0') === '1');
         } else {
             $answer = $none;
         }
@@ -246,7 +249,7 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
             }
         }
         $profile = realm_profile($pdo, $uid, isset($_POST['save_profile']) ? $uid : (int)$_GET['profile']);
-        // The praise this person has been given hangs in their profile (migration 088). Praise is public.
+        // The praise this person has been given hangs in their profile (migration 090). Praise is public.
         if ($profile !== null) $profile['praise'] = realm_praise_received($pdo, (int)$profile['id']);
         $answer = $profile === null ? ['ok' => false, 'error' => 'There is nobody living there.'] : ['ok' => true, 'profile' => $profile, 'said' => $said];
         if ($bad !== '') $answer['error'] = $bad;
@@ -359,7 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $state = realm_state($pdo, $uid);
 $state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
-// Praise (migration 088): the asker's own mana and what was praised in the last two minutes.
+// Praise (migration 090): the asker's own mana and what was praised in the last two minutes.
 $state['praise'] = realm_praise_news($pdo, $uid);
 if ($praised) $state['praised'] = true;
 if ($error !== '') $state['error'] = $error;

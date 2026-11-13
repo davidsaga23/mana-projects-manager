@@ -586,7 +586,7 @@ function artist_may_post(): bool {
         // standing on, so the others see it walk. ⚠ THEIR OWN ROW, AND IT GRANTS
         // NOTHING: realm_stand() holds it to the room they are really inside or
         // to the map, and nothing reads a spot to decide what somebody may do.
-        // `praise` (2026-11-13, migration 088): praising somebody, which spends
+        // `praise` (2026-11-13, migration 090): praising somebody, which spends
         // one of the asker's own mana. ⚠ THE ID POSTED IS WHO IS PRAISED, never
         // who gives: realm_praise_give() takes the giver from the session, and
         // refuses unless the two characters are in the same place right now.

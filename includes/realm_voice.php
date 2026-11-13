@@ -50,9 +50,19 @@ const REALM_VOICE_CAP = 5;
 const REALM_VOICE_SECONDS = 15;
 /** A signal older than this is ignored: the connection it was for has moved on. */
 const REALM_SIGNAL_SECONDS = 30;
-/** The longest signal taken, in characters. An audio-only offer is a few thousand. */
-const REALM_SIGNAL_MAX = 12000;
-const REALM_SIGNAL_KINDS = ['offer', 'answer', 'ice'];
+/**
+ * The longest signal taken, in characters. An audio-only offer is a few
+ * thousand; the offer for a shared screen lists every picture format the browser
+ * knows and runs to about ten thousand, so the limit was raised from 12000 on
+ * 2026-11-13. `realm_signals.body` is TEXT, which holds 65535.
+ */
+const REALM_SIGNAL_MAX = 30000;
+/**
+ * offer / answer / ice set up the line the SOUND travels on. soffer / sanswer /
+ * sice set up the separate, one-way line a SHARED SCREEN travels on (migration
+ * 088), so that a screen that cannot get through never disturbs the sound.
+ */
+const REALM_SIGNAL_KINDS = ['offer', 'answer', 'ice', 'soffer', 'sanswer', 'sice'];
 
 /** Have the tables arrived (migration 085)? Asked once per request; never throws. */
 function realm_voice_available(PDO $pdo): bool {
@@ -61,6 +71,28 @@ function realm_voice_available(PDO $pdo): bool {
     try {
         $pdo->query('SELECT 1 FROM realm_voice LIMIT 1');
         $pdo->query('SELECT 1 FROM realm_signals LIMIT 1');
+        return $ok = true;
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/**
+ * Sharing a screen in a call (migration 088). David, 2026-11-13: "let's discuss
+ * the option to share your screen while in a voice chat", and that day: one
+ * person at a time, seen only by the people in the call, ended when the sharer
+ * stops, leaves the call or leaves the room, and no sound from the screen.
+ *
+ * The picture goes from browser to browser like the sound. All the server keeps
+ * is who holds the screen in a room. Asked once per request; never throws.
+ * Until the migration runs this is false and the browser shows no Share button.
+ */
+function realm_share_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    if (!realm_voice_available($pdo)) return $ok = false;
+    try {
+        $pdo->query('SELECT sharing, share_since FROM realm_voice LIMIT 1');
         return $ok = true;
     } catch (Throwable $e) {
         return $ok = false;
@@ -89,7 +121,12 @@ function realm_voice_room_of(PDO $pdo, int $uid): string {
 }
 
 /**
- * Who is in voice in $place: [{id, muted, sid}], in the order they joined.
+ * Who is in voice in $place: [{id, muted, sid, share}], in the order they joined.
+ *
+ * `share` is true for AT MOST ONE person: the one sharing their screen. When two
+ * rows both say sharing (two people pressed Share in the same second), the one
+ * who started first holds the screen, then the smaller id; the other browser is
+ * told by seeing that it is not the one named, and stops.
  *
  * Somebody counts only while ALL of this is true: their voice row is fresh,
  * it names this room, and their character is still inside this room with a
@@ -98,7 +135,8 @@ function realm_voice_room_of(PDO $pdo, int $uid): string {
  */
 function realm_voice_roster(PDO $pdo, string $place): array {
     if ($place === '') return [];
-    $q = $pdo->prepare('SELECT v.user_id, v.muted, v.session
+    $share = realm_share_available($pdo);
+    $q = $pdo->prepare('SELECT v.user_id, v.muted, v.session' . ($share ? ', v.sharing, v.share_since' : '') . '
                           FROM realm_voice v
                           JOIN realm_people rp ON rp.user_id = v.user_id
                          WHERE v.place = ?
@@ -108,15 +146,27 @@ function realm_voice_roster(PDO $pdo, string $place): array {
                       ORDER BY v.joined_at, v.user_id');
     $q->execute([$place]);
     $out = [];
+    $holder = -1;       // where in $out the one who holds the screen is
+    $since  = '';
     foreach ($q->fetchAll() as $r) {
-        $out[] = ['id' => (int)$r['user_id'], 'muted' => (int)$r['muted'] === 1, 'sid' => (int)$r['session']];
+        $id = (int)$r['user_id'];
+        if ($share && (int)$r['sharing'] === 1) {
+            $at = (string)($r['share_since'] ?? '');
+            if ($holder < 0 || $at < $since || ($at === $since && $id < $out[$holder]['id'])) {
+                $holder = count($out);
+                $since  = $at;
+            }
+        }
+        $out[] = ['id' => $id, 'muted' => (int)$r['muted'] === 1, 'sid' => (int)$r['session'], 'share' => false];
     }
+    if ($holder >= 0) $out[$holder]['share'] = true;
     return $out;
 }
 
 /**
  * Who is in voice in the room the asker is inside, for somebody who is NOT in
- * voice themselves: [{id, muted}]. Null until migration 085 has run.
+ * voice themselves: [{id, muted, share}]. Null until migration 085 has run.
+ * `share` lets the room say "Renata is sharing a screen, join the call to see it".
  *
  * Sent with the unread counts and with every chat answer, as knock news is, so
  * somebody standing in a room sees a voice chat begin within a few seconds
@@ -127,7 +177,7 @@ function realm_voice_here(PDO $pdo, int $uid): ?array {
     try {
         $out = [];
         foreach (realm_voice_roster($pdo, realm_voice_room_of($pdo, $uid)) as $p) {
-            $out[] = ['id' => $p['id'], 'muted' => $p['muted']];
+            $out[] = ['id' => $p['id'], 'muted' => $p['muted'], 'share' => $p['share']];
         }
         return $out;
     } catch (Throwable $e) {
@@ -170,6 +220,10 @@ function realm_voice_join(PDO $pdo, int $uid, string $place): array {
     $pdo->prepare('INSERT INTO realm_voice (user_id, place, session, muted, joined_at, last_seen) VALUES (?, ?, ?, 0, NOW(), NOW())
                    ON DUPLICATE KEY UPDATE place = VALUES(place), session = VALUES(session), muted = 0, joined_at = NOW(), last_seen = NOW()')
         ->execute([$uid, $room, $sid]);
+    // A fresh Join never arrives already sharing a screen (migration 088).
+    if (realm_share_available($pdo)) {
+        $pdo->prepare('UPDATE realm_voice SET sharing = 0, share_since = NULL WHERE user_id = ?')->execute([$uid]);
+    }
     // Anything still addressed to me was for an earlier call. And, since nothing
     // else ever sweeps these two tables: rows left behind by closed pages.
     $pdo->prepare('DELETE FROM realm_signals WHERE to_user = ? OR from_user = ?')->execute([$uid, $uid]);
@@ -195,6 +249,7 @@ function realm_voice_leave(PDO $pdo, int $uid, int $sid): void {
 /**
  * The once-a-second request of a browser that is in voice. In one go it:
  *   says "I am still here" (and whether I am muted),
+ *   says whether I am sharing my screen ($share, migration 088),
  *   hands over the signals I want delivered ($out: [{to, kind, body}]),
  *   and collects the signals waiting for me, which are then deleted.
  *
@@ -207,8 +262,16 @@ function realm_voice_leave(PDO $pdo, int $uid, int $sid): void {
  * only to somebody on that room's voice list, which realm_voice_roster() builds
  * from who is really inside. `body` is never read here; it is the browsers' own
  * text and is handed over as it came, within a length limit.
+ *
+ * ⚠ ONE SCREEN PER ROOM (David, 2026-11-13: "One at a time"). $share = true is a
+ * request, not a fact: it is granted only while nobody else on the room's list
+ * holds the screen. The answer's list marks who does (`share`), and a browser
+ * that asked and is not the one marked stops its own share and says who was
+ * first. $share = false always lets go. Leaving the call deletes the row, and
+ * walking out or closing the page takes the person off the list, so each of
+ * those ends the share with nothing extra to do.
  */
-function realm_voice_poll(PDO $pdo, int $uid, int $sid, bool $muted, array $out): array {
+function realm_voice_poll(PDO $pdo, int $uid, int $sid, bool $muted, array $out, bool $share = false): array {
     $gone = function (string $why): array { return ['in' => false, 'why' => $why, 'people' => [], 'signals' => []]; };
     if (!realm_voice_available($pdo)) return $gone('Calls need a database update first.');
     $q = $pdo->prepare('SELECT place, session FROM realm_voice WHERE user_id = ?');
@@ -224,7 +287,23 @@ function realm_voice_poll(PDO $pdo, int $uid, int $sid, bool $muted, array $out)
     $pdo->prepare('UPDATE realm_voice SET last_seen = NOW(), muted = ? WHERE user_id = ? AND session = ?')
         ->execute([$muted ? 1 : 0, $uid, $sid]);
 
+    $sharing = realm_share_available($pdo);
+    if ($sharing && !$share) {
+        $pdo->prepare('UPDATE realm_voice SET sharing = 0, share_since = NULL WHERE user_id = ? AND session = ? AND sharing = 1')
+            ->execute([$uid, $sid]);
+    }
     $people = realm_voice_roster($pdo, $place);
+    if ($sharing && $share) {
+        $held = false;      // does anybody, me included, hold the screen already?
+        foreach ($people as $p) {
+            if ($p['share']) $held = true;
+        }
+        if (!$held) {
+            $pdo->prepare('UPDATE realm_voice SET sharing = 1, share_since = NOW() WHERE user_id = ? AND session = ?')
+                ->execute([$uid, $sid]);
+            $people = realm_voice_roster($pdo, $place);
+        }
+    }
     $there = [];
     foreach ($people as $p) $there[$p['id']] = true;
 
