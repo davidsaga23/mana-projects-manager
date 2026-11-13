@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: sending jumps to the bottom, and rooms say "Exit" *(no migration)*
+
+**Asked by David**: "when writing in a chat, when hit enter it should take you to the end of the
+conversation (the bottom) so we can see what's the last thing we sent", and, with a picture of the
+doorway in his room, "add the exit name here in each room's door".
+
+- **Sending a message scrolls the conversation to the bottom**, even if you had scrolled up to read,
+  so your message is always in view. New messages from others still only pull you down when you are
+  already near the bottom.
+- **Every room's doorway has a small "Exit" plate** on the floor just inside it. Someone standing on
+  it covers it.
+
 ## 2026-11-13 — The Realm: small animations *(no migration)*
 
 **Asked by David**: "let's create some basic animations for when you: teleport, open a chest, access
