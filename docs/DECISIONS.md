@@ -5640,3 +5640,16 @@ theirs and others bio and profile from Anima, and update it."
   are drawn faint and speech bubbles are not shown.
 - **Not verified:** PHP was never run (the files parse, and the two libraries were compared by a
   script); the real profile save and picture upload; Safari, Firefox and phones; dragging by touch.
+
+## 2026-11-13 — The Realm says "call", the code says "voice"
+
+David: "let's change 'Join voice' for 'Join call'".
+
+- **On screen the word is "call"**: Join call, Leave call, "in a call", "The call is full". Anything
+  new that people read about it uses the same word.
+- **The code, the tables (`realm_voice`, `realm_signals`), the request field (`voice=`) and the
+  function names keep "voice".** Renaming them would need a migration and a change to the
+  allow-list in `includes/auth.php` for no gain to anybody using it.
+- **"Use a video call" stays** in the two messages that send people elsewhere (a full call, a
+  connection that could not be made): it means Google Meet or similar, outside the Realm.
+- **Entries above this one keep "voice"**, as written that day.
