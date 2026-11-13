@@ -5531,3 +5531,62 @@ like if the speaker was broken. Let's ... fix it".
   silently for a few seconds and then end themselves. The snare and hat are still made of filtered
   hiss, by design; if those also read as noise, the next step is to drop the hat and soften the
   snare further.
+
+## 2026-11-12 — Voice in the Realm: browser to browser, by pressing Join
+
+David: "let's start working on the voice chats". Earlier the same day: "I think is fine 3-5 people
+talking informally but if we need more people (which rarely happens) we can cast a spell and
+connect it with google meetings so we can all hop on there", and voice "with a specific person ...
+should be face-to-face in the map".
+
+- **Every room, one rule.** The people INSIDE the same room can talk, up to five
+  (`REALM_VOICE_CAP`). David chose every room over starting with houses or the Tavern only.
+- **Each person presses Join voice.** David chose this over voice starting on walking in. Being in
+  a room never opens a microphone.
+- **The sound never touches Anima.** WebRTC, one direct line between each pair of people in voice
+  (a mesh, fine for five). The server keeps the list of who is in voice (`realm_voice`) and relays
+  the set-up notes (`realm_signals`: offer, answer, network addresses), each read once and deleted.
+- **The first outside service in the Realm, by David's yes.** He asked first: "we need this to be
+  fiction free and easy for everyone to use. Is that the case? What about privacy? If I change
+  browser do I need to share anything new?" The answers he agreed to: nobody installs or sets up
+  anything; the lookup (STUN, `stun.l.google.com`) sees only the internet address of the
+  connection asking, never names, Anima, or sound; a new browser only asks for the microphone
+  again. One honest note given: people in the same call can technically see each other's internet
+  address, as in any direct call. It is one line, `realm_voice_ice()` in
+  `includes/realm_voice.php`. **Anima's server still talks to nobody**; only each person's browser
+  does, and only while in voice. `docs/HANDOFF.md` says so now.
+- **No relay (TURN).** Two people on strict networks (some offices, some phone hotspots) may fail
+  to connect. The page tries twice, then says so. A relay costs a few dollars a month and is a
+  second entry in `realm_voice_ice()`; add it when a real pair of people cannot connect.
+- **Signalling by short requests**, because the hosting cannot hold a connection open. A browser in
+  voice posts `voice=poll` once a second: it says "still here" and whether muted, hands over its
+  notes, and collects its own. Notes are also sent a fifth of a second after they are made, so a
+  line comes up in about two seconds. A voice row not refreshed for 15 seconds is treated as gone,
+  which is how a closed page leaves. **A five-person call is about 5 requests a second in total**
+  (plus a short burst while lines come up), each a handful of small indexed queries. Nobody outside
+  a call pays this. If the hosting objects, the first lever is the one-second interval in
+  `voiceBeat()`'s `setInterval`.
+- **Who may signal whom is checked on the server on every request:** the sender has a voice row for
+  this window, is inside that room; the recipient is on that room's voice list, which is built
+  from who is really inside with a fresh heartbeat. The body of a note is never read by the server.
+- **Who calls whom:** of any two people the smaller user id makes the offer. Every Join gets a new
+  number (`session`), so a reload or a second window is told apart: the newest window has the
+  voice and the older one is told "Your voice moved to another window."
+- **Others in the room see who is in voice within a few seconds**, because the list rides on the
+  unread and chat answers (`realm_voice_here()`), as knock news does. Who is SPEAKING is only shown
+  to people who are in voice themselves: it is measured from the sound, which only they receive.
+- **The room's Leave button now reads "Leave room"**, since "Leave voice" sits beside it.
+- **Left for later:** "Summon the Council" (needs a saved Meet link an admin sets once, a button
+  in the Council Hall and a notice to everybody online); desktop notifications and sounds (the
+  installed app); choosing a microphone or speaker; volume per person.
+- **How it was tested, and what that proves:** a local copy of the page with a stand-in server
+  written to follow `includes/realm_voice.php` rule for rule, shared between two tabs through
+  `localStorage`, and a pretend microphone (a steady tone, a different pitch per person). Two tabs
+  as two people in the Tavern: both joined, a line came up, and each tab measured the OTHER
+  person's pitch arriving (662 Hz and 441 Hz for tones of 660 and 440). Also seen working: mute
+  (the other side received silence), leaving and rejoining voice, a line cut on purpose rebuilding
+  itself, leaving the room hanging up, the "microphone is blocked" message. That proves the
+  browser code and the shape of the exchange. It does NOT prove the PHP (never run), real
+  microphones and echo, two different networks (both tabs were on one machine, so the address
+  lookup was never needed), three or more people, or other browsers than the preview's Chromium.
+  The test page is not in the repository.

@@ -114,6 +114,12 @@ as done by the admin) from the Users page. `preview_blocks_saving()` is the gate
 so on screen), costs money per use, and can fail (reported honestly). Any future AI assistant
 should reuse this shape. Nothing else in the app talks to the outside world.
 
+One exception that is NOT the server: while somebody is in a voice chat in the Realm, **their
+browser** asks Google's public address-lookup service (STUN) for its own internet address, so two
+browsers on different networks can reach each other. No sound and no Anima data goes to it. David
+agreed to it on 2026-11-12 (`docs/DECISIONS.md`); it is one line, `realm_voice_ice()` in
+`includes/realm_voice.php`.
+
 ---
 
 ## 3. How it is deployed — READ BEFORE TOUCHING DEPLOY
