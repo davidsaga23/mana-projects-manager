@@ -1072,6 +1072,12 @@ function drawRoom(c, cw, ch) {
   if (land) slayPaint(c,land);
   /* The way out, wide enough to stand on. */
   c.fillStyle = PAL.glow; c.fillRect(106,150,28,8); c.fillStyle = PAL.hot; c.fillRect(110,155,20,3);
+  /* THE DOORWAY SAYS "EXIT" (David, 2026-11-13, with a picture of the lit doorway at the bottom of
+     his room: "add the exit name here in each room's door"). A small plate on the floor just inside
+     it, in every room, painted before the people so somebody standing on it covers it. */
+  c.font = 'bold 7px "Courier New", monospace'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.fillStyle = PAL.plate; c.fillRect(107,139,26,10); c.lineWidth = .75; c.strokeStyle = PAL.primaryBorder; c.strokeRect(107.4,139.4,25.2,9.2);
+  c.fillStyle = PAL.primary; c.fillText('Exit',120,146.5); c.textAlign = 'start';
   var my = me()||{cloak:'mana',hat:'none',pet:'none'}, who = [], walking = !!RM.walk || held.size > 0;
   roomPeople(o).forEach(function (p, i) { var at = standOf(p,i), gl = glide(p.id,at.x,at.y,o.id); who.push({p:p,x:Math.round(gl.x),y:Math.round(gl.y),bob:gl.path?(Math.floor(Date.now()/130)%2)*2:(f+i)%4===0?2:0}); });
   who.push({p:my,x:Math.round(RM.x),y:Math.round(RM.y),bob:walking?(Math.floor(Date.now()/130)%2)*2:0,mine:true});
@@ -1774,6 +1780,13 @@ function follow() { var v = S.view, m = 60, x = v.x, y = v.y;
   if (S.pos.x<v.x+m) x = S.pos.x-m; else if (S.pos.x>v.x+v.w-m) x = S.pos.x-v.w+m;
   if (S.pos.y<v.y+m+30) y = S.pos.y-m-30; else if (S.pos.y>v.y+v.h-m) y = S.pos.y-v.h+m;
   if (x!==v.x || y!==v.y) setView({x:x,y:y,w:v.w}); }
+/* THE CHARACTER STAYS ON THE MAP (David, 2026-11-13, with a picture of his character half off the top
+   edge above The Moor: "right now the characters can go off the map, let's restrict that"). The
+   feet used to be held only 40 units from the top, and a character is about 60 tall with the arrow
+   above it, so the head and the arrow left the picture; on the right, a companion beside the
+   character did the same. These are the limits for the FEET, so the whole figure stays in view. */
+var EDGE = {left:16,right:1572,top:78,bottom:990};
+function inEdge(x, y) { return x >= EDGE.left && x <= EDGE.right && y >= EDGE.top && y <= EDGE.bottom; }
 function freeAt(x, y) { var tx = Math.floor(x/16), ty = Math.floor(y/16); return tx>=0&&ty>=0&&tx<GRID.W&&ty<GRID.H&&!GRID.b[ty*GRID.W+tx]; }
 function canStand(x, y) { return freeAt(x-6,y)&&freeAt(x+6,y); }
 /* The way on foot from one point to another, round whatever is solid. */
@@ -1781,7 +1794,7 @@ function route(from, to) {
   var W = GRID.W, H = GRID.H, ti = function (p) { return Math.max(0,Math.min(H-1,Math.floor(p.y/16)))*W+Math.max(0,Math.min(W-1,Math.floor(p.x/16))); };
   var s = ti(from), t = ti(to), prev = new Int32Array(W*H).fill(-1), q = [s], D = [[1,0],[-1,0],[0,1],[0,-1]], h, d; prev[s] = s;
   for (h = 0; h < q.length && prev[t] < 0; h++) { var i = q[h], x = i%W, y = (i-x)/W;
-    for (d = 0; d < 4; d++) { var nx = x+D[d][0], ny = y+D[d][1], j = ny*W+nx; if (nx<0||ny<0||nx>=W||ny>=H||prev[j]>=0||(GRID.b[j]&&j!==t)) continue; prev[j] = i; q.push(j); } }
+    for (d = 0; d < 4; d++) { var nx = x+D[d][0], ny = y+D[d][1], j = ny*W+nx; if (nx<0||ny<0||nx>=W||ny>=H||prev[j]>=0||((GRID.b[j]||!inEdge(nx*16+8,ny*16+8))&&j!==t)) continue; prev[j] = i; q.push(j); } }
   if (prev[t] < 0) return null;
   var path = [{x:to.x,y:to.y}]; for (var k = t; k!==s; k = prev[k]) path.push({x:(k%W)*16+8,y:Math.floor(k/W)*16+8});
   return path.reverse();
@@ -1845,14 +1858,29 @@ function bindMap() {
 window.addEventListener('pointermove',function (e) { S.touched = true; if (!drag) return; var dx = e.clientX-drag.x, dy = e.clientY-drag.y; if (!drag.moved && Math.hypot(dx,dy) < 5) return; drag.moved = true; setView({x:drag.vx-dx*drag.k,y:drag.vy-dy*drag.k,w:S.view.w}); });
 window.addEventListener('pointerup',function () { if (drag && drag.moved) { justDragged = true; setTimeout(function () { justDragged = false; },60); } drag = null; });
 function select(id, center) { if (!B[id]) return; S.sel = id; if (center && !S.inside) { var o = B[id]; setView({x:o.x-S.view.w/2,y:o.y-40-S.view.h/2,w:S.view.w}); } renderCard(); renderSide(); }
-function nearest() { var best = null, bd = 36; BLIST.forEach(function (o) { var t = spot(o.id), d = Math.hypot(t.x-S.pos.x,t.y-S.pos.y); if (d < bd) { bd = d; best = o.id; } }); return best; }
+/* AT A BUILDING IS ANYWHERE AROUND IT (David, 2026-11-13, standing just right of his own house:
+   "right now only appears the buttons when you are on the left side of the buildings, is it possible
+   to expand the trigger area?"). It used to be a circle 36 units round the one spot beside the door,
+   on the building's left. Now it is a box round the whole building: its width plus NEAR.side each
+   side, from a little above the roof to NEAR.below under the door. Where two boxes overlap (houses
+   stand close), the building whose door is nearer wins. */
+var NEAR = {side:34,above:14,below:44};
+function nearest() {
+  var best = null, bd = Infinity, x = S.pos.x, y = S.pos.y;
+  BLIST.forEach(function (o) {
+    var h = HIT[o.kind]; if (!h) return;
+    if (x < o.x-h[0]-NEAR.side || x > o.x+h[0]+NEAR.side || y < o.y-h[1]-NEAR.above || y > o.y+NEAR.below) return;
+    var d = Math.hypot(o.x-x,o.y-y); if (d < bd) { bd = d; best = o.id; }
+  });
+  return best;
+}
 function keyTick(ts) {
   if (!held.size) { kraf = 0; klt = 0; if (S.inside) draw(); return; }
   var dt = klt ? Math.min(.05,(ts-klt)/1000) : 0; klt = ts;
   var dx = (held.has('ArrowRight')?1:0)-(held.has('ArrowLeft')?1:0), dy = (held.has('ArrowDown')?1:0)-(held.has('ArrowUp')?1:0);
   /* Inside a room the same keys walk the room (roomStep), and nothing is said to the map. */
   if (S.inside) { if (dx || dy) roomStep(dx,dy,dt); kraf = requestAnimationFrame(keyTick); return; }
-  if (dx || dy) { var n = Math.hypot(dx,dy), st = 230*dt, nx = Math.max(20,Math.min(1580,S.pos.x+dx/n*st)), ny = Math.max(40,Math.min(990,S.pos.y+dy/n*st)), stuck = !canStand(S.pos.x,S.pos.y);
+  if (dx || dy) { var n = Math.hypot(dx,dy), st = 230*dt, nx = Math.max(EDGE.left,Math.min(EDGE.right,S.pos.x+dx/n*st)), ny = Math.max(EDGE.top,Math.min(EDGE.bottom,S.pos.y+dy/n*st)), stuck = !canStand(S.pos.x,S.pos.y);
     S.pos = (stuck||canStand(nx,ny))?{x:nx,y:ny}:canStand(nx,S.pos.y)?{x:nx,y:S.pos.y}:canStand(S.pos.x,ny)?{x:S.pos.x,y:ny}:S.pos;
     spotDirty(); follow(); draw();
     var at = nearest(); if (at!==S.here) { S.here = at; S.sel = at; renderCard(); renderSide(); if (at) send({arrive:at,inside:0}); } }
@@ -1948,7 +1976,8 @@ document.addEventListener('click',function (e) {
    between two people. An open conversation asks for anything new every 3 seconds and stops asking
    while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
    ST.chat is null until the migration has run, and then none of this draws. */
-var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false};
+/* first: the first message on screen, so the reactions asked for are those of the messages shown. */
+var CH = {open:null,last:0,first:0,timer:0,busy:false,seen:false,wide:false};
 /* THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at the middle of the
    chat bar so there's an option to extend it over the map"). The handle on the conversation's left
    edge lays it over the map, for room to read and write, and brings it back. The choice is kept
@@ -2062,7 +2091,7 @@ function rich(body) {
 }
 function msgHTML(m) {
   var pic = m.image ? '<a class="rimglink" href="realm_image.php?id='+m.id+'" target="_blank" rel="noopener"><img class="rimg" src="realm_image.php?id='+m.id+'" alt="Picture from '+esc(m.name)+'" loading="lazy"></a>' : '';
-  return '<div class="rmsg'+(m.mine?' is-mine':'')+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
+  return '<div class="rmsg'+(m.mine?' is-mine':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
 }
 function chatTake(j) {
   CH.busy = false;
@@ -2075,10 +2104,13 @@ function chatTake(j) {
     fresh.forEach(function (m) { BUB[m.user] = {text:m.body || '(a picture)',until:Date.now()+BUBBLE_MS}; });
     draw(); setTimeout(draw,BUBBLE_MS+100);
   }
-  if (fresh.length) { if (!CH.last) box.innerHTML = ''; box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen) box.scrollTop = box.scrollHeight; }
+  if (fresh.length) { if (!CH.last) { box.innerHTML = ''; CH.first = fresh[0].id; } box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen || CH.jump) box.scrollTop = box.scrollHeight; }
+  if (CH.jump && j.messages) { CH.jump = false; box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
   if (FIND.jump) findLand(fresh);
   CH.seen = true;
+  /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
+  if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
   if (j.unread) takeUnread(j.unread);
@@ -2091,13 +2123,13 @@ function chatTake(j) {
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
-  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+(FIND.jump && !CH.last ? '&at='+FIND.jump : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(FIND.jump && !CH.last ? '&at='+FIND.jump : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
 }
 function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
   if (CH.open===id) { $('chatInput').focus(); return; }
-  CH.open = id; CH.last = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
+  CH.open = id; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
 }
@@ -2162,11 +2194,17 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
   var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open) return;
   inp.value = ''; CH.busy = true; sugClose(); setPick(null);
+  /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end
+     of the conversation (the bottom) so we can see what's the last thing we sent"). Before, the list
+     only followed new messages if you were already near the bottom, so after scrolling up to read,
+     your own message landed out of sight. Now it jumps down at once, and again when the answer with
+     your message arrives (chatTake reads CH.jump). */
+  CH.jump = true; var mb = $('chatMsgs'); if (mb) mb.scrollTop = mb.scrollHeight;
   /* A picture travels as a file, so the message goes as a form with parts; words alone go as before. */
-  var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last);
+  var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last); f.append('from',CH.first);
   if (pic) f.append('image',pic,pic.name || 'pasted-image.png');
   fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
+    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; CH.jump = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
 });
 
 /* ---------- search (David, 2026-11-13: "all channels and dms") ----------
@@ -2245,8 +2283,9 @@ function findLand(fresh) {
   var id = FIND.jump, box = $('chatMsgs'), i = -1, el;
   FIND.jump = 0;
   fresh.forEach(function (m, k) { if (m.id===id) i = k; });
-  /* The page was drawn from empty, so its messages are the box's children in the same order. */
-  el = i >= 0 && box.children.length===fresh.length ? box.children[i] : null;
+  /* Each message carries its id (added with reactions, PR 238). Failing that, the page was drawn
+     from empty, so its messages are the box's children in the same order. */
+  el = box.querySelector('.rmsg[data-msg="'+id+'"]') || (i >= 0 && box.children.length===fresh.length ? box.children[i] : null);
   if (!el) { toast('That message could not be shown in the conversation.'); return; }
   el.classList.add('is-found');
   el.scrollIntoView({block:'center'});
@@ -3122,6 +3161,9 @@ R.shopOwned = function (list) { if (ST.shop && list) { ST.shop.owned = list; if 
    has been taken out of it). */
 /* What assets/realm_praise.js borrows: the fan of stars over somebody who has just been praised. */
 R.fxAt = fxAt;
+/* What assets/realm_react.js borrows: the open conversation (which one, what is on screen) and the
+   one place an answer about it is taken in, so a reaction's answer is drawn like any other. */
+R.chat = CH; R.chatTake = chatTake;
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
@@ -3157,7 +3199,7 @@ function keepSpot() {
       draw(); send({arrive:k.inside,inside:1}); spotDirty();
       return;
     }
-    if (num(k.x) && num(k.y) && canStand(k.x,k.y)) {
+    if (num(k.x) && num(k.y) && inEdge(k.x,k.y) && canStand(k.x,k.y)) {
       S.pos = {x:k.x,y:k.y}; var at = nearest(); S.here = at; S.sel = at;
       follow(); renderCard(); renderSide(); draw();
       if (at && at!==home) send({arrive:at,inside:0});

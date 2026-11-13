@@ -356,6 +356,11 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // GET  unread=1                            only the unread counts
 // GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
 // GET  chat=<channel>&at=<message id>      open a conversation at a found message
+// POST react=<message id>&emoji=<key>&after=<id>&from=<id>
+//                                          give or take back my reaction (migration
+//                                          093), then the same answer as chat=
+// Every answer about a conversation carries `reactions` once migration 093 has
+// run: the reactions on the messages from `from` on (the first one on screen).
 //
 // Answered here, apart from the map: an open conversation asks every few
 // seconds and has no use for where everybody is standing.
@@ -389,7 +394,17 @@ if (isset($_GET['search'])) {
     }
     exit;
 }
-$channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
+// ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
+// message is really in, so the access check below is asked about the right
+// conversation whatever id is posted.
+$reactTo = isset($_POST['react']) ? (int)$_POST['react'] : 0;
+$channel = isset($_POST['say']) ? (string)$_POST['say']
+         : (isset($_POST['react']) ? realm_message_channel($pdo, $reactTo)
+         : (isset($_GET['chat']) ? (string)$_GET['chat'] : ''));
+if (isset($_POST['react']) && $channel === '') {
+    echo json_encode(['ok' => true, 'error' => 'That message is no longer there.']);
+    exit;
+}
 if ($channel !== '') {
     if (!realm_chat_available($pdo)) {
         echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
@@ -421,6 +436,7 @@ if ($channel !== '') {
                 }
             }
         }
+        if ($reactTo > 0) $said = realm_react($pdo, $uid, $reactTo, (string)($_POST['emoji'] ?? ''));
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
         // Opened from a search result: start a little before the found message.
         if ($after === 0 && isset($_GET['at'])) $after = realm_search_start($pdo, $channel, (int)$_GET['at']);
@@ -436,6 +452,13 @@ if ($channel !== '') {
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
                    'offers' => realm_offer_news($pdo, $uid)];
+        // Reactions (migration 093): only once the table exists, so the page
+        // knows whether to offer them. A first page starts at its own first message.
+        if (realm_reactions_available($pdo)) {
+            $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
+            if ($after === 0 && $messages) $from = (int)$messages[0]['id'];
+            $answer['reactions'] = (object)realm_reactions($pdo, $uid, $channel, $from);
+        }
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {

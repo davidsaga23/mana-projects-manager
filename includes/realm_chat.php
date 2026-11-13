@@ -356,3 +356,110 @@ function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, b
         // The message was kept; only the bell is silent.
     }
 }
+
+// ---- reactions (migration 093) -------------------------------------------------
+// David, 2026-11-13, choosing what chat needed next: emoji reactions, "the
+// most-used Slack feature, a thumbs up saves typing 'ok'".
+//
+// What was settled, and is relied on below:
+//   * A SMALL FIXED SET, not a full emoji picker: light, quick to hit, and in
+//     keeping with the pixel look. The set is the keys below; the pictures are
+//     drawn by assets/realm_react.js. A key that is not in the set is refused.
+//   * ANYBODY WHO MAY READ THE CONVERSATION MAY REACT, Announcements included:
+//     reacting is not writing. realm_react() asks realm_channel_access() for
+//     the channel the MESSAGE is in, so a raven can only be reacted to by its
+//     two people, whatever id is posted.
+//   * A REACTION IS NOT A MESSAGE. It is never counted as unread and never
+//     rings Anima's bell; the others see it within seconds because an open
+//     conversation already asks for news every 3 seconds.
+
+/** The reactions anybody can give, in the order the picker shows them. */
+const REALM_REACTIONS = ['up', 'heart', 'laugh', 'party', 'eyes', 'thanks'];
+
+/** Has migration 093 made the table? Asked once per request; never throws. */
+function realm_reactions_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $pdo->query('SELECT 1 FROM realm_reactions LIMIT 1');
+        return $ok = true;
+    } catch (Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/** The channel a message was said in, or '' when there is no such message. Never throws. */
+function realm_message_channel(PDO $pdo, int $messageId): string {
+    if ($messageId <= 0) return '';
+    try {
+        $q = $pdo->prepare('SELECT channel FROM realm_messages WHERE id = ?');
+        $q->execute([$messageId]);
+        return (string)($q->fetchColumn() ?: '');
+    } catch (Throwable $e) {
+        return '';
+    }
+}
+
+/**
+ * Give my reaction to a message, or take it back if I had already given that
+ * one (a toggle, as in Slack). Returns '' when it was done, or the sentence to
+ * show.
+ *
+ * ⚠ THE CALLER HAS ALREADY CHECKED realm_channel_access() for the channel the
+ * message is really in (realm_message_channel()), never one that was posted.
+ * The person is always the session's own account.
+ */
+function realm_react(PDO $pdo, int $uid, int $messageId, string $emoji): string {
+    if (!realm_reactions_available($pdo)) return 'Reactions need a database update first. An administrator opens migrate.php once.';
+    if (!in_array($emoji, REALM_REACTIONS, true)) return 'That reaction is not one of the Realm\'s.';
+    $off = $pdo->prepare('DELETE FROM realm_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?');
+    $off->execute([$messageId, $uid, $emoji]);
+    if ($off->rowCount() > 0) return '';
+    // INSERT IGNORE: two quick clicks that both found nothing to take away
+    // leave one reaction, not an error.
+    $pdo->prepare('INSERT IGNORE INTO realm_reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, NOW())')
+        ->execute([$messageId, $uid, $emoji]);
+    return '';
+}
+
+/**
+ * The reactions on the messages of a channel from message $fromId on, which is
+ * the first message the conversation on screen shows. Message id => list of
+ * ['e' => key, 'n' => how many, 'mine' => bool, 'who' => [names]], each emoji in
+ * the order it was first given. Messages without reactions are left out.
+ * The caller has already checked realm_channel_access(). Never throws: an empty
+ * answer is "no reactions".
+ */
+function realm_reactions(PDO $pdo, int $uid, string $channel, int $fromId): array {
+    if ($fromId <= 0 || !realm_reactions_available($pdo)) return [];
+    $out = [];
+    try {
+        $q = $pdo->prepare('SELECT r.message_id, r.emoji, r.user_id, u.display_name, u.username, c.name AS crew_name
+                              FROM realm_reactions r
+                              JOIN realm_messages m ON m.id = r.message_id
+                         LEFT JOIN users u ON u.id = r.user_id
+                         LEFT JOIN crew c ON c.id = u.crew_id
+                             WHERE m.channel = ? AND m.id >= ?
+                          ORDER BY r.message_id, r.created_at, r.user_id
+                             LIMIT 3000');
+        $q->execute([$channel, $fromId]);
+        $at = [];   // message id => emoji => its place in that message's list
+        foreach ($q->fetchAll() as $r) {
+            $mid = (int)$r['message_id'];
+            $key = (string)$r['emoji'];
+            if (!in_array($key, REALM_REACTIONS, true)) continue;
+            if (!isset($at[$mid][$key])) {
+                $at[$mid][$key] = isset($out[$mid]) ? count($out[$mid]) : 0;
+                $out[$mid][] = ['e' => $key, 'n' => 0, 'mine' => false, 'who' => []];
+            }
+            $i = $at[$mid][$key];
+            $mine = (int)$r['user_id'] === $uid;
+            $out[$mid][$i]['n']++;
+            if ($mine) $out[$mid][$i]['mine'] = true;
+            $out[$mid][$i]['who'][] = $mine ? 'You' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username'])));
+        }
+    } catch (Throwable $e) {
+        return [];
+    }
+    return $out;
+}

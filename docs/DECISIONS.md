@@ -6044,6 +6044,20 @@ forward"); how a swap works step by step is my design, below.
 - **Not verified:** PHP was never run. A gift and a swap were tried between two pretend people;
   saying no, calling an offer off, an offer running out and walking away were not tried.
 
+## 2026-11-13 — Realm chat reactions: a fixed set of six, reactions are not messages
+
+David chose emoji reactions as the next chat feature ("the most-used Slack feature, a 👍 saves
+typing 'ok'"). Built as:
+- **A fixed set of six** (👍 ❤️ 😂 🎉 👀 🙏), not a full picker: light, quick, fits the pixel look.
+  The keys live in `REALM_REACTIONS` (`includes/realm_chat.php`) and the pictures in
+  `assets/realm_react.js`; adding one means adding it in both. The database keeps the key, never the
+  emoji. David can still ask for a full picker later.
+- **Reacting is not writing**: anybody who can read a conversation can react, Announcements included.
+- **A reaction is not a message**: no unread count, no bell. Others see it through the open
+  conversation's 3-second poll, which carries the reactions of every message on screen.
+- **The POST names a message, never a channel**: `realm_api.php` looks up the message's own channel
+  and asks `realm_channel_access()` before writing, so ravens stay between their two people.
+
 ## 2026-11-13 — Searching the Realm's chat
 
 **Asked by David**: "search across all chat history". Losing Slack history after 90 days is one of
