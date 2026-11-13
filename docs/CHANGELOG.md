@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: small animations *(no migration)*
+
+**Asked by David**: "let's create some basic animations for when you: teleport, open a chest, access
+the book shelf, open your profile, get a praise, are idle (zzzz), talk with voice or in voice chat".
+
+- **Teleport:** a ring of sparks and a beam where you were, and the same closing in where you land.
+- **Chest:** the lid lifts and gold coins hop out, then your purse opens.
+- **Bookshelf:** pages flutter up off the shelf, then your library opens.
+- **Portrait:** a light sweeps across the frame with a few violet stars, then the profile opens.
+  The window for these three now opens about half a second after the click, so the animation shows.
+- **Praise:** a fan of stars opens over the person praised, in the colour of the kind of praise
+  (Craft blue, Help green, Idea gold, Rescue red), for everybody who can see them.
+- **Idle:** three Z's drift up and fade over a resting character, instead of one still Z.
+- **Talking in a call:** sound rings leave the microphone mark and the ring at the feet breathes.
+- Nothing moves for somebody whose computer asks for reduced motion; the windows then open at once.
+
 ## 2026-11-13 — The Realm: names behind the characters, and a reload keeps your place *(no migration)*
 
 **Reported by David**, with a picture of "Renata" and "The Tavern" written across the characters

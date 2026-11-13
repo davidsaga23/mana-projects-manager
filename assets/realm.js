@@ -357,8 +357,114 @@ function sprite(c, x, y, L, bob) {
   else if (L.pet==='dragon') { var dg = '#58b368', dl = shade(dg,55); PS([[22,-18,6,8,dl],[13,-10,10,9,dg],[12,-18,9,8,dg],[12,-21,2,3,PAL.wall],[19,-21,2,3,PAL.wall],[23,-5,5,3,dg]]);
     A(23,-17,1,6,dg); A(25,-17,1,5,dg); A(15,-7,6,6,PAL.lavaL); A(15,-5,6,1,PAL.glow); A(15,-3,6,1,PAL.glow); A(13,-15,2,2,PAL.win); A(18,-15,2,2,PAL.win); A(14,-15,1,2,o); A(19,-15,1,2,o); A(14,-12,1,1,o); A(18,-12,1,1,o); A(27,-5,2,2,TINT.ember); }
 }
-/* Resting: a small Z over the head. */
-function zed(c, x, y) { c.fillStyle = PAL.out; c.fillRect(x+7,y-63,9,9); c.fillStyle = PAL.hot; c.fillRect(x+8,y-62,7,1); c.fillRect(x+8,y-56,7,1); for (var i = 0; i < 5; i++) c.fillRect(x+13-i,y-61+i,2,1); }
+/* RESTING: THREE Z'S DRIFTING UP (David, 2026-11-13: an animation for when you "are idle (zzzz)").
+   They rise, lean a little and fade, one after another, over about three seconds. The map is
+   repainted every 260 ms anyway, so this costs nothing extra; with "reduce motion" set they simply
+   stand still, as the single Z used to. */
+function zed(c, x, y) {
+  var t = Date.now()/3000, i;
+  for (i = 0; i < 3; i++) {
+    var p = calm ? .25+i*.25 : (t+i/3)%1, zx = Math.round(x+5+p*9+Math.sin(p*6.28)*2), zy = Math.round(y-58-p*20), w = 7+Math.round(p*3);
+    c.globalAlpha = calm ? 1 : Math.min(1,p/.12)*Math.max(0,1-Math.max(0,(p-.55)/.45));
+    c.fillStyle = PAL.out; c.fillRect(zx-1,zy-1,w+2,w+2);
+    c.fillStyle = PAL.hot; c.fillRect(zx,zy,w,1); c.fillRect(zx,zy+w-1,w,1);
+    for (var j = 0; j < w-2; j++) c.fillRect(zx+w-2-j,zy+1+j,2,1);
+  }
+  c.globalAlpha = 1;
+}
+/* ---------- the small animations (David, 2026-11-13) ----------
+   "let's create some basic animations for when you: teleport, open a chest, access the book shelf,
+   open your profile, get a praise, are idle (zzzz), talk with voice or in voice chat."
+   Idle and talking belong to a character and are drawn with them (zed, voiceMark). The other four
+   are moments, so they are kept here as a short-lived list and painted over whatever is on screen:
+   fx(kind, x, y) starts one where something happened, in the units of the picture it belongs to
+   (the map, or the room I am standing in: `room` is which, so a room's sparks never show on the
+   map). While any of them is running, or anybody is speaking, the picture is repainted by the
+   clock; when they are over it goes back to its usual slow beat.
+   NOTHING MOVES FOR SOMEBODY WHO ASKED FOR LESS MOTION (prefers-reduced-motion): fx() does nothing
+   at all then, as the rest of the Realm already does (`calm`). */
+var FX = [], fxraf = 0;
+var FXMS = {poof:460,land:460,chest:900,shelf:800,portrait:760,praise:1500};
+function fx(kind, x, y, col) {
+  if (calm || !FXMS[kind]) return;
+  FX.push({k:kind,x:x,y:y,col:col||TINT.mana,t0:Date.now(),room:!!S.inside});
+  fxWake();
+}
+/* The same, over a person wherever they are standing right now (LASTAT is filled as they are
+   drawn). Used for praise, which happens to somebody, not at a spot. */
+function fxAt(id, kind, tint) {
+  var a = LASTAT[id]; if (!a || !!a.room !== !!S.inside) return;
+  fx(kind,a.x,a.y,TINT[tint]||TINT.spell);
+}
+function fxWake() { if (!fxraf) fxraf = requestAnimationFrame(fxTick); }
+function fxTick() {
+  fxraf = 0; var now = Date.now();
+  FX = FX.filter(function (e) { return now-e.t0 < FXMS[e.k]; });
+  draw();
+  if (FX.length || talkingNow()) fxWake();
+}
+function talkingNow() { var now = Date.now(); for (var k in VO.talk) if (VO.talk[k] > now) return true; return false; }
+/* A four-pointed star, outlined like everything else in the Realm. */
+function star(c, x, y, col) { c.fillStyle = PAL.out; c.fillRect(x-2,y-4,5,9); c.fillRect(x-4,y-2,9,5); c.fillStyle = col; c.fillRect(x-1,y-3,3,7); c.fillRect(x-3,y-1,7,3); }
+function fxPaint(c, room) {
+  if (!FX.length) return;
+  var now = Date.now();
+  FX.forEach(function (e) {
+    if (!!e.room !== !!room) return;
+    var k = (now-e.t0)/FXMS[e.k], i, p, px, py;
+    if (k < 0 || k > 1) return;
+    if (e.k==='poof' || e.k==='land') {
+      /* Leaving: a ring of sparks thrown outwards and a beam going up. Arriving: the same ring
+         closing in, so the two read as one journey. */
+      var kk = e.k==='land' ? 1-k : k, r = 5+kk*24;
+      c.globalAlpha = Math.max(0,1-k);
+      for (i = 0; i < 8; i++) { var an = i*Math.PI/4;
+        c.fillStyle = PAL.out; c.fillRect(Math.round(e.x+Math.cos(an)*r)-3,Math.round(e.y-26+Math.sin(an)*r*.55)-3,6,6);
+        c.fillStyle = e.col; c.fillRect(Math.round(e.x+Math.cos(an)*r)-2,Math.round(e.y-26+Math.sin(an)*r*.55)-2,4,4); }
+      c.fillStyle = PAL.hot; c.fillRect(Math.round(e.x)-2,Math.round(e.y-20-kk*34),4,Math.round(10+kk*24));
+      c.globalAlpha = 1; return;
+    }
+    if (e.k==='chest') {
+      /* The lid swings up and five coins hop out of it. */
+      var lid = Math.min(1,k*3);
+      c.globalAlpha = Math.max(0,1-Math.max(0,(k-.6)/.4));
+      c.fillStyle = PAL.out; c.fillRect(Math.round(e.x-11),Math.round(e.y-16-lid*5),22,3);
+      c.fillStyle = TINT.candle; c.fillRect(Math.round(e.x-10),Math.round(e.y-15-lid*5),20,1);
+      for (i = 0; i < 5; i++) { p = Math.min(1,Math.max(0,k*1.5-i*.12)); if (p <= 0) continue;
+        px = Math.round(e.x-9+i*5+Math.sin(p*6.28+i)*3); py = Math.round(e.y-8-Math.sin(p*3.14)*24);
+        c.globalAlpha = Math.max(0,1-p);
+        c.fillStyle = PAL.out; c.fillRect(px-1,py-1,6,6); c.fillStyle = TINT.candle; c.fillRect(px,py,4,4); c.fillStyle = PAL.hot; c.fillRect(px+1,py+1,1,1); }
+      c.globalAlpha = 1; return;
+    }
+    if (e.k==='shelf') {
+      /* A book slides out and its pages flutter up. */
+      for (i = 0; i < 5; i++) { p = Math.min(1,Math.max(0,k*1.4-i*.1)); if (p <= 0) continue;
+        px = Math.round(e.x-10+i*5+Math.sin(p*6.28+i*2)*4); py = Math.round(e.y-4-p*26);
+        c.globalAlpha = Math.max(0,1-p);
+        c.fillStyle = PAL.out; c.fillRect(px-1,py-1,6,7); c.fillStyle = PAL.win; c.fillRect(px,py,4,5); c.fillStyle = PAL.hot; c.fillRect(px,py+2,4,1); }
+      c.globalAlpha = 1; return;
+    }
+    if (e.k==='portrait') {
+      /* A light sweeps across the frame, the way a glass does when you step in front of it. */
+      c.globalAlpha = Math.max(0,.85-Math.abs(k-.5)*1.3);
+      c.fillStyle = PAL.hot;
+      var bx = Math.round(e.x-14+k*28);
+      for (i = 0; i < 12; i++) c.fillRect(bx-i,Math.round(e.y-24+i*2),3,2);
+      c.globalAlpha = Math.max(0,1-k);
+      for (i = 0; i < 3; i++) { var sa = k*6.28+i*2.1; star(c,Math.round(e.x+Math.cos(sa)*12),Math.round(e.y-12+Math.sin(sa)*12),TINT.violet); }
+      c.globalAlpha = 1; return;
+    }
+    /* Praise: a fan of stars opening over the head, in the colour of the kind of praise. */
+    for (i = 0; i < 7; i++) { p = Math.min(1,Math.max(0,k*1.3-i*.06)); if (p <= 0) continue;
+      var a2 = -Math.PI/2+(i-3)*.36, d = 6+p*30;
+      px = Math.round(e.x+Math.cos(a2)*d*1.2); py = Math.round(e.y-48+Math.sin(a2)*d);
+      c.globalAlpha = Math.max(0,1-p*p);
+      star(c,px,py,e.col); }
+    c.globalAlpha = 1;
+  });
+}
+/* Where everybody was last drawn, so a thing that happens TO somebody can be shown over them. */
+var LASTAT = {};
 function puff(c, x, y, f, big) { for (var i = 0; i < 3; i++) { var ph = (f+i*3)%9, s = (big?6:4)+Math.floor(ph/3)*2; c.globalAlpha = .75*(1-ph/9); c.fillStyle = PAL.smoke; c.fillRect(x+ph,y-ph*(big?6:4),s,s); } c.globalAlpha = 1; }
 /* Who is INSIDE a building, as a row of small heads above its roof. */
 function heads(c, o, list) {
@@ -662,6 +768,26 @@ function placeHot(o, lay, s, ox, oy) {
 }
 /* Where the merchant stands in the room `o`, or null: only a meeting place has one. */
 function stallOf(o) { var l = (o && !o.owner && PROPS[o.kind]) || [], i; for (i = 0; i < l.length; i++) if (l[i][0]==='stall') return l[i]; return null; }
+/* The middle of the bottom edge of a thing in the room I am standing in, in the room's own units,
+   so an animation can be started where that thing is drawn. Null if it is not there. */
+function thingSpot(name) {
+  var o = B[S.inside]; if (!o) return null;
+  var land = o.owner ? null : campOf(o.id), lay = o.owner ? roomOf(o.owner.id) : land ? campLay(o.id) : null;
+  if (!lay) return null;
+  var hit = null; lay.items.forEach(function (x) { if (x[0]===name) hit = x; });
+  if (!hit) return null;
+  var t = THINGS[name];
+  return {x:hit[1]+t.w/2,y:hit[2]+t.h};
+}
+/* A thing was opened: its animation plays, and the window follows about half a second later so the
+   animation is seen before the window covers it. With "reduce motion" set the window opens at once. */
+function fxThing(name, open) {
+  var p = thingSpot(name);
+  if (!p || calm) { open(); return; }
+  /* The pages leave from the middle of the shelf, above its name tag, not from its bottom edge. */
+  fx(name==='chest'?'chest':name==='shelf'?'shelf':'portrait',p.x,name==='shelf'?p.y-14:p.y);
+  setTimeout(open,420);
+}
 function paintThing(c, it, o) {
   /* In a camp a decoration carries who stood it there (it[3]) and wears that person's colour. */
   var who = it[3] ? person(it[3]) : null, st = thingStamp(it[0],who ? who.cloak : o.tint), h = o.owner ? HOME[o.owner.id] : null;
@@ -962,6 +1088,7 @@ function drawRoom(c, cw, ch) {
     if (d.mine && !deco) { c.fillStyle = PAL.win; c.fillRect(px-13,py+2,26,2); c.fillRect(px-13,py,2,2); c.fillRect(px+11,py,2,2); }
     sprite(c,px,py,d.p,d.bob); c.globalAlpha = 1;
     if (idle && !deco) zed(c,px,py);
+    LASTAT[d.p.id] = {x:d.x,y:d.y,room:true};
   });
   c.setTransform(s,0,0,s,ox,oy);
   /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
@@ -970,6 +1097,7 @@ function drawRoom(c, cw, ch) {
   who.forEach(function (d) { if (d.mine ? VO.on : d.p.voice) { voiceMark(c,d.x,d.y,isTalking(d.mine?ST.me:d.p.id),d.mine?VO.muted:!!d.p.muted,f);
     /* A small screen on the other side of the head: this person is sharing theirs (shareMark). */
     if (sw && sw===(d.mine?ST.me:d.p.id)) shareMark(c,d.x,d.y); } });
+  fxPaint(c,true);
   if (deco) {
     if (DECO.sel >= 0 && lay.items[DECO.sel]) { var it = lay.items[DECO.sel], t = THINGS[it[0]], x0 = it[1]-3, y0 = it[2]-3, w = t.w+6, h = t.h+6;
       c.fillStyle = DECO.bad ? TINT.ember : TINT.mana; c.fillRect(x0,y0,w,1); c.fillRect(x0,y0+h-1,w,1); c.fillRect(x0,y0,1,h); c.fillRect(x0+w-1,y0,1,h); }
@@ -1485,6 +1613,7 @@ function draw() {
       if (it.idle) c.globalAlpha = .6;
       sprite(c,it.x,it.y,it.who,it.bob); c.globalAlpha = 1;
       if (it.idle) zed(c,it.x,it.y);
+      LASTAT[it.who.id] = {x:it.x,y:it.y,room:false};
     }
     /* Names go on after the buildings, then every character standing across one is painted again
        inside that name's patch only, so they are in front of the name and nothing else changes. */
@@ -1503,6 +1632,7 @@ function draw() {
       heads(c,o,w.inside[o.id]||[]);
     });
     puff(c,1380,636,f,true);
+    fxPaint(c,false);
     /* The arrow is always on top, so you can find yourself when a house covers you. */
     if (!en) { var ay = myy-70-(f%2)*2; c.fillStyle = PAL.out; c.fillRect(mx-6,ay-1,12,5); c.fillRect(mx-4,ay+4,8,3); c.fillRect(mx-2,ay+7,4,2);
       c.fillStyle = PAL.win; c.fillRect(mx-5,ay,10,3); c.fillRect(mx-3,ay+3,6,2); c.fillRect(mx-1,ay+5,2,2); }
@@ -1674,7 +1804,9 @@ function tick(ts) {
   if (w.i >= w.path.length) { S.raf = 0; arrived(w.id); return; }
   spotDirty(); follow(); draw(); S.raf = requestAnimationFrame(tick);
 }
-function teleport(id) { if (!spot(id)) return; arrived(id); }
+/* TELEPORTING (David, 2026-11-13): a ring of sparks and a beam where I was, the same closing in
+   where I arrive, so the jump is seen and not just a cut. */
+function teleport(id) { if (!spot(id)) return; var fx0 = {x:S.pos.x,y:S.pos.y}; fx('poof',fx0.x,fx0.y); arrived(id); fx('land',S.pos.x,S.pos.y); }
 /* A short animation driven by the clock: fn gets 0..1, done runs at the end. */
 function play(ms, fn, done) { if (calm) { fn(1); done(); return; } var t0 = 0; (function step(ts) { if (!t0) t0 = ts; var k = Math.min(1,(ts-t0)/ms); fn(k); draw(); if (k < 1) requestAnimationFrame(step); else done(); })(performance.now()); }
 /* Walk in through the door, fade, and you are in the room. */
@@ -1778,10 +1910,10 @@ document.addEventListener('click',function (e) {
     if (sa==='start') shareStart(); else if (sa==='stop') shareStop(); else if (sa==='full') shareFull();
     else { SH.hide = sa==='hide'; renderInside(); } }
   else if (t.closest('[data-leave]')) leave();
-  else if (t.closest('#chestBtn')) openGold();
+  else if (t.closest('#chestBtn')) fxThing('chest',openGold);
   /* The merchant's counter is assets/realm_shop.js. */
   else if (t.closest('#shopBtn')) { if (R.openShop) R.openShop(); }
-  else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
+  else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) fxThing('portrait',function () { openProfile(ho.owner.id); }); }
   else if (t.closest('#slayBtn')) campWin('slay');
   else if (t.closest('#scrollBtn')) campWin('brief');
   else if (t.closest('#calBtn')) campWin('timeline');
@@ -1802,7 +1934,8 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-zoom]'))) { var z = b.getAttribute('data-zoom'), v = S.view, cx = v.x+v.w/2, cy = v.y+v.h/2; if (z==='in') zoomAt(.72,cx,cy); else if (z==='out') zoomAt(1.39,cx,cy); else setView(z==='village'?VILLAGE:FULL); }
   else if ((b = t.closest('[data-door]'))) send({set_door:b.getAttribute('data-door')});
   else if (t.closest('#lookBtn')) openLook();
-  else if (t.closest('#focusBtn') || t.closest('#shelfBtn')) openFocus();
+  else if (t.closest('#shelfBtn')) fxThing('shelf',openFocus);
+  else if (t.closest('#focusBtn')) openFocus();
   else if ((b = t.closest('[data-focusstart]'))) focusDo({focus:'start',task:b.getAttribute('data-focusstart')});
   else if (t.closest('[data-focusstop]')) focusDo({focus:'stop'});
   else if (t.closest('[data-focusclose]')) $('focusDlg').close();
@@ -2571,6 +2704,7 @@ function voiceMeter() {
   Object.keys(VO.peers).forEach(function (k) { if (voiceLoud(VO.peers[k]) > .02) VO.talk[k] = now+450; });
   Object.keys(VO.talk).forEach(function (k) { if (VO.talk[k] > now) sig += k+','; });
   if (sig!==VO.talkSig) { VO.talkSig = sig; draw(); }
+  if (sig && !calm) fxWake();
 }
 function voiceMute() {
   if (!VO.on) return;
@@ -2617,8 +2751,16 @@ function voiceBar(o) {
    head, struck through in red while muted, and green with a ring at the feet while they speak. */
 function voiceMark(c, x, y, talking, muted, f) {
   var bx = x-20, by = y-46, col = muted ? PAL.smoke : talking ? TINT.spell : PAL.hot, i;
-  if (talking) { c.fillStyle = TINT.spell; c.fillRect(x-12,y+1,24,2); c.fillRect(x-12,y-1,2,2); c.fillRect(x+10,y-1,2,2);
-    c.fillRect(bx-2,by+2,1,5); if (f%2) c.fillRect(bx-4,by+1,1,7); }
+  /* SPEAKING IS ALIVE (David, 2026-11-13: an animation for when you "talk with voice or in voice
+     chat"): two rings leave the microphone and fade, and the ring at the feet breathes. While
+     anybody speaks the picture is repainted by the clock (fxTick), so this is smooth. */
+  if (talking) { var t = calm ? .5 : (Date.now()%900)/900, br = calm ? 0 : Math.round(Math.sin(t*6.28)*2), j;
+    c.fillStyle = TINT.spell; c.fillRect(x-12-br,y+1,24+br*2,2); c.fillRect(x-12-br,y-1,2,2); c.fillRect(x+10+br,y-1,2,2);
+    for (j = 0; j < 2; j++) { var p = (t+j/2)%1, r = 3+p*6;
+      c.globalAlpha = Math.max(0,1-p); c.fillStyle = TINT.spell;
+      c.fillRect(bx-Math.round(r),by+4-Math.round(r*.8),1,Math.round(r*1.6)+1);
+      c.fillRect(bx-Math.round(r)+1,by+4-Math.round(r*.8)-1,1,1); c.fillRect(bx-Math.round(r)+1,by+5+Math.round(r*.8),1,1); }
+    c.globalAlpha = 1; }
   c.fillStyle = PAL.out; c.fillRect(bx,by,9,9); c.fillStyle = PAL.veil; c.fillRect(bx+1,by+1,7,7);
   c.fillStyle = col; c.fillRect(bx+3,by+1,3,4); c.fillRect(bx+2,by+4,1,2); c.fillRect(bx+6,by+4,1,2); c.fillRect(bx+2,by+6,5,1); c.fillRect(bx+4,by+7,1,1);
   if (muted) { c.fillStyle = TINT.ember; for (i = 0; i < 7; i++) c.fillRect(bx+1+i,by+7-i,1,1); }
@@ -2875,6 +3017,8 @@ R.shopOwned = function (list) { if (ST.shop && list) { ST.shop.owned = list; if 
 /* What assets/realm_trade.js borrows: after a thing has changed hands, ask for the map again (what
    I own and what everybody wears) and, standing in my own office, for my room (a thing I gave away
    has been taken out of it). */
+/* What assets/realm_praise.js borrows: the fan of stars over somebody who has just been praised. */
+R.fxAt = fxAt;
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();

@@ -115,6 +115,9 @@ function news() {
     t.innerHTML = '<b>'+esc(mine ? 'You' : first(r.from_name))+' praised '+esc(forMe ? 'you' : first(r.to_name))+'</b><span><i class="rkind is-'+kindOf(r.kind).id+'">'+esc(kindOf(r.kind).n)+'</i> '+esc(r.note)+'</span>'
       +(forMe ? '<small>It is kept in your profile, in the portrait in your house.</small>' : '');
     R.toastHome().appendChild(t); setTimeout(function () { t.remove(); },forMe ? 20000 : 10000);
+    /* GETTING A PRAISE IS SEEN ON THE MAP (David, 2026-11-13): a fan of stars opens over the person
+       praised, in the colour of the kind, for whoever can see them right now. */
+    if (R.fxAt) R.fxAt(r.to,'praise',{craft:'mana',help:'spell',idea:'candle',rescue:'ember'}[kindOf(r.kind).id]);
   });
   firstNews = false;
 }
