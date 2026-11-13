@@ -5689,3 +5689,16 @@ see other people walk a feature across the board".
 - **Not verified:** PHP was never run (the block checker passes and the deploy's `php -l` is the
   backstop). Two real people in one room were never tried: the second person was played by a
   stand-in page. Phones and touch, Safari and Firefox. The real load on the hosting.
+
+## 2026-11-13 — The Realm says "call", the code says "voice"
+
+David: "let's change 'Join voice' for 'Join call'".
+
+- **On screen the word is "call"**: Join call, Leave call, "in a call", "The call is full". Anything
+  new that people read about it uses the same word.
+- **The code, the tables (`realm_voice`, `realm_signals`), the request field (`voice=`) and the
+  function names keep "voice".** Renaming them would need a migration and a change to the
+  allow-list in `includes/auth.php` for no gain to anybody using it.
+- **"Use a video call" stays** in the two messages that send people elsewhere (a full call, a
+  connection that could not be made): it means Google Meet or similar, outside the Realm.
+- **Entries above this one keep "voice"**, as written that day.

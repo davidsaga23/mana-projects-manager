@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: "Join call" instead of "Join voice" *(no migration)*
+
+**Asked by David:** "let's change 'Join voice' for 'Join call'".
+
+- **The button in a room reads Join call**, and once in, **Leave call**. Mute is unchanged.
+- **Every sentence about it says call:** "Renata is in a call.", "In a call with Tim.", "2 inside,
+  2 in a call" in Places to meet, "The call is full, 5 people are talking.", and the messages when
+  something goes wrong (microphone blocked, connection lost, moved to another window, database
+  update needed).
+- **Nothing else changes.** How a call works is as it was on 2026-11-12. In the code, the tables
+  and the requests the word is still "voice"; older entries below keep the wording of their day.
+- **Not verified:** PHP was never run; the browser side was checked in a stand-in copy of the page.
+
+---
 ## 2026-11-13 — The Realm: walk around inside a room, and see each other walk *(migration 087)*
 
 **Asked by David:** "let's also have the option for the avatars to move freely inside each house".
