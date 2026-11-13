@@ -6127,3 +6127,25 @@ Asked for "shows that react to production", David chose, among options put to hi
   on stays hidden.
 Where a show stood this morning is estimated from today's status log (approvals less retakes); it
 only decides whether a banner flies. No migration: a milestone's big burst is remembered per browser.
+
+## 2026-11-13 — The Realm: Slack's message actions (migration 096)
+
+David sent Slack's hover bar: "let's add these same features from slack so the transition is
+smoother". Asked which parts he wants, he chose:
+- **More menu:** edit & delete my own, copy link to message, mark unread. **No pinning.**
+- **Quick reactions:** keep the Realm's six; the bar shows each person's three most used (filled
+  with thumbs up, thanks, party for somebody who has not reacted yet). No ✅ or 🙌.
+- **Save for later with reminders** (20 min, 1 h, 3 h, tomorrow 9:00) that ring Anima's bell.
+- **One PR** for all of it.
+How it was built, and why:
+- **Every action names a message, never a channel**: the server reads the message's channel and asks
+  the usual access check, so no id reaches into somebody else's raven. Forward also checks the
+  person may write where it goes.
+- **Only the author edits or deletes**; no admin override (the same rule as reading ravens).
+- **Delete keeps the row** as "This message was deleted." so threads, order and unread counts hold.
+  Its picture's file stays on disk, because a forwarded copy points at the same file.
+- **The bell line names whose message, never its words or its channel**: the bell shows on every
+  page, and the place may be a show the reader is no longer on.
+- **No new polling.** Edits/deletions ride on the 3-second poll of an open conversation; reminders
+  ring on the bell's 30-second poll (`notify_poll.php`) and on the Realm's heartbeat, once each.
+- Reminder times are the server's clock (the studio's time zone in `config.php`).
