@@ -31,6 +31,36 @@ people can see them."
 - **Not yet:** defeating them. How a creature weakens as the show's tasks are finished is David's
   call and comes as a follow-up.
 
+## 2026-11-13 — The Realm: sending jumps to the bottom, and rooms say "Exit" *(no migration)*
+
+**Asked by David**: "when writing in a chat, when hit enter it should take you to the end of the
+conversation (the bottom) so we can see what's the last thing we sent", and, with a picture of the
+doorway in his room, "add the exit name here in each room's door".
+
+- **Sending a message scrolls the conversation to the bottom**, even if you had scrolled up to read,
+  so your message is always in view. New messages from others still only pull you down when you are
+  already near the bottom.
+- **Every room's doorway has a small "Exit" plate** on the floor just inside it. Someone standing on
+  it covers it.
+---
+
+## 2026-11-13 — The Realm: emoji reactions on chat messages *(migration 093)*
+
+**Asked by David**: emoji reactions, "the most-used Slack feature, a 👍 saves typing 'ok'".
+
+- **Every message, in every channel and every raven,** has a small react button on its top corner
+  while the pointer is over it (always there, faintly, on a touch screen). It opens a row of six:
+  👍 ❤️ 😂 🎉 👀 🙏. A fixed set, not a full emoji picker, to keep it light and in the Realm's look.
+- **Under the message**, a chip per reaction with how many; yours is lit. Click a chip to add or take
+  back yours; hover it to see who ("Renata Ruiz and You reacted with thumbs up").
+- **Anybody who can read the conversation can react**, Announcements included; a raven only by its two
+  people. The server checks the channel the message is really in.
+- **Others see it within seconds** (the open conversation's 3-second check). A reaction is not a
+  message: no unread count, no bell.
+- **Needs migration 093** (`realm_reactions`). Until David runs it the chat looks exactly as before.
+- Files: `assets/realm_react.js` (new), small hooks in `assets/realm.js`, `includes/realm_chat.php`,
+  `realm_api.php`, `includes/auth.php` (`react` on the allow-list), `assets/realm.css`, `realm.php`.
+
 ## 2026-11-13 — The Realm: small animations *(no migration)*
 
 **Asked by David**: "let's create some basic animations for when you: teleport, open a chest, access
