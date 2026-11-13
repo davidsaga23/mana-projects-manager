@@ -14,6 +14,27 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: threads in chat *(migration 094)*
+
+**Asked by David**, who chose threads for the Realm's chat: "reply to one message without flooding
+the channel; long channels get unreadable without them".
+
+- **Reply in thread** appears on any message, in every channel and in ravens, while the pointer is
+  over it (always on a touch screen). The replies live in the thread, not in the channel. The panel
+  shows the thread with a back arrow to the channel; it fills in live, like the channel.
+- **Under the message**, the channel shows "3 replies · last 10:42"; click it to open the thread.
+- **"Also send to #The Tavern"**: a tick box under a thread's writing box, off by default. Ticked, the
+  reply shows in the channel too, with "Replied in a thread: …" above it (as in Slack).
+- **Threads you started or replied in are yours to follow.** Their new replies count in that channel's
+  number, show "2 new" under the message, and gather in a new **Threads** row at the top of the
+  channel list, which lists them latest first. Other people's threads light nothing up.
+- **Pictures, tags and reactions work in replies** as in messages; a tag in a thread rings the bell
+  as before.
+- **Needs migration 094** (`parent_id` and `also_channel` on `realm_messages`, and
+  `realm_thread_reads`). Until David runs it the chat looks exactly as before.
+- Files: `includes/realm_chat.php`, `realm_api.php`, `realm.php`, `assets/realm.js`,
+  `assets/realm.css`, one line in `assets/realm_react.js`.
+
 ## 2026-11-13 — The Realm: a building's card shows all round it, and nobody walks off the map *(no migration)*
 
 **Asked by David**, with two pictures: "right now only appears the buttons when you are on the left

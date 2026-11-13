@@ -6068,3 +6068,24 @@ that task **today**, logged plus running, rather than the length of the current 
 restarts every 25 minutes. Read only; it travels with the existing heartbeat state (`work` on each
 person, `realm_clocks()` in `includes/realm.php`). If the Realm opens beyond the testers, revisit
 whether artists should see each other's tasks.
+
+## 2026-11-13 — Realm chat threads: ravens too, "also send to the channel", followed threads count twice
+
+David chose threads as the next chat feature ("reply to one message without flooding the channel;
+long channels get unreadable without them"). Asked that day, he chose:
+- **Threads everywhere, ravens included**, not only the shared channels.
+- **A reply may also be sent to the channel**, with a tick box that is off by default, as in Slack.
+- **New replies in a thread you follow show in both places**: in that channel's number and in a
+  separate "Threads" row. You follow a thread you started or replied in; nothing else (not being
+  tagged in it, not opening it).
+
+How it is built:
+- **One level only**: a reply has no replies. A reply keeps its parent's `channel`, so
+  `realm_channel_access()` decides who reads it exactly as for the channel, and `realm_image.php`
+  needed no change.
+- **The thread id is checked against the channel** (`realm_thread_parent_ok()`), so a thread from
+  somebody else's ravens cannot be read or answered through a channel I may open.
+- **A reply also sent to the channel is counted once**: in the channel's number, not again as a
+  thread reply.
+- **Writing in a thread marks it read up to your reply**, so you are not told about what you had
+  already seen when you answered.
