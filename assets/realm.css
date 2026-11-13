@@ -291,6 +291,30 @@ small { color: var(--muted); font-size: 13px; }
 .rcomposer input:not([type=file]) { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; transition: border-color var(--ease); }
 .rcomposer input::placeholder { color: var(--faint); }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.rcomposer[hidden], .ralso[hidden], .rback[hidden] { display: none; }
+
+/* THREADS (David, 2026-11-13), migration 095. "Reply in thread" shows on a message when it is
+   pointed at or reached with the keyboard, and always on a touch screen, which cannot point. The
+   line under a message with replies opens its thread; in the thread, the first message stands apart. */
+/* margin-right keeps it clear of the reactions button on the message's top-right corner (.rreactadd). */
+.rreply { margin-left: auto; margin-right: 26px; background: none; border: 0; padding: 0 2px; font: inherit; font-size: 12px; color: var(--primary); cursor: pointer; opacity: 0; transition: opacity var(--ease); }
+.rmsg:hover .rreply, .rmsg:focus-within .rreply, .rreply:focus-visible { opacity: 1; }
+@media (hover: none) { .rreply { opacity: 1; } }
+.rthr { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; background: none; border: 0; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.rthr:hover { text-decoration: underline; }
+.rthr small { font-weight: 400; font-size: 12px; }
+.rthrfrom { display: block; background: none; border: 0; padding: 0; margin: 2px 0; font: inherit; font-size: 12px; color: var(--muted); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+button.rthrfrom:hover { color: var(--primary); }
+.rmsg.is-parent { max-width: 100%; align-self: stretch; }
+.rthrline { margin: 4px 0 0; padding-top: 8px; border-top: 1px solid var(--border-soft); font-size: 12px; color: var(--muted); }
+.ralso { display: flex; align-items: center; gap: 6px; padding: 8px var(--chat-pad) 0; font-size: 13px; color: var(--muted); cursor: pointer; }
+.ralso input { accent-color: var(--primary); }
+.rtrow { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 8px 11px; font: inherit; color: var(--text-2); cursor: pointer; transition: border-color var(--ease); }
+.rtrow:hover { border-color: var(--primary-border); }
+.rtrow.is-new { border-color: var(--primary-border); background: var(--primary-tint); }
+.rtrowhead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rtrowhead small { font-size: 12px; color: var(--faint); }
+.rtrowbody { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
 
 /* THE WIDE CONVERSATION. The handle puts .chat-wide on .rapp, and the conversation then takes the
    map's place: the lists stay, so a channel or a person is still one click away, and the map is

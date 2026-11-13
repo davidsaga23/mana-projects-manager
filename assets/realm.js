@@ -1989,6 +1989,9 @@ function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
   if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
+    /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
+    if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
+      h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
     ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
       h += '<button type="button" class="rrow'+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"><span class="rhash">#</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>'; });
     h += '</div></div>'; }
@@ -2239,6 +2242,9 @@ document.addEventListener('click',function (e) {
   else if (t.closest('[data-unpick]')) setPick(null);
   else if ((b = t.closest('[data-tag]'))) sugPick(+b.getAttribute('data-tag'));
   else if (t.closest('#chatWide')) chatWide(!CH.wide);
+  else if ((b = t.closest('[data-thread]'))) openThread(+b.getAttribute('data-thread'),b.getAttribute('data-thchan')||CH.open);
+  else if (t.closest('[data-threads]')) openThreads();
+  else if (t.closest('#chatBack')) chatBack();
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
   else if ((b = t.closest('[data-sel]'))) { if (justDragged) return; if (mapAway()) chatWide(false); select(b.getAttribute('data-sel'),b.hasAttribute('data-center')); }
@@ -2289,8 +2295,14 @@ document.addEventListener('click',function (e) {
    between two people. An open conversation asks for anything new every 3 seconds and stops asking
    while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
    ST.chat is null until the migration has run, and then none of this draws. */
-/* first: the first message on screen, so the reactions asked for are those of the messages shown. */
-var CH = {open:null,last:0,first:0,timer:0,busy:false,seen:false,wide:false};
+var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false,thread:0,from:'',first:0};
+/* THREADS (David, 2026-11-13: "reply to one message without flooding the channel; long channels
+   get unreadable without them"), migration 095. CH.thread is the message whose thread the panel
+   shows (0: the channel itself); CH.from is where its back arrow returns ('' the channel, THREADS
+   the list); CH.first the first message on screen, so the server counts replies (and reactions,
+   assets/realm_react.js) from there on. CH.open is THREADS while the panel lists the threads I follow. TH.unread is what is
+   new in those, [{channel,parent,n}]; TH.counts the reply counts under the open channel's messages. */
+var THREADS = '*threads', TH = {unread:(ST.chat && ST.chat.tunread) || [],counts:{}};
 /* THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at the middle of the
    chat bar so there's an option to extend it over the map"). The handle on the conversation's left
    edge lays it over the map, for room to read and write, and brings it back. The choice is kept
@@ -2314,6 +2326,7 @@ function mapAway() { var m = $('mapbox'); return !!(CH.open && CH.wide && m && !
 function unread() { return (ST.chat && ST.chat.unread) || {}; }
 function dmId(a, b) { return 'dm:'+Math.min(a,b)+':'+Math.max(a,b); }
 function chanTitle(id) {
+  if (id===THREADS) return 'Threads';
   var m = /^dm:(\d+):(\d+)$/.exec(id);
   if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
   var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
@@ -2330,8 +2343,9 @@ function chanFor(placeId) {
 }
 /* New unread counts arrived. A raven that was not there a moment ago is announced, because a small
    number appearing beside a name is easy to miss (David, 2026-11-12: "not working atm"). */
-function takeUnread(u) {
+function takeUnread(u, tu) {
   if (!ST.chat || !u) return;
+  if (tu) { TH.unread = tu; paintThreads(); }
   var old = ST.chat.unread || {};
   Object.keys(u).forEach(function (k) {
     var m = /^dm:(\d+):(\d+)$/.exec(k);
@@ -2344,7 +2358,7 @@ function takeUnread(u) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread,j.tunread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -2404,29 +2418,66 @@ function rich(body) {
 }
 function msgHTML(m) {
   var pic = m.image ? '<a class="rimglink" href="realm_image.php?id='+m.id+'" target="_blank" rel="noopener"><img class="rimg" src="realm_image.php?id='+m.id+'" alt="Picture from '+esc(m.name)+'" loading="lazy"></a>' : '';
-  return '<div class="rmsg'+(m.mine?' is-mine':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></div>'+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+'</div>';
+  /* Threads: in the channel, a message may be answered in its thread and shows how many replies it
+     has; a reply that was also sent to the channel says what it answers. In a thread, the first
+     message is drawn apart from its replies. */
+  var top = !m.parent && threadsOn(), inThread = !!CH.thread;
+  var reply = top && !inThread ? '<button type="button" class="rreply" data-thread="'+m.id+'" title="Reply in thread">Reply in thread</button>' : '';
+  var from = m.parent && m.also ? (inThread ? '<small class="rthrfrom">Also sent to the channel</small>' : '<button type="button" class="rthrfrom" data-thread="'+m.parent+'">Replied in a thread: &ldquo;'+esc(m.about)+'&rdquo;</button>') : '';
+  var foot = top && !inThread ? '<div class="rthrslot" data-thrslot="'+m.id+'">'+thrFoot(m.id)+'</div>' : '';
+  var h = '<div class="rmsg'+(m.mine?' is-mine':'')+(inThread && m.id===CH.thread?' is-parent':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small>'+reply+'</div>'+from+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+foot+'</div>';
+  return inThread && m.id===CH.thread ? h+'<p class="rthrline" id="thrLine">Replies</p>' : h;
+}
+function threadsOn() { return !!(ST.chat && ST.chat.threads); }
+/* What is new for me in one thread I follow; and in all of them, for the Threads row. */
+function thrNew(parent) { var n = 0; TH.unread.forEach(function (t) { if (t.parent===parent) n += t.n; }); return n; }
+function thrNewAll() { var n = 0; TH.unread.forEach(function (t) { if (!(CH.thread && t.parent===CH.thread)) n += t.n; }); return n; }
+/* The line under a message that has a thread: "3 replies · last 10:42", and "2 new" when I follow it. */
+function thrFoot(id) {
+  var c = TH.counts[id]; if (!c) return '';
+  var u = thrNew(id);
+  return '<button type="button" class="rthr" data-thread="'+id+'">'+c.n+(c.n===1?' reply':' replies')+' <small>&middot; last '+esc(c.at)+'</small>'+(u?' <b class="rbadge">'+u+' new</b>':'')+'</button>';
+}
+function paintThreads() {
+  if (!CH.open || CH.thread || CH.open===THREADS) return;
+  var box = $('chatMsgs'); if (!box) return;
+  [].forEach.call(box.querySelectorAll('[data-thrslot]'),function (el) { var h = thrFoot(+el.getAttribute('data-thrslot')); if (el.innerHTML!==h) el.innerHTML = h; });
+}
+/* The panel's head and writing box for what it shows: a channel, a thread, or the list of threads. */
+function chatMode() {
+  var list = CH.open===THREADS, back = $('chatBack');
+  var name = chanTitle(CH.open);
+  $('chatTitle').textContent = !CH.thread ? name : (/^dm:/.test(CH.open) ? name.replace(/^Ravens/,'Thread') : 'Thread in '+name);
+  if (back) { back.hidden = !CH.thread; var to = CH.from===THREADS ? 'Back to your threads' : 'Back to '+chanTitle(CH.open); back.title = to; back.setAttribute('aria-label',to); }
+  $('chatForm').hidden = list;
+  if ($('chatAlsoRow')) { $('chatAlsoRow').hidden = !CH.thread; $('chatAlso').checked = false;
+    $('chatAlsoText').textContent = /^dm:/.test(CH.open||'') ? 'Also send to the ravens' : 'Also send to #'+chanTitle(CH.open); }
 }
 function chatTake(j) {
   CH.busy = false;
   if (!j) return;
   if (j.error) toast(j.error);
   if (!j.ok) { closeChat(); return; }
-  if (j.channel!==CH.open) return;
+  if (j.channel!==CH.open || (j.thread||0)!==CH.thread) return;
   var box = $('chatMsgs'), stick = box.scrollHeight-box.scrollTop-box.clientHeight < 60, fresh = j.messages.filter(function (m) { return m.id > CH.last; });
-  if (fresh.length && CH.last && spokenHere(j.channel)) {
+  if (fresh.length && CH.last && !CH.thread && spokenHere(j.channel)) {
     fresh.forEach(function (m) { BUB[m.user] = {text:m.body || '(a picture)',until:Date.now()+BUBBLE_MS}; });
     draw(); setTimeout(draw,BUBBLE_MS+100);
   }
+  if (j.threads) { Object.keys(j.threads).forEach(function (k) { TH.counts[k] = j.threads[k]; }); }
   if (fresh.length) { if (!CH.last) { box.innerHTML = ''; CH.first = fresh[0].id; } box.insertAdjacentHTML('beforeend',fresh.map(msgHTML).join('')); CH.last = fresh[fresh.length-1].id; if (stick || !CH.seen || CH.jump) box.scrollTop = box.scrollHeight; }
   if (CH.jump && j.messages) { CH.jump = false; box.scrollTop = box.scrollHeight; }
   else if (!CH.last && !CH.seen) box.innerHTML = '<p class="rempty">Nothing here yet. Be the first to write.</p>';
+  if (CH.thread && $('thrLine')) { var nr = box.querySelectorAll('.rmsg').length-1; $('thrLine').textContent = nr ? nr+(nr===1?' reply':' replies') : 'No replies yet. Write the first.'; }
   if (FIND.jump) findLand(fresh);
   CH.seen = true;
   /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
   if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
-  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? 'Write a message' : 'Only Production writes here';
-  if (j.unread) takeUnread(j.unread);
+  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : 'Only Production writes here';
+  if ($('chatAlsoRow')) $('chatAlsoRow').hidden = !(CH.thread && j.can_post);
+  if (j.unread) takeUnread(j.unread,j.tunread);
+  paintThreads();
   takeKnocks(j.knocks);
   /* Offers of a gift or a swap ride on the same answers as knocks (assets/realm_trade.js). */
   if (R.onOffers) R.onOffers(j.offers);
@@ -2434,19 +2485,51 @@ function chatTake(j) {
   if (!VO.on) takeVoiceRoom(j.voice);
   takeSpots(j.spots);
 }
+/* THE THREADS I FOLLOW, the latest reply first: what the Threads row opens. */
+function threadsTake(j) {
+  CH.busy = false;
+  if (!j) return;
+  if (!j.ok) { if (j.error) toast(j.error); closeChat(); return; }
+  if (CH.open!==THREADS) return;
+  var h = (j.list||[]).map(function (t) { var u = thrNew(t.parent);
+    return '<button type="button" class="rtrow'+(u?' is-new':'')+'" data-thread="'+t.parent+'" data-thchan="'+esc(t.channel)+'"><span class="rtrowhead"><b>'+esc(chanTitle(t.channel))+'</b><small>'+t.n+(t.n===1?' reply':' replies')+' &middot; last '+esc(t.at)+'</small>'+(u?'<b class="rbadge">'+u+' new</b>':'')+'</span><span class="rtrowbody">'+esc(t.mine?'You':t.name)+': '+esc(t.about)+'</span></button>'; }).join('');
+  $('chatMsgs').innerHTML = h || '<p class="rempty">No threads yet. A thread you start or reply in gathers here, with its new replies.</p>';
+  CH.seen = true;
+  if (j.unread) takeUnread(j.unread,j.tunread);
+  takeKnocks(j.knocks);
+  if (R.onOffers) R.onOffers(j.offers);
+  if (!VO.on) takeVoiceRoom(j.voice);
+  takeSpots(j.spots);
+}
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
-  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(FIND.jump && !CH.last ? '&at='+FIND.jump : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  if (CH.open===THREADS) {
+    fetch(R.api+'?threads=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
+      .then(function (r) { return r.json(); }).then(threadsTake).catch(function () { CH.busy = false; });
+    return;
+  }
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(CH.thread ? '&thread='+CH.thread : (FIND.jump && !CH.last ? '&at='+FIND.jump : '')),{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
+}
+/* Show a conversation in the panel: a channel (thread 0), one message's thread, or the list. */
+function chatShow(id, thread, from) {
+  CH.open = id; CH.thread = thread||0; CH.from = from||''; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; TH.counts = {}; setPick(null); sugClose();
+  $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); chatMode(); $('chatMsgs').innerHTML = '';
+  clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw();
+  if (id!==THREADS) $('chatInput').focus();
 }
 function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
-  if (CH.open===id) { $('chatInput').focus(); return; }
-  CH.open = id; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; setPick(null); sugClose();
-  $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); $('chatTitle').textContent = chanTitle(id); $('chatMsgs').innerHTML = '';
-  clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw(); $('chatInput').focus();
+  if (CH.open===id && !CH.thread) { $('chatInput').focus(); return; }
+  chatShow(id,0,'');
 }
-function closeChat() { CH.open = null; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
+function openThread(parent, channel) {
+  if (!ST.chat || !threadsOn() || !parent || !channel || channel===THREADS) return;
+  chatShow(channel,parent,CH.open===THREADS ? THREADS : (CH.thread ? CH.from : ''));
+}
+function openThreads() { if (ST.chat && threadsOn() && $('chat')) chatShow(THREADS,0,''); }
+function chatBack() { if (CH.from===THREADS) openThreads(); else chatShow(CH.open,0,''); }
+function closeChat() { CH.open = null; CH.thread = 0; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
 /* A PICTURE IN A MESSAGE (David, 2026-11-12: "let's also allow images ... in all chats"), migration
    083. One per message, up to 5 MB, chosen with the + button or pasted straight into the box. The
    server checks it again; this only saves a wasted upload. */
@@ -2505,7 +2588,8 @@ if ($('chatFile')) $('chatFile').addEventListener('change',function () { offerPi
 /* Guarded: a page drawn before chat existed has no form, and must not stop the map over it. */
 if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
-  var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open) return;
+  var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open || CH.open===THREADS) return;
+  var also = !!(CH.thread && $('chatAlso') && $('chatAlso').checked), thread = CH.thread;
   inp.value = ''; CH.busy = true; sugClose(); setPick(null);
   /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end
      of the conversation (the bottom) so we can see what's the last thing we sent"). Before, the list
@@ -2515,6 +2599,8 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   CH.jump = true; var mb = $('chatMsgs'); if (mb) mb.scrollTop = mb.scrollHeight;
   /* A picture travels as a file, so the message goes as a form with parts; words alone go as before. */
   var f = pic ? new FormData() : new URLSearchParams(); f.append('say',CH.open); f.append('body',body); f.append('after',CH.last); f.append('from',CH.first);
+  if (thread) { f.append('thread',thread); if (also) f.append('also','1'); }
+  if ($('chatAlso')) $('chatAlso').checked = false;
   if (pic) f.append('image',pic,pic.name || 'pasted-image.png');
   fetch(R.api,{method:'POST',body:f,credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; CH.jump = false; inp.value = body; setPick(pic); toast('That message was not sent. Try again.'); });
@@ -2544,7 +2630,7 @@ function findDraw(note) {
   if (!box) return;
   if (FIND.list.length) {
     h += '<div class="rfoundlist">'+FIND.list.map(function (m) {
-      return '<button type="button" class="rfound" data-found="'+esc(m.channel)+'" data-mid="'+m.id+'"><span class="rfoundhead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></span><span class="rfoundwhere">'+esc(m.where)+'</span>'+
+      return '<button type="button" class="rfound" data-found="'+esc(m.channel)+'" data-mid="'+m.id+'" data-fthread="'+(+m.thread||0)+'"><span class="rfoundhead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small></span><span class="rfoundwhere">'+esc(m.where)+'</span>'+
         '<span class="rfoundbody">'+(m.snippet ? findMarks(m.snippet) : '<i>A picture</i>')+(m.image && m.snippet ? ' <i>(with a picture)</i>' : '')+'</span></button>';
     }).join('')+'</div>';
     if (FIND.more) h += '<button type="button" class="rbtn rsmall rfoundmore" data-findmore="1"'+(FIND.busy?' disabled':'')+'>'+(FIND.busy?'Looking…':'Older results')+'</button>';
@@ -2584,8 +2670,10 @@ function findTyped() {
 function findClear() { if (!$('searchInput')) return; $('searchInput').value = ''; findTyped(); }
 /* Open the conversation a result is in, at that message. A conversation that is already open is
    opened again, so it starts at the found message rather than wherever it was. */
-function findOpen(channel, id) {
+function findOpen(channel, id, thread) {
   FIND.jump = id;
+  /* Threads (migration 095): a reply kept in its thread is not in the channel, so its thread opens. */
+  if (thread && threadsOn()) { openThread(thread,channel); return; }
   if (CH.open===channel) CH.open = null;
   openChat(channel);
 }
@@ -2618,7 +2706,7 @@ if ($('search') && ST.chat) {
   });
   $('searchRes').addEventListener('click',function (e) {
     var b = e.target.closest('[data-found]');
-    if (b) { findOpen(b.getAttribute('data-found'),+b.getAttribute('data-mid')); return; }
+    if (b) { findOpen(b.getAttribute('data-found'),+b.getAttribute('data-mid'),+b.getAttribute('data-fthread')); return; }
     if (e.target.closest('[data-findmore]') && !FIND.busy) findAsk(true);
   });
 }

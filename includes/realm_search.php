@@ -130,7 +130,9 @@ function realm_search(PDO $pdo, int $uid, string $q, bool $mayAnnounce, int $bef
     }
 
     $cols = 'm.id, m.channel, m.user_id, m.body, m.created_at, u.display_name, u.username, c.name AS crew_name, '
-          . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image';
+          . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image, '
+          // Threads (migration 095): a reply kept in its thread opens that thread, not the channel.
+          . (function_exists('realm_threads_available') && realm_threads_available($pdo) ? 'IF(m.also_channel = 1, NULL, m.parent_id)' : 'NULL') . ' AS thread_of';
     $sql = 'SELECT ' . $cols . ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id
              WHERE ' . implode(' AND ', $where) . ' ORDER BY m.id DESC LIMIT ' . (REALM_SEARCH_PAGE + 1);
     $st = $pdo->prepare($sql);
@@ -155,6 +157,7 @@ function realm_search(PDO $pdo, int $uid, string $q, bool $mayAnnounce, int $bef
                        : (date('Y', $t) === $year ? date('j M, H:i', $t) : date('j M Y', $t)),
             'snippet' => realm_search_snippet((string)$r['body'], $words[0]),
             'image'   => (string)($r['image'] ?? '') !== '',
+            'thread'  => (int)($r['thread_of'] ?? 0),
         ];
     }
     return ['results' => $out, 'more' => $more, 'note' => ''];

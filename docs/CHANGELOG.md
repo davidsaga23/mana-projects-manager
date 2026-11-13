@@ -42,6 +42,29 @@ glance on the map.
 
 ---
 
+## 2026-11-13 — The Realm: threads in chat *(migration 095)*
+
+**Asked by David**, who chose threads for the Realm's chat: "reply to one message without flooding
+the channel; long channels get unreadable without them".
+
+- **Reply in thread** appears on any message, in every channel and in ravens, while the pointer is
+  over it (always on a touch screen). The replies live in the thread, not in the channel. The panel
+  shows the thread with a back arrow to the channel; it fills in live, like the channel.
+- **Under the message**, the channel shows "3 replies · last 10:42"; click it to open the thread.
+- **"Also send to #The Tavern"**: a tick box under a thread's writing box, off by default. Ticked, the
+  reply shows in the channel too, with "Replied in a thread: …" above it (as in Slack).
+- **Threads you started or replied in are yours to follow.** Their new replies count in that channel's
+  number, show "2 new" under the message, and gather in a new **Threads** row at the top of the
+  channel list, which lists them latest first. Other people's threads light nothing up.
+- **Pictures, tags and reactions work in replies** as in messages; a tag in a thread rings the bell
+  as before. **A search result inside a thread** opens that thread.
+- **Needs migration 095** (`parent_id` and `also_channel` on `realm_messages`, and
+  `realm_thread_reads`). Until David runs it the chat looks exactly as before.
+- Files: `includes/realm_chat.php`, `realm_api.php`, `realm.php`, `assets/realm.js`,
+  `assets/realm.css`, one line each in `assets/realm_react.js` and `includes/realm_search.php`.
+
+---
+
 ## 2026-11-13 — The Realm: a creature in every show's land *(no migration)*
 
 **Asked by David**: "let's also add a creature to defeat per land/project. An ogre in the forest,
