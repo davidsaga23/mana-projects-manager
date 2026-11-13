@@ -22,6 +22,8 @@
 // POST knock=<owner's user id>            knock on an ajar door you are standing at
 // POST answer_knock=<knock id>&let=0|1    answer a knock on your own door
 // POST voice=join|poll|leave              voice in the room you are inside (further down)
+// POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 090)
+// GET  purse=1                            the asker's OWN mana and gold
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 
 require __DIR__ . '/includes/db.php';
@@ -33,6 +35,7 @@ require_once __DIR__ . '/includes/realm_chat.php';
 require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passes accept_upload()
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_once __DIR__ . '/includes/realm_focus.php';
+require_once __DIR__ . '/includes/realm_praise.php';
 require_login_json();
 
 header('Content-Type: application/json');
@@ -113,6 +116,17 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'Your tasks could not be reached. Try again in a moment.']);
     }
+    exit;
+}
+
+// ---- the purse (David, 2026-11-12, migration 090) -----------------------------
+// GET purse=1    the asker's own mana and gold, brought up to date with their
+//                time log first.
+//
+// ⚠ THERE IS NO ID TO ASK FOR. "No visible balances" (David): a purse is only
+// ever read for the session's own account.
+if (isset($_GET['purse'])) {
+    echo json_encode(['ok' => true, 'purse' => realm_purse($pdo, $uid)]);
     exit;
 }
 
@@ -235,6 +249,8 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
             }
         }
         $profile = realm_profile($pdo, $uid, isset($_POST['save_profile']) ? $uid : (int)$_GET['profile']);
+        // The praise this person has been given hangs in their profile (migration 090). Praise is public.
+        if ($profile !== null) $profile['praise'] = realm_praise_received($pdo, (int)$profile['id']);
         $answer = $profile === null ? ['ok' => false, 'error' => 'There is nobody living there.'] : ['ok' => true, 'profile' => $profile, 'said' => $said];
         if ($bad !== '') $answer['error'] = $bad;
         echo json_encode($answer);
@@ -379,6 +395,7 @@ if ($channel !== '') {
 }
 
 $error = '';
+$praised = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['ping'])) {
@@ -391,6 +408,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = realm_knock($pdo, $uid, (int)$_POST['knock']);
         } elseif (isset($_POST['answer_knock'])) {
             $error = realm_knock_answer($pdo, $uid, (int)$_POST['answer_knock'], (string)($_POST['let'] ?? '0') === '1');
+        } elseif (isset($_POST['praise'])) {
+            // The giver is the session's own account; realm_praise_give() checks the two are face to face.
+            $error = realm_praise_give($pdo, $uid, (int)$_POST['praise'], (string)($_POST['kind'] ?? ''), (string)($_POST['note'] ?? ''));
+            if ($error === '') $praised = true;
         } elseif (isset($_POST['arrive'])) {
             $error = realm_arrive($pdo, $uid, (string)$_POST['arrive'], (string)($_POST['inside'] ?? '0') === '1');
         } else {
@@ -403,5 +424,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $state = realm_state($pdo, $uid);
 $state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
+// Praise (migration 090): the asker's own mana and what was praised in the last two minutes.
+$state['praise'] = realm_praise_news($pdo, $uid);
+if ($praised) $state['praised'] = true;
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);

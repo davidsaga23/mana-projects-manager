@@ -1096,6 +1096,8 @@ function decoKey(e) {
    showing a number nobody has earned. */
 function openGold() {
   var d = $('goldDlg'); if (!d || d.open) return;
+  /* Once assets/realm_praise.js is loaded the chest shows the real purse (migration 087). */
+  if (R.openGold) { R.openGold(d,$('goldBody')); return; }
   $('goldBody').innerHTML = '<p class="rgold"><b>No gold yet</b></p><p>Gold has not arrived in the Realm. When it does, you will earn it from approved work, from praise you receive, and one coin for every full week of logged time.</p>'
     +'<p>It will buy clothes, accessories, companions and things for your office, which can be given away or swapped. Your gold is private, and it never has anything to do with pay.</p>'
     +'<div class="rdacts"><button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
@@ -1112,6 +1114,7 @@ function profView() {
     +'<div class="rprofwho"><b>'+esc(p.name)+'</b>'+(p.role?'<small>'+esc(p.role)+'</small>':'')+(p.mine&&p.email?'<small>'+esc(p.email)+'</small>':'')+(p.mine&&p.phone?'<small>'+esc(p.phone)+'</small>':'')+'</div></div>'
     +(p.bio ? '<p class="rprofbio">'+esc(p.bio).replace(/\n/g,'<br>')+'</p>' : '<p class="rprofbio is-none">'+(p.mine?'You have not written a bio yet.':'No bio written yet.')+'</p>')
     +(p.mine ? '<small>'+(p.why ? esc(p.why) : 'Others see your name, role, bio and picture. Your email and phone are shown only to you here.')+'</small>' : '')
+    +(R.profExtra ? R.profExtra(p) : '')
     +'<div class="rdacts">'+(p.can_edit?'<button type="button" class="rbtn" data-profedit="1">Edit your profile</button>':'')+'<button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
   body.innerHTML = h;
 }
@@ -1579,6 +1582,8 @@ function applyState(st) {
   if (S.inside && B[S.inside] && B[S.inside].owner && !B[S.inside].owner.me) roomAsk(B[S.inside].owner.id);
   if (fresh) takeUnread(fresh);
   takeKnocks(st.knocks);
+  /* Praise, mana and gold live in assets/realm_praise.js; it is told whenever the map changes. */
+  if (R.onState) R.onState(ST);
   takeSpots(st.spots);
 }
 function send(fields) {
@@ -2807,6 +2812,8 @@ window.addEventListener('pagehide',function () {
 });
 
 /* ---------- start ---------- */
+/* What assets/realm_praise.js borrows: the notices and the one way of asking the server. */
+R.toast = toast; R.toastHome = toastHome; R.send = send;
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
 var mine = me(), home = (mine && B[mine.place]) ? mine.place : (mine ? 'user:'+mine.id : 'tavern'), hs = spot(home);
