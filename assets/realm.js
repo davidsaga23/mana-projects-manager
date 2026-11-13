@@ -397,17 +397,16 @@ function roomArt(kind, tint) {
    [what, x, y, width, height], the top left corner in the room's own units. */
 var PROPS = {
   tavern:[['bar',24,46,192,20],['keg',28,100,22,26],['keg',190,100,22,26]],
-  hall:[['slab',70,74,100,10]],
-  tent:[['plans',96,70,48,12],['box',28,110,18,14],['boxS',196,112,16,12]]
+  hall:[['slab',70,74,100,10]]
+  /* A show's camp (the tent) has no row here since 2026-11-13: what stands in it is a list of
+     things, as in a house (CAMP_FIX and everybody's one decoration), so that the same code keeps
+     decorations off the fixtures. Its map table is the thing camp_table; the two crates left. */
 };
 function propArt(id) {
   var x;
   if (id==='bar') { parts([[0,8,192,12,PAL.wood]]); P1(0,8,192,2,shade(PAL.wood,35)); for (x = 10; x < 186; x += 22) { parts([[x,0,6,8,PAL.wall]]); P1(x,0,6,2,PAL.win); } }
   else if (id==='keg') { parts([[0,0,22,26,PAL.wood]]); P1(0,6,22,2,PAL.iron); P1(0,18,22,2,PAL.iron); }
   else if (id==='slab') { parts([[0,0,100,10,PAL.marble]]); P1(0,8,100,2,PAL.marbleD); }
-  else if (id==='plans') { parts([[0,0,48,12,PAL.wood]]); P1(4,2,40,8,PAL.wall); P1(12,4,8,2,TINT.ember); P1(26,5,10,2,TINT.mana); }
-  else if (id==='box') parts([[0,0,18,14,PAL.wood]]);
-  else if (id==='boxS') parts([[0,0,16,12,PAL.wood]]);
 }
 var PSTAMP = {};
 function propStamp(pr) { return PSTAMP[pr[0]] || (PSTAMP[pr[0]] = stamp(pr[3]+2,pr[4]+2,1,1,function () { propArt(pr[0]); })); }
@@ -497,7 +496,12 @@ var THINGS = {
   telescope:{n:'Telescope',z:'floor',w:26,h:30,max:1},
   cauldron:{n:'Cauldron',z:'floor',w:22,h:20,max:1},
   orb:{n:'Crystal ball',z:'floor',w:14,h:22,max:1,gold:1},
-  throne:{n:'Throne',z:'floor',w:22,h:34,max:1,gold:1}
+  throne:{n:'Throne',z:'floor',w:22,h:34,max:1,gold:1},
+  /* What is always in a show's camp (fix): never in the library, never moved. See CAMP_FIX. */
+  camp_scroll:{n:'Brief',z:'wall',w:16,h:26,y:18,max:1,fix:1},
+  camp_calendar:{n:'Timeline',z:'wall',w:22,h:24,y:20,max:1,fix:1},
+  camp_board:{n:'Production tracking',z:'wall',w:44,h:30,y:16,max:1,fix:1},
+  camp_table:{n:'Map table',z:'floor',w:48,h:16,max:1,fix:1}
 };
 var STYLES = {wall:{plaster:'Plaster',stone:'Stone',timber:'Timber'},floor:{planks:'Planks',flags:'Flagstones',checker:'Checker'},rug:{classic:'Square',round:'Round',none:'No rug'}};
 /* The room everybody starts with. includes/realm_room.php holds the same one (realm_room_default). */
@@ -531,6 +535,12 @@ function thingArt(id, col) {
   else if (id==='telescope') { parts([[12,5,4,25,W],[6,27,16,3,WD],[0,0,26,6,I]]); P1(0,0,26,1,PAL.stoneD); P1(22,1,4,4,PAL.win); P1(23,2,2,2,PAL.hot); P1(12,5,1,22,shade(W,35)); }
   else if (id==='cauldron') { parts([[2,6,18,12,I],[0,4,22,3,I],[4,18,3,2,I],[15,18,3,2,I]]); P1(2,4,18,2,TINT.spell); P1(5,4,4,1,PAL.hot); P1(3,8,2,8,PAL.stoneD); parts([[6,0,2,2,TINT.spell]]); parts([[13,1,2,2,TINT.spell]]); }
   else if (id==='orb') { parts([[4,14,6,6,W],[1,19,12,3,WD]]); parts([[3,1,8,13,TINT.violet],[1,3,12,9,TINT.violet]]); P1(4,3,3,3,PAL.hot); P1(9,9,3,3,shade(TINT.violet,-55)); }
+  else if (id==='camp_scroll') { parts([[0,0,16,3,W],[2,3,12,20,PAL.wall],[0,23,16,3,W]]); P1(0,0,16,1,shade(W,35)); for (i = 0; i < 5; i++) P1(4,6+i*3,i%2?6:8,1,PAL.wallD); P1(9,19,3,3,TINT.ember); P1(10,20,1,1,PAL.hot); }
+  else if (id==='camp_calendar') { parts([[0,0,22,24,PAL.wall]]); P1(0,0,22,5,TINT.ember); P1(0,0,22,1,shade(TINT.ember,45)); parts([[4,-2,2,4,I],[16,-2,2,4,I]]);
+    for (i = 0; i < 4; i++) for (x = 0; x < 5; x++) P1(2+x*4,7+i*4,3,3,(i===1&&x===2)?col:PAL.wallD); }
+  else if (id==='camp_board') { parts([[0,0,44,30,W]]); P1(0,0,44,1,shade(W,35)); P1(2,2,40,26,PAL.winD);
+    for (i = 0; i < 5; i++) for (x = 0; x < 7; x++) { var q = (i*3+x*5)%7; P1(5+x*5,4+i*5,3,3,x > 5-i ? PAL.stoneD : q < 4 ? TINT.spell : q===4 ? TINT.teal : q===5 ? TINT.ember : TINT.mana); } }
+  else if (id==='camp_table') { parts([[4,10,4,6,WD],[40,10,4,6,WD],[0,0,48,12,W]]); P1(0,0,48,1,shade(W,35)); P1(0,10,48,2,WD); P1(4,2,40,7,PAL.wall); P1(8,4,7,3,PAL.grassA); P1(22,3,9,4,PAL.grassA); P1(17,3,2,5,PAL.water); P1(12,5,2,2,TINT.ember); P1(27,5,2,2,TINT.mana); P1(36,4,3,2,PAL.rock); }
   else if (id==='throne') { parts([[3,0,16,24,TINT.candle],[0,14,4,14,PAL.glow],[18,14,4,14,PAL.glow],[0,20,22,8,TINT.candle],[2,28,4,6,PAL.glow],[16,28,4,6,PAL.glow]]); P1(5,3,12,16,TINT.ember); P1(4,20,14,5,TINT.ember); P1(3,0,16,2,PAL.hot); P1(10,0,2,2,TINT.mana); }
 }
 /* Each thing is painted once per colour and kept. A table's cup stands 5 units above its box, so
@@ -600,12 +610,16 @@ function inRoom(it) { var t = THINGS[it[0]]; return it[1] >= 12 && it[1] <= 228-
 function fits(items, i) { if (!inRoom(items[i])) return false; for (var k = 0; k < items.length; k++) if (k!==i && clash(items[i],items[k])) return false; return true; }
 
 /* The three ways in. [button, thing, only in my own house]. */
-var HOT = [['shelfBtn','shelf',true],['chestBtn','chest',true],['portraitBtn','portrait',false]];
+var HOT = [['shelfBtn','shelf',true],['chestBtn','chest',true],['portraitBtn','portrait',false],
+  /* In a show's camp, for somebody on that show: the scroll, the calendar and the board. */
+  ['scrollBtn','camp_scroll',false,true],['calBtn','camp_calendar',false,true],['boardBtn','camp_board',false,true]];
 function placeHot(o, lay, s, ox, oy) {
-  var k = Math.min(2,window.devicePixelRatio||1);
+  var k = Math.min(2,window.devicePixelRatio||1), open = (o && !o.owner && lay) ? campInfo(o.id) : null, sb = $('slayBtn');
+  /* The slaying bar is not a thing in the room's list, so its button is laid over where it is painted. */
+  if (sb) { sb.hidden = !open; if (open) { sb.style.left = (ox+30*s)/k+'px'; sb.style.top = oy/k+'px'; sb.style.width = 200*s/k+'px'; sb.style.height = 11*s/k+'px'; } }
   HOT.forEach(function (h) {
     var b = $(h[0]), it = null; if (!b) return;
-    if (o && o.owner && lay && (o.owner.me || !h[2])) lay.items.forEach(function (x) { if (x[0]===h[1]) it = x; });
+    if (o && lay && (h[3] ? open : (o.owner && (o.owner.me || !h[2])))) lay.items.forEach(function (x) { if (x[0]===h[1]) it = x; });
     b.hidden = !it; b.classList.toggle('is-near',!!it && RM.near===h[0]); if (!it) return;
     var t = THINGS[h[1]];
     b.style.left = (ox+(it[1]-1)*s)/k+'px'; b.style.top = (oy+(it[2]-1)*s)/k+'px'; b.style.width = (t.w+2)*s/k+'px'; b.style.height = (t.h+2)*s/k+'px';
@@ -614,7 +628,8 @@ function placeHot(o, lay, s, ox, oy) {
   });
 }
 function paintThing(c, it, o) {
-  var st = thingStamp(it[0],o.tint), h = HOME[o.owner.id];
+  /* In a camp a decoration carries who stood it there (it[3]) and wears that person's colour. */
+  var who = it[3] ? person(it[3]) : null, st = thingStamp(it[0],who ? who.cloak : o.tint), h = o.owner ? HOME[o.owner.id] : null;
   c.drawImage(st.cv,it[1]-st.ox,it[2]-st.oy);
   if (it[0]==='portrait' && h && h.pic) c.drawImage(h.pic,it[1]+2,it[2]+2);
 }
@@ -646,7 +661,8 @@ var RM = {x:120,y:142,walk:null,raf:0,lt:0,near:null,leaving:false};
 function roomSolids(o) {
   var out = [];
   if (!o) return out;
-  if (o.owner) roomOf(o.owner.id).items.forEach(function (it) { var t = THINGS[it[0]]; if (t.z!=='floor') return; var ft = foot(it); out.push({x:ft[0],y:ft[1],w:ft[2],h:ft[3],by:it[2]+t.h}); });
+  var lay = o.owner ? roomOf(o.owner.id) : campOf(o.id) ? campLay(o.id) : null;
+  if (lay) lay.items.forEach(function (it) { var t = THINGS[it[0]]; if (t.z!=='floor') return; var ft = foot(it); out.push({x:ft[0],y:ft[1],w:ft[2],h:ft[3],by:it[2]+t.h}); });
   else (PROPS[o.kind]||[]).forEach(function (pr) { var d = Math.min(10,pr[4]); out.push({x:pr[1],y:pr[2]+pr[4]-d,w:pr[3],h:d,by:pr[2]+pr[4]}); });
   return out;
 }
@@ -696,11 +712,12 @@ function roomSettle() {
 /* Which of the bookshelf, the chest and the portrait am I standing next to? The same rule as
    placeHot(): the shelf and the chest only in my own house, a portrait in anybody's. */
 function roomNear(o) {
-  var best = null;
-  if (!o || !o.owner || DECO.on) return null;
+  var best = null, lay = !o || DECO.on ? null : o.owner ? roomOf(o.owner.id) : campInfo(o.id) ? campLay(o.id) : null;
+  if (!lay) return null;
   HOT.forEach(function (h) {
-    if ((!o.owner.me && h[2]) || !$(h[0])) return;
-    roomOf(o.owner.id).items.forEach(function (it) {
+    /* A house answers with its three, a camp with its own three (h[3]). */
+    if ((h[3] ? !!o.owner : (!o.owner || (!o.owner.me && h[2]))) || !$(h[0])) return;
+    lay.items.forEach(function (it) {
       if (it[0]!==h[1]) return;
       var t = THINGS[it[0]], near;
       if (t.z==='wall') near = RM.y <= 70 && RM.x >= it[1]-6 && RM.x <= it[1]+t.w+6;
@@ -870,20 +887,24 @@ function spotFlush() {
 function spotSpace() { SP.at = {}; SP.sig = ''; SP.dirty = false; SP.sent = ''; }
 function drawRoom(c, cw, ch) {
   var o = B[S.inside]; if (!o) { placeHot(null); return; }
-  var home = !!o.owner, deco = home && o.owner.me && DECO.on, lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : null);
+  var home = !!o.owner, land = home ? null : campOf(o.id), deco = DECO.on && (land ? DECO.camp===o.id : (home && o.owner.me && !DECO.camp));
+  var lay = deco ? DECO.lay : (home ? roomOf(o.owner.id) : land ? campLay(o.id) : null);
   /* While decorating, the library lies along the bottom, so the room is fitted into what is left. */
   var k = Math.min(2,window.devicePixelRatio||1), bar = deco ? $('decoBar') : null, pad = bar ? (bar.offsetHeight+12)*k : 0;
-  var s = Math.max(1,Math.min(cw/240,(ch-70-pad)/160)), ox = Math.round((cw-240*s)/2), oy = Math.round((ch-pad-160*s)/2+30), f = S.frame;
+  /* In a camp the slaying bar is the top strip of the picture, and it is there to be seen at a
+     glance: so the room is fitted BELOW the bar that names the room, however tall that has wrapped. */
+  var ib = land ? $('insideBar') : null, top = ib && !ib.hidden ? (ib.offsetTop+ib.offsetHeight+6)*k : 0;
+  var s = Math.max(1,Math.min(cw/240,(ch-Math.max(70,top+8*k)-pad)/160)), ox = Math.round((cw-240*s)/2), oy = Math.max(Math.round(top),Math.round((ch-pad-160*s)/2+30)), f = S.frame;
   RT = {s:s,ox:ox,oy:oy};
   placeHot(deco?null:o,lay,s,ox,oy);
   c.setTransform(s,0,0,s,ox,oy);
   /* Back to front: whatever stands lower on the floor is nearer, and covers what is behind it. */
   var order = [];
   if (!home) { c.drawImage(roomArt(o.kind,o.tint).cv,0,0); (PROPS[o.kind]||[]).forEach(function (pr) { order.push({y:pr[2]+pr[4],prop:pr}); }); }
-  else {
-    c.drawImage(homeArt(lay,o.tint).cv,0,0);
-    lay.items.forEach(function (it) { if (THINGS[it[0]].z==='wall') paintThing(c,it,o); else order.push({y:it[2]+THINGS[it[0]].h,it:it}); });
-  }
+  else c.drawImage(homeArt(lay,o.tint).cv,0,0);
+  /* A house's things, or a camp's: its fixtures and everybody's one decoration. */
+  if (lay) lay.items.forEach(function (it) { if (THINGS[it[0]].z==='wall') paintThing(c,it,o); else order.push({y:it[2]+THINGS[it[0]].h,it:it}); });
+  if (land) slayPaint(c,land);
   /* The way out, wide enough to stand on. */
   c.fillStyle = PAL.glow; c.fillRect(106,150,28,8); c.fillStyle = PAL.hot; c.fillRect(110,155,20,3);
   var my = me()||{cloak:'mana',hat:'none',pet:'none'}, who = [], walking = !!RM.walk || held.size > 0;
@@ -950,20 +971,32 @@ function tagsUnderBubbles(cv, placed, s, ox, oy) {
    does not fit goes back to where it was, so the copy can always be saved. */
 function copyLay(l) { return {wall:l.wall,floor:l.floor,rug:l.rug,items:l.items.map(function (i) { return i.slice(); })}; }
 function decoStart() {
-  var m = me(); if (!m || S.inside!=='user:'+m.id || DECO.on) return;
-  if (HOME[m.id] && !HOME[m.id].ready) { toast('Decorating needs a database update first. An administrator opens migrate.php once.'); return; }
-  DECO = {on:true,lay:copyLay(roomOf(m.id)),sel:-1,drag:null,bad:false}; RM.walk = null; RM.near = null; held.clear();
+  var m = me(), k = campInfo(S.inside); if (!m || DECO.on) return;
+  if (k) { /* A show's camp: the working copy is the camp as it stands, and only my own thing in it can be picked. */
+    if (!k.ready) { toast('Decorating a camp needs a database update first. An administrator opens migrate.php once.'); return; }
+    DECO = {on:true,camp:S.inside,lay:campLay(S.inside),sel:-1,drag:null,bad:false}; DECO.sel = campMine();
+  } else {
+    if (S.inside!=='user:'+m.id) return;
+    if (HOME[m.id] && !HOME[m.id].ready) { toast('Decorating needs a database update first. An administrator opens migrate.php once.'); return; }
+    DECO = {on:true,lay:copyLay(roomOf(m.id)),sel:-1,drag:null,bad:false};
+  }
+  RM.walk = null; RM.near = null; held.clear();
   $('mapbox').classList.add('is-deco'); renderInside(); renderDeco(); draw();
 }
 function decoEnd() {
   if (!DECO.on) return;
-  DECO.on = false; DECO.drag = null; var b = $('decoBar'); if (b) { b.hidden = true; b.innerHTML = ''; }
+  DECO.on = false; DECO.camp = null; DECO.drag = null; var b = $('decoBar'); if (b) { b.hidden = true; b.innerHTML = ''; }
   $('mapbox').classList.remove('is-deco'); roomSettle(); RM.near = roomNear(B[S.inside]); renderInside(); draw();
 }
 function decoCount(id) { return DECO.lay.items.filter(function (it) { return it[0]===id; }).length; }
 function dseg(label, key) { var o = STYLES[key]; return '<span class="rdecopick"><span>'+label+'</span><span class="rseg">'+Object.keys(o).map(function (v) { return '<button type="button" data-decostyle="'+key+'" data-val="'+v+'" aria-pressed="'+(DECO.lay[key]===v)+'">'+o[v]+'</button>'; }).join('')+'</span></span>'; }
+function decoThumbs(bar) {
+  var m = me(), tint = m ? m.cloak : 'mana';
+  Array.prototype.forEach.call(bar.querySelectorAll('canvas[data-thumb]'),function (cv) { var c = cv.getContext('2d'); var k = +cv.getAttribute('data-k'); c.imageSmoothingEnabled = false; c.setTransform(k,0,0,k,0,0); c.drawImage(thingStamp(cv.getAttribute('data-thumb'),tint).cv,0,0); });
+}
 function renderDeco() {
   var bar = $('decoBar'); if (!bar || !DECO.on) return;
+  if (DECO.camp) { renderCampDeco(bar); return; }
   var it = DECO.lay.items[DECO.sel], t = it ? THINGS[it[0]] : null, keep = bar.querySelector('.rdecolib'), left = keep ? keep.scrollLeft : 0;
   var h = '<div class="rdecohead"><b>Decorating your office</b><small>Drag a thing to move it, or pick it and use the arrow keys.</small><span class="rgrow"></span>'
     +'<button type="button" class="rbtn rsmall" data-decoreset="1">Starting room</button><button type="button" class="rbtn rsmall" data-decocancel="1">Cancel</button><button type="button" class="rbtn rprimary rsmall" data-decosave="1">Save</button></div>'
@@ -972,33 +1005,38 @@ function renderDeco() {
     +(t ? '<span>Picked: <b>'+esc(t.n)+'</b></span>'+(t.req ? '<small>This one stays in every house, '+esc(t.req)+'.</small>' : '<button type="button" class="rbtn rsmall" data-decoremove="1">Remove it</button>') : '<small>Nothing is picked.</small>')+'</div>'
     +'<div class="rdecolib" role="group" aria-label="The library">';
   Object.keys(THINGS).forEach(function (id) {
+    if (THINGS[id].fix) return;
     /* Small things are shown at twice their size, big ones at their own, so the row stays low. */
     var x = THINGS[id], n = decoCount(id), full = n >= x.max, k = (x.h > 22 || x.w > 32) ? 1 : 2;
     h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+((x.gold||full)?' aria-disabled="true"':'')+' title="'+esc(x.gold?'For sale later, with gold':full?(x.max===1?'Already in the room':'No more of these fit the rules'):'Add to the room')+'">'
       +'<canvas data-thumb="'+id+'" data-k="'+k+'" width="'+(x.w+2)*k+'" height="'+(x.h+7)*k+'" style="width:'+(x.w+2)*k+'px;height:'+(x.h+7)*k+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'Costs gold, later':x.req?'In every house':n+' of '+x.max)+'</small></button>';
   });
   bar.innerHTML = h+'</div>'; bar.hidden = false;
-  var m = me(), tint = m ? m.cloak : 'mana';
-  Array.prototype.forEach.call(bar.querySelectorAll('canvas[data-thumb]'),function (cv) { var c = cv.getContext('2d'); var k = +cv.getAttribute('data-k'); c.imageSmoothingEnabled = false; c.setTransform(k,0,0,k,0,0); c.drawImage(thingStamp(cv.getAttribute('data-thumb'),tint).cv,0,0); });
+  decoThumbs(bar);
   var lib = bar.querySelector('.rdecolib'); if (lib) lib.scrollLeft = left;
 }
 /* A new thing goes to the first free spot: along the wall, or row by row down the floor. */
 function decoAdd(id) {
-  var t = THINGS[id], items = DECO.lay.items, x, y; if (!t) return;
+  var t = THINGS[id], items = DECO.lay.items, x, y; if (!t || t.fix) return;
   if (t.gold) { toast(t.n+' is bought with gold, and gold has not arrived in the Realm yet.'); return; }
-  if (decoCount(id) >= t.max) { /* Already there: pick it, so it can be found and moved. */
+  if (DECO.camp) { /* One each (David, 2026-11-13). The server refuses a second as well. */
+    if (t.req) return;
+    if (campMine() >= 0) { DECO.sel = campMine(); toast('You already have one thing in this camp. Take it out first to choose another.'); renderDeco(); draw(); return; } }
+  else if (decoCount(id) >= t.max) { /* Already there: pick it, so it can be found and moved. */
     for (x = 0; x < items.length; x++) if (items[x][0]===id) { DECO.sel = x; break; } renderDeco(); draw(); return; }
-  var it = [id,12,t.z==='wall'?t.y:0]; items.push(it);
+  var it = [id,12,t.z==='wall'?t.y:0]; if (DECO.camp) it.push(ST.me); items.push(it);
   var ys = t.z==='wall' ? [t.y] : [78-t.h,100-t.h,122-t.h,144-t.h,66-t.h,90-t.h,112-t.h,134-t.h];
   for (y = 0; y < ys.length; y++) for (x = 12; x <= 228-t.w; x += 2) { it[1] = x; it[2] = ys[y]; if (fits(items,items.length-1)) { DECO.sel = items.length-1; renderDeco(); draw(); return; } }
   items.pop(); toast('There is no free spot for that. Move or remove something first.');
 }
 function decoRemove() {
-  var it = DECO.lay.items[DECO.sel]; if (!it || THINGS[it[0]].req) return;
+  if (DECO.camp) DECO.sel = campMine();
+  var it = DECO.lay.items[DECO.sel]; if (!it || THINGS[it[0]].req || THINGS[it[0]].fix) return;
   DECO.lay.items.splice(DECO.sel,1); DECO.sel = -1; renderDeco(); draw();
 }
 function decoSave() {
   var m = me(); if (!m) return;
+  if (DECO.camp) { campSave(); return; }
   send({save_room:JSON.stringify(DECO.lay)}).then(function (j) {
     if (!j) { toast('Your office could not be saved. Try again in a moment.'); return; }
     if (j.room) roomTake(j.room);
@@ -1010,6 +1048,7 @@ function roomPoint(e) { var cv = $('mapcv'), r = cv.getBoundingClientRect(), k =
 function decoHit(p) {
   var best = -1, rank = -1;
   DECO.lay.items.forEach(function (it, i) { var t = THINGS[it[0]];
+    if (DECO.camp && it[3]!==ST.me) return;   /* in a camp, only my own thing can be picked */
     if (p.x < it[1]-1 || p.x > it[1]+t.w+1 || p.y < it[2]-1 || p.y > it[2]+t.h+1) return;
     var d = t.z==='floor' ? 1000+it[2]+t.h : 1; if (d > rank) { rank = d; best = i; } });
   return best;
@@ -1040,6 +1079,7 @@ window.addEventListener('pointercancel',decoDrop);
    removes it, Escape leaves decorating without saving. A move that does not fit is not made. */
 function decoKey(e) {
   if (e.key==='Escape') { e.preventDefault(); decoEnd(); toast('Nothing was changed.'); return; }
+  if (DECO.camp) DECO.sel = campMine();
   var it = DECO.lay.items[DECO.sel]; if (!it) return;
   if (e.key==='Delete') { e.preventDefault(); decoRemove(); return; }
   var dx = e.key==='ArrowRight' ? 1 : e.key==='ArrowLeft' ? -1 : 0, dy = e.key==='ArrowDown' ? 1 : e.key==='ArrowUp' ? -1 : 0; if (!dx && !dy) return;
@@ -1101,6 +1141,245 @@ function openProfile(id) {
     .then(function (r) { return r.json(); })
     .then(function (j) { if (j && j.profile) { PROF = j.profile; profView(); } else { d.close(); toast((j && j.error) || 'That profile could not be opened. Try again in a moment.'); } })
     .catch(function () { d.close(); toast('That profile could not be opened. Try again in a moment.'); });
+}
+
+/* ---------- a show's camp (David, 2026-11-13, migration 091) ----------
+   "For all the project camps, let's always have the following: A bar with the finished tasks and the
+   progress for 'slaying' the project. A kind of papyrus on the wall so they can see live the brief of
+   that project. A calendar to visualize the timeline. A checkbox list so they can see the production
+   tracking, to see all the shots and their status in the checkbox. Decorate is also available but
+   only one item per person."
+
+   FOUR THINGS ARE ALWAYS THERE (CAMP_FIX, and the camp_ rows of THINGS): the scroll, the calendar and
+   the board on the back wall, and the map table on the floor. They are things like any other, so the
+   house's own code draws them, lays a see-through button over each (placeHot) and keeps decorations
+   off them (fits). The slaying bar is painted over the back wall by slayPaint().
+
+   EVERYTHING SHOWN IS ANIMA'S OWN AND READ ONLY. The scroll and the board ask realm_api.php when
+   they open and again every minute while they stay open; the calendar is Anima's Timeline chart
+   itself, in a frame, as it stands when opened; the bar and the decorations are asked
+   every 45 seconds while I stand in the camp. Nothing is pushed: the hosting cannot hold a
+   connection open. Nothing here can change a status, a date or the brief.
+
+   WHO SEES WHAT is decided by the server on every request (includes/realm_camp.php): only somebody
+   who may see the show; the scroll and the board only while their switch in Anima (Brief,
+   Production tracking) is on for them; the calendar for everybody on the show (David's choice). This file only draws what came back.
+
+   ⚠ CAMP_FIX IS ALSO IN includes/realm_camp.php (REALM_CAMP_FIXED). The numbers MUST match. */
+var CAMP = {}, CAMP_FIX = [['camp_scroll',20,18],['camp_calendar',44,20],['camp_board',176,16],['camp_table',96,64]];
+var CW = {kind:null,land:null,scope:'',data:null,timer:0,seq:0};
+function campOf(id) { var m = /^land:(.+)$/.exec(id||''); return m ? m[1] : null; }
+/* What the server said about the camp behind this building, or null when it is not a camp, not
+   answered yet, or belongs to a show I am not on. */
+function campInfo(id) { var k = CAMP[campOf(id)]; return k && !k.closed ? k : null; }
+/* The camp as a list of things, the shape a house's room has: the fixtures first, then everybody's
+   one decoration, each carrying whose it is. */
+function campLay(id) {
+  var k = campInfo(id), items = CAMP_FIX.map(function (f) { return f.slice(); });
+  if (k) k.things.forEach(function (t) { items.push([t.thing,t.x,t.y,t.user]); });
+  return {items:items};
+}
+/* Where my own thing is in the working copy while decorating, or -1. */
+function campMine() { var at = -1; if (DECO.lay) DECO.lay.items.forEach(function (it, i) { if (it[3]===ST.me) at = i; }); return at; }
+function campTake(k) {
+  if (!k || !k.land) return;
+  if (!k.closed) k.things = (k.things||[]).filter(function (t) { return THINGS[t.thing] && !THINGS[t.thing].fix && !THINGS[t.thing].req; });
+  CAMP[k.land] = k;
+  /* A thing somebody has just stood where I am: step clear of it, as in a house (roomSettle). */
+  if (S.inside==='land:'+k.land) { if (!DECO.on) { roomSettle(); RM.near = roomNear(B[S.inside]); renderInside(); } draw(); }
+  if (CW.kind==='slay' && CW.land===k.land && $('campDlg') && $('campDlg').open) campSlay();
+}
+function campAsk(id) {
+  var land = campOf(id); if (!land) return;
+  fetch(R.api+'?camp='+encodeURIComponent(land),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j && j.camp) campTake(j.camp); })
+    .catch(function () { /* The fixtures are drawn; the bar fills in when an answer comes. */ });
+}
+/* THE SLAYING BAR. Finishing a show is slaying it: the green is what has been finished, the red is
+   what is left of the beast, whose head sits at the far end. The numbers are tasks, one shot or
+   asset through one step, finished when approved, which is how Anima counts a whole show. */
+var SLAY = null;
+function slayPaint(c, land) {
+  var k = CAMP[land]; if (!k || k.closed) return;
+  if (!SLAY) SLAY = {sword:stamp(13,10,1,1,function () { parts([[0,3,2,2,PAL.glow],[2,1,2,6,PAL.glow],[4,3,7,2,PAL.marble]]); P1(4,3,7,1,PAL.hot); }),
+    head:stamp(14,12,1,2,function () { parts([[3,1,8,6,TINT.ember],[0,3,4,4,TINT.ember]]); P1(8,-1,2,2,PAL.hot); P1(5,2,2,2,PAL.hot); P1(6,3,1,1,PAL.out); P1(1,4,1,1,PAL.out); P1(1,7,1,1,PAL.hot); P1(3,7,1,1,PAL.hot); P1(3,1,8,1,shade(TINT.ember,45)); })};
+  var p = k.progress, x = 46, y = 1, w = 116, h = 8, cut = p ? Math.max(p.done > 0 ? 1 : 0,Math.round((w-2)*Math.min(1,p.done/p.total))) : 0, i;
+  c.drawImage(SLAY.sword.cv,x-14,y-1);
+  c.fillStyle = PAL.stoneD; c.fillRect(x,y,w,h);
+  c.fillStyle = p ? shade(TINT.ember,-90) : PAL.winD; c.fillRect(x+1,y+1,w-2,h-2);
+  if (cut > 0) { c.fillStyle = TINT.spell; c.fillRect(x+1,y+1,cut,h-2); c.fillStyle = PAL.hot; c.fillRect(x+1,y+1,cut,1); c.fillStyle = shade(TINT.spell,-80); c.fillRect(x+1,y+h-2,cut,1); }
+  c.fillStyle = PAL.out; for (i = 1; i < 10; i++) c.fillRect(x+1+Math.round((w-2)*i/10),y+1,1,2);
+  c.globalAlpha = p && p.done >= p.total ? .35 : 1; c.drawImage(SLAY.head.cv,x+w+1,y-2); c.globalAlpha = 1;
+  c.font = 'bold 7px "Courier New", monospace'; c.textBaseline = 'top'; c.fillStyle = PAL.hot;
+  c.fillText(p ? p.done+'/'+p.total : 'no tasks yet',x+w+16,y+1);
+}
+
+/* ---- one decoration each ----
+   The house's decorating, pointed at a camp: the working copy is the camp as it stands, only my own
+   thing can be picked, dragged or taken out, and the library offers one thing, not a roomful.
+   Production and admins may also take out somebody else's (may_clear, asked again by the server). */
+function renderCampDeco(bar) {
+  var k = campInfo(DECO.camp)||{things:[]}, mi = campMine(), mine = mi >= 0 ? DECO.lay.items[mi] : null, keep = bar.querySelector('.rdecolib'), left = keep ? keep.scrollLeft : 0;
+  var h = '<div class="rdecohead"><b>Your one thing in this camp</b><small>Everybody on the show may stand one thing here. Drag yours to move it, or use the arrow keys.</small><span class="rgrow"></span>'
+    +'<button type="button" class="rbtn rsmall" data-decocancel="1">Cancel</button><button type="button" class="rbtn rprimary rsmall" data-decosave="1">Save</button></div>'
+    +'<div class="rdecorow rdecosel">'+(mine ? '<span>Yours: <b>'+esc(THINGS[mine[0]].n)+'</b></span><button type="button" class="rbtn rsmall" data-decoremove="1">Take it out</button>' : '<small>You have nothing here yet. Choose one thing below.</small>');
+  k.things.forEach(function (t) { if (t.mine) return;
+    h += '<span class="rcampwho">'+esc(THINGS[t.thing].n)+', '+esc(firstName(t.name))+(k.may_clear ? '<button type="button" class="rbtn rsmall" data-campclear="'+(+t.user)+'" title="Take '+esc(firstName(t.name))+'&#39;s thing out of the camp">Take out</button>' : '')+'</span>'; });
+  h += '</div><div class="rdecolib" role="group" aria-label="The library">';
+  Object.keys(THINGS).forEach(function (id) {
+    var x = THINGS[id]; if (x.fix || x.req) return;
+    var has = mine && mine[0]===id, off = x.gold || (mine && !has), sc = (x.h > 22 || x.w > 32) ? 1 : 2;
+    h += '<button type="button" class="rthing'+(x.gold?' is-gold':'')+'" data-decoadd="'+id+'"'+(off?' aria-disabled="true"':'')+' title="'+esc(x.gold?'For sale later, with gold':has?'This is your thing in the camp':mine?'You already have one thing here':'Stand it in the camp')+'">'
+      +'<canvas data-thumb="'+id+'" data-k="'+sc+'" width="'+(x.w+2)*sc+'" height="'+(x.h+7)*sc+'" style="width:'+(x.w+2)*sc+'px;height:'+(x.h+7)*sc+'px"></canvas><span>'+esc(x.n)+'</span><small>'+(x.gold?'Costs gold, later':has?'Yours':'Free')+'</small></button>';
+  });
+  bar.innerHTML = h+'</div>'; bar.hidden = false;
+  decoThumbs(bar);
+  var lib = bar.querySelector('.rdecolib'); if (lib) lib.scrollLeft = left;
+}
+function campSave() {
+  var id = DECO.camp, land = campOf(id), k = campInfo(id), mi = campMine(), it = mi >= 0 ? DECO.lay.items[mi] : null;
+  var old = k ? k.things.filter(function (t) { return t.mine; })[0] : null;
+  if (!it && !old) { decoEnd(); return; }
+  var done = function (j) {
+    if (!j) { toast('The camp could not be saved. Try again in a moment.'); return; }
+    if (j.camp) campTake(j.camp);
+    if (j.saved) { decoEnd(); toast(it ? 'Your '+THINGS[it[0]].n.toLowerCase()+' is in the camp.' : 'Your thing is out of the camp.'); }
+  };
+  var place = function () { return send({camp_thing:land,thing:it[0],x:it[1],y:it[2]}).then(done); };
+  /* A different thing than the one I had: the old one goes first, because the server keeps one each. */
+  if (!it || (old && old.thing!==it[0])) send({camp_thing:land,remove:0}).then(function (j) { if (it && j && j.saved) place(); else done(j); });
+  else place();
+}
+function campClear(uid) {
+  var id = DECO.camp || S.inside, land = campOf(id); if (!land || !uid) return;
+  send({camp_thing:land,remove:uid}).then(function (j) {
+    if (!j || !j.camp) return;
+    campTake(j.camp);
+    if (DECO.on && DECO.camp===id) { /* Keep what I was doing with my own thing; redraw the rest from the answer. */
+      var mi = campMine(), mine = mi >= 0 ? DECO.lay.items[mi] : null;
+      DECO.lay = campLay(id); DECO.lay.items = DECO.lay.items.filter(function (it) { return it[3]!==ST.me; }); if (mine) DECO.lay.items.push(mine);
+      DECO.sel = campMine(); renderDeco(); draw(); }
+    if (j.saved) toast('Taken out of the camp.');
+  });
+}
+
+/* ---- the four windows ---- */
+/* Text from Anima, escaped, with its web addresses made into links that open in a new tab. */
+function linked(t) {
+  return esc(t).replace(/\bhttps?:\/\/(?:(?!&quot;|&#39;|&lt;|&gt;)[^\s<])+/g,function (u) {
+    var tail = /[.,:!?)]+$/.exec(u), end = tail ? tail[0] : ''; if (end) u = u.slice(0,-end.length);
+    return '<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+u+'</a>'+end; });
+}
+/* The foot of a window: the way to the full screen in Anima (only an address of that screen is
+   ever used), and Close. */
+function campFoot(url, start, label) {
+  return '<div class="rdacts">'+(url && String(url).indexOf(start)===0 ? '<a class="rbtn" href="'+esc(url)+'" target="_blank" rel="noopener">'+label+'</a>' : '')+'<button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
+}
+function campWin(kind) {
+  var d = $('campDlg'), k = campInfo(S.inside); if (!d || d.open || !k) return;
+  var sw = {brief:['brief','The Brief'],tracking:['production','Production tracking']}[kind];
+  if (sw && !(k.can && k.can[sw[0]])) { toast(sw[1]+' is switched off for your account. Production can turn it on for you on the Users page.'); return; }
+  CW.kind = kind; CW.land = k.land; CW.scope = ''; CW.data = null; clearInterval(CW.timer);
+  d.className = 'rcamp is-'+kind;
+  $('campTitle').textContent = {slay:'Slaying ',brief:'The brief of ',timeline:'The timeline of ',tracking:'Production tracking of '}[kind]+k.name;
+  $('campBody').innerHTML = '<p class="rcnote">Opening…</p>'+campFoot('','','');
+  d.showModal();
+  if (kind==='slay') { campSlay(); return; }
+  /* THE WHOLE TIMELINE (David, 2026-11-13, with a picture of the Timeline's general chart: "let's
+     bring the whole timeline as the attachment, the whole widget"). The calendar is that very
+     chart: Anima's Timeline page in a frame, in its embedded view (timeline.php?embed=1), which
+     draws the chart and its milestones and lets nothing be moved. It is the same code as the
+     Timeline, so it cannot differ from it. It is for everybody on the show, artists included
+     (asked the same day: "Yes, show artists"); the page itself asks whether this person has the
+     Realm and is on the show. Current when opened; not reloaded while open, because a reload
+     would throw away the zoom and the place scrolled to. */
+  if (kind==='timeline') {
+    d.className = 'rcamp is-timeline';
+    $('campBody').innerHTML = '<iframe class="rcframe" title="The timeline of '+esc(k.name)+'" src="timeline.php?project='+(+k.project_id)+'&amp;embed=1"></iframe>'
+      +'<p class="rcnote">This is the show&#39;s Timeline as it stands in Anima. Nothing can be moved from here.</p>'
+      +campFoot(k.timeline_page ? 'timeline.php?project='+(+k.project_id) : '','timeline.php?','Open the full Timeline in Anima');
+    return;
+  }
+  campWinAsk();
+  /* Current when opened, then asked again every minute while it stays open. Never while the tab
+     is hidden. */
+  CW.timer = setInterval(function () { if (d.open && !document.hidden) campWinAsk(); },60000);
+}
+function campWinAsk() {
+  var kind = CW.kind, d = $('campDlg'), seq = ++CW.seq; if (!kind || kind==='slay' || kind==='timeline' || !d) return;
+  var fail = function (why) { if (seq!==CW.seq || CW.kind!==kind || !d.open || CW.data) return; d.close(); toast(why || 'That could not be opened. Try again in a moment.'); };
+  fetch(R.api+'?camp='+encodeURIComponent(CW.land)+'&'+kind+'=1'+(kind==='tracking' && CW.scope ? '&scope='+encodeURIComponent(CW.scope) : ''),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (seq!==CW.seq || CW.kind!==kind || !d.open) return;
+      if (!j || !j[kind]) { fail(j && j.error); return; }
+      CW.data = j[kind]; campWinDraw();
+    })
+    .catch(function () { fail(''); });
+}
+/* Draw the open window again from what came back, keeping where the reader had scrolled to. */
+function campWinDraw() {
+  var body = $('campBody'), sc = body.querySelector('.rcscroll'), top = sc ? sc.scrollTop : 0, left = sc ? sc.scrollLeft : 0;
+  body.innerHTML = CW.kind==='brief' ? campBrief(CW.data) : campTracking(CW.data);
+  sc = body.querySelector('.rcscroll'); if (sc) { sc.scrollTop = top; sc.scrollLeft = left; }
+}
+function campSlay() {
+  var k = CAMP[CW.land], p = k && k.progress, h;
+  if (!p) h = '<p class="rcnote">This show has nothing to count yet. Once it has shots or assets and a pipeline, the bar fills as their steps are approved.</p>';
+  else h = '<p class="rslaypct">'+p.pct+'%<small> slain</small></p><div class="rslaybar" role="img" aria-label="'+p.pct+' percent finished"><i style="width:'+Math.max(0,Math.min(100,p.done/p.total*100)).toFixed(1)+'%"></i></div>'
+    +'<p><b>'+p.done+'</b> of <b>'+p.total+'</b> tasks finished, '+(p.total-p.done > 0 ? '<b>'+(p.total-p.done)+'</b> to go.' : 'the show is slain.')+'</p>'
+    +'<p class="rcnote">A task is one shot or asset through one step, and it is finished when it is approved. This is the same count as the show&#39;s progress in Anima.</p>';
+  $('campBody').innerHTML = h+campFoot('','','');
+}
+/* THE SCROLL: the Brief as Anima holds it now. */
+function campBrief(b) {
+  var h = '';
+  if (!b.ready) h = '<p class="rcnote">The Brief needs a database update that has not been applied yet.</p>';
+  else if (b.empty) h = '<p class="rcnote">Nothing has been written in this show&#39;s Brief yet. Production fills it in on the Brief screen in Anima.</p>';
+  else {
+    h = '<div class="rpap rcscroll">'+(b.client ? '<p class="rpapclient">Client: <b>'+esc(b.client)+'</b></p>' : '');
+    [['The ask',b.summary],['Deliverables',b.deliverables],['Reference',b.reference],['Notes',b.notes]].forEach(function (s) { if (s[1]) h += '<h3>'+s[0]+'</h3><p>'+linked(s[1])+'</p>'; });
+    if (b.files && b.files.length) { h += '<h3>Files</h3><ul>';
+      b.files.forEach(function (f) { if (String(f.url).indexOf('attachment.php?')===0) h += '<li><a href="'+esc(f.url)+'" target="_blank" rel="noopener">'+esc(f.name)+'</a>'+(f.size ? ' <small>'+esc(f.size)+'</small>' : '')+'</li>'; });
+      h += '</ul>'; }
+    h += '</div>'+(b.updated ? '<p class="rcnote">Last updated '+esc(b.updated)+'. Read only here.</p>' : '<p class="rcnote">Read only here.</p>');
+  }
+  return h+campFoot(b.url,'brief.php?','Open the full Brief in Anima');
+}
+/* THE BOARD: production tracking as Anima's own screen draws it. A row per shot (or asset), a small
+   square per step in the status's colour, a dash where the step does not apply, and the DONE count.
+   The legend is built from the show's own statuses, so it cannot drift from what the cells show.
+   A cell arrives as a number: a status id, 0 for nothing recorded yet, -1 where the step does not
+   apply. Read only: nothing here can be clicked to change a status. */
+function campTracking(g) {
+  var by = {}, noun = {asset:'asset',shot:'shot',project:'deliverable'}[g.scope]||'item', label = {asset:'Pre-production',shot:'Production',project:'Post-production'}, h, last = null, groups = {}, ng = 0;
+  g.statuses.forEach(function (s) { by[s.id] = s; });
+  g.rows.forEach(function (r) { if (!groups[r.g]) { groups[r.g] = 1; ng++; } });
+  h = '<div class="rttabs" role="group" aria-label="Phase">';
+  ['asset','shot','project'].forEach(function (k) { h += '<button type="button" class="rbtn rsmall" data-campscope="'+k+'" aria-pressed="'+(g.scope===k)+'">'+label[k]+' ('+(+g.counts[k]||0)+')</button>'; });
+  h += '</div>';
+  if (!g.rows.length || !g.steps.length) {
+    h += '<p class="rcnote">'+(!g.rows.length ? 'This show has no '+noun+'s yet.' : 'No pipeline step belongs to '+label[g.scope]+' on this show.')+' Production sets that up in Anima.</p>';
+    return h+campFoot(g.url,'production.php?','Open Production tracking in Anima');
+  }
+  h += '<p class="rcmeta"><b>'+(+g.done)+'</b> of <b>'+(+g.total)+'</b> cells approved, <b>'+(+g.ready)+'</b> of '+g.rows.length+' '+noun+(g.rows.length===1?'':'s')+' fully ready. Green means approved.</p>';
+  h += '<div class="rtlegend"><b>How to read a cell</b>';
+  g.statuses.forEach(function (s) { var c = hex(s.color);
+    h += '<span><i class="rtchip"'+(c?' style="background:'+c+'"':'')+'></i>'+esc(s.name)+(s.ready?'<em class="is-ready">ready</em>':'')+(s.blocked?'<em class="is-blocked">blocked</em>':'')+(s.na?'<em>n/a</em>':'')+'</span>'; });
+  h += '<span><i class="rtchip is-none"></i>Nothing recorded yet</span><span><i class="rtdash">&mdash;</i>Step does not apply</span></div>';
+  h += '<div class="rtwrap rcscroll"><table class="rtrack"><thead><tr><th>'+noun.charAt(0).toUpperCase()+noun.slice(1)+'</th>';
+  g.steps.forEach(function (s) { h += '<th class="rtstep" title="'+esc(s.of)+'">'+esc(s.name)+'</th>'; });
+  h += '<th class="rtdone">Done</th></tr></thead><tbody>';
+  g.rows.forEach(function (r) {
+    if (ng > 1 && r.g!==last) { last = r.g; h += '<tr class="rtgroup"><td colspan="'+(g.steps.length+2)+'">'+esc(r.g)+'</td></tr>'; }
+    h += '<tr'+(r.r?' class="is-ready"':'')+'><th scope="row">'+esc(r.n)+(r.r?'<em>ready</em>':'')+'</th>';
+    r.c.forEach(function (v) { var s = v > 0 ? by[v] : null, c = s ? hex(s.color) : '';
+      h += v < 0 ? '<td><i class="rtdash" title="Step does not apply">&mdash;</i></td>' : s ? '<td><i class="rtchip"'+(c?' style="background:'+c+'"':'')+' title="'+esc(s.name)+'"></i></td>' : '<td><i class="rtchip is-none" title="Nothing recorded yet"></i></td>'; });
+    h += '<td class="rtdone">'+(+r.d)+'/'+(+r.t)+'</td></tr>';
+  });
+  h += '</tbody></table></div><p class="rcnote">Read only here. Statuses are set in Anima.</p>';
+  return h+campFoot(g.url,'production.php?','Open Production tracking in Anima');
 }
 
 /* ---------- the frame ---------- */
@@ -1212,7 +1491,10 @@ function renderInside() {
   var names = [];
   if (o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.place===o.id) names.push(o.owner.name);
   ST.people.forEach(function (p) { if (!p.me && p.state!=='away' && p.inside && p.place===o.id && names.indexOf(p.name) < 0) names.push(p.name); });
-  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', ')):'Nobody else is here right now.')+(o.owner && o.owner.me?' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.':'')+'</span><span class="rgrow"></span>'+voiceBar(o)+((o.owner && o.owner.me && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
+  /* A show's camp: its four fixtures for somebody on the show, one sentence for anybody else. */
+  var land = campOf(o.id), k = land ? CAMP[land] : null, mayDeco = (o.owner && o.owner.me) || (k && !k.closed);
+  var hint = (o.owner && o.owner.me) ? ' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.' : !k ? '' : k.closed ? ' This camp belongs to a show you are not on, so its boards are covered.' : ' Click the bar, the scroll, the calendar or the board, or walk up to one and press Enter.';
+  bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', '))+(hint?'.':''):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
   /* The shared screen sits under this bar, however many lines the bar takes. */
   shareShow();
 }
@@ -1314,7 +1596,7 @@ function goInside(id) {
   S.sel = null; renderCard();
   play(420,function (k) { S.pos = {x:from.x+(to.x-from.x)*k,y:from.y+(to.y-from.y)*k}; S.enter = k*.9; },function () {
     play(220,function (k) { S.fade = k; },function () {
-      S.enter = null; S.inside = id; S.pos = from; roomCome(); if (o.owner) roomAsk(o.owner.id); renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
+      S.enter = null; S.inside = id; S.pos = from; roomCome(); if (o.owner) roomAsk(o.owner.id); else if (campOf(id)) campAsk(id); renderInside(); renderSide(); if (chanFor(id)) openChat(chanFor(id));
       play(260,function (k) { S.fade = 1-k; },function () { S.fade = 0; draw(); });
       send({arrive:id,inside:1});
     });
@@ -1408,6 +1690,12 @@ document.addEventListener('click',function (e) {
   else if (t.closest('[data-leave]')) leave();
   else if (t.closest('#chestBtn')) openGold();
   else if (t.closest('#portraitBtn')) { var ho = B[S.inside]; if (ho && ho.owner) openProfile(ho.owner.id); }
+  else if (t.closest('#slayBtn')) campWin('slay');
+  else if (t.closest('#scrollBtn')) campWin('brief');
+  else if (t.closest('#calBtn')) campWin('timeline');
+  else if (t.closest('#boardBtn')) campWin('tracking');
+  else if ((b = t.closest('[data-campscope]'))) { CW.scope = b.getAttribute('data-campscope'); campWinAsk(); }
+  else if ((b = t.closest('[data-campclear]'))) campClear(+b.getAttribute('data-campclear'));
   else if ((b = t.closest('[data-dlgclose]'))) { var dl = b.closest('dialog'); if (dl) dl.close(); }
   else if (t.closest('[data-profedit]')) profEdit();
   else if (t.closest('[data-profcancel]')) profView();
@@ -2503,6 +2791,17 @@ if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],
   var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
   b.setAttribute('aria-label',h[3]); b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
 });
+/* A show's camp: the same see-through buttons over the bar, the scroll, the calendar and the board.
+   While I stand in a camp it is asked again every 45 seconds (three small queries for the bar, one
+   for the decorations), so the bar moves and a colleague's new thing shows without leaving. */
+if ($('mapbox')) { [['slayBtn','','','How much of the show is finished, on the slaying bar'],['scrollBtn','scrollTag','Brief','The brief of this show, on the scroll'],['calBtn','calTag','Timeline','The timeline of this show, on the calendar'],['boardBtn','boardTag','Tracking','The production tracking of this show, on the board']].forEach(function (h) {
+    var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
+    b.setAttribute('aria-label',h[3]); if (h[1]) b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
+  });
+  setInterval(function () { if (S.inside && campOf(S.inside) && !DECO.on && !document.hidden) campAsk(S.inside); },45000);
+  /* The window shut. (If it was opened again in the same breath, it is a new window and is left alone.) */
+  if ($('campDlg')) $('campDlg').addEventListener('close',function () { if ($('campDlg').open) return; clearInterval(CW.timer); CW.kind = null; CW.data = null; });
+}
 if ($('focusBtn') && $('focusNow')) {
   var shelf = document.createElement('button'); shelf.type = 'button'; shelf.id = 'shelfBtn'; shelf.className = 'rshelf'; shelf.hidden = true;
   shelf.setAttribute('aria-label','Your tasks, on the bookshelf'); shelf.innerHTML = '<span id="shelfTag">Your tasks</span>'; $('mapbox').appendChild(shelf);

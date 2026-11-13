@@ -161,6 +161,15 @@ foreach (($state['people'] ?? []) as $p) {
     <h2 id="profTitle">Profile</h2>
     <div id="profBody"></div>
   </dialog>
+  <?php /* What is always in a show's camp (David, 2026-11-13): "A bar with the finished tasks and the
+           progress for 'slaying' the project. A kind of papyrus on the wall so they can see live the
+           brief of that project. A calendar to visualize the timeline. A checkbox list so they can
+           see the production tracking". One window for all four, filled by assets/realm.js from
+           realm_api.php?camp=, read only. */ ?>
+  <dialog id="campDlg" class="rcamp" aria-labelledby="campTitle">
+    <h2 id="campTitle">Camp</h2>
+    <div id="campBody"></div>
+  </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">
     <h2 id="lookTitle">Your character and house</h2>
     <form id="lookForm" method="dialog"></form>
