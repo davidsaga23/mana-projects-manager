@@ -1165,14 +1165,14 @@ function renderSide() {
   var w = whereabouts();
   BLIST.forEach(function (o) { if (!o.place) return; var n = (w.inside[o.id]||[]).length + (S.inside===o.id?1:0);
     var nv = voiceOthers(o.id).length + (VO.on && S.inside===o.id?1:0);
-    h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in voice':'')+'</small>':'')+'</button>'; });
+    h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in a call':'')+'</small>':'')+'</button>'; });
   $('side').innerHTML = h+'</div></div>';
 }
 function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
   if (S.walk) { h = '<div class="rcard"><b>Walking to '+esc(title(S.walk.id))+'…</b><div class="racts"><button type="button" class="rbtn rsmall" data-tele="'+esc(S.walk.id)+'">Teleport instead</button></div></div>'; }
   else if (o) {
-    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Go inside to talk, in writing or by voice.';
+    var why = mayEnter(id), sub = o.owner ? (o.owner.state==='away'?'Away':(o.owner.state==='idle'?'Resting. ':'')+DOORS[o.owner.door]+(o.owner.focus?', in a focus session':'')+(o.owner.me?'. Your tasks are on the bookshelf inside':'')) : 'A place to meet. Go inside to talk, in writing or in a call.';
     /* At an ajar door, with nobody having let me in yet, the button is Knock. */
     var ajar = o.owner && !o.owner.me && o.owner.state!=='away' && o.owner.door==='ajar' && !PASS[o.owner.id];
     var waiting = ajar && KN.mine && KN.mine.to===o.owner.id && KN.mine.status==='waiting';
@@ -1906,7 +1906,8 @@ if ($('focusBody')) {
    voice chat, and so does a door closing on a visitor.
 
    NOBODY IS HEARD BY SURPRISE. Walking in never opens the microphone. Each person presses Join
-   voice; the browser then asks for the microphone, once per browser.
+   call (the button read "Join voice" until David asked for "Join call" on 2026-11-13; the code
+   keeps the word voice); the browser then asks for the microphone, once per browser.
 
    THE SOUND GOES STRAIGHT FROM BROWSER TO BROWSER (WebRTC), one direct line to each other person in
    voice, which is fine for five. It never passes through Anima. To find each other across different
@@ -1960,14 +1961,14 @@ function takeVoiceRoom(list) {
 }
 function micWords(e) {
   var n = e && e.name;
-  if (n==='NotAllowedError' || n==='SecurityError') return 'The microphone is blocked for this site. Click the padlock beside the address, allow the microphone, then press Join voice again.';
-  if (n==='NotFoundError' || n==='OverconstrainedError') return 'No microphone was found. Plug one in, then press Join voice again.';
-  return 'The microphone could not be opened. Close any other app that is using it, then press Join voice again.';
+  if (n==='NotAllowedError' || n==='SecurityError') return 'The microphone is blocked for this site. Click the padlock beside the address, allow the microphone, then press Join call again.';
+  if (n==='NotFoundError' || n==='OverconstrainedError') return 'No microphone was found. Plug one in, then press Join call again.';
+  return 'The microphone could not be opened. Close any other app that is using it, then press Join call again.';
 }
 function voiceJoin() {
   if (VO.on || VO.joining || !S.inside) return;
-  if (!voiceReady()) { toast('Voice needs a database update first. An administrator opens migrate.php once.'); return; }
-  if (!voiceCan()) { toast('This browser cannot do voice chat. Use a current Chrome, Edge, Firefox or Safari.'); return; }
+  if (!voiceReady()) { toast('Calls need a database update first. An administrator opens migrate.php once.'); return; }
+  if (!voiceCan()) { toast('This browser cannot join a call. Use a current Chrome, Edge, Firefox or Safari.'); return; }
   var place = S.inside, mine = ++VO.asked; VO.joining = true; renderInside();
   var fail = function (msg) { VO.joining = false; voiceQuiet(); if (msg) toast(msg); renderInside(); };
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false}).then(function (stream) {
@@ -1979,14 +1980,14 @@ function voiceJoin() {
     voicePost({voice:'join',place:place}).then(function (j) {
       var v = j && j.voice;
       if (mine!==VO.asked) { if (v && v.in) voicePost({voice:'leave',sid:v.sid}).catch(function () {}); return; }
-      if (!j || !j.ok || !v || !v.in) { fail((j && j.error) || 'Voice could not be reached. Try again in a moment.'); return; }
+      if (!j || !j.ok || !v || !v.in) { fail((j && j.error) || 'The call could not be reached. Try again in a moment.'); return; }
       if (S.inside!==place) { voicePost({voice:'leave',sid:v.sid}).catch(function () {}); fail(''); return; }
       VO.joining = false; VO.on = true; VO.sid = v.sid; VO.place = place; VO.muted = false; VO.misses = 0; VO.busy = 0; VO.out = [];
       VO.tries = {}; VO.dead = {}; VO.seen = {}; VO.talk = {};
       voiceEars();
       VO.timer = setInterval(voiceBeat,1000); VO.meter = setInterval(voiceMeter,150);
       voiceTake(j); renderInside(); renderSide(); draw();
-    }).catch(function () { if (mine===VO.asked) fail('Voice could not be reached. Try again in a moment.'); });
+    }).catch(function () { if (mine===VO.asked) fail('The call could not be reached. Try again in a moment.'); });
   },function (e) { if (mine===VO.asked) fail(micWords(e)); });
 }
 /* Let go of everything on this computer: the lines, the microphone, the timers. Tells nobody. */
@@ -2017,7 +2018,7 @@ function voiceBeat() {
   if (VO.busy && Date.now()-VO.busy < 8000) return;
   var out = VO.out, sid = VO.sid; VO.out = []; VO.busy = Date.now();
   var missed = function () { VO.busy = 0; VO.out = out.concat(VO.out).slice(-40);
-    if (++VO.misses >= 20) { voiceStop(false); toast('Voice lost touch with Anima, so you left the voice chat. Check your connection, then press Join voice again.'); } };
+    if (++VO.misses >= 20) { voiceStop(false); toast('The call lost touch with Anima, so you left it. Check your connection, then press Join call again.'); } };
   voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,out:JSON.stringify(out)}).then(function (j) {
     if (!VO.on || VO.sid!==sid) return;
     if (!j || !j.ok || !j.voice) { missed(); return; }
@@ -2119,7 +2120,7 @@ function voiceFail(P) {
   var id = P.id, who = person(id), n = VO.tries[id] = (VO.tries[id]||0)+1;
   voiceDrop(id);
   if (n >= 2 && !VO.dead[id]) { VO.dead[id] = true;
-    toast('Your voice could not connect with '+(who?firstName(who.name):'somebody')+'. One of you is probably on a network that blocks direct calls. Try another network, or use a video call.'); }
+    toast('Your call could not connect with '+(who?firstName(who.name):'somebody')+'. One of you is probably on a network that blocks direct calls. Try another network, or use a video call.'); }
   renderInside();
 }
 /* The meters: my own microphone and each voice that arrives, for the speaking mark only. Nothing is
@@ -2159,20 +2160,20 @@ function voiceWake() {
   if (!VO.blocked) return; VO.blocked = false;
   Object.keys(VO.peers).forEach(function (k) { var el = VO.peers[k].el; if (el) { var pr = el.play(); if (pr && pr.catch) pr.catch(function () { VO.blocked = true; }); } });
 }
-/* The voice part of the room's bar: Join voice, or Mute and Leave voice, and who is talking. */
+/* The voice part of the room's bar: Join call, or Mute and Leave call, and who is talking. */
 function voiceBar(o) {
   if (!ST.voice) return '';
-  if (!ST.voice.ready) return '<span class="rvoice"><button type="button" class="rbtn rsmall" disabled>Join voice</button><small>Voice needs a database update first.</small></span>';
+  if (!ST.voice.ready) return '<span class="rvoice"><button type="button" class="rbtn rsmall" disabled>Join call</button><small>Calls need a database update first.</small></span>';
   var others = voiceOthers(o.id), cap = ST.voice.cap||5, h = '<span class="rvoice">';
   if (VO.on) {
     var names = others.map(function (p) { var P = VO.peers[p.id]; return firstName(p.name)+(VO.dead[p.id]?' (could not connect)':(P && P.ok)?'':' (connecting…)'); });
-    h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In voice with '+names.join(', ')+'.' : 'In voice. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')+'</small>'
+    h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In a call with '+names.join(', ')+'.' : 'In a call. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')+'</small>'
       +'<button type="button" class="rbtn rsmall" data-voice="mute" aria-pressed="'+VO.muted+'">'+(VO.muted?'Unmute':'Mute')+'</button>'
-      +'<button type="button" class="rbtn rsmall" data-voice="leave">Leave voice</button>';
+      +'<button type="button" class="rbtn rsmall" data-voice="leave">Leave call</button>';
   } else {
     var full = others.length >= cap, who = others.map(function (p) { return firstName(p.name); });
-    h += (others.length ? '<small>'+esc(full ? 'The voice table is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in voice.')+'</small>' : '')
-      +'<button type="button" class="rbtn rsmall" data-voice="join"'+((VO.joining||full)?' disabled':'')+'>'+(VO.joining?'Joining…':'Join voice')+'</button>';
+    h += (others.length ? '<small>'+esc(full ? 'The call is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in a call.')+'</small>' : '')
+      +'<button type="button" class="rbtn rsmall" data-voice="join"'+((VO.joining||full)?' disabled':'')+'>'+(VO.joining?'Joining…':'Join call')+'</button>';
   }
   return h+'</span>';
 }

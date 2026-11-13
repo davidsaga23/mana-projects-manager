@@ -162,7 +162,7 @@ if (isset($_POST['voice'])) {
         if ($what === 'poll') $reply['spots'] = realm_spots($pdo, $uid);
         echo json_encode($reply);
     } catch (Throwable $e) {
-        echo json_encode(['ok' => false, 'error' => 'Voice could not be reached. Try again in a moment.']);
+        echo json_encode(['ok' => false, 'error' => 'The call could not be reached. Try again in a moment.']);
     }
     exit;
 }
