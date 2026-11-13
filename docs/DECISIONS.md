@@ -5678,8 +5678,9 @@ shop and the word for praise were NOT discussed before he said so; they are open
 - **Gold from approved work is not built.** David said gold comes from it and gave no amount. To
   decide with him, with care: a coin per approval is the part most easily read as a productivity
   score.
-- **The word is plain "praise"** on every screen. Anima's task board is called Spell; "blessing"
-  was proposed and David has not chosen.
+- **The word is "praise"** on every screen (David, 2026-11-13, asked to choose between praise,
+  blessing and spell: "Keep praise"). Anima's task board is called Spell, so a praise is never
+  called a spell. This closes the question left open on 2026-11-12.
 - **Open, not yet discussed with David:** giving a thing to somebody and whether they must accept;
   swapping and what happens if one person walks away; what can and cannot change hands; whether an
   inventory is private; the shop, prices and rare things; limits on praising the same person.

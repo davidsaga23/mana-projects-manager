@@ -17,7 +17,7 @@
    - The praise somebody has received, in their profile.
 
    The word on the screen is plain "praise". Anima's task board is called Spell, so a praise is not
-   called a spell here; David has not chosen another word. */
+   called a spell here. David, 2026-11-13: "Keep praise". */
 (function () {
 'use strict';
 var R = window.REALM;

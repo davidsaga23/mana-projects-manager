@@ -39,8 +39,8 @@
 // NOT BUILT YET, and said so on the screen where it matters: gold from approved
 // work (David has not said how much), anything to spend gold on, gifting and
 // swapping, the Herald, and a keepsake drawn in the office. The word for praise
-// is plain "praise": Anima's task board is already called Spell, and David has
-// not chosen another word.
+// is "praise" (David, 2026-11-13: "Keep praise"): Anima's task board is already
+// called Spell.
 //
 // My readings, to confirm with David:
 //   * "1 week" is five working days in a row, counted on the run itself, so a
