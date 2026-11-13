@@ -19,8 +19,9 @@
 //     the portrait (profile). They can be moved, never removed, and there is
 //     exactly one of each, so every house has the three ways in.
 //   * THE LIBRARY IS REALM_ROOM_THINGS. Everything in it is free except the rows
-//     marked gold, which are shown as "for sale later" and cannot be placed until
-//     gold exists (stage 4). No prices are stored: David has not set any.
+//     marked gold, which the merchant in the Tavern sells (migration 092). One
+//     of those can be placed only by somebody who owns it: realm_room_save()
+//     asks realm_owned(). The prices are in REALM_SHOP, includes/realm_shop.php.
 //
 // ⚠ THE LIST BELOW IS ALSO IN assets/realm.js (THINGS), which draws each thing.
 // The sizes MUST match: this file decides whether a room is allowed, that file
@@ -106,9 +107,15 @@ function realm_room_default(): array {
  *   * a floor thing stands on the floor, and two may not stand on the same
  *     ground (only the bottom 10 units count, so a tall thing may rise behind
  *     a low one, as it would in a real room);
- *   * the bookshelf, the chest and the portrait are there exactly once.
+ *   * the bookshelf, the chest and the portrait are there exactly once;
+ *   * a thing the merchant sells is placed only by somebody who owns it.
+ *     $owned is the list of what the SAVER owns (realm_owned). It is null when
+ *     a stored room is only being read to be drawn: that room passed this rule
+ *     when it was saved, and the reader is usually not the owner.
+ *     A thing that is given away or swapped is taken out of its old owner's
+ *     stored room when it leaves them (realm_owned_strip, realm_trade.php).
  */
-function realm_room_check($in, string &$why): ?array {
+function realm_room_check($in, string &$why, ?array $owned = null): ?array {
     $why = 'That room could not be read. Try again.';
     if (!is_array($in) || !isset($in['items']) || !is_array($in['items'])) return null;
     $out = [];
@@ -124,7 +131,10 @@ function realm_room_check($in, string &$why): ?array {
         $id = (string)$it[0];
         if (!isset(REALM_ROOM_THINGS[$id]) || !is_numeric($it[1]) || !is_numeric($it[2])) return null;
         [$zone, $w, $h, $hang, $most, , $gold] = REALM_ROOM_THINGS[$id];
-        if ($gold) { $why = 'That one is bought with gold, and gold has not arrived yet.'; return null; }
+        if ($gold && $owned !== null && !in_array($id, $owned, true)) {
+            $why = ucfirst(REALM_SHOP_NAMES[$id] ?? 'that') . ' is not yours yet. The merchant in the Tavern sells it.';
+            return null;
+        }
         $count[$id] = ($count[$id] ?? 0) + 1;
         if ($count[$id] > $most) { $why = 'There are too many of one thing in that room.'; return null; }
         $x = (int)$it[1];
@@ -188,7 +198,8 @@ function realm_room_save(PDO $pdo, int $uid, string $json): string {
     if (!realm_rooms_available($pdo)) return 'Decorating needs a database update first. An administrator opens migrate.php once.';
     if (strlen($json) > 6000) return 'That is more than one room can hold.';
     $why = '';
-    $room = realm_room_check(json_decode($json, true), $why);
+    // What the merchant sells may stand here only if the saver owns it (includes/realm_shop.php).
+    $room = realm_room_check(json_decode($json, true), $why, realm_owned($pdo, $uid));
     if ($room === null) return $why;
     // Only somebody with a house has a room to decorate.
     $q = $pdo->prepare('SELECT 1 FROM realm_people WHERE user_id = ? AND house_slot IS NOT NULL');

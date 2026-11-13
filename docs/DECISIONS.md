@@ -5942,3 +5942,104 @@ Same thread, after PR 229 was open.
   is private (proposed: yes, others see only what you wear and what stands in your office); whether
   "on time" should be judged by the day of delivery instead of the day of approval; whether on time
   means a second coin.
+
+## 2026-11-13 — The Realm's shop: a merchant, eight things, three prices
+
+David, in the thread he asked for ("let's open a new thread for that"). The choices were put to him
+a few at a time, each with a recommendation. He answered "Agree to all three" (where, what,
+prices), "yeah let's move forward" (scarcity, owning, giving, what goes in the first build), and
+then "Yes, build it".
+
+- **Where: a merchant in the Tavern.** Not a new building (more drawing, kept for later if the shop
+  earns it) and not only a button in a list. It gives gold a place, and it fits the Realm's habit
+  that things happen face to face. The buyer must be inside the Tavern, checked on the server
+  (`realm_shop_buy()`). The things for sale also show, with their price, in the Decorate library
+  and in Your character, which send you to the merchant, so nobody has to hunt for them.
+- **What: eight things to begin with**, because every new thing is drawn in code. The three office
+  things already drawn and marked gold (shield and swords, crystal ball, throne), two headwear
+  (crown, feathered cap), two companions (fox, small dragon) and one cloak (starry). Everything
+  that was free stays free.
+- **Prices: 5, 12 and 25 coins.** Set against what a steady artist earns (about 3 to 10 coins a
+  week), and against the people who approve work instead of delivering it (David, Tim, Renata,
+  Production), who earn perhaps 1 to 3 a week from logging and praise: nobody should be shut out.
+  Small 5: crown, feathered cap, shield and swords. Medium 12: crystal ball, fox, starry cloak.
+  Grand 25: throne, small dragon. All eight cost 96 coins, three to four months for a steady
+  artist. Which thing got which price was my proposal; David did not change it.
+- **No scarcity.** Nothing runs out, nothing is limited in number, nothing is taken away. In a
+  studio of 20, "only three thrones exist" turns a toy into a contest, and there is no ranking in
+  the Realm. New things may arrive now and then with a notice.
+- **One of each per person.** The unique key on `realm_owned` holds it.
+- **No undo and no selling back.** If a thing could be sold back, one person could buy it, give it
+  away, and the other sell it for the coins: gold handed over by another route, which David ruled
+  out on 2026-11-12. So the merchant asks before taking anything, and that is the only way back.
+- **Private.** What somebody owns is read only for the session's own account, like the purse:
+  there is no request that takes somebody else's id. Others see what you wear and what stands in
+  your office. This closes "whether the list of what you own is private" (yes).
+- **Stored** in `realm_owned` (migration 092): one line per thing owned, with who holds it, how it
+  reached them (`got`: bought today, gift and swap later), who it came from and what was paid.
+  Rules in `includes/realm_shop.php`, which holds the prices (`REALM_SHOP`); the screen is sent
+  them. The counter is its own file, `assets/realm_shop.js`. `assets/realm.js` draws the merchant
+  (a piece of the Tavern's furniture, `PROPS`), the five new pieces, and marks what is the
+  merchant's (`PAID`, and `gold` in `THINGS`).
+- **Ownership is checked where a thing is used**, not only at the counter: `realm_set_look()`
+  refuses a bought piece that is not yours, and `realm_room_save()` refuses a bought thing that is
+  not yours. Reading a stored room does not check, because the reader is usually not the owner.
+- **Agreed for the next build, not built:** a gift must be accepted; a swap happens only when both
+  press agree in the same place, and if one walks away nothing moves; a bought thing stays
+  exchangeable whoever holds it, and comes off the old owner's character and out of their office
+  when it leaves them. ⚠ That last part must be written with giving: nothing does it today.
+- **Small choices made without asking.** The merchant stands to the right of the Tavern's rug.
+  The starry cloak is midnight blue, and so is its owner's roof, since a roof takes the cloak's
+  colour. The feathered cap takes the cloak's colour, like the pointed hat and the hood. A thing
+  can be tried on in Your character and Save waits until it is put back. The chest lists what you
+  own. Coins earned since the purse was last counted are counted before a purchase.
+- **Still open:** things drawn by the studio's artists (a later stage); new things arriving with a
+  notice; whether praise received can ever be traded (proposed: no); whether "on time" is judged
+  by delivery or approval.
+- **Not verified:** PHP was never run; the screen was exercised against a pretend server only.
+
+## 2026-11-13 — Giving and swapping, and the starting purse
+
+David, the same thread, after the shop was built: "let's build the giving and swapping, let's also
+start with 5 gold and 5 mana for all the new people landing in the realm", and then "includeing
+renata and myself". The rules of an exchange are the ones he agreed with the shop ("yeah let's move
+forward"); how a swap works step by step is my design, below.
+
+- **Only what the merchant sells changes hands**, face to face: the same place, both inside or both
+  outside, both with the page open, as for a praise. Asked when the offer is made and again at the
+  moment things move, so if one of them has walked away nothing moves.
+- **A gift must be accepted.** The receiver sees a notice with Accept and No thanks.
+- **A swap, in three steps, because what somebody owns is private.** The one who starts cannot pick
+  from the other's things. A offers one thing "for a swap"; B answers by choosing one of their own
+  to give back; A sees it and agrees. Only then do both things move, in one transaction. This is
+  what "both press agree" became.
+- **One of each still holds.** A thing cannot be offered to somebody who already has one, and the
+  giver is told so. ⚠ That is the one fact about another person's list that is ever given away; it
+  cannot be avoided without letting the offer fail silently.
+- **A thing that leaves comes off**, in the same transaction: off the old owner's character
+  (headwear and companion to none, a cloak to the colour a new person is given) and out of their
+  stored room (`realm_owned_strip()`). If that cannot be done, the exchange is undone.
+- **An offer lasts five minutes from its last step**, and making a new one ends your earlier one.
+- **Only the two people see an offer or how it ended.** Nothing is announced to the village,
+  unlike a praise: who owns what is private.
+- **No gold moves in an exchange**, and nothing can be sold back, so gold still cannot pass from
+  one person to another.
+- **Stored** in `realm_offers`, added to migration 092 with `realm_owned` (not yet run, so one migration, not two; it was 091 until the camps took that number).
+  Rules in `includes/realm_trade.php`, screen in `assets/realm_trade.js`. Offers travel with the
+  map, the unread counts and every chat answer, like knocks, so they are seen in a few seconds.
+- **The starting purse: 5 gold and 5 mana, once, for everybody.** `REALM_START_GOLD` and
+  `REALM_START_MANA` in `includes/realm_praise.php`. ⚠ It is a mark on the purse
+  (`realm_purse.started`, migration 092), not something a new purse is created with: PR 229 was
+  merged while this was being built, so David's and Renata's purses may already exist, and a
+  praise received before a first visit makes a purse too. `realm_purse()` gives the coins to any
+  purse not yet marked, inside the lock on that row, and marks it. The migration itself adds
+  nothing to anybody's gold, so running it twice gives nothing twice. The chest's rules say
+  "Everybody starts with 5 coins and 5 mana" once 092 has run.
+- **My readings, to confirm with David:** for a purse that already exists the 5 coins are added
+  to what it holds; mana stops at 5, the most anybody holds, so somebody with 3 mana ends at 5,
+  not 8.
+- **Bought things do not stand in a show's camp** (camps arrived from PR 232 during this build).
+  A camp holds one free thing per person; what the merchant sells is for your own office. Not
+  asked; easy to open later.
+- **Not verified:** PHP was never run. A gift and a swap were tried between two pretend people;
+  saying no, calling an offer off, an offer running out and walking away were not tried.

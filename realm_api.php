@@ -24,6 +24,12 @@
 // POST voice=join|poll|leave              voice in the room you are inside (further down)
 // POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 090)
 // GET  purse=1                            the asker's OWN mana and gold
+// GET  shop=1                             the merchant's counter: prices, what the asker owns, their coins
+// POST buy=<item id>                      buy one thing from the merchant, inside the Tavern (migration 092)
+// POST offer=<their user id>&item=&kind=gift|swap
+//                                         offer one of my bought things to somebody standing where I am
+// POST offer_answer=<offer id>&say=accept|decline|agree|cancel&item=
+//                                         the next step of an offer I made or was made (includes/realm_trade.php)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 
 require __DIR__ . '/includes/db.php';
@@ -127,6 +133,26 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
 // ever read for the session's own account.
 if (isset($_GET['purse'])) {
     echo json_encode(['ok' => true, 'purse' => realm_purse($pdo, $uid)]);
+    exit;
+}
+
+// ---- the merchant (David, 2026-11-13, migration 092) --------------------------
+// GET  shop=1        the price list, what the asker owns, and their own coins
+// POST buy=<item>    buy one thing; the same answer, with `bought` when it worked
+//
+// ⚠ NO ID IN EITHER. What somebody owns and holds is read only for the
+// session's own account, and realm_shop_buy() checks the rest: inside the
+// Tavern, not owned already, enough coins. `buy` is in artist_may_post().
+if (isset($_GET['shop']) || isset($_POST['buy'])) {
+    try {
+        $bad = isset($_POST['buy']) ? realm_shop_buy($pdo, $uid, (string)$_POST['buy']) : '';
+        $answer = ['ok' => true, 'shop' => realm_shop_answer($pdo, $uid)];
+        if (isset($_POST['buy'])) $answer['bought'] = $bad === '';
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The merchant could not be reached. Try again in a moment.']);
+    }
     exit;
 }
 
@@ -339,7 +365,9 @@ $mayAnnounce = can_edit();
 if (isset($_GET['unread'])) {
     echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce) : [],
                       'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
-                      'spots' => realm_spots($pdo, $uid)]);
+                      'spots' => realm_spots($pdo, $uid),
+                      // Offers of a gift or a swap ride here too, like knocks, so they are seen in seconds.
+                      'offers' => realm_offer_news($pdo, $uid)]);
     exit;
 }
 $channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
@@ -385,7 +413,8 @@ if ($channel !== '') {
         }
         $answer = ['ok' => true, 'channel' => $channel, 'messages' => $messages, 'can_post' => $may['post'],
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce), 'knocks' => realm_knock_news($pdo, $uid),
-                   'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid)];
+                   'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
+                   'offers' => realm_offer_news($pdo, $uid)];
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {
@@ -396,6 +425,7 @@ if ($channel !== '') {
 
 $error = '';
 $praised = false;
+$offered = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['ping'])) {
@@ -412,6 +442,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // The giver is the session's own account; realm_praise_give() checks the two are face to face.
             $error = realm_praise_give($pdo, $uid, (int)$_POST['praise'], (string)($_POST['kind'] ?? ''), (string)($_POST['note'] ?? ''));
             if ($error === '') $praised = true;
+        } elseif (isset($_POST['offer'])) {
+            // The giver is the session's own account; realm_offer_make() checks the thing is theirs and the two are face to face.
+            $error = realm_offer_make($pdo, $uid, (int)$_POST['offer'], (string)($_POST['item'] ?? ''), (string)($_POST['kind'] ?? ''));
+            if ($error === '') $offered = true;
+        } elseif (isset($_POST['offer_answer'])) {
+            $error = realm_offer_answer($pdo, $uid, (int)$_POST['offer_answer'], (string)($_POST['say'] ?? ''), (string)($_POST['item'] ?? ''));
+            if ($error === '') $offered = true;
         } elseif (isset($_POST['arrive'])) {
             $error = realm_arrive($pdo, $uid, (string)$_POST['arrive'], (string)($_POST['inside'] ?? '0') === '1');
         } else {
@@ -427,5 +464,10 @@ $state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
 // Praise (migration 090): the asker's own mana and what was praised in the last two minutes.
 $state['praise'] = realm_praise_news($pdo, $uid);
 if ($praised) $state['praised'] = true;
+// The merchant (migration 092): the prices, and what the asker themselves owns.
+$state['shop'] = realm_shop_state($pdo, $uid);
+// Giving and swapping: the asker's own offers, waiting or just ended.
+$state['offers'] = realm_offer_news($pdo, $uid);
+if ($offered) $state['offered'] = true;
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);

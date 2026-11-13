@@ -45,6 +45,10 @@ if ($ready && !$preview) {
     // Mana, gold and praise (migration 090). Opening the Realm is when the time log is counted.
     realm_purse($pdo, $uid);
     $state['praise'] = realm_praise_news($pdo, $uid);
+    // The merchant (migration 092): the prices, and what this person owns.
+    $state['shop'] = realm_shop_state($pdo, $uid);
+    // Giving and swapping: this person's own offers, waiting or just ended.
+    $state['offers'] = realm_offer_news($pdo, $uid);
 }
 $hasHouse = false;
 foreach (($state['people'] ?? []) as $p) {
@@ -187,6 +191,10 @@ foreach (($state['people'] ?? []) as $p) {
   <script src="assets/realm.js<?= asset_ver('realm.js') ?>"></script>
   <?php /* Praise, mana and gold (migration 090): its own file, so the map's script stays as it was. */ ?>
   <script src="assets/realm_praise.js<?= asset_ver('realm_praise.js') ?>"></script>
+  <?php /* The merchant in the Tavern (migration 092): the counter where gold is spent. */ ?>
+  <script src="assets/realm_shop.js<?= asset_ver('realm_shop.js') ?>"></script>
+  <?php /* Giving and swapping what was bought, face to face (the same migration). */ ?>
+  <script src="assets/realm_trade.js<?= asset_ver('realm_trade.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>
