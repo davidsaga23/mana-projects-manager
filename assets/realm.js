@@ -1141,18 +1141,34 @@ try { if (localStorage.getItem('realmMusic')==='0') MU.on = false; var mv = pars
 function musicSave() { try { localStorage.setItem('realmMusic',MU.on?'1':'0'); localStorage.setItem('realmMusicVol',String(MU.vol)); } catch (e) { /* Then it is simply not remembered. */ } }
 /* LOFI (David, 2026-11-12, after hearing the first version, a slow beatless chord: "I don't like the
    current music, can we try something more lofi?"). A four-bar loop at 72 beats a minute: mellow
-   jazz chords and a soft bass, a dusty kick, snare and hat with a little swing, a stray high note
-   now and then, record crackle underneath, the whole thing dulled and made to waver slightly in
-   pitch like an old tape. Every sound is still built here from plain waves and noise.
+   jazz chords and a soft bass, a soft kick, snare and hat with a little swing, a stray high note
+   now and then, the whole thing dulled and made to waver slightly in pitch like an old tape. Every
+   sound is still built here from plain waves and noise.
+
+   NO RECORD CRACKLE (David, 2026-11-12: "there's a bit of noise in the lo-fi music, it sounds like
+   if the speaker was broken"). The first lofi version played "record crackle" underneath: about
+   thirty sharp clicks a second, nearly as loud as the loudest note, and sent round the dull filter
+   so nothing softened them. Measured, it was the only thing in the mix making sudden jumps, and
+   that is exactly what a torn speaker does. It is gone, not turned down: a sound that reads as a
+   fault has no place under somebody's work. The kick drum was also more than twice as loud as the
+   chords, a low thump a laptop speaker rattles on, so it is now quieter and does not dip as low.
+
+   WHAT KEEPS IT CLEAN, in the order the sound travels (musicStart): the dull filter; a filter that
+   removes the rumble below what small speakers can play; a limiter, which is only a safety net and
+   normally does nothing; then the volume. With the volume last, no setting of the slider can push
+   the sound past full scale: at the top it peaks at about half of it. Every note and drum hit
+   swells from silence and ends at silence (musicTone, musicHiss), because a sound that starts or
+   stops part way up is heard as a click.
 
    Notes are booked on the sound engine's own clock a couple of seconds ahead (musicPlan), because a
    browser slows the timers of a tab that is not in front, and a beat driven straight by a timer
    would stumble whenever the Realm was behind another window. */
-var BPM = 72, BEAT = 60/BPM;
+var BPM = 72, BEAT = 60/BPM, MUSIC_TOP = .8;
 /* E minor 9, A 13, D major 9, B minor 11: bass note, then the four notes of the chord. */
 var CHORDS = [[82.41,196,246.94,293.66,369.99],[110,196,246.94,277.18,369.99],[73.42,185,220,277.18,329.63],[123.47,185,220,293.66,329.63]];
 var BELLS = [587.33,659.25,739.99,880,987.77];
-function musicLevel() { return MU.vol*MU.vol*.9; }
+/* The slider, squared, because ears hear loudness in ratios: half way along sounds about half as loud. */
+function musicLevel() { return MU.vol*MU.vol*MUSIC_TOP; }
 /* Called inside a click, and nowhere else. */
 function musicWake(t) {
   var AC = window.AudioContext || window.webkitAudioContext, n = focusNow();
@@ -1163,7 +1179,8 @@ function musicWake(t) {
 function musicTone(out, type, f, at, dur, loud, attack, wow) {
   var ctx = MU.ctx, o = ctx.createOscillator(), v = ctx.createGain();
   o.type = type; o.frequency.value = f; if (wow) wow.connect(o.detune);
-  v.gain.setValueAtTime(0,at); v.gain.linearRampToValueAtTime(loud,at+attack); v.gain.exponentialRampToValueAtTime(.0001,at+dur);
+  /* The fade is a curve that can never reach zero, so it is aimed at next to nothing and the last step to silence is a straight one. */
+  v.gain.setValueAtTime(0,at); v.gain.linearRampToValueAtTime(loud,at+attack); v.gain.exponentialRampToValueAtTime(.0001,at+dur); v.gain.linearRampToValueAtTime(0,at+dur+.03);
   o.connect(v); v.connect(out); o.start(at); o.stop(at+dur+.05); o.onended = function () { v.disconnect(); };
   return o;
 }
@@ -1172,7 +1189,7 @@ function musicBell(out, f, loud) { musicTone(out,'sine',f,MU.ctx.currentTime,3.6
 function musicHiss(rig, at, dur, loud, kind, freq) {
   var ctx = MU.ctx, src = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), v = ctx.createGain();
   src.buffer = rig.noise; fl.type = kind; fl.frequency.value = freq;
-  v.gain.setValueAtTime(loud,at); v.gain.exponentialRampToValueAtTime(.0001,at+dur);
+  v.gain.setValueAtTime(0,at); v.gain.linearRampToValueAtTime(loud,at+.004); v.gain.exponentialRampToValueAtTime(.0001,at+dur); v.gain.linearRampToValueAtTime(0,at+dur+.02);
   src.connect(fl); fl.connect(v); v.connect(rig.bus); src.start(at,Math.random()*.8,dur+.05); src.onended = function () { v.disconnect(); };
 }
 /* One half-beat of the loop: n counts 0 to 31 across the four bars. */
@@ -1180,8 +1197,8 @@ function musicStep(rig, n, t) {
   var bar = n>>3, s = n&7, ch = CHORDS[bar], at = t+(s&1 ? BEAT*.1 : 0), i;
   if (s===0 || s===5) for (i = 1; i < 5; i++) musicTone(rig.bus,'triangle',ch[i],at+i*.03,s?BEAT*1.3:BEAT*3.6,s?.035:.07,.02,rig.wow);
   if (s===0 || s===5) musicTone(rig.bus,'triangle',ch[0],at,s?BEAT*.9:BEAT*1.5,s?.13:.18,.02,rig.wow);
-  if (s===0 || s===5 || (s===3 && (bar&1))) { var k = musicTone(rig.bus,'sine',120,at,.3,.5,.005,null); k.frequency.setValueAtTime(120,at); k.frequency.exponentialRampToValueAtTime(45,at+.12); }
-  if (s===2 || s===6) musicHiss(rig,at,.14,.14,'bandpass',1700);
+  if (s===0 || s===5 || (s===3 && (bar&1))) { var k = musicTone(rig.bus,'sine',110,at,.28,.24,.008,null); k.frequency.setValueAtTime(110,at); k.frequency.exponentialRampToValueAtTime(52,at+.1); }
+  if (s===2 || s===6) musicHiss(rig,at,.14,.075,'bandpass',1300);
   musicHiss(rig,at,.04,s&1?.02:.035,'highpass',6500);
   if (s && Math.random() < .1) musicTone(rig.bus,'sine',BELLS[Math.floor(Math.random()*BELLS.length)],at,BEAT*1.6,.05,.01,rig.wow);
 }
@@ -1195,21 +1212,22 @@ function musicStart() {
   var ctx = MU.ctx; if (!ctx || MU.rig || ctx.state!=='running') return;
   var t = ctx.currentTime, rig = {live:[],step:0,next:t+.15,plan:0}, i;
   rig.master = ctx.createGain(); rig.master.gain.setValueAtTime(0,t); rig.master.gain.setTargetAtTime(musicLevel(),t,1.2); rig.master.connect(ctx.destination);
-  /* Everything musical goes through one dull filter: that, more than anything, is the "lo" in lofi. */
-  rig.bus = ctx.createBiquadFilter(); rig.bus.type = 'lowpass'; rig.bus.frequency.value = 2400; rig.bus.Q.value = .7; rig.bus.connect(rig.master);
+  /* The safety net: it leaves the music alone and only holds back a moment when several notes land
+     together. It sits BEFORE the volume, so what the volume receives is already bounded. */
+  var lim = ctx.createDynamicsCompressor(); lim.threshold.value = -8; lim.knee.value = 4; lim.ratio.value = 12; lim.attack.value = .004; lim.release.value = .2; lim.connect(rig.master);
+  /* Below about 38 Hz there is nothing to hear, only work for a small speaker. */
+  var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 38; hp.Q.value = .7; hp.connect(lim);
+  /* Everything goes through one dull filter: that, more than anything, is the "lo" in lofi. */
+  rig.bus = ctx.createBiquadFilter(); rig.bus.type = 'lowpass'; rig.bus.frequency.value = 2400; rig.bus.Q.value = .7; rig.bus.connect(hp);
   var lfo = ctx.createOscillator(); rig.wow = ctx.createGain(); lfo.frequency.value = .45; rig.wow.gain.value = 9; lfo.connect(rig.wow); lfo.start(); rig.live.push(lfo);
   rig.noise = ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate); var d = rig.noise.getChannelData(0); for (i = 0; i < d.length; i++) d[i] = Math.random()*2-1;
-  /* Record crackle: two seconds of near silence with a faint hiss and a few clicks, played round and round. */
-  var dust = ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate), c = dust.getChannelData(0); for (i = 0; i < c.length; i++) c[i] = (Math.random()*2-1)*(Math.random() < .0006 ? .9 : .012);
-  var spin = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), dv = ctx.createGain(); spin.buffer = dust; spin.loop = true; hp.type = 'highpass'; hp.frequency.value = 900; dv.gain.value = .5;
-  spin.connect(hp); hp.connect(dv); dv.connect(rig.master); spin.start(); rig.live.push(spin);
   musicPlan(rig); rig.plan = setInterval(function () { musicPlan(rig); },400);
   MU.rig = rig;
 }
 function musicStop() {
   var rig = MU.rig, ctx = MU.ctx; if (!rig) return; MU.rig = null;
   clearInterval(rig.plan);
-  var t = ctx.currentTime; rig.master.gain.cancelScheduledValues(t); rig.master.gain.setTargetAtTime(0,t,.5);
+  var t = ctx.currentTime; rig.master.gain.cancelScheduledValues(t); rig.master.gain.setTargetAtTime(0,t,.35);
   /* Notes already booked play out unheard behind the faded master, which is then unplugged. */
   setTimeout(function () { rig.live.forEach(function (o) { try { o.stop(); } catch (e) { /* already stopped */ } }); rig.master.disconnect(); },2800);
 }

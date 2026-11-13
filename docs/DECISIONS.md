@@ -5505,3 +5505,29 @@ extend it over the map?" (with a screenshot, the left edge of the open conversat
   again (speech bubbles in a room, the bookshelf that opens Your tasks, the Leave button of a
   room). Notices, knocks, the picture viewer and Your character are unaffected. There is no
   dragging to an in-between width.
+
+## 2026-11-12 — The focus music has no crackle, and how its sound is kept clean
+
+David, the same day the lofi loop went live: "there's a bit of noise in the lo-fi music, it sounds
+like if the speaker was broken. Let's ... fix it".
+
+- **No "record crackle", no hiss bed, no deliberate distortion.** The lofi version had a crackle
+  layer for character. Rendered and measured, it was about thirty clicks a second at up to 0.38 of
+  full scale beside music peaking at 0.48, and it went round the low-pass filter. A person working
+  hears that as a fault, not as texture. The lofi character now comes only from the slow tempo,
+  the chords, the dull filter and the slight tape waver. Do not add a noise layer back without
+  David hearing it first.
+- **The order of the chain is the rule** (`musicStart` in `assets/realm.js`): voices, low-pass
+  2.4 kHz, high-pass 38 Hz, limiter, volume, speakers. The limiter (a `DynamicsCompressorNode`) is
+  a safety net: it adds some gain of its own, which `MUSIC_TOP` accounts for. Top of the slider
+  peaks near 0.45 of full scale. Anybody adding a voice measures again.
+- **The kick sits level with the chords and bass** (it was 7 dB above them) and sweeps 110 to
+  52 Hz, not 120 to 45, for small speakers.
+- **How it was measured, since no session can listen:** the music code was taken as text from
+  `assets/realm.js` in a local test page and rendered with an `OfflineAudioContext`, each layer
+  alone and together; peak, samples at full scale, largest sample-to-sample jump and RMS were
+  read from the result. The test page is not in the repository.
+- **Known limits:** unheard by a person. Notes already booked when the music stops play out
+  silently for a few seconds and then end themselves. The snare and hat are still made of filtered
+  hiss, by design; if those also read as noise, the next step is to drop the hat and soften the
+  snare further.
