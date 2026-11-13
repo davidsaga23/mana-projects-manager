@@ -34,7 +34,8 @@ var PAL = {out:'#141a28',grassA:'#2e6b4b',grassB:'#2a6446',tuft:'#43906a',tuftD:
   wall:'#d2c8b2',wallD:'#aba18d',stone:'#8d95aa',stoneD:'#666e86',wood:'#7a5638',woodD:'#573c27',marble:'#dfe3ee',marbleD:'#b9c0d4',
   cobble:'#7f8699',cobbleL:'#8f96a8',cobbleH:'#a4abbd',iron:'#3b4256',
   win:'#ffd36e',winD:'#2a3350',door:'#4a3020',skin:'#f3d3b0',cheek:'#f0a898',mouth:'#b06a58',hair:'#5a3a26',fur:'#9aa1b4',owl:'#a58b6a',owlL:'#c9b08a',boot:'#3a2a20',
-  smoke:'#c9d1e0',glow:'#e2b35c',shadow:'rgba(0,0,0,.28)',mist:'rgba(176,186,206,.3)',dim:'rgba(0,0,0,.16)',lift:'rgba(255,255,255,.12)',veil:'#191919',ground:'#101010'};
+  smoke:'#c9d1e0',glow:'#e2b35c',shadow:'rgba(0,0,0,.28)',mist:'rgba(176,186,206,.3)',dim:'rgba(0,0,0,.16)',lift:'rgba(255,255,255,.12)',veil:'#191919',ground:'#101010',
+  text:'#ededed',textMuted:'rgba(255,255,255,.6)',primary:'#5fb2ff',primaryBorder:'rgba(95,178,255,.45)',plate:'rgba(16,16,16,.88)',ok:'#26fe89',warn:'#f0c33c',danger:'#ff6b6b'};
 var TINT = {candle:'#ffc66b',mana:'#5fb2ff',spell:'#26fe89',ember:'#ff7a59',violet:'#b592ff',rose:'#ff8fb3',teal:'#4fd6c8',starry:'#3d4494'};
 var CLOAKS = {candle:'Gold',mana:'Blue',spell:'Green',ember:'Ember',violet:'Violet',rose:'Rose',teal:'Teal',starry:'Starry'};
 var HATS = {none:'Bare',hat:'Pointed hat',hood:'Hood',crown:'Crown',cap:'Feathered cap'};
@@ -1428,6 +1429,36 @@ function campTracking(g) {
 }
 
 /* ---------- the frame ---------- */
+/* THE NAMES ON THE MAP ARE PAINTED, NOT LAID OVER IT (David, 2026-11-13, with a picture of "Renata"
+   and "The Tavern" written across the characters standing there: "these names should be behind the
+   characters"). They used to be text in the SVG that sits over the canvas for clicking, and anything
+   on the page is above anything painted, so a name always covered whoever stood on it. Now each
+   name, its door mark and a place's plate are painted after the buildings, and draw() then paints
+   again the part of any character that stands across one, so the character is in front.
+   Each box returned is the patch a name covers. The colours are the roles of assets/realm.css. */
+function mapLabels(c) {
+  var out = [];
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round';
+  BLIST.forEach(function (o) {
+    var hot = S.hot===o.id, tw;
+    if (o.place) {
+      c.font = 'bold 15px "Courier New", monospace'; tw = c.measureText(o.name).width;
+      var w = Math.ceil(tw)+22, x = Math.round(o.x-w/2), y = o.y+24;
+      c.fillStyle = PAL.plate; c.fillRect(x,y,w,21); c.lineWidth = 1.5; c.strokeStyle = hot ? PAL.primary : PAL.primaryBorder; c.strokeRect(x+.5,y+.5,w-1,20);
+      c.fillStyle = PAL.primary; c.fillText(o.name,o.x,o.y+39);
+      out.push({x:x-1,y:y-1,w:w+2,h:23}); return;
+    }
+    c.font = 'bold 14px "Courier New", monospace'; tw = c.measureText(o.name).width;
+    var cx = o.x+4, half = tw/2+12, d = o.lit ? o.door : '', mx = cx-half, my = o.y+15;
+    c.lineWidth = 3; c.strokeStyle = PAL.ground; c.strokeText(o.name,cx,o.y+20);
+    c.fillStyle = hot ? PAL.primary : (o.lit ? PAL.text : PAL.textMuted); c.fillText(o.name,cx,o.y+20);
+    if (d==='sealed') { c.save(); c.translate(mx,my); c.rotate(Math.PI/4); c.fillStyle = PAL.danger; c.fillRect(-3.5,-3.5,7,7); c.lineWidth = 1; c.strokeStyle = PAL.ground; c.strokeRect(-3.5,-3.5,7,7); c.restore(); }
+    else if (d) { c.beginPath(); c.arc(mx,my,d==='open'?4:3.5,0,Math.PI*2); c.fillStyle = d==='open'?PAL.ok:PAL.ground; c.fill(); c.lineWidth = d==='open'?1:2; c.strokeStyle = d==='open'?PAL.ground:PAL.warn; c.stroke(); }
+    out.push({x:mx-6,y:o.y+6,w:half+tw/2+9,h:20});
+  });
+  c.textAlign = 'start';
+  return out;
+}
 function draw() {
   var cv = $('mapcv'); if (!cv || !GROUND) return;
   var dpr = Math.min(2,window.devicePixelRatio||1), cw = Math.round(cv.clientWidth*dpr), ch = Math.round(cv.clientHeight*dpr); if (!cw || !ch) return;
@@ -1455,6 +1486,18 @@ function draw() {
       sprite(c,it.x,it.y,it.who,it.bob); c.globalAlpha = 1;
       if (it.idle) zed(c,it.x,it.y);
     }
+    /* Names go on after the buildings, then every character standing across one is painted again
+       inside that name's patch only, so they are in front of the name and nothing else changes. */
+    var labs = mapLabels(c);
+    list.forEach(function (it) {
+      if (it.st) return;
+      labs.forEach(function (lb) {
+        if (it.x+30 < lb.x || it.x-16 > lb.x+lb.w || it.y+4 < lb.y || it.y-60 > lb.y+lb.h) return;
+        c.save(); c.beginPath(); c.rect(lb.x,lb.y,lb.w,lb.h); c.clip();
+        if (it.idle) c.globalAlpha = .6; if (it.mine && en) c.globalAlpha = Math.max(0,1-en);
+        sprite(c,it.x,it.y,it.who,it.bob); c.restore(); c.globalAlpha = 1;
+      });
+    });
     BLIST.forEach(function (o) {
       if (o.owner && o.owner.focus) puff(c,o.x+(o.kind==='forge'?16:0),o.y-(o.kind==='forge'?82:o.kind==='tower'?128:66),f,false);
       heads(c,o,w.inside[o.id]||[]);
@@ -1480,15 +1523,12 @@ function overlay() {
   });
   h += '<text class="region" x="800" y="952">Anima Village</text>';
   BLIST.forEach(function (o) {
-    var hw = HIT[o.kind][0], ht = HIT[o.kind][1], half = o.name.length*4.4+10, mark = '';
-    if (o.place) { var w = o.name.length*9.2+20;
-      h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(o.name)+', a place to meet"><rect class="hit" x="'+(o.x-hw-10)+'" y="'+(o.y-ht)+'" width="'+(hw*2+20)+'" height="'+(ht+50)+'" rx="4"/><rect class="plate" x="'+(o.x-w/2)+'" y="'+(o.y+24)+'" width="'+w+'" height="21" rx="3"/><text class="lbl place" x="'+o.x+'" y="'+(o.y+39)+'">'+esc(o.name)+'</text></g>';
+    var hw = HIT[o.kind][0], ht = HIT[o.kind][1];
+    if (o.place) {
+      h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(o.name)+', a place to meet"><rect class="hit" x="'+(o.x-hw-10)+'" y="'+(o.y-ht)+'" width="'+(hw*2+20)+'" height="'+(ht+50)+'" rx="4"/></g>';
       return; }
     var d = o.lit ? o.door : '';
-    if (d==='open') mark = '<circle cx="'+(o.x-half)+'" cy="'+(o.y+15)+'" r="4" style="fill:var(--spell);stroke:var(--night)"/>';
-    else if (d==='ajar') mark = '<circle cx="'+(o.x-half)+'" cy="'+(o.y+15)+'" r="3.5" style="fill:var(--night);stroke:var(--candle);stroke-width:2"/>';
-    else if (d==='sealed') mark = '<rect x="'+(o.x-half-3.5)+'" y="'+(o.y+11.5)+'" width="7" height="7" transform="rotate(45 '+(o.x-half)+' '+(o.y+15)+')" style="fill:var(--ember);stroke:var(--night)"/>';
-    h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(title(o.id))+(d?', '+DOORS[d]:', away')+'"><rect class="hit" x="'+(o.x-hw)+'" y="'+(o.y-ht)+'" width="'+(hw*2)+'" height="'+(ht+24)+'" rx="4"/>'+mark+'<text class="lbl'+(o.lit?'':' away')+'" x="'+(o.x+4)+'" y="'+(o.y+20)+'">'+esc(o.name)+'</text></g>';
+    h += '<g class="bld" tabindex="0" role="button" data-sel="'+esc(o.id)+'" aria-label="'+esc(title(o.id))+(d?', '+DOORS[d]:', away')+'"><rect class="hit" x="'+(o.x-hw)+'" y="'+(o.y-ht)+'" width="'+(hw*2)+'" height="'+(ht+24)+'" rx="4"/></g>';
   });
   return h+'</svg>';
 }
@@ -1666,6 +1706,8 @@ var drag = null, justDragged = false, held = new Set(), kraf = 0, klt = 0;
 function bindMap() {
   var s = $('mapsvg'); if (!s) return;
   s.addEventListener('wheel',function (e) { e.preventDefault(); var p = s.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; var q = p.matrixTransform(s.getScreenCTM().inverse()); zoomAt(e.deltaY>0?1.15:.87,q.x,q.y); },{passive:false});
+  s.addEventListener('mouseover',function (e) { var b = e.target.closest && e.target.closest('.bld'), id = b ? b.getAttribute('data-sel') : null; if (id!==S.hot) { S.hot = id; draw(); } });
+  s.addEventListener('mouseleave',function () { if (S.hot) { S.hot = null; draw(); } });
   s.addEventListener('pointerdown',function (e) { drag = {x:e.clientX,y:e.clientY,vx:S.view.x,vy:S.view.y,k:1/s.getScreenCTM().a,moved:false}; });
 }
 window.addEventListener('pointermove',function (e) { S.touched = true; if (!drag) return; var dx = e.clientX-drag.x, dy = e.clientY-drag.y; if (!drag.moved && Math.hypot(dx,dy) < 5) return; drag.moved = true; setView({x:drag.vx-dx*drag.k,y:drag.vy-dy*drag.k,w:S.view.w}); });
@@ -2839,6 +2881,45 @@ rebuildBuildings();
 var mine = me(), home = (mine && B[mine.place]) ? mine.place : (mine ? 'user:'+mine.id : 'tavern'), hs = spot(home);
 if (hs) { S.pos = {x:hs.x,y:hs.y}; S.here = home; }
 applyState(ST);
+/* A RELOAD KEEPS YOU WHERE YOU WERE (David, 2026-11-13: "is it possible when you reload to be kept
+   in the same spot or house where you left?"). The page used to start you outside the door of the
+   building the server last saw you arrive at, so a reload threw you out of a room and undid any
+   walking. Where I stand is now written down in this browser every few seconds and as the page
+   closes, and read back here: the room I was in and my place in it, or my place on the map.
+   - Only for the same person on this computer, and only for 12 hours: the next morning you start
+     at your own door again, as before.
+   - A room is entered again only if its door still lets me in (mayEnter). An ajar door I was let
+     through does not after a reload, so I am then stood outside it, where I walked in from.
+   - It runs after applyState() because the ground and the buildings must exist to test the spot. */
+var KEEP = 'realmSpot';
+function keepSpot() {
+  if (!mine || S.enter!==null) return;
+  try { localStorage.setItem(KEEP,JSON.stringify({u:mine.id,t:Date.now(),inside:(!RM.leaving && S.inside) || null,x:Math.round(S.pos.x),y:Math.round(S.pos.y),rx:Math.round(RM.x),ry:Math.round(RM.y)})); } catch (e) { /* A private window may refuse; then a reload starts at the door, as it used to. */ }
+}
+(function () {
+  var k = null; try { k = JSON.parse(localStorage.getItem(KEEP) || 'null'); } catch (e) { k = null; }
+  if (!k || !mine || k.u!==mine.id || !(Date.now()-k.t < 12*3600000)) return;
+  var num = function (v) { return typeof v==='number' && isFinite(v); };
+  try {
+    if (k.inside && B[k.inside] && !mayEnter(k.inside) && spot(k.inside)) {
+      var o = B[k.inside], d = spot(k.inside);
+      S.pos = {x:d.x,y:d.y}; S.here = k.inside; S.sel = null; S.inside = k.inside; roomCome();
+      if (num(k.rx) && num(k.ry) && roomFree(k.rx,k.ry,roomSolids(o))) { RM.x = k.rx; RM.y = k.ry; }
+      if (o.owner) roomAsk(o.owner.id); else if (campOf(k.inside)) campAsk(k.inside);
+      renderCard(); renderInside(); renderSide(); if (chanFor(k.inside)) openChat(chanFor(k.inside));
+      draw(); send({arrive:k.inside,inside:1}); spotDirty();
+      return;
+    }
+    if (num(k.x) && num(k.y) && canStand(k.x,k.y)) {
+      S.pos = {x:k.x,y:k.y}; var at = nearest(); S.here = at; S.sel = at;
+      follow(); renderCard(); renderSide(); draw();
+      if (at && at!==home) send({arrive:at,inside:0});
+      spotDirty();
+    }
+  } catch (e) { /* Whatever was written down is no use: the door I started at stands. */ }
+})();
+window.addEventListener('pagehide',keepSpot);
+setInterval(keepSpot,5000);
 /* The heartbeat. One small request every 25 seconds says I am still here and brings back where
    everybody else is. `active` is whether I touched the page since the last one. */
 setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); },25000);
