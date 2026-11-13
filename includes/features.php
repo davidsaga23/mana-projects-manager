@@ -125,6 +125,14 @@ const FEATURES = [
     // David, 2026-11-05: Historic quotas for Admin and Production.
     'quotas'        => ['label' => 'Historic quotas', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
+    // Commercial, the CRM (David, 2026-11-12, migration 085): leads, proposals
+    // and quotes. "Admins only" to begin with, so Production starts OFF and can
+    // be switched on here, by role or by person. ⚠ SALES FIGURES, not a show's
+    // budget or cost (see includes/crm.php), which is why this may be a switch
+    // at all when Finance, rates and contracts may not. Locked off for the roles
+    // that cannot save anywhere: the screens are all editing.
+    'commercial'    => ['label' => 'Commercial: leads, proposals and quotes', 'group' => 'The whole studio', 'note' => 'sales figures; see and edit',
+                        'on' => ['editor' => 0, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
     'invite'        => ['label' => 'Person page: create a login, resend the link', 'group' => 'The whole studio',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
 
@@ -200,6 +208,8 @@ const FEATURE_SCRIPTS = [
     'export_artists.php'  => 'artists',
     'bookings.php'        => 'bookings',
     'history_quotas.php'  => 'quotas',
+    'commercial.php'      => 'commercial',
+    'commercial_api.php'  => 'commercial',
     'users.php'           => 'users',
     'log_reminders.php'   => 'log_reminder_send',
     'realm.php'           => 'realm',
