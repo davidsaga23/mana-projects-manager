@@ -146,7 +146,7 @@ R.openGold = function (d, body) {
           ? '<p>'+(p.streak ? 'You have logged your time '+p.streak+' working '+(p.streak === 1 ? 'day' : 'days')+' in a row. '+left+' more '+(left === 1 ? 'day' : 'days')+' for the next coin.'
                             : 'Log your time today to start a run. Every working day you log gives 1 mana, and every '+p.every+' in a row gives 1 gold coin.')+'</p>'
           : '<p>Your login is not linked to a person yet, so there is no time log to earn from. An administrator links it on the Users page.</p>')
-        /* What I have bought from the merchant (assets/realm_shop.js, migration 091). */
+        /* What I have bought from the merchant (assets/realm_shop.js, migration 092). */
         +(R.chestExtra ? R.chestExtra() : '')
         /* THE RULES, IN THE CHEST (David, 2026-11-13: "let's also add the mana and gold rules when they
            open their own chest"). The numbers come from the server, so the words cannot drift from

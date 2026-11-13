@@ -1,4 +1,4 @@
-/* The Realm: giving and swapping what was bought (David, 2026-11-13, migration 091).
+/* The Realm: giving and swapping what was bought (David, 2026-11-13, migration 092).
 
    The rules are in includes/realm_trade.php and are checked there; this file only shows them.
    Its own file, like assets/realm_praise.js and assets/realm_shop.js. It borrows the notices and

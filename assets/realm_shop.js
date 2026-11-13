@@ -1,4 +1,4 @@
-/* The Realm: the merchant's counter (David, 2026-11-13, migration 091).
+/* The Realm: the merchant's counter (David, 2026-11-13, migration 092).
 
    The rules are in includes/realm_shop.php and are checked there; this file only shows them.
    Like assets/realm_praise.js it is its own file, so the map's script (assets/realm.js) stays

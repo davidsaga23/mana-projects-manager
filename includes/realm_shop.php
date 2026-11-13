@@ -1,5 +1,5 @@
 <?php
-// The Realm — the merchant, and what each person owns (migration 091).
+// The Realm — the merchant, and what each person owns (migration 092).
 //
 // David, 2026-11-12: gold "buys clothes, accessories and pets", and on the same
 // day, about the office: "they can modify it from a library of free and opt to
@@ -70,7 +70,7 @@ const REALM_SHOP_NAMES = [
     'throne' => 'the throne', 'dragon' => 'the small dragon',
 ];
 
-/** Has migration 091 arrived, and gold with it (090)? Asked once per request; never throws. */
+/** Has migration 092 arrived, and gold with it (090)? Asked once per request; never throws. */
 function realm_shop_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -113,7 +113,7 @@ function realm_look_known(string $part, string $v): bool {
 }
 
 /**
- * What travels with the map, for the asker alone: has 091 run, the price list,
+ * What travels with the map, for the asker alone: has 092 run, the price list,
  * and the ids of what THEY own, so the library and "Your character" can tell
  * "yours" from "at the merchant". No coins: those are asked for at the counter
  * (realm_shop_answer). One small read. Never throws.

@@ -1,5 +1,5 @@
 <?php
-// The Realm — giving and swapping what was bought (migration 091).
+// The Realm — giving and swapping what was bought (migration 092).
 //
 // David, 2026-11-13: "not exchangable are all the free starters, but anything
 // you paid for is exchangable", and, after the shop was built: "let's build the
@@ -47,7 +47,7 @@ const REALM_OFFER_SECONDS = 300;
 /** How long a finished offer is still told to the two people, so both see how it ended. */
 const REALM_OFFER_NEWS_SECONDS = 120;
 
-/** Has the offers table arrived (migration 091), with the shop? Asked once per request; never throws. */
+/** Has the offers table arrived (migration 092), with the shop? Asked once per request; never throws. */
 function realm_offers_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -258,7 +258,7 @@ function realm_owned_strip(PDO $pdo, int $uid, string $item): void {
 
 /**
  * What the asker needs to know about their own offers right now:
- *   ready  false until migration 091 has run
+ *   ready  false until migration 092 has run
  *   list   the offers they made or were made, still waiting or just ended:
  *          [{id, mine, with, name, kind, give, back, status}], where `mine`
  *          says the asker made it, `with` and `name` are the other person,

@@ -25,7 +25,7 @@
 // POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 090)
 // GET  purse=1                            the asker's OWN mana and gold
 // GET  shop=1                             the merchant's counter: prices, what the asker owns, their coins
-// POST buy=<item id>                      buy one thing from the merchant, inside the Tavern (migration 091)
+// POST buy=<item id>                      buy one thing from the merchant, inside the Tavern (migration 092)
 // POST offer=<their user id>&item=&kind=gift|swap
 //                                         offer one of my bought things to somebody standing where I am
 // POST offer_answer=<offer id>&say=accept|decline|agree|cancel&item=
@@ -136,7 +136,7 @@ if (isset($_GET['purse'])) {
     exit;
 }
 
-// ---- the merchant (David, 2026-11-13, migration 091) --------------------------
+// ---- the merchant (David, 2026-11-13, migration 092) --------------------------
 // GET  shop=1        the price list, what the asker owns, and their own coins
 // POST buy=<item>    buy one thing; the same answer, with `bought` when it worked
 //
@@ -286,6 +286,68 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
     exit;
 }
 
+// ---- a show's camp (David, 2026-11-13, migration 091) --------------------------
+// GET  camp=<land>                    the camp: the slaying bar's numbers, the
+//                                     decorations, which windows I may open
+// GET  camp=<land>&brief=1            the scroll: the show's Brief
+// GET  camp=<land>&tracking=1&scope=shot|asset|project
+//                                     the board: the show's production tracking
+// POST camp_thing=<land>&thing=&x=&y= stand my ONE thing in the camp, or move it
+// POST camp_thing=<land>&remove=<user id, or 0 for my own>
+//                                     take a thing out (somebody else's: Production only)
+//
+// ⚠ A LAND IS SENT, NEVER A SHOW. realm_camp_open() finds the show that holds
+// the land and asks may_see_project(); the id used below is always that one.
+// ⚠ ANIMA'S SWITCHES ARE ASKED HERE for the scroll and the board ('brief',
+// 'production'), so a screen switched off for somebody cannot be read through a
+// camp. The calendar is not answered here at all: it is timeline.php?embed=1 in
+// a frame, open to everybody on the show (David, 2026-11-13: "Yes, show artists"). Everything is read only except `camp_thing`, the one field named in
+// artist_may_post(), which writes the session's own row (or deletes another's
+// only for can_edit()).
+if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
+    try {
+        require_once __DIR__ . '/includes/realm_camp.php';
+        $land = isset($_POST['camp_thing']) ? (string)$_POST['camp_thing'] : (string)$_GET['camp'];
+        $why = '';
+        $show = realm_camp_open($pdo, $land, $why);
+        if ($show === null) {
+            echo json_encode(['ok' => false, 'error' => $why, 'camp' => ['land' => $land, 'closed' => true]]);
+            exit;
+        }
+        $pid = (int)$show['id'];
+        $on  = fn(string $k): bool => !function_exists('feature_on') || feature_on($k);
+        $off = fn(string $what): string => $what . ' is switched off for your account. Production can turn it on for you on the Users page.';
+        if (isset($_GET['brief'])) {
+            echo json_encode($on('brief') ? ['ok' => true, 'brief' => realm_camp_brief($pdo, $pid)]
+                                          : ['ok' => false, 'error' => $off('The Brief')]);
+            exit;
+        }
+        if (isset($_GET['tracking'])) {
+            echo json_encode($on('production') ? ['ok' => true, 'tracking' => realm_camp_tracking($pdo, $pid, (string)($_GET['scope'] ?? ''))]
+                                               : ['ok' => false, 'error' => $off('Production tracking')]);
+            exit;
+        }
+        $bad = '';
+        if (isset($_POST['camp_thing'])) {
+            try {
+                $bad = isset($_POST['remove'])
+                    ? realm_camp_remove($pdo, $uid, $pid, (int)$_POST['remove'], can_edit())
+                    : realm_camp_place($pdo, $uid, $pid, (string)($_POST['thing'] ?? ''), (int)($_POST['x'] ?? 0), (int)($_POST['y'] ?? 0));
+            } catch (Throwable $e) {
+                $bad = 'That could not be saved. Try again in a moment.';
+            }
+        }
+        $answer = ['ok' => true, 'camp' => realm_camp_answer($pdo, $uid, $land, $show,
+                       ['brief' => $on('brief'), 'production' => $on('production'), 'timeline' => $on('timeline')], can_edit())];
+        if ($bad !== '') { $answer['error'] = $bad; $answer['saved'] = false; }
+        elseif (isset($_POST['camp_thing'])) $answer['saved'] = true;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The camp could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+
 // ---- chat (stage 2, migration 082) ------------------------------------------
 // GET  chat=<channel>&after=<id>           what was said, and marks it read
 // POST say=<channel>&body=...&after=<id>   say something, then the same answer
@@ -402,7 +464,7 @@ $state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
 // Praise (migration 090): the asker's own mana and what was praised in the last two minutes.
 $state['praise'] = realm_praise_news($pdo, $uid);
 if ($praised) $state['praised'] = true;
-// The merchant (migration 091): the prices, and what the asker themselves owns.
+// The merchant (migration 092): the prices, and what the asker themselves owns.
 $state['shop'] = realm_shop_state($pdo, $uid);
 // Giving and swapping: the asker's own offers, waiting or just ended.
 $state['offers'] = realm_offer_news($pdo, $uid);

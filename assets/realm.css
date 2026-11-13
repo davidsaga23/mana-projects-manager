@@ -67,6 +67,12 @@
   --candle: var(--warn);
   --ember: var(--danger);
   --shade: var(--veil);
+  /* The scroll in a show's camp (2026-11-13): paper, its ink, its edge, and a link that reads on paper. */
+  --papyrus: #ead9b0;
+  --papyrus-ink: #2b2118;
+  --papyrus-edge: #b99a5f;
+  --papyrus-edge-strong: #7a5a26;
+  --papyrus-link: #1d4f8f;
 
   --body: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --display: var(--body);
@@ -372,6 +378,60 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rmusic input { accent-color: var(--primary); }
 .rmusic small { flex-basis: 100%; }
 
+/* ---- a show's camp (David, 2026-11-13) ----
+   One window (#campDlg) for the four things that are in every camp: the slaying bar, the scroll (the
+   Brief), the calendar (the Timeline) and the board (Production tracking). All read only. A status's
+   or a step's own colour is data from the show and is written inline by assets/realm.js; every
+   colour written here is a role. */
+dialog.rcamp { width: min(560px, calc(100% - 32px)); max-height: calc(100% - 32px); }
+dialog.rcamp.is-brief { width: min(680px, calc(100% - 32px)); }
+dialog.rcamp.is-tracking { width: min(1180px, calc(100% - 32px)); }
+/* The calendar: Anima's own Timeline chart, in a frame. */
+dialog.rcamp.is-timeline { width: min(1500px, calc(100% - 32px)); }
+.rcframe { display: block; width: 100%; height: min(70vh, 760px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+#campBody { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#campBody p { margin: 0; }
+.rcnote { color: var(--muted); font-size: 13px; }
+.rcmeta { color: var(--text-2); }
+.rcampwho { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+/* The bar's button has no name tag: the numbers are painted beside the bar itself. */
+#slayBtn { border-radius: 3px; }
+.rslaypct { font-size: 40px; font-weight: 700; line-height: 1; color: var(--ok); font-variant-numeric: tabular-nums; }
+.rslaypct small { font-size: 16px; font-weight: 600; color: var(--muted); }
+.rslaybar { height: 16px; background: var(--danger-tint); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.rslaybar i { display: block; height: 100%; background: var(--ok); }
+/* The scroll: the one place in the frame that is paper, because David asked for "a kind of papyrus". */
+.rpap { background: var(--papyrus); color: var(--papyrus-ink); border: 1px solid var(--papyrus-edge); border-radius: var(--radius-sm); padding: 16px 20px; max-height: 58vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.rpap h3 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-top: 8px; color: var(--papyrus-edge-strong); }
+.rpap p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.rpap a { color: var(--papyrus-link); text-decoration: underline; }
+.rpap ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.rpap small { color: var(--papyrus-edge-strong); }
+/* The board: Anima's tracking grid. The header and the first column stay put while the rest
+   scrolls, so a show with hundreds of shots can still be read. */
+.rttabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.rttabs .rbtn[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.rtlegend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; }
+.rtlegend b { flex-basis: 100%; }
+.rtlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.rtlegend em { font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--muted); }
+.rtlegend em.is-ready { color: var(--ok); background: var(--ok-tint); }
+.rtlegend em.is-blocked { color: var(--warn); background: var(--warn-tint); }
+.rtchip { display: inline-block; flex: none; width: 15px; height: 15px; border-radius: 3px; background: var(--muted); vertical-align: middle; }
+.rtchip.is-none { background: none; border: 1px dashed var(--faint); }
+.rtdash { display: inline-block; width: 15px; text-align: center; font-style: normal; color: var(--faint); }
+.rtwrap { max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.rtrack { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+.rtrack th, .rtrack td { padding: 7px 10px; text-align: center; border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+.rtrack thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-3); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-2); }
+.rtrack thead th.rtstep { white-space: normal; max-width: 86px; line-height: 1.25; }
+.rtrack th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; background: var(--surface); font-weight: 700; color: var(--primary); }
+.rtrack thead th:first-child { z-index: 3; background: var(--surface-3); color: var(--text-2); }
+.rtrack tbody th em { font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-left: 8px; color: var(--ok); }
+.rtrack td.rtdone, .rtrack th.rtdone { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rtrack tbody tr:hover td, .rtrack tbody tr:hover th { background: var(--surface-2); }
+.rtrack tr.rtgroup td { text-align: left; background: var(--surface-2); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
 @media (max-width: 860px) {
   html, body { height: auto; }
   .rapp, .rapp.with-chat { grid-template-columns: minmax(0, 1fr); }
@@ -423,7 +483,7 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rrules h3:first-child { margin-top: 0; }
 .rrules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; color: var(--text-2); }
 
-/* The merchant's counter (assets/realm_shop.js, migration 091), and what is for sale elsewhere. */
+/* The merchant's counter (assets/realm_shop.js, migration 092), and what is for sale elsewhere. */
 #shopDlg { width: min(560px, calc(100% - 32px)); }
 #shopBody { display: flex; flex-direction: column; gap: 12px; }
 .rshopgold { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--warn-strong); }

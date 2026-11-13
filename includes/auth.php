@@ -590,19 +590,24 @@ function artist_may_post(): bool {
         // one of the asker's own mana. ⚠ THE ID POSTED IS WHO IS PRAISED, never
         // who gives: realm_praise_give() takes the giver from the session, and
         // refuses unless the two characters are in the same place right now.
-        // `buy` (2026-11-13, migration 091): buying from the merchant in the
+        // `camp_thing` (2026-11-13, migration 091): the ONE thing each person may
+        // stand in a show's camp. ⚠ NO SHOW ID AND NO OWNER TO FORGE: a land is
+        // sent, realm_camp_open() finds its show and asks may_see_project(), and
+        // the row written is the session's own. Taking out somebody else's thing
+        // is refused in realm_camp_remove() unless can_edit().
+        // `buy` (2026-11-13, migration 092): buying from the merchant in the
         // Tavern with the asker's OWN gold. ⚠ NO ID TO FORGE: realm_shop_buy()
         // takes the buyer from the session, checks they are inside the Tavern,
         // and takes the coins in the statement that checks there are enough.
-        // `offer`, `offer_answer` (2026-11-13, migration 091): giving or swapping
+        // `offer`, `offer_answer` (2026-11-13, migration 092): giving or swapping
         // a thing bought from the merchant. ⚠ THE ACTOR IS THE SESSION'S OWN
         // ACCOUNT: the ids posted are the other person and the offer.
         // realm_offer_make() gives only what the asker owns, face to face, and
         // realm_offer_answer() lets an offer be answered only by the person it
         // was made to and agreed only by the person who made it.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'buy',
-                            'offer', 'offer_answer'],
+                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
+                            'buy', 'offer', 'offer_answer'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

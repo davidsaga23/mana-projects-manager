@@ -5782,6 +5782,89 @@ David, with a CRM he prototyped as a claude.ai artifact: "can we incorporate thi
 - **Ready for Gmail sync, not built:** each contact has its own `last_contact_at`, and each
   activity a `type` and a `contact_id`, which is what a sync would write.
 
+## 2026-11-13 — What is always in a show's camp
+
+**Asked by David:** "for all the project camps, let's always have the following: A bar with the
+finished tasks and the progress for 'slaying' the project. A kind of papyrus on the wall so they
+can see live the brief of that project. A calendar to visualize the timeline. A checkbox list so
+they can see the production tracking, to see all the shots and their status in the checkbox
+(attached). Decorate is also available but only one item per person."
+
+- **Four fixtures, in every camp, that nobody can move:** the slaying bar over the back wall, the
+  scroll (Brief), the calendar (Timeline) and the board (Production tracking). The map table stays
+  on the floor; the two crates left to make room for decorations. The fixtures are things in the
+  house library's own list (`THINGS`, the `camp_` rows, and `CAMP_FIX`; `REALM_CAMP_FIXED` in
+  `includes/realm_camp.php`), so the house's code draws them, puts a button over each, makes them
+  solid, and keeps decorations off them. No second system.
+- **Anima's own numbers, never a copy.** Each window calls the function its screen calls:
+  `projects_overall_pct()` for the bar, `timeline.php` itself for the calendar, `build_grid()` for
+  the board; the Brief is read from the same two tables `brief.php` reads. Nothing is stored in
+  the Realm, so a camp cannot disagree with Anima.
+- **Which progress figure.** The bar uses the count behind the progress capsule on the project
+  list (tasks approved out of all tasks, three queries), which hands its rows to
+  `dashboard_overall()`, the one place a show becomes a percentage. The Dashboard's own route
+  (`dashboard_steps()`) runs several queries per step and would be asked every 45 seconds by
+  everybody in a camp. The two can differ only on a show with progress rows left behind by a step
+  whose scope was changed, which is the case the Dashboard corrects for.
+- **The show is never taken from the browser.** A request names a land; the server finds the show
+  on that land in `realm_lands` and asks `may_see_project()` first, every time.
+- **Anima's switches hold for the scroll and the board.** The scroll asks `brief`, the board asks
+  `production`. A window whose switch is off does not open and its data is not sent.
+- **The calendar is the Timeline's own chart, not a drawing of it** (David, 2026-11-13, sending
+  a picture of the Timeline's "General, pipeline steps" chart: "let's bring the whole timeline as
+  the attachment, the whole widget"). The first version drew a compact chart of its own. Now the
+  calendar window frames `timeline.php?project=N&embed=1`: the same page and the same
+  `assets/timeline.js`, in an embedded view that prints only the general chart and its milestones
+  list, without Anima's top bar (it does not load `includes/header.php`), without the detailed
+  schedule or the saved versions, and with editing switched off for everybody, Production
+  included, so a camp stays a place for looking. Who may open it is the next entry. It
+  is current when the window opens and is not reloaded while open, because a reload would throw
+  away the zoom and the place scrolled to. The page loads its chart library from a CDN, as the
+  Timeline always has; that happens inside the frame, and the Realm page itself still loads
+  nothing from another site. The compact chart that was drawn first is gone.
+- **Artists see the whole chart in the camp** (David, 2026-11-13, asked whether artists, whose
+  "Timeline: see" switch is off by default, should see this whole chart in the camp too: "Yes,
+  show artists"). So LOOKING at the embedded chart asks the Realm's switch instead of the
+  Timeline's: whoever has the Realm sees it in the camps of the shows they are on
+  (`feature_for_script()` in `includes/features.php`, for a GET to `timeline.php` with `?embed`;
+  `may_see_project()` is still asked). Only that: the full Timeline page, its saved versions, the
+  detailed schedule (who does what, when) and every save still ask `timeline` and
+  `timeline_edit`. The address can be opened outside the Realm by the same people, and shows the
+  same read-only chart. The camp's button to the full Timeline is drawn only for somebody with
+  the Timeline switch. The reduced view (delivery date and milestones only) and the "closed"
+  choice that were built while this was open have been removed.
+- **No money, and no client contact.** No budget, rate, cost or invoice is read and
+  `includes/money.php` is never loaded. The Brief's "who to call" field is left out: he asked for
+  the ask, the deliverables and the references, and a phone number is not for a room. Who is on
+  each task (the tracking grid's names, the schedule's people) is not sent either.
+- **Read only.** The only thing a camp writes is a person's own decoration.
+- **"Live" means asked again, gently.** The hosting cannot hold a connection open. The bar and the
+  decorations: every 45 seconds while you stand in a camp (three small queries and one more). An
+  open window: once when opened, then every 60 seconds (the calendar's Timeline chart only when opened). Nothing while the tab is
+  hidden, and nothing for anybody who is not in a camp.
+- **One decoration each** (migration 091, `realm_camp_things`, keyed by show and person, so a
+  second cannot exist; a different thing sent while one stands is refused in words). Anything in
+  the house library that is free, except the bookshelf, the chest and the portrait, which belong
+  to a house. It wears its owner's colour.
+- **Proposed, and built: Production and admins can take out anybody's thing** (`can_edit()`), so
+  a camp can be tidied. Nobody else can touch another person's.
+- **When somebody leaves the show** their thing stays in the camp, as something they left behind,
+  until they or Production take it out; they can no longer move it, because they can no longer
+  open the camp. **When a show stops being active** its camp leaves the map; the rows are kept by
+  show and come back with it. A switched-off account's thing is not drawn.
+- **Somebody from another show** can still walk into the tent (that was already so) and sees the
+  furniture, no bar, no buttons, and one sentence saying the boards are covered.
+- **Small choices made without asking.** The bar is the top strip of the room, with its numbers
+  painted beside it, and the room is fitted below the bar that names the room so it is never
+  covered. The board opens on Production (shots) when the show has shots, else Pre-production.
+  Group rows (episodes) are drawn only when there is more than one. Attached files are links,
+  no thumbnails, so a camp never downloads a full picture to draw a small one.
+- **Not done:** a real dragon; thumbnails of attachments; the donuts and per-step counters of the
+  Production tracking screen; the detailed schedule (who does what, when) in the calendar.
+- **Not verified:** PHP was never run (the block checker passes and the deploy's `php -l` is the
+  backstop). Real show data was never seen: a show with an unusual pipeline, a very long brief or
+  a thousand shots. Nobody could log in. Phones and touch, Safari and Firefox. The real load.
+
 ## 2026-11-13 — Praise in the Realm: the rules, and what the first version leaves out
 
 David, in the thread opened to "discuss how spell praise and collectibles can be exchanged". Four
@@ -5892,7 +5975,7 @@ then "Yes, build it".
 - **Private.** What somebody owns is read only for the session's own account, like the purse:
   there is no request that takes somebody else's id. Others see what you wear and what stands in
   your office. This closes "whether the list of what you own is private" (yes).
-- **Stored** in `realm_owned` (migration 091): one line per thing owned, with who holds it, how it
+- **Stored** in `realm_owned` (migration 092): one line per thing owned, with who holds it, how it
   reached them (`got`: bought today, gift and swap later), who it came from and what was paid.
   Rules in `includes/realm_shop.php`, which holds the prices (`REALM_SHOP`); the screen is sent
   them. The counter is its own file, `assets/realm_shop.js`. `assets/realm.js` draws the merchant
@@ -5941,16 +6024,22 @@ forward"); how a swap works step by step is my design, below.
   unlike a praise: who owns what is private.
 - **No gold moves in an exchange**, and nothing can be sold back, so gold still cannot pass from
   one person to another.
-- **Stored** in `realm_offers`, added to migration 091 (not yet run, so one migration, not two).
+- **Stored** in `realm_offers`, added to migration 092 with `realm_owned` (not yet run, so one migration, not two; it was 091 until the camps took that number).
   Rules in `includes/realm_trade.php`, screen in `assets/realm_trade.js`. Offers travel with the
   map, the unread counts and every chat answer, like knocks, so they are seen in a few seconds.
 - **The starting purse: 5 gold and 5 mana, once, for everybody.** `REALM_START_GOLD` and
-  `REALM_START_MANA` in `includes/realm_praise.php`. Nobody had a purse when this was written
-  (migration 090 had not run), so David and Renata get it like everybody else, the first time
-  their purse is opened. `realm_purse_open()` is now the only place a purse is created: a praise
-  received before somebody's first visit used to create an empty one, and would have cost them the
-  starting coins. The chest's rules say "Everybody starts with 5 coins and 5 mana".
-- **My reading, to confirm with David:** 5 mana is also the most anybody holds, so a new person
-  starts full and the mana of their first logged days is not added until they have praised.
+  `REALM_START_MANA` in `includes/realm_praise.php`. ⚠ It is a mark on the purse
+  (`realm_purse.started`, migration 092), not something a new purse is created with: PR 229 was
+  merged while this was being built, so David's and Renata's purses may already exist, and a
+  praise received before a first visit makes a purse too. `realm_purse()` gives the coins to any
+  purse not yet marked, inside the lock on that row, and marks it. The migration itself adds
+  nothing to anybody's gold, so running it twice gives nothing twice. The chest's rules say
+  "Everybody starts with 5 coins and 5 mana" once 092 has run.
+- **My readings, to confirm with David:** for a purse that already exists the 5 coins are added
+  to what it holds; mana stops at 5, the most anybody holds, so somebody with 3 mana ends at 5,
+  not 8.
+- **Bought things do not stand in a show's camp** (camps arrived from PR 232 during this build).
+  A camp holds one free thing per person; what the merchant sells is for your own office. Not
+  asked; easy to open later.
 - **Not verified:** PHP was never run. A gift and a swap were tried between two pretend people;
   saying no, calling an offer off, an offer running out and walking away were not tried.

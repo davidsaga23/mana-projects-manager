@@ -19,7 +19,7 @@
 //     the portrait (profile). They can be moved, never removed, and there is
 //     exactly one of each, so every house has the three ways in.
 //   * THE LIBRARY IS REALM_ROOM_THINGS. Everything in it is free except the rows
-//     marked gold, which the merchant in the Tavern sells (migration 091). One
+//     marked gold, which the merchant in the Tavern sells (migration 092). One
 //     of those can be placed only by somebody who owns it: realm_room_save()
 //     asks realm_owned(). The prices are in REALM_SHOP, includes/realm_shop.php.
 //

@@ -36,7 +36,7 @@
 
 // Voice (migration 085) has its own file; the map needs it to say who is talking.
 require_once __DIR__ . '/realm_voice.php';
-// The merchant (migration 091): what can be bought, and what each person owns.
+// The merchant (migration 092): what can be bought, and what each person owns.
 // Only a list and a few small functions; nothing runs when it is loaded.
 require_once __DIR__ . '/realm_shop.php';
 // Giving and swapping what was bought (the same migration).
@@ -201,7 +201,7 @@ function realm_set_look(PDO $pdo, int $uid, array $in): string {
     $set = [];
     $args = [];
     // What the merchant sells is worn only by somebody who owns it (migration
-    // 091, includes/realm_shop.php). ⚠ CHECKED HERE, not only on the screen:
+    // 092, includes/realm_shop.php). ⚠ CHECKED HERE, not only on the screen:
     // "Your character" lets a thing be tried on, and this is what stops it
     // being saved. One refused piece refuses the whole change, so the person
     // is told instead of finding half of it applied.

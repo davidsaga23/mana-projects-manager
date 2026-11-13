@@ -45,7 +45,7 @@ if ($ready && !$preview) {
     // Mana, gold and praise (migration 090). Opening the Realm is when the time log is counted.
     realm_purse($pdo, $uid);
     $state['praise'] = realm_praise_news($pdo, $uid);
-    // The merchant (migration 091): the prices, and what this person owns.
+    // The merchant (migration 092): the prices, and what this person owns.
     $state['shop'] = realm_shop_state($pdo, $uid);
     // Giving and swapping: this person's own offers, waiting or just ended.
     $state['offers'] = realm_offer_news($pdo, $uid);
@@ -169,6 +169,15 @@ foreach (($state['people'] ?? []) as $p) {
     <h2 id="profTitle">Profile</h2>
     <div id="profBody"></div>
   </dialog>
+  <?php /* What is always in a show's camp (David, 2026-11-13): "A bar with the finished tasks and the
+           progress for 'slaying' the project. A kind of papyrus on the wall so they can see live the
+           brief of that project. A calendar to visualize the timeline. A checkbox list so they can
+           see the production tracking". One window for all four, filled by assets/realm.js from
+           realm_api.php?camp=, read only. */ ?>
+  <dialog id="campDlg" class="rcamp" aria-labelledby="campTitle">
+    <h2 id="campTitle">Camp</h2>
+    <div id="campBody"></div>
+  </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">
     <h2 id="lookTitle">Your character and house</h2>
     <form id="lookForm" method="dialog"></form>
@@ -182,7 +191,7 @@ foreach (($state['people'] ?? []) as $p) {
   <script src="assets/realm.js<?= asset_ver('realm.js') ?>"></script>
   <?php /* Praise, mana and gold (migration 090): its own file, so the map's script stays as it was. */ ?>
   <script src="assets/realm_praise.js<?= asset_ver('realm_praise.js') ?>"></script>
-  <?php /* The merchant in the Tavern (migration 091): the counter where gold is spent. */ ?>
+  <?php /* The merchant in the Tavern (migration 092): the counter where gold is spent. */ ?>
   <script src="assets/realm_shop.js<?= asset_ver('realm_shop.js') ?>"></script>
   <?php /* Giving and swapping what was bought, face to face (the same migration). */ ?>
   <script src="assets/realm_trade.js<?= asset_ver('realm_trade.js') ?>"></script>

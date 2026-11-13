@@ -1,4 +1,4 @@
--- 091 — The Realm: what each person owns (the merchant in the Tavern), and giving and swapping it.
+-- 092 — The Realm: what each person owns (the merchant in the Tavern), and giving and swapping it.
 --
 -- David, 2026-11-12: gold "buys clothes, accessories and pets", and things for
 -- the office ("opt to buy new stuff"). The shop's rules were agreed with him on
@@ -27,10 +27,18 @@
 -- An offer nobody moves on is simply too old after five minutes; nothing has to
 -- clean it up. Only the two people ever read their offers.
 --
+-- realm_purse.started: has this person been given the starting purse? David,
+-- 2026-11-13: "let's also start with 5 gold and 5 mana for all the new people
+-- landing in the realm ... includeing renata and myself". 0 for every purse that
+-- exists now and every new one; includes/realm_praise.php gives the coins once
+-- and sets it to 1. Nothing is added to anybody's gold by this file itself.
+--
 -- Needs 090 (realm_purse) for there to be any gold to spend. Until this runs
 -- the Realm works as before: the merchant says a database update is needed, and
 -- the things for sale cannot be bought, worn or placed.
--- Safe to re-run: CREATE TABLE IF NOT EXISTS.
+-- Safe to re-run: the tables are CREATE TABLE IF NOT EXISTS, and the last line
+-- stops a second run with "Duplicate column name", which is harmless (the
+-- tables above it are already made, and nobody is given the coins twice).
 
 CREATE TABLE IF NOT EXISTS realm_owned (
   id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,3 +67,5 @@ CREATE TABLE IF NOT EXISTS realm_offers (
   FOREIGN KEY (from_user) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (to_user) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE realm_purse ADD COLUMN started TINYINT NOT NULL DEFAULT 0;
