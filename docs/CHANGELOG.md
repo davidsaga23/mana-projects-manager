@@ -43,11 +43,11 @@ Decorate is also available but only one item per person."
   thing, move it and take it out. Nobody can touch somebody else's, except that Production and
   admins can take any out. The fixtures cannot be moved or covered.
 - **Read only.** Nothing in a camp changes a status, a date or the brief.
-- **Who sees it.** Only somebody who may see the show; each window only while its own switch in
-  Anima (Brief, Timeline, Production tracking) is on for them. Somebody from another show can
+- **Who sees it.** Only somebody who may see the show. The scroll and the board only while their
+  own switch in Anima (Brief, Production tracking) is on for them. The calendar is for everybody
+  on the show, artists included, although their Timeline switch is off (David, asked: "Yes, show
+  artists"); the button to the full Timeline is offered only to those who have that switch. Somebody from another show can
   still walk into the tent and sees the furniture with one sentence, and no data.
-- **Waiting on David:** what the calendar shows an artist, whose Timeline switch is off by
-  default. Until he decides it is closed for them (see `docs/DECISIONS.md`).
 - **Until migration 091 runs** every camp has its fixtures and windows, and Decorate says it needs
   a database update.
 - **Not verified:** PHP was never run; real show data was never seen; nobody could log in to try
