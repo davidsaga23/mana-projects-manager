@@ -586,7 +586,7 @@ function artist_may_post(): bool {
         // standing on, so the others see it walk. ⚠ THEIR OWN ROW, AND IT GRANTS
         // NOTHING: realm_stand() holds it to the room they are really inside or
         // to the map, and nothing reads a spot to decide what somebody may do.
-        // `camp_thing` (2026-11-13, migration 089): the ONE thing each person may
+        // `camp_thing` (2026-11-13, migration 091): the ONE thing each person may
         // stand in a show's camp. ⚠ NO SHOW ID AND NO OWNER TO FORGE: a land is
         // sent, realm_camp_open() finds its show and asks may_see_project(), and
         // the row written is the session's own. Taking out somebody else's thing

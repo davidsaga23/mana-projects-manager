@@ -5749,6 +5749,39 @@ to him a few at a time; his answers are quoted. Then: "Yes, build it".
   in the call, and no button without the migration. Never tried: the browser's real picker and a
   real screen, two computers on two networks, a weak upload, Firefox, Safari, phones watching.
 
+## 2026-11-12 — Commercial: the CRM lives in the main database, admins only, and counts sales, not cost
+
+David, with a CRM he prototyped as a claude.ai artifact: "can we incorporate this to anima?"
+
+- **The main database, not the finance one, and not a third.** Asked, David said "either that or
+  we can create a different one, let me know what you think". The finance database exists to keep
+  people's pay out of reach of an ordinary bug; a CRM is companies, contacts and notes with sale
+  prices on them. Putting it there would make it admin-only for good and send every CRM screen
+  through the one file reserved for pay (`includes/money.php`). A third database would mean another
+  login to create in cPanel and a third update path, for no protection the switch does not give.
+- **Behind its own access switch, "Commercial", administrators only to begin with** (David: "Yes
+  admins only"). Production starts off and can be switched on by role or by person; supervisors,
+  artists and clients are locked off because every Commercial screen is editing. Everybody who can
+  open it can edit. This is the one switch that carries money figures; it may be a switch because
+  they are sales figures, not rates, salaries or a show's budget.
+- **Sales, never cost.** Anima tracks budget against cost and never profit. The CRM's figures (deal
+  values, weighted forecast, won this quarter, quotes) stay in their own tables (`crm_*`); nothing
+  joins them to a show's budget, costs, money strip or the finance database, and a won deal does
+  not create or change a project. Putting a won figure beside a show's cost would be a profit
+  figure.
+- **The rules run on the server** (`includes/crm.php`), not in the browser as in the prototype:
+  stage history and `closed_at`, proposal Sent → Proposal stage, quote Approved → deal value,
+  Q-YYYY-NNN numbering (inside the insert's transaction, so two quotes at once cannot share a
+  number), and the import's grouping by company and duplicate skipping (checked again against what
+  is saved when the batch runs, so importing the same file twice adds nobody twice).
+- **No sidebar.** The prototype put the six views in a "Commercial" sidebar section; Anima has a
+  top bar only, so Commercial is a button there and the views are tabs.
+- **Kept from the prototype:** the views, wording, filters remembered in the browser (per login),
+  the CSV formats. **Dropped:** its example data and "Remove examples" banner, the legacy stage
+  names, and the copy of the primary contact on the lead.
+- **Ready for Gmail sync, not built:** each contact has its own `last_contact_at`, and each
+  activity a `type` and a `contact_id`, which is what a sync would write.
+
 ## 2026-11-13 — What is always in a show's camp
 
 **Asked by David:** "for all the project camps, let's always have the following: A bar with the
@@ -5793,7 +5826,7 @@ they can see the production tracking, to see all the shots and their status in t
   open window: once when opened, then every 60 seconds, the calendar every 120 because
   `timeline_picture()` is the heaviest (several queries per step). Nothing while the tab is
   hidden, and nothing for anybody who is not in a camp.
-- **One decoration each** (migration 089, `realm_camp_things`, keyed by show and person, so a
+- **One decoration each** (migration 091, `realm_camp_things`, keyed by show and person, so a
   second cannot exist; a different thing sent while one stands is refused in words). Anything in
   the house library that is free, except the bookshelf, the chest and the portrait, which belong
   to a house. It wears its owner's colour.

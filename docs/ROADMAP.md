@@ -1406,7 +1406,7 @@ its own pull request behind the `realm` switch, and waits for David's go-ahead.
 | 2d. Task details | Each task in the task window shows its status (in the status's colour) and due date, hours logged and a link into Anima; the status can be changed there by My tasks' own rules, now shared in `includes/own_status.php` | **Built 2026-11-12**, no migration |
 | 2e. My house | Decorating your office from a library, the same starting room for everybody, a treasure chest (gold, not counted yet) and a portrait that opens the Anima profile. Three library things are marked "Costs gold, later" | **Built 2026-11-12**, migration 086 |
 | 2f. Walking in rooms | Walk inside every room with the keys or a click, solid walls and furniture, the door leaves. Others see you walk, in rooms and on the map, a second or three behind; "in the same room" stays the rule for face to face | **Built 2026-11-13**, migration 087, waiting for David's go-ahead |
-| 2g. Project camps | Every show's camp always has a slaying bar (tasks finished out of all), a scroll with the Brief, a calendar with the timeline and a board with Production tracking, all read only and behind Anima's own switches; and one decoration per person | **Built 2026-11-13**, migration 089, waiting for David's go-ahead and his answer on what the calendar shows artists |
+| 2g. Project camps | Every show's camp always has a slaying bar (tasks finished out of all), a scroll with the Brief, a calendar with the timeline and a board with Production tracking, all read only and behind Anima's own switches; and one decoration per person | **Built 2026-11-13**, migration 091, waiting for David's go-ahead and his answer on what the calendar shows artists |
 | 3. Voice | Voice for up to 5 people inside the same room, in every room, by pressing Join call; mute, who is speaking, straight from browser to browser. Knocking was built earlier (migration 084) | **Built 2026-11-12**, migration 085, waiting for David's go-ahead and a first real test with two people |
 | 3a. Screen sharing | In a call, one person at a time shares a tab, a window or the whole screen with the others in the call: a large panel over the room, a red band for the sharer, sharp and slow for reading, no sound, nothing stored | **Built 2026-11-13**, migration 088, waiting for David's go-ahead and a first real test with two people |
 | 3b. Voice, the rest | "Summon the Council" opening a saved Google Meet link for bigger meetings; a relay (TURN) if two real people cannot connect; choosing a microphone | Not built |
@@ -1427,3 +1427,17 @@ makes the unread counts come every 3 seconds instead of 8 while there is movemen
 the hosting the first time several people wander the map at once.
 The camps (2026-11-13) ask once every 45 seconds per person standing in one, and once a minute
 per open window (the calendar every two): watch the calendar on a show with many steps.
+
+## Commercial (the CRM) — BUILT 2026-11-12 (migration 089)
+
+Ported from David's prototype: Prospects, Pipeline, Follow-ups, Clients, Proposals and Quotes, with
+CSV import and export, behind the "Commercial" switch (admins only). Decisions in DECISIONS.md,
+2026-11-12. Left for later, from the prototype's own list:
+
+- **Gmail sync**: count the emails sent to each contact and update their last touch and the
+  outreach numbers. Server side, through Google's API with each person's own sign-in. The tables
+  are ready (per-contact `last_contact_at`, activity `type` and `contact_id`).
+- A client's proposals and quotes inside the Clients drawer.
+- PDF export of a quote.
+- Reminders for overdue follow-ups (the bell is the obvious place).
+

@@ -1123,7 +1123,7 @@ function openProfile(id) {
     .catch(function () { d.close(); toast('That profile could not be opened. Try again in a moment.'); });
 }
 
-/* ---------- a show's camp (David, 2026-11-13, migration 087) ----------
+/* ---------- a show's camp (David, 2026-11-13, migration 091) ----------
    "For all the project camps, let's always have the following: A bar with the finished tasks and the
    progress for 'slaying' the project. A kind of papyrus on the wall so they can see live the brief of
    that project. A calendar to visualize the timeline. A checkbox list so they can see the production

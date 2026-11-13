@@ -210,6 +210,13 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
          title="Invoice payments">Invoices<?php if ($paymentsCount > 0): ?><span
           class="mytasks-badge is-new" title="Invoices waiting to be paid"><?= (int)$paymentsCount ?></span><?php endif; ?></a>
       <?php endif; ?>
+      <?php // COMMERCIAL, the CRM (David, 2026-11-12): leads, proposals and
+            // quotes. The prototype put it in a sidebar; Anima has none, so it is
+            // a button here and its six views are tabs inside. Its own switch,
+            // admins only to begin with. ?>
+      <?php if (function_exists('feature_on') && feature_on('commercial') && can_edit()): ?>
+      <a href="commercial.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'commercial.php' ? ' is-on' : '' ?>">Commercial</a>
+      <?php endif; ?>
       <?php // TASKS, next to My tasks and not inside a project, because the
             // question it answers spans them: "what is open everywhere, and how
             // are we doing across the shows" (David, 2026-10-07). Same reasoning

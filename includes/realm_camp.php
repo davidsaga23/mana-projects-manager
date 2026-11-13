@@ -1,5 +1,5 @@
 <?php
-// The Realm: what is always inside a show's camp (migration 089).
+// The Realm: what is always inside a show's camp (migration 091).
 //
 // David, 2026-11-13: "for all the project camps, let's always have the
 // following: A bar with the finished tasks and the progress for 'slaying' the
@@ -63,7 +63,7 @@ const REALM_CAMP_FIXED = [
  */
 const REALM_CAMP_TIMELINE_WITHOUT_SWITCH = 'closed';
 
-/** Has migration 089 run? Until it has, a camp has its fixtures and no decorations. */
+/** Has migration 091 run? Until it has, a camp has its fixtures and no decorations. */
 function realm_camp_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;

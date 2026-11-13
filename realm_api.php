@@ -244,7 +244,7 @@ if (isset($_GET['room']) || isset($_POST['save_room']) || isset($_GET['profile']
     exit;
 }
 
-// ---- a show's camp (David, 2026-11-13, migration 089) --------------------------
+// ---- a show's camp (David, 2026-11-13, migration 091) --------------------------
 // GET  camp=<land>                    the camp: the slaying bar's numbers, the
 //                                     decorations, which windows I may open
 // GET  camp=<land>&brief=1            the scroll: the show's Brief
