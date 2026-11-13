@@ -24,6 +24,8 @@
 // POST voice=join|poll|leave              voice in the room you are inside (further down)
 // POST praise=<their user id>&kind=&note= praise somebody standing where you are (migration 090)
 // GET  purse=1                            the asker's OWN mana and gold
+// GET  shop=1                             the merchant's counter: prices, what the asker owns, their coins
+// POST buy=<item id>                      buy one thing from the merchant, inside the Tavern (migration 091)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 
 require __DIR__ . '/includes/db.php';
@@ -127,6 +129,26 @@ if (isset($_GET['focus']) || isset($_POST['focus']) || isset($_POST['task_status
 // ever read for the session's own account.
 if (isset($_GET['purse'])) {
     echo json_encode(['ok' => true, 'purse' => realm_purse($pdo, $uid)]);
+    exit;
+}
+
+// ---- the merchant (David, 2026-11-13, migration 091) --------------------------
+// GET  shop=1        the price list, what the asker owns, and their own coins
+// POST buy=<item>    buy one thing; the same answer, with `bought` when it worked
+//
+// ⚠ NO ID IN EITHER. What somebody owns and holds is read only for the
+// session's own account, and realm_shop_buy() checks the rest: inside the
+// Tavern, not owned already, enough coins. `buy` is in artist_may_post().
+if (isset($_GET['shop']) || isset($_POST['buy'])) {
+    try {
+        $bad = isset($_POST['buy']) ? realm_shop_buy($pdo, $uid, (string)$_POST['buy']) : '';
+        $answer = ['ok' => true, 'shop' => realm_shop_answer($pdo, $uid)];
+        if (isset($_POST['buy'])) $answer['bought'] = $bad === '';
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The merchant could not be reached. Try again in a moment.']);
+    }
     exit;
 }
 
@@ -365,5 +387,7 @@ $state['chat'] = realm_chat_summary($pdo, $uid, $mayAnnounce);
 // Praise (migration 090): the asker's own mana and what was praised in the last two minutes.
 $state['praise'] = realm_praise_news($pdo, $uid);
 if ($praised) $state['praised'] = true;
+// The merchant (migration 091): the prices, and what the asker themselves owns.
+$state['shop'] = realm_shop_state($pdo, $uid);
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);

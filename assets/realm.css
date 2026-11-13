@@ -422,3 +422,25 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rrules h3 { font-size: 14px; font-weight: 700; margin: 6px 0 0; }
 .rrules h3:first-child { margin-top: 0; }
 .rrules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; color: var(--text-2); }
+
+/* The merchant's counter (assets/realm_shop.js, migration 091), and what is for sale elsewhere. */
+#shopDlg { width: min(560px, calc(100% - 32px)); }
+#shopBody { display: flex; flex-direction: column; gap: 12px; }
+.rshopgold { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--warn-strong); }
+.rshopgold b { font-size: 17px; }
+.rshopgold span, .rshopnote { color: var(--muted); font-size: 13px; }
+.rshop { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; }
+.rshopitem { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto auto; align-items: center; gap: 4px 12px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.rshopitem canvas { width: 60px; height: 60px; image-rendering: pixelated; }
+.rshopitem.is-mine { background: none; }
+.rshopitem.is-asking { border-color: var(--primary); grid-template-columns: 60px minmax(0, 1fr) auto; }
+.rshopitem.is-asking .rshopact { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.rshopname { display: flex; flex-direction: column; min-width: 0; }
+.rshopname small { color: var(--muted); font-size: 13px; }
+.rshopcost { color: var(--warn-strong); font-weight: 600; white-space: nowrap; }
+.rshopyours { color: var(--muted); font-weight: 600; }
+.rshopbtns { display: inline-flex; gap: 8px; }
+.rowned { color: var(--text-2); }
+.rseg button.is-sale i { font-style: normal; font-size: 12px; color: var(--warn-strong); border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; margin-left: 2px; }
+.rtry { color: var(--warn-strong); }
+dialog .rseg { flex-wrap: wrap; }

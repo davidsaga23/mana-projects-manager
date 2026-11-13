@@ -590,8 +590,12 @@ function artist_may_post(): bool {
         // one of the asker's own mana. ⚠ THE ID POSTED IS WHO IS PRAISED, never
         // who gives: realm_praise_give() takes the giver from the session, and
         // refuses unless the two characters are in the same place right now.
+        // `buy` (2026-11-13, migration 091): buying from the merchant in the
+        // Tavern with the asker's OWN gold. ⚠ NO ID TO FORGE: realm_shop_buy()
+        // takes the buyer from the session, checks they are inside the Tavern,
+        // and takes the coins in the statement that checks there are enough.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
-                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise'],
+                            'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'buy'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

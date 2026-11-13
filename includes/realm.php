@@ -36,6 +36,9 @@
 
 // Voice (migration 085) has its own file; the map needs it to say who is talking.
 require_once __DIR__ . '/realm_voice.php';
+// The merchant (migration 091): what can be bought, and what each person owns.
+// Only a list and a few small functions; nothing runs when it is loaded.
+require_once __DIR__ . '/realm_shop.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;
@@ -195,9 +198,23 @@ function realm_set_door(PDO $pdo, int $uid, string $door): string {
 function realm_set_look(PDO $pdo, int $uid, array $in): string {
     $set = [];
     $args = [];
+    // What the merchant sells is worn only by somebody who owns it (migration
+    // 091, includes/realm_shop.php). ⚠ CHECKED HERE, not only on the screen:
+    // "Your character" lets a thing be tried on, and this is what stops it
+    // being saved. One refused piece refuses the whole change, so the person
+    // is told instead of finding half of it applied.
+    $owned = null;
     foreach (['cloak' => REALM_CLOAKS, 'hat' => REALM_HATS, 'pet' => REALM_PETS, 'house_kind' => REALM_KINDS] as $col => $allowed) {
         $v = (string)($in[$col] ?? '');
-        if ($v !== '' && in_array($v, $allowed, true)) { $set[] = $col . ' = ?'; $args[] = $v; }
+        if ($v === '') continue;
+        if (in_array($v, $allowed, true)) { $set[] = $col . ' = ?'; $args[] = $v; continue; }
+        if (isset(REALM_SHOP[$v]) && REALM_SHOP[$v][0] === $col) {
+            if ($owned === null) $owned = realm_owned($pdo, $uid);
+            if (!in_array($v, $owned, true)) {
+                return ucfirst(REALM_SHOP_NAMES[$v] ?? 'that') . ' is not yours yet. The merchant in the Tavern sells it for ' . (int)REALM_SHOP[$v][1] . ' coins.';
+            }
+            $set[] = $col . ' = ?'; $args[] = $v;
+        }
     }
     if (!$set) return 'Nothing to change.';
     $args[] = $uid;
@@ -400,9 +417,10 @@ function realm_state(PDO $pdo, int $uid): array {
                 'focus'  => $here && (string)$r['phase'] === 'focus',
                 'voice'  => $talks,
                 'muted'  => $talks && (int)$r['v_muted'] === 1,
-                'cloak'  => in_array($r['cloak'], REALM_CLOAKS, true) ? (string)$r['cloak'] : 'mana',
-                'hat'    => in_array($r['hat'], REALM_HATS, true) ? (string)$r['hat'] : 'none',
-                'pet'    => in_array($r['pet'], REALM_PETS, true) ? (string)$r['pet'] : 'none',
+                // Free or bought (realm_look_known): it was checked against what they own when it was put on.
+                'cloak'  => realm_look_known('cloak', (string)$r['cloak']) ? (string)$r['cloak'] : 'mana',
+                'hat'    => realm_look_known('hat', (string)$r['hat']) ? (string)$r['hat'] : 'none',
+                'pet'    => realm_look_known('pet', (string)$r['pet']) ? (string)$r['pet'] : 'none',
                 'me'     => $id === $uid,
             ];
         }

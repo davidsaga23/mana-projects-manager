@@ -146,6 +146,8 @@ R.openGold = function (d, body) {
           ? '<p>'+(p.streak ? 'You have logged your time '+p.streak+' working '+(p.streak === 1 ? 'day' : 'days')+' in a row. '+left+' more '+(left === 1 ? 'day' : 'days')+' for the next coin.'
                             : 'Log your time today to start a run. Every working day you log gives 1 mana, and every '+p.every+' in a row gives 1 gold coin.')+'</p>'
           : '<p>Your login is not linked to a person yet, so there is no time log to earn from. An administrator links it on the Users page.</p>')
+        /* What I have bought from the merchant (assets/realm_shop.js, migration 091). */
+        +(R.chestExtra ? R.chestExtra() : '')
         /* THE RULES, IN THE CHEST (David, 2026-11-13: "let's also add the mana and gold rules when they
            open their own chest"). The numbers come from the server, so the words cannot drift from
            what is counted. */
@@ -160,7 +162,9 @@ R.openGold = function (d, body) {
         +'<h3>Good to know</h3><ul>'
         +'<li>A day can be logged until noon of the next working day.</li>'
         +'<li>Weekends, holidays and booked days off do not break a run. A missed working day starts it again.</li>'
-        +'<li>Gold cannot be handed to somebody else. There is nothing to buy yet: clothes, companions and things for your office are coming.</li>'
+        +(R.chestExtra && R.chestExtra()
+          ? '<li>Gold is spent at the merchant in the Tavern. One of each, and a purchase cannot be undone or sold back.</li><li>Gold cannot be handed to somebody else.</li>'
+          : '<li>Gold cannot be handed to somebody else. There is nothing to buy yet: clothes, companions and things for your office are coming.</li>')
         +'<li>Your gold is private, nobody else can see it, and it never has anything to do with pay.</li></ul></div>'+close;
     })
     .catch(function () { body.innerHTML = '<p>The chest could not be opened. Try again in a moment.</p>'+close; });
