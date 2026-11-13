@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: what somebody says is in front of the names of things *(no migration)*
+
+**Reported by David**, with a picture of "Your tasks" and "Your profile" sitting on top of a speech
+bubble: "let's make sure the names of the objects are behind the dialogues".
+
+- **A speech bubble now covers the name of the bookshelf, the chest or the portrait** where it
+  reaches it. The name comes back when the bubble goes. The thing itself still works when clicked.
+
 ## 2026-11-12 — The Realm: decorate your office, with a chest and a portrait *(migration 086)*
 
 **Asked by David:** "let's start with decorate my office. Let's all start with the same basic look
