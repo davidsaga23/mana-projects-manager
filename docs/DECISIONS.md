@@ -5797,7 +5797,7 @@ they can see the production tracking, to see all the shots and their status in t
   `includes/realm_camp.php`), so the house's code draws them, puts a button over each, makes them
   solid, and keeps decorations off them. No second system.
 - **Anima's own numbers, never a copy.** Each window calls the function its screen calls:
-  `projects_overall_pct()` for the bar, `timeline_picture()` for the calendar, `build_grid()` for
+  `projects_overall_pct()` for the bar, `timeline.php` itself for the calendar (`timeline_picture()` for its reduced view), `build_grid()` for
   the board; the Brief is read from the same two tables `brief.php` reads. Nothing is stored in
   the Realm, so a camp cannot disagree with Anima.
 - **Which progress figure.** The bar uses the count behind the progress capsule on the project
@@ -5810,6 +5810,19 @@ they can see the production tracking, to see all the shots and their status in t
   on that land in `realm_lands` and asks `may_see_project()` first, every time.
 - **Anima's switches hold.** The scroll asks `brief`, the board asks `production`, the calendar
   asks `timeline`. A window whose switch is off does not open and its data is not sent.
+- **The calendar is the Timeline's own chart, not a drawing of it** (David, 2026-11-13, sending
+  a picture of the Timeline's "General, pipeline steps" chart: "let's bring the whole timeline as
+  the attachment, the whole widget"). The first version drew a compact chart of its own. Now the
+  calendar window frames `timeline.php?project=N&embed=1`: the same page and the same
+  `assets/timeline.js`, in an embedded view that prints only the general chart and its milestones
+  list, without Anima's top bar (it does not load `includes/header.php`), without the detailed
+  schedule or the saved versions, and with editing switched off for everybody, Production
+  included, so a camp stays a place for looking. Who may open it is decided by the page's own
+  gate, as for the full Timeline: the Timeline switch and whether the account is on the show. It
+  is current when the window opens and is not reloaded while open, because a reload would throw
+  away the zoom and the place scrolled to. The page loads its chart library from a CDN, as the
+  Timeline always has; that happens inside the frame, and the Realm page itself still loads
+  nothing from another site. The compact chart is kept only as the reduced view below.
 - **⚠ OPEN, David's to decide: the calendar for artists.** Artists have "Timeline: see" off by
   default, and he asked for a calendar in every camp. Three ways: (a) a reduced view for them, the
   delivery date and the milestones only, no step bars; (b) closed for them; (c) he turns Timeline
@@ -5823,8 +5836,8 @@ they can see the production tracking, to see all the shots and their status in t
 - **Read only.** The only thing a camp writes is a person's own decoration.
 - **"Live" means asked again, gently.** The hosting cannot hold a connection open. The bar and the
   decorations: every 45 seconds while you stand in a camp (three small queries and one more). An
-  open window: once when opened, then every 60 seconds, the calendar every 120 because
-  `timeline_picture()` is the heaviest (several queries per step). Nothing while the tab is
+  open window: once when opened, then every 60 seconds (the reduced calendar every 120; the whole Timeline chart only
+  when opened). Nothing while the tab is
   hidden, and nothing for anybody who is not in a camp.
 - **One decoration each** (migration 091, `realm_camp_things`, keyed by show and person, so a
   second cannot exist; a different thing sent while one stands is refused in words). Anything in

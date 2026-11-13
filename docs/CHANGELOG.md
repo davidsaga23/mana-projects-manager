@@ -14,6 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+<<<<<<< HEAD
 ## 2026-11-13 — The Realm: what is always in a show's camp *(migration 091)*
 
 **Asked by David:** "for all the project camps, let's always have the following: A bar with the
@@ -29,9 +30,12 @@ Decorate is also available but only one item per person."
 - **The scroll** opens the show's Brief on paper: the client, the ask, the deliverables, the
   references (web addresses become links), the notes and the attached files by name, with a
   button to the full Brief in Anima. The client's contact is not shown.
-- **The calendar** opens the show's timeline, small: a bar per dated step with how much is
-  delivered, the milestones, today, the delivery date and the working days left, with a button to
-  the full Timeline.
+- **The calendar** opens the show's whole Timeline chart, the "General, pipeline steps" widget
+  itself (David, the same day: "let's bring the whole timeline as the attachment, the whole
+  widget"): every step's bar with its progress, the arrows between steps, the milestones, the
+  today line, zoom, and the PNG and PDF downloads, with the milestones list under it and a button
+  to the full Timeline. It is Anima's Timeline page shown in a frame (`timeline.php?embed=1`), so
+  it cannot differ from the Timeline, and nothing on it can be moved from the camp.
 - **The board** opens Production tracking as Anima draws it: a row per shot, a small square per
   step in the status's colour, a dash where a step does not apply, the DONE count, the legend of
   the show's own statuses, and the three phases (Pre-production, Production, Post-production).
@@ -49,6 +53,15 @@ Decorate is also available but only one item per person."
   a database update.
 - **Not verified:** PHP was never run; real show data was never seen; nobody could log in to try
   it on live. Tried in a stand-in page with made-up data.
+=======
+## 2026-11-13 — The Realm: what somebody says is in front of the names of things *(no migration)*
+
+**Reported by David**, with a picture of "Your tasks" and "Your profile" sitting on top of a speech
+bubble: "let's make sure the names of the objects are behind the dialogues".
+
+- **A speech bubble now covers the name of the bookshelf, the chest or the portrait** where it
+  reaches it. The name comes back when the bubble goes. The thing itself still works when clicked.
+>>>>>>> 7ca345cccedd1d166996e0dd52a61791b554ae17
 ## 2026-11-12 — Commercial: the CRM *(migration 089)*
 
 **Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
