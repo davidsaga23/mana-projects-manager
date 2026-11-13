@@ -111,7 +111,16 @@ foreach (($state['people'] ?? []) as $p) {
   </main>
 <?php else: ?>
   <div class="rapp">
-    <nav class="rside" id="side" aria-label="People and places"></nav>
+    <nav class="rside" aria-label="People and places">
+      <?php /* Search across every conversation (David, 2026-11-13: "all channels and dms").
+               Outside #side, because #side is redrawn every few seconds and would lose what
+               is being typed. assets/realm.js shows it once chat exists. */ ?>
+      <form class="rsearch" id="search" role="search" hidden>
+        <input type="search" id="searchInput" autocomplete="off" maxlength="200" placeholder="Search messages" aria-label="Search all your conversations">
+      </form>
+      <div class="rsearchres" id="searchRes" hidden aria-live="polite"></div>
+      <div class="rsidelists" id="side"></div>
+    </nav>
     <main class="rmain">
       <?php if (!$hasHouse): ?>
         <p class="rwarn">Every plot in the village is taken, so you have no house yet. You can still walk around. Tell David, more plots can be added.</p>
