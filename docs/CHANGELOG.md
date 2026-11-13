@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: what somebody says is in front of the names of things *(no migration)*
+
+**Reported by David**, with a picture of "Your tasks" and "Your profile" sitting on top of a speech
+bubble: "let's make sure the names of the objects are behind the dialogues".
+
+- **A speech bubble now covers the name of the bookshelf, the chest or the portrait** where it
+  reaches it. The name comes back when the bubble goes. The thing itself still works when clicked.
 ## 2026-11-12 — Commercial: the CRM *(migration 089)*
 
 **Asked by David:** "can we incorporate this to anima?", about the CRM he built as a prototype.
