@@ -358,6 +358,11 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // GET  chat=<channel>&from=<id>&after=     a channel, with `threads`: reply counts from message <id> on
 // POST say=<channel>&thread=<id>&also=0|1  reply in a thread, and maybe also to the channel
 // GET  threads=1                           the threads I follow (the "Threads" row)
+// POST react=<message id>&emoji=<key>&after=<id>&from=<id>
+//                                          give or take back my reaction (migration
+//                                          093), then the same answer as chat=
+// Every answer about a conversation carries `reactions` once migration 093 has
+// run: the reactions on the messages from `from` on (the first one on screen).
 //
 // Answered here, apart from the map: an open conversation asks every few
 // seconds and has no use for where everybody is standing.
@@ -395,7 +400,17 @@ if (isset($_GET['threads'])) {
     }
     exit;
 }
-$channel = isset($_POST['say']) ? (string)$_POST['say'] : (isset($_GET['chat']) ? (string)$_GET['chat'] : '');
+// ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
+// message is really in, so the access check below is asked about the right
+// conversation whatever id is posted.
+$reactTo = isset($_POST['react']) ? (int)$_POST['react'] : 0;
+$channel = isset($_POST['say']) ? (string)$_POST['say']
+         : (isset($_POST['react']) ? realm_message_channel($pdo, $reactTo)
+         : (isset($_GET['chat']) ? (string)$_GET['chat'] : ''));
+if (isset($_POST['react']) && $channel === '') {
+    echo json_encode(['ok' => true, 'error' => 'That message is no longer there.']);
+    exit;
+}
 // Threads (migration 094): with thread=<id> the request is about that message's
 // thread, in the same channel. Checked below, after the channel itself.
 $thread = max(0, (int)($_POST['thread'] ?? ($_GET['thread'] ?? 0)));
@@ -440,6 +455,7 @@ if ($channel !== '') {
                 }
             }
         }
+        if ($reactTo > 0) $said = realm_react($pdo, $uid, $reactTo, (string)($_POST['emoji'] ?? ''));
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
         $messages = realm_messages($pdo, $uid, $channel, $after, $thread);
         if ($messages) {
@@ -461,6 +477,13 @@ if ($channel !== '') {
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
                    'offers' => realm_offer_news($pdo, $uid)];
+        // Reactions (migration 093): only once the table exists, so the page
+        // knows whether to offer them. A first page starts at its own first message.
+        if (realm_reactions_available($pdo)) {
+            $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
+            if ($after === 0 && $messages) $from = (int)$messages[0]['id'];
+            $answer['reactions'] = (object)realm_reactions($pdo, $uid, $channel, $from);
+        }
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
     } catch (Throwable $e) {
