@@ -180,9 +180,9 @@ if (isset($_POST['voice'])) {
 // Answered here, apart from the map, with only where the others stand: it is
 // sent often and has no use for the rest.
 if (isset($_POST['stand'])) {
-    $xy = explode(',', (string)$_POST['stand']);
-    if (count($xy) === 2 && is_numeric($xy[0]) && is_numeric($xy[1])) {
-        realm_stand($pdo, $uid, (int)round((float)$xy[0]), (int)round((float)$xy[1]));
+    // Two short whole numbers and nothing else; anything odd is simply not saved.
+    if (preg_match('/^(\d{1,4}),(\d{1,4})$/', (string)$_POST['stand'], $xy) === 1) {
+        realm_stand($pdo, $uid, (int)$xy[1], (int)$xy[2]);
     }
     echo json_encode(['ok' => true, 'spots' => realm_spots($pdo, $uid)]);
     exit;
