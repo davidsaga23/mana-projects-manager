@@ -14,6 +14,34 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: each show's sky reacts to production *(no migration)*
+
+**Asked by David**: "shows that react to production", so the state of every show can be seen at a
+glance on the map.
+
+- **Weather over each show's land**, from Anima's own pace rule (the green / amber / red of the
+  breakdown grid, applied to the whole show: work approved against working days used between its
+  start and delivery dates): **clear** on pace, **clouds** a little behind, **rain** well behind,
+  a **storm** with lightning once the delivery date has passed with work still open. No delivery
+  date, or too early to judge, is a clear sky.
+- **Fireworks over the camp** while work is being approved (a task approved within the hour, read
+  from Anima's status log).
+- **Milestones:** when a show crosses 25, 50, 75 or 100% approved today, a pennant flies beside its
+  camp for the rest of the day, and each person gets one big volley (and a message, if they are on
+  the show) the first time they are on the map that day.
+- **Everyone sees every sky** (David's choice). A show you are not on is still "Another show"; only
+  its weather travels, never a count.
+- **Said in words too:** a camp's card and its map label read out the weather, for screen readers.
+- **Reduced motion:** clouds and rain stand still, no lightning, no fireworks; the banner stays.
+- **Cheap:** the percentage is the slaying bar's own (`projects_overall_pct()`), plus one query on
+  today's status log; worked out at most every 90 seconds for the whole studio and kept in a small
+  file in the server's temp folder, so the 25-second heartbeat does not run it for each person.
+  Rules in `includes/realm_weather.php`.
+- **Not verified:** PHP was never run and no real show data was seen; the map was tried in a local
+  mock with made-up weather on all five lands, with and without reduced motion.
+
+---
+
 ## 2026-11-13 — The Realm: threads in chat *(migration 095)*
 
 **Asked by David**, who chose threads for the Realm's chat: "reply to one message without flooding
@@ -35,6 +63,8 @@ the channel; long channels get unreadable without them".
 - Files: `includes/realm_chat.php`, `realm_api.php`, `realm.php`, `assets/realm.js`,
   `assets/realm.css`, one line each in `assets/realm_react.js` and `includes/realm_search.php`.
 
+---
+
 ## 2026-11-13 — The Realm: a creature in every show's land *(no migration)*
 
 **Asked by David**: "let's also add a creature to defeat per land/project. An ogre in the forest,
@@ -55,6 +85,8 @@ people can see them."
   defeated** on its land for good, stars over its head, for everybody to see. The stage comes with
   the land's weather from the server (`sky.beast`); until that change is live every creature is healthy.
 
+---
+
 ## 2026-11-13 — The Realm: search every conversation *(migration 094, optional for speed)*
 
 **Asked by David**: search across all chat history, "all channels and dms". The studio is on
@@ -71,6 +103,8 @@ so it can be found again forever.
 - Escape, or emptying the box, brings back Channels, People and Places.
 - **Migration 094** adds a search index to the messages so it stays quick over years. The search
   works before it runs, just more slowly on a big history.
+
+---
 
 ## 2026-11-13 — The Realm: a building's card shows all round it, and nobody walks off the map *(no migration)*
 
