@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: a building's card shows all round it, and nobody walks off the map *(no migration)*
+
+**Asked by David**, with two pictures: "right now only appears the buttons when you are on the left
+side of the buildings, is it possible to expand the trigger area?", and "right now the characters can
+go off the map, let's restrict that".
+
+- **A building's card ("Go inside", "Knock") now shows when you stand anywhere around it**: either
+  side, in front or just behind, not only at the spot left of its door. Where two buildings stand
+  close, the one whose door is nearer wins.
+- **Characters can no longer walk off the edge of the map.** The whole figure, its arrow and its
+  companion stay in the picture.
+---
+
 ## 2026-11-13 — The Realm: sending jumps to the bottom, and rooms say "Exit" *(no migration)*
 
 **Asked by David**: "when writing in a chat, when hit enter it should take you to the end of the
