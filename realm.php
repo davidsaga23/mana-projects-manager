@@ -155,7 +155,7 @@ foreach (($state['people'] ?? []) as $p) {
                lays the conversation over the map and back; assets/realm.js keeps its label, and
                which way the arrow points is assets/realm.css. */ ?>
       <button type="button" class="rwide" id="chatWide" aria-expanded="false" aria-label="Make the conversation wider" title="Make the conversation wider"><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><path d="M8 2 2 8l6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="rchathead"><button type="button" class="rbtn rsmall rback" id="chatBack" hidden aria-label="Back" title="Back">&larr;</button><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
+      <div class="rchathead"><button type="button" class="rbtn rsmall rback" id="chatBack" hidden aria-label="Back" title="Back"><svg viewBox="0 0 24 14" width="24" height="14" aria-hidden="true"><path d="M22 7H3M8.5 1.5 3 7l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h2 id="chatTitle"></h2><span class="rgrow"></span><button type="button" class="rbtn rsmall" data-chatclose="1">Close</button></div>
       <div class="rmsgs" id="chatMsgs" aria-live="polite"></div>
       <div class="rsuggest" id="chatSuggest" hidden></div>
       <div class="rpicked" id="chatPicked" hidden></div>

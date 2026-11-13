@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: a wider arrow back from a thread *(no migration)*
+
+**Asked by David**: "wider arrow to go back please". The back button at the top of a thread is now a
+wide, drawn arrow instead of a small text one. Files: `realm.php`, `assets/realm.css`.
+
 ## 2026-11-13 — The Realm: "Reply in thread" is an icon *(no migration)*
 
 **Asked by David**: "let's add an icon like in slack instead of text here". The words on a message
