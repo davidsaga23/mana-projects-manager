@@ -146,8 +146,22 @@ R.openGold = function (d, body) {
           ? '<p>'+(p.streak ? 'You have logged your time '+p.streak+' working '+(p.streak === 1 ? 'day' : 'days')+' in a row. '+left+' more '+(left === 1 ? 'day' : 'days')+' for the next coin.'
                             : 'Log your time today to start a run. Every working day you log gives 1 mana, and every '+p.every+' in a row gives 1 gold coin.')+'</p>'
           : '<p>Your login is not linked to a person yet, so there is no time log to earn from. An administrator links it on the Users page.</p>')
-        +'<p>A day can be logged until noon of the next working day. Weekends, holidays and booked days off do not break a run. </p><p>Each task of yours that is approved gives 1 gold coin, and 1 mana as well when it is approved by its due date. You also get a coin the first time each person praises you in a week.</p>'
-        +'<p>There is nothing to buy yet: clothes, companions and things for your office are coming. Your gold is private, nobody else can see it, and it never has anything to do with pay.</p>'+close;
+        /* THE RULES, IN THE CHEST (David, 2026-11-13: "let's also add the mana and gold rules when they
+           open their own chest"). The numbers come from the server, so the words cannot drift from
+           what is counted. */
+        +'<div class="rrules"><h3>How you earn mana</h3><ul>'
+        +'<li>1 mana for each working day you log your time.</li>'
+        +'<li>1 mana when a task of yours is approved on or before its due date.</li>'
+        +'<li>You hold at most '+p.cap+'. Mana is only for praising others, and a praise costs 1.</li></ul>'
+        +'<h3>How you earn gold</h3><ul>'
+        +'<li>1 coin for every '+p.every+' working days in a row that you log your time.</li>'
+        +'<li>1 coin for each task of yours that is approved.</li>'
+        +'<li>1 coin the first time each person praises you in a week.</li></ul>'
+        +'<h3>Good to know</h3><ul>'
+        +'<li>A day can be logged until noon of the next working day.</li>'
+        +'<li>Weekends, holidays and booked days off do not break a run. A missed working day starts it again.</li>'
+        +'<li>Gold cannot be handed to somebody else. There is nothing to buy yet: clothes, companions and things for your office are coming.</li>'
+        +'<li>Your gold is private, nobody else can see it, and it never has anything to do with pay.</li></ul></div>'+close;
     })
     .catch(function () { body.innerHTML = '<p>The chest could not be opened. Try again in a moment.</p>'+close; });
 };
