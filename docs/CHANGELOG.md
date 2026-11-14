@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — Top bar: an Admin menu instead of a row of links *(no migration)*
+
+**Asked by David**: "let's create a button that says admin, inside that let's include all these tabs
+so we don't have such a busy top bar". The plain links at the right of the top bar are now one
+**Admin** button after Commercial. It opens a menu in three groups: Studio Tasks, Artists pool,
+Bookings, Historic quotas, Historic fees; then Users, Email, Migrations, Bugs; then Tour and Log out.
+It opens on a click (works on a tablet), shuts on Escape or a click outside, works from the keyboard,
+and highlights the page you are on. The Migrations and Bugs counts show inside the menu and, added
+together, on the button. Each link keeps its old permission and access-switch check. Anybody who is
+not an admin gets the same menu with only their links, labelled **More**. The tour's "Users and Bugs"
+step now points at the Admin button. Files: `includes/header.php`, `assets/nav-menu.js`,
+`assets/style.css`, `assets/tour.js`.
+
 ## 2026-11-13 — The Realm: Slack's bar over a message *(migration 096)*
 
 **Asked by David**, with a screenshot of Slack: "let's add these same features from slack so the
