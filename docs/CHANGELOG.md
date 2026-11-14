@@ -33,6 +33,33 @@ The move is added to the invoice's note ("Moved from FCM · Layout by David, 202
 Files: `includes/invoice_move.php` (new), `finance_project.php`, `includes/money.php`,
 `assets/style.css`, `finance_install_19.sql`.
 
+## 2026-11-13 — The Realm: the names of things in a room sit behind the characters *(no migration)*
+
+**Asked by David**, with a picture of "Timeline" and its blue frame drawn across his character in a
+camp: "let's make these stay behind the character".
+
+- **The name tags in a room (Your tasks, Your gold, Your profile, Brief, Timeline, Tracking,
+  Merchant) and the blue frame round the thing you stand next to are now part of the picture.** A
+  character standing in front of one covers it; a speech bubble covers it too.
+- Clicking a thing, pressing Enter next to it and reaching it with Tab work as before.
+---
+
+## 2026-11-13 — The Realm: make your own channels, public or private, under their show *(migration 097)*
+
+**Asked by David**: "let's add the option to create new channels (public/private) and ask if it's
+linked to a specific project so they can be nested inside the general channels for each project".
+For **Production and admins only** (David: "only admins and prod can create channels"), a **+**
+beside CHANNELS opens *New channel*: a name, **public** (everybody in the Realm reads and
+writes) or **private** (only the people you tick; nobody else sees it exists, admins included), and
+*Is it for a show?* (or *No, studio-wide*). A show's channels are listed indented under its own
+channel, with an arrow to fold them; a folded show shows their unread count. Private channels wear a
+lock. The cog in an open channel's head renames it, changes who is in a private one, archives it
+(it leaves the list but its messages stay searchable), or leaves a private one. Who may see what is
+decided on the server, everywhere chat reads a channel (opening it, counts, threads, search,
+pictures, reactions, tags in the bell). Dormant until **migration 097** runs: before that the + says
+a database update is needed. Files: `includes/realm_made.php` (new), `includes/realm_chat.php`,
+`includes/realm_search.php`, `realm_api.php`, `includes/auth.php`, `assets/realm_made.js` (new),
+`assets/realm.js`, `assets/realm.css`, `realm.php`.
 ## 2026-11-13 — Top bar: an Admin menu instead of a row of links *(no migration)*
 
 **Asked by David**: "let's create a button that says admin, inside that let's include all these tabs

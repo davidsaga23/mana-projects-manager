@@ -1402,6 +1402,19 @@ function drawRoom(c, cw, ch) {
     if (idle && !deco) zed(c,px,py);
     LASTAT[d.p.id] = {x:d.x,y:d.y,room:true,n:SP.n};
   });
+  /* The names of the things in the room and the frame round the one I am next to go on now, and
+     anybody standing in front of one is painted again over it (roomTags, below). */
+  if (!deco) { var tags = roomTags(c);
+    if (tags.length) who.forEach(function (d) {
+      var px = Math.round(d.x/.9), py = Math.round(d.y/.9), foot = oy+d.y*s, x0 = ox+(d.x-12)*s, x1 = ox+(d.x+28)*s, y0 = oy+(d.y-58)*s, y1 = oy+(d.y+4)*s;
+      tags.forEach(function (t) {
+        if (foot < t.base || x1 < t.x || x0 > t.x+t.w || y1 < t.y || y0 > t.y+t.h) return;
+        c.save(); c.setTransform(1,0,0,1,0,0); c.beginPath(); c.rect(t.x,t.y,t.w,t.h); c.clip();
+        c.setTransform(s*.9,0,0,s*.9,ox,oy); if (!d.mine && d.p.state==='idle') c.globalAlpha = .6;
+        sprite(c,px,py,d.p,d.bob); c.restore();
+      });
+    });
+  }
   c.setTransform(s,0,0,s,ox,oy);
   /* Who is in voice, and who is speaking right now (voiceMark, in the voice section). Each mark is
      drawn where that person stands, so it goes with them when they walk. */
@@ -1422,25 +1435,40 @@ function drawRoom(c, cw, ch) {
   /* Lowest first, so a lifted bubble's line is drawn over nothing that matters. */
   var placed = placeBubbles(boxes);
   placed.sort(function (p, q) { return p.by-q.by; }).forEach(function (bx) { paintBubble(c,bx); });
-  tagsUnderBubbles(c.canvas,placed,s,ox,oy);
 }
-/* WHAT SOMEBODY SAYS GOES IN FRONT OF THE NAME OF A THING (David, 2026-11-13, with a picture of
-   "Your tasks" and "Your profile" sitting on top of a speech bubble: "let's make sure the names of
-   the objects are behind the dialogues"). The bubbles are painted on the canvas; the names are tags
-   on the see-through buttons laid over the bookshelf, the chest and the portrait, and anything on
-   the page is always above anything painted. So a name that a bubble reaches is put away for as long
-   as the bubble is up, which is what "behind it" looks like, and comes back when the bubble goes.
-   The button itself stays where it is and still works. */
-function tagsUnderBubbles(cv, placed, s, ox, oy) {
-  if (!cv || !cv.getBoundingClientRect) return;
-  var k = Math.min(2,window.devicePixelRatio||1), at = cv.getBoundingClientRect();
+/* THE NAMES OF THINGS IN A ROOM ARE PAINTED, BEHIND THE PEOPLE (David, 2026-11-13, with a picture of
+   "Timeline" and its blue frame drawn across his character in a camp: "let's make these stay behind
+   the character"). The bookshelf, chest, portrait, scroll, calendar, board and the merchant are
+   see-through buttons laid over the room, so they can be clicked and reached with the keyboard; their
+   name tags and the frame used to be part of those buttons, and anything on the page is always above
+   anything painted. Now the buttons stay, invisible (assets/realm.css), and this paints what they used
+   to show, in the same colours and size: the name under the thing, and the frame while I stand next
+   to it (is-near), point at it or reach it with Tab. drawRoom() then paints anybody standing IN FRONT
+   of the thing (feet lower than its bottom edge) again over it, and a speech bubble, painted later
+   still, covers a name by itself; that last part replaces the old trick of hiding a name under a bubble.
+   Works in device pixels, as the buttons are placed (placeHot). Each box returned: where the paint
+   went, and `base`, the thing's bottom edge, for the in-front test. */
+function roomTags(c) {
+  var k = Math.min(2,window.devicePixelRatio||1), out = [], cs = window.getComputedStyle ? getComputedStyle(document.documentElement) : null;
+  var prim = (cs && cs.getPropertyValue('--primary').trim()) || PAL.primary, onp = (cs && cs.getPropertyValue('--on-primary').trim()) || PAL.ground, font = (cs && cs.getPropertyValue('--body').trim()) || 'sans-serif';
+  var rr = function (x, y, w, h, r) { c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); };
+  c.save(); c.setTransform(1,0,0,1,0,0);
   HOT.concat([['shopBtn']]).forEach(function (h) {
-    var b = $(h[0]), tag = b && b.querySelector('span'), under = false; if (!tag) return;
-    if (!b.hidden) { var r = tag.getBoundingClientRect();
-      placed.forEach(function (p) { var x = at.left+(ox+(p.bx-1)*s)/k, y = at.top+(oy+(p.by-1)*s)/k, w = (p.w+2)*s/k, hh = (p.h+2)*s/k;
-        if (r.left < x+w && x < r.right && r.top < y+hh && y < r.bottom) under = true; }); }
-    tag.style.visibility = under ? 'hidden' : '';
+    var b = $(h[0]); if (!b || b.hidden) return;
+    var x = parseFloat(b.style.left)*k, y = parseFloat(b.style.top)*k, w = parseFloat(b.style.width)*k+4*k, hh = parseFloat(b.style.height)*k+4*k;
+    if (!(w > 0 && hh > 0)) return;
+    var lit = b.classList.contains('is-near') || b.matches(':hover') || b.matches(':focus-visible');
+    if (lit) { c.lineWidth = 2*k; c.strokeStyle = prim; rr(x+k,y+k,w-2*k,hh-2*k,4*k); c.stroke(); out.push({x:x,y:y,w:w,h:hh,base:y+hh}); }
+    var tag = b.querySelector('span'), text = tag ? tag.textContent : '';
+    if (!text) return;
+    c.font = '700 '+Math.round(12*k)+'px '+font; c.textAlign = 'center'; c.textBaseline = 'middle';
+    var pw = c.measureText(text).width+16*k, ph = 17*k, tx = x+w/2-pw/2, ty = y+hh+5*k;
+    c.fillStyle = prim; rr(tx,ty,pw,ph,4*k); c.fill();
+    c.fillStyle = onp; c.fillText(text,x+w/2,ty+ph/2+.5*k);
+    out.push({x:tx,y:ty,w:pw,h:ph,base:y+hh});
   });
+  c.restore(); c.textAlign = 'start'; c.textBaseline = 'alphabetic';
+  return out;
 }
 
 /* ---------- decorating (David, 2026-11-12) ----------
@@ -1988,14 +2016,13 @@ function whereWords(p) {
 function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
-  if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
+  if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2>'+(ST.chat.create?'<button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button>':'')+'</div><div class="rrows">';
     /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
     /* Saved for later (migration 096): my own list, opened by assets/realm_msgact.js. */
     if (ST.chat.acts) h += '<button type="button" class="rrow" data-savedlist="1"><span class="rhash">&#9733;</span><span>Saved</span></button>';
-    ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
-      h += '<button type="button" class="rrow'+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"><span class="rhash">#</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>'; });
+    h += chanRows(un);
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
@@ -2007,6 +2034,48 @@ function renderSide() {
     var nv = voiceOthers(o.id).length + (VO.on && S.inside===o.id?1:0);
     h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in a call':'')+'</small>':'')+'</button>'; });
   $('side').innerHTML = h+'</div></div>';
+}
+/* CHANNELS PEOPLE MAKE (David, 2026-11-13, migration 097: "create new channels (public/private) and
+   ask if it's linked to a specific project so they can be nested inside the general channels for each
+   project"). A made channel of a show is listed indented under that show's own channel, which gets a
+   small arrow to fold them away, as Slack's sections do; a folded show carries its channels' unread
+   count on its own row. Studio-wide made channels follow the built-in ones. A private channel wears a
+   lock instead of "#". The "+" is drawn only for Production and admins (David, 2026-11-13: "only
+   admins and prod can create channels"); the server refuses anybody else too. The server only ever sends the channels this person may read (includes/
+   realm_made.php), so nothing here decides who sees what. Which shows are folded is remembered in
+   this browser only. The "+" above, and the window it opens, are assets/realm_made.js. */
+var FOLD = (function () { try { return JSON.parse(localStorage.getItem('realmFold')||'{}') || {}; } catch (e) { return {}; } })();
+function chanFold(id) {
+  if (FOLD[id]) delete FOLD[id]; else FOLD[id] = 1;
+  try { localStorage.setItem('realmFold',JSON.stringify(FOLD)); } catch (e) {}
+  renderSide();
+}
+var LOCK = '<svg viewBox="0 0 12 12" width="11" height="11" aria-label="Private"><rect x="2" y="5.2" width="8" height="5.8" rx="1.2" fill="currentColor"/><path d="M3.9 5.4V3.8a2.1 2.1 0 0 1 4.2 0v1.6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+function chanRow(c, un, sub, plus) {
+  var n = c.id===CH.open ? 0 : (un[c.id]||0)+(plus||0);
+  return '<button type="button" class="rrow'+(sub?' is-sub':'')+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"'+(c.private?' title="Private channel"':'')+'><span class="rhash">'+(c.private?LOCK:'#')+'</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>';
+}
+function chanRows(un) {
+  var list = ST.chat.channels, kids = {}, h = '', top = [], shows = [];
+  list.forEach(function (c) { if (c.made && c.show) (kids[c.show] = kids[c.show] || []).push(c); });
+  list.forEach(function (c) {
+    var m = /^project:(\d+)$/.exec(c.id);
+    if (m) shows.push(c);
+    /* A show's channel whose show has no channel of its own here stays at the top level. */
+    else if (!(c.made && c.show && list.some(function (x) { return x.id==='project:'+c.show; }))) top.push(c);
+  });
+  /* The built-in places first, then the studio-wide made ones, then each show with its own. */
+  top.forEach(function (c) { h += chanRow(c,un,false); });
+  shows.forEach(function (c) {
+    var pid = c.id.slice(8), mine = kids[pid] || [];
+    if (!mine.length) { h += chanRow(c,un,false); return; }
+    var shut = !!FOLD[c.id], extra = 0;
+    if (shut) mine.forEach(function (k) { if (k.id!==CH.open) extra += un[k.id]||0; });
+    var row = chanRow(c,un,false,extra);
+    h += '<div class="rchgroup"><button type="button" class="rfold'+(shut?' is-shut':'')+'" data-chanfold="'+esc(c.id)+'" aria-expanded="'+(!shut)+'" aria-label="'+(shut?'Show':'Hide')+' the channels of '+esc(c.name)+'"><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+row+'</div>';
+    if (!shut) mine.forEach(function (k) { h += chanRow(k,un,true); });
+  });
+  return h;
 }
 function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
@@ -2248,6 +2317,7 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#chatWide')) chatWide(!CH.wide);
   else if ((b = t.closest('[data-thread]'))) openThread(+b.getAttribute('data-thread'),b.getAttribute('data-thchan')||CH.open);
   else if (t.closest('[data-threads]')) openThreads();
+  else if ((b = t.closest('[data-chanfold]'))) chanFold(b.getAttribute('data-chanfold'));
   else if (t.closest('#chatBack')) chatBack();
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
@@ -2334,7 +2404,8 @@ function chanTitle(id) {
   var m = /^dm:(\d+):(\d+)$/.exec(id);
   if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
   var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
-  return c ? c.name : 'Chat';
+  /* An archived channel (migration 097) is not in the list; opened from a search, its name came with the answer. */
+  return c ? c.name : ((R.chanName && R.chanName(id)) || 'Chat');
 }
 /* The conversation that belongs to a building: a place's channel, or ravens with a house's owner. */
 function chanFor(placeId) {
@@ -2518,7 +2589,7 @@ function chatTake(j) {
   /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
   if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
-  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : 'Only Production writes here';
+  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : (j.chan && j.chan.archived ? 'This channel is archived' : 'Only Production writes here');
   if ($('chatAlsoRow')) $('chatAlsoRow').hidden = !(CH.thread && j.can_post);
   if (j.unread) takeUnread(j.unread,j.tunread);
   paintThreads();
@@ -3613,6 +3684,10 @@ R.chat = CH; R.chatTake = chatTake;
    a conversation at one message (as a search result does), names for the forward list, and the map's
    current state (channels, people). */
 R.msgHTML = msgHTML; R.findOpen = findOpen; R.chanTitle = chanTitle; R.dmId = dmId; R.st = function () { return ST; };
+/* What assets/realm_made.js borrows (channels people make, migration 097): the state as it is now
+   (ST is replaced by every heartbeat), a way to take in a new channel list, and opening one. */
+R.now = function () { return ST; }; R.openChat = openChat; R.closeChat = closeChat;
+R.takeChat = function (c) { if (!c || !ST) return; if (ST.chat && ST.chat.unread && !c.unread) c.unread = ST.chat.unread; ST.chat = c; renderSide(); badge(); };
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();
@@ -3675,6 +3750,7 @@ setInterval(function () {
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */
+if ($('mapbox')) ['pointerover','pointerout','focusin','focusout'].forEach(function (ev) { $('mapbox').addEventListener(ev,function (e) { if (S.inside && e.target.closest && e.target.closest('.rshelf')) draw(); }); });
 if ($('mapbox')) [['chestBtn','chestTag','Your gold','Your gold, in the chest'],['portraitBtn','portraitTag','Profile','A profile, in the portrait'],['shopBtn','shopTag','Merchant','The merchant, who sells things for gold']].forEach(function (h) {
   var b = document.createElement('button'); b.type = 'button'; b.id = h[0]; b.className = 'rshelf'; b.hidden = true;
   b.setAttribute('aria-label',h[3]); b.innerHTML = '<span id="'+h[1]+'">'+h[2]+'</span>'; $('mapbox').appendChild(b);
