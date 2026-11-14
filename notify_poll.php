@@ -40,6 +40,19 @@ if (function_exists('feature_on') && !feature_on('bell')) {
 }
 
 $crewId = (int)(effective_crew_id($pdo) ?? 0);
+// REMINDERS ON SAVED REALM MESSAGES (David, 2026-11-13, migration 096: "Save +
+// reminders"). They ring here, on the poll every page already makes, so a
+// reminder arrives whether or not the Realm is open; no new loop. Only for the
+// real login, never inside "View as", and silent before the migration runs:
+// realm_reminders_ring() is one small query that never throws.
+if (!in_preview()) {
+    try {
+        require_once __DIR__ . '/includes/realm_msgact.php';
+        realm_reminders_ring($pdo, (int)($_SESSION['user_id'] ?? 0));
+    } catch (Throwable $e) {
+        // The bell still answers below.
+    }
+}
 $items = [];
 foreach (notify_recent($pdo, $crewId) as $n) {
     $items[] = [

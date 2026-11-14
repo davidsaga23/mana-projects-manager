@@ -14,6 +14,29 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: Slack's bar over a message *(migration 096)*
+
+**Asked by David**, with a screenshot of Slack: "let's add these same features from slack so the
+transition is smoother". Pointing at a message (or reaching it with Tab, or tapping it on a phone)
+shows one small bar on its corner, in Slack's order:
+- **three quick reactions**: your three most used, from the Realm's six (no new emoji, as agreed);
+- **add a reaction** and **reply in thread** (these two existed; they moved into the bar);
+- **forward** to any channel or raven you can write in, with an optional note. The copy says
+  "Forwarded from #place · who". A raven is only ever called "a raven", and a show you are not on
+  "a show channel";
+- **save for later / remind me**: in 20 minutes, 1 hour, 3 hours or tomorrow at 9:00. The reminder
+  rings Anima's bell ("Reminder about Renata's message in the Realm", which opens the Realm at the
+  message) and shows a notice in the Realm. "Saved" in the channel list opens your own list;
+- **More (⋮)**: copy a link to the message, mark unread (it stays unread until you leave the
+  conversation or write in it), and for your own messages **edit** ("(edited)") and **delete**
+  ("This message was deleted.", which keeps the row, so a thread under it stays).
+The arrow keys move between messages and Enter goes into the bar. No new polling: edits and
+deletions ride on the open conversation's 3-second poll, reminders on the bell's.
+**Needs migration 096.** Until it runs, the bar shows reactions, reply in thread, copy link and mark
+unread. Files: `includes/realm_msgact.php` (new), `assets/realm_msgact.js` (new),
+`includes/realm_chat.php`, `realm_api.php`, `assets/realm.js`, `assets/realm_react.js`,
+`assets/realm.css`, `realm.php`, `includes/notify.php`, `notify_poll.php`, `includes/auth.php`.
+
 ## 2026-11-13 — The Realm: a wider arrow back from a thread *(no migration)*
 
 **Asked by David**: "wider arrow to go back please". The back button at the top of a thread is now a

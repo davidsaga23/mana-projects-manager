@@ -610,9 +610,16 @@ function artist_may_post(): bool {
         // looks up the channel that message is in and asks
         // realm_channel_access() before anything is written, so a raven can only
         // be reacted to by its two people.
+        // `forward`, `save_msg`, `unsave_msg`, `edit_msg`, `delete_msg`,
+        // `unread_from` (2026-11-13, migration 096): Slack's message actions.
+        // ⚠ EACH NAMES A MESSAGE: realm_api.php reads its channel and asks
+        // realm_channel_access() (forward also asks to WRITE where it goes);
+        // edit and delete are refused unless the session wrote the message; the
+        // saved list and the read mark are only ever the asker's own rows.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
                             'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
-                            'buy', 'offer', 'offer_answer', 'react'],
+                            'buy', 'offer', 'offer_answer', 'react',
+                            'forward', 'save_msg', 'unsave_msg', 'edit_msg', 'delete_msg', 'unread_from'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id
