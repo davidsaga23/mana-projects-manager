@@ -2,7 +2,8 @@
 // how to use the platform and where to find stuff?").
 //
 // Loaded only when includes/tour.php says the tour is running on this page,
-// either by itself on a person's first login or from "Tour" in the top bar.
+// either by itself on a person's first login or from "Tour" in the top bar's
+// Admin / More menu.
 // No library: a spotlight box over the real element, a card beside it, and
 // Next / Back / Skip.
 //
@@ -38,7 +39,7 @@
   var welcomeArtist = {
     page: '*', title: 'Welcome to Anima',
     body: 'Anima is where the studio keeps track of the work: your tasks, your hours and your ' +
-          'reviews. This takes about a minute, and Tour in the top bar brings it back any time.'
+          'reviews. This takes about a minute, and Tour, in the menu at the right of the top bar, brings it back any time.'
   };
   var homeStep = {
     page: 'home.php', find: ['.dash-strip', 'h2.wizard-title'], only: function (c) { return c.home; },
@@ -94,7 +95,7 @@
     page: '*', find: ['.bug-fab'],
     title: 'Report a bug',
     body: 'If something is broken or confusing, press Report a bug, say what went wrong and add a ' +
-          'screenshot if you can. Tour in the top bar brings this guide back any time.'
+          'screenshot if you can. Tour, in the menu at the right of the top bar, brings this guide back any time.'
   };
 
   var STEPS = {
@@ -111,7 +112,7 @@
       {
         page: '*', title: 'Welcome to Anima',
         body: 'Anima is where the studio plans and tracks every show: projects, people, tasks and ' +
-              'reviews. This takes about a minute, and Tour in the top bar brings it back any time.'
+              'reviews. This takes about a minute, and Tour, in the menu at the right of the top bar, brings it back any time.'
       },
       {
         page: 'index.php', find: ['.project-list', '.empty-state'],
@@ -150,10 +151,13 @@
       },
       reviewsStep,
       {
-        page: '*', find: ['.topbar a[href="users.php"]'], only: function (c) { return c.role === 'admin'; },
-        title: 'Users and Bugs',
-        body: 'Users lists every login: its role, the Salaried tick and when it was last seen. Bugs, ' +
-              'beside it, holds every report sent with the Report a bug button.'
+        // The Admin button, not the links: since 2026-11-13 Users and Bugs live
+        // inside its menu, and a closed menu's links have nothing to highlight.
+        page: '*', find: ['#navMenuBtn'], only: function (c) { return c.role === 'admin'; },
+        title: 'The Admin menu',
+        body: 'Studio pages and admin tools live in here. Users lists every login: its role, the Salaried ' +
+              'tick and when it was last seen. Bugs holds every report sent with the Report a bug button. ' +
+              'Tour and Log out are at the bottom.'
       },
       // Admins read the reports on Bugs, so the step above covers them.
       { page: '*', find: bugStep.find, title: bugStep.title, body: bugStep.body,
