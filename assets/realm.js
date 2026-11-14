@@ -1988,14 +1988,13 @@ function whereWords(p) {
 function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
-  if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
+  if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2>'+(ST.chat.create?'<button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button>':'')+'</div><div class="rrows">';
     /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
     /* Saved for later (migration 096): my own list, opened by assets/realm_msgact.js. */
     if (ST.chat.acts) h += '<button type="button" class="rrow" data-savedlist="1"><span class="rhash">&#9733;</span><span>Saved</span></button>';
-    ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
-      h += '<button type="button" class="rrow'+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"><span class="rhash">#</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>'; });
+    h += chanRows(un);
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
@@ -2007,6 +2006,48 @@ function renderSide() {
     var nv = voiceOthers(o.id).length + (VO.on && S.inside===o.id?1:0);
     h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in a call':'')+'</small>':'')+'</button>'; });
   $('side').innerHTML = h+'</div></div>';
+}
+/* CHANNELS PEOPLE MAKE (David, 2026-11-13, migration 097: "create new channels (public/private) and
+   ask if it's linked to a specific project so they can be nested inside the general channels for each
+   project"). A made channel of a show is listed indented under that show's own channel, which gets a
+   small arrow to fold them away, as Slack's sections do; a folded show carries its channels' unread
+   count on its own row. Studio-wide made channels follow the built-in ones. A private channel wears a
+   lock instead of "#". The "+" is drawn only for Production and admins (David, 2026-11-13: "only
+   admins and prod can create channels"); the server refuses anybody else too. The server only ever sends the channels this person may read (includes/
+   realm_made.php), so nothing here decides who sees what. Which shows are folded is remembered in
+   this browser only. The "+" above, and the window it opens, are assets/realm_made.js. */
+var FOLD = (function () { try { return JSON.parse(localStorage.getItem('realmFold')||'{}') || {}; } catch (e) { return {}; } })();
+function chanFold(id) {
+  if (FOLD[id]) delete FOLD[id]; else FOLD[id] = 1;
+  try { localStorage.setItem('realmFold',JSON.stringify(FOLD)); } catch (e) {}
+  renderSide();
+}
+var LOCK = '<svg viewBox="0 0 12 12" width="11" height="11" aria-label="Private"><rect x="2" y="5.2" width="8" height="5.8" rx="1.2" fill="currentColor"/><path d="M3.9 5.4V3.8a2.1 2.1 0 0 1 4.2 0v1.6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+function chanRow(c, un, sub, plus) {
+  var n = c.id===CH.open ? 0 : (un[c.id]||0)+(plus||0);
+  return '<button type="button" class="rrow'+(sub?' is-sub':'')+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"'+(c.private?' title="Private channel"':'')+'><span class="rhash">'+(c.private?LOCK:'#')+'</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>';
+}
+function chanRows(un) {
+  var list = ST.chat.channels, kids = {}, h = '', top = [], shows = [];
+  list.forEach(function (c) { if (c.made && c.show) (kids[c.show] = kids[c.show] || []).push(c); });
+  list.forEach(function (c) {
+    var m = /^project:(\d+)$/.exec(c.id);
+    if (m) shows.push(c);
+    /* A show's channel whose show has no channel of its own here stays at the top level. */
+    else if (!(c.made && c.show && list.some(function (x) { return x.id==='project:'+c.show; }))) top.push(c);
+  });
+  /* The built-in places first, then the studio-wide made ones, then each show with its own. */
+  top.forEach(function (c) { h += chanRow(c,un,false); });
+  shows.forEach(function (c) {
+    var pid = c.id.slice(8), mine = kids[pid] || [];
+    if (!mine.length) { h += chanRow(c,un,false); return; }
+    var shut = !!FOLD[c.id], extra = 0;
+    if (shut) mine.forEach(function (k) { if (k.id!==CH.open) extra += un[k.id]||0; });
+    var row = chanRow(c,un,false,extra);
+    h += '<div class="rchgroup"><button type="button" class="rfold'+(shut?' is-shut':'')+'" data-chanfold="'+esc(c.id)+'" aria-expanded="'+(!shut)+'" aria-label="'+(shut?'Show':'Hide')+' the channels of '+esc(c.name)+'"><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+row+'</div>';
+    if (!shut) mine.forEach(function (k) { h += chanRow(k,un,true); });
+  });
+  return h;
 }
 function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
@@ -2248,6 +2289,7 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#chatWide')) chatWide(!CH.wide);
   else if ((b = t.closest('[data-thread]'))) openThread(+b.getAttribute('data-thread'),b.getAttribute('data-thchan')||CH.open);
   else if (t.closest('[data-threads]')) openThreads();
+  else if ((b = t.closest('[data-chanfold]'))) chanFold(b.getAttribute('data-chanfold'));
   else if (t.closest('#chatBack')) chatBack();
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
@@ -2334,7 +2376,8 @@ function chanTitle(id) {
   var m = /^dm:(\d+):(\d+)$/.exec(id);
   if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
   var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
-  return c ? c.name : 'Chat';
+  /* An archived channel (migration 097) is not in the list; opened from a search, its name came with the answer. */
+  return c ? c.name : ((R.chanName && R.chanName(id)) || 'Chat');
 }
 /* The conversation that belongs to a building: a place's channel, or ravens with a house's owner. */
 function chanFor(placeId) {
@@ -2518,7 +2561,7 @@ function chatTake(j) {
   /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
   if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
-  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : 'Only Production writes here';
+  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : (j.chan && j.chan.archived ? 'This channel is archived' : 'Only Production writes here');
   if ($('chatAlsoRow')) $('chatAlsoRow').hidden = !(CH.thread && j.can_post);
   if (j.unread) takeUnread(j.unread,j.tunread);
   paintThreads();
@@ -3613,6 +3656,10 @@ R.chat = CH; R.chatTake = chatTake;
    a conversation at one message (as a search result does), names for the forward list, and the map's
    current state (channels, people). */
 R.msgHTML = msgHTML; R.findOpen = findOpen; R.chanTitle = chanTitle; R.dmId = dmId; R.st = function () { return ST; };
+/* What assets/realm_made.js borrows (channels people make, migration 097): the state as it is now
+   (ST is replaced by every heartbeat), a way to take in a new channel list, and opening one. */
+R.now = function () { return ST; }; R.openChat = openChat; R.closeChat = closeChat;
+R.takeChat = function (c) { if (!c || !ST) return; if (ST.chat && ST.chat.unread && !c.unread) c.unread = ST.chat.unread; ST.chat = c; renderSide(); badge(); };
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();

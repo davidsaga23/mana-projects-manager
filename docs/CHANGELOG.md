@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-13 — The Realm: make your own channels, public or private, under their show *(migration 097)*
+
+**Asked by David**: "let's add the option to create new channels (public/private) and ask if it's
+linked to a specific project so they can be nested inside the general channels for each project".
+For **Production and admins only** (David: "only admins and prod can create channels"), a **+**
+beside CHANNELS opens *New channel*: a name, **public** (everybody in the Realm reads and
+writes) or **private** (only the people you tick; nobody else sees it exists, admins included), and
+*Is it for a show?* (or *No, studio-wide*). A show's channels are listed indented under its own
+channel, with an arrow to fold them; a folded show shows their unread count. Private channels wear a
+lock. The cog in an open channel's head renames it, changes who is in a private one, archives it
+(it leaves the list but its messages stay searchable), or leaves a private one. Who may see what is
+decided on the server, everywhere chat reads a channel (opening it, counts, threads, search,
+pictures, reactions, tags in the bell). Dormant until **migration 097** runs: before that the + says
+a database update is needed. Files: `includes/realm_made.php` (new), `includes/realm_chat.php`,
+`includes/realm_search.php`, `realm_api.php`, `includes/auth.php`, `assets/realm_made.js` (new),
+`assets/realm.js`, `assets/realm.css`, `realm.php`.
 ## 2026-11-13 — Top bar: an Admin menu instead of a row of links *(no migration)*
 
 **Asked by David**: "let's create a button that says admin, inside that let's include all these tabs

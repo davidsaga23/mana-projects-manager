@@ -6149,3 +6149,35 @@ How it was built, and why:
 - **No new polling.** Edits/deletions ride on the 3-second poll of an open conversation; reminders
   ring on the bell's 30-second poll (`notify_poll.php`) and on the Realm's heartbeat, once each.
 - Reminder times are the server's clock (the studio's time zone in `config.php`).
+## 2026-11-13 — The Realm: channels people make (David)
+
+David, with a picture of the channel list: "let's add the option to create new channels
+(public/private) and ask if it's linked to a specific project so they can be nested inside the
+general channels for each project". Migration 097, `includes/realm_made.php`.
+
+How it is built:
+- **One list decides.** A made channel is `ch:<id>` in the chat. `realm_channels()` adds the made
+  channels the account may read to its list, and every privacy check in chat already asks that list
+  (`realm_channel_access()`, unread counts, the Threads row, search, `realm_image.php`, reactions).
+  There is no second rule to keep in step.
+- **Private means invisible.** Only members see a private channel, its name, its count or its
+  messages; an admin who is not in it cannot reach it either, the same rule as ravens. Asking for it
+  by id answers as if it did not exist. A tag in it rings only its members, so a bell never learns
+  the channel exists.
+- **A show's channel is for people on that show** (`may_see_project()`), public or private, as the
+  show's own channel already is; the bell calls it "a show channel", as for the show's own.
+- **Archived, not deleted.** It leaves the list and nobody writes in it; its messages stay readable
+  and searchable (search names it "(archived)").
+- **Names** are free text up to 60 letters, unique per show (or studio-wide) among the channels the
+  person can see, so a "name taken" answer never gives away a private channel.
+
+Who may do what:
+- **Only Production and admins make channels** (David, same day, after seeing a first version where
+  anybody could: "only admins and prod can create channels"). `realm_made_may_create()`; the "+" is
+  not drawn for anybody else and the server refuses them too.
+- **The one who made it, Production (`can_edit()`) and admins** may rename it, choose its members
+  and archive it, but only a channel they can see. Anybody may leave a private channel except the
+  one who made it, who stays in it so it always has somebody to manage it
+  (`realm_made_may_manage()`).
+- **Public channels need no joining**: everybody in the Realm reads and writes them, as the Tavern
+  works today (Slack's join model was the alternative; proposed as the default).
