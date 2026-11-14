@@ -14,21 +14,44 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-13 — The Realm: make your own channels, public or private, under their show *(migration 096)*
+## 2026-11-13 — The Realm: make your own channels, public or private, under their show *(migration 097)*
 
 **Asked by David**: "let's add the option to create new channels (public/private) and ask if it's
 linked to a specific project so they can be nested inside the general channels for each project".
-A **+** beside CHANNELS opens *New channel*: a name, **public** (everybody in the Realm reads and
+For **Production and admins only** (David: "only admins and prod can create channels"), a **+**
+beside CHANNELS opens *New channel*: a name, **public** (everybody in the Realm reads and
 writes) or **private** (only the people you tick; nobody else sees it exists, admins included), and
 *Is it for a show?* (or *No, studio-wide*). A show's channels are listed indented under its own
 channel, with an arrow to fold them; a folded show shows their unread count. Private channels wear a
 lock. The cog in an open channel's head renames it, changes who is in a private one, archives it
 (it leaves the list but its messages stay searchable), or leaves a private one. Who may see what is
 decided on the server, everywhere chat reads a channel (opening it, counts, threads, search,
-pictures, reactions, tags in the bell). Dormant until **migration 096** runs: before that the + says
+pictures, reactions, tags in the bell). Dormant until **migration 097** runs: before that the + says
 a database update is needed. Files: `includes/realm_made.php` (new), `includes/realm_chat.php`,
 `includes/realm_search.php`, `realm_api.php`, `includes/auth.php`, `assets/realm_made.js` (new),
 `assets/realm.js`, `assets/realm.css`, `realm.php`.
+## 2026-11-13 — The Realm: Slack's bar over a message *(migration 096)*
+
+**Asked by David**, with a screenshot of Slack: "let's add these same features from slack so the
+transition is smoother". Pointing at a message (or reaching it with Tab, or tapping it on a phone)
+shows one small bar on its corner, in Slack's order:
+- **three quick reactions**: your three most used, from the Realm's six (no new emoji, as agreed);
+- **add a reaction** and **reply in thread** (these two existed; they moved into the bar);
+- **forward** to any channel or raven you can write in, with an optional note. The copy says
+  "Forwarded from #place · who". A raven is only ever called "a raven", and a show you are not on
+  "a show channel";
+- **save for later / remind me**: in 20 minutes, 1 hour, 3 hours or tomorrow at 9:00. The reminder
+  rings Anima's bell ("Reminder about Renata's message in the Realm", which opens the Realm at the
+  message) and shows a notice in the Realm. "Saved" in the channel list opens your own list;
+- **More (⋮)**: copy a link to the message, mark unread (it stays unread until you leave the
+  conversation or write in it), and for your own messages **edit** ("(edited)") and **delete**
+  ("This message was deleted.", which keeps the row, so a thread under it stays).
+The arrow keys move between messages and Enter goes into the bar. No new polling: edits and
+deletions ride on the open conversation's 3-second poll, reminders on the bell's.
+**Needs migration 096.** Until it runs, the bar shows reactions, reply in thread, copy link and mark
+unread. Files: `includes/realm_msgact.php` (new), `assets/realm_msgact.js` (new),
+`includes/realm_chat.php`, `realm_api.php`, `assets/realm.js`, `assets/realm_react.js`,
+`assets/realm.css`, `realm.php`, `includes/notify.php`, `notify_poll.php`, `includes/auth.php`.
 
 ## 2026-11-13 — The Realm: a wider arrow back from a thread *(no migration)*
 

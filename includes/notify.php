@@ -109,7 +109,9 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag', 'later'], true)) return 0;
+    // 'later' (a saved Realm message's reminder, migration 096): the same, no fallback.
+    if ($kind === 'later' && !enum_has_value($pdo, 'notifications', 'kind', 'later')) return 0;
     // 'raven' (a message left in the Realm for somebody who is away, migration
     // 082) has no fallback either: until 082 runs there are no ravens to ring for.
     if ($kind === 'raven' && !enum_has_value($pdo, 'notifications', 'kind', 'raven')) return 0;
@@ -219,6 +221,9 @@ function notify_mark_seen(PDO $pdo, int $crewId): int {
 function notify_link(array $n): string {
     // A raven is read in the Realm, where the sender's name carries the unread mark.
     if (in_array($n['kind'] ?? '', ['raven', 'tag'], true)) return 'realm.php';
+    // A reminder about a saved Realm message (migration 096) opens the Realm AT
+    // that message; item_key holds its id. The Realm checks it may still be read.
+    if (($n['kind'] ?? '') === 'later') return 'realm.php' . (!empty($n['item_key']) ? '?msg=' . (int)$n['item_key'] : '');
     if (!empty($n['ticket_id'])) {
         return 'ticket.php?id=' . (int)$n['ticket_id']
              . (!empty($n['comment_id']) ? '#c' . (int)$n['comment_id'] : '');
@@ -244,6 +249,7 @@ function notify_verb(string $kind): string {
         'reminder' => 'asked you to log',     // + "your time for Tue 11 Nov" (080)
         'raven'    => 'sent you a raven',     // + "in the Realm" (082)
         'tag'      => 'tagged you in',        // + "The Tavern in the Realm" (083)
+        'later'    => 'about',                // "Reminder about Renata's message in the Realm" (096)
     ];
     return $words[$kind] ?? 'changed';
 }

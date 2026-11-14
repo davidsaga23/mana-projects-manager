@@ -1,5 +1,5 @@
 <?php
-// The Realm's chat: channels people make themselves (migration 096).
+// The Realm's chat: channels people make themselves (migration 097).
 //
 // David, 2026-11-13, with a picture of the channel list: "let's add the option
 // to create new channels (public/private) and ask if it's linked to a specific
@@ -41,7 +41,7 @@
 /** The longest name a channel may have. */
 const REALM_CHANNEL_NAME_MAX = 60;
 
-/** Has migration 096 made the tables? Asked once per request; never throws. */
+/** Has migration 097 made the tables? Asked once per request; never throws. */
 function realm_made_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;

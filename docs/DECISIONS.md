@@ -6128,11 +6128,32 @@ Asked for "shows that react to production", David chose, among options put to hi
 Where a show stood this morning is estimated from today's status log (approvals less retakes); it
 only decides whether a banner flies. No migration: a milestone's big burst is remembered per browser.
 
+## 2026-11-13 — The Realm: Slack's message actions (migration 096)
+
+David sent Slack's hover bar: "let's add these same features from slack so the transition is
+smoother". Asked which parts he wants, he chose:
+- **More menu:** edit & delete my own, copy link to message, mark unread. **No pinning.**
+- **Quick reactions:** keep the Realm's six; the bar shows each person's three most used (filled
+  with thumbs up, thanks, party for somebody who has not reacted yet). No ✅ or 🙌.
+- **Save for later with reminders** (20 min, 1 h, 3 h, tomorrow 9:00) that ring Anima's bell.
+- **One PR** for all of it.
+How it was built, and why:
+- **Every action names a message, never a channel**: the server reads the message's channel and asks
+  the usual access check, so no id reaches into somebody else's raven. Forward also checks the
+  person may write where it goes.
+- **Only the author edits or deletes**; no admin override (the same rule as reading ravens).
+- **Delete keeps the row** as "This message was deleted." so threads, order and unread counts hold.
+  Its picture's file stays on disk, because a forwarded copy points at the same file.
+- **The bell line names whose message, never its words or its channel**: the bell shows on every
+  page, and the place may be a show the reader is no longer on.
+- **No new polling.** Edits/deletions ride on the 3-second poll of an open conversation; reminders
+  ring on the bell's 30-second poll (`notify_poll.php`) and on the Realm's heartbeat, once each.
+- Reminder times are the server's clock (the studio's time zone in `config.php`).
 ## 2026-11-13 — The Realm: channels people make (David)
 
 David, with a picture of the channel list: "let's add the option to create new channels
 (public/private) and ask if it's linked to a specific project so they can be nested inside the
-general channels for each project". Migration 096, `includes/realm_made.php`.
+general channels for each project". Migration 097, `includes/realm_made.php`.
 
 How it is built:
 - **One list decides.** A made channel is `ch:<id>` in the chat. `realm_channels()` adds the made
@@ -6150,10 +6171,13 @@ How it is built:
 - **Names** are free text up to 60 letters, unique per show (or studio-wide) among the channels the
   person can see, so a "name taken" answer never gives away a private channel.
 
-Put to David as defaults, to confirm before merging (one place each to change):
+Who may do what:
+- **Only Production and admins make channels** (David, same day, after seeing a first version where
+  anybody could: "only admins and prod can create channels"). `realm_made_may_create()`; the "+" is
+  not drawn for anybody else and the server refuses them too.
+- **The one who made it, Production (`can_edit()`) and admins** may rename it, choose its members
+  and archive it, but only a channel they can see. Anybody may leave a private channel except the
+  one who made it, who stays in it so it always has somebody to manage it
+  (`realm_made_may_manage()`).
 - **Public channels need no joining**: everybody in the Realm reads and writes them, as the Tavern
-  works today (Slack's join model was the alternative).
-- **Anybody in the Realm may make a channel**, public or private. **The one who made it, Production
-  (`can_edit()`) and admins** may rename it, choose its members and archive it, but only a channel
-  they can see. Anybody may leave a private channel except the one who made it, who stays in it so
-  it always has somebody to manage it (`realm_made_may_manage()`).
+  works today (Slack's join model was the alternative; proposed as the default).

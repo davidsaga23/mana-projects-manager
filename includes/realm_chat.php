@@ -24,8 +24,10 @@
 // ⚠ ALWAYS THE REAL LOGIN, as in includes/realm.php: the caller passes
 // realm_user_id(), and realm_api.php refuses to run inside a preview.
 
-// Channels people make themselves, public or private (migration 096).
+// Channels people make themselves, public or private (migration 097).
 require_once __DIR__ . '/realm_made.php';
+// Slack's message actions (migration 096): forward, save, edit, delete.
+require_once __DIR__ . '/realm_msgact.php';
 
 /** The longest message that is kept. Longer is cut, not refused. */
 const REALM_MESSAGE_MAX = 2000;
@@ -54,7 +56,7 @@ function realm_dm_channel(int $a, int $b): string {
  * The shared channels this person may open, in the order the list shows them.
  * Ravens are not in here: they are listed against the people, not as channels.
  *
- * Channels people made (migration 096, includes/realm_made.php) come last: the
+ * Channels people made (migration 097, includes/realm_made.php) come last: the
  * public ones, and the private ones this person is IN. ⚠ EVERY PRIVACY CHECK IN
  * CHAT ASKS THIS LIST, so a private channel missing from it is unreadable,
  * uncounted and unsearchable for that person. $uid is the real login (0 asks
@@ -97,7 +99,7 @@ function realm_channel_access(PDO $pdo, int $uid, string $channel, bool $mayAnno
         $q->execute([$uid === $a ? $b : $a]);
         return $q->fetchColumn() ? ['read' => true, 'post' => true] : $no;
     }
-    // Archived made channels too (migration 096): a search result must still
+    // Archived made channels too (migration 097): a search result must still
     // open. Nobody writes in one, and `why` says so.
     foreach (realm_channels($pdo, $mayAnnounce, $uid, true) as $c) {
         if ($c['id'] === $channel) {
@@ -115,12 +117,38 @@ function realm_channel_access(PDO $pdo, int $uid, string $channel, bool $mayAnno
  * checked realm_channel_access().
  */
 function realm_messages(PDO $pdo, int $uid, string $channel, int $after, int $thread = 0): array {
+    [$cols, $from, $where, $args] = realm_message_query($pdo, $channel, $thread);
+    if ($after > 0) {
+        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' AND m.id > ? ORDER BY m.id LIMIT 200');
+        $q->execute(array_merge($args, [$after]));
+        $rows = $q->fetchAll();
+    } else {
+        // A thread opens whole (up to 200 replies); a channel opens on its latest page.
+        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' ORDER BY m.id DESC LIMIT ' . ($thread > 0 ? 200 : REALM_CHAT_PAGE));
+        $q->execute($args);
+        $rows = array_reverse($q->fetchAll());
+    }
+    return array_map(function ($r) use ($pdo, $uid) { return realm_message_out($pdo, $r, $uid); }, $rows);
+}
+
+/**
+ * The pieces of the query every list of messages is read with: the columns, the
+ * tables, and the WHERE for one channel (or one thread in it), with its values.
+ * Shared by realm_messages() and realm_changed_messages(), so an edited message
+ * arrives in exactly the shape a new one does.
+ */
+function realm_message_query(PDO $pdo, string $channel, int $thread): array {
     $threads = realm_threads_available($pdo);
+    $acts = function_exists('realm_msgact_available') && realm_msgact_available($pdo);
     $cols = 'm.id, m.user_id, m.body, m.created_at, u.display_name, u.username, c.name AS crew_name, '
           . (realm_chat_images($pdo) ? 'm.image' : 'NULL') . ' AS image, '
-          . ($threads ? 'm.parent_id, m.also_channel, pm.body AS parent_body' : 'NULL AS parent_id, 0 AS also_channel, NULL AS parent_body');
+          . ($threads ? 'm.parent_id, m.also_channel, pm.body AS parent_body' : 'NULL AS parent_id, 0 AS also_channel, NULL AS parent_body')
+          // Message actions (migration 096): edited, deleted, and where a forwarded copy came from.
+          . ($acts ? ', m.edited_at, m.deleted_at, m.fwd_from, m.fwd_channel, m.fwd_user, m.fwd_at, fu.display_name AS fwd_display, fu.username AS fwd_username, fc.name AS fwd_crew'
+                   : ', NULL AS edited_at, NULL AS deleted_at, NULL AS fwd_from');
     $from = ' FROM realm_messages m LEFT JOIN users u ON u.id = m.user_id LEFT JOIN crew c ON c.id = u.crew_id'
-          . ($threads ? ' LEFT JOIN realm_messages pm ON pm.id = m.parent_id' : '');
+          . ($threads ? ' LEFT JOIN realm_messages pm ON pm.id = m.parent_id' : '')
+          . ($acts ? ' LEFT JOIN users fu ON fu.id = m.fwd_user LEFT JOIN crew fc ON fc.id = fu.crew_id' : '');
     // THREADS (migration 095). The channel shows its own messages and the replies
     // that were also sent to it; a thread shows its first message and its replies.
     $args = [$channel];
@@ -132,38 +160,64 @@ function realm_messages(PDO $pdo, int $uid, string $channel, int $after, int $th
     } elseif ($threads) {
         $where .= ' AND (m.parent_id IS NULL OR m.also_channel = 1)';
     }
-    if ($after > 0) {
-        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' AND m.id > ? ORDER BY m.id LIMIT 200');
-        $q->execute(array_merge($args, [$after]));
-        $rows = $q->fetchAll();
-    } else {
-        // A thread opens whole (up to 200 replies); a channel opens on its latest page.
-        $q = $pdo->prepare('SELECT ' . $cols . $from . $where . ' ORDER BY m.id DESC LIMIT ' . ($thread > 0 ? 200 : REALM_CHAT_PAGE));
-        $q->execute($args);
-        $rows = array_reverse($q->fetchAll());
+    return [$cols, $from, $where, $args];
+}
+
+/**
+ * The messages on screen (from message $from on) that were edited or deleted:
+ * the open conversation asks for anything NEW every 3 seconds, and this rides
+ * on the same answer so a change to an older message reaches everybody too
+ * (migration 096). Every one of them is sent each time; the page redraws only
+ * those whose `v` changed. Never throws: an empty answer is "nothing changed".
+ */
+function realm_changed_messages(PDO $pdo, int $uid, string $channel, int $from, int $thread = 0): array {
+    if ($from <= 0 || !function_exists('realm_msgact_available') || !realm_msgact_available($pdo)) return [];
+    try {
+        [$cols, $tables, $where, $args] = realm_message_query($pdo, $channel, $thread);
+        $q = $pdo->prepare('SELECT ' . $cols . $tables . $where . ' AND m.id >= ? AND (m.edited_at IS NOT NULL OR m.deleted_at IS NOT NULL) ORDER BY m.id LIMIT 300');
+        $q->execute(array_merge($args, [$from]));
+        return array_map(function ($r) use ($pdo, $uid) { return realm_message_out($pdo, $r, $uid); }, $q->fetchAll());
+    } catch (Throwable $e) {
+        return [];
     }
-    $out = [];
-    foreach ($rows as $r) {
-        $t = strtotime((string)$r['created_at']);
-        $parentBody = (string)($r['parent_body'] ?? '');
-        $out[] = [
-            'id'   => (int)$r['id'],
-            'user' => (int)$r['user_id'],
-            'name' => $r['user_id'] === null ? 'Somebody who left' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username']))),
-            'body' => (string)$r['body'],
-            // True when realm_image.php?id=<this id> has a picture to serve.
-            'image' => (string)($r['image'] ?? '') !== '',
-            'at'   => realm_chat_when($t),
-            'mine' => (int)$r['user_id'] === $uid,
-            // Threads (migration 095): the message this one replies to, 0 for none;
-            // whether the reply was also sent to the channel; and, for such a reply,
-            // the start of what it answers, so the channel can say so.
-            'parent' => (int)($r['parent_id'] ?? 0),
-            'also'   => (int)($r['also_channel'] ?? 0) === 1,
-            'about'  => (int)($r['also_channel'] ?? 0) === 1 ? realm_chat_snippet($parentBody) : '',
+}
+
+/** One row of the query above, as the page draws it. */
+function realm_message_out(PDO $pdo, array $r, int $uid): array {
+    $t = strtotime((string)$r['created_at']);
+    $parentBody = (string)($r['parent_body'] ?? '');
+    $deleted = ($r['deleted_at'] ?? null) !== null;
+    $fwd = null;
+    if (($r['fwd_from'] ?? null) !== null && !$deleted) {
+        $fwd = [
+            'name'  => ($r['fwd_user'] ?? null) === null ? 'Somebody who left'
+                     : ((int)$r['fwd_user'] === $uid ? 'You' : trim((string)(($r['fwd_crew'] ?? '') ?: (($r['fwd_display'] ?? '') ?: ($r['fwd_username'] ?? ''))))),
+            'where' => function_exists('realm_fwd_place') ? realm_fwd_place($pdo, (string)$r['fwd_channel']) : 'a channel',
+            'at'    => ($r['fwd_at'] ?? null) ? realm_chat_when(strtotime((string)$r['fwd_at'])) : '',
         ];
     }
-    return $out;
+    return [
+        'id'   => (int)$r['id'],
+        'user' => (int)$r['user_id'],
+        'name' => $r['user_id'] === null ? 'Somebody who left' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username']))),
+        'body' => (string)$r['body'],
+        // True when realm_image.php?id=<this id> has a picture to serve.
+        'image' => (string)($r['image'] ?? '') !== '',
+        'at'   => realm_chat_when($t),
+        'mine' => (int)$r['user_id'] === $uid,
+        // Threads (migration 095): the message this one replies to, 0 for none;
+        // whether the reply was also sent to the channel; and, for such a reply,
+        // the start of what it answers, so the channel can say so.
+        'parent' => (int)($r['parent_id'] ?? 0),
+        'also'   => (int)($r['also_channel'] ?? 0) === 1,
+        'about'  => (int)($r['also_channel'] ?? 0) === 1 ? realm_chat_snippet($parentBody) : '',
+        // Message actions (migration 096). `v` changes whenever the message is
+        // edited or deleted, which is how the page knows to redraw it.
+        'edited'  => ($r['edited_at'] ?? null) !== null && !$deleted,
+        'deleted' => $deleted,
+        'fwd'     => $fwd,
+        'v'       => (string)($r['deleted_at'] ?? '') . '|' . (string)($r['edited_at'] ?? ''),
+    ];
 }
 
 /** A time as the chat prints it: "10:42" today, "12 Nov, 10:42" before. */
@@ -403,13 +457,18 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     $tunread = [];
     $unread = realm_unread($pdo, $uid, $mayAnnounce, $tunread);
     return ['channels' => realm_channels($pdo, $mayAnnounce, $uid), 'unread' => $unread,
-            // May channels be made yet (migration 096)? The "+" beside CHANNELS says so if not.
+            // May channels be made yet (migration 097)? The "+" beside CHANNELS says so if not.
             'make' => realm_made_available($pdo),
             // May this person make one at all? Production and admins only (David, 2026-11-13).
             'create' => realm_made_may_create(),
             'images' => realm_chat_images($pdo),
             // Threads (migration 095): may messages be replied to, and what is new in the ones I follow.
-            'threads' => realm_threads_available($pdo), 'tunread' => $tunread];
+            'threads' => realm_threads_available($pdo), 'tunread' => $tunread,
+            // Message actions (migration 096): may messages be forwarded, saved,
+            // edited and deleted; and my three most-used reactions for the bar.
+            'acts' => function_exists('realm_msgact_available') && realm_msgact_available($pdo),
+            'favs' => function_exists('realm_reaction_favs') ? realm_reaction_favs($pdo, $uid) : [],
+            'remind' => REALM_REMIND];
 }
 
 /**
@@ -545,11 +604,11 @@ function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, b
         } else {
             foreach (realm_channels($pdo, $mayAnnounce, $fromUid) as $c) {
                 // A made channel of a show is named like the show's own channel,
-                // for the same reason (migration 096).
+                // for the same reason (migration 097).
                 if ($c['id'] === $channel) $where = !empty($c['show']) ? 'a show channel' : (string)$c['name'];
             }
         }
-        // ⚠ A PRIVATE CHANNEL RINGS ONLY ITS MEMBERS (migration 096). Somebody
+        // ⚠ A PRIVATE CHANNEL RINGS ONLY ITS MEMBERS (migration 097). Somebody
         // outside it who is tagged hears nothing: their bell must not learn the
         // channel exists. null means any channel that is not private.
         $only = realm_made_ring_only($pdo, $channel);

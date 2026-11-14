@@ -1,4 +1,4 @@
--- 096 — The Realm's chat: channels people make themselves, public or private.
+-- 097 — The Realm's chat: channels people make themselves, public or private.
 --
 -- David, 2026-11-13: "let's add the option to create new channels
 -- (public/private) and ask if it's linked to a specific project so they can be

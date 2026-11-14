@@ -208,7 +208,9 @@ foreach (($state['people'] ?? []) as $p) {
   <script src="assets/realm_trade.js<?= asset_ver('realm_trade.js') ?>"></script>
   <?php /* Emoji reactions on chat messages (migration 093): its own file, like the three above. */ ?>
   <script src="assets/realm_react.js<?= asset_ver('realm_react.js') ?>"></script>
-  <?php /* Channels people make, public or private, for a show or studio-wide (migration 096). After
+  <?php /* Slack's message actions (migration 096): forward, save and remind, edit, delete, copy link. */ ?>
+  <script src="assets/realm_msgact.js<?= asset_ver('realm_msgact.js') ?>"></script>
+  <?php /* Channels people make, public or private, for a show or studio-wide (migration 097). After
            realm_react.js: both answer every chat answer, and this one keeps the other's hook. */ ?>
   <script src="assets/realm_made.js<?= asset_ver('realm_made.js') ?>"></script>
 <?php endif; ?>

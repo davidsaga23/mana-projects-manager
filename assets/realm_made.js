@@ -1,4 +1,4 @@
-/* The Realm: channels people make themselves (David, 2026-11-13, migration 096).
+/* The Realm: channels people make themselves (David, 2026-11-13, migration 097).
 
    "Let's add the option to create new channels (public/private) and ask if it's linked to a specific
    project so they can be nested inside the general channels for each project."
