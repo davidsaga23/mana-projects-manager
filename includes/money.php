@@ -1110,6 +1110,7 @@ function finance_migration_checks(): array {
         'finance_install_17.sql' => ['crew_terms.monthly_salary', 'crew_terms_log.monthly_salary'],
         // The invoice template (PR #200), claimed while this was being built.
         'finance_install_18.sql' => ['invoice_details.crew_id'],
+        'finance_install_19.sql' => ['invoice_moves.id'],
     ];
 }
 

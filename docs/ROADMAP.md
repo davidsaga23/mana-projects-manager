@@ -1296,6 +1296,16 @@ invoice status. Supervisors get a team panel; salaried staff see no money at all
 - **Studio time** (meetings, desk time) is not on the invoice information. Whether a freelancer
   invoices it is for David to say.
 
+## Asked for on 2026-11-13
+
+### Move an invoice to another project — BUILT 2026-11-13 (finance_install_19, optional)
+
+David: *"can we add a new button in the edit to change this invoice to another project?"* In the
+invoice's edit row on a project's Invoices tab. Choices in DECISIONS 2026-11-13. Still open: the
+monthly invoice page (`finance_invoice.php`) can already re-point a line to another of the person's
+positions, but without the confirmation panel or the log; the move log is not shown anywhere yet
+(only the note is).
+
 ## Asked for on 2026-11-11
 
 ### Finance database updates from migrate.php — BUILT 2026-11-11 (no migration)

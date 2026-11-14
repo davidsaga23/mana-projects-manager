@@ -19,6 +19,7 @@ require_once __DIR__ . '/includes/stopcost.php';
 require_once __DIR__ . '/includes/budgetpool.php';
 require_once __DIR__ . '/includes/budget_lock.php';
 require_once __DIR__ . '/includes/step_variance.php';
+require_once __DIR__ . '/includes/invoice_move.php';
 require_admin();
 
 $projectId = (int)($_GET['project'] ?? $_GET['id'] ?? 0);
@@ -413,6 +414,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (trim((string)($in['crew_name'] ?? '')) !== '' && $sameSender) unset($t['crew_name']);
             $in = array_merge($in, $t);
             flash('ok', save_invoice($in, $project, $who));
+        } elseif (isset($_POST['move_invoice'])) {
+            // MOVE TO ANOTHER PROJECT (David, 2026-11-13), confirmed on the
+            // panel above the list. The invoice is updated in place and must be
+            // this show's; the target position is checked against the target
+            // show's own lanes. See includes/invoice_move.php.
+            $toId = (int)($_POST['to_project'] ?? 0);
+            $to = null;
+            foreach (invoice_move_projects($pdo, $projectId) as $s) if ((int)$s['id'] === $toId) $to = $s;
+            if (!$to) throw new RuntimeException('That project is not one an invoice can move to, so nothing was moved.');
+            $r = move_invoice((int)$_POST['move_invoice'], $project, $to,
+                              invoice_move_target($pdo, $toId, trim((string)($_POST['position'] ?? ''))), $who);
+            flash('ok', $r['message']);
+            if ($r['warn']) flash('warn', $r['warn']);
+            $selfUrl = 'finance_project.php?project=' . $projectId . '&tab=invoices';
         } elseif (isset($_POST['save_invoice'])) {
             flash('ok', save_invoice($_POST, $project, $who));
         } elseif (isset($_POST['save_invoice_notes'])) {
@@ -2230,6 +2245,12 @@ if ($retakePct <= 0):
 
 <h3>Invoices <span class="muted">· <?= count($invoices) ?></span></h3>
 
+<?php // "Move to another project…" in an edit row opens this confirmation step. ?>
+<?php $moveId = (int)($_GET['move_invoice'] ?? 0);
+      foreach ($moveId ? $invoices : [] as $iv) {
+          if ((int)$iv['id'] === $moveId) invoice_move_panel($pdo, $project, $iv, (int)($_GET['to'] ?? 0), $fxRates);
+      } ?>
+
 <?php if ($invoices): ?>
   <table>
     <thead>
@@ -2386,6 +2407,9 @@ if ($retakePct <= 0):
             <div class="invoice-edit-actions">
               <button type="submit">Save</button>
               <button type="button" class="secondary invoice-edit-cancel" data-invoice="<?= (int)$iv['id'] ?>">Cancel</button>
+              <?php // Recorded on the wrong show (David, 2026-11-13): moves it, in place. ?>
+              <a class="button secondary" href="?project=<?= $projectId ?>&amp;tab=invoices&amp;move_invoice=<?= (int)$iv['id'] ?>#move"
+                 title="Put this invoice on another project, keeping everything else about it">Move to another project…</a>
               <span class="muted small">Setting a paid date marks it paid; Paid with no date fills in today;
                 another status on a paid invoice clears its paid date.</span>
             </div>
