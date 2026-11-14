@@ -3790,6 +3790,42 @@ button.secondary.danger:hover { background: var(--danger-border); }
   background: var(--on-primary); color: var(--primary); border-color: var(--on-primary);
 }
 
+/* THE ADMIN / MORE MENU (David, 2026-11-13: "let's create a button that says
+   admin, inside that let's include all these tabs so we don't have such a busy
+   top bar"). The button is a .nav-board like its neighbours; the panel is
+   Spell's group menu (.board-group-pop): --surface-3 over --border-strong. */
+.nav-menu { position: relative; display: inline-block; margin-left: 6px; }
+/* A <button>, so the global button rule (margin-top, 15px type, solid blue)
+   has to be undone; .nav-board supplies the rest. */
+.nav-menu-btn { margin-top: 0; border: 0; font: inherit; font-weight: 600; cursor: pointer; gap: 6px; }
+.nav-menu-btn[aria-expanded="true"] { background: var(--primary-fill); color: var(--on-primary); }
+.nav-menu-btn .pending-badge { margin-left: 0; }
+.nav-menu-caret { opacity: .8; transition: transform var(--ease); }
+.nav-menu-btn[aria-expanded="true"] .nav-menu-caret { transform: rotate(180deg); }
+.nav-menu-panel {
+  position: absolute; z-index: 70; top: calc(100% + 8px); right: 0; min-width: 210px;
+  display: flex; flex-direction: column; padding: 5px;
+  background: var(--surface-3); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
+}
+.nav-menu-panel[hidden] { display: none; }
+.nav-menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 34px; padding: 7px 10px; border-radius: var(--radius-sm);
+  color: var(--text); font-size: 13px; text-decoration: none; white-space: nowrap;
+}
+.nav-menu-item:hover, .nav-menu-item:focus-visible { background: var(--surface-2); text-decoration: none; }
+.nav-menu-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* The page you are on, said the way the bar's buttons say it. */
+.nav-menu-item.is-on { background: var(--primary-tint); color: var(--primary); font-weight: 600; }
+.nav-menu-item.needs-action { color: var(--warn); font-weight: 600; }
+.nav-menu-sep { height: 1px; margin: 5px 4px; background: var(--border); }
+/* Same as the bell: a panel anchored to the right of the button runs off the
+   left edge once the bar wraps on a phone. */
+@media (max-width: 640px) {
+  .nav-menu-panel { position: fixed; top: 54px; left: 12px; right: 12px; min-width: 0; }
+}
+
 /* The per-group expand/collapse menu (2026-10-22). Quiet until pointed at:
    one of these sits on every group header and most of the time nobody wants it. */
 .board-group-menu { position: relative; margin-left: auto; }
