@@ -1988,7 +1988,7 @@ function whereWords(p) {
 function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
-  if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2><button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button></div><div class="rrows">';
+  if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2>'+(ST.chat.create?'<button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button>':'')+'</div><div class="rrows">';
     /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
@@ -2010,7 +2010,8 @@ function renderSide() {
    project"). A made channel of a show is listed indented under that show's own channel, which gets a
    small arrow to fold them away, as Slack's sections do; a folded show carries its channels' unread
    count on its own row. Studio-wide made channels follow the built-in ones. A private channel wears a
-   lock instead of "#". The server only ever sends the channels this person may read (includes/
+   lock instead of "#". The "+" is drawn only for Production and admins (David, 2026-11-13: "only
+   admins and prod can create channels"); the server refuses anybody else too. The server only ever sends the channels this person may read (includes/
    realm_made.php), so nothing here decides who sees what. Which shows are folded is remembered in
    this browser only. The "+" above, and the window it opens, are assets/realm_made.js. */
 var FOLD = (function () { try { return JSON.parse(localStorage.getItem('realmFold')||'{}') || {}; } catch (e) { return {}; } })();

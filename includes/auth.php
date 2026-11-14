@@ -610,12 +610,14 @@ function artist_may_post(): bool {
         // looks up the channel that message is in and asks
         // realm_channel_access() before anything is written, so a raven can only
         // be reacted to by its two people.
-        // `channel` (2026-11-13, migration 096): making a chat channel, or
-        // renaming, archiving, choosing the members of or leaving one. ⚠ THE
-        // ACTOR IS THE SESSION'S OWN ACCOUNT, and the channel id posted is looked
-        // up as that account sees it (realm_made_find()): a private channel they
-        // are not in answers "not there". Changing one is refused in
-        // realm_made_change() unless they made it, or can_edit()/is_admin().
+        // `channel` (2026-11-13, migration 096): for an artist, only LEAVING a
+        // private chat channel they are in; making one is refused in
+        // realm_made_create() unless can_edit()/is_admin() (David: "only admins
+        // and prod can create channels"). ⚠ THE ACTOR IS THE SESSION'S OWN
+        // ACCOUNT, and the channel id posted is looked up as that account sees it
+        // (realm_made_find()): a private channel they are not in answers "not
+        // there". Changing one is refused in realm_made_change() unless they made
+        // it, or can_edit()/is_admin().
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
                             'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
                             'buy', 'offer', 'offer_answer', 'react', 'channel'],

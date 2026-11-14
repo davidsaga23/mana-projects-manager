@@ -405,6 +405,8 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
     return ['channels' => realm_channels($pdo, $mayAnnounce, $uid), 'unread' => $unread,
             // May channels be made yet (migration 096)? The "+" beside CHANNELS says so if not.
             'make' => realm_made_available($pdo),
+            // May this person make one at all? Production and admins only (David, 2026-11-13).
+            'create' => realm_made_may_create(),
             'images' => realm_chat_images($pdo),
             // Threads (migration 095): may messages be replied to, and what is new in the ones I follow.
             'threads' => realm_threads_available($pdo), 'tunread' => $tunread];

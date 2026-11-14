@@ -22,12 +22,16 @@
 //   * FOR A SHOW: listed under that show's own channel, and only for people
 //     who may see that show (may_see_project()), public or private, the rule a
 //     show's own channel already follows.
-//   * WHO MAY DO WHAT (proposed to David, 2026-11-13; one place to change, see
-//     realm_made_may_manage()): anybody in the Realm may make a channel, public
-//     or private. The person who made it, and Production and admins, may rename
-//     it, change who is in it (private only) and archive it, but only a channel
-//     they can see: an admin who is not in a private channel cannot reach it.
-//     Anybody in a private channel may leave it, except the one who made it.
+//   * WHO MAKES CHANNELS: ONLY PRODUCTION AND ADMINS (David, 2026-11-13, on
+//     seeing the first version, where anybody could: "only admins and prod can
+//     create channels"). realm_made_may_create() is the one place that says so;
+//     the "+" is not even drawn for anybody else, and realm_made_create()
+//     refuses them whatever is posted.
+//   * WHO MAY CHANGE ONE (realm_made_may_manage()): the person who made it, and
+//     Production and admins, may rename it, change who is in it (private only)
+//     and archive it, but only a channel they can see: an admin who is not in a
+//     private channel cannot reach it. Anybody in a private channel may leave
+//     it, except the one who made it.
 //   * ARCHIVED: gone from the list and nobody writes in it, but nothing is
 //     deleted. Its messages are still found by the search and open from there.
 //
@@ -134,6 +138,14 @@ function realm_made_find(PDO $pdo, int $uid, string $channel): ?array {
 }
 
 /**
+ * May this person make a channel at all? Production and admins only (David,
+ * 2026-11-13: "only admins and prod can create channels").
+ */
+function realm_made_may_create(): bool {
+    return (function_exists('can_edit') && can_edit()) || (function_exists('is_admin') && is_admin());
+}
+
+/**
  * May this person rename, archive and choose the members of this channel? The
  * one who made it, or Production and admins. The channel came from
  * realm_made_find(), so they can already see it.
@@ -197,6 +209,8 @@ function realm_made_name_taken(PDO $pdo, int $uid, string $name, int $show, int 
  */
 function realm_made_create(PDO $pdo, int $uid, string $name, bool $private, int $show, string $memberIds): array {
     if (!realm_made_available($pdo)) return ['error' => 'New channels need a database update first. An administrator opens migrate.php once.'];
+    // ⚠ THE LOCK THAT COUNTS: the page hides the "+", this refuses the post.
+    if (!realm_made_may_create()) return ['error' => 'Only Production and admins can make channels.'];
     $name = realm_made_name($name);
     if ($name === '') return ['error' => 'Give the channel a name.'];
     if ($show > 0) {

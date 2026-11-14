@@ -60,7 +60,7 @@ function ticked() {
 /* ---------- a new channel ---------- */
 function openNew() {
   var c = chat();
-  if (!c) return;
+  if (!c || !c.create) return;
   if (!c.make) { toast('New channels need a database update first. An administrator opens migrate.php once.'); return; }
   /* Opened while a show's channel (or one of its own) is open: that show is chosen already. */
   var open = R.chat.open || '', pre = 0, m = /^project:(\d+)$/.exec(open);
