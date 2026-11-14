@@ -2016,12 +2016,13 @@ function whereWords(p) {
 function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
-  if (ST.chat) { h += '<div><h2>Channels</h2><div class="rrows">';
+  if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2>'+(ST.chat.create?'<button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button>':'')+'</div><div class="rrows">';
     /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
-    ST.chat.channels.forEach(function (c) { var n = c.id===CH.open ? 0 : (un[c.id]||0);
-      h += '<button type="button" class="rrow'+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"><span class="rhash">#</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>'; });
+    /* Saved for later (migration 096): my own list, opened by assets/realm_msgact.js. */
+    if (ST.chat.acts) h += '<button type="button" class="rrow" data-savedlist="1"><span class="rhash">&#9733;</span><span>Saved</span></button>';
+    h += chanRows(un);
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
@@ -2033,6 +2034,48 @@ function renderSide() {
     var nv = voiceOthers(o.id).length + (VO.on && S.inside===o.id?1:0);
     h += '<button type="button" class="rrow'+(S.sel===o.id?' is-on':'')+'" data-sel="'+esc(o.id)+'" data-center="1"><span>'+esc(o.name)+'</span>'+(n?'<small>'+n+' inside'+(nv?', '+nv+' in a call':'')+'</small>':'')+'</button>'; });
   $('side').innerHTML = h+'</div></div>';
+}
+/* CHANNELS PEOPLE MAKE (David, 2026-11-13, migration 097: "create new channels (public/private) and
+   ask if it's linked to a specific project so they can be nested inside the general channels for each
+   project"). A made channel of a show is listed indented under that show's own channel, which gets a
+   small arrow to fold them away, as Slack's sections do; a folded show carries its channels' unread
+   count on its own row. Studio-wide made channels follow the built-in ones. A private channel wears a
+   lock instead of "#". The "+" is drawn only for Production and admins (David, 2026-11-13: "only
+   admins and prod can create channels"); the server refuses anybody else too. The server only ever sends the channels this person may read (includes/
+   realm_made.php), so nothing here decides who sees what. Which shows are folded is remembered in
+   this browser only. The "+" above, and the window it opens, are assets/realm_made.js. */
+var FOLD = (function () { try { return JSON.parse(localStorage.getItem('realmFold')||'{}') || {}; } catch (e) { return {}; } })();
+function chanFold(id) {
+  if (FOLD[id]) delete FOLD[id]; else FOLD[id] = 1;
+  try { localStorage.setItem('realmFold',JSON.stringify(FOLD)); } catch (e) {}
+  renderSide();
+}
+var LOCK = '<svg viewBox="0 0 12 12" width="11" height="11" aria-label="Private"><rect x="2" y="5.2" width="8" height="5.8" rx="1.2" fill="currentColor"/><path d="M3.9 5.4V3.8a2.1 2.1 0 0 1 4.2 0v1.6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+function chanRow(c, un, sub, plus) {
+  var n = c.id===CH.open ? 0 : (un[c.id]||0)+(plus||0);
+  return '<button type="button" class="rrow'+(sub?' is-sub':'')+(CH.open===c.id?' is-on':'')+'" data-chat="'+esc(c.id)+'"'+(c.private?' title="Private channel"':'')+'><span class="rhash">'+(c.private?LOCK:'#')+'</span><span>'+esc(c.name)+'</span>'+(n?'<b class="rbadge">'+n+'</b>':'')+'</button>';
+}
+function chanRows(un) {
+  var list = ST.chat.channels, kids = {}, h = '', top = [], shows = [];
+  list.forEach(function (c) { if (c.made && c.show) (kids[c.show] = kids[c.show] || []).push(c); });
+  list.forEach(function (c) {
+    var m = /^project:(\d+)$/.exec(c.id);
+    if (m) shows.push(c);
+    /* A show's channel whose show has no channel of its own here stays at the top level. */
+    else if (!(c.made && c.show && list.some(function (x) { return x.id==='project:'+c.show; }))) top.push(c);
+  });
+  /* The built-in places first, then the studio-wide made ones, then each show with its own. */
+  top.forEach(function (c) { h += chanRow(c,un,false); });
+  shows.forEach(function (c) {
+    var pid = c.id.slice(8), mine = kids[pid] || [];
+    if (!mine.length) { h += chanRow(c,un,false); return; }
+    var shut = !!FOLD[c.id], extra = 0;
+    if (shut) mine.forEach(function (k) { if (k.id!==CH.open) extra += un[k.id]||0; });
+    var row = chanRow(c,un,false,extra);
+    h += '<div class="rchgroup"><button type="button" class="rfold'+(shut?' is-shut':'')+'" data-chanfold="'+esc(c.id)+'" aria-expanded="'+(!shut)+'" aria-label="'+(shut?'Show':'Hide')+' the channels of '+esc(c.name)+'"><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+row+'</div>';
+    if (!shut) mine.forEach(function (k) { h += chanRow(k,un,true); });
+  });
+  return h;
 }
 function renderCard() {
   var slot = $('cardslot'), id = S.sel, o = B[id], h = '';
@@ -2106,6 +2149,8 @@ function applyState(st) {
   takeKnocks(st.knocks);
   /* Praise, mana and gold live in assets/realm_praise.js; it is told whenever the map changes. */
   if (R.onState) R.onState(ST);
+  /* Reminders on saved messages that rang on this beat (migration 096): assets/realm_msgact.js. */
+  if (st.reminders && R.onReminders) R.onReminders(st.reminders);
   takeSpots(st.spots);
   skyNews();
 }
@@ -2272,6 +2317,7 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#chatWide')) chatWide(!CH.wide);
   else if ((b = t.closest('[data-thread]'))) openThread(+b.getAttribute('data-thread'),b.getAttribute('data-thchan')||CH.open);
   else if (t.closest('[data-threads]')) openThreads();
+  else if ((b = t.closest('[data-chanfold]'))) chanFold(b.getAttribute('data-chanfold'));
   else if (t.closest('#chatBack')) chatBack();
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
   else if (t.closest('[data-chatclose]')) closeChat();
@@ -2323,7 +2369,7 @@ document.addEventListener('click',function (e) {
    between two people. An open conversation asks for anything new every 3 seconds and stops asking
    while the window is hidden; unread counts for everything else ride on the 25-second heartbeat.
    ST.chat is null until the migration has run, and then none of this draws. */
-var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false,thread:0,from:'',first:0};
+var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false,thread:0,from:'',first:0,keep:false};
 /* THREADS (David, 2026-11-13: "reply to one message without flooding the channel; long channels
    get unreadable without them"), migration 095. CH.thread is the message whose thread the panel
    shows (0: the channel itself); CH.from is where its back arrow returns ('' the channel, THREADS
@@ -2358,7 +2404,8 @@ function chanTitle(id) {
   var m = /^dm:(\d+):(\d+)$/.exec(id);
   if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
   var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
-  return c ? c.name : 'Chat';
+  /* An archived channel (migration 097) is not in the list; opened from a search, its name came with the answer. */
+  return c ? c.name : ((R.chanName && R.chanName(id)) || 'Chat');
 }
 /* The conversation that belongs to a building: a place's channel, or ravens with a house's owner. */
 function chanFor(placeId) {
@@ -2450,11 +2497,48 @@ function msgHTML(m) {
      has; a reply that was also sent to the channel says what it answers. In a thread, the first
      message is drawn apart from its replies. */
   var top = !m.parent && threadsOn(), inThread = !!CH.thread;
-  var reply = top && !inThread ? '<button type="button" class="rreply" data-thread="'+m.id+'" title="Reply in thread" aria-label="Reply in thread"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 6h6M5 8.2h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>' : '';
   var from = m.parent && m.also ? (inThread ? '<small class="rthrfrom">Also sent to the channel</small>' : '<button type="button" class="rthrfrom" data-thread="'+m.parent+'">Replied in a thread: &ldquo;'+esc(m.about)+'&rdquo;</button>') : '';
   var foot = top && !inThread ? '<div class="rthrslot" data-thrslot="'+m.id+'">'+thrFoot(m.id)+'</div>' : '';
-  var h = '<div class="rmsg'+(m.mine?' is-mine':'')+(inThread && m.id===CH.thread?' is-parent':'')+'" data-msg="'+(+m.id)+'"><div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small>'+reply+'</div>'+from+(m.body?'<div class="rmsgbody">'+rich(m.body)+'</div>':'')+pic+foot+'</div>';
+  /* MESSAGE ACTIONS (David, 2026-11-13, migration 096: "let's add these same features from slack so
+     the transition is smoother"). A deleted message keeps its place and says so; an edited one says
+     "(edited)"; a forwarded copy quotes the original under "Forwarded from". The bar of actions is
+     drawn here and worked by assets/realm_msgact.js (and its reactions by assets/realm_react.js). */
+  var body = m.deleted ? '<div class="rmsgbody rdeleted">This message was deleted.</div>' : (m.body ? '<div class="rmsgbody">'+rich(m.body)+'</div>' : '');
+  var main = m.fwd ? '<div class="rfwd"><small class="rfwdfrom">Forwarded from '+esc(m.fwd.where)+' &middot; '+esc(m.fwd.name)+(m.fwd.at ? ' &middot; '+esc(m.fwd.at) : '')+'</small>'+body+pic+'</div>' : body+(m.deleted ? '' : pic);
+  var cls = 'rmsg'+(m.mine?' is-mine':'')+(m.deleted?' is-deleted':'')+(inThread && m.id===CH.thread?' is-parent':'');
+  var h = '<div class="'+cls+'" data-msg="'+(+m.id)+'" data-v="'+esc(m.v||'')+'"'+(m.fwd?' data-fwd="1"':'')+' tabindex="0">'+(m.deleted ? '' : barHTML(m, top && !inThread))
+        +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main+foot+'</div>';
   return inThread && m.id===CH.thread ? h+'<p class="rthrline" id="thrLine">Replies</p>' : h;
+}
+/* THE BAR OVER A MESSAGE, in Slack's order: three quick reactions (my three most used, from the
+   Realm's six), add a reaction, reply in thread, forward, save for later, and More. Shown while the
+   pointer is over the message or it has the keyboard's focus (assets/realm.css), and on a touch
+   screen when the message is tapped. Reactions show only once the server says they exist (the
+   box carries .has-react, set by assets/realm_react.js); forward and save only after migration 096. */
+var BAR_ICON = {
+  react:'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="7" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="6.8" r=".9" fill="currentColor"/><circle cx="8.8" cy="6.8" r=".9" fill="currentColor"/><path d="M4.8 9.6q2.2 2 4.4 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13.5 1.5v4M11.5 3.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  thread:'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 6h6M5 8.2h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  fwd:'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M9.5 3l4 3.8-4 3.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.2 6.8H7.5q-4.5 0-4.5 4.7v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  save:'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5.5v3.2l2 1.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 2.6l1.6-1.1M13 2.6l-1.6-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  more:'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="3.5" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="12.5" r="1.4" fill="currentColor"/></svg>'
+};
+/* My three quick reactions: the ones I use most, filled up from Slack's habit (thumbs up first). The
+   set and its pictures belong to assets/realm_react.js (R.reactSet). */
+var QUICK_FALLBACK = ['up','thanks','party'];
+function quickReacts() {
+  var by = {}; (R.reactSet || []).forEach(function (x) { by[x.k] = x; });
+  var out = ((ST.chat && ST.chat.favs) || []).filter(function (k) { return by[k]; });
+  QUICK_FALLBACK.forEach(function (k) { if (out.length < 3 && by[k] && out.indexOf(k) < 0) out.push(k); });
+  return out.slice(0,3).map(function (k) { return by[k]; });
+}
+function barHTML(m, canThread) {
+  var b = function (cls, attrs, label, inner) { return '<button type="button" class="'+cls+'" '+attrs+' title="'+label+'" aria-label="'+label+'">'+inner+'</button>'; };
+  var h = quickReacts().map(function (x) { return b('rbarq rbar-r','data-react="'+x.k+'"','React with '+esc(x.n),x.e); }).join('');
+  h += b('rbar-r','data-reactadd="1"','Add a reaction',BAR_ICON.react);
+  if (canThread) h += b('','data-thread="'+m.id+'"','Reply in thread',BAR_ICON.thread);
+  if (ST.chat && ST.chat.acts) h += b('','data-act="fwd"','Forward message',BAR_ICON.fwd)+b('','data-act="save"','Save for later or remind me',BAR_ICON.save);
+  h += b('','data-act="more" aria-haspopup="menu"','More actions',BAR_ICON.more);
+  return '<div class="rmsgbar" role="toolbar" aria-label="Message actions">'+h+'</div>';
 }
 function threadsOn() { return !!(ST.chat && ST.chat.threads); }
 /* What is new for me in one thread I follow; and in all of them, for the Threads row. */
@@ -2499,10 +2583,13 @@ function chatTake(j) {
   if (CH.thread && $('thrLine')) { var nr = box.querySelectorAll('.rmsg').length-1; $('thrLine').textContent = nr ? nr+(nr===1?' reply':' replies') : 'No replies yet. Write the first.'; }
   if (FIND.jump) findLand(fresh);
   CH.seen = true;
+  /* Edits, deletions and what I saved (migration 096): assets/realm_msgact.js. Before the reactions,
+     so a redrawn message gets its reactions back at once. */
+  if (R.onActs) R.onActs(j);
   /* Reactions on the messages (migration 093) are drawn by assets/realm_react.js. */
   if (R.onChat) R.onChat(j);
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
-  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : 'Only Production writes here';
+  if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : (j.chan && j.chan.archived ? 'This channel is archived' : 'Only Production writes here');
   if ($('chatAlsoRow')) $('chatAlsoRow').hidden = !(CH.thread && j.can_post);
   if (j.unread) takeUnread(j.unread,j.tunread);
   paintThreads();
@@ -2536,12 +2623,12 @@ function chatAsk() {
       .then(function (r) { return r.json(); }).then(threadsTake).catch(function () { CH.busy = false; });
     return;
   }
-  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(CH.thread ? '&thread='+CH.thread : (FIND.jump && !CH.last ? '&at='+FIND.jump : '')),{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(CH.keep ? '&keep=1' : '')+(CH.thread ? '&thread='+CH.thread : (FIND.jump && !CH.last ? '&at='+FIND.jump : '')),{credentials:'same-origin',headers:{'Accept':'application/json'}})
     .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
 }
 /* Show a conversation in the panel: a channel (thread 0), one message's thread, or the list. */
 function chatShow(id, thread, from) {
-  CH.open = id; CH.thread = thread||0; CH.from = from||''; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; TH.counts = {}; setPick(null); sugClose();
+  CH.open = id; CH.thread = thread||0; CH.from = from||''; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; CH.keep = false; TH.counts = {}; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); chatMode(); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw();
   if (id!==THREADS) $('chatInput').focus();
@@ -2618,7 +2705,7 @@ if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
   var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open || CH.open===THREADS) return;
   var also = !!(CH.thread && $('chatAlso') && $('chatAlso').checked), thread = CH.thread;
-  inp.value = ''; CH.busy = true; sugClose(); setPick(null);
+  inp.value = ''; CH.busy = true; CH.keep = false; sugClose(); setPick(null);
   /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end
      of the conversation (the bottom) so we can see what's the last thing we sent"). Before, the list
      only followed new messages if you were already near the bottom, so after scrolling up to read,
@@ -3593,6 +3680,14 @@ R.fxAt = fxAt;
 /* What assets/realm_react.js borrows: the open conversation (which one, what is on screen) and the
    one place an answer about it is taken in, so a reaction's answer is drawn like any other. */
 R.chat = CH; R.chatTake = chatTake;
+/* What assets/realm_msgact.js borrows (migration 096): drawing a message again after an edit, opening
+   a conversation at one message (as a search result does), names for the forward list, and the map's
+   current state (channels, people). */
+R.msgHTML = msgHTML; R.findOpen = findOpen; R.chanTitle = chanTitle; R.dmId = dmId; R.st = function () { return ST; };
+/* What assets/realm_made.js borrows (channels people make, migration 097): the state as it is now
+   (ST is replaced by every heartbeat), a way to take in a new channel list, and opening one. */
+R.now = function () { return ST; }; R.openChat = openChat; R.closeChat = closeChat;
+R.takeChat = function (c) { if (!c || !ST) return; if (ST.chat && ST.chat.unread && !c.unread) c.unread = ST.chat.unread; ST.chat = c; renderSide(); badge(); };
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
 rebuildBuildings();

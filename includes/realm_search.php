@@ -53,7 +53,11 @@ function realm_search_indexed(PDO $pdo): bool {
  */
 function realm_search_places(PDO $pdo, int $uid, bool $mayAnnounce): array {
     $out = [];
-    foreach (realm_channels($pdo, $mayAnnounce) as $c) $out[(string)$c['id']] = (string)$c['name'];
+    // Archived made channels too (migration 097): archiving keeps the history
+    // findable. Private ones only for their members, as realm_channels() decides.
+    foreach (realm_channels($pdo, $mayAnnounce, $uid, true) as $c) {
+        $out[(string)$c['id']] = (string)$c['name'] . (!empty($c['archived']) ? ' (archived)' : '');
+    }
     // My ravens: one per other person who lives in the Realm, which is the rule
     // realm_channel_access() opens a raven by.
     $q = $pdo->prepare('SELECT rp.user_id, u.display_name, u.username, c.name AS crew_name

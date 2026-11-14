@@ -217,89 +217,105 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       <?php if (function_exists('feature_on') && feature_on('commercial') && can_edit()): ?>
       <a href="commercial.php" class="nav-board<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'commercial.php' ? ' is-on' : '' ?>">Commercial</a>
       <?php endif; ?>
-      <?php // TASKS, next to My tasks and not inside a project, because the
-            // question it answers spans them: "what is open everywhere, and how
-            // are we doing across the shows" (David, 2026-10-07). Same reasoning
-            // as Artists and Bookings — a thing about ALL the work does not
-            // belong behind a choice of one show.
-            //
-            // ⚠ "PROJECTS" WAS HERE AND IS GONE (David, same day: "we can delete
-            // the projects menu next to my tasks, we can always go back with home
-            // or changing projects"). The brand at the top left IS the link to
-            // the project list — it always has been, on every screen — and the
-            // breadcrumb inside a project says "Projects /" as well, so the list
-            // had three ways to reach it and one of them was a word in a row of
-            // four. Check the brand is still a link before adding a fourth item
-            // back here. ?>
-      <?php if ($fa('studio_tasks')): ?> · <a href="alltasks.php">Studio Tasks</a><?php endif; ?>
-      <?php // ARTISTS is up here, not inside a project, because a freelancer is
-            // not the property of the show that first spoke to them — the whole
-            // value of writing them down is that the NEXT show can find them.
-            // Same reasoning as the step library and the ideal quotas.
-            //
-            // A third link rather than a fourth: what is on my desk, the shows,
-            // and the people. Everything about one show is still reached by
-            // picking it from Projects. ?>
-      <?php if ($fa('artists')): ?> · <a href="artists.php">Artists pool</a><?php endif; ?>
-      <?php // BOOKINGS beside Artists (David, 2026-09-21): the same people, seen
-            // across every show at once, who is needed where and when two shows
-            // want the same person. Up here for the reason Artists is: it is
-            // about no one show, so no show's tabs could hold it. ?>
-      <?php if ($fa('bookings')): ?> · <a href="bookings.php">Bookings</a><?php endif; ?>
-
-      <?php // THE RECORDS. David, 2026-09-01: "I'll need from time to time, to
-            // check the records and see what we used to charge certain slots or
-            // quotas." Both sit beside Artists rather than inside a project for
-            // the same reason it does — the value of a record is that the NEXT
-            // show can read it, and neither is about any one show.
-            //
-            // Two links rather than one History page with tabs, because they are
-            // reached for separately: a quota is a production question asked
-            // while planning, a fee is a money question asked while budgeting.
-            //
-            // Fees are admin-only, like every other screen carrying a rate.
-            // Quotas are not: days per item and headcount are production facts. ?>
-      <?php if ($fa('quotas')): ?> · <a href="history_quotas.php">Historic quotas</a><?php endif; ?>
-      <?php if (is_admin()): ?>
-        · <a href="history_fees.php">Historic fees</a>
-      <?php endif; ?>
-
       <?php
-      // The setup and housekeeping screens, behind a separator. Opened
-      // occasionally rather than daily — the same split project_nav() makes
-      // between its work tabs and its data tabs.
+      // ⚠ THE ADMIN MENU (David, 2026-11-13: "let's create a button that says
+      // admin, inside that let's include all these tabs so we don't have such a
+      // busy top bar"). The plain links that used to trail the buttons are now
+      // one dropdown. Only the PRESENTATION moved: every link below keeps the
+      // exact switch and permission check it had as a bare link, so the menu
+      // offers precisely what the bar used to, person by person.
       //
-      // Nothing about a PROJECT belongs down here. Everything that is about one
-      // show is reached by picking it from Projects and choosing a section
-      // inside it; what is left in this group is the application itself —
-      // accounts, mail, the database.
+      // Three groups, divided by a line: the studio pages, the admin tools, and
+      // you (Tour, Log out). Built as a list first so an empty group draws no
+      // divider and an empty menu draws no button at all.
+      //
+      // "Admin" only for an admin. Anybody else gets the same menu with only
+      // their links, called "More": an artist has Tour and Log out, and a
+      // button saying Admin over those would promise something it cannot keep.
+      $navHere = basename($_SERVER['SCRIPT_NAME'] ?? '');
+      $navGroups = [[], [], []];
+
+      // TASKS, not inside a project, because the question it answers spans
+      // them: "what is open everywhere, and how are we doing across the shows"
+      // (David, 2026-10-07). ⚠ "PROJECTS" WAS ONCE BESIDE IT AND IS GONE (same
+      // day): the brand at the top left IS the link to the project list, on
+      // every screen. Check it still is before adding a Projects link back.
+      if ($fa('studio_tasks')) $navGroups[0][] = ['href' => 'alltasks.php', 'label' => 'Studio Tasks'];
+      // ARTISTS, not inside a project, because a freelancer is not the property
+      // of the show that first spoke to them: the value of writing them down is
+      // that the NEXT show can find them.
+      if ($fa('artists')) $navGroups[0][] = ['href' => 'artists.php', 'label' => 'Artists pool'];
+      // BOOKINGS (David, 2026-09-21): the same people across every show at once.
+      if ($fa('bookings')) $navGroups[0][] = ['href' => 'bookings.php', 'label' => 'Bookings'];
+      // THE RECORDS (David, 2026-09-01: "check the records and see what we used
+      // to charge certain slots or quotas"). Two links, because a quota is a
+      // production question and a fee a money one. Fees are admin-only, like
+      // every screen carrying a rate; quotas are production facts.
+      if ($fa('quotas')) $navGroups[0][] = ['href' => 'history_quotas.php', 'label' => 'Historic quotas'];
+      if (is_admin()) $navGroups[0][] = ['href' => 'history_fees.php', 'label' => 'Historic fees'];
+
+      // The application itself: accounts, mail, the database, the reports.
+      // USERS for Production too (David, 2026-11-05), through its switch.
+      // Email and Migrations stay admin-only and are not switches.
+      if ($fa('users') && (is_admin() || can_edit())) $navGroups[1][] = ['href' => 'users.php', 'label' => 'Users'];
+      if (is_admin()) {
+          $navGroups[1][] = ['href' => 'smtp_test.php', 'label' => 'Email'];
+          $navGroups[1][] = ['href' => 'migrate.php', 'label' => 'Migrations',
+              'badge' => (int)$pendingMigrations, 'badgeTitle' => 'Database updates waiting',
+              'warn' => $pendingMigrations > 0];
+      }
+      // BUGS: an admin reads every report here, anyone else the ones they
+      // filed. Filing one is the 🐞 button at the bottom right, not this link.
+      if ($fa('bugs_list') && isset($pdo) && $pdo instanceof PDO && bugs_available($pdo)) {
+          $navGroups[1][] = ['href' => 'bugs.php', 'label' => 'Bugs',
+              'badge' => (int)$openBugs, 'badgeTitle' => 'Open bug reports'];
+      }
+
+      // Tour carries this page's own address (?tour=0), so it is never marked
+      // as the current page even though its file name matches.
+      if ($fa('tour')) $navGroups[2][] = ['href' => tour_link(), 'label' => 'Tour',
+          'title' => 'Show the guided tour again', 'noHere' => true];
+      $navGroups[2][] = ['href' => 'logout.php', 'label' => 'Log out'];
+
+      $navGroups = array_values(array_filter($navGroups));
+      // What the CLOSED button still owes you: the counts that used to sit in
+      // the bar (pending migrations, open bugs), and whether you are on one of
+      // its pages, so "where am I" survives the links being tucked away.
+      $navBadge = 0; $navOn = false; $navBadgeTitles = [];
+      foreach ($navGroups as $g) {
+          foreach ($g as $it) {
+              if (!empty($it['badge'])) {
+                  $navBadge += $it['badge'];
+                  $navBadgeTitles[] = $it['badge'] . ' ' . strtolower($it['badgeTitle']);
+              }
+              if (empty($it['noHere']) && basename((string)parse_url($it['href'], PHP_URL_PATH)) === $navHere) $navOn = true;
+          }
+      }
       ?>
-      <span class="nav-sep" aria-hidden="true">|</span>
-      <?php // USERS for Production too (David, 2026-11-05), through its switch.
-            // Email and Migrations stay admin-only and are not switches. ?>
-      <?php if ($fa('users') && (is_admin() || can_edit())): ?>
-        <a href="users.php">Users</a>
+      <?php if ($navGroups): ?>
+      <div class="nav-menu" id="navMenu">
+        <button type="button" class="nav-board nav-menu-btn<?= $navOn ? ' is-on' : '' ?>" id="navMenuBtn"
+                aria-haspopup="true" aria-expanded="false" aria-controls="navMenuPanel"><?= is_admin() ? 'Admin' : 'More' ?><?php
+          if ($navBadge > 0): ?><span class="pending-badge" title="<?= e(implode(', ', $navBadgeTitles)) ?>"><?= (int)$navBadge ?></span><?php endif;
+          ?><svg class="nav-menu-caret" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false"><path fill="currentColor" d="M1.5 3.5h7L5 7.5z"/></svg></button>
+        <div class="nav-menu-panel" id="navMenuPanel" hidden>
+          <?php foreach ($navGroups as $gi => $g): ?>
+            <?php if ($gi > 0): ?><div class="nav-menu-sep" role="separator"></div><?php endif; ?>
+            <?php foreach ($g as $it):
+                $itOn = empty($it['noHere']) && basename((string)parse_url($it['href'], PHP_URL_PATH)) === $navHere; ?>
+              <a href="<?= e($it['href']) ?>" class="nav-menu-item<?= $itOn ? ' is-on' : '' ?><?= !empty($it['warn']) ? ' needs-action' : '' ?>"<?=
+                 $itOn ? ' aria-current="page"' : '' ?><?= !empty($it['title']) ? ' title="' . e($it['title']) . '"' : '' ?>><?= e($it['label']) ?><?php
+                 if (!empty($it['badge'])): ?><span class="pending-badge" title="<?= e($it['badgeTitle']) ?>"><?= (int)$it['badge'] ?></span><?php endif; ?></a>
+            <?php endforeach; ?>
+          <?php endforeach; ?>
+        </div>
+      </div>
       <?php endif; ?>
-      <?php if (is_admin()): ?>
-        · <a href="smtp_test.php">Email</a>
-        · <a href="migrate.php" class="<?= $pendingMigrations > 0 ? 'needs-action' : '' ?>">Migrations<?php
-             if ($pendingMigrations > 0): ?><span class="pending-badge"><?= $pendingMigrations ?></span><?php endif;
-           ?></a>
-      <?php endif; ?>
-      <?php // BUGS: an admin reads every report here, anyone else the ones they
-            // filed. Admin and Production by default since 2026-11-05 (the
-            // "Bugs list" switch). Filing one is the 🐞 button at the bottom
-            // right of every screen, a switch of its own that stays on for
-            // everyone, not this link. ?>
-      <?php if ($fa('bugs_list') && isset($pdo) && $pdo instanceof PDO && bugs_available($pdo)): ?>
-        · <a href="bugs.php">Bugs<?php if ($openBugs > 0): ?><span class="pending-badge"
-             title="Open bug reports"><?= $openBugs ?></span><?php endif; ?></a>
-      <?php endif; ?>
-      <?php if ($fa('tour')): ?>· <a href="<?= e(tour_link()) ?>" title="Show the guided tour again">Tour</a><?php endif; ?>
-      · <a href="logout.php">Log out</a>
     </div>
   </div>
 <?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
+<?php // The Admin / More menu above: open, close, keys. Tiny, no library. ?>
+<script defer src="assets/nav-menu.js<?= asset_ver('nav-menu.js') ?>"></script>
 <?php // The unread count on the Realm button, kept fresh (David, 2026-11-12: "I need to be
       // on that page"). Only for somebody who has the Realm; see assets/realm-nudge.js. ?>
 <?php if (function_exists('feature_on') && feature_on('realm')): ?><script defer src="assets/realm-nudge.js<?= asset_ver('realm-nudge.js') ?>"></script><?php endif; ?>

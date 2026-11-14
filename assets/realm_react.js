@@ -7,8 +7,8 @@
    (window.REALM.chatTake) from assets/realm.js, which calls REALM.onChat with every answer.
 
    WHAT IS HERE.
-   - A small "react" button on every message, shown while the pointer is over it (always, faintly,
-     on a touch screen, which has no pointer to hover with). It opens a row of six reactions: a
+   - An "add reaction" button and three quick reactions in the bar over every message (since
+     2026-11-13, migration 096; drawn by assets/realm.js). The button opens a row of six reactions: a
      fixed set, not a full emoji picker, to keep it light and in keeping with the pixel look.
    - Under a message, a chip for each reaction given: the emoji and how many, lit when one of them
      is mine. Clicking a chip gives or takes back mine; hovering it says who.
@@ -35,6 +35,9 @@ var SET = [
   {k:'thanks', e:'🙏', n:'thanks'}
 ];
 var BY = {}; SET.forEach(function (x) { BY[x.k] = x; });
+/* The bar over each message (assets/realm.js, barHTML; migration 096) shows three of these as quick
+   reactions, so it reads the set from here rather than keeping a second copy. */
+R.reactSet = SET;
 
 var ON = false;     // has the server said reactions exist?
 var NOW = {};       // message id => the list the server last sent for it
@@ -54,16 +57,18 @@ function chipsHTML(rs) {
     return '<button type="button" class="rreact'+(r.mine?' is-mine':'')+'" data-react="'+esc(r.e)+'" aria-pressed="'+(r.mine?'true':'false')+'" title="'+esc(say)+'" aria-label="'+esc(say)+'"><span aria-hidden="true">'+x.e+'</span><b>'+(+r.n)+'</b></button>';
   }).join('');
 }
-var ADD = '<button type="button" class="rreactadd" data-reactadd="1" title="React" aria-label="React to this message"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="7" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.2" cy="6.8" r=".9" fill="currentColor"/><circle cx="8.8" cy="6.8" r=".9" fill="currentColor"/><path d="M4.8 9.6q2.2 2 4.4 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13.5 1.5v4M11.5 3.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>';
+/* (The add-reaction button itself is drawn in the bar over each message: assets/realm.js, barHTML.) */
 
 /* Draw what is known onto every message on screen. Only a message whose reactions changed is
    touched, so a chip under the pointer is not replaced every 3 seconds for nothing. */
 function paint() {
   var box = $('chatMsgs'); if (!box) return;
+  /* The "react" buttons now live in the bar over each message (assets/realm.js, barHTML; David,
+     2026-11-13: "let's add these same features from slack"). They are drawn always and shown only
+     while the box carries .has-react, which is the server saying reactions exist. */
+  box.classList.toggle('has-react', ON);
   Array.prototype.forEach.call(box.querySelectorAll('.rmsg[data-msg]'), function (el) {
-    var add = el.querySelector(':scope > .rreactadd');
-    if (!ON) { if (add) add.remove(); var old = el.querySelector(':scope > .rreacts'); if (old) old.remove(); return; }
-    if (!add) el.insertAdjacentHTML('beforeend', ADD);
+    if (!ON) { var old = el.querySelector(':scope > .rreacts'); if (old) old.remove(); return; }
     var h = chipsHTML(NOW[el.getAttribute('data-msg')]), row = el.querySelector(':scope > .rreacts');
     if (row && row.getAttribute('data-h') === h) return;
     if (!h) { if (row) row.remove(); return; }

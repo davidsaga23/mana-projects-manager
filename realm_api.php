@@ -31,6 +31,7 @@
 // POST offer_answer=<offer id>&say=accept|decline|agree|cancel&item=
 //                                         the next step of an offer I made or was made (includes/realm_trade.php)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
+// POST channel=new|rename|members|archive|leave  make or change a chat channel (further down, migration 097)
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -419,14 +420,122 @@ if (isset($_GET['search'])) {
     }
     exit;
 }
+// ---- channels people make (David, 2026-11-13, migration 097) ---------------
+// POST channel=new&name=&private=0|1&show=<project id, 0 for studio-wide>&members=3,7
+// POST channel=rename&id=ch:<n>&name=
+// POST channel=members&id=ch:<n>&add=3,7&remove=9     (a private channel only)
+// POST channel=archive&id=ch:<n>
+// POST channel=leave&id=ch:<n>                        (leave a private channel I am in)
+// The answer is the channel list again (`chat`), and, for a channel that is
+// still mine to read, its `info`. The rules, and who may do what, are in
+// includes/realm_made.php. ⚠ `channel` IS IN artist_may_post(): the actor is the
+// session's own account, and every id is looked up as that account sees it, so
+// a private channel somebody is not in cannot be named, changed or left.
+if (isset($_POST['channel'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $what = (string)$_POST['channel'];
+        $id = (string)($_POST['id'] ?? '');
+        $bad = '';
+        if ($what === 'new') {
+            $made = realm_made_create($pdo, $uid, (string)($_POST['name'] ?? ''), (string)($_POST['private'] ?? '0') === '1',
+                                      max(0, (int)($_POST['show'] ?? 0)), (string)($_POST['members'] ?? ''));
+            $bad = (string)($made['error'] ?? '');
+            $id = (string)($made['id'] ?? '');
+        } else {
+            $bad = realm_made_change($pdo, $uid, $id, $what, $_POST);
+        }
+        $answer = ['ok' => true, 'chat' => realm_chat_summary($pdo, $uid, $mayAnnounce)];
+        if ($id !== '' && ($info = realm_made_info($pdo, $uid, $id)) !== null) { $answer['id'] = $id; $answer['info'] = $info; }
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The channel could not be saved. Try again in a moment.']);
+    }
+    exit;
+}
+
+// ---- Slack's message actions (David, 2026-11-13, migration 096) ---------------
+// "let's add these same features from slack so the transition is smoother".
+// GET  msg_where=<message id>             where a message is: a copied link, or the
+//                                         bell's reminder, opens the Realm there
+// GET  saved=1                            my saved messages ("Saved")
+// POST save_msg=<message id>&remind=20m|1h|3h|tomorrow|''
+//                                         save it for later, or change its reminder
+// POST unsave_msg=<message id>            take it out of my saved list
+// POST forward=<message id>&to=<channel>&note=
+//                                         forward it to a channel or raven I write in
+// (Editing, deleting and "mark unread" are further down, with the chat: their
+// answer is the conversation itself.)
+//
+// ⚠ EVERY ONE NAMES A MESSAGE. Whether I may read it is asked of the channel
+// the message is really in; forward also asks whether I may write where it goes
+// (realm_forward()). The saved list is only ever the session's own account.
+if (isset($_GET['msg_where']) || isset($_GET['saved']) || isset($_POST['save_msg']) || isset($_POST['unsave_msg']) || isset($_POST['forward'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        if (isset($_GET['saved'])) {
+            echo json_encode(realm_msgact_available($pdo)
+                ? ['ok' => true, 'list' => realm_saved_list($pdo, $uid, $mayAnnounce), 'remind' => REALM_REMIND]
+                : ['ok' => false, 'error' => 'Saving needs a database update first. An administrator opens migrate.php once.']);
+            exit;
+        }
+        $id = (int)($_GET['msg_where'] ?? ($_POST['save_msg'] ?? ($_POST['unsave_msg'] ?? ($_POST['forward'] ?? 0))));
+        $where = realm_message_channel($pdo, $id);
+        if ($where === '' || !realm_channel_access($pdo, $uid, $where, $mayAnnounce)['read']) {
+            // The same answer for "not there" and "not yours": a raven between two
+            // other people must not be told apart from a message that never was.
+            echo json_encode(['ok' => false, 'error' => 'That message is not there, or not yours to read.']);
+            exit;
+        }
+        if (isset($_GET['msg_where'])) {
+            $thread = 0;
+            if (realm_threads_available($pdo)) {
+                $q = $pdo->prepare('SELECT IF(also_channel = 1, 0, COALESCE(parent_id, 0)) FROM realm_messages WHERE id = ?');
+                $q->execute([$id]);
+                $thread = (int)$q->fetchColumn();
+            }
+            echo json_encode(['ok' => true, 'id' => $id, 'channel' => $where, 'thread' => $thread]);
+            exit;
+        }
+        if (isset($_POST['forward'])) {
+            $bad = realm_forward($pdo, $uid, $id, (string)($_POST['to'] ?? ''), (string)($_POST['note'] ?? ''), $mayAnnounce);
+            echo json_encode($bad === '' ? ['ok' => true, 'to' => (string)($_POST['to'] ?? '')] : ['ok' => true, 'error' => $bad]);
+            exit;
+        }
+        if (isset($_POST['unsave_msg'])) {
+            realm_unsave_message($pdo, $uid, $id);
+            echo json_encode(['ok' => true, 'id' => $id, 'saved' => false]);
+            exit;
+        }
+        $bad = realm_save_message($pdo, $uid, $id, (string)($_POST['remind'] ?? ''));
+        $here = $bad === '' ? realm_saved_here($pdo, $uid, $where, $id) : [];
+        echo json_encode($bad === '' ? ['ok' => true, 'id' => $id, 'saved' => true, 'remind' => (string)($here[(string)$id] ?? '')]
+                                     : ['ok' => true, 'error' => $bad]);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'That could not be saved. Try again in a moment.']);
+    }
+    exit;
+}
+
 // ⚠ A REACTION NAMES A MESSAGE, NEVER A CHANNEL. The channel is the one that
 // message is really in, so the access check below is asked about the right
-// conversation whatever id is posted.
+// conversation whatever id is posted. The same for editing, deleting and
+// "mark unread" (migration 096): $actOn is the message, and only its own
+// channel is ever checked.
 $reactTo = isset($_POST['react']) ? (int)$_POST['react'] : 0;
+$actOn = (int)($_POST['edit_msg'] ?? ($_POST['delete_msg'] ?? ($_POST['unread_from'] ?? 0)));
 $channel = isset($_POST['say']) ? (string)$_POST['say']
          : (isset($_POST['react']) ? realm_message_channel($pdo, $reactTo)
-         : (isset($_GET['chat']) ? (string)$_GET['chat'] : ''));
-if (isset($_POST['react']) && $channel === '') {
+         : ($actOn > 0 ? realm_message_channel($pdo, $actOn)
+         : (isset($_GET['chat']) ? (string)$_GET['chat'] : '')));
+if ((isset($_POST['react']) || isset($_POST['edit_msg']) || isset($_POST['delete_msg']) || isset($_POST['unread_from'])) && $channel === '') {
     echo json_encode(['ok' => true, 'error' => 'That message is no longer there.']);
     exit;
 }
@@ -457,7 +566,8 @@ if ($channel !== '') {
         $said = '';
         if (isset($_POST['say'])) {
             if (!$may['post']) {
-                $said = 'Only Production can write in Announcements.';
+                // An archived channel says so (migration 097); otherwise it is Announcements.
+                $said = (string)($may['why'] ?? 'Only Production can write in Announcements.');
             } else {
                 // One picture may come with the words (migration 083). A refused
                 // picture refuses the whole message, so nothing half-arrives.
@@ -475,11 +585,21 @@ if ($channel !== '') {
             }
         }
         if ($reactTo > 0) $said = realm_react($pdo, $uid, $reactTo, (string)($_POST['emoji'] ?? ''));
+        // Message actions (migration 096). Only the author may edit or delete:
+        // realm_edit_message() and realm_delete_message() check that against the
+        // session's own account. Marking unread only moves MY read mark.
+        if (isset($_POST['edit_msg'])) $said = realm_edit_message($pdo, $uid, $actOn, (string)($_POST['body'] ?? ''));
+        elseif (isset($_POST['delete_msg'])) $said = realm_delete_message($pdo, $uid, $actOn);
+        elseif (isset($_POST['unread_from'])) realm_mark_unread_from($pdo, $uid, $channel, $actOn);
+        // KEEP UNREAD: after "mark unread" the conversation stays open, and its polls
+        // send keep=1 so they do not mark it read again straight away (Slack does the
+        // same until you leave the channel or write in it).
+        $keep = isset($_POST['unread_from']) || !empty($_GET['keep']) || !empty($_POST['keep']);
         $after = max(0, (int)($_POST['after'] ?? ($_GET['after'] ?? 0)));
         // Opened from a search result: start a little before the found message.
         if ($after === 0 && $thread === 0 && isset($_GET['at'])) $after = realm_search_start($pdo, $channel, (int)$_GET['at']);
         $messages = realm_messages($pdo, $uid, $channel, $after, $thread);
-        if ($messages) {
+        if ($messages && !($keep && $thread === 0)) {
             $lastSeen = (int)$messages[count($messages) - 1]['id'];
             // Reading a thread marks the thread read, not the channel.
             if ($thread > 0) realm_mark_thread_read($pdo, $uid, $thread, $lastSeen);
@@ -499,12 +619,23 @@ if ($channel !== '') {
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
                    'offers' => realm_offer_news($pdo, $uid)];
+        // A channel somebody made (migration 097): its name, lock, members and
+        // whether I may change it, for the head of the conversation.
+        if (realm_made_num($channel) > 0) $answer['chan'] = realm_made_info($pdo, $uid, $channel);
         // Reactions (migration 093): only once the table exists, so the page
         // knows whether to offer them. A first page starts at its own first message.
         if (realm_reactions_available($pdo)) {
             $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
             if ($after === 0 && $messages) $from = (int)$messages[0]['id'];
             $answer['reactions'] = (object)realm_reactions($pdo, $uid, $channel, $from);
+        }
+        // Message actions (migration 096): the messages on screen that were edited
+        // or deleted, and which of them I saved. Only once the migration has run.
+        if (realm_msgact_available($pdo)) {
+            $from = max(0, (int)($_POST['from'] ?? ($_GET['from'] ?? 0)));
+            if ($after === 0 && $messages) $from = (int)$messages[0]['id'];
+            $answer['changed'] = realm_changed_messages($pdo, $uid, $channel, $from, $thread);
+            $answer['saved'] = (object)realm_saved_here($pdo, $uid, $channel, $from);
         }
         if ($said !== '') $answer['error'] = $said;
         echo json_encode($answer);
@@ -516,11 +647,15 @@ if ($channel !== '') {
 
 $error = '';
 $praised = false;
+$reminders = [];
 $offered = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (isset($_POST['ping'])) {
             realm_ping($pdo, $uid, (string)($_POST['active'] ?? '0') === '1');
+            // Reminders on saved messages (migration 096) ring on the heartbeat too,
+            // and the Realm shows a notice for each, since its page has no bell.
+            $reminders = realm_reminders_ring($pdo, $uid);
         } elseif (isset($_POST['set_door'])) {
             $error = realm_set_door($pdo, $uid, (string)$_POST['set_door']);
         } elseif (isset($_POST['set_look'])) {
@@ -560,5 +695,7 @@ $state['shop'] = realm_shop_state($pdo, $uid);
 // Giving and swapping: the asker's own offers, waiting or just ended.
 $state['offers'] = realm_offer_news($pdo, $uid);
 if ($offered) $state['offered'] = true;
+// Reminders that rang on this heartbeat (migration 096): shown as a notice in the Realm.
+if ($reminders) $state['reminders'] = $reminders;
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);
