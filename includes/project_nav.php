@@ -33,7 +33,6 @@ const PROJECT_TABS_HIDDEN_FROM_VIEWERS = [
     'dashboard',   // Dashboard
     'crew',        // Staffing
     'timeline',    // Timeline
-    'schedule',    // Schedule
     'team',        // Team performance
     'setup',       // Setup
     'import',      // Import
@@ -76,7 +75,6 @@ const PROJECT_TAB_FEATURES = [
     'brief'      => 'brief',
     'dashboard'  => 'dashboard',
     'crew'       => 'staffing',
-    'schedule'   => 'schedule',
     'timeline'   => 'timeline',
     'shots'      => 'shots',
     'production' => 'production',
@@ -116,7 +114,9 @@ function project_nav_items(int $projectId): array {
         // stay separate files; what was a choice of tab is now a choice of view
         // inside one, drawn by crew_view_switch(). Both mark this tab.
         ['key' => 'crew',       'label' => 'Staffing',            'href' => 'crew.php' . $p,               'group' => 'work'],
-        ['key' => 'schedule',   'label' => 'Schedule',            'href' => 'schedule.php' . $p,           'group' => 'work'],
+        // No Schedule tab since 2026-11-16 (David: "can't edit any dates"). Its
+        // preview is the Timeline's "Draft dates from the plan…" dialog now,
+        // and schedule.php redirects there for old links.
         ['key' => 'timeline',   'label' => 'Timeline',            'href' => 'timeline.php' . $p,           'group' => 'work'],
         // Directly before Production tracking, because it is the same list one
         // step earlier: Shots says what is IN each shot, Production tracking says

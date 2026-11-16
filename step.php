@@ -267,8 +267,8 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
       straight away. The <strong>start date</strong> changes nothing here — the pace is measured
       from today — but it is what the timeline bar and the scheduler are drawn from. Clearing
       either box empties that date.
-      A schedule already saved is not replanned; <a href="schedule.php?project=<?= $projectId ?>">re-run
-      it</a> to fit the new date.
+      A schedule already saved is not replanned; <a href="timeline.php?project=<?= $projectId ?>#draft">draft
+      the dates again</a> on the Timeline to fit the new date.
     </p>
   </div>
 <?php endif; ?>

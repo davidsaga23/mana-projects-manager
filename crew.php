@@ -666,7 +666,7 @@ require __DIR__ . '/includes/header.php';
       <?= $surplusCount === 1 ? 'is' : 'are' ?> above what the headcount now asks for,
       lowering a department's headcount never deletes people, because work may already be planned
       against them. <?= $surplusCount === 1 ? 'It is' : 'They are' ?> highlighted below.
-      Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a> first so that
+      <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a> first so that
       work moves onto the remaining slots, then remove the empty ones.
     </div>
   <?php endif; ?>

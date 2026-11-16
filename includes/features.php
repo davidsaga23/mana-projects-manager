@@ -161,8 +161,6 @@ const FEATURES = [
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0], 'locked' => ['supervisor', 'artist', 'client']],
     'dashboard'     => ['label' => 'Dashboard', 'group' => 'Inside a project',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
-    'schedule'      => ['label' => 'Schedule', 'group' => 'Inside a project',
-                        'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
     'team'          => ['label' => 'Team performance', 'group' => 'Inside a project',
                         'on' => ['editor' => 1, 'supervisor' => 0, 'artist' => 0, 'client' => 0]],
     'setup'         => ['label' => 'Setup, Import, Statuses, Names', 'group' => 'Inside a project',
@@ -238,8 +236,13 @@ const FEATURE_SCRIPTS = [
     'timeline_import.php' => 'timeline',
     'dashboard.php'       => 'dashboard',
     'step.php'            => 'dashboard',
-    'schedule.php'        => 'schedule',
-    'schedule_api.php'    => 'schedule',
+    // NO SCHEDULE SWITCH SINCE 2026-11-16: the Schedule tab folded into the
+    // Timeline (David: dates are adjusted there). schedule.php only redirects to
+    // the Timeline now, and schedule_api.php is what every bar on the Timeline
+    // saves through, so both answer to the Timeline's switches. Before this, an
+    // admin could switch "Schedule" off and silently break the Timeline's drags.
+    'schedule.php'        => 'timeline',
+    'schedule_api.php'    => 'timeline',
     'team.php'            => 'team',
     'wizard.php'          => 'setup',
     'import.php'          => 'setup',
@@ -284,6 +287,7 @@ const FEATURE_POSTS = [
     'hiring.php'        => [['*', '', 'staffing_edit']],
     'timeline.php'      => [['*', '', 'timeline_edit']],
     'timeline_import.php' => [['*', '', 'timeline_edit']],
+    'schedule_api.php'  => [['*', '', 'timeline_edit']],
     'person.php'        => [['field', 'create_login', 'invite'], ['field', 'resend_link', 'invite'],
                             ['field', 'copy_link', 'invite']],
 ];

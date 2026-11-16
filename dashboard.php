@@ -106,9 +106,9 @@ require __DIR__ . '/includes/header.php';
 <?php
 $attention = [];
 if (!$plan['n']) $attention[] = ['No schedule saved, so there are no dates to measure against.',
-                                 'schedule.php?project=' . $projectId, 'Work one out'];
+                                 'timeline.php?project=' . $projectId . '#draft', 'Draft the dates'];
 if ($planOver > 0) $attention[] = ['The saved plan finishes ' . $planOver . ' working days past delivery.',
-                                   'schedule.php?project=' . $projectId, 'Look at the schedule'];
+                                   'timeline.php?project=' . $projectId, 'Open the timeline'];
 if ($lateSteps) {
     $n = array_map(function ($s) { return $s['step']['name']; }, array_slice($lateSteps, 0, 4));
     $attention[] = [count($lateSteps) . ' department' . (count($lateSteps) === 1 ? '' : 's') .

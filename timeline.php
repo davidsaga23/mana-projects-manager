@@ -25,6 +25,7 @@ require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/pipeline.php';
 require __DIR__ . '/includes/scheduler.php';
 require __DIR__ . '/includes/timeline_versions.php';
+require __DIR__ . '/includes/schedule_draft.php';
 require_login();
 
 $projectId = (int)($_GET['project'] ?? 0);
@@ -148,20 +149,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['milestone_action'])) 
     exit;
 }
 
-// Regenerate: recompute and save, without leaving the timeline.
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regenerate'])) {
+// DRAFT DATES FROM THE PLAN (David, 2026-11-16): Apply and Clear, from the
+// dialog includes/schedule_draft.php draws. This was the Schedule tab's job and
+// the Timeline's "Regenerate"; both now come here. `regenerate` is still read,
+// so a form left open in a tab from before this change still does what it says.
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && (isset($_POST['draft_action']) || isset($_POST['regenerate']))) {
     try {
-        $plan = build_schedule($pdo, $project);
-        if (!$plan['tasks']) {
-            throw new RuntimeException('The plan came out empty, open the Schedule screen, ' .
-                                       'which lists the reasons.');
+        if (($_POST['draft_action'] ?? 'apply') === 'clear') {
+            schedule_draft_clear($pdo, $projectId);
+        } else {
+            schedule_draft_apply($pdo, $project);
         }
-        $res = commit_schedule($pdo, $projectId, $plan);
-        flash('ok', sprintf('Rescheduled %d task%s, replacing %d from the previous run. %s',
-            $res['written'], $res['written'] === 1 ? '' : 's', $res['deleted'],
-            $plan['kept'] ? count($plan['kept']) . ' hand-locked task(s) were left alone.'
-                          : 'No hand-locked tasks were affected.'));
-        foreach ($plan['problems'] as $p) flash('warn', $p);
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -280,11 +279,19 @@ $crewList = $editable ? $pdo->query(
 $stale       = false;
 $freshCount  = 0;
 $storedCount = count($tasks);
+$fresh       = null;
 if ($version === null && !$embed) {
     $fresh      = build_schedule($pdo, $project);
     $freshCount = count($fresh['tasks']);
     $stale      = $freshCount !== $storedCount;
 }
+
+// The "Draft dates from the plan…" dialog, and the gentle note that the plan has
+// moved on since the dates were drafted (includes/schedule_draft.php). Editors
+// only, on the live timeline: they are the ones who can act on either.
+$canDraft     = $editable && $fresh !== null;
+$draftSchema  = $canDraft && schedule_schema_ready($pdo);
+$planChanged  = $canDraft && $tasks && !$stale && schedule_plan_changed($pdo, $projectId);
 
 $pageTitle = 'Timeline · ' . $project['name'] . ($version !== null ? ' · ' . $version['label'] : '');
 if (!$embed) require __DIR__ . '/includes/header.php';
@@ -393,8 +400,18 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       drawn than the setup now calls for, usually because work was approved, marked not
       applicable, or items were removed.
     <?php endif; ?>
-    <?php if ($editable): ?>Press <em>Regenerate</em> to bring it in line.<?php endif; ?>
+    <?php if ($canDraft): ?>
+      <button type="button" class="linkish" data-open-draft>Draft the dates again…</button>
+    <?php endif; ?>
   </div>
+<?php elseif ($planChanged): ?>
+  <?php // GENTLE, NOT AMBER-AND-BOLD (David, 2026-11-16). The dates on the chart
+        // are still a perfectly good plan, and may be hand-adjusted on purpose;
+        // this only says the ingredients moved since they were drafted. ?>
+  <p class="tl-note tl-plan-changed">
+    The plan has changed since the dates were drafted.
+    <button type="button" class="linkish" data-open-draft>Draft again?</button>
+  </p>
 <?php endif; ?>
 
 <?php // The GENERAL chart no longer needs a schedule to exist: it draws the
@@ -411,7 +428,9 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       <p>The general chart draws each department's planned dates; the detailed one draws the
          saved schedule. Neither exists yet.</p>
       <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Set the dates →</a>
-         <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
+         <?php if ($canDraft): ?>
+           <button type="button" class="secondary" data-open-draft>Draft dates from the plan…</button>
+         <?php endif; ?></p>
     <?php endif; ?>
   </div>
 <?php else: ?>
@@ -634,12 +653,9 @@ if (!$embed) require __DIR__ . '/includes/header.php';
            title="Read a refined GanttProject file back into the schedule">.gan ↑</a>
       <?php endif; ?>
 
-      <?php if ($editable): ?>
-        <form method="post" class="tl-inline"
-              onsubmit="return confirm('Recalculate and save the schedule? Hand-locked tasks are preserved.');">
-          <input type="hidden" name="regenerate" value="1">
-          <button type="submit">Regenerate</button>
-        </form>
+      <?php if ($canDraft): ?>
+        <?php // Opens the preview; nothing is saved until Apply inside it. ?>
+        <button type="button" data-open-draft>Draft dates from the plan…</button>
       <?php endif; ?>
     </div>
   </div>
@@ -679,29 +695,16 @@ if (!$embed) require __DIR__ . '/includes/header.php';
         The setup as it stands works out to
         <strong><?= $freshCount ?> task<?= $freshCount === 1 ? '' : 's' ?></strong>.
       <?php else: ?>
-        The setup as it stands does not work out to any tasks yet, and the Schedule screen
-        lists why.
+        The setup as it stands does not work out to any tasks yet;
+        <em>Draft dates from the plan</em> lists why.
       <?php endif; ?>
     </p>
-    <?php if ($editable): ?>
-      <?php // Two real buttons, the pairing every other screen uses. A link
-            // styled as a button renders in the page font and a <button> in
-            // the browser's, so side by side they came out 5px apart in height. ?>
+    <?php if ($canDraft): ?>
       <div class="actions">
-        <?php if ($freshCount > 0): ?>
-          <form method="post" class="tl-inline"
-                onsubmit="return confirm('Work out the schedule from the setup and save it? You can regenerate it at any time.');">
-            <input type="hidden" name="regenerate" value="1">
-            <button type="submit">Build the detailed schedule</button>
-          </form>
-        <?php endif; ?>
-        <form method="get" action="schedule.php" class="tl-inline">
-          <input type="hidden" name="project" value="<?= (int)$projectId ?>">
-          <button type="submit" class="secondary">Preview it on the Schedule screen</button>
-        </form>
+        <button type="button" data-open-draft>Draft dates from the plan…</button>
       </div>
     <?php else: ?>
-      <p class="muted small">An editor can build it from the Schedule screen.</p>
+      <p class="muted small">An editor can draft it here, with <em>Draft dates from the plan</em>.</p>
     <?php endif; ?>
   <?php endif; ?>
 </section>
@@ -768,7 +771,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
         </select>
       </label>
       <label class="inline"><input type="checkbox" id="editManual">
-        Lock this task, Regenerate won't move it</label>
+        Lock this task, drafting from the plan won't move it</label>
       <div class="actions">
         <button type="button" class="secondary" onclick="closeTaskEditor()">Cancel</button>
         <button type="submit">Save</button>
@@ -879,6 +882,9 @@ window.DETAILED_TASKS = <?= json_encode($tasks, JSON_UNESCAPED_UNICODE) ?>;
 <script src="assets/timeline.js<?= asset_ver('timeline.js') ?>"></script>
 
 <?php endif; ?>
+
+<?php // Outside the branch above, so the empty page's button has a dialog to open. ?>
+<?php if ($canDraft) schedule_draft_dialog($fresh, $project, $draftSchema, schedule_auto_count($pdo, $projectId), schedule_drafted_at($pdo, $projectId)); ?>
 
 </div>   <?php // closes .tl-page ?>
 

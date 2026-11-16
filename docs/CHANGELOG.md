@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — The Schedule tab is folded into the Timeline *(no migration)*
+
+- **No Schedule tab any more.** Its preview now opens on the Timeline from **Draft dates from the
+  plan…** (editors only): each department's start and finish, which finish late and by how much,
+  how many tasks are blocked, and the hand-planned tasks it leaves alone. **Apply** saves it and the
+  Timeline reloads with the new dates; **Cancel** changes nothing. **Clear the saved schedule** is at
+  the foot of the same dialog, behind a confirmation.
+- The Timeline's **Regenerate** and **Build the detailed schedule** buttons became this one button,
+  so nothing is saved without the preview first.
+- **"The plan has changed since the dates were drafted. Draft again?"** appears on the Timeline when
+  headcount, days per item, coverage, the workflow, the breakdown, the estimates or days off changed
+  after the last Apply. It starts working from each show's first Apply after this change.
+- **Old links still work:** `schedule.php` opens the Timeline with the dialog open. Links on
+  Staffing, Shots, a department's page, a person's page and the Dashboard now point there too.
+- **Access:** the "Schedule" switch is gone from Users. Dragging bars on the Timeline now follows
+  the Timeline's own switches ("Timeline: see" / "Edit") rather than that separate one.
+
 ## 2026-11-16 — Dashboard: the "Counted in tasks" note is gone *(no migration)*
 
 - The paragraph under Overall progress's four cards no longer shows.
