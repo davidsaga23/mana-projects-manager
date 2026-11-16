@@ -6206,6 +6206,52 @@ David: *"can we add a new button in the edit to change this invoice to another p
   and a browser confirm.
 
 
+## 2026-11-16 — The Realm's Activity list
+
+David chose an Activity view, as in Slack; pitched to him as "your mentions, replies to your threads,
+and reactions to your messages, in one list".
+- **No log of events.** The list is read from the messages, threads and reactions already kept
+  (`includes/realm_activity.php`), so it cannot disagree with the conversations, and an edited or
+  deleted message changes or leaves it at once. Ravens to you are in it too; a forwarded message
+  sent to you arrives as a raven and says "forwarded you a message".
+- **Privacy is the chat's own**: every query is limited by `realm_channel_filter()`, the list the
+  unread counts and the Threads list use. Private channels count only for their members.
+- **Read is shared with the chat.** A row is read once its conversation (or thread) has been read
+  there, or it was clicked in the list, or "Mark all as read" came after it. Reactions have no
+  conversation read mark, so only the list reads them. Migration 098 (`realm_activity_reads`)
+  holds the list's own marks: one row per row clicked, and one `*` row for "everything before".
+- **The last 30 days.** Older news is still in the conversations and in search; the window keeps
+  the count cheap enough to ride on every poll (heartbeat, `?unread=1`, chat answers).
+- **The bell and Activity agree, they do not duplicate.** The bell is the nudge outside the Realm
+  (one line per sender, never the words); Activity is the full list inside it. "Mark all as read"
+  quiets the Realm's `raven` and `tag` lines in the bell; opening a mention quiets the `tag` line
+  from its sender; reading a raven already quieted its line.
+
+## 2026-11-16 — Realm statuses, and lunch in the Diner
+
+David: *"Status messages: Let's also create a diner so people's avatars go immediately there when
+they set up their status 'Lunch'"*.
+- **One status per person**, on their own `realm_people` row (migration 099), set only by them: no
+  id is posted (`set_status` in `artist_may_post()`, `realm_status_set()` writes the session's row).
+- **The server ends it.** `status_until` is checked on every look at the map (`realm_status_sweep()`
+  in `realm_state()` and on opening the Realm), and an expired one is never sent even if a sweep
+  failed. "Today" means until 23:59:59 on the studio's clock (`config.php` timezone).
+- **Emoji from a fixed list** (`REALM_STATUS_EMOJI`), so a form can never put anything else beside a
+  name; the words are free, one line, at most 80 characters.
+- **Lunch moves the character on the server**, not only on the screen, so everybody sees it at once:
+  inside the Diner on setting it; on clearing it, letting it run out, or switching to another status,
+  back **home, inside their own house** (`REALM_LUNCH_BACK = 'home'`). **Asked David** whether it
+  should be "back home" or "back where they were"; the place before lunch is stored
+  (`status_back`), so the other answer is a one-word change. Somebody who already walked out of the
+  Diner is left where they are.
+- **A status stays a ready-made one while it keeps that one's emoji**: "Lunch with Tim" with 🍔 is
+  still Lunch and goes to the Diner; picking another emoji makes it the person's own.
+- **The Diner is a place like the Tavern**: always open, its own channel `diner` and calls, no table
+  of its own. Placed at the east end of the second street (1215, 590), clear of every plot, road and
+  name; the Village zoom widened to 320..1310 to include it.
+- **Days-off calendar hook**: `realm_status_set($pdo, $uid, 'off', '', '', 'today', 'calendar')`.
+  It should leave a status the person set themselves alone (`from` is 'self'). Not built (David:
+  the calendar is done separately).
 ## 2026-11-16 — Realm chat: @here and @channel
 
 David: *"@here @channel too"*. Settled with him the same day:

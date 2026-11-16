@@ -91,6 +91,9 @@ foreach (($state['people'] ?? []) as $p) {
   <?php /* Your tasks are on the bookshelf in your own house (David, 2026-11-12). This button shows
            only while a clock is running, or for somebody with no house and so no shelf. */ ?>
   <button type="button" class="rbtn" id="focusBtn"<?= $hasHouse ? ' hidden' : '' ?>>Your tasks</button>
+  <?php /* Your status, as in Slack (David, 2026-11-16, migration 099): the button shows it and
+           opens the window that sets it; "Lunch" walks you to the Diner. assets/realm_status.js. */ ?>
+  <button type="button" class="rbtn rstatbtn" id="statusBtn">Set a status</button>
   <button type="button" class="rbtn" id="lookBtn">Your character</button>
   <?php endif; ?>
   <span class="rwho"><?= e(current_user_display()) ?></span>
@@ -189,6 +192,10 @@ foreach (($state['people'] ?? []) as $p) {
     <h2 id="campTitle">Camp</h2>
     <div id="campBody"></div>
   </dialog>
+  <dialog id="statusDlg" class="rstatdlg" aria-labelledby="statusTitle">
+    <h2 id="statusTitle">Your status</h2>
+    <form id="statusForm" method="dialog"></form>
+  </dialog>
   <dialog id="lookDlg" aria-labelledby="lookTitle">
     <h2 id="lookTitle">Your character and house</h2>
     <form id="lookForm" method="dialog"></form>
@@ -213,6 +220,11 @@ foreach (($state['people'] ?? []) as $p) {
   <?php /* Channels people make, public or private, for a show or studio-wide (migration 097). After
            realm_react.js: both answer every chat answer, and this one keeps the other's hook. */ ?>
   <script src="assets/realm_made.js<?= asset_ver('realm_made.js') ?>"></script>
+  <?php /* Activity: everything that is for me in one list (migration 098). After realm_react.js,
+           whose reaction pictures it borrows. */ ?>
+  <script src="assets/realm_activity.js<?= asset_ver('realm_activity.js') ?>"></script>
+  <?php /* Setting your status (migration 099). Last, because it adds to the map's R.onState hook. */ ?>
+  <script src="assets/realm_status.js<?= asset_ver('realm_status.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>

@@ -28,6 +28,8 @@
 require_once __DIR__ . '/realm_made.php';
 // Slack's message actions (migration 096): forward, save, edit, delete.
 require_once __DIR__ . '/realm_msgact.php';
+// "Activity": everything that is for me, in one list (migration 098).
+require_once __DIR__ . '/realm_activity.php';
 require_once __DIR__ . '/realm_broadcast.php';   // @here and @channel (David, 2026-11-16)
 
 /** The longest message that is kept. Longer is cut, not refused. */
@@ -69,6 +71,8 @@ function realm_channels(PDO $pdo, bool $mayAnnounce, int $uid = 0, bool $archive
         ['id' => 'announcements', 'name' => 'Announcements', 'post' => $mayAnnounce],
         ['id' => 'tavern',        'name' => 'The Tavern',    'post' => true],
         ['id' => 'council',       'name' => 'Council Hall',  'post' => true],
+        // The Diner (David, 2026-11-16): where lunch is eaten, talked over like the Tavern.
+        ['id' => 'diner',         'name' => 'The Diner',     'post' => true],
     ];
     try {
         foreach ($pdo->query('SELECT p.id, p.name FROM realm_lands l JOIN projects p ON p.id = l.project_id ORDER BY p.name') as $r) {
@@ -469,7 +473,10 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
             // edited and deleted; and my three most-used reactions for the bar.
             'acts' => function_exists('realm_msgact_available') && realm_msgact_available($pdo),
             'favs' => function_exists('realm_reaction_favs') ? realm_reaction_favs($pdo, $uid) : [],
-            'remind' => REALM_REMIND];
+            'remind' => REALM_REMIND,
+            // Activity (migration 098): how many rows of my Activity list are unread,
+            // and whether rows can be marked read yet.
+            'activity' => realm_activity_count($pdo, $uid, $mayAnnounce), 'actmark' => realm_activity_available($pdo)];
 }
 
 /**
