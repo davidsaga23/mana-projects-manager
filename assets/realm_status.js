@@ -1,4 +1,4 @@
-/* The Realm: setting your status (David, 2026-11-16, migration 098).
+/* The Realm: setting your status (David, 2026-11-16, migration 099).
 
    "Status messages: Let's also create a diner so people's avatars go immediately there when they set
    up their status 'Lunch'". Slack's status: an emoji and a short line beside your name, from a few

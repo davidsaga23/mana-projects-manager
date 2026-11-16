@@ -2080,7 +2080,7 @@ function overlay() {
   });
   return h+'</svg>';
 }
-/* ---------- statuses (David, 2026-11-16, migration 098) ----------
+/* ---------- statuses (David, 2026-11-16, migration 099) ----------
    Slack's status: an emoji and a short line beside a name ("In review until 3", "Lunch", "Off
    tomorrow"). Each person's comes with the map (`status`, includes/realm_status.php): kind, emoji,
    text, and `left`, the seconds until it clears (null: only when cleared by hand). THE SERVER CLEARS
@@ -2115,6 +2115,10 @@ function renderSide() {
   var rank = {online:0,idle:1,away:2}, ppl = ST.people.slice().sort(function (a, b) { return (b.me-a.me) || (rank[a.state]-rank[b.state]) || a.name.localeCompare(b.name); });
   var h = '', un = unread();
   if (ST.chat) { h += '<div><div class="rsidehead"><h2>Channels</h2>'+(ST.chat.create?'<button type="button" class="rchanadd" data-chanew="1" title="New channel" aria-label="New channel">+</button>':'')+'</div><div class="rrows">';
+    /* Activity (David, 2026-11-16, migration 098): everything that is for me, in one list. The list
+       is assets/realm_activity.js; the number is how many of its rows are unread. */
+    var an = ST.chat.activity || 0;
+    h += '<button type="button" class="rrow'+(CH.open===ACTIVITY?' is-on':'')+'" data-activity="1"><span class="rhash">@</span><span>Activity</span>'+(an?'<b class="rbadge">'+(an > 99 ? '99+' : an)+'</b>':'')+'</button>';
     /* Threads (migration 095): the threads I follow, with what is new in them (David, 2026-11-13). */
     if (threadsOn()) { var tn = CH.open===THREADS ? 0 : thrNewAll();
       h += '<button type="button" class="rrow'+(CH.open===THREADS?' is-on':'')+'" data-threads="1"><span class="rhash">&#8627;</span><span>Threads</span>'+(tn?'<b class="rbadge">'+tn+'</b>':'')+'</button>'; }
@@ -2460,6 +2464,7 @@ document.addEventListener('click',function (e) {
   else if (t.closest('#chatWide')) chatWide(!CH.wide);
   else if ((b = t.closest('[data-thread]'))) openThread(+b.getAttribute('data-thread'),b.getAttribute('data-thchan')||CH.open);
   else if (t.closest('[data-threads]')) openThreads();
+  else if (t.closest('[data-activity]')) openActivity();
   else if ((b = t.closest('[data-chanfold]'))) chanFold(b.getAttribute('data-chanfold'));
   else if (t.closest('#chatBack')) chatBack();
   else if ((b = t.closest('[data-chat]'))) { openChat(b.getAttribute('data-chat')); if (b.classList.contains('rtoast')) b.remove(); }
@@ -2520,6 +2525,10 @@ var CH = {open:null,last:0,timer:0,busy:false,seen:false,wide:false,thread:0,fro
    assets/realm_react.js) from there on. CH.open is THREADS while the panel lists the threads I follow. TH.unread is what is
    new in those, [{channel,parent,n}]; TH.counts the reply counts under the open channel's messages. */
 var THREADS = '*threads', TH = {unread:(ST.chat && ST.chat.tunread) || [],counts:{}};
+/* ACTIVITY (David, 2026-11-16, migration 098): CH.open is ACTIVITY while the panel lists everything
+   that is for me. It is drawn and asked for by assets/realm_activity.js (R.actAsk); a conversation
+   opened from it has CH.from ACTIVITY, so its back arrow returns to the list. */
+var ACTIVITY = '*activity';
 /* THE CONVERSATION OVER THE MAP (David, 2026-11-12: "an arrow pointing left at the middle of the
    chat bar so there's an option to extend it over the map"). The handle on the conversation's left
    edge lays it over the map, for room to read and write, and brings it back. The choice is kept
@@ -2544,6 +2553,7 @@ function unread() { return (ST.chat && ST.chat.unread) || {}; }
 function dmId(a, b) { return 'dm:'+Math.min(a,b)+':'+Math.max(a,b); }
 function chanTitle(id) {
   if (id===THREADS) return 'Threads';
+  if (id===ACTIVITY) return 'Activity';
   var m = /^dm:(\d+):(\d+)$/.exec(id);
   if (m) { var other = person(+m[1]===ST.me ? +m[2] : +m[1]); return other ? 'Ravens with '+firstName(other.name) : 'Ravens'; }
   var c = ((ST.chat && ST.chat.channels)||[]).filter(function (x) { return x.id===id; })[0];
@@ -2576,7 +2586,7 @@ function takeUnread(u, tu) {
 function askUnread() {
   if (!ST.chat || CH.open || document.hidden) return;
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { takeUnread(j.unread,j.tunread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
+    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { if (j.activity!=null) ST.chat.activity = j.activity; takeUnread(j.unread,j.tunread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -2700,10 +2710,10 @@ function paintThreads() {
 }
 /* The panel's head and writing box for what it shows: a channel, a thread, or the list of threads. */
 function chatMode() {
-  var list = CH.open===THREADS, back = $('chatBack');
+  var list = CH.open===THREADS || CH.open===ACTIVITY, back = $('chatBack');
   var name = chanTitle(CH.open);
   $('chatTitle').textContent = !CH.thread ? name : (/^dm:/.test(CH.open) ? name.replace(/^Ravens/,'Thread') : 'Thread in '+name);
-  if (back) { back.hidden = !CH.thread; var to = CH.from===THREADS ? 'Back to your threads' : 'Back to '+chanTitle(CH.open); back.title = to; back.setAttribute('aria-label',to); }
+  if (back) { back.hidden = !CH.thread && CH.from!==ACTIVITY; var to = CH.from===THREADS ? 'Back to your threads' : CH.from===ACTIVITY ? 'Back to your activity' : 'Back to '+chanTitle(CH.open); back.title = to; back.setAttribute('aria-label',to); }
   $('chatForm').hidden = list;
   if ($('chatAlsoRow')) { $('chatAlsoRow').hidden = !CH.thread; $('chatAlso').checked = false;
     $('chatAlsoText').textContent = /^dm:/.test(CH.open||'') ? 'Also send to the ravens' : 'Also send to #'+chanTitle(CH.open); }
@@ -2734,6 +2744,7 @@ function chatTake(j) {
   $('chatInput').disabled = !j.can_post; $('chatSend').disabled = !j.can_post;
   if ($('chatAttach')) $('chatAttach').hidden = !(j.can_post && ST.chat && ST.chat.images); $('chatInput').placeholder = j.can_post ? (CH.thread ? 'Reply in the thread' : 'Write a message') : (j.chan && j.chan.archived ? 'This channel is archived' : 'Only Production writes here');
   if ($('chatAlsoRow')) $('chatAlsoRow').hidden = !(CH.thread && j.can_post);
+  if (ST.chat && j.activity!=null) ST.chat.activity = j.activity;
   if (j.unread) takeUnread(j.unread,j.tunread);
   paintThreads();
   takeKnocks(j.knocks);
@@ -2753,6 +2764,12 @@ function threadsTake(j) {
     return '<button type="button" class="rtrow'+(u?' is-new':'')+'" data-thread="'+t.parent+'" data-thchan="'+esc(t.channel)+'"><span class="rtrowhead"><b>'+esc(chanTitle(t.channel))+'</b><small>'+t.n+(t.n===1?' reply':' replies')+' &middot; last '+esc(t.at)+'</small>'+(u?'<b class="rbadge">'+u+' new</b>':'')+'</span><span class="rtrowbody">'+esc(t.mine?'You':t.name)+': '+esc(t.about)+'</span></button>'; }).join('');
   $('chatMsgs').innerHTML = h || '<p class="rempty">No threads yet. A thread you start or reply in gathers here, with its new replies.</p>';
   CH.seen = true;
+  takeNews(j);
+}
+/* The news every list answer carries (Threads here, Activity in assets/realm_activity.js): the
+   unread counts, the Activity count, knocks, offers, voice and the spots people stand on. */
+function takeNews(j) {
+  if (ST.chat && j.activity!=null) ST.chat.activity = j.activity;
   if (j.unread) takeUnread(j.unread,j.tunread);
   takeKnocks(j.knocks);
   if (R.onOffers) R.onOffers(j.offers);
@@ -2761,6 +2778,7 @@ function threadsTake(j) {
 }
 function chatAsk() {
   if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
+  if (CH.open===ACTIVITY) { if (R.actAsk) R.actAsk(); else CH.busy = false; return; }
   if (CH.open===THREADS) {
     fetch(R.api+'?threads=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
       .then(function (r) { return r.json(); }).then(threadsTake).catch(function () { CH.busy = false; });
@@ -2774,7 +2792,7 @@ function chatShow(id, thread, from) {
   CH.open = id; CH.thread = thread||0; CH.from = from||''; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; CH.keep = false; TH.counts = {}; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); chatMode(); $('chatMsgs').innerHTML = '';
   clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw();
-  if (id!==THREADS) $('chatInput').focus();
+  if (id!==THREADS && id!==ACTIVITY) $('chatInput').focus();
 }
 function openChat(id) {
   if (!ST.chat || !id || !$('chat')) return;
@@ -2783,10 +2801,11 @@ function openChat(id) {
 }
 function openThread(parent, channel) {
   if (!ST.chat || !threadsOn() || !parent || !channel || channel===THREADS) return;
-  chatShow(channel,parent,CH.open===THREADS ? THREADS : (CH.thread ? CH.from : ''));
+  chatShow(channel,parent,(CH.open===THREADS || CH.open===ACTIVITY) ? CH.open : (CH.thread ? CH.from : ''));
 }
 function openThreads() { if (ST.chat && threadsOn() && $('chat')) chatShow(THREADS,0,''); }
-function chatBack() { if (CH.from===THREADS) openThreads(); else chatShow(CH.open,0,''); }
+function openActivity() { if (ST.chat && $('chat')) chatShow(ACTIVITY,0,''); }
+function chatBack() { if (CH.from===THREADS) openThreads(); else if (CH.from===ACTIVITY) openActivity(); else chatShow(CH.open,0,''); }
 function closeChat() { CH.open = null; CH.thread = 0; clearInterval(CH.timer); $('chat').hidden = true; $('chat').parentNode.classList.remove('with-chat'); renderSide(); badge(); draw(); }
 /* A PICTURE IN A MESSAGE (David, 2026-11-12: "let's also allow images ... in all chats"), migration
    083. One per message, up to 5 MB, chosen with the + button or pasted straight into the box. The
@@ -2846,7 +2865,7 @@ if ($('chatFile')) $('chatFile').addEventListener('change',function () { offerPi
 /* Guarded: a page drawn before chat existed has no form, and must not stop the map over it. */
 if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
   e.preventDefault();
-  var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open || CH.open===THREADS) return;
+  var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open || CH.open===THREADS || CH.open===ACTIVITY) return;
   var also = !!(CH.thread && $('chatAlso') && $('chatAlso').checked), thread = CH.thread;
   inp.value = ''; CH.busy = true; CH.keep = false; sugClose(); setPick(null);
   /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end
@@ -2928,8 +2947,10 @@ function findTyped() {
 function findClear() { if (!$('searchInput')) return; $('searchInput').value = ''; findTyped(); }
 /* Open the conversation a result is in, at that message. A conversation that is already open is
    opened again, so it starts at the found message rather than wherever it was. */
-function findOpen(channel, id, thread) {
+function findOpen(channel, id, thread, from) {
   FIND.jump = id;
+  /* Opened from the Activity list (assets/realm_activity.js): the back arrow returns to it. */
+  if (from===ACTIVITY && ST.chat && $('chat')) { chatShow(channel,(thread && threadsOn()) ? thread : 0,ACTIVITY); return; }
   /* Threads (migration 095): a reply kept in its thread is not in the channel, so its thread opens. */
   if (thread && threadsOn()) { openThread(thread,channel); return; }
   if (CH.open===channel) CH.open = null;
@@ -3831,7 +3852,10 @@ R.msgHTML = msgHTML; R.findOpen = findOpen; R.chanTitle = chanTitle; R.dmId = dm
 /* What assets/realm_made.js borrows (channels people make, migration 097): the state as it is now
    (ST is replaced by every heartbeat), a way to take in a new channel list, and opening one. */
 R.now = function () { return ST; }; R.openChat = openChat; R.closeChat = closeChat;
-/* What assets/realm_status.js borrows (statuses, migration 098): sending a change and taking in the
+/* What assets/realm_activity.js borrows (migration 098): the name of the Activity list, the news
+   every list answer carries, and redrawing the side list when its number changes. */
+R.ACTIVITY = ACTIVITY; R.takeNews = takeNews; R.renderSide = renderSide;
+/* What assets/realm_status.js borrows (statuses, migration 099): sending a change and taking in the
    map that comes back, which is where lunch moves me; and the words of a status. */
 R.send = send; R.stOf = stOf; R.stUntil = stUntil; R.me = me;
 R.takeChat = function (c) { if (!c || !ST) return; if (ST.chat && ST.chat.unread && !c.unread) c.unread = ST.chat.unread; ST.chat = c; renderSide(); badge(); };

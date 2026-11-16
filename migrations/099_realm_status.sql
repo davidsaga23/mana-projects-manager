@@ -1,4 +1,4 @@
--- 098 — The Realm: status messages ("Lunch", "In review until 3"), and lunch in the Diner.
+-- 099 — The Realm: status messages ("Lunch", "In review until 3"), and lunch in the Diner.
 --
 -- David, 2026-11-16: "Status messages: Let's also create a diner so people's
 -- avatars go immediately there when they set up their status 'Lunch'".

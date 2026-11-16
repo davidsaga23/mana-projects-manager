@@ -1,5 +1,5 @@
 <?php
-// The Realm: status messages, and lunch in the Diner (migration 098).
+// The Realm: status messages, and lunch in the Diner (migration 099).
 //
 // David, 2026-11-16: "Status messages: Let's also create a diner so people's
 // avatars go immediately there when they set up their status 'Lunch'". The
@@ -60,7 +60,7 @@ const REALM_STATUS_CLEAR = ['30m' => 1800, '1h' => 3600, 'today' => 'today', 'ne
 /** The longest line a status may have, in characters. */
 const REALM_STATUS_MAX = 80;
 
-/** Has migration 098 arrived? Asked once per request; never throws. */
+/** Has migration 099 arrived? Asked once per request; never throws. */
 function realm_status_ready(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;
@@ -221,7 +221,7 @@ function realm_status_of(array $r): ?array {
             'from'  => (string)($r['status_from'] ?? 'self') === 'calendar' ? 'calendar' : 'self'];
 }
 
-/** What the picker needs, sent with the map: has 098 run, the presets, the emoji, the times. */
+/** What the picker needs, sent with the map: has 099 run, the presets, the emoji, the times. */
 function realm_status_menu(PDO $pdo): array {
     $presets = [];
     foreach (REALM_STATUS_PRESETS as $k => $p) $presets[] = ['kind' => $k, 'emoji' => $p[0], 'text' => $p[1], 'clear' => $p[2]];

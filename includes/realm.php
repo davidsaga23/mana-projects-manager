@@ -43,7 +43,7 @@ require_once __DIR__ . '/realm_shop.php';
 require_once __DIR__ . '/realm_trade.php';
 // Each show's sky over its land (no migration): weather and fireworks, read from Anima.
 require_once __DIR__ . '/realm_weather.php';
-// Status messages and lunch in the Diner (migration 098, David 2026-11-16).
+// Status messages and lunch in the Diner (migration 099, David 2026-11-16).
 require_once __DIR__ . '/realm_status.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
@@ -95,7 +95,7 @@ function realm_enter(PDO $pdo, int $uid): void {
             ->execute([$uid, REALM_KINDS[$uid % count(REALM_KINDS)], REALM_CLOAKS[$uid % count(REALM_CLOAKS)]]);
         $pdo->prepare('UPDATE realm_people SET place = ?, inside = 0,' . realm_spot_reset($pdo) . ' last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
             ->execute(['user:' . $uid, $uid]);
-        // Somebody whose status is Lunch (migration 098) arrives at the Diner
+        // Somebody whose status is Lunch (migration 099) arrives at the Diner
         // instead, inside, as setting it put them there. An expired lunch was
         // cleared by the sweep first and leaves them at home.
         if (realm_status_ready($pdo)) {
@@ -502,7 +502,7 @@ function shot_label_safe($episode, $shotCode): string {
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
     $clocks = realm_clocks($pdo);
-    // Statuses that ran out are cleared, and lunchers sent back, before anybody is read (migration 098).
+    // Statuses that ran out are cleared, and lunchers sent back, before anybody is read (migration 099).
     realm_status_sweep($pdo);
     $status = realm_status_ready($pdo);
     try {
@@ -548,7 +548,7 @@ function realm_state(PDO $pdo, int $uid): array {
                 'pet'    => realm_look_known('pet', (string)$r['pet']) ? (string)$r['pet'] : 'none',
                 'me'     => $id === $uid,
                 'work'   => $clocks[(int)$r['crew_ref']] ?? null,
-                // "Lunch", "In review until 3" (migration 098): shown whether they are here or away.
+                // "Lunch", "In review until 3" (migration 099): shown whether they are here or away.
                 'status' => $status ? realm_status_of($r) : null,
             ];
         }
@@ -573,7 +573,7 @@ function realm_state(PDO $pdo, int $uid): array {
             // `share`: has migration 088 run, so a screen can be shared in a call.
             'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice(),
                         'share' => realm_share_available($pdo)],
-            // The status picker's choices, and whether migration 098 has run.
+            // The status picker's choices, and whether migration 099 has run.
             'statuses' => realm_status_menu($pdo)];
 }
 

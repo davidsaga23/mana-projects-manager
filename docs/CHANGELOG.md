@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-16 — The Realm: status messages, and the Diner *(migration 098)*
+## 2026-11-16 — The Realm: status messages, and the Diner *(migration 099)*
 
 **Asked by David**: "Status messages: Let's also create a diner so people's avatars go immediately
 there when they set up their status 'Lunch'". **Status**, as in Slack: an emoji and a short line
@@ -31,11 +31,29 @@ booths. Anybody can walk in; it has its own channel (**The Diner**) and calls, l
 **Setting Lunch teleports you inside, onto a stool** (with the teleport sparkle), and everybody sees
 you there; **when lunch ends or is cleared you go back home**, inside your house. Walking out of the
 Diner during lunch is allowed. The "Village" zoom reaches a little further east to include it.
-Until migration 098 runs, the Diner works and the status window says an update is needed. A hook
+Until migration 099 runs, the Diner works and the status window says an update is needed. A hook
 for the days-off calendar to set "Off" by itself is in place (`realm_status_set(..., 'calendar')`),
 not used yet.
 
 ---
+
+## 2026-11-16 — The Realm: Activity, everything for you in one list *(migration 098)*
+
+**Asked by David**: an Activity view, as in Slack, so nothing gets lost when channels are busy. An
+**Activity** row now sits at the top of the CHANNELS list, with a number for what is unread. It
+opens one list, newest first, of the last 30 days: messages that **tag you** (@your name, @here,
+@channel), **replies** in threads you started or replied in, **reactions** to your messages
+("Renata reacted 👍 to your message"), and **ravens** sent to you (a forwarded one says so). Each
+row says who, what, where and when, with the start of the message; clicking it opens that
+conversation or thread **at that message**, lit up, with a back arrow to Activity. Filters: All,
+Mentions, Threads, Reactions, Ravens. **Mark all as read**.
+
+Reading a conversation reads its rows too, so the Activity number and the channel numbers go down
+together. Only conversations you can read are in it: a private channel only for its members, a raven
+only for its two people. The number rides on the polling the Realm already does. Migration 098 only
+remembers rows marked read in the list; until it runs the list works, but reactions cannot be marked
+read and Mark all as read is greyed out. The bell: "Mark all as read" also quiets the Realm's raven
+and tag lines in Anima's bell, and opening a mention quiets the bell line from its sender.
 
 ## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
 
