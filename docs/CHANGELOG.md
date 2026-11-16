@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Brief: the intro paragraph is gone *(no migration)*
+
+- The paragraph under the Brief heading ("What the client asked for, in their terms…") no longer
+  shows. The page now opens on the "Last updated" line and the fields.
+
 ## 2026-11-16 — Project Overview: the Export buttons sit at the top right *(no migration)*
 
 - Export progress, Export shot list and Export asset list moved from under the progress table to the

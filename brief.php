@@ -182,12 +182,6 @@ require __DIR__ . '/includes/header.php';
   <?php exit; ?>
 <?php endif; ?>
 
-<p class="lead">
-  What the client asked for, in their terms, the thing every date, quota and breakdown on the
-  other screens is ultimately derived from. Written as prose rather than a form, because every
-  brief is shaped differently and a box that doesn't fit is a box people leave empty.
-</p>
-
 <?php if (!$hasAny): ?>
   <div class="flash flash-warn">
     Nothing recorded yet. This is worth ten minutes at the start of a show: it is the document
