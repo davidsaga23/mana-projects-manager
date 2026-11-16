@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Project Overview: the Export buttons sit at the top right *(no migration)*
+
+- Export progress, Export shot list and Export asset list moved from under the progress table to the
+  top right of the Overview, beside the project's title.
+
 ## 2026-11-16 — Project Overview: the tasks-scheduled and crew-slots line is gone *(no migration)*
 
 - Under Overall progress, "N tasks scheduled. N crew slots, N still a placeholder." no longer shows.

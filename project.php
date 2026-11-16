@@ -144,10 +144,23 @@ require __DIR__ . '/includes/header.php';
 
 <?php project_nav($project, 'overview'); ?>
 
-<h2 class="wizard-title">
-  <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
-  <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
-</h2>
+<?php // The three exports sit at the top right, beside the title (David, 2026-11-16:
+      // "let's change these buttons to the top of the page on the right side"). They
+      // used to follow the progress table at the very bottom of the page. Each names
+      // the FILE it produces, so the row reads as a choice of three sheets. ?>
+<div class="page-head project-head">
+  <h2 class="wizard-title">
+    <?= e($project['name']) ?> <span class="muted">(<?= e($project['code']) ?>)</span>
+    <span class="status status-<?= e($project['status']) ?>"><?= e(str_replace('_', ' ', $project['status'])) ?></span>
+  </h2>
+  <?php if (!hidden_from_viewers('export')): ?>
+    <div class="export-row">
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>">Export progress ↓</a>
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=shots">Export shot list ↓</a>
+      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=assets">Export asset list ↓</a>
+    </div>
+  <?php endif; ?>
+</div>
 
 <?php
 // THE WAY TO SIGN-OFF FROM THE PROJECT'S OWN PAGE (David, 2026-11-03: "there
@@ -375,17 +388,6 @@ $startIn = $daysTo($project['start_date']);
     </tr>
     <?php endforeach; ?>
   </table>
-  <?php // Three buttons where a paragraph used to bury two links in an
-        // explanation of the Tracked column. Each names the FILE it produces
-        // rather than the act of exporting, so the row reads as a choice of
-        // three sheets rather than three ways to press Export. ?>
-  <?php if (!hidden_from_viewers('export')): ?>
-    <div class="export-row">
-      <a class="button secondary" href="export.php?project=<?= $projectId ?>">Export progress ↓</a>
-      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=shots">Export shot list ↓</a>
-      <a class="button secondary" href="export.php?project=<?= $projectId ?>&amp;what=assets">Export asset list ↓</a>
-    </div>
-  <?php endif; ?>
 <?php endif; ?>
 
 </div>

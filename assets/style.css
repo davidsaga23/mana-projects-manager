@@ -1583,6 +1583,9 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
 .page-head { display: flex; align-items: baseline; justify-content: space-between;
              gap: 16px; flex-wrap: wrap; }
 .page-head .wizard-title { margin-bottom: 0; }
+/* The project Overview's title with its three exports at the right. */
+.project-head { align-items: center; margin: 4px 0 14px; }
+.project-head .export-row { margin: 0; }
 /* The project a transcript's cards will be filed against, inline in the
    sentence that says what is about to happen. */
 .file-them select { width: auto; margin: 0 2px; }
