@@ -457,7 +457,7 @@ require __DIR__ . '/includes/header.php';
     <div class="muted small" style="margin-top:6px;">
       The scheduler plans around these dates when it is re-run, so this is either a schedule saved
       before the dates were set, bars placed by hand, or work nobody else on the department could take.
-      Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a>, move the work on the
+      <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a>, move the work on the
       <a href="timeline.php?project=<?= $projectId ?>">timeline</a>, or change the dates below.
     </div>
   </div>

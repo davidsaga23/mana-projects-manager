@@ -103,7 +103,7 @@ require __DIR__ . '/includes/header.php';
       <strong>N/A</strong> instead of leaving it blank: an empty cell reads as
       "not decided yet" and keeps the wait, <strong>N/A</strong> clears it.
     <?php endif; ?>
-    <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> afterwards;
+    <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a> on the Timeline afterwards;
     a saved plan is a snapshot and will not improve by itself.
   </div>
 <?php else: ?>
@@ -117,7 +117,7 @@ require __DIR__ . '/includes/header.php';
           echo ', ' . $naCount . ' cell' . ($naCount === 1 ? '' : 's') . ' marked N/A';
       }
     ?>.
-    <a href="schedule.php?project=<?= $projectId ?>">Re-run the schedule</a> to use it:
+    <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a> on the Timeline to use it:
     a saved plan is a snapshot and does not update itself.
   </p>
 <?php endif; ?>

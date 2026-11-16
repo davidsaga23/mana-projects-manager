@@ -123,7 +123,7 @@
       {
         page: 'project.php', via: 'a[href^="project.php?id="]', find: ['.proj-tabs'],
         title: 'Inside a project',
-        body: 'The tabs cover the whole show: Brief and Dashboard to read; Staffing, Schedule, Timeline ' +
+        body: 'The tabs cover the whole show: Brief and Dashboard to read; Staffing, Timeline ' +
               'and Shots to plan; Production tracking and Tasks to follow the work. Setup, Import and ' +
               'Export sit after the line.'
       },
