@@ -47,10 +47,11 @@ var PETS = {none:'None',owl:'Owl',cat:'Cat',fox:'Fox',dragon:'Small dragon'};
 var PAID = {crown:1,cap:1,fox:1,dragon:1,starry:1};
 var KINDS = {study:'Cottage',tower:'Tower',forge:'Forge'};
 var DOORS = {open:'Door open',ajar:'Door ajar',sealed:'Sealed'};
-var HIT = {tower:[22,122],study:[32,68],forge:[38,80],tavern:[58,80],hall:[58,80],tent:[30,62]};
+var HIT = {tower:[22,122],study:[32,68],forge:[38,80],tavern:[58,80],hall:[58,80],tent:[30,62],diner:[50,92]};
 var SIDE = {tower:38,study:46,forge:52};
-var DOORX = {tower:0,study:12,forge:20,tavern:0,hall:0,tent:0};
-var FULL = {x:0,y:0,w:1600,h:1000}, VILLAGE = {x:330,y:300,w:940,h:587.5};
+var DOORX = {tower:0,study:12,forge:20,tavern:0,hall:0,tent:0,diner:0};
+/* The village view reaches a little further east since 2026-11-16, so that the Diner is in it. */
+var FULL = {x:0,y:0,w:1600,h:1000}, VILLAGE = {x:320,y:300,w:990,h:618.75};
 var MTS = [[150,300,70],[515,304,62],[235,300,115],[440,300,100],[335,292,145]];
 
 /* The five pieces of landscape. A show's war room is pitched at `camp`. */
@@ -90,6 +91,11 @@ function rebuildBuildings() {
   var add = function (b) { B[b.id] = b; BLIST.push(b); };
   add({id:'council',kind:'hall',x:800,y:462,tint:'candle',name:'Council Hall',lit:true,place:true});
   add({id:'tavern',kind:'tavern',x:800,y:590,tint:'candle',name:'The Tavern',lit:true,place:true});
+  /* THE DINER (David, 2026-11-16: "create a diner so people's avatars go immediately there when they
+     set up their status 'Lunch'"). A roadside diner at the east end of the second street, past the
+     last row of houses and clear of the roads to the Wood and the Ashlands. Anybody may walk in, as
+     into the Tavern; setting the status Lunch puts you inside (see "lunch" further down). */
+  add({id:'diner',kind:'diner',x:1215,y:590,tint:'rose',name:'The Diner',lit:true,place:true});
   ST.lands.forEach(function (l) {
     var L = LANDS[l.land]; if (!L || !l.claimed) return;
     add({id:'land:'+l.land,kind:'tent',x:L.camp[0],y:L.camp[1],tint:{peaks:'mana',wood:'violet',ash:'ember',lake:'teal',moor:'rose'}[l.land],name:l.name+' war room',lit:true,place:true});
@@ -101,7 +107,7 @@ function rebuildBuildings() {
 }
 function spot(id) {
   var o = B[id]; if (!o) return null;
-  return {x:o.x-({tower:36,tavern:72,hall:72,tent:44}[o.kind]||52),y:o.y+4};
+  return {x:o.x-({tower:36,tavern:72,hall:72,tent:44,diner:62}[o.kind]||52),y:o.y+4};
 }
 function title(id) {
   var o = B[id]; if (!o) return '';
@@ -144,6 +150,8 @@ function tileMap() {
   var quad = function (a, b, c) { for (var n = 0; n <= 100; n++) { var t = n/100, u = 1-t; put(u*u*a[0]+2*u*t*b[0]+t*t*c[0],u*u*a[1]+2*u*t*b[1]+t*t*c[1],'p'); } };
   STREETS.forEach(function (sy) { line(480,sy,1120,sy); });
   line(656,500,656,884); line(944,500,944,884); line(800,468,800,500); line(800,596,800,628);
+  /* The second street runs on to the Diner's door. */
+  line(1120,628,1215,628); line(1215,596,1215,628);
   BLIST.forEach(function (o) { if (o.owner) line(o.x,o.y+6,o.x,o.street); });
   quad([480,500],[420,440],[362,368]); quad([1120,500],[1190,440],[1262,368]); quad([1120,640],[1160,730],[1172,814]);
   quad([480,756],[400,740],[268,718]); line(656,500,656,330); quad([656,330],[680,285],[770,268]);
@@ -219,7 +227,9 @@ function paintGround(ctx, TM) {
   }
 }
 var TM = null, GROUND = null, OBJ = [], HOUSES = [], GRID = null, PINE = null, PEAKS = null, CONE = null;
-function nearBuilding(x, y, pad) { for (var i = 0; i < BLIST.length; i++) { var o = BLIST[i]; if (Math.abs(x-o.x) < HIT[o.kind][0]+pad && y > o.y-HIT[o.kind][1]-pad && y < o.y+34) return true; } return false; }
+/* The Diner stands out in the grass, past the town, where pines grow: it keeps a wider clearing, so
+   none stands on its name plate or in front of its door. */
+function nearBuilding(x, y, pad) { for (var i = 0; i < BLIST.length; i++) { var o = BLIST[i], d = o.kind==='diner' ? 36 : 0; if (Math.abs(x-o.x) < HIT[o.kind][0]+pad+d && y > o.y-HIT[o.kind][1]-pad && y < o.y+34+d) return true; } return false; }
 /* Rebuilt only when somebody new gets a house or a show takes or leaves a land. */
 function buildWorld() {
   TM = tileMap();
@@ -246,7 +256,7 @@ function buildWorld() {
     signArt(L.sign[0],L.sign[1]);
   });
   /* What cannot be walked through: water (bridges are fine), the peaks, the volcano, the foot of every building. */
-  var FOOT = {tower:18,study:26,forge:30,tavern:50,hall:54,tent:24}, blk = new Uint8Array(W*H);
+  var FOOT = {tower:18,study:26,forge:30,tavern:50,hall:54,tent:24,diner:44}, blk = new Uint8Array(W*H);
   for (ty = 0; ty < H; ty++) for (tx = 0; tx < W; tx++) {
     var cx = tx*16+8, cy = ty*16+8, k = T[ty*W+tx]==='w', i;
     for (i = 0; i < MTS.length; i++) if (cy>MTS[i][1]-MTS[i][2]&&cy<=MTS[i][1]&&Math.abs(cx-MTS[i][0])<=(cy-(MTS[i][1]-MTS[i][2]))*.7) k = true;
@@ -283,7 +293,7 @@ function banner(x, col) { parts([[x,-72,2,72,PAL.wood],[x+2,-70,11,24,col]]); P1
 /* One building, its base centre at 0,0. */
 function houseArt(o) {
   var tint = TINT[o.tint]||TINT.candle, k = o.kind, lit = o.lit, r, i;
-  if (k==='tavern') { plaza(66,24); banner(-64,tint); } else if (k==='hall') { plaza(66,24); banner(-66,tint); banner(64,tint); } else if (k==='tent') plaza(38,22);
+  if (k==='tavern') { plaza(66,24); banner(-64,tint); } else if (k==='diner') plaza(56,24); else if (k==='hall') { plaza(66,24); banner(-66,tint); banner(64,tint); } else if (k==='tent') plaza(38,22);
   else P1(-HIT[k][0]+2,0,HIT[k][0]*2-4,4,PAL.shadow);
   if (k==='tower') {
     parts([[-16,-76,32,76,PAL.stone],[-20,-84,40,8,PAL.stoneD]]);
@@ -309,6 +319,8 @@ function houseArt(o) {
     [-40,-27,18,31].forEach(function (d) { pane(d,-40,9,10,true); });
     doorArt(-8,-20,16,20); parts([[-15,-17,3,5,PAL.win]]);
     P1(50,-46,2,28,PAL.wood); parts([[52,-42,14,10,PAL.wood]]); P1(55,-39,8,1,PAL.win); P1(55,-36,6,1,PAL.win);
+  } else if (k==='diner') {
+    dinerArt(tint);
   } else if (k==='hall') {
     parts([[-52,-6,104,6,PAL.stoneD],[-48,-10,96,4,PAL.stone]]); parts([[-44,-46,88,36,PAL.glow]]); P1(-44,-46,88,8,shade(PAL.glow,-34));
     for (i = 0; i < 5; i++) { var cx = -44+i*20; parts([[cx,-46,8,36,PAL.marble]]); P1(cx+5,-46,3,36,PAL.snowD); P1(cx+2,-44,1,32,PAL.snowD); }
@@ -322,6 +334,35 @@ function houseArt(o) {
       if (r>22) { var ow = Math.round((r-22)*.36)+1; P1(-ow-1,y3,ow*2+2,1,PAL.out); P1(-ow,y3,ow*2,1,PAL.glow); } }
     P1(-28,0,56,1,PAL.out); P1(-1,-58,2,14,PAL.wood); parts([[1,-58,10,6,tint]]); P1(1,-58,10,2,shade(tint,45));
   }
+}
+/* The Diner (David, 2026-11-16): a low roadside diner with a striped awning, big lit windows with
+   the stools showing through, a glass door, DINER in neon on the roof and a burger on a pole sign. */
+var GLYPH = {D:[6,5,5,5,6],I:[7,2,2,2,7],N:[5,7,7,5,5],E:[7,4,6,4,7],R:[6,5,6,5,5]};
+function neon(word, x, y, col) {
+  for (var i = 0; i < word.length; i++) { var gl = GLYPH[word[i]], r, b;
+    for (r = 0; r < 5; r++) for (b = 0; b < 3; b++) if (gl[r]&(4>>b)) { P1(x+i*8+b*2,y+r*2,2,2,col); } }
+}
+function dinerArt(tint) {
+  /* The pole sign on the right, behind the building. */
+  parts([[44,-78,3,78,PAL.iron]]);
+  parts([[30,-98,32,22,PAL.out]]); P1(31,-97,30,20,shade(tint,-70)); P1(31,-97,30,1,tint); P1(31,-78,30,1,tint);
+  parts([[38,-93,16,4,TINT.candle]]); P1(39,-93,14,1,PAL.hot); P1(37,-89,18,2,TINT.spell); P1(37,-87,18,3,PAL.wood); P1(38,-84,16,3,TINT.candle); P1(41,-92,1,1,PAL.wall); P1(47,-92,1,1,PAL.wall);
+  /* The body: white enamel with a stripe in the sign's colour, a darker kick at the foot. */
+  parts([[-46,-36,92,36,PAL.marble]]); P1(36,-36,10,36,PAL.marbleD); P1(-46,-36,2,36,PAL.lift);
+  P1(-46,-12,92,4,tint); P1(-46,-12,92,1,shade(tint,45)); P1(-46,-5,92,5,PAL.marbleD); P1(-46,-5,92,1,PAL.stoneD);
+  /* Two long windows, stools showing against the light. */
+  [-40,10].forEach(function (wx) { parts([[wx,-30,30,15,PAL.win]]); P1(wx,-30,30,3,PAL.hot); P1(wx+15,-30,1,15,PAL.marbleD);
+    for (var k = 3; k < 30; k += 7) { P1(wx+k,-20,4,2,tint); P1(wx+k+1,-18,2,3,PAL.iron); } });
+  /* A glass door with its push bar. */
+  parts([[-6,-26,12,26,PAL.glow]]); P1(-6,-26,12,3,shade(PAL.glow,-40)); P1(-4,-14,8,1,PAL.iron); P1(-1,-26,1,26,PAL.marbleD); P1(-4,-3,8,3,PAL.hot);
+  /* The roof: a flat iron edge, and a striped awning over the windows. */
+  parts([[-50,-42,100,6,PAL.iron]]); P1(-50,-42,100,1,PAL.rockL);
+  for (var a = -48; a < 48; a += 8) { P1(a,-36,4,5,tint); P1(a+4,-36,4,5,PAL.snow); }
+  P1(-49,-31,98,1,PAL.out);
+  /* DINER in neon on the roof. */
+  parts([[-24,-60,48,16,PAL.out]]); P1(-23,-59,46,14,shade(tint,-80)); P1(-12,-44,2,2,PAL.iron); P1(10,-44,2,2,PAL.iron);
+  neon('DINER',-19,-57,tint); neon('DINER',-19,-57,tint);
+  P1(-23,-59,46,1,shade(tint,30));
 }
 function buildHouses() { HOUSES = BLIST.map(function (o) { return {x:o.x,y:o.y,st:stamp(176,168,84,144,function () { houseArt(o); })}; }); }
 
@@ -805,6 +846,7 @@ function whereabouts() {
 var ROOMS = {};
 function roomArt(kind, tint) {
   var key = kind+tint; if (ROOMS[key]) return ROOMS[key];
+  if (kind==='diner') return (ROOMS[key] = stamp(240,160,0,0,function () { dinerRoom(TINT[tint]||TINT.rose); }));
   var col = TINT[tint]||TINT.candle, tent = kind==='tent', stonef = kind==='hall';
   ROOMS[key] = stamp(240,160,0,0,function () {
     var x, y, i;
@@ -824,6 +866,25 @@ function roomArt(kind, tint) {
   });
   return ROOMS[key];
 }
+/* Inside the Diner: a black and white floor, enamel walls with a stripe, a clock, a menu board,
+   windows on the street, and a row of stools at the counter painted on the floor, so that somebody
+   standing on one is seen sitting at the counter. The counter, the jukebox and the booths stand on
+   the floor as PROPS, below. */
+var DINER_STOOLS = [34,60,86,112,138,164];
+function dinerRoom(col) {
+  var x, y;
+  P1(0,0,240,160,PAL.out);
+  for (y = 52; y < 150; y += 8) for (x = 10; x < 230; x += 8) P1(x,y,8,8,((x-10)/8+(y-52)/8)%2 ? PAL.iron : PAL.marble);
+  P1(10,10,220,42,PAL.marble); P1(10,10,220,3,PAL.iron); P1(10,34,220,4,col); P1(10,34,220,1,shade(col,45)); P1(10,46,220,6,PAL.marbleD); P1(10,46,220,1,PAL.stoneD);
+  [[22,14],[196,14]].forEach(function (w) { parts([[w[0],w[1],22,16,PAL.winD]]); P1(w[0]+3,w[1]+3,1,1,PAL.hot); P1(w[0]+15,w[1]+9,1,1,PAL.hot); P1(w[0]+11,w[1],1,16,PAL.iron); });
+  /* The menu board and the clock. */
+  parts([[64,14,52,18,PAL.out]]); for (y = 17; y < 30; y += 4) { P1(68,y,24,1,PAL.wall); P1(100,y,10,1,TINT.candle); }
+  parts([[130,15,14,14,PAL.wall]]); P1(136,17,1,6,PAL.out); P1(136,22,5,1,PAL.out); P1(130,15,14,1,PAL.hot);
+  parts([[156,16,24,12,col]]); P1(159,19,18,6,shade(col,-60)); P1(161,21,3,2,PAL.hot); P1(166,21,3,2,PAL.hot); P1(171,21,3,2,PAL.hot);
+  /* The stools: a red seat on a chrome post. */
+  DINER_STOOLS.forEach(function (sx) { parts([[sx-5,70,10,4,col]]); P1(sx-5,70,10,1,shade(col,45)); P1(sx-1,74,2,7,PAL.marbleD); parts([[sx-4,81,8,2,PAL.iron]]); });
+  P1(108,150,24,4,PAL.glow);
+}
 /* THE FURNITURE OF A MEETING PLACE (David, 2026-11-13: "let's also have the option for the avatars to
    move freely inside each house"). It used to be part of the room's one picture. Now that people
    walk about, each piece is its own small picture, so that it can stop a character and so that
@@ -832,7 +893,10 @@ function roomArt(kind, tint) {
 var PROPS = {
   /* The stall is the merchant's (David, 2026-11-13: the shop is "a merchant in the Tavern"). */
   tavern:[['bar',24,46,192,20],['keg',28,100,22,26],['keg',190,100,22,26],['stall',158,64,36,34]],
-  hall:[['slab',70,74,100,10]]
+  hall:[['slab',70,74,100,10]],
+  /* The Diner (2026-11-16): the counter along the back with the stools in front of it (painted on
+     the floor, dinerRoom()), the jukebox in the corner, and a booth each side of the door. */
+  diner:[['counter',18,42,172,24],['jukebox',198,36,22,34],['booth',20,108,46,26],['booth',174,108,46,26]]
   /* A show's camp (the tent) has no row here since 2026-11-13: what stands in it is a list of
      things, as in a house (CAMP_FIX and everybody's one decoration), so that the same code keeps
      decorations off the fixtures. Its map table is the thing camp_table; the two crates left. */
@@ -847,6 +911,14 @@ function propArt(id) {
     parts([[0,21,36,13,PAL.wood]]); P1(0,21,36,2,shade(PAL.wood,35)); P1(4,25,28,7,TINT.ember); P1(4,25,28,1,shade(TINT.ember,45)); P1(15,26,6,5,TINT.candle); P1(16,27,4,1,PAL.hot); P1(17,28,2,2,PAL.glow);
     parts([[3,15,4,6,TINT.spell]]); P1(4,13,2,2,PAL.wall); P1(3,15,1,3,PAL.hot); parts([[28,17,6,4,TINT.candle]]); P1(28,15,1,2,TINT.candle); P1(30,15,2,2,TINT.candle); P1(33,15,1,2,TINT.candle); P1(30,18,2,2,TINT.ember); }
   else if (id==='slab') { parts([[0,0,100,10,PAL.marble]]); P1(0,8,100,2,PAL.marbleD); }
+  /* The Diner's counter: a long top, the cook's hatch behind it, a pie under glass, a coffee pot. */
+  else if (id==='counter') { parts([[0,10,172,14,PAL.marble]]); P1(0,10,172,3,TINT.rose); P1(0,13,172,1,shade(TINT.rose,-50)); P1(0,20,172,4,PAL.marbleD);
+    parts([[118,0,26,10,PAL.snowD]]); P1(119,1,24,8,PAL.lift); P1(124,5,14,4,TINT.candle); P1(126,4,10,1,shade(TINT.candle,40));
+    parts([[22,3,8,7,PAL.iron]]); P1(23,4,6,3,PAL.wood); P1(30,5,2,2,PAL.iron); parts([[60,6,10,4,PAL.wall]]); P1(62,4,6,2,TINT.ember); parts([[88,5,6,5,PAL.wall]]); P1(89,6,4,1,PAL.wood); }
+  else if (id==='jukebox') { parts([[0,6,22,28,TINT.violet]]); P1(0,0,22,8,TINT.candle); P1(2,1,18,6,PAL.hot); P1(3,12,16,10,PAL.winD);
+    for (x = 4; x < 18; x += 4) P1(x,14,2,6,TINT.rose); P1(3,24,16,2,PAL.iron); P1(3,28,16,4,shade(TINT.violet,-50)); }
+  else if (id==='booth') { parts([[0,0,46,8,TINT.rose],[0,8,6,18,TINT.rose],[40,8,6,18,TINT.rose]]); P1(0,0,46,2,shade(TINT.rose,45));
+    parts([[9,10,28,8,PAL.marble]]); P1(9,16,28,2,PAL.marbleD); P1(20,18,6,8,PAL.iron); P1(13,11,5,3,PAL.wall); P1(28,11,4,4,TINT.ember); }
 }
 var PSTAMP = {};
 function propStamp(pr) { return PSTAMP[pr[0]] || (PSTAMP[pr[0]] = stamp(pr[3]+2,pr[4]+2,1,1,function () { propArt(pr[0]); })); }
@@ -2008,6 +2080,32 @@ function overlay() {
   });
   return h+'</svg>';
 }
+/* ---------- statuses (David, 2026-11-16, migration 098) ----------
+   Slack's status: an emoji and a short line beside a name ("In review until 3", "Lunch", "Off
+   tomorrow"). Each person's comes with the map (`status`, includes/realm_status.php): kind, emoji,
+   text, and `left`, the seconds until it clears (null: only when cleared by hand). THE SERVER CLEARS
+   IT; this page only stops showing one whose time is up before the next heartbeat says so. It is
+   shown beside the name in People, on the card of a house, on the card over a character, and beside
+   the name on a chat message. Set and cleared in assets/realm_status.js. */
+function stOf(p) {
+  var s = p && p.status; if (!s) return null;
+  if (s.left!==null && s.left!==undefined && s.left <= (Date.now()-(ST.got||Date.now()))/1000) return null;
+  return s;
+}
+/* "clears at 13:30", in the viewer's own clock; '' for a status with no end. Not "until": the
+   words often say until when already ("In review until 3"). */
+function stUntil(s) {
+  if (!s || s.left===null || s.left===undefined) return '';
+  var t = new Date((ST.got||Date.now())+s.left*1000), h = t.getHours(), m = t.getMinutes();
+  return 'clears at '+h+':'+(m<10?'0':'')+m;
+}
+function stWords(s) { return s ? s.emoji+' '+s.text : ''; }
+function stChip(p) {
+  var s = stOf(p); if (!s) return '';
+  var u = stUntil(s);
+  return '<i class="rstat" title="'+esc(s.text+(u?', '+u:''))+'" aria-label="Status: '+esc(s.text)+'">'+esc(s.emoji)+'</i>';
+}
+function lunching() { var s = stOf(me()); return !!(s && s.kind==='lunch'); }
 function whereWords(p) {
   if (p.state==='away') return 'Away';
   var own = p.place==='user:'+p.id, o = B[p.place], at = own ? '' : (o ? (p.inside?'In ':'At ')+(o.owner?firstName(o.owner.name)+"'s":o.name) : '');
@@ -2026,7 +2124,7 @@ function renderSide() {
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
-  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"'+((ST.chat && !p.me)?' data-raven="'+dmId(ST.me,p.id)+'" title="Open your ravens with '+esc(firstName(p.name))+'"':'')+'><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small>'+esc(whereWords(p))+'</small>')+'</button>'; });
+  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"'+((ST.chat && !p.me)?' data-raven="'+dmId(ST.me,p.id)+'" title="Open your ravens with '+esc(firstName(p.name))+'"':'')+'><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+stChip(p)+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small'+(stOf(p)?' class="rstattext" title="'+esc(stOf(p).text+'. '+whereWords(p))+'"':'')+'>'+esc(stOf(p)?stOf(p).text:whereWords(p))+'</small>')+'</button>'; });
   if (!ppl.length) h += '<small style="padding:0 8px">Nobody has a house yet.</small>';
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
@@ -2088,7 +2186,8 @@ function renderCard() {
     if (ajar) why = waiting ? 'Knocking. Waiting for '+firstName(o.owner.name)+' to answer.' : (KN.ready ? 'The door is ajar. Knock, and wait to be let in.' : 'The door is ajar. Knocking needs a database update first.');
     var btn = S.here===id && ajar ? '<button type="button" class="rbtn rprimary rsmall" data-knock="'+o.owner.id+'"'+((waiting||!KN.ready)?' disabled':'')+'>'+(waiting?'Knocking…':'Knock')+'</button>' :
       S.here===id ? '<button type="button" class="rbtn rprimary rsmall" data-enter="'+esc(id)+'"'+(why?' disabled':'')+'>Go inside</button>' : '<button type="button" class="rbtn rprimary rsmall" data-walk="'+esc(id)+'">Walk there</button><button type="button" class="rbtn rsmall" data-tele="'+esc(id)+'">Teleport</button>';
-    h = '<div class="rcard"><b>'+esc(title(id))+'</b><small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
+    var sto = o.owner ? stOf(o.owner) : null;
+    h = '<div class="rcard"><b>'+esc(title(id))+'</b>'+(sto?'<span class="rcardstat">'+esc(stWords(sto))+(stUntil(sto)?' <small>'+esc(stUntil(sto))+'</small>':'')+'</span>':'')+'<small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
   }
   slot.innerHTML = h;
 }
@@ -2102,6 +2201,7 @@ function renderInside() {
   var land = campOf(o.id), k = land ? CAMP[land] : null, mayDeco = (o.owner && o.owner.me) || (k && !k.closed);
   var hint = (o.owner && o.owner.me) ? ' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.' : !k ? '' : k.closed ? ' This camp belongs to a show you are not on, so its boards are covered.' : ' Click the bar, the scroll, the calendar or the board, or walk up to one and press Enter.';
   if (stallOf(o)) hint = ' The merchant sells things for gold: walk up and press Enter, or click.';
+  if (o.id==='diner') hint = lunching() ? ' Enjoy your lunch. Clear your status when you are done and you go back home.' : ' Pull up a stool. Set your status to Lunch and you come straight here.';
   bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', '))+(hint?'.':''):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
   /* The shared screen sits under this bar, however many lines the bar takes. */
   shareShow();
@@ -2153,6 +2253,7 @@ function applyState(st) {
   if (st.reminders && R.onReminders) R.onReminders(st.reminders);
   takeSpots(st.spots);
   skyNews();
+  lunchCheck();
 }
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
@@ -2209,6 +2310,48 @@ function tick(ts) {
 /* TELEPORTING (David, 2026-11-13): a ring of sparks and a beam where I was, the same closing in
    where I arrive, so the jump is seen and not just a cut. */
 function teleport(id) { if (!spot(id)) return; var fx0 = {x:S.pos.x,y:S.pos.y}; fx('poof',fx0.x,fx0.y); arrived(id); fx('land',S.pos.x,S.pos.y); }
+/* ---------- lunch (David, 2026-11-16: "a diner so people's avatars go immediately there when they set
+   up their status 'Lunch'") ----------
+   The SERVER moves the character (includes/realm_status.php): setting Lunch stands me inside the
+   Diner, and when it ends, by the clock or by clearing it, back home (REALM_LUNCH_BACK there). So
+   everybody else sees it at once. This page only follows, with the teleport's sparkle: on the map
+   or in whatever room I was in, a ring of sparks where I was, and the same closing in at the stool.
+   Only when it CHANGES (or on opening the page while at lunch): walking out of the Diner during
+   lunch is allowed, and nothing then pulls me back. */
+var LUNCH = {was:null,busy:false};
+function lunchCheck() {
+  var m = me(); if (!m || !B.diner) return;
+  var now = lunching(), was = LUNCH.was; LUNCH.was = now;
+  if (was===now) return;
+  if (now) { if (S.inside!=='diner') jump('diner',true); return; }
+  /* Lunch ended. If I was still at the Diner the server has stood me somewhere else: follow it. */
+  if (was && (S.inside==='diner' || S.here==='diner') && m.place!=='diner' && B[m.place]) jump(m.place,!!m.inside);
+}
+/* Out of the room I am in, with nothing shown: the room's call hangs up, as walking out does. */
+function quietOut() { voiceStop(true); BUB = {}; decoEnd(); RM.walk = null; held.clear(); S.inside = null; spotSpace(); }
+/* Teleport to a place, outside it or straight into its room. */
+function jump(id, inside) {
+  var o = B[id]; if (!o || LUNCH.busy) return; LUNCH.busy = true;
+  S.walk = null; held.clear();
+  if (S.inside) fx('poof',RM.x,RM.y); else fx('poof',S.pos.x,S.pos.y);
+  setTimeout(function () {
+    LUNCH.busy = false;
+    if (S.inside===id && inside) return;
+    if (S.inside) quietOut();
+    var s = spot(id); S.pos = {x:s.x,y:s.y}; S.here = id; S.sel = inside ? null : id;
+    if (inside) {
+      S.inside = id; roomCome();
+      /* At the Diner, a stool at the counter: each person's own, so two lunchers do not stand on one. */
+      if (id==='diner') { var sol = roomSolids(o), n = DINER_STOOLS.length, k, at = (ST.me||0)%n;
+        for (k = 0; k < n; k++) { var sx = DINER_STOOLS[(at+k)%n]; if (roomFree(sx,80,sol)) { RM.x = sx; RM.y = 80; break; } } }
+      if (o.owner) roomAsk(o.owner.id); else if (campOf(id)) campAsk(id);
+      fx('land',RM.x,RM.y);
+      if (chanFor(id) && !CH.open) openChat(chanFor(id));
+    } else { fx('land',S.pos.x,S.pos.y); follow(); }
+    renderCard(); renderInside(); renderSide(); draw();
+    send({arrive:id,inside:inside?1:0}).then(function () { if (inside) spotDirty(); });
+  },calm ? 0 : FXMS.poof);
+}
 /* A short animation driven by the clock: fn gets 0..1, done runs at the end. */
 function play(ms, fn, done) { if (calm) { fn(1); done(); return; } var t0 = 0; (function step(ts) { if (!t0) t0 = ts; var k = Math.min(1,(ts-t0)/ms); fn(k); draw(); if (k < 1) requestAnimationFrame(step); else done(); })(performance.now()); }
 /* Walk in through the door, fade, and you are in the room. */
@@ -2410,7 +2553,7 @@ function chanTitle(id) {
 /* The conversation that belongs to a building: a place's channel, or ravens with a house's owner. */
 function chanFor(placeId) {
   if (!ST.chat) return null;
-  if (placeId==='tavern' || placeId==='council') return placeId;
+  if (placeId==='tavern' || placeId==='council' || placeId==='diner') return placeId;
   var m = /^land:(.+)$/.exec(placeId);
   if (m) { var l = ST.lands.filter(function (x) { return x.land===m[1]; })[0]; return l && l.project_id ? 'project:'+l.project_id : null; }
   m = /^user:(\d+)$/.exec(placeId);
@@ -2507,7 +2650,7 @@ function msgHTML(m) {
   var main = m.fwd ? '<div class="rfwd"><small class="rfwdfrom">Forwarded from '+esc(m.fwd.where)+' &middot; '+esc(m.fwd.name)+(m.fwd.at ? ' &middot; '+esc(m.fwd.at) : '')+'</small>'+body+pic+'</div>' : body+(m.deleted ? '' : pic);
   var cls = 'rmsg'+(m.mine?' is-mine':'')+(m.deleted?' is-deleted':'')+(inThread && m.id===CH.thread?' is-parent':'');
   var h = '<div class="'+cls+'" data-msg="'+(+m.id)+'" data-v="'+esc(m.v||'')+'"'+(m.fwd?' data-fwd="1"':'')+' tabindex="0">'+(m.deleted ? '' : barHTML(m, top && !inThread))
-        +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b><small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main+foot+'</div>';
+        +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b>'+(m.user?stChip(person(m.user)):'')+'<small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main+foot+'</div>';
   return inThread && m.id===CH.thread ? h+'<p class="rthrline" id="thrLine">Replies</p>' : h;
 }
 /* THE BAR OVER A MESSAGE, in Slack's order: three quick reactions (my three most used, from the
@@ -2837,7 +2980,8 @@ function seg(label, key, opts) { return '<div class="rpick"><span>'+label+'</spa
 function renderLook() {
   var names = {cloak:CLOAKS,hat:HATS,pet:PETS}, tried = ['cloak','hat','pet'].filter(function (k) { return lookSale(k,LOOK[k]); });
   var note = tried.length ? '<small class="rtry">You are trying on '+tried.map(function (k) { var v = LOOK[k]; return 'the '+esc(names[k][v].toLowerCase())+(k==='cloak'?' cloak':'')+(price(v)?' ('+price(v)+' coins)':''); }).join(' and ')+'. The merchant in the Tavern sells '+(tried.length > 1?'them':'it')+'. Pick something of yours to save.</small>' : '';
-  $('lookForm').innerHTML = '<div class="rlook"><canvas id="charcv" class="rchar" width="120" height="120" role="img" aria-label="Your character"></canvas><div class="rpicks">'+seg('Cloak','cloak',CLOAKS)+seg('Head','hat',HATS)+seg('Companion','pet',PETS)+seg('House','house_kind',KINDS)+'</div></div><small>Your roof takes the colour of your cloak, so your house and your character match.</small>'+note+'<div class="rdacts"><button type="button" class="rbtn" data-lookcancel="1">Cancel</button><button class="rbtn rprimary"'+(tried.length?' disabled':'')+'>Save</button></div>';
+  var mst = stOf(me()), stl = $('statusDlg') ? '<div class="rlookstat"><span>Status</span><b>'+(mst?esc(stWords(mst))+(stUntil(mst)?' <small>'+esc(stUntil(mst))+'</small>':''):'<small>None set</small>')+'</b><button type="button" class="rbtn rsmall" data-statusopen="1">'+(mst?'Change':'Set a status')+'</button></div>' : '';
+  $('lookForm').innerHTML = stl+'<div class="rlook"><canvas id="charcv" class="rchar" width="120" height="120" role="img" aria-label="Your character"></canvas><div class="rpicks">'+seg('Cloak','cloak',CLOAKS)+seg('Head','hat',HATS)+seg('Companion','pet',PETS)+seg('House','house_kind',KINDS)+'</div></div><small>Your roof takes the colour of your cloak, so your house and your character match.</small>'+note+'<div class="rdacts"><button type="button" class="rbtn" data-lookcancel="1">Cancel</button><button class="rbtn rprimary"'+(tried.length?' disabled':'')+'>Save</button></div>';
   var c = $('charcv').getContext('2d'); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,120,120); c.setTransform(2,0,0,2,0,0); sprite(c,22,58,LOOK,0);
 }
 function openLook() { var m = me(); if (!m) return; LOOK = {cloak:m.cloak,hat:m.hat,pet:m.pet,house_kind:m.kind}; renderLook(); $('lookDlg').showModal(); }
@@ -3687,6 +3831,9 @@ R.msgHTML = msgHTML; R.findOpen = findOpen; R.chanTitle = chanTitle; R.dmId = dm
 /* What assets/realm_made.js borrows (channels people make, migration 097): the state as it is now
    (ST is replaced by every heartbeat), a way to take in a new channel list, and opening one. */
 R.now = function () { return ST; }; R.openChat = openChat; R.closeChat = closeChat;
+/* What assets/realm_status.js borrows (statuses, migration 098): sending a change and taking in the
+   map that comes back, which is where lunch moves me; and the words of a status. */
+R.send = send; R.stOf = stOf; R.stUntil = stUntil; R.me = me;
 R.takeChat = function (c) { if (!c || !ST) return; if (ST.chat && ST.chat.unread && !c.unread) c.unread = ST.chat.unread; ST.chat = c; renderSide(); badge(); };
 R.refresh = function () { send({ping:1,active:1}); var m = me(); if (m && S.inside==='user:'+m.id && !DECO.on) roomAsk(m.id); };
 ['pointerdown','wheel','touchstart'].forEach(function (ev) { window.addEventListener(ev,function () { S.touched = true; },{passive:true}); });
@@ -3805,14 +3952,15 @@ function whoHit(e) {
 function whoTime(m) { m = Math.max(0,Math.floor(m)); var h = Math.floor(m/60), r = m%60; return h ? h+' h'+(r?' '+(r<10?'0':'')+r:'') : m+' min'; }
 function whoFill(id) {
   var p = person(id), el = whoBox(); if (!p || !el) return false;
-  var w = p.work, h = '<b>'+esc(p.name)+(p.me?' (you)':'')+'</b>';
+  var w = p.work, sto = stOf(p), h = '<b>'+esc(p.name)+(p.me?' (you)':'')+'</b>';
+  if (sto) h += '<span class="rwhostat">'+esc(stWords(sto))+(stUntil(sto)?' <small>'+esc(stUntil(sto))+'</small>':'')+'</span>';
   if (w) {
     var mins = w.mins + (w.tick ? (Date.now()-(ST.got||Date.now()))/60000 : 0);
     h += '<span class="rwhotask">'+esc(w.title)+'</span><small>'+esc(w.show)
       +(w.brk ? ' &middot; '+esc(w.brk) : mins >= 1 ? ' &middot; '+esc(whoTime(mins))+' today' : ' &middot; just started')+'</small>'
       +(w.link ? '<a href="'+esc(w.link)+'" target="_blank" rel="noopener">Open in Anima</a>' : '');
   }
-  el.innerHTML = h; el.classList.toggle('is-bare',!w);
+  el.innerHTML = h; el.classList.toggle('is-bare',!w && !sto);
   return true;
 }
 function whoShow(id) { clearTimeout(WHO.hide); if (WHO.id!==id || $('whoTip').hidden) { if (!whoFill(id)) return; WHO.id = id; $('whoTip').hidden = false; } whoPlace(); }

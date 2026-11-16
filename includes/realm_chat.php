@@ -68,6 +68,8 @@ function realm_channels(PDO $pdo, bool $mayAnnounce, int $uid = 0, bool $archive
         ['id' => 'announcements', 'name' => 'Announcements', 'post' => $mayAnnounce],
         ['id' => 'tavern',        'name' => 'The Tavern',    'post' => true],
         ['id' => 'council',       'name' => 'Council Hall',  'post' => true],
+        // The Diner (David, 2026-11-16): where lunch is eaten, talked over like the Tavern.
+        ['id' => 'diner',         'name' => 'The Diner',     'post' => true],
     ];
     try {
         foreach ($pdo->query('SELECT p.id, p.name FROM realm_lands l JOIN projects p ON p.id = l.project_id ORDER BY p.name') as $r) {
