@@ -6349,3 +6349,31 @@ phases, so the app now says so.
   keys, and today's figures are matched to the signed-off ones by that label. Renaming needs the
   `$renamed` map in `kickoff_render_section()` extended to list titles too.
 - New screens use **Department** and **Phase**, never "step" for a pipeline step.
+
+## 2026-11-16 — Schedule folded into the Timeline
+
+David: the Schedule tab *"can't edit any dates"*, and he would rather adjust dates in the Timeline.
+Asked whether the scheduler should go, he agreed to keep its engine and drop the separate tab.
+
+- **One place for dates: the Timeline.** The forward pass (`build_schedule()` / `commit_schedule()`
+  in `includes/scheduler.php`) is unchanged and still worth having for first drafts and re-plans; it
+  is now reached from **Draft dates from the plan…**, a dialog drawn by
+  `includes/schedule_draft.php`. The dialog reuses the plan the Timeline already works out on every
+  load for its "out of date" check, so opening it costs nothing extra and the two can never differ.
+- **Preview first, always.** The Timeline's old Regenerate saved straight away behind a
+  `confirm()`. Now every save goes through the preview, and Apply keeps the migration-010 guard.
+- **`schedule.php` stays as a redirect** to `timeline.php?project=N#draft`, which opens the dialog.
+  It does not act on a POST: nothing posts there any more.
+- **"Plan changed" is a fingerprint, not a date.** None of the inputs has an "updated at", and the
+  plan cannot be compared with a fresh one because the pass starts from today. So Apply stores a
+  hash of the inputs (`project_settings`: `schedule_inputs_sig`, `schedule_drafted_at`; no
+  migration) and the Timeline compares it on each load. Counted: each department's headcount, days
+  per item, coverage and scope, the workflow, estimates and retake allowance, shots / assets /
+  shot-asset links / N/A marks, the studio calendar, and the absences, engagement dates and lane
+  assignments of the people on this show. **Not counted:** approvals and progress (work getting done
+  is not the plan changing) and departments' dates dragged on the general chart (that is editing
+  dates, which is what the Timeline is for). A show shows no note until its first Apply.
+- **`schedule_api.php` answers to the Timeline's switches** (`timeline` / `timeline_edit`). It is
+  what every bar on the Timeline saves through; under its own "Schedule" switch, turning that off
+  silently broke the Timeline's drags. The "Schedule" switch is removed.
+
