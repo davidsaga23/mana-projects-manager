@@ -31,7 +31,7 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
         if (!isset($existing[$id])) continue;
         $name = trim($name);
         if ($name === '') {
-            flash('warn', 'A step was left with a blank name, so its old name was kept.');
+            flash('warn', 'A department was left with a blank name, so its old name was kept.');
             continue;
         }
         $before = $existing[$id];
@@ -62,7 +62,7 @@ function wizard_pipeline_apply_edits(PDO $pdo, int $projectId): int {
             // Names only have to be unique within what they apply to, so this
             // means a clash with a step of the SAME scope.
             flash('warn', 'Could not rename "' . $before['name'] . '" to "' . $name .
-                          '", another step for ' . applies_to_phrase($appliesTo, $assetType) .
+                          '", another department for ' . applies_to_phrase($appliesTo, $assetType) .
                           ' is already called that. The same name is fine on a different scope.');
         }
     }
@@ -77,7 +77,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     // every button on this screen. Only Add acts on them — say so, rather than
     // letting a typed name disappear on Save the way the renames used to.
     if ($action !== 'add' && trim($_POST['new_name'] ?? '') !== '') {
-        flash('warn', 'You had typed "' . trim($_POST['new_name']) . '" in the "Add a step" box '
+        flash('warn', 'You had typed "' . trim($_POST['new_name']) . '" in the "Add a department" box '
                     . 'but pressed a different button, so it was not added. Everything else was '
                     . 'saved, type it again and press Add.');
     }
@@ -87,13 +87,13 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         $templateId = (int)($_POST['template_id'] ?? 0);
         $existing = pipeline_steps($pdo, $projectId);
         if ($existing) {
-            throw new RuntimeException('This project already has steps, so a template was not applied.');
+            throw new RuntimeException('This project already has departments, so a template was not applied.');
         }
         if ($templateId > 0) {
             $n = apply_pipeline_template($pdo, $projectId, $templateId);
-            flash('ok', "Added $n steps from the template. Edit, add or remove any of them.");
+            flash('ok', "Added $n departments from the template. Edit, add or remove any of them.");
         } else {
-            flash('ok', 'Starting with an empty pipeline, add your steps below.');
+            flash('ok', 'Starting with an empty pipeline, add your departments below.');
         }
         return wizard_pipeline_url($pdo, $projectId);
     }
@@ -118,7 +118,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         if ($name === '') {
             // Not a throw: the error path goes back to the plain step URL, which
             // on an empty pipeline is the template picker again, not this list.
-            flash('err', 'Give the new step a name.');
+            flash('err', 'Give the new department a name.');
             return wizard_pipeline_url($pdo, $projectId);
         }
         [$appliesTo, $assetType] = parse_applies_to($_POST['new_applies_to'] ?? 'shot');
@@ -147,14 +147,14 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             $ins->execute($args);
             $newId = (int)$pdo->lastInsertId();
         } catch (PDOException $e) {
-            throw new RuntimeException('This project already has a step called "' . $name .
+            throw new RuntimeException('This project already has a department called "' . $name .
                                        '" for ' . applies_to_phrase($appliesTo, $assetType) .
                                        '. The same name is fine on a different scope.');
         }
         // Give it somewhere sensible in the graph; the workflow screen refines it.
         link_new_step($pdo, $projectId, $newId);
         step_library_remember($pdo, $name, $appliesTo, $tracks, null, $newDept);
-        flash('ok', 'Added the step "' . $name . '" at the end of the pipeline. ' .
+        flash('ok', 'Added the department "' . $name . '" at the end of the pipeline. ' .
                     'It will be suggested on future projects too.');
         return wizard_url($projectId, 2);
     }
@@ -226,7 +226,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
 
         // Order is presentation only now that dependencies are set explicitly, so
         // rearranging this list can no longer disturb the workflow.
-        flash('ok', 'Saved the new step order. The workflow is unaffected, order here is ' .
+        flash('ok', 'Saved the new department order. The workflow is unaffected, order here is ' .
                     'just how the list reads.');
         return wizard_url($projectId, 2);
     }
@@ -239,7 +239,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
         foreach ($steps as $i => $s) if ((int)$s['id'] === $stepId) $index = $i;
 
         if ($index === null) {
-            flash('warn', 'That step no longer exists.');
+            flash('warn', 'That department no longer exists.');
             return wizard_url($projectId, 2);
         }
 
@@ -251,14 +251,14 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             $pdo->prepare('DELETE FROM pipeline_steps WHERE id = ? AND project_id = ?')
                 ->execute([$stepId, $projectId]);
             renumber_steps($pdo, $projectId);
-            flash('ok', 'Removed the step "' . $name . '". Anything that waited for it now ' .
+            flash('ok', 'Removed the department "' . $name . '". Anything that waited for it now ' .
                         'waits for whatever it waited for.');
             return wizard_url($projectId, 2);
         }
 
         $swapWith = $verb === 'up' ? $index - 1 : $index + 1;
         if ($swapWith < 0 || $swapWith >= count($steps)) {
-            flash('warn', 'That step is already at the ' . ($verb === 'up' ? 'top' : 'bottom') . '.');
+            flash('warn', 'That department is already at the ' . ($verb === 'up' ? 'top' : 'bottom') . '.');
             return wizard_url($projectId, 2);
         }
         $upd = $pdo->prepare('UPDATE pipeline_steps SET step_order = ? WHERE id = ?');
@@ -270,7 +270,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     }
 
     if ($changed > 0) {
-        flash('ok', "Saved changes to $changed step" . ($changed === 1 ? '' : 's') . '.');
+        flash('ok', "Saved changes to $changed department" . ($changed === 1 ? '' : 's') . '.');
     } elseif ($action === 'save') {
         flash('ok', 'No changes to save.');
     }
@@ -314,7 +314,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         foreach ($templates as $t) if ($t['project_type'] === $project['type']) $matched = true;
         ?>
         <p class="lead">Start from a template, then change anything. Templates are just
-           starting points, editing these steps never affects other projects.</p>
+           starting points, editing these departments never affects other projects.</p>
         <form method="post" class="stack">
           <input type="hidden" name="action" value="template">
           <div class="template-grid">
@@ -323,13 +323,13 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
               <input type="radio" name="template_id" value="<?= (int)$t['id'] ?>"
                      <?= $t['project_type'] === $project['type'] ? 'checked' : '' ?>>
               <strong><?= e($t['name']) ?></strong>
-              <span class="muted"><?= (int)$t['step_count'] ?> steps · for <?= e($t['project_type']) ?> projects</span>
+              <span class="muted"><?= (int)$t['step_count'] ?> departments · for <?= e($t['project_type']) ?> projects</span>
             </label>
           <?php endforeach; ?>
             <label class="template-card">
               <input type="radio" name="template_id" value="0" <?= $matched ? '' : 'checked' ?>>
               <strong>Start empty</strong>
-              <span class="muted">Add every step by hand</span>
+              <span class="muted">Add every department by hand</span>
             </label>
           </div>
           <div class="actions"><button type="submit">Use this →</button></div>
@@ -339,9 +339,9 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     }
     ?>
     <p class="lead">These are the stages work passes through. The order here is just for
-       reading; which steps wait for which is set on the next screen.</p>
+       reading; which departments wait for which is set on the next screen.</p>
     <p class="muted small">
-      <strong>Applies to</strong> decides what a step is counted against. <em>Both</em> is for
+      <strong>Applies to</strong> decides what a department is counted against. <em>Both</em> is for
       work that passes over shots <em>and</em> assets, 2D colour, where characters and shots
       are both coloured. <em>The whole project</em> is for one-off deliverables like an
       animatic, a music track or the final mix, which belong to no particular shot.
@@ -368,7 +368,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       <div class="step-filter">
         <label class="inline"><strong>Show</strong>
           <select data-filter-for="step-rows" data-filter-attr="data-category"
-                  data-filter-note="step-filter-note" data-filter-noun="steps">
+                  data-filter-note="step-filter-note" data-filter-noun="departments">
             <option value="">everything (<?= count($steps) ?>)</option>
             <?php foreach ($present as $value => $count):
                   [$k, $t] = parse_applies_to($value); ?>
@@ -377,7 +377,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
           </select>
         </label>
         <span class="muted small" id="step-filter-note">Filtering only changes what you see,
-          saving still keeps every step.</span>
+          saving still keeps every department.</span>
       </div>
       <?php endif; ?>
 
@@ -413,7 +413,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       <table class="step-table">
         <thead>
         <tr>
-          <th></th><th>Step</th>
+          <th></th><th>Department</th>
           <?php if ($hasDept): ?>
             <th title="Which phase of production this department belongs to. Groups the timeline and is the subtotal boundary on a budget.">Phase</th>
           <?php endif; ?>
@@ -461,15 +461,15 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
           <td class="row-actions">
             <button type="submit" name="action" value="up:<?= $id ?>"   title="Move up">↑</button>
             <button type="submit" name="action" value="down:<?= $id ?>" title="Move down">↓</button>
-            <button type="submit" name="action" value="del:<?= $id ?>"  title="Remove step" class="danger"
-                    onclick="return confirm('Remove the step <?= e(addslashes($s['name'])) ?>?');">✕</button>
+            <button type="submit" name="action" value="del:<?= $id ?>"  title="Remove department" class="danger"
+                    onclick="return confirm('Remove the department <?= e(addslashes($s['name'])) ?>?');">✕</button>
           </td>
         </tr>
         <?php endforeach; ?>
         </tbody>
       </table>
       <?php if (!$steps): ?>
-        <p class="muted small">No steps yet. Add the first one below, or
+        <p class="muted small">No departments yet. Add the first one below, or
           <a href="<?= e(wizard_url($projectId, 2)) ?>">pick a template instead</a>.</p>
       <?php endif; ?>
 
@@ -511,8 +511,8 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
           // button too, since HTML5 validates the whole form. The empty case is
           // caught server-side, where it can say something useful. ?>
     <div class="add-row">
-      <strong>Add a step</strong>
-      <input name="new_name" id="new-step-name" placeholder="Step name"
+      <strong>Add a department</strong>
+      <input name="new_name" id="new-step-name" placeholder="Department name"
              list="step-library-names" autocomplete="off">
       <datalist id="step-library-names">
         <?php foreach ($library as $l): ?>
@@ -537,7 +537,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
     </form>
 
     <?php if ($library): ?>
-      <p class="muted small">Start typing to see <?= count($library) ?> step
+      <p class="muted small">Start typing to see <?= count($library) ?> department
          <?= count($library) === 1 ? 'name' : 'names' ?> used on other projects, picking one
          fills in its usual settings. Anything new you add gets remembered the same way.</p>
     <?php endif; ?>

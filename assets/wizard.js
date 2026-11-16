@@ -698,7 +698,7 @@
     var head = [];
     table.querySelectorAll('thead th').forEach(function (th, i) {
       var t = clean(th.innerText);
-      if (i === 0) { head.push('Step', 'Scope'); return; }
+      if (i === 0) { head.push('Department', 'Scope'); return; }
       if (th.textContent.indexOf('Dates') !== -1 && i < 5) { head.push('Start', 'Deadline'); return; }
       head.push(t);
     });

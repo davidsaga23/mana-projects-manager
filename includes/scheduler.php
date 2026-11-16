@@ -62,13 +62,13 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
 
     $steps = pipeline_steps($pdo, $projectId);
     if (!$steps) {
-        $out['problems'][] = 'This project has no pipeline steps, so there is nothing to schedule.';
+        $out['problems'][] = 'This project has no departments, so there is nothing to schedule.';
         return $out;
     }
 
     $depsMap = step_dependencies_map($pdo, $projectId);
     if (pipeline_has_cycle($depsMap)) {
-        $out['problems'][] = 'The workflow has steps waiting for each other in a loop. ' .
+        $out['problems'][] = 'The workflow has departments waiting for each other in a loop. ' .
                              'Fix it on the Workflow screen, nothing can be scheduled until then.';
         return $out;
     }
@@ -153,7 +153,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
 
     if (!empty($axis['exhausted'])) {
         $out['problems'][] = 'The plan ran past the end of the calendar this tool will build ' .
-                             '(about twelve years). That normally means a step has far more work ' .
+                             '(about twelve years). That normally means a department has far more work ' .
                              'than one lane can absorb, check the headcount and days-per-item on ' .
                              'the Dates & headcount screen.';
     }
@@ -176,7 +176,7 @@ function build_schedule(PDO $pdo, array $project, ?string $today = null): array 
         );
     }
     if (!$projectDeadline) {
-        $out['notes'][] = 'This project has no delivery date, so steps without a deadline of ' .
+        $out['notes'][] = 'This project has no delivery date, so departments without a deadline of ' .
                           'their own were sized from their own workload rather than from a date.';
     }
     if (!$holidays) {
@@ -524,7 +524,7 @@ function scheduler_schedule_step(
             if ($nearMiss !== null) {
                 $s['notes'][] = sprintf(
                     'Scoped to "%s", but nothing is typed that way, %d asset%s typed "%s". ' .
-                    'Nothing is planned for this step until the two spellings are merged on ' .
+                    'Nothing is planned for this department until the two spellings are merged on ' .
                     'the Assets screen.',
                     $step['applies_to_asset_type'], $nearMiss['count'],
                     $nearMiss['count'] === 1 ? ' is' : 's are', $nearMiss['type']
@@ -628,7 +628,7 @@ function scheduler_schedule_step(
             $row = $manual[$stepId . '|band'];
             $s['manual']++;
             $s['scheduled'] = 0;
-            $s['kept'][] = ['step' => $stepName, 'item' => $stepName . ' (whole step)',
+            $s['kept'][] = ['step' => $stepName, 'item' => $stepName . ' (whole department)',
                             'start_date' => $row['start_date'], 'end_date' => $row['end_date']];
             $s['start_date'] = $row['start_date'];
             $s['end_date']   = $row['end_date'];
@@ -637,7 +637,7 @@ function scheduler_schedule_step(
             if ($s['deadline'] && $s['end_date'] > $s['deadline']) {
                 $s['late_days'] = working_days_after($s['deadline'], $s['end_date']);
             }
-            $s['notes'][] = 'This step is drawn as one band and that band has been placed by ' .
+            $s['notes'][] = 'This department is drawn as one band and that band has been placed by ' .
                             'hand, so the scheduler left it exactly where it is.';
             return $s;
         }
@@ -673,7 +673,7 @@ function scheduler_schedule_step(
             ? 'Drawn as one band from the project estimate, because no ' . $scope .
               ' have been added yet. It becomes real per-item dates as soon as a breakdown exists.'
             : sprintf(
-                'Drawn as one band: %s%% coverage says how MUCH of this step there is, not which %s. ' .
+                'Drawn as one band: %s%% coverage says how MUCH of this department there is, not which %s. ' .
                 'Mark the ones it doesn\'t touch as not applicable, or set coverage to 100%%, and this ' .
                 'splits into real per-item dates.',
                 fmt_num($coverage * 100),
@@ -732,12 +732,12 @@ function scheduler_schedule_step(
         if ($around) {
             $s['notes'][] = 'Planned around the days off and show dates of ' . implode(', ', $around) .
                             ': their tasks skip the days they are away, and each item goes to ' .
-                            'whoever on this step can finish it first.';
+                            'whoever on this department can finish it first.';
         }
         foreach ($pastEnd as $i => $count) {
             $s['notes'][] = sprintf(
                 '%d task%s run%s past the last day on the show of %s (%s), because nobody else ' .
-                'on this step was still on it. Extend their dates on their person page, or add someone.',
+                'on this department was still on it. Extend their dates on their person page, or add someone.',
                 $count, $count === 1 ? '' : 's', $count === 1 ? 's' : '',
                 $laneCrew[$stepId][$i + 1]['name'], $laneUnavail[$i]['end'] ?? '?'
             );
@@ -756,7 +756,7 @@ function scheduler_schedule_step(
         }
     }
     if (!$s['deadline']) {
-        $s['notes'][] = 'No deadline on this step and none on the project, so there is nothing ' .
+        $s['notes'][] = 'No deadline on this department and none on the project, so there is nothing ' .
                         'to check the finish date against.';
     }
 
@@ -874,7 +874,7 @@ function scheduler_lane_count(
                 $notes[] = sprintf(
                     'Hitting %s would take more than %d people working in parallel, which is more ' .
                     'than there are items to work on. Capped at %d, the finish date below is the ' .
-                    'earliest this step can manage, not the deadline.',
+                    'earliest this department can manage, not the deadline.',
                     $deadline, $cap, $cap
                 );
                 return [$cap, 'capped', $notes];

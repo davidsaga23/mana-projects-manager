@@ -419,7 +419,7 @@ function notify_assignee(PDO $pdo, int $ticketId, string $reason = 'assigned'): 
         $context[] = 'Shot: ' . $shot;
     }
     if ($t['asset_name']) $context[] = 'Asset: ' . $t['asset_name'];
-    if ($t['step_name'])  $context[] = 'Step: ' . $t['step_name'];
+    if ($t['step_name'])  $context[] = 'Department: ' . $t['step_name'];
     $context[] = 'Priority: ' . ucfirst($t['priority']);
     if ($t['status_name']) $context[] = 'Status: ' . $t['status_name'];
     if ($t['due_date'])    $context[] = 'Due: ' . date('M j, Y', strtotime($t['due_date']));
@@ -513,7 +513,7 @@ function notify_admins_of_hire(PDO $pdo, array $h): array {
     $html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2733;">'
         . '<p><strong>' . $esc($h['by']) . '</strong> hired <strong>' . $esc($h['candidate']) . '</strong> into <strong>'
         . $esc($where) . '</strong> on ' . $esc($h['project_name']) . '.</p>'
-        . ($h['step'] !== '' ? '<p style="color:#5a6a7a;margin:0 0 12px;">Step: ' . $esc($h['step']) . '</p>' : '')
+        . ($h['step'] !== '' ? '<p style="color:#5a6a7a;margin:0 0 12px;">Department: ' . $esc($h['step']) . '</p>' : '')
         . ($h['rate_note'] !== '' ? '<p>' . $esc($h['rate_note']) . '</p>' : '')
         . '<p style="margin-top:16px;"><a href="' . $esc($url) . '" '
         . 'style="background:#2f6fb2;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;display:inline-block;">'
@@ -521,7 +521,7 @@ function notify_admins_of_hire(PDO $pdo, array $h): array {
         . '<p style="color:#8a97a3;font-size:12px;margin-top:18px;">Anima | Project manager</p>'
         . '</div>';
     $text = $line . "\n"
-        . ($h['step'] !== '' ? 'Step: ' . $h['step'] . "\n" : '')
+        . ($h['step'] !== '' ? 'Department: ' . $h['step'] . "\n" : '')
         . ($h['rate_note'] !== '' ? "\n" . $h['rate_note'] . "\n" : '')
         . "\nOpen Staffing: {$url}\n";
 

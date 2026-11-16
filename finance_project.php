@@ -316,11 +316,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $wanted = is_array($_POST['department'] ?? null) ? $_POST['department'] : [];
             $r = save_step_departments($pdo, $projectId, $wanted);
             if ($r['changed']) {
-                flash('ok', sprintf('Moved %d step%s: %s. Every figure below regroups immediately, '
+                flash('ok', sprintf('Moved %d department%s: %s. Every figure below regroups immediately, '
                                   . 'and the answer is remembered for future projects.',
                       $r['changed'], $r['changed'] === 1 ? '' : 's', implode('; ', $r['moved'])));
             } else {
-                flash('warn', 'Nothing changed, every step is already in the phase shown.');
+                flash('warn', 'Nothing changed, every department is already in the phase shown.');
             }
 
         } elseif (isset($_POST['save_expenses'])) {
@@ -877,8 +877,8 @@ if ($configured && $dbError === null) {
       <strong><?= e($project['delivery_date'] ?: '—') ?></strong></div>
   </div>
   <p class="muted small">
-    A <strong>task</strong> is one item through one step, every shot and every asset multiplied by
-    the steps that apply to it, so <?= (int)$progress['applicable'] ?> is the whole show as a
+    A <strong>task</strong> is one item through one department, every shot and every asset multiplied by
+    the departments that apply to it, so <?= (int)$progress['applicable'] ?> is the whole show as a
     count of things to finish, not a count of shots. The same figures the
     <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> draws, from the same
     calculation, so the two screens cannot disagree about how far along the show is.
@@ -1089,13 +1089,13 @@ if ($configured && $dbError === null) {
     <?php if ($stop['booked']['rows']): ?>
       <h4>Still booked after today</h4>
       <p class="muted small">
-        Working days left in each step's window, from today to its deadline, for every named
+        Working days left in each department's window, from today to its deadline, for every named
         person holding a lane on it. Weekends and the holiday calendar are already taken out.
         Placeholders are excluded — an unfilled slot costs nothing yet.
         <strong>This is the plan, not an obligation.</strong>
       </p>
       <table>
-        <thead><tr><th>Who</th><th>Step</th><th>Remaining window</th>
+        <thead><tr><th>Who</th><th>Department</th><th>Remaining window</th>
                    <th class="num">Days</th><th class="num">At their rate</th></tr></thead>
         <tbody>
         <?php foreach ($stop['booked']['rows'] as $r): ?>
@@ -1165,7 +1165,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
   <?php if (isset($phases['Unassigned'])): ?>
     <p class="muted small warn-text">
       <strong><?= e(number_format($phases['Unassigned']['cost'], 2)) ?></strong> sits under
-      <em>Unassigned</em> because those steps have no phase set. Put them in one below and the
+      <em>Unassigned</em> because those departments have no phase set. Put them in one below and the
       subtotals stop lying by omission.
     </p>
   <?php endif; ?>
@@ -1177,7 +1177,7 @@ uksort($phases, function ($a, $b) use ($phaseOrder) {
     </p>
   <?php elseif (can_edit()): ?>
     <p class="muted small">
-      Which phase each step belongs to is set at the top of the
+      Which phase each department belongs to is set at the top of the
       <a href="finance_project.php?project=<?= $projectId ?>&amp;tab=projection">Expense
       projection</a>, beside the table it regroups.
     </p>
@@ -1302,21 +1302,21 @@ endif; ?>
 ?>
 <?php if ($hasDeptCol && can_edit()): ?>
   <details class="inline-actions">
-    <summary>Which phase each step belongs to</summary>
+    <summary>Which phase each department belongs to</summary>
     <p class="muted small">
-      A step's phase is what groups it here, on the expense projection, and in the crew list,
+      A department's phase is what groups it here, on the expense projection, and in the crew list,
       so moving <em>Comp</em> to Post-production regroups every one of them at once. It is a
       <strong>production</strong> fact rather than a financial one, and it is stored with the
-      step, not with the money.
+      department, not with the money.
       <br>
-      The answer is also remembered against the step's <strong>name</strong>, so every future
+      The answer is also remembered against the department's <strong>name</strong>, so every future
       project starts with it filled in rather than asking again. Free text: type a phase that
       isn't listed and it becomes one.
     </p>
     <form method="post">
       <input type="hidden" name="save_departments" value="1">
       <table class="review-table">
-        <thead><tr><th>Step</th><th>Covers</th><th>Phase</th></tr></thead>
+        <thead><tr><th>Department</th><th>Covers</th><th>Phase</th></tr></thead>
         <tbody>
         <?php foreach (pipeline_steps($pdo, $projectId) as $st): ?>
           <tr>
@@ -1454,7 +1454,7 @@ try {
 
 <p class="muted small">
   Two numbers from opposite directions. <strong>Minimum</strong> is what the plan demands of one
-  person per day: the step's work spread over the working days from its start to its deadline,
+  person per day: the department's work spread over the working days from its start to its deadline,
   divided by the people on it, the same figure Dates &amp; headcount shows. It is arithmetic and
   <strong>not editable</strong>. <strong>Ideal</strong> is what this project says that work actually
   takes, its days per item on
@@ -1463,13 +1463,13 @@ try {
 
 <?php if (!$quotaRows): ?>
   <div class="empty-state">
-    <p>This project has no pipeline steps yet, so there is nothing to compare.</p>
+    <p>This project has no departments yet, so there is nothing to compare.</p>
   </div>
 <?php else: ?>
 
   <?php if ($quotaOver > 0): ?>
     <div class="flash flash-err">
-      <strong><?= $quotaOver ?> step<?= $quotaOver === 1 ? '' : 's' ?></strong>
+      <strong><?= $quotaOver ?> department<?= $quotaOver === 1 ? '' : 's' ?></strong>
       <?= $quotaOver === 1 ? 'demands' : 'demand' ?> a pace above this project's ideal. That is not
       an ambitious plan, it is one the people on it are not expected to hit. The three fixes are
       more people, more time, or less work, and all three land on this page.
@@ -1496,7 +1496,7 @@ try {
     </colgroup>
     <thead>
       <tr>
-        <th>Step</th><th>Covers</th>
+        <th>Department</th><th>Covers</th>
         <th class="num">Work</th>
         <th class="num">People</th>
         <th class="num">Minimum / person / day</th>
@@ -1546,9 +1546,9 @@ try {
   <p class="muted small">
     The minimum here is the one on
     <a href="wizard.php?project=<?= $projectId ?>&amp;step=6">Dates &amp; headcount</a>, over each
-    step's own dates, so the two cannot disagree. The
+    department's own dates, so the two cannot disagree. The
     <a href="dashboard.php?project=<?= $projectId ?>">production dashboard</a> asks the other
-    question, what the work still left needs from today, and on a step that is running late that
+    question, what the work still left needs from today, and on a department that is running late that
     is the number that goes red first.
   </p>
 
@@ -1621,7 +1621,7 @@ if ($retakePct <= 0):
 <?php endif; ?>
 <p class="muted small">
   Laid out like <code>RTC_ExpenseProjection_v01.xlsx</code>: <strong>one row per person</strong>,
-  grouped by phase with subtotals. Two artists on a step are two rows, because they are two
+  grouped by phase with subtotals. Two artists in a department are two rows, because they are two
   people who each get paid. Person-days come from the same <code>step_quota()</code> the dashboard
   and the CSV export use; the rate comes from each person's page.
   <strong>Computed every time this page loads</strong>, never stored, so it cannot disagree with the plan.
@@ -1635,7 +1635,7 @@ if ($retakePct <= 0):
 </p>
 
 <?php if (!$proj['rows']): ?>
-  <p class="muted">No pipeline steps yet.</p>
+  <p class="muted">No departments yet.</p>
 <?php else: ?>
   <?php // BULK RATES. Its own form, outside the table, because every row already
         // carries a single-rate form and forms cannot nest. The tick boxes in
@@ -1677,8 +1677,8 @@ if ($retakePct <= 0):
               // per-row: Days, Months and Projected are all one person's share,
               // and reading this as theirs too is what made the export charge
               // every animator for all of the footage. ?>
-        <th class="num" title="The step's total. Days, Months and Projected are one person's share of it.">Units
-          <span class="muted">(step)</span></th>
+        <th class="num" title="The department's total. Days, Months and Projected are one person's share of it.">Units
+          <span class="muted">(department)</span></th>
         <th class="num">Actual days</th>
         <th class="num" title="The days logged, at this row's rate. What the work done is worth, not what was invoiced.">Logged
           <span class="muted">× rate</span></th>
@@ -1727,7 +1727,7 @@ if ($retakePct <= 0):
                 $othersTip = implode("\n", array_map(fn($pp) => $pp['name'] . ': ' . number_format($pp['amount'], 2), $r['payees'] ?? [])); ?>
           <td>
             <?php if (!empty($r['step_level'])): ?>
-              <span class="muted small" title="<?= e($othersTip) ?>">invoiced to the step:
+              <span class="muted small" title="<?= e($othersTip) ?>">invoiced to the department:
                 <?= e(implode(', ', array_map(fn($pp) => $pp['name'], $others))) ?></span>
             <?php elseif ($r['crew_id']): ?>
               <a href="person.php?project=<?= $projectId ?>&amp;crew=<?= (int)$r['crew_id'] ?>&amp;from=finance"><?= e($r['artist']) ?></a>
@@ -1801,7 +1801,7 @@ if ($retakePct <= 0):
                     // There is nothing to multiply it by, so the row is unpriced
                     // rather than costed against an item count — which would be a
                     // confident wrong number nothing on screen would question. ?>
-              <div class="err small">rate is per second, this step is not</div>
+              <div class="err small">rate is per second, this department is not</div>
             <?php endif; ?>
             <?php // A supervision position is costed from its dates, not from a
                   // quota, and the row says which dates. ?>
@@ -1811,7 +1811,7 @@ if ($retakePct <= 0):
                   : '<a href="wizard.php?project=' . $projectId . '&amp;step=6#supervision">set its dates</a>' ?></div>
             <?php endif; ?>
             <?php if (($r['days_source'] ?? '') === 'estimate'): ?>
-              <span class="est-tag" title="No studio standard for this step, so this row is costed from the project's own estimate">est.</span>
+              <span class="est-tag" title="No studio standard for this department, so this row is costed from the project's own estimate">est.</span>
             <?php endif; ?>
           </td>
           <td class="num muted"><?= !empty($r['step_level']) ? '—' : e(fmt_num($r['months'], 2)) ?></td>
@@ -1823,7 +1823,7 @@ if ($retakePct <= 0):
                 // trims the trailing zero, but 40.5 seconds of footage was
                 // rendering as "41" — overstating the show and disagreeing with
                 // the export, which writes the column at full precision. ?>
-          <td class="num muted" title="The whole step. The Days column beside it is this row's share of it."><?=
+          <td class="num muted" title="The whole department. The Days column beside it is this row's share of it."><?=
                 (!empty($r['step_level']) ? '—' : e(fmt_num($r['units'], 1))) ?></td>
           <?php // EDITABLE FOR ADMINS (David, 2026-11-05). "+ days" logs time for
                 // this person on this step with no task (migration 076): it adds
@@ -1840,7 +1840,7 @@ if ($retakePct <= 0):
             <?php endif; ?>
             <?php if ($sdEditable): ?>
               <details class="days-edit">
-                <summary title="<?= $stepDaysReady ? 'Log days for this person on this step' : 'Needs migration 076 (migrate.php)' ?>">+ days</summary>
+                <summary title="<?= $stepDaysReady ? 'Log days for this person in this department' : 'Needs migration 076 (migrate.php)' ?>">+ days</summary>
                 <?php if (!$stepDaysReady): ?>
                   <p class="small warn-text">Needs migration 076. Open migrate.php to run it.</p>
                 <?php else: ?>
@@ -2005,7 +2005,7 @@ if ($retakePct <= 0):
 
   <p class="muted small">
     <strong>Months</strong> is days ÷ <?= (int)DAYS_PER_MONTH ?>, the working days in a month.
-    <strong>Actual days</strong> comes from time logged against that person on that step.
+    <strong>Actual days</strong> comes from time logged against that person in that department.
     <strong>Logged × rate</strong> is those days at the row's rate: what the work done so far is
     worth, an estimate beside the invoices, never counted in Actual or Difference. A flat fee or a
     per-second rate has no days to price.
@@ -2015,8 +2015,8 @@ if ($retakePct <= 0):
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
     On a subtotal it is the whole phase's projection minus what has been invoiced so far, so
     it also counts the rows nobody has invoiced yet.
-    <strong>Actual days</strong> is what was logged; <em>+ days</em> logs days for that person on
-    that step from here, with no task, adding to what they logged (it counts on their statement too).
+    <strong>Actual days</strong> is what was logged; <em>+ days</em> logs days for that person in
+    that department from here, with no task, adding to what they logged (it counts on their statement too).
     Tick <strong>Done</strong> when somebody has finished on a position: its Difference is then
     marked <em>final</em>, and a subtotal is final once every row in it is done.
     <?php if (!$doneReady): ?>
@@ -2055,7 +2055,7 @@ if ($retakePct <= 0):
 
 <p class="muted small">
   Costs with no lane behind them, software seats, render or cloud time, a music licence, stock,
-  equipment, travel. The projection above is computed from pipeline steps and can only ever contain
+  equipment, travel. The projection above is computed from departments and can only ever contain
   people; <strong>these are the rest of what a show spends</strong>, and they count toward the
   Current forecast cost and Budget variance at the top of this page.
   <br>
@@ -2269,11 +2269,11 @@ if ($retakePct <= 0):
         <td class="muted small">
           <?php if ($ivH === null): ?>
             <button type="button" class="linkish warn-text invoice-attach-btn" data-invoice="<?= (int)$iv['id'] ?>"
-                    title="Choose the position or step this invoice pays for">unattached</button>
+                    title="Choose the position or department this invoice pays for">unattached</button>
           <?php else: ?>
             <?= e($iv['step_name'] ?: '') ?>
             <?php if ($ivH === 0): ?>
-              <br><em>whole step, no position</em>
+              <br><em>whole department, no position</em>
             <?php elseif ((int)($iv['crew_id'] ?? 0) !== $ivH): ?>
               <br><em>on <?= e($ivPosLabel[$ivH . '|' . (int)$iv['step_id']] ?? 'another') ?>'s position</em>
             <?php endif; ?>
@@ -2361,9 +2361,9 @@ if ($retakePct <= 0):
                     <option value="<?= e($v) ?>" <?= $ivSel === $v ? 'selected' : '' ?>><?= e($ps['label']) ?></option>
                   <?php endforeach; ?>
                 </optgroup>
-                <optgroup label="A whole step, no position">
+                <optgroup label="A whole department, no position">
                   <?php foreach ($ivSteps as $st): $v = '0:' . (int)$st['id']; ?>
-                    <option value="<?= e($v) ?>" <?= $ivSel === $v ? 'selected' : '' ?>><?= e($st['name']) ?>, whole step</option>
+                    <option value="<?= e($v) ?>" <?= $ivSel === $v ? 'selected' : '' ?>><?= e($st['name']) ?>, whole department</option>
                   <?php endforeach; ?>
                 </optgroup>
               </select>
@@ -2493,10 +2493,10 @@ if ($retakePct <= 0):
                             data-start="<?= e($ps['start'] ?? '') ?>" data-end="<?= e($ps['end'] ?? '') ?>"><?= e($ps['label']) ?></option>
                   <?php endforeach; ?>
                 </optgroup>
-                <optgroup label="A whole step, no position">
+                <optgroup label="A whole department, no position">
                   <?php foreach ($ivSteps as $st): ?>
                     <option value="0:<?= (int)$st['id'] ?>" data-crewname=""
-                            data-start="<?= e($st['start_date'] ?? '') ?>" data-end="<?= e($st['deadline'] ?? '') ?>"><?= e($st['name']) ?>, whole step</option>
+                            data-start="<?= e($st['start_date'] ?? '') ?>" data-end="<?= e($st['deadline'] ?? '') ?>"><?= e($st['name']) ?>, whole department</option>
                   <?php endforeach; ?>
                 </optgroup>
               </select>
@@ -2542,7 +2542,7 @@ if ($retakePct <= 0):
     <button type="button" class="secondary" onclick="invAddRows()">Add 5 more rows</button>
   </div>
   <p class="muted small">
-    <strong>Pays for</strong> a whole step puts the invoice on a line of its own under that step on the
+    <strong>Pays for</strong> a whole department puts the invoice on a line of its own under that department on the
     projection, counted in the department's phase. <strong>Sent by</strong> somebody other than the
     person on the position keeps it on that position's row, and lists it on the sender's statement.
     <?php if (!$ivHolderReady): ?>
@@ -2550,7 +2550,7 @@ if ($retakePct <= 0):
       <code>finance_install_15.sql</code> imported into the finance database first.</span>
     <?php endif; ?>
     Choosing a <strong>position</strong> puts that invoice on that row of the projection above,
-    crew and step together are the lane, which is why "who" alone cannot say what a payment was
+    crew and department together are the lane, which is why "who" alone cannot say what a payment was
     for. Leaving it blank is a real answer: a kill fee or a one-off counts in the project total and
     is listed as unattached, rather than being forced onto a row nobody agreed to.
     Marking one <strong>paid</strong> without a date fills in today.
@@ -2707,8 +2707,8 @@ function invAddRows() {
   <h3>Artist statements</h3>
   <p class="muted small">
     What each person on the show should invoice, counted from their contract dates (or, where none
-    are set, from the dates of the steps they are on). Days come from time logged in Anima, seconds
-    from shots <strong>approved</strong> on the footage steps, and the amount follows each person's
+    are set, from the dates of the departments they are in). Days come from time logged in Anima, seconds
+    from shots <strong>approved</strong> on the footage departments, and the amount follows each person's
     rate unit. <strong>Left to invoice</strong> is the planned work not yet logged (days left, or
     seconds not yet approved) at their rate; for a flat fee, the fee less what has been invoiced.
     Every artist sees their own statement, and only theirs, from My tasks.
@@ -2795,7 +2795,7 @@ function invAddRows() {
           <td class="muted small">
             <?= $w['from'] ? e(date('j M', strtotime($w['from']))) : '—' ?> –
             <?= $w['to'] ? e(date('j M Y', strtotime($w['to']))) : '—' ?>
-            <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their steps">steps</span><?php endif; ?>
+            <?php if ($w['source'] === 'department'): ?><br><span title="No contract dates set; the dates of their departments">departments</span><?php endif; ?>
           </td>
           <td class="small"><?php if (count($st['lines']) > 1): ?><?= count($st['lines']) ?> contracts<br><span class="muted">see the statement</span><?php else: ?><?php if ($st['rate'] !== null && $st['fx'] && $st['rate_usd'] !== null): // dollars first (2026-11-02) ?><?= e(fmt_money($st['rate_usd'], $st['unit'], 'USD')) ?><br><span class="muted">(<?= e(number_format($st['rate'], 2) . ' ' . $st['rate_currency']) ?>)</span><?php else: ?><?= $st['rate'] !== null ? e(fmt_money($st['rate'], $st['unit'], $st['rate_currency'])) : '<span class="warn-text">no rate</span>' ?><?php endif; ?><?php endif; ?></td>
           <td class="num"><?= e(fmt_num($st['planned_days'], 1)) ?></td>
@@ -2978,10 +2978,10 @@ function invAddRows() {
     <p><strong>There is no pool to show yet.</strong> It is the days in the
       <a href="?project=<?= $projectId ?>&amp;tab=projection">expense projection</a>, so it needs:</p>
     <ul class="small">
-      <li>pipeline steps with work in them — shots or assets, and days per item;</li>
-      <li>somebody standing in each step — set on
+      <li>departments with work in them — shots or assets, and days per item;</li>
+      <li>somebody standing in each department — set on
         <a href="crew.php?project=<?= $projectId ?>">Staffing</a>, slots count as well as people;</li>
-      <li>and, to check the work fits, a start date and a deadline on each step — set on
+      <li>and, to check the work fits, a start date and a deadline on each department — set on
         <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>.</li>
     </ul>
     <p class="small">Nothing is typed in here. Fix those and this screen fills itself in.</p>
@@ -3000,9 +3000,9 @@ function invAddRows() {
     <strong><?= e(fmt_num($pool['days']['window'], 1)) ?> days</strong>
     <?php if ($pool['days']['short']): ?>
       <span class="warn-text small"><?= count($pool['days']['short']) ?>
-        step<?= count($pool['days']['short']) === 1 ? ' does' : 's do' ?> not fit their dates</span>
+        department<?= count($pool['days']['short']) === 1 ? ' does' : 's do' ?> not fit their dates</span>
     <?php else: ?>
-      <span class="muted small">slots &times; each step's window</span>
+      <span class="muted small">slots &times; each department's window</span>
     <?php endif; ?></div>
   <div><span class="muted small">Days worked</span>
     <strong><?= e(fmt_num($pool['days']['used'], 1)) ?> days</strong>
@@ -3014,7 +3014,7 @@ function invAddRows() {
     <span class="muted small">from logged hours</span>
     <?php if ($pool['unlogged']): ?>
       <span class="warn-text small"><?= count($pool['unlogged']) ?>
-        step<?= count($pool['unlogged']) === 1 ? ' has' : 's have' ?> none logged</span>
+        department<?= count($pool['unlogged']) === 1 ? ' has' : 's have' ?> none logged</span>
     <?php endif; ?></div>
   <div><span class="muted small">Unused</span>
     <strong class="<?= $pool['days']['left'] < 0 ? 'err' : '' ?>">
@@ -3047,19 +3047,19 @@ function invAddRows() {
 </div>
 
 <p class="muted small">
-  Every figure above is in <strong>days</strong>; money appears only inside a step, next to the
+  Every figure above is in <strong>days</strong>; money appears only inside a department, next to the
   rate that converts it. The pool is <em>not typed in</em> — it is the Days column of the
   <a href="?project=<?= $projectId ?>&amp;tab=projection">expense projection</a>, the work each
-  step needs (its items &times; days per item &times; the retake allowance, a whole day per
-  person), so the two screens always agree. <strong>Dates allow</strong> is each step's slots
+  department needs (its items &times; days per item &times; the retake allowance, a whole day per
+  person), so the two screens always agree. <strong>Dates allow</strong> is each department's slots
   multiplied by the working days between its start date and its deadline on
-  <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>: a step that
+  <a href="production.php?project=<?= $projectId ?>">Dates &amp; headcount</a>: a department that
   needs more than that will not fit its dates as they stand.
   Days worked are only what has been logged — by hand or with the timer on
   <a href="mytasks.php">My tasks</a> — divided by this project's
   <?= e(fmt_num($pool['hours_per_day'], 1)) ?>-hour day. The dates are never used to guess it.
   <?php if ($pool['unlogged']): ?>
-    A step nobody has logged time on counts as 0 days worked: <?= e(implode(', ', $pool['unlogged'])) ?>.
+    A department nobody has logged time on counts as 0 days worked: <?= e(implode(', ', $pool['unlogged'])) ?>.
   <?php endif; ?>
 </p>
 
@@ -3070,7 +3070,7 @@ function invAddRows() {
         // exact shape of failure Lesson 11 records. ?>
   <div class="flash flash-warn">
     <strong><?= count($pool['undated']) ?>
-      step<?= count($pool['undated']) === 1 ? ' has' : 's have' ?> no dates</strong>,
+      department<?= count($pool['undated']) === 1 ? ' has' : 's have' ?> no dates</strong>,
     so <?= count($pool['undated']) === 1 ? 'its' : 'their' ?> work is in the pool but nothing says
     whether it fits: <?= e(implode(', ', $pool['undated'])) ?>. "Dates allow" leaves
     <?= count($pool['undated']) === 1 ? 'it' : 'them' ?> out, and before any time is logged
@@ -3080,7 +3080,7 @@ function invAddRows() {
 <?php endif; ?>
 
 <?php if ($pool['days']['rows']): ?>
-<h3>By pipeline step</h3>
+<h3>By department</h3>
 <div class="step-cards">
   <?php foreach ($pool['days']['rows'] as $r): ?>
     <?php
@@ -3177,7 +3177,7 @@ function invAddRows() {
           <?php endif; ?>
         </div>
         <?php if (!$r['tracks_seconds']): ?>
-          <div class="warn-text small">This step is tracked in items, not seconds, so the figures
+          <div class="warn-text small">This department is tracked in items, not seconds, so the figures
             above are item counts. Set it to track seconds for a real seconds pool.</div>
         <?php endif; ?>
       </article>
@@ -3186,7 +3186,7 @@ function invAddRows() {
   <p class="muted small">
     <?= e(fmt_num($pool['seconds']['used'], 3)) ?>s approved of
     <?= e(fmt_num($pool['seconds']['pool'], 3)) ?>s across
-    <?= count($pool['seconds']['rows']) ?> step<?= count($pool['seconds']['rows']) === 1 ? '' : 's' ?>.
+    <?= count($pool['seconds']['rows']) ?> department<?= count($pool['seconds']['rows']) === 1 ? '' : 's' ?>.
   </p>
 <?php endif; ?>
 
@@ -3203,7 +3203,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
   <h3 id="step-<?= (int)$open['id'] ?>"><?= e($open['name']) ?>
     <span class="muted">— the detail behind the card</span></h3>
   <div class="dash-strip">
-    <div><span class="muted small">Rate on this step</span>
+    <div><span class="muted small">Rate on this department</span>
       <strong><?= $open['rate_min'] === null ? '—'
             : e(fmt_money_plain($open['rate_min'], $pcur)) ?></strong>
       <?php // Which steps already agree on one rate is the map of how far the
@@ -3264,12 +3264,12 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         <?= e(fmt_unit($open['total'], $open['unit'])) ?> approved.
         <?php if ($open['filled'] < $open['slots']): ?>
           Only <?= (int)$open['filled'] ?> of <?= (int)$open['slots'] ?> slots are filled, so the
-          days are being worked more slowly than the plan assumes — this step is not under budget,
+          days are being worked more slowly than the plan assumes — this department is not under budget,
           it is under-staffed.
         <?php endif; ?>
       </p>
       <p class="muted small">
-        <a href="step.php?project=<?= $projectId ?>&amp;step=<?= (int)$open['id'] ?>">Open the step</a>
+        <a href="step.php?project=<?= $projectId ?>&amp;step=<?= (int)$open['id'] ?>">Open the department</a>
         · <a href="?project=<?= $projectId ?>&amp;tab=pool">close this</a>
       </p>
     </div>
@@ -3298,7 +3298,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
         $wcur = $who['currency']; ?>
   <h4>Who is on it <span class="muted small">— each person against their share of the pool</span></h4>
   <?php if (!$who['rows']): ?>
-    <p class="muted small">Nobody paid by the day is on this step.</p>
+    <p class="muted small">Nobody paid by the day is in this department.</p>
   <?php else: ?>
     <div class="table-scroll">
     <table class="pool-people">
@@ -3344,7 +3344,7 @@ foreach ($pool['days']['rows'] as $r) if ((int)$r['id'] === $openId) $open = $r;
     </div>
     <p class="muted small">
       Budget is each person's share of the projected work in days (their Days on the expense
-      projection), times their day rate. Used is the days they logged on this step.
+      projection), times their day rate. Used is the days they logged in this department.
       Invoiced is what they have billed against this position.
       <?php if (!$tt['priced']): ?>A "+" on a total means somebody here has no day rate, so money is missing from it.<?php endif; ?>
       People paid by the second are left out, because they have no day budget.

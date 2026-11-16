@@ -14,7 +14,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
 <p class="summary-line">
   <strong><?= e($state['name']) ?></strong> ·
   <?= (int)$analysis['parent_count'] ?> items ·
-  <?= (int)$analysis['subitem_count'] ?> step records
+  <?= (int)$analysis['subitem_count'] ?> department records
 </p>
 
 <?php // THE COLUMNS, said before the import rather than discovered after it.
@@ -44,7 +44,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   <div class="flash flash-warn">
     Some values in this file aren't known here yet:
     <?php $bits = [];
-      if ($unmatchedSteps)  $bits[] = "$unmatchedSteps step name" . ($unmatchedSteps === 1 ? '' : 's');
+      if ($unmatchedSteps)  $bits[] = "$unmatchedSteps department name" . ($unmatchedSteps === 1 ? '' : 's');
       if ($unmatchedStatus) $bits[] = "$unmatchedStatus status value" . ($unmatchedStatus === 1 ? '' : 's');
       if ($unmatchedPeople) $bits[] = "$unmatchedPeople " . ($unmatchedPeople === 1 ? 'person' : 'people');
       echo e(implode(', ', $bits));
@@ -66,7 +66,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
     <tr>
       <td><strong><?= e($g) ?></strong>
         <?php if ($info['project_step_matches'] === $info['count'] && $info['count'] > 0): ?>
-          <div class="muted small">every item here names a whole-project step</div>
+          <div class="muted small">every item here names a whole-project department</div>
         <?php endif; ?>
         <input type="hidden" name="group_key[<?= $gi ?>]" value="<?= e($g) ?>"></td>
       <td class="muted"><?= (int)$info['count'] ?></td>
@@ -75,7 +75,7 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
           <option value="shots"        <?= $guess === 'shots'        ? 'selected' : '' ?>>shots (no episodes)</option>
           <option value="episode"      <?= $guess === 'episode'      ? 'selected' : '' ?>>an episode of shots</option>
           <option value="asset_type"   <?= $guess === 'asset_type'   ? 'selected' : '' ?>>a type of asset</option>
-          <option value="project_step" <?= $guess === 'project_step' ? 'selected' : '' ?>>whole-project steps</option>
+          <option value="project_step" <?= $guess === 'project_step' ? 'selected' : '' ?>>whole-project departments</option>
           <option value="ignore">ignore this group</option>
         </select>
       </td>
@@ -85,32 +85,32 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
   <p class="muted small">
     <strong>Shots (no episodes)</strong> is for a single film or commercial, the shots go in
     as one flat list rather than an episode named after the group.
-    <strong>Whole-project steps</strong> is for groups like Pre-production or Post-production,
-    where each item (an animatic, a music track) <em>is</em> a step for the whole show rather
-    than something with steps beneath it.
+    <strong>Whole-project departments</strong> is for groups like Pre-production or Post-production,
+    where each item (an animatic, a music track) <em>is</em> a department for the whole show rather
+    than something with departments beneath it.
   </p>
 
   <?php if ($analysis['childless']): ?>
     <label class="inline checkbox-note">
       <input type="checkbox" name="skip_childless" value="1" checked>
       Skip the <?= count($analysis['childless']) ?> item<?= count($analysis['childless']) === 1 ? '' : 's' ?>
-      with no pipeline steps under them
+      with no departments under them
     </label>
     <p class="muted small">
       <?php $names = array_map(function ($c) { return $c['title'] . ' (' . $c['group'] . ')'; }, $analysis['childless']); ?>
       <?= e(implode(', ', array_slice($names, 0, 8))) ?><?= count($names) > 8 ? ' …' : '' ?>.
-      An item with no steps beneath it is usually not a shot or an asset, a time bucket or a
+      An item with no departments beneath it is usually not a shot or an asset, a time bucket or a
       one-off deliverable. Untick to import them anyway.
     </p>
   <?php endif; ?>
 
-  <h3>Pipeline steps</h3>
-  <p class="muted small">Subitem names in the file, matched to this project's steps,
-     listed <strong>per group</strong>, because the same name can mean different steps.
+  <h3>Departments</h3>
+  <p class="muted small">Subitem names in the file, matched to this project's departments,
+     listed <strong>per group</strong>, because the same name can mean different departments.
      "Concept" under Characters and "Concept" under Environments are two different things,
      so each gets its own choice.</p>
   <table class="review-table">
-    <tr><th>Group</th><th>In the file</th><th>Rows</th><th>Is this project's step</th></tr>
+    <tr><th>Group</th><th>In the file</th><th>Rows</th><th>Is this project's department</th></tr>
     <?php $si = 0; $lastGroup = null; foreach ($analysis['steps'] as $s): ?>
     <tr class="<?= $s['step_id'] === null ? 'has-problem' : '' ?>">
       <td class="muted"><?= $s['group'] === $lastGroup ? '' : e($s['group']) ?><?php $lastGroup = $s['group']; ?></td>
@@ -134,14 +134,14 @@ $unmatchedStatus = count(array_filter($analysis['statuses'], function ($s) { ret
               <?php if (!empty($ps['applies_to_asset_type'])): ?>· <?= e($ps['applies_to_asset_type']) ?><?php endif; ?>
             </option>
           <?php endforeach; ?>
-          <option value="new">+ create a step called "<?= e($s['external']) ?>"</option>
+          <option value="new">+ create a department called "<?= e($s['external']) ?>"</option>
         </select>
         <?php /* Only relevant when "create a step" is chosen. Rendered visible so
                  it still works without JavaScript; the script hides it until it
                  actually applies. */ ?>
         <?php if ($s['step_id'] === null): ?>
           <span class="step-scope" id="step-scope-<?= $si ?>">
-            <span class="muted small">new step applies to</span>
+            <span class="muted small">new department applies to</span>
             <select name="step_applies[<?= $si ?>]">
               <?= applies_to_options('shot', asset_types($pdo)) ?>
             </select>

@@ -186,7 +186,7 @@ if ($project['status'] === 'setup' && can_edit()):
       Waiting for sign-off. The set-up is frozen until everyone asked has approved.
       <a class="button secondary" href="kickoff.php?project=<?= $projectId ?>">See the sign-off</a>
     <?php elseif (!$hasSteps): ?>
-      This project is still in set-up. Add its pipeline steps before asking for sign-off.
+      This project is still in set-up. Add its departments before asking for sign-off.
       <a class="button secondary" href="wizard.php?project=<?= $projectId ?>&amp;step=2">Resume setup</a>
     <?php else: ?>
       <?= $kickState === 'changes_requested'
@@ -347,12 +347,12 @@ $startIn = $daysTo($project['start_date']);
       // the top ("21 Crew · 20 named · 1 still open"), and the schedule has its
       // own tab. ?>
 
-<h3>Progress by step</h3>
+<h3>Progress by department</h3>
 <?php if (!$steps): ?>
   <?php if (hidden_from_viewers('setup')): ?>
-    <p class="muted">No pipeline steps yet.</p>
+    <p class="muted">No departments yet.</p>
   <?php else: ?>
-    <p class="muted">No pipeline steps yet, <a href="wizard.php?project=<?= $projectId ?>&amp;step=2">add them</a>.</p>
+    <p class="muted">No departments yet, <a href="wizard.php?project=<?= $projectId ?>&amp;step=2">add them</a>.</p>
   <?php endif; ?>
 <?php else: ?>
   <?php if ($blocked): ?>
@@ -361,7 +361,7 @@ $startIn = $daysTo($project['start_date']);
       remaining, but they need unblocking rather than an artist.</p>
   <?php endif; ?>
   <table class="review-table">
-    <tr><th>Step</th><th>Applies to</th><th>Tracked</th><th>Delivered</th><th>Approved</th><th>Deadline</th></tr>
+    <tr><th>Department</th><th>Applies to</th><th>Tracked</th><th>Delivered</th><th>Approved</th><th>Deadline</th></tr>
     <?php foreach ($steps as $s):
       // A whole-project step is one deliverable; a type-scoped step counts only
       // the assets of that type, never all of them.

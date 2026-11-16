@@ -30,7 +30,7 @@ if (!$report):
   </tr>
   <tr>
     <td><strong>Progress records</strong>
-      <div class="muted small">one per pipeline step on each shot or asset</div></td>
+      <div class="muted small">one per department on each shot or asset</div></td>
     <td><strong><?= (int)$report['progress_created'] + (int)$report['progress_updated'] ?></strong></td>
     <td><?= (int)$report['progress_created'] ?></td>
     <td><?= (int)$report['progress_updated'] ?></td>
@@ -40,10 +40,10 @@ if (!$report):
 <?php
 $skips = [
   'skipped_ignored_group' => 'in groups set to be ignored',
-  'skipped_childless'     => 'items with no pipeline steps under them',
-  'skipped_no_step'       => 'step records whose step was set to be skipped',
-  'skipped_no_parent'     => 'step records whose parent item was not imported',
-  'skipped_no_project_step' => 'whole-project items with no matching project step',
+  'skipped_childless'     => 'items with no departments under them',
+  'skipped_no_step'       => 'department records whose department was set to be skipped',
+  'skipped_no_parent'     => 'department records whose parent item was not imported',
+  'skipped_no_project_step' => 'whole-project items with no matching project department',
 ];
 $anySkips = false;
 foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
@@ -82,10 +82,10 @@ $loose = $report['unmatched_people'] || $report['unmapped_statuses']
         // dropdown on the mapping screen, so the name is the only thing that
         // makes it fixable at all. ?>
   <?php if (!empty($report['unmatched_project_steps'])): ?>
-    <p><strong>Whole-project items with no step of that name here.</strong>
-       Their status was not imported, so the step still reads as untouched.
+    <p><strong>Whole-project items with no department of that name here.</strong>
+       Their status was not imported, so the department still reads as untouched.
        Either their group was mapped to something other than <em>whole-project
-       deliverables</em>, or this project's pipeline has no project-wide step
+       deliverables</em>, or this project's pipeline has no project-wide department
        spelled that way — check the names on
        <a href="wizard.php?project=<?= $projectId ?>&amp;step=3">Workflow</a>.</p>
     <table class="review-table">

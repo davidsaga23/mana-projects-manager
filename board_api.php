@@ -73,7 +73,7 @@ try {
     }
 
     if (!$projectId || !$stepId || $itemKey === '') {
-        throw new RuntimeException('A project, a step and an item are all required.');
+        throw new RuntimeException('A project, a department and an item are all required.');
     }
 
     // ---- the row named must really be this project's -----------------------
@@ -83,7 +83,7 @@ try {
     $chk = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
     $chk->execute([$stepId, $projectId]);
     $step = $chk->fetch();
-    if (!$step) throw new RuntimeException('That step is not part of this project.');
+    if (!$step) throw new RuntimeException('That department is not part of this project.');
 
     $kind   = substr($itemKey, 0, 1);
     $itemId = (int)substr($itemKey, 1);

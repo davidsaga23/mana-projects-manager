@@ -136,7 +136,7 @@
       d.setDate(d.getDate() + 1);
     }
     return '<div class="bk-row bk-head"><div class="bk-label">'
-         + (view === 'person' ? 'Person' : 'Show and step') + '</div>'
+         + (view === 'person' ? 'Person' : 'Show and department') + '</div>'
          + '<div class="bk-track" style="width:' + (r.days * w) + 'px">' + html + '</div></div>';
   }
 
@@ -186,7 +186,7 @@
       .sort(function (a, b) { return a.name.localeCompare(b.name); });
     if (!rows.length) {
       return { html: '', empty: onlyClashes ? 'Nobody is on two shows at once.'
-                                            : 'Nobody holds a position on a dated step of these shows yet.' };
+                                            : 'Nobody holds a position on a dated department of these shows yet.' };
     }
 
     var all = [];
@@ -259,8 +259,8 @@
       if (steps.length) groups.push({ project: p, steps: steps });
     });
     if (!groups.length) {
-      return { html: '', empty: onlyClashes ? 'No step has anybody who is needed on another show at the same time.'
-                                            : 'None of these shows has a dated step yet.' };
+      return { html: '', empty: onlyClashes ? 'No department has anybody who is needed on another show at the same time.'
+                                            : 'None of these shows has a dated department yet.' };
     }
 
     var all = [];
@@ -320,7 +320,7 @@
       return (a.person.localeCompare(b.person)) || (x.from < y.from ? -1 : (x.from > y.from ? 1 : 0));
     });
     if (!BK.bookings.length) {
-      el.innerHTML = '<p class="muted">Nobody holds a position on a dated step of these shows yet.</p>';
+      el.innerHTML = '<p class="muted">Nobody holds a position on a dated department of these shows yet.</p>';
       return;
     }
     if (!cs.length) {
@@ -704,7 +704,7 @@
     });
     $('bkOnlyLabel').textContent = view === 'person'
       ? 'Only people on two shows at once'
-      : 'Only steps with somebody on two shows at once';
+      : 'Only departments with somebody on two shows at once';
     drawSummary();
   }
 

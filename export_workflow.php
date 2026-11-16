@@ -45,7 +45,7 @@ $steps = pipeline_steps($pdo, $projectId);
 if (!$steps) {
     // Reported, never a broken download (lesson 7). An empty SVG would arrive
     // looking like the export was the thing that failed.
-    flash('err', 'There are no pipeline steps on this project yet, so there is no workflow to export.');
+    flash('err', 'There are no departments on this project yet, so there is no workflow to export.');
     header('Location: ' . $back);
     exit;
 }

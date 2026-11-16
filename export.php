@@ -108,7 +108,7 @@ $retakePct = project_retake_pct($pdo, $projectId);
 $retake    = retake_factor($retakePct);
 
 fputcsv($out, [
-    'Project', 'Code', 'Step', 'Applies to', 'Measured in',
+    'Project', 'Code', 'Department', 'Applies to', 'Measured in',
     'Work units', 'Unit', 'Covers %', 'Full scope units',
     'Days per unit', 'Retakes %', 'Base person-days', 'Total person-days',
     'Total person-months',

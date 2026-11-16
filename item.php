@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
 
     if ($problems) flash('err', implode(' ', $problems));
     flash('ok', $changed > 0
-        ? "Saved $changed step" . ($changed === 1 ? '' : 's') . ' on ' . $item['name'] . '.'
+        ? "Saved $changed department" . ($changed === 1 ? '' : 's') . ' on ' . $item['name'] . '.'
         : 'No changes to save.');
     header('Location: ' . $selfUrl);
     exit;
@@ -193,7 +193,7 @@ require __DIR__ . '/includes/header.php';
   <?php else: ?>
     <span class="ctx-chip ctx-step">Whole-show deliverable</span>
   <?php endif; ?>
-  · <strong><?= $approved ?></strong> of <?= $countable ?> steps approved
+  · <strong><?= $approved ?></strong> of <?= $countable ?> departments approved
   <?php if ($blocked): ?> · <span class="warn-text"><?= $blocked ?> blocked</span><?php endif; ?>
 </p>
 
@@ -203,7 +203,7 @@ require __DIR__ . '/includes/header.php';
 
 <?php if (!$hasDetail): ?>
   <div class="flash flash-warn">
-    Version and notes per step need migration <code>020</code>, which hasn't been applied yet.
+    Version and notes per department need migration <code>020</code>, which hasn't been applied yet.
     Everything else on this page works.
     <?php if (is_admin()): ?><a href="migrate.php">Review and apply it →</a><?php endif; ?>
   </div>
@@ -211,8 +211,8 @@ require __DIR__ . '/includes/header.php';
 
 <?php if (!$rows): ?>
   <div class="empty-state">
-    <p><strong>No pipeline step applies to this <?= e($item['scope']) ?>.</strong></p>
-    <p class="muted">A step's scope is set on the Setup screen. Nothing is broken, there is
+    <p><strong>No department applies to this <?= e($item['scope']) ?>.</strong></p>
+    <p class="muted">A department's scope is set on the Setup screen. Nothing is broken, there is
        simply no work defined for it.</p>
   </div>
 <?php else: ?>
@@ -222,7 +222,7 @@ require __DIR__ . '/includes/header.php';
   <table class="item-table">
     <thead>
       <tr>
-        <th>Step</th><th>Status</th><th>Who</th>
+        <th>Department</th><th>Status</th><th>Who</th>
         <?php if ($hasDetail): ?><th>Version</th><?php endif; ?>
         <th>Due</th>
         <?php if ($hasDetail): ?><th>Notes</th><?php endif; ?>
@@ -284,7 +284,7 @@ require __DIR__ . '/includes/header.php';
   </table>
 
   <?php if (can_edit()): ?>
-    <div class="actions"><button type="submit">Save all steps</button></div>
+    <div class="actions"><button type="submit">Save all departments</button></div>
   <?php endif; ?>
 </form>
 
@@ -303,7 +303,7 @@ require __DIR__ . '/includes/header.php';
 <?php if ($tickets): ?>
   <h3>Open tickets <span class="muted">· <?= count($tickets) ?></span></h3>
   <table>
-    <thead><tr><th>Ref</th><th>Title</th><th>Step</th><th>Owner</th><th>Status</th><th>Due</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Title</th><th>Department</th><th>Owner</th><th>Status</th><th>Due</th></tr></thead>
     <tbody>
     <?php foreach ($tickets as $tk): $c = $tk['status_color'] ?: '#8a97a3'; ?>
       <tr>

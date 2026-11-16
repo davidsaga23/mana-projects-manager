@@ -55,13 +55,13 @@ if ($action === 'step_progress_auto') {
     require_once __DIR__ . '/includes/timeline_versions.php';   // timeline_auto_progress()
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
-    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No department given.');
     if (!column_exists($pdo, 'pipeline_steps', 'progress_pct')) api_fail(PROGRESS_NEEDS_036);
 
     $chk = $pdo->prepare('SELECT name FROM pipeline_steps WHERE id = ? AND project_id = ?');
     $chk->execute([$stepId, $projectId]);
     $name = $chk->fetchColumn();
-    if ($name === false) api_fail('That step is not on this project.');
+    if ($name === false) api_fail('That department is not on this project.');
 
     $pdo->prepare('UPDATE pipeline_steps SET progress_pct = 0, progress_source = NULL WHERE id = ? AND project_id = ?')
         ->execute([$stepId, $projectId]);
@@ -88,7 +88,7 @@ if ($action === 'step_progress_auto') {
 if ($action === 'step_progress') {
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
-    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No department given.');
     if (!column_exists($pdo, 'pipeline_steps', 'progress_pct')) api_fail(PROGRESS_NEEDS_036);
     $pct = progress_pct_from_post();
 
@@ -97,7 +97,7 @@ if ($action === 'step_progress') {
     );
     $chk->execute([$stepId, $projectId]);
     $row = $chk->fetch();
-    if (!$row) api_fail('That step is not on this project.');
+    if (!$row) api_fail('That department is not on this project.');
 
     // Only a CHANGED number is re-attributed, so "set by" always names whoever
     // last actually moved it.
@@ -138,7 +138,7 @@ if ($action === 'step_progress') {
 if ($action === 'step_dates' || $action === 'step_edit') {
     $stepId    = (int)($_POST['step_id'] ?? 0);
     $projectId = (int)($_GET['project'] ?? $_POST['project'] ?? 0);
-    if ($stepId <= 0 || $projectId <= 0) api_fail('No step given.');
+    if ($stepId <= 0 || $projectId <= 0) api_fail('No department given.');
 
     $start = trim((string)($_POST['start_date'] ?? ''));
     $end   = trim((string)($_POST['end_date'] ?? ''));
@@ -150,7 +150,7 @@ if ($action === 'step_dates' || $action === 'step_edit') {
             api_fail('That is not a date this app can store.');
         }
     }
-    if ($end < $start) api_fail('A step cannot end before it starts.');
+    if ($end < $start) api_fail('A department cannot end before it starts.');
 
     // Before 036 the editor sends no progress and says why; a request that
     // sends one anyway is refused whole rather than saving only the dates.
@@ -169,7 +169,7 @@ if ($action === 'step_dates' || $action === 'step_edit') {
     );
     $chk->execute([$stepId, $projectId]);
     $row = $chk->fetch();
-    if (!$row) api_fail('That step is not on this project.');
+    if (!$row) api_fail('That department is not on this project.');
     $name = $row['name'];
 
     $set  = 'start_date = ?, deadline = ?';

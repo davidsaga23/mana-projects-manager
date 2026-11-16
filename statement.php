@@ -106,9 +106,9 @@ if ($admin && $project) {
       <strong><?= e($dateFmt($s['window']['to'])) ?></strong>,
       <?= $s['window']['source'] === 'contract'
             ? 'the contract dates on the show.'
-            : 'the dates of the steps you are on (no contract dates are set yet).' ?>
+            : 'the dates of the departments you are in (no contract dates are set yet).' ?>
     <?php else: ?>
-      No contract dates and no dated steps yet, so this counts everything on the show so far.
+      No contract dates and no dated departments yet, so this counts everything on the show so far.
     <?php endif; ?>
   </p>
 

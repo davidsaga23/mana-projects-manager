@@ -145,7 +145,7 @@
       {
         page: 'spell.php', find: ['.board-open-task', '.board-rows', '.board-title'],
         title: 'Spell',
-        body: 'Every task of a show on one screen, shot by shot. Filter by step, status, person or due ' +
+        body: 'Every task of a show on one screen, shot by shot. Filter by department, status, person or due ' +
               'date, and click a task to open its side panel: assign it, set its status, and see its ' +
               'versions and notes.'
       },

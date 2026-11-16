@@ -305,8 +305,8 @@ function save_dependencies(PDO $pdo, int $projectId, array $wanted): void {
 
     if (pipeline_has_cycle($clean)) {
         throw new RuntimeException(
-            'That would make steps wait for each other in a loop, so nothing was saved. ' .
-            'Check the step you just changed.'
+            'That would make departments wait for each other in a loop, so nothing was saved. ' .
+            'Check the department you just changed.'
         );
     }
 
@@ -602,7 +602,7 @@ function template_save_from_post(PDO $pdo, int $projectId, array $project): stri
     $n = create_template_from_project($pdo, $projectId, $name, $type, $overwrite);
 
     return ($overwrite ? "Replaced the template \"$name\"" : "Saved this pipeline as the template \"$name\"")
-         . ", $n step" . ($n === 1 ? '' : 's')
+         . ", $n department" . ($n === 1 ? '' : 's')
          . ', including which of them run in parallel'
          . (column_exists($pdo, 'pipeline_template_steps', 'department')
             ? ' and which phase each belongs to' : '')
@@ -671,7 +671,7 @@ function template_save_form(PDO $pdo, array $project, string $note = '', bool $i
       </label>
       <button type="submit" <?= $inline ? 'name="action" value="save_template"' : '' ?>
               class="secondary">Save as template</button>
-      <small><?= $note !== '' ? e($note) : 'Saves the steps, their settings and which of them run in parallel, but not
+      <small><?= $note !== '' ? e($note) : 'Saves the departments, their settings and which of them run in parallel, but not
              dates or headcount, which belong to this project alone. New projects will be
              offered it alongside the built-in templates.' ?></small>
     </<?= $tag ?>>
@@ -693,7 +693,7 @@ function create_template_from_project(PDO $pdo, int $projectId, string $name, st
     }
 
     $steps = pipeline_steps($pdo, $projectId);
-    if (!$steps) throw new RuntimeException('There are no pipeline steps to save yet.');
+    if (!$steps) throw new RuntimeException('There are no departments to save yet.');
 
     $dup = $pdo->prepare('SELECT id FROM pipeline_templates WHERE name = ?');
     $dup->execute([$name]);
@@ -872,7 +872,7 @@ function set_step_dates(PDO $pdo, array $project, int $stepId,
     $stmt = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
     $stmt->execute([$stepId, (int)$project['id']]);
     $step = $stmt->fetch();
-    if (!$step) throw new RuntimeException('That step is not part of this project.');
+    if (!$step) throw new RuntimeException('That department is not part of this project.');
 
     // Strict: a date input posts Y-m-d, and anything else is refused rather than
     // handed to strtotime(), which would read "next friday" as a date.

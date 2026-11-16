@@ -108,7 +108,7 @@ require __DIR__ . '/includes/header.php';
 <h2 class="wizard-title">Schedule</h2>
 
 <p class="lead">
-  Working forwards from the pipeline: every step waits for the ones before it, the work is
+  Working forwards from the pipeline: every department waits for the ones before it, the work is
   spread across as many people as are planned for it, and the finish date is whatever falls
   out. Nothing below is saved until you press the button.
 </p>
@@ -189,10 +189,10 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
 
-  <h3>By step</h3>
+  <h3>By department</h3>
   <table class="review-table sched-table">
     <tr>
-      <th>Step</th>
+      <th>Department</th>
       <th title="What the plan is made of: one row per shot or asset, or a single band where the detail isn't known yet.">Planned as</th>
       <th>Work left</th>
       <th title="How many people run side by side. Taken from the planned headcount; derived from the deadline when none is set.">Lanes</th>
@@ -254,7 +254,7 @@ require __DIR__ . '/includes/header.php';
         <td></td>
         <td colspan="6" class="warn-text">
           Finishes <?= (int)$s['late_days'] ?> working day<?= $s['late_days'] === 1 ? '' : 's' ?>
-          past its deadline. Either the date moves, or this step needs more people than the
+          past its deadline. Either the date moves, or this department needs more people than the
           <?= (int)$s['lanes'] ?> planned.
         </td>
       </tr>
@@ -286,7 +286,7 @@ require __DIR__ . '/includes/header.php';
   <h3>Lanes</h3>
   <p class="muted small">
     <?php if ($anySlotless): ?>
-      These are derived from the step name because this project has no crew slots yet.
+      These are derived from the department name because this project has no crew slots yet.
       <a href="crew.php?project=<?= $projectId ?>">Create them from the headcount</a> and the
       plan starts naming who does what, a placeholder at first, a real person once someone
       is hired into the slot.
@@ -320,7 +320,7 @@ require __DIR__ . '/includes/header.php';
     </p>
   <?php endif; ?>
   <table class="review-table sched-tasks">
-    <tr><th>Starts</th><th>Finishes</th><th>Step</th><th>Item</th><th>Lane</th></tr>
+    <tr><th>Starts</th><th>Finishes</th><th>Department</th><th>Item</th><th>Lane</th></tr>
     <?php foreach (array_slice($plan['tasks'], 0, SCHEDULE_ROW_LIMIT) as $t): ?>
     <tr class="<?= $t['blocked'] ? 'has-problem' : '' ?>">
       <td class="muted"><?= e($t['start_date']) ?></td>
@@ -346,7 +346,7 @@ require __DIR__ . '/includes/header.php';
       never rewrites them.
     </p>
     <table class="review-table">
-      <tr><th>Step</th><th>Item</th><th>Starts</th><th>Finishes</th></tr>
+      <tr><th>Department</th><th>Item</th><th>Starts</th><th>Finishes</th></tr>
       <?php foreach ($plan['kept'] as $k): ?>
       <tr>
         <td class="wf-name"><?= e($k['step']) ?></td>
@@ -375,7 +375,7 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
   <p class="muted">
     There is nothing to schedule yet. The reasons are listed above, usually a missing
-    breakdown, a missing deadline, or a pipeline with no steps in it.
+    breakdown, a missing deadline, or a pipeline with no departments in it.
   </p>
 <?php endif; ?>
 

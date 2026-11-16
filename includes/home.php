@@ -402,7 +402,7 @@ function home_invoice_lines(PDO $pdo, int $crewId, array $shows, ?array $terms,
             }
             $out['lines'][] = [
                 'project'    => $show['project'],
-                'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Step') : 'Other work on the show',
+                'step'       => $sid > 0 ? ($stepNames[$sid] ?? 'Department') : 'Other work on the show',
                 'own_contract' => $ownContract,
                 'dates'      => $days[$pid][$sid] ?? [],
                 // For Finance → Monthly invoices, which prefills its lines from these.
@@ -946,7 +946,7 @@ function home_invoice_artist_fields(): array {
 function home_invoice_instructions(): array {
     return [
         'Send one invoice a month, for the month the work was done in.',
-        'In the description, put one line per project and step: the lines below, copied as they are.',
+        'In the description, put one line per project and department: the lines below, copied as they are.',
         'Include the breakdown of the days worked (or of the seconds billed): each line below lists its dates.',
         'Send it to ' . HOME_INVOICE_TO . ' and nowhere else, not to producers or supervisors.',
         'Amounts are in US dollars unless your contract says another currency.',
