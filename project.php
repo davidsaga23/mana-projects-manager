@@ -328,31 +328,11 @@ $startIn = $daysTo($project['start_date']);
   </div>
 <?php endif; ?>
 
-<?php // The card grid that used to sit here is gone (2026-08-15). It was built
-      // before the tab bar existed and duplicated it exactly — nine cards
-      // linking to nine tabs three centimetres above them. The two facts the
-      // cards carried that the tabs cannot (how much is scheduled, how many crew
-      // slots are still placeholders) are in the line below instead, which is
-      // where a number belongs rather than inside a navigation control. ?>
-<p class="muted small">
-  <?php if ($scheduled): ?>
-    <?php // The finish date used to be here too. It belongs beside the delivery
-          // date it has to be compared against, so the capsule above owns it now
-          // and this line just counts the work. ?>
-    <strong><?= $scheduled ?></strong> task<?= $scheduled === 1 ? '' : 's' ?> scheduled.
-  <?php else: ?>
-    <?php if (hidden_from_viewers('schedule')): ?>
-      Nothing scheduled yet.
-    <?php else: ?>
-      Nothing scheduled yet, the <a href="schedule.php?project=<?= $projectId ?>">Schedule</a>
-      screen works the pipeline forwards into real dates.
-    <?php endif; ?>
-  <?php endif; ?>
-  <?php if ($slotCount): ?>
-    <?= $slotCount ?> crew slot<?= $slotCount === 1 ? '' : 's' ?><?php
-      if ($slotsUnfilled): ?>, <strong><?= $slotsUnfilled ?></strong> still a placeholder<?php endif; ?>.
-  <?php endif; ?>
-</p>
+<?php // The "N tasks scheduled. N crew slots, N still a placeholder." line that
+      // sat here is gone (David, 2026-11-16: "let's delete this under the
+      // overall progress bar"). The crew figures are already in the summary at
+      // the top ("21 Crew · 20 named · 1 still open"), and the schedule has its
+      // own tab. ?>
 
 <h3>Progress by step</h3>
 <?php if (!$steps): ?>
