@@ -266,6 +266,9 @@ small { color: var(--muted); font-size: 13px; }
 .rimg { display: block; max-width: 100%; max-height: 240px; border-radius: var(--radius-sm); margin-top: 4px; }
 .rtag { color: var(--primary); font-weight: 600; }
 .rtag.is-me { background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 0 4px; }
+/* @here and @channel (David, 2026-11-16): a pill that reads as "everybody", apart from a person's tag. */
+.rtag.rbcast { background: var(--primary-tint); color: var(--primary); border-radius: 4px; padding: 0 4px; }
+.rbcastrow { font-weight: 600; }
 /* Reactions on a message (David, 2026-11-13, migration 093; assets/realm_react.js): the chips under
    it. The buttons that give one are in the bar over the message (below). */
 .rmsg[data-msg] { position: relative; }
