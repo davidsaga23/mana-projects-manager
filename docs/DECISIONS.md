@@ -6204,3 +6204,30 @@ David: *"can we add a new button in the edit to change this invoice to another p
   record should not be. The log is optional: without it the move still happens.
 - **Admins only** (`can_see_money()`, on the admin-only finance page), after a confirmation panel
   and a browser confirm.
+
+
+## 2026-11-16 — Realm statuses, and lunch in the Diner
+
+David: *"Status messages: Let's also create a diner so people's avatars go immediately there when
+they set up their status 'Lunch'"*.
+- **One status per person**, on their own `realm_people` row (migration 098), set only by them: no
+  id is posted (`set_status` in `artist_may_post()`, `realm_status_set()` writes the session's row).
+- **The server ends it.** `status_until` is checked on every look at the map (`realm_status_sweep()`
+  in `realm_state()` and on opening the Realm), and an expired one is never sent even if a sweep
+  failed. "Today" means until 23:59:59 on the studio's clock (`config.php` timezone).
+- **Emoji from a fixed list** (`REALM_STATUS_EMOJI`), so a form can never put anything else beside a
+  name; the words are free, one line, at most 80 characters.
+- **Lunch moves the character on the server**, not only on the screen, so everybody sees it at once:
+  inside the Diner on setting it; on clearing it, letting it run out, or switching to another status,
+  back **home, inside their own house** (`REALM_LUNCH_BACK = 'home'`). **Asked David** whether it
+  should be "back home" or "back where they were"; the place before lunch is stored
+  (`status_back`), so the other answer is a one-word change. Somebody who already walked out of the
+  Diner is left where they are.
+- **A status stays a ready-made one while it keeps that one's emoji**: "Lunch with Tim" with 🍔 is
+  still Lunch and goes to the Diner; picking another emoji makes it the person's own.
+- **The Diner is a place like the Tavern**: always open, its own channel `diner` and calls, no table
+  of its own. Placed at the east end of the second street (1215, 590), clear of every plot, road and
+  name; the Village zoom widened to 320..1310 to include it.
+- **Days-off calendar hook**: `realm_status_set($pdo, $uid, 'off', '', '', 'today', 'calendar')`.
+  It should leave a status the person set themselves alone (`from` is 'self'). Not built (David:
+  the calendar is done separately).
