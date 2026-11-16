@@ -14,6 +14,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Desktop notifications with a sound; Anima installs as an app *(no migration)*
+
+**Asked by David**: "let's enable desktop notifications so we can send sounds and reminders" (2026-11-12),
+chosen as "desktop notifications with sound" on 2026-11-16. Somebody working in Maya, Toon Boom or
+Photoshop now gets a Windows notification and a soft two-note chime for a **raven**, an **@tag**, a
+**knock** on their Realm door, a **call starting** in the room they are in, a **reminder** (saved
+message, log your time) and anything else the bell rings (task assigned, moved, review notes).
+
+- Turned on from **Turn on desktop notifications** at the foot of the bell, or **Notifications** in the
+  Realm's top bar: a window explains, then the browser asks. Never asked on page load.
+- Per kind on/off, sound on/off, a test button; kept on each computer (localStorage).
+- Nothing pops up while you are looking at Anima; one tab speaks for all; a raven says who, not what.
+- Clicking one opens the thing (in the Realm, the raven or the message, without reloading).
+- `manifest.json` + icons: Edge and Chrome offer **Install Anima**; with "Start automatically on
+  device login" it opens with Windows. How-to: `docs/DESKTOP_NOTIFICATIONS.md`.
+- Limits: rides on the existing polls (about 30 s late at most; about a minute in a long-hidden tab);
+  nothing while every Anima tab is closed. Web Push proposed as a follow-up.
+
 ## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
 
 **Asked by David**: "can we add a new button in the edit to change this invoice to another project?"
