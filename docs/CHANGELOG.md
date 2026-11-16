@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — The Realm: birthdays decorate the person's house *(migration 100)*
+
+**Asked by David**: "Celebrations: but only for birthdays, and only if they're available in their
+profile. Their house should be decorated with balloons, and colors so everyone knows."
+
+Each person can add their **birthday, month and day only (no year)**, to their own profile: on Home's
+General info tab, or from the portrait in their Realm house. It is optional; nobody else ever sees the
+date. On the day, their house on the map gets a bunch of **balloons** tied to its corner that bob
+gently, a string of **coloured flags** under the eaves and, now and then, a puff of **confetti** over
+the roof; inside the house there are balloons in the corners and flags along the wall. Their row in
+**People**, their house card, the card over their character and their profile say **🎂 Birthday
+today**. A birthday on a Saturday or Sunday is celebrated on the **Friday before**; 29 February is
+celebrated on 28 February in other years. With "reduce motion" the balloons stand still and there is
+no confetti. No upcoming-birthdays list. Needs **migration 100**: until it runs the birthday field is
+not offered and no house is decorated.
+
 ## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
 
 **Asked by David**: "can we add a new button in the edit to change this invoice to another project?"
