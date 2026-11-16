@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Realm chat: @here and @channel *(no migration)*
+
+**Asked by David**: "@here @channel too", as in Slack. In any Realm channel (not in ravens),
+**@channel** rings everybody who can read the channel and **@here** only those of them who have the
+Realm open right now (idle counts as here). Each person gets what an @name tag gives: the line on
+Anima's bell ("Renata tagged you in The Tavern in the Realm"), the channel's unread count, and (once
+PR 252 ships it) the Activity view. Both show in the message as pills and are offered in the @ picker after the people.
+Before a message that would ring **6 people or more** the page asks "@channel will notify 18 people
+in this channel. Send?"; Cancel keeps the words in the box. Everybody may use them.
+A private channel rings only its members, and a show's channel only the people on that show.
+Files: `includes/realm_broadcast.php` (new), `includes/realm_chat.php`, `realm_api.php`
+(GET `reach=`), `assets/realm.js`, `assets/realm.css`.
+
 ## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
 
 **Asked by David**: "can we add a new button in the edit to change this invoice to another project?"

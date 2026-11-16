@@ -6204,3 +6204,21 @@ David: *"can we add a new button in the edit to change this invoice to another p
   record should not be. The log is optional: without it the move still happens.
 - **Admins only** (`can_see_money()`, on the admin-only finance page), after a confirmation panel
   and a browser confirm.
+
+
+## 2026-11-16 — Realm chat: @here and @channel
+
+David: *"@here @channel too"*. Settled with him the same day:
+- **Everybody in the Realm may use them**, not only Production or supervisors. The guard against
+  noise is the confirmation, not a rank.
+- **Idle counts as here**: @here rings everybody with the Realm open, online or idle (Slack rings only
+  the active ones). An idle person usually has the Realm in another tab while they work.
+- **Ask from 6 people up**: the page asks the server how many would be rung (GET `reach=`, worked out
+  from the database, so a private channel's members are never guessed by the page) and confirms at
+  `REALM_BROADCAST_ASK` (6) or more.
+- **Who "can read the channel"**: a private channel's members only; a show's channel (or a channel
+  made under a show) the people staffed on that show plus the see-all roles; a studio-wide channel
+  everybody in the Realm. Never the sender. Not in ravens.
+- **The same bell line as a personal tag** (kind `tag`, same summary), so somebody both named and
+  reached hears it once, and the Activity view (which reads `@here`/`@channel` from the words) lists
+  it like any mention. No migration.
