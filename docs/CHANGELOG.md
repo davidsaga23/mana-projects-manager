@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Freelancers change their own email on Home *(no migration)*
+
+**Asked by David**: "let's include email to the invoice details and to the profile". Asked which,
+he chose letting people edit it on Home.
+- Home → General info → **Edit your profile** has an **Email** box. It is the one address Anima has
+  for them (`crew.email`): notifications and invites go there, and it prints in the From block of
+  their invoice. It can be changed but not emptied from Home; Production can still edit or clear it
+  on the person page. Logins are by username, so a new email locks nobody out.
+- The invoice already printed this email; it now stays up to date without asking Production.
+
 ## 2026-11-16 — Desktop notifications with a sound; Anima installs as an app *(no migration)*
 
 **Asked by David**: "let's enable desktop notifications so we can send sounds and reminders" (2026-11-12),

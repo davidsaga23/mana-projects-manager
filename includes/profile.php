@@ -32,10 +32,17 @@ function home_profile(PDO $pdo, int $crewId): array {
 }
 
 /**
- * Save a person's OWN phone, bio and picture. The crew id is the caller's
+ * Save a person's OWN email, phone, bio and picture. The crew id is the caller's
  * effective_crew_id(), never anything the form sent (see the allow-list entry
- * for home.php in includes/auth.php). Name and email are not written here: they
- * are what notifications and logins hang off, so they stay with an admin.
+ * for home.php in includes/auth.php). The name is not written here: it is what
+ * every screen and statement shows them by, so it stays with Production.
+ *
+ * THE EMAIL (David, 2026-11-16: "let's include email to the invoice details and
+ * to the profile"; asked, he chose letting them edit it here). It is crew.email,
+ * the one address Anima has: notifications and invites go to it and their
+ * invoice prints it. Logins are by username, so changing it does not lock
+ * anybody out. It cannot be emptied from here (Anima would lose the way to
+ * reach them); Production can still clear it on the person page.
  *
  * @return string a sentence for the flash message
  */
@@ -47,6 +54,15 @@ function home_save_profile(PDO $pdo, int $crewId, array $in, ?array $photo, bool
     if (mb_strlen($phone) > 50) throw new RuntimeException('That phone number is too long.');
     if ($phone !== '' && !preg_match('/^[0-9+()\-.\s\/ext]+$/i', $phone)) {
         throw new RuntimeException('A phone number can only have digits, spaces and + ( ) - . characters.');
+    }
+    // Only touched when the form sent it, so another caller leaves it alone.
+    $email = null;
+    if (array_key_exists('email', $in)) {
+        $email = trim((string)$in['email']);
+        if ($email === '') throw new RuntimeException('Your email cannot be empty: it is how Anima reaches you. Nothing was saved.');
+        if (mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            throw new RuntimeException('"' . $email . '" does not look like an email address. Nothing was saved.');
+        }
     }
     $bio = trim((string)($in['bio'] ?? ''));
     if (mb_strlen($bio) > 2000) throw new RuntimeException('Keep the bio under 2,000 characters.');
@@ -78,6 +94,10 @@ function home_save_profile(PDO $pdo, int $crewId, array $in, ?array $photo, bool
 
     $pdo->prepare('UPDATE crew SET phone = ?, bio = ?, photo_stored = ?, photo_mime = ? WHERE id = ?')
         ->execute([$phone !== '' ? $phone : null, $bio !== '' ? $bio : null, $stored, $mime, $crewId]);
+    if ($email !== null && $email !== (string)($old['email'] ?? '')) {
+        $pdo->prepare('UPDATE crew SET email = ? WHERE id = ?')->execute([$email, $crewId]);
+        $said = rtrim($said, '.') . '. Anima now reaches you at ' . $email . '.';
+    }
 
     // THE BIRTHDAY (migration 100; David, 2026-11-16): month and day, never the
     // year, both optional and both or neither. Only touched when the form sent the

@@ -232,7 +232,8 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
             <?php endif; ?>
           </tbody>
         </table>
-        <p class="muted small">Your name and email are what Anima uses to reach you; to change them, ask Production.</p>
+        <p class="muted small">Your email is where Anima reaches you, and it prints on your invoices: change it under
+          <strong>Edit your profile</strong>. To change your name, ask Production.</p>
       </div>
       <?php if (home_profile_available($pdo)): ?>
         <div class="home-bio">
@@ -249,6 +250,11 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
         <summary><span class="board-version-title">Edit your profile</span></summary>
         <form method="post" enctype="multipart/form-data" class="stack">
           <input type="hidden" name="save_profile" value="1">
+          <?php // David, 2026-11-16: "let's include email to the invoice details and to the profile".
+                // The one address Anima has for them (crew.email): notifications, invites, and
+                // the From block of their invoice all use it, so there is no second copy. ?>
+          <label>Email
+            <input type="email" name="email" maxlength="190" required value="<?= e((string)($profile['email'] ?? '')) ?>" placeholder="you@example.com"></label>
           <label>Phone <span class="muted small">(optional)</span>
             <input name="phone" maxlength="50" value="<?= e((string)($profile['phone'] ?? '')) ?>" placeholder="+52 55 1234 5678"></label>
           <label>Bio <span class="muted small">(a few lines about you and your work)</span>
