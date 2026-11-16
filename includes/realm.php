@@ -43,6 +43,8 @@ require_once __DIR__ . '/realm_shop.php';
 require_once __DIR__ . '/realm_trade.php';
 // Each show's sky over its land (no migration): weather and fireworks, read from Anima.
 require_once __DIR__ . '/realm_weather.php';
+// Birthdays (migration 100): whose house is decorated today. Pure, never throws.
+require_once __DIR__ . '/birthday.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;
@@ -488,10 +490,14 @@ function shot_label_safe($episode, $shotCode): string {
  * it. `voice` is true while they are in the voice chat of the room they are
  * inside, and `muted` while their microphone is off there (migration 085). Clients and switched-off accounts are never listed.
  * `work` is the task their clock is running on (realm_clocks()), or null.
+ * `birthday_today` is true on the day their birthday is celebrated (migration 100).
  */
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
     $clocks = realm_clocks($pdo);
+    // Whose birthday is celebrated today (includes/birthday.php). Only this yes
+    // or no leaves the server, and only on the day: never the date itself.
+    $bdays = birthdays_today($pdo);
     try {
         $timer = function_exists('column_exists') && column_exists($pdo, 'time_timers', 'phase');
         // In voice (migration 085): a fresh voice row that names the room the person is in.
@@ -533,6 +539,8 @@ function realm_state(PDO $pdo, int $uid): array {
                 'pet'    => realm_look_known('pet', (string)$r['pet']) ? (string)$r['pet'] : 'none',
                 'me'     => $id === $uid,
                 'work'   => $clocks[(int)$r['crew_ref']] ?? null,
+                // David, 2026-11-16: "Their house should be decorated with balloons, and colors so everyone knows."
+                'birthday_today' => (int)$r['crew_ref'] > 0 && isset($bdays[(int)$r['crew_ref']]),
             ];
         }
     } catch (Throwable $e) {

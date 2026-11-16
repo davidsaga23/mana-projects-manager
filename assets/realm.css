@@ -408,6 +408,12 @@ dialog.rpic { width: auto; max-width: min(1100px, calc(100% - 32px)); }
 .rprofform input:not([type=file]):not([type=checkbox]), .rprofform textarea { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; resize: vertical; }
 .rprofform input:focus-visible, .rprofform textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .rprofform input[type=checkbox] { accent-color: var(--primary); }
+/* Birthdays (David, 2026-11-16): "🎂 Birthday today" in the People list, the house card, the card over
+   a character and the profile, in the warm accent so it stands out; the month and day pickers in your
+   own profile sit side by side. */
+.rbday, .rrow small.rbday, .rwhotip small.rbday { color: var(--warn, #e0a33a); font-weight: 600; }
+.rbdaypick { display: flex; gap: 8px; }
+.rbdaypick select { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
 #focusBody { display: flex; flex-direction: column; gap: 14px; }
 .rfidle { color: var(--muted); }
 .rfnow { background: var(--surface-2); border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
