@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         step_library_remember($pdo, $s['external'], $applies, 0);
                         $createdSteps++;
                     } catch (PDOException $e) {
-                        throw new RuntimeException('Could not create the step "' . $s['external'] . '" for ' .
+                        throw new RuntimeException('Could not create the department "' . $s['external'] . '" for ' .
                                                    applies_to_phrase($applies, $assetType) . '.');
                     }
                 } else {
@@ -167,8 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             if ($createdSteps) {
-                flash('ok', "Created $createdSteps new pipeline step" . ($createdSteps === 1 ? '' : 's') .
-                            '. Each waits for the last step of its own chain, set what they ' .
+                flash('ok', "Created $createdSteps new department" . ($createdSteps === 1 ? '' : 's') .
+                            '. Each waits for the last department of its own chain, set what they ' .
                             'really wait for on the workflow screen.');
             }
 

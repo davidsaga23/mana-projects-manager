@@ -72,7 +72,7 @@ require __DIR__ . '/includes/header.php';
 <h2 class="wizard-title">Bookings <span class="muted">· every show</span></h2>
 <p class="lead">
   Who is needed on which show, and when, read from each show's <strong>general timeline</strong>:
-  somebody holding a position on a step is booked from that step's start to its deadline.
+  somebody holding a position on a department is booked from that department's start to its deadline.
   <strong class="bk-clash-text">Red</strong> marks the same person needed on two shows on the
   same working days. Shows in setup, active or on hold are included; wrapped and archived ones
   are not. <strong>Stripes</strong> are a person's days off, entered on the
@@ -141,7 +141,7 @@ require __DIR__ . '/includes/header.php';
 
   <?php if ($positions['undated']): ?>
     <p class="muted small">
-      Not drawn, because the step has no dates on its show's timeline yet:
+      Not drawn, because the department has no dates on its show's timeline yet:
       <?php
         $names = [];
         foreach ($positions['undated'] as $u) {

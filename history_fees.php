@@ -69,7 +69,7 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
 
 <form method="get" class="inline-form filter-bar">
-  <input name="q" value="<?= e($q) ?>" size="26" placeholder="Search step, person, slot or project">
+  <input name="q" value="<?= e($q) ?>" size="26" placeholder="Search department, person, slot or project">
   <select name="project" onchange="this.form.submit()">
     <option value="0">All projects</option>
     <?php foreach ($projects as $p): ?>

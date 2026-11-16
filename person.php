@@ -456,7 +456,7 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
     <div class="muted small" style="margin-top:6px;">
       The scheduler plans around these dates when it is re-run, so this is either a schedule saved
-      before the dates were set, bars placed by hand, or work nobody else on the step could take.
+      before the dates were set, bars placed by hand, or work nobody else on the department could take.
       Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a>, move the work on the
       <a href="timeline.php?project=<?= $projectId ?>">timeline</a>, or change the dates below.
     </div>
@@ -475,11 +475,11 @@ require __DIR__ . '/includes/header.php';
   </p>
 <?php endif; ?>
 
-<h3>Pace, step by step</h3>
+<h3>Pace by department</h3>
 <p class="muted small">
-  <strong>Required</strong> is the minimum one person must finish each day for that step's
+  <strong>Required</strong> is the minimum one person must finish each day for that department's
   deadline to hold, the platform's central number, and the same one the dashboard shows.
-  <strong>Recent</strong> is approximate: history is recorded per step, not per person, so this
+  <strong>Recent</strong> is approximate: history is recorded per department, not per person, so this
   counts their approved tasks touched in the last 7 working days. A re-import that touches old
   rows inflates it; a week nobody records inflates nothing at all. Read it as a direction, not a
   measurement.
@@ -492,7 +492,7 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
 <table>
   <thead>
-    <tr><th>Step</th><th>Scope</th><th class="num">Assigned</th><th class="num">Approved</th>
+    <tr><th>Department</th><th>Scope</th><th class="num">Assigned</th><th class="num">Approved</th>
         <th class="num">Blocked</th><th class="num">Required /day</th><th class="num">Recent /day</th>
         <th>Deadline</th></tr>
   </thead>
@@ -515,7 +515,7 @@ require __DIR__ . '/includes/header.php';
   <?php endforeach; ?>
   </tbody>
 </table>
-<p class="muted small">A dash under <strong>Required</strong> means that step has no deadline, so
+<p class="muted small">A dash under <strong>Required</strong> means that department has no deadline, so
    there is no pace to be behind. A day is <?= e(fmt_num($hours, 1)) ?> hours on this project.</p>
 <?php endif; ?>
 
@@ -728,7 +728,7 @@ require __DIR__ . '/includes/header.php';
     Recorded for the person, so it counts on every show they are on, and shown with everybody else's
     on the <a href="bookings.php?tab=days-off">Days off</a> tab of Bookings. Public holidays belong on the
     studio <a href="calendar.php">Calendar</a> instead, which closes the day for everyone. The
-    scheduler skips these days for this person and hands their work to whoever on the step is free,
+    scheduler skips these days for this person and hands their work to whoever on the department is free,
     <strong>the next time the schedule is run</strong>, a saved plan does not move by itself.
   </p>
   <?php if ($absences): ?>

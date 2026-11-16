@@ -262,7 +262,7 @@ elseif ($view === 'compare'):
     <p><strong>This project has no signed-off kick-off to compare with.</strong></p>
     <p class="muted">Projects that went active before the sign-off existed have no record of how they started,
       and one cannot be made now without passing today's numbers off as the original plan. The starting
-      estimate per step, where one was recorded, is on <a href="history_quotas.php">Historic quotas</a>.</p>
+      estimate per department, where one was recorded, is on <a href="history_quotas.php">Historic quotas</a>.</p>
   </div>
     <?php else:
     $was    = json_decode((string)$kick['snapshot'], true) ?: ['sections' => []];
@@ -349,8 +349,8 @@ elseif ($view === 'compare'):
   sort($fPeople, SORT_NATURAL | SORT_FLAG_CASE);
   if ($fSteps || $fPeople): ?>
     <div class="inline-form kickoff-filter">
-      <label>Step
-        <select id="kfStep"><option value="">All steps</option>
+      <label>Department
+        <select id="kfStep"><option value="">All departments</option>
           <?php foreach (array_keys($fSteps) as $st): ?><option value="<?= e((string)$st) ?>"><?= e((string)$st) ?></option><?php endforeach; ?>
         </select></label>
       <label>Person

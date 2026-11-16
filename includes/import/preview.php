@@ -52,7 +52,7 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
   </tr>
   <tr>
     <td><strong>Progress records</strong>
-      <div class="muted small">one per pipeline step on each shot or asset, the status,
+      <div class="muted small">one per department on each shot or asset, the status,
         and who's on it</div></td>
     <td><strong><?= (int)$report['progress_created'] + (int)$report['progress_updated'] ?></strong></td>
     <td><?= (int)$report['progress_created'] ?></td>
@@ -67,10 +67,10 @@ $willWrite = $report['shots_created'] + $report['shots_updated']
 <?php
 $skips = [
   'skipped_ignored_group' => 'in groups set to be ignored',
-  'skipped_childless'     => 'items with no pipeline steps under them',
-  'skipped_no_step'       => 'step records whose step is set to be skipped',
-  'skipped_no_parent'     => 'step records whose parent item was not imported',
-  'skipped_no_project_step' => 'whole-project items with no matching project step',
+  'skipped_childless'     => 'items with no departments under them',
+  'skipped_no_step'       => 'department records whose department is set to be skipped',
+  'skipped_no_parent'     => 'department records whose parent item was not imported',
+  'skipped_no_project_step' => 'whole-project items with no matching project department',
 ];
 $anySkips = false;
 foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
@@ -90,10 +90,10 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
   <div class="flash flash-warn">
     <strong><?= count($report['unmatched_project_steps']) ?></strong> whole-project
     <?= count($report['unmatched_project_steps']) === 1 ? 'item doesn\'t' : 'items don\'t' ?>
-    match a project-level step in this pipeline, so they won't be imported:
+    match a project-level department in this pipeline, so they won't be imported:
     <?= e(implode(', ', array_keys($report['unmatched_project_steps']))) ?>.
     Add them on the <a href="wizard.php?project=<?= $projectId ?>&step=2">Pipeline</a> screen
-    as "The whole project" steps, or set that group to be ignored.
+    as "The whole project" departments, or set that group to be ignored.
   </div>
 <?php endif; ?>
 
@@ -102,9 +102,9 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
       // while looking perfectly healthy on this screen. ?>
 <?php if (!empty($report['scope_mismatch'])): ?>
   <div class="flash flash-err">
-    <p style="margin:0 0 6px;"><strong>Some steps are set to cover something other than what the
+    <p style="margin:0 0 6px;"><strong>Some departments are set to cover something other than what the
        board files them under.</strong> The rows still import — the board is the source of truth
-       for status — but <strong>the dashboard will not count them</strong>, so those steps will
+       for status — but <strong>the dashboard will not count them</strong>, so those departments will
        sit at 0 and never move.</p>
     <ul style="margin:6px 0 0; padding-left:20px;">
       <?php foreach ($report['scope_mismatch'] as $name => $m): ?>
@@ -114,10 +114,10 @@ foreach ($skips as $k => $_) if (!empty($report[$k])) $anySkips = true;
       <?php endforeach; ?>
     </ul>
     <p class="small" style="margin:6px 0 0;">
-      Fix it in one of two places: change the step's <em>Covers</em> on the
+      Fix it in one of two places: change the department's <em>Covers</em> on the
       <a href="wizard.php?project=<?= $projectId ?>&step=2">Pipeline</a> screen to match the board,
       or move that work in Plaky. Changing <em>Covers</em> does not move rows that are already
-      here — the old ones stay, uncounted, and the step page says how many.
+      here — the old ones stay, uncounted, and the department page says how many.
     </p>
   </div>
 <?php endif; ?>

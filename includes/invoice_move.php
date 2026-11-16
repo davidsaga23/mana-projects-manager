@@ -113,7 +113,7 @@ function move_invoice(int $id, array $from, array $to, array $target, string $wh
     if ($posCrew !== null && !$hasHolder) {
         // A whole step with no sender already reads as the step without it.
         if ($posCrew === 0 && $sender === null) $posCrew = null;
-        else throw new RuntimeException("Putting an invoice on somebody else's position, or on a whole step, needs "
+        else throw new RuntimeException("Putting an invoice on somebody else's position, or on a whole department, needs "
             . 'finance_install_15.sql imported into the finance database. Nothing was moved.');
     }
 
@@ -278,7 +278,7 @@ function invoice_move_panel(PDO $pdo, array $project, array $iv, int $toId, arra
     <?php endif; ?>
     <?php if ($sender !== null && !$mine): ?>
       <li><?= e($senderName) ?> has no position on <?= e($to['name']) ?>: choose somebody else's position,
-        a whole step, or leave it unattached.</li>
+        a whole department, or leave it unattached.</li>
     <?php endif; ?>
     <?php if ($c !== 'USD'): ?>
       <li>The invoice stays in <?= e($c) ?> (<?= e(fmt_money_plain($amount, $c)) ?>); each show counts it in dollars at
@@ -315,9 +315,9 @@ function invoice_move_panel(PDO $pdo, array $project, array $iv, int $toId, arra
             <?php endforeach; ?>
           </optgroup>
         <?php endif; ?>
-        <optgroup label="A whole step, no position">
+        <optgroup label="A whole department, no position">
           <?php foreach ($toSteps as $st): $v = '0:' . (int)$st['id']; ?>
-            <option value="<?= e($v) ?>" <?= $sel === $v ? 'selected' : '' ?>><?= e($st['name']) ?>, whole step</option>
+            <option value="<?= e($v) ?>" <?= $sel === $v ? 'selected' : '' ?>><?= e($st['name']) ?>, whole department</option>
           <?php endforeach; ?>
         </optgroup>
       </select>

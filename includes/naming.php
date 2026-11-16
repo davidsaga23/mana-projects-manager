@@ -38,7 +38,7 @@ function naming_tokens(): array {
         'SHOT'     => 'the shot code',
         'TYPE'     => "the asset type's code",
         'ASSET'    => "the asset's name, no spaces",
-        'STEP'     => "the step's code",
+        'STEP'     => "the department's code",
         'VERSION'  => 'the version number',
         'INITIALS' => "the artist's initials",
     ];

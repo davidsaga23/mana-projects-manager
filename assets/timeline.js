@@ -1107,7 +1107,7 @@
       if (o.progress_manual) {
         var why = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         why.textContent = 'Set by hand' + (o.progress_source ? ': ' + o.progress_source : '')
-                        + '. Open the step to put it back to automatic.';
+                        + '. Open the department to put it back to automatic.';
         tag.appendChild(why);
       }
       w.appendChild(tag);
@@ -1635,9 +1635,9 @@
     function syncLabel() {
       var picked = cbs().filter(function (cb) { return cb.checked; });
       allCb.checked = picked.length === 0;
-      if (picked.length === 0) label.textContent = 'All steps';
+      if (picked.length === 0) label.textContent = 'All departments';
       else if (picked.length === 1) label.textContent = picked[0].parentElement.textContent.trim();
-      else label.textContent = picked.length + ' steps';
+      else label.textContent = picked.length + ' departments';
     }
 
     toggle.addEventListener('click', function (e) {

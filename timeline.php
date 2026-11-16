@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['version_action'])) {
         // What was kept, not just that something was: a version holding no
         // schedule reads very differently from one holding 400 tasks.
         flash('ok', sprintf(
-            'Saved as %s: %d step bar%s, %d scheduled task%s and %d milestone%s. '
+            'Saved as %s: %d department bar%s, %d scheduled task%s and %d milestone%s. '
           . 'Pick it under Version to look at it again.',
             $v['label'],
             $v['steps'], $v['steps'] === 1 ? '' : 's',
@@ -405,10 +405,10 @@ if (!$embed) require __DIR__ . '/includes/header.php';
   <div class="empty-state">
     <?php if ($version !== null): ?>
       <h2>Nothing was drawn in this version</h2>
-      <p>No step had dates and no schedule had been saved when it was taken.</p>
+      <p>No department had dates and no schedule had been saved when it was taken.</p>
     <?php else: ?>
       <h2>Nothing planned or scheduled yet</h2>
-      <p>The general chart draws each step's planned dates; the detailed one draws the
+      <p>The general chart draws each department's planned dates; the detailed one draws the
          saved schedule. Neither exists yet.</p>
       <p><a class="button" href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Set the dates →</a>
          <a class="button secondary" href="schedule.php?project=<?= $projectId ?>">Open the schedule →</a></p>
@@ -418,14 +418,14 @@ if (!$embed) require __DIR__ . '/includes/header.php';
 
 <?php if ($undated && $embed): ?>
   <p class="muted small">
-    <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no dates yet, so
+    <?= count($undated) ?> department<?= count($undated) === 1 ? ' has' : 's have' ?> no dates yet, so
     <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn:
     <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
       if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
   </p>
 <?php elseif ($undated && $version === null): ?>
   <div class="flash flash-warn">
-    <?= count($undated) ?> step<?= count($undated) === 1 ? ' has' : 's have' ?> no start or
+    <?= count($undated) ?> department<?= count($undated) === 1 ? ' has' : 's have' ?> no start or
     deadline yet, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn below:
     <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
       if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
@@ -433,7 +433,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
   </div>
 <?php elseif ($undated): ?>
   <p class="muted small">
-    <?= count($undated) ?> step<?= count($undated) === 1 ? '' : 's' ?> had no dates when this
+    <?= count($undated) ?> department<?= count($undated) === 1 ? '' : 's' ?> had no dates when this
     version was saved, so <?= count($undated) === 1 ? 'it is' : 'they are' ?> not drawn:
     <strong><?= e(implode(', ', array_slice($undated, 0, 8))) ?></strong><?php
       if (count($undated) > 8): ?> and <?= count($undated) - 8 ?> more<?php endif; ?>.
@@ -443,7 +443,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
 <?php if ($general): ?>
 <section class="tl-section">
   <div class="tl-head">
-    <h3>General · pipeline steps</h3>
+    <h3>General · departments</h3>
     <div class="tl-controls">
       <span class="zoom-controls">
         <button type="button" class="secondary zoom-btn" onclick="zoomGeneral(-1)" title="Zoom out">−</button>
@@ -457,14 +457,14 @@ if (!$embed) require __DIR__ . '/includes/header.php';
   <div id="generalGantt" class="tl-chart"></div>
   <?php if ($editable): ?>
     <p class="muted small tl-note">
-      Drag a bar to change that step's dates, it saves straight into
+      Drag a bar to change that department's dates, it saves straight into
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Dates &amp; headcount</a>,
       so the two always agree. A moved bar keeps its <strong>working days</strong>: slid over a
       weekend or a studio holiday it stretches, rather than losing a day to it.
       <strong>Double-click</strong> a bar to type its dates, see how many working days it needs,
       and record its progress. Arrows show what the
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=3') ?>">workflow</a> says waits
-      for what; a <strong class="dep-legend">red one</strong> means you have planned a step to
+      for what; a <strong class="dep-legend">red one</strong> means you have planned a department to
       start before the thing it waits for has finished. That is allowed here, it is a warning,
       not a wall, but the schedule will not be able to honour it.
       <?php // A drag here writes to a screen you are not looking at, which is
@@ -492,9 +492,9 @@ if (!$embed) require __DIR__ . '/includes/header.php';
           <strong>double-click</strong> it to change it, the same gestures the task bars use.
           Grab it anywhere down the line, not just the diamond.
           <?php if ($msSteps): ?>
-            <br>Tie one to a step and its marker sits on <strong>that step's row</strong> instead
+            <br>Tie one to a department and its marker sits on <strong>that department's row</strong> instead
             of at the top, and turns <strong class="err">red</strong> if the date falls before
-            that step finishes, a review of work that will not exist yet.
+            that department finishes, a review of work that will not exist yet.
           <?php endif; ?>
         <?php endif; ?>
       </p>
@@ -517,7 +517,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
                 <?php if (!empty($m['step_name'])): ?>
                   <span class="ms-onstep">reviews <?= e($m['step_name']) ?></span>
                   <?php if (!empty($m['early'])): ?>
-                    <span class="err small">that step runs to <?= e($m['step_end']) ?></span>
+                    <span class="err small">that department runs to <?= e($m['step_end']) ?></span>
                   <?php endif; ?>
                   <?= $m['notes'] !== '' ? ' · ' : '' ?>
                 <?php endif; ?>
@@ -546,7 +546,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
           <input name="ms_notes" placeholder="Notes (optional)" size="26" maxlength="255">
           <?php if ($msSteps): ?>
             <select name="ms_step">
-              <option value="">not tied to a step</option>
+              <option value="">not tied to a department</option>
               <?php // The scope, not just the name. A pipeline legitimately has
                     // Concept for characters, for environments and for props —
                     // three options reading "Concept" is a guess, and the same
@@ -584,14 +584,14 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       <?php // A checkbox panel rather than <select multiple>, which needs ctrl+click.
             // The steps come with the drawing, so an old version offers the
             // pipeline it was drawn with, even a step deleted since. ?>
-      <span class="muted small multiselect" id="stepFilterWrap">Step
+      <span class="muted small multiselect" id="stepFilterWrap">Department
         <button type="button" class="multiselect-toggle" id="stepFilterToggle"
                 aria-haspopup="true" aria-expanded="false">
-          <span id="stepFilterLabel">All steps</span> <span class="caret">▾</span>
+          <span id="stepFilterLabel">All departments</span> <span class="caret">▾</span>
         </button>
         <div class="multiselect-panel" id="stepFilterPanel" hidden>
           <label class="multiselect-opt"><input type="checkbox" id="stepFilterAll" checked>
-            <strong>All steps</strong></label>
+            <strong>All departments</strong></label>
           <div class="multiselect-divider"></div>
           <?php foreach ($filterSteps as $st): ?>
             <label class="multiselect-opt">
@@ -612,7 +612,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
         <select id="groupBy">
           <option value="date">By date</option>
           <option value="item">By asset / shot</option>
-          <option value="step">By pipeline step</option>
+          <option value="step">By department</option>
         </select>
       </label>
 
@@ -674,7 +674,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
     <p class="tl-note">
       <strong>Not built yet.</strong> This chart draws the saved schedule, every shot and asset on
       its own bar, and none has been saved for this project. The chart above does not need one:
-      it draws each step's planned dates.
+      it draws each department's planned dates.
       <?php if ($freshCount > 0): ?>
         The setup as it stands works out to
         <strong><?= $freshCount ?> task<?= $freshCount === 1 ? '' : 's' ?></strong>.
@@ -724,16 +724,16 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       <label>Date <input type="date" name="ms_date" id="msDate" required></label>
       <label>Notes <input name="ms_notes" id="msNotes" maxlength="255"></label>
       <?php if ($msSteps): ?>
-        <label>Reviews which step
+        <label>Reviews which department
           <select name="ms_step" id="msStep">
-            <option value="">not tied to a step</option>
+            <option value="">not tied to a department</option>
             <?php foreach ($steps as $st): ?>
               <option value="<?= (int)$st['id'] ?>"><?= e($st['name'] . ' · '
                   . applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) ?></option>
             <?php endforeach; ?>
           </select>
-          <small>Puts the marker on that step's row, and warns if the date falls before
-                 the step finishes.</small></label>
+          <small>Puts the marker on that department's row, and warns if the date falls before
+                 the department finishes.</small></label>
       <?php endif; ?>
       <div class="actions">
         <button type="button" class="secondary" onclick="closeMsEditor()">Cancel</button>
@@ -791,7 +791,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
 <?php if ($general): ?>
 <div id="stepEditor" class="tl-modal" style="display:none;">
   <div class="tl-modal-box tl-step-box" role="dialog" aria-modal="true" aria-labelledby="seTitle">
-    <h3 id="seTitle">Step</h3>
+    <h3 id="seTitle">Department</h3>
     <p id="seScope" class="muted small se-scope"></p>
     <form id="stepEditForm">
       <div class="se-dates">

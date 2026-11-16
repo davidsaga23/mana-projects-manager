@@ -2011,10 +2011,10 @@ function campWinDraw() {
 }
 function campSlay() {
   var k = CAMP[CW.land], p = k && k.progress, h;
-  if (!p) h = '<p class="rcnote">This show has nothing to count yet. Once it has shots or assets and a pipeline, the bar fills as their steps are approved.</p>';
+  if (!p) h = '<p class="rcnote">This show has nothing to count yet. Once it has shots or assets and a pipeline, the bar fills as their departments are approved.</p>';
   else h = '<p class="rslaypct">'+p.pct+'%<small> slain</small></p><div class="rslaybar" role="img" aria-label="'+p.pct+' percent finished"><i style="width:'+Math.max(0,Math.min(100,p.done/p.total*100)).toFixed(1)+'%"></i></div>'
     +'<p><b>'+p.done+'</b> of <b>'+p.total+'</b> tasks finished, '+(p.total-p.done > 0 ? '<b>'+(p.total-p.done)+'</b> to go.' : 'the show is slain.')+'</p>'
-    +'<p class="rcnote">A task is one shot or asset through one step, and it is finished when it is approved. This is the same count as the show&#39;s progress in Anima.</p>';
+    +'<p class="rcnote">A task is one shot or asset through one department, and it is finished when it is approved. This is the same count as the show&#39;s progress in Anima.</p>';
   $('campBody').innerHTML = h+campFoot('','','');
 }
 /* THE SCROLL: the Brief as Anima holds it now. */
@@ -2045,14 +2045,14 @@ function campTracking(g) {
   ['asset','shot','project'].forEach(function (k) { h += '<button type="button" class="rbtn rsmall" data-campscope="'+k+'" aria-pressed="'+(g.scope===k)+'">'+label[k]+' ('+(+g.counts[k]||0)+')</button>'; });
   h += '</div>';
   if (!g.rows.length || !g.steps.length) {
-    h += '<p class="rcnote">'+(!g.rows.length ? 'This show has no '+noun+'s yet.' : 'No pipeline step belongs to '+label[g.scope]+' on this show.')+' Production sets that up in Anima.</p>';
+    h += '<p class="rcnote">'+(!g.rows.length ? 'This show has no '+noun+'s yet.' : 'No department belongs to '+label[g.scope]+' on this show.')+' Production sets that up in Anima.</p>';
     return h+campFoot(g.url,'production.php?','Open Production tracking in Anima');
   }
   h += '<p class="rcmeta"><b>'+(+g.done)+'</b> of <b>'+(+g.total)+'</b> cells approved, <b>'+(+g.ready)+'</b> of '+g.rows.length+' '+noun+(g.rows.length===1?'':'s')+' fully ready. Green means approved.</p>';
   h += '<div class="rtlegend"><b>How to read a cell</b>';
   g.statuses.forEach(function (s) { var c = hex(s.color);
     h += '<span><i class="rtchip"'+(c?' style="background:'+c+'"':'')+'></i>'+esc(s.name)+(s.ready?'<em class="is-ready">ready</em>':'')+(s.blocked?'<em class="is-blocked">blocked</em>':'')+(s.na?'<em>n/a</em>':'')+'</span>'; });
-  h += '<span><i class="rtchip is-none"></i>Nothing recorded yet</span><span><i class="rtdash">&mdash;</i>Step does not apply</span></div>';
+  h += '<span><i class="rtchip is-none"></i>Nothing recorded yet</span><span><i class="rtdash">&mdash;</i>Department does not apply</span></div>';
   h += '<div class="rtwrap rcscroll"><table class="rtrack"><thead><tr><th>'+noun.charAt(0).toUpperCase()+noun.slice(1)+'</th>';
   g.steps.forEach(function (s) { h += '<th class="rtstep" title="'+esc(s.of)+'">'+esc(s.name)+'</th>'; });
   h += '<th class="rtdone">Done</th></tr></thead><tbody>';
@@ -2060,7 +2060,7 @@ function campTracking(g) {
     if (ng > 1 && r.g!==last) { last = r.g; h += '<tr class="rtgroup"><td colspan="'+(g.steps.length+2)+'">'+esc(r.g)+'</td></tr>'; }
     h += '<tr'+(r.r?' class="is-ready"':'')+'><th scope="row">'+esc(r.n)+(r.r?'<em>ready</em>':'')+'</th>';
     r.c.forEach(function (v) { var s = v > 0 ? by[v] : null, c = s ? hex(s.color) : '';
-      h += v < 0 ? '<td><i class="rtdash" title="Step does not apply">&mdash;</i></td>' : s ? '<td><i class="rtchip"'+(c?' style="background:'+c+'"':'')+' title="'+esc(s.name)+'"></i></td>' : '<td><i class="rtchip is-none" title="Nothing recorded yet"></i></td>'; });
+      h += v < 0 ? '<td><i class="rtdash" title="Department does not apply">&mdash;</i></td>' : s ? '<td><i class="rtchip"'+(c?' style="background:'+c+'"':'')+' title="'+esc(s.name)+'"></i></td>' : '<td><i class="rtchip is-none" title="Nothing recorded yet"></i></td>'; });
     h += '<td class="rtdone">'+(+r.d)+'/'+(+r.t)+'</td></tr>';
   });
   h += '</tbody></table></div><p class="rcnote">Read only here. Statuses are set in Anima.</p>';

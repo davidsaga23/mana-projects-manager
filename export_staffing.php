@@ -220,7 +220,7 @@ foreach ($byDept as $deptName => $deptSteps) {
     for ($i = 1; $i < 8; $i++) $bandRow[] = ['v' => '', 's' => XLSX_BAND];
     $put($bandRow);
 
-    $put([['v' => 'Step', 's' => XLSX_HEAD], ['v' => '#', 's' => XLSX_HEAD],
+    $put([['v' => 'Department', 's' => XLSX_HEAD], ['v' => '#', 's' => XLSX_HEAD],
           ['v' => 'State', 's' => XLSX_HEAD], ['v' => 'Who', 's' => XLSX_HEAD],
           ['v' => 'Stage', 's' => XLSX_HEAD],
           ['v' => 'Needed from', 's' => XLSX_HEAD], ['v' => 'Needed by', 's' => XLSX_HEAD],
@@ -272,7 +272,7 @@ foreach ($byDept as $deptName => $deptSteps) {
     $put([]);
 }
 
-$put([['v' => '"Needed from" and "Needed by" are the step\'s own dates, so an empty position with a '
+$put([['v' => '"Needed from" and "Needed by" are the department\'s own dates, so an empty position with a '
            . 'near date is the one to chase first. "Tasks waiting" is how much is already scheduled '
            . 'on that track and has nobody to do it.', 's' => XLSX_NOTE]]);
 

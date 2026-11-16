@@ -211,7 +211,7 @@ require __DIR__ . '/includes/header.php';
         <th title="What this state means for delivered/approved reporting">Counts as</th>
         <th title="Work that cannot proceed, as opposed to work not yet started">Blocked</th>
         <?php if ($hasExcluded): ?>
-          <th title="This item does not pass through this step at all, the scheduler plans no time for it">Not applicable</th>
+          <th title="This item does not pass through this department at all, the scheduler plans no time for it">Not applicable</th>
         <?php endif; ?>
         <?php if ($hasBoard): ?>
           <th title="Show this status as a column on the tasks board">Board column</th>
@@ -323,7 +323,7 @@ require __DIR__ . '/includes/header.php';
   <strong>Not applicable</strong> is different again: the work doesn't exist. A shot with no
   FX, a prop that needs no rig. It is what <code>N/A</code> has always meant, and the
   scheduler reads it, an item marked this way gets no time planned for it, rather than
-  sitting in the plan forever as something nobody will ever finish. It is also how a step
+  sitting in the plan forever as something nobody will ever finish. It is also how a department
   whose coverage is still a guess ("FX is about 30% of the show") turns into real per-shot
   dates: mark the shots it doesn't touch, and the estimate stops being needed.
 </p>

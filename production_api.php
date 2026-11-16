@@ -31,7 +31,7 @@ try {
     $statusId  = ($rawStatus === '' || $rawStatus === null) ? null : (int)$rawStatus;
 
     if (!$projectId || !$stepId || $itemKey === '') {
-        throw new RuntimeException('A project, a step and an item are all required.');
+        throw new RuntimeException('A project, a department and an item are all required.');
     }
 
     // The step must belong to the project named. Without this an id from another
@@ -39,7 +39,7 @@ try {
     $chk = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
     $chk->execute([$stepId, $projectId]);
     $step = $chk->fetch();
-    if (!$step) throw new RuntimeException('That step is not part of this project.');
+    if (!$step) throw new RuntimeException('That department is not part of this project.');
 
     // Same for the status.
     $status = null;

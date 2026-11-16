@@ -212,16 +212,16 @@ require __DIR__ . '/includes/header.php';
      same wherever they work.</p>
 <?php endif; ?>
 
-<h3>Known step and asset aliases</h3>
+<h3>Known department and asset aliases</h3>
 <?php if (!$nameAliases): ?>
   <p class="muted">None yet. One is created whenever an import maps a differently-spelled name
-     onto one of this project's steps.</p>
+     onto one of this project's departments.</p>
 <?php else: ?>
   <table class="review-table">
     <tr><th>Kind</th><th>Name as it arrives</th><th>Means</th><th></th></tr>
     <?php foreach ($nameAliases as $a): ?>
     <tr>
-      <td class="muted"><?= e($a['kind']) ?></td>
+      <td class="muted"><?= e($a['kind'] === 'step' ? 'department' : $a['kind']) ?></td>
       <td><?= e($a['alias']) ?></td>
       <td><strong><?= e($a['canonical_name']) ?></strong></td>
       <td class="row-actions">

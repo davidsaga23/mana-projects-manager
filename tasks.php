@@ -470,7 +470,7 @@ foreach ($cards as $sid => $list) {
             </datalist>
           </label>
         </div>
-        <label>Pipeline step <span class="muted small">(which part of the pipeline this is about)</span>
+        <label>Department <span class="muted small">(which part of the pipeline this is about)</span>
           <?php // One control, two meanings — a step id, or "the app itself".
                 // ticket_step_options() draws it for this form and for the ticket
                 // page, so the two cannot drift about what is on offer. ?>

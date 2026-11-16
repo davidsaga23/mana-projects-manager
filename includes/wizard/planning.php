@@ -37,7 +37,7 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         $end   = $project['delivery_date'];
         if (!$end) {
             throw new RuntimeException('Set a delivery date on the Basics screen first, ' .
-                                       'there is nothing to spread the steps across.');
+                                       'there is nothing to spread the departments across.');
         }
         if ($end < $start) throw new RuntimeException('The delivery date is before the start date.');
 
@@ -69,8 +69,8 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
             }
             $i++;
         }
-        flash('ok', "Spread $touched steps across $c stage" . ($c === 1 ? '' : 's') .
-                    " between $start and $end. Steps that run at the same time share dates. " .
+        flash('ok', "Spread $touched departments across $c stage" . ($c === 1 ? '' : 's') .
+                    " between $start and $end. Departments that run at the same time share dates. " .
                     'Adjust anything below.');
         return wizard_url($projectId, 6);
     }
@@ -124,10 +124,10 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
 
         $n = capture_baseline($pdo, $projectId, $reason);
         flash('ok', $isFirst
-            ? "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') . '. This project ' .
+            ? "Recorded today's estimates for $n department" . ($n === 1 ? '' : 's') . '. This project ' .
               'was already running, so these are current numbers rather than what it started ' .
               'with, the record says so, and future projects get a true starting estimate.'
-            : "Recorded today's estimates for $n step" . ($n === 1 ? '' : 's') .
+            : "Recorded today's estimates for $n department" . ($n === 1 ? '' : 's') .
               '. The previous baseline is kept, the history now shows both, so a revision ' .
               'reads as a revision rather than replacing what came before.');
         return wizard_url($projectId, 6);
@@ -208,7 +208,7 @@ function wizard_save_planning(PDO $pdo, ?array $project): string {
         }
     }
 
-    flash('ok', "Saved dates and headcount for $saved step" . ($saved === 1 ? '' : 's') . '.');
+    flash('ok', "Saved dates and headcount for $saved department" . ($saved === 1 ? '' : 's') . '.');
     if ($dpuChanges) {
         flash('ok', 'Changed days per item for ' . ideal_list($dpuChanges) . '. On this project only, '
                   . 'no other project changed.');
@@ -236,8 +236,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
 
     if (!$steps) {
         ?>
-        <p class="lead">No pipeline steps yet.</p>
-        <p><a href="<?= e(wizard_url($projectId, 2)) ?>">← Add the pipeline steps first</a></p>
+        <p class="lead">No departments yet.</p>
+        <p><a href="<?= e(wizard_url($projectId, 2)) ?>">← Add the departments first</a></p>
         <?php
         return;
     }
@@ -255,8 +255,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
 
     <form method="post" class="inline-form">
       <input type="hidden" name="action" value="spread">
-      <button type="submit" class="secondary">Spread the steps evenly across those dates</button>
-      <small>A starting point: each stage gets an equal slice, and parallel steps share dates.</small>
+      <button type="submit" class="secondary">Spread the departments evenly across those dates</button>
+      <small>A starting point: each stage gets an equal slice, and parallel departments share dates.</small>
     </form>
 
     <?php // Where a new project's days per item are set, so where starting from
@@ -287,7 +287,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         <span>
           Starting estimate recorded
           <strong><?= e(substr((string)$baseline['captured_at'], 0, 10)) ?></strong>
-          <span class="muted">(<?= e($baseline['reason']) ?>, <?= (int)$baseline['steps'] ?> steps)</span>
+          <span class="muted">(<?= e($baseline['reason']) ?>, <?= (int)$baseline['steps'] ?> departments)</span>
         </span>
       <?php else: ?>
         <span class="warn-text">No starting estimate recorded for this project yet.</span>
@@ -304,7 +304,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         Editing the numbers below never changes what was recorded, that is the point.
         Comparing the two is how next project's estimates get better
         <?php if ($drift): ?>
-          · <strong><?= count($drift) ?></strong> step<?= count($drift) === 1 ? '' : 's' ?>
+          · <strong><?= count($drift) ?></strong> department<?= count($drift) === 1 ? '' : 's' ?>
           now differ<?= count($drift) === 1 ? 's' : '' ?> from the baseline
         <?php endif; ?>
       </small>
@@ -312,10 +312,10 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
 
     <?php if ($drift): ?>
       <details class="inline-actions">
-        <summary><?= count($drift) ?> step<?= count($drift) === 1 ? '' : 's' ?>
+        <summary><?= count($drift) ?> department<?= count($drift) === 1 ? '' : 's' ?>
           changed since the estimate was recorded</summary>
         <table class="review-table">
-          <tr><th>Step</th><th>What changed</th></tr>
+          <tr><th>Department</th><th>What changed</th></tr>
           <?php foreach ($drift as $d): ?>
             <tr>
               <td class="wf-name">
@@ -367,7 +367,7 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         $missed = array_sum($others);
     ?>
       <div class="flash flash-warn">
-        A step is scoped to <strong>"<?= e($hit) ?>"</strong>, but
+        A department is scoped to <strong>"<?= e($hit) ?>"</strong>, but
         <strong><?= $missed ?></strong> asset<?= $missed === 1 ? ' is' : 's are' ?> typed
         <?= e(implode(' or ', array_map(function ($n) { return '"' . $n . '"'; }, array_keys($others)))) ?>
         instead, so <?= $missed === 1 ? 'it is' : 'they are' ?> not counted in the work below,
@@ -453,8 +453,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
         </colgroup>
         <thead>
         <tr>
-          <th>Step</th>
-          <th title="How much of its scope this step actually touches. FX might only land on a third of the running time.">Covers</th>
+          <th>Department</th>
+          <th title="How much of its scope this department actually touches. FX might only land on a third of the running time.">Covers</th>
           <th title="The amount of work the quota is calculated from, after the coverage percentage is applied.">Work</th>
           <?php // Two date columns became one, stacked. A native date input cannot
                 // be made much narrower than the text it holds, so two of them side
@@ -463,8 +463,8 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
                 // height — which is the trade this whole screen now makes. ?>
           <th>Dates<div class="muted small">start / deadline</div></th>
           <th title="The business days from the start date to the deadline, both days counted. Weekends and studio holidays are left out.">Business days<div class="muted small">start to deadline</div></th>
-          <th title="This project's ideal quota: how long one shot or asset takes one person when the work is done properly. The schedule and the budget run on it, and it belongs to this project alone. Decimals are fine, 0.5 is half a day. On a step measured in seconds this is days per SECOND of footage.">Days per item<div class="muted small">this project's ideal</div></th>
-          <th title="How many people are on this step. Decimals are fine, 2.5 means someone is half-time.">People</th>
+          <th title="This project's ideal quota: how long one shot or asset takes one person when the work is done properly. The schedule and the budget run on it, and it belongs to this project alone. Decimals are fine, 0.5 is half a day. On a department measured in seconds this is days per SECOND of footage.">Days per item<div class="muted small">this project's ideal</div></th>
+          <th title="How many people are in this department. Decimals are fine, 2.5 means someone is half-time.">People</th>
           <?php // The header and its cells are two lists kept in step by hand, and
                 // nothing warns when they drift: from 2026-08-17 until David spotted
                 // it, two of these headings sat over each other's figures. ?>
@@ -481,13 +481,13 @@ function wizard_render_planning(PDO $pdo, ?array $project): void {
           // pace, the same number as the Days per item box turned into items per
           // person per day, so the two can be read against each other.
           ?>
-          <th title="The arithmetic quota: what one person must finish each day for this step to hit its deadline. Derived from the work, the dates and the people, not editable.">Minimum<div class="muted small">per person / day</div></th>
+          <th title="The arithmetic quota: what one person must finish each day for this department to hit its deadline. Derived from the work, the dates and the people, not editable.">Minimum<div class="muted small">per person / day</div></th>
           <?php // Retakes sits BEFORE Duration because it is one of the things the
                 // duration is made of: work, plus the allowance, divided by people.
                 // Reading it after the total it feeds is reading the sum before its
                 // parts. ?>
-          <th title="What the retake allowance adds to this step, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
-          <th title="How long the step takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this step's own start and deadline, this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
+          <th title="What the retake allowance adds to this department, in days. The percentage above, converted.">Retakes<div class="muted small">in days</div></th>
+          <th title="How long the department takes at these settings: the work divided by the people on it, retakes included. The line under it compares that against the working days between this department's own start and deadline, this is a plan, so it is judged on the window you gave it, not on how much of that window has gone.">Duration<div class="muted small">at these settings</div></th>
           <th>Is that enough?</th>
           <th class="col-sep" title="The pace this project's ideal quota implies, in the same unit as the Minimum column, so the two can be compared directly. Red when it cannot keep up with the deadline.">Ideal<div class="muted small">per person / day</div></th>
         </tr>

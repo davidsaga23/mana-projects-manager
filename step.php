@@ -70,7 +70,7 @@ $all = dashboard_steps($pdo, $projectId, $delivery);
 $s = null;
 foreach ($all as $row) if ((int)$row['step']['id'] === $stepId) $s = $row;
 if (!$s) {
-    flash('err', 'That step is not part of this project.');
+    flash('err', 'That department is not part of this project.');
     header('Location: dashboard.php?project=' . $projectId);
     exit;
 }
@@ -151,7 +151,7 @@ require __DIR__ . '/includes/header.php';
 <?php if ($stepTickets): ?>
   <div class="flash flash-warn">
     <strong><?= count($stepTickets) ?></strong> open
-    ticket<?= count($stepTickets) === 1 ? '' : 's' ?> raised against this step:
+    ticket<?= count($stepTickets) === 1 ? '' : 's' ?> raised against this department:
     <?php foreach ($stepTickets as $i => $tk): ?>
       <?php if ($i > 0): ?>·<?php endif; ?>
       <a href="ticket.php?id=<?= (int)$tk['id'] ?>"><?= e(ticket_ref($tk)) ?></a>
@@ -249,7 +249,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
                 // back to the project's delivery date, and a screen that did not
                 // say so would make that look like a bug. ?>
           <?php if ($inherited): ?>
-            · <em>the project's delivery date, this step has none of its own</em>
+            · <em>the project's delivery date, this department has none of its own</em>
           <?php endif; ?>
         <?php else: ?>
           <strong>none</strong> <span class="muted">(and the project has no delivery date)</span>
@@ -276,7 +276,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
 <?php // --- the quota, per team and per artist ------------------------------ ?>
 <h3>The daily quota</h3>
 <?php if ($s['required_pace'] === null): ?>
-  <p class="muted">This step has no deadline and the project has no delivery date, so there is
+  <p class="muted">This department has no deadline and the project has no delivery date, so there is
      nothing to work a quota back from.
      <a href="wizard.php?project=<?= $projectId ?>&step=6">Set one →</a></p>
 <?php elseif (is_infinite($s['required_pace'])): ?>
@@ -291,7 +291,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
     <div><span class="muted small">Each person must finish</span>
       <strong><?= $s['per_artist'] === null ? '—' : e(fmt_unit((float)$s['per_artist'], $unit)) ?></strong>
       <span class="muted small">
-        <?= $s['per_artist'] === null ? 'no headcount set on this step'
+        <?= $s['per_artist'] === null ? 'no headcount set on this department'
             : 'per working day, across ' . e(fmt_num($s['headcount'])) . ' people' ?></span></div>
     <div><span class="muted small">Being finished</span>
       <strong class="status-<?= e($s['status']) ?>">
@@ -316,7 +316,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
     $ratio = (float)$s['per_artist'] / $idealPerDay; ?>
     <?php if ($ratio > 1.05): ?>
       <div class="flash flash-err">
-        This step needs <strong><?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% more per person per
+        This department needs <strong><?= e(fmt_num(($ratio - 1) * 100, 0)) ?>% more per person per
         day</strong> than this project's ideal. That is not an ambitious target, it is one nobody is
         expected to hit. More people, more time, or less work.
       </div>
@@ -332,11 +332,11 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
     The team figure does not fall when people are added, the work needed to hit a date is
     fixed. Only each person's share of it moves.
     <?php if ($s['actual_pace'] !== null && $s['actual_pace'] < $s['required_pace']): ?>
-      <span class="warn-text">At the current rate this step does not reach its deadline.</span>
+      <span class="warn-text">At the current rate this department does not reach its deadline.</span>
     <?php endif; ?>
   </p>
   <?php if ($slots): ?>
-    <p class="muted small">On this step:
+    <p class="muted small">On this department:
       <?php $names = [];
         foreach ($slots as $sl) $names[] = $sl['name'] . ((int)$sl['is_placeholder'] === 1 ? ' (slot)' : '');
         echo e(implode(' · ', $names)); ?>
@@ -408,7 +408,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
 <?php endif; ?>
 
 <?php // --- the items themselves ---------------------------------------------- ?>
-<h3>Everything at this step <span class="muted">· <?= count($rows) ?> tracked of <?= (int)$s['applicable'] ?></span></h3>
+<h3>Everything in this department <span class="muted">· <?= count($rows) ?> tracked of <?= (int)$s['applicable'] ?></span></h3>
 
 <?php // ⚠ THE LEFTOVERS, NAMED. Changing a step's scope does not delete the
       // progress rows the old scope created, so a step re-scoped from shots to
@@ -418,7 +418,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
 <?php if (!empty($s['stale_rows'])): ?>
   <p class="flash flash-warn">
     <strong><?= (int)$s['stale_rows'] ?> of these were tracked under a different scope</strong>
-    and are not counted any more. This step now covers
+    and are not counted any more. This department now covers
     <?= e(applies_to_phrase((string)$step['applies_to'], $step['applies_to_asset_type'] ?? null)) ?>, so only
     <?= (int)$s['tracked'] ?> of the rows below count towards its
     <?= e(fmt_unit($s['target'], $unit)) ?>. They are kept rather than deleted: they are
@@ -426,7 +426,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
   </p>
 <?php endif; ?>
 <?php if (!$rows): ?>
-  <p class="muted">Nothing has been recorded against this step yet. Progress arrives through
+  <p class="muted">Nothing has been recorded against this department yet. Progress arrives through
      <a href="import.php?project=<?= $projectId ?>">the importer</a>.</p>
 <?php else: ?>
   <table class="review-table">

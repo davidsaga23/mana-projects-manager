@@ -263,7 +263,7 @@ function copy_project_ideals(PDO $pdo, int $toId, int $fromId, string $who = '')
     }
     $steps = pipeline_steps($pdo, $toId);
     if (!$steps) {
-        throw new RuntimeException('This project has no pipeline steps yet, so there is nothing to copy onto.');
+        throw new RuntimeException('This project has no departments yet, so there is nothing to copy onto.');
     }
 
     $note = mb_substr(sprintf('Copied from %s%s on %s', $from['name'],
@@ -310,12 +310,12 @@ function copy_ideals_flash(array $r): void {
                           . 'them, and no other project changed.',
                             $n, $n === 1 ? '' : 's', $name, ideal_list($r['changed'])));
     } elseif ($r['same'] > 0) {
-        flash('ok', sprintf('Every step that %s also has already had the same days per item, so nothing '
+        flash('ok', sprintf('Every department that %s also has already had the same days per item, so nothing '
                           . 'changed.', $name));
     }
     $u = count($r['unmatched']);
     if ($u > 0) {
-        flash('warn', sprintf('%d step%s no step with the same name and scope on %s, so %s own days per '
+        flash('warn', sprintf('%d department%s no department with the same name and scope on %s, so %s own days per '
                             . 'item: %s.',
                               $u, $u === 1 ? ' has' : 's have', $name,
                               $u === 1 ? 'it kept its' : 'they kept their', ideal_list($r['unmatched'])));
@@ -359,8 +359,8 @@ function project_ideals_copy_form(PDO $pdo, array $project): void {
       </label>
       <button type="submit" class="secondary">Copy days per item</button>
       <small>
-        Each step takes the number from the step with the same name and scope on that project, and
-        steps it does not have keep theirs. A copy, not a link: changing either project afterwards
+        Each department takes the number from the department with the same name and scope on that project, and
+        departments it does not have keep theirs. A copy, not a link: changing either project afterwards
         changes nothing on the other.
       </small>
     </form>

@@ -109,7 +109,7 @@ require __DIR__ . '/includes/header.php';
 <p class="lead">
   <?= e($phase['blurb']) ?>
   <strong>Green means approved</strong>, finished, and ready for the next department to pick up.
-  A dash means the step doesn't apply. Click any cell to set its status.
+  A dash means the department doesn't apply. Click any cell to set its status.
 </p>
 
 <?php if (!$grid['steps'] || !$grid['rows']): ?>
@@ -119,14 +119,14 @@ require __DIR__ . '/includes/header.php';
       <p class="muted">Add them on the Setup screen, or bring them in from Plaky on the Import screen.</p>
       <p><a class="button" href="wizard.php?project=<?= $projectId ?>&amp;step=<?= $scope === 'shot' ? 4 : 5 ?>">Open Setup →</a></p>
     <?php else: ?>
-      <p><strong>No pipeline step belongs to <?= e($phase['label']) ?> on this project.</strong></p>
+      <p><strong>No department belongs to <?= e($phase['label']) ?> on this project.</strong></p>
       <p class="muted">
         <?php if ($scope === 'project'): ?>
-          A whole-show deliverable is a step whose scope is <em>the project</em> rather than shots
+          A whole-show deliverable is a department whose scope is <em>the project</em> rather than shots
           or assets, an animatic, a music track, the mix, the final master. Set that on the
           Setup screen and it will appear here.
         <?php else: ?>
-          A step's scope is set on the Setup screen, applies to shots, to assets, or to one kind
+          A department's scope is set on the Setup screen, applies to shots, to assets, or to one kind
           of asset. Nothing here is broken; there is simply nothing to draw.
         <?php endif; ?>
       </p>
@@ -145,7 +145,7 @@ require __DIR__ . '/includes/header.php';
   <div class="bar-outer"><div class="bar-inner" style="width:<?= number_format($grid['pct'], 1) ?>%"></div></div>
   <p class="muted small" style="margin:6px 0 0;">
     <?= number_format($grid['pct'], 1) ?>% across <?= count($grid['rows']) ?>
-    <?= e($phase['noun']) ?><?= count($grid['rows']) === 1 ? '' : 's' ?> and <?= count($grid['steps']) ?> steps ·
+    <?= e($phase['noun']) ?><?= count($grid['rows']) === 1 ? '' : 's' ?> and <?= count($grid['steps']) ?> departments ·
     <strong><?= $readyTotal ?></strong> fully ready for production
   </p>
 
@@ -207,7 +207,7 @@ require __DIR__ . '/includes/header.php';
       <span class="cell-chip cell-none"></span> Nothing recorded yet
     </span>
     <span class="legend-item">
-      <span class="cell-dash">—</span> Step doesn't apply
+      <span class="cell-dash">—</span> Department doesn't apply
     </span>
   </div>
 </section>
@@ -264,14 +264,14 @@ require __DIR__ . '/includes/header.php';
             <?php // The obvious thing to click, and now it does something: the
                   // item's own page, with every step opened up. ?>
             <a href="item.php?project=<?= $projectId ?>&amp;item=<?= e(urlencode($row['item_key'])) ?>"><?= e($row['name']) ?></a>
-            <?php if ($row['ready']): ?><span class="ready-tag" title="Every step that applies is approved">ready</span><?php endif; ?>
+            <?php if ($row['ready']): ?><span class="ready-tag" title="Every department that applies is approved">ready</span><?php endif; ?>
           </td>
           <?php foreach ($grid['steps'] as $st): $cell = $row['cells'][(int)$st['id']]; ?>
             <td class="track-cell">
               <?php if ($cell['kind'] === 'n/a'): ?>
                 <span class="cell-dash" title="<?= $cell['reason'] === 'excluded'
                       ? 'Marked not applicable for this item'
-                      : e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) . ', this step does not cover it' ?>">—</span>
+                      : e(applies_to_phrase($st['applies_to'], $st['applies_to_asset_type'] ?? null)) . ', this department does not cover it' ?>">—</span>
               <?php else:
                 $s = $cell['status'];
                 $title = ($s['name'] ?? 'Nothing recorded')

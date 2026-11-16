@@ -669,7 +669,7 @@ function board_crew_cell(array $t, array $crew, int $projectId, bool $mayEdit): 
     // This step's people, the rest of the show, everybody else (see
     // board_assignees()). An empty group is not drawn.
     $stepId = (int)($t['step_id'] ?? 0);
-    $groups = [[(string)($t['step'] ?? 'This step'), []], ['Rest of the crew', []], ['Other people', []]];
+    $groups = [[(string)($t['step'] ?? 'This department'), []], ['Rest of the crew', []], ['Other people', []]];
     foreach ($crew as $c) {
         $g = in_array($stepId, $c['steps'], true) ? 0 : ($c['on_show'] ? 1 : 2);
         $groups[$g][1][] = $c;

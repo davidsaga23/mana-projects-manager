@@ -383,16 +383,16 @@ require __DIR__ . '/includes/header.php';
     <?php if (stripos($naming['shots'], '{TYPE}') !== false || stripos($naming['shots'], '{ASSET}') !== false): ?>
       <p class="flash flash-warn small">
         The shots template uses <code>{TYPE}</code> or <code>{ASSET}</code>, which only mean something
-        for assets, so on shots they are left out. To put the department in a shot's file name
-        (MSD_SH220_<strong>CH_SH</strong>_V01_AA), write it into the step's code below, for example
+        for assets, so on shots they are left out. To put CH or BG in a shot's file name
+        (MSD_SH220_<strong>CH_SH</strong>_V01_AA), write it into the department's code below, for example
         <code>CH_LO</code> for CH layout.
       </p>
     <?php endif; ?>
 
     <?php if ($namingSteps): ?>
-      <h4>Step codes</h4>
-      <p class="muted small">What {STEP} becomes for each step. Guessed from the name until you type one.
-        A code can carry the department too, like <code>CH_LO</code> or <code>BG_CL</code>.</p>
+      <h4>Department codes</h4>
+      <p class="muted small">What {STEP} becomes for each department. Guessed from the name until you type one.
+        A code can carry CH or BG too, like <code>CH_LO</code> or <code>BG_CL</code>.</p>
       <div class="naming-codes">
         <?php foreach ($namingSteps as $s):
           $saved = (string)($naming['codes']['steps'][(string)$s['id']] ?? ''); ?>

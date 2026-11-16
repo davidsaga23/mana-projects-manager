@@ -397,10 +397,10 @@ function ideal_match_post(PDO $pdo, int $projectId, string $action, string $self
 
             $n = count($r['changed']);
             if ($n > 0) {
-                flash('ok', sprintf('Matched to %s: %d step%s changed, %s. No other project changed.',
+                flash('ok', sprintf('Matched to %s: %d department%s changed, %s. No other project changed.',
                                     $held['file'], $n, $n === 1 ? '' : 's', ideal_list($r['changed'], 30)));
             } else {
-                flash('ok', sprintf('Every matched step already had the days per item %s works out to, '
+                flash('ok', sprintf('Every matched department already had the days per item %s works out to, '
                                   . 'so nothing changed.', $held['file']));
             }
             if ($r['no_count']) {
@@ -414,7 +414,7 @@ function ideal_match_post(PDO $pdo, int $projectId, string $action, string $self
                 if ($role['rows'] > 0 && (int)($mapping[$i] ?? 0) === 0) $skipped[] = $role['label'];
             }
             if ($skipped) {
-                flash('warn', sprintf('Not matched to any step, so not applied: %s.', ideal_list($skipped)));
+                flash('warn', sprintf('Not matched to any department, so not applied: %s.', ideal_list($skipped)));
             }
             // The figure somebody will check first, said here rather than left
             // to be found on another tab.
@@ -470,7 +470,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
         <button type="submit" class="secondary">Preview</button>
         <small>
           Upload the approved sheet, in the shape <em>Download as Excel</em> produces. Each role's
-          days are worked back into days per item for its step, using this project's own counts and
+          days are worked back into days per item for its department, using this project's own counts and
           retake allowance, so the projection carries the approved days. Nothing changes until you
           have seen the result and confirmed it.
         </small>
@@ -524,7 +524,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
           </colgroup>
           <thead>
             <tr>
-              <th>Approved role</th><th class="num">Person-days</th><th>Step on this project</th>
+              <th>Approved role</th><th class="num">Person-days</th><th>Department on this project</th>
               <th class="num">Counted here</th><th class="num">Days per item now</th>
               <th class="num">Becomes</th><th>Notes</th>
             </tr>
@@ -540,7 +540,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
                 $notes[] = 'No days in the sheet. A fixed cost like this belongs in Other expenses, not in '
                          . 'days per item.';
             } elseif ($m === null) {
-                $notes[] = 'No step matched. Pick one, or this role is skipped.';
+                $notes[] = 'No department matched. Pick one, or this role is skipped.';
             } else {
                 if ($m['new'] === null) {
                     $notes[] = 'Nothing on this project to count it by yet, so it cannot be worked out.';
@@ -551,7 +551,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
                 }
                 if (count($rolesByStep[$sid] ?? []) > 1) {
                     $notes[] = 'Added together with ' . implode(', ', array_diff($rolesByStep[$sid], [$role['label']]))
-                             . ', which match the same step.';
+                             . ', which match the same department.';
                 }
                 $here = $rates['by_step'][$sid] ?? null;
                 if ($here !== null && $role['rates']) {
@@ -563,7 +563,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
                                            implode(', ', $role['rates']), implode(', ', $here['day']));
                     }
                     if ($here['unpriced'] > 0) {
-                        $notes[] = sprintf('%d position%s on this step %s no rate yet.', $here['unpriced'],
+                        $notes[] = sprintf('%d position%s in this department %s no rate yet.', $here['unpriced'],
                                            $here['unpriced'] === 1 ? '' : 's', $here['unpriced'] === 1 ? 'has' : 'have');
                     }
                 }
@@ -579,7 +579,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
               <td class="num"><?= $role['rows'] > 0 ? e(fmt_num($role['days'], 2)) : '<span class="muted">&mdash;</span>' ?></td>
               <td>
                 <?php if ($role['rows'] > 0): ?>
-                  <select name="map[<?= (int)$i ?>]" aria-label="Step for <?= e($role['label']) ?>">
+                  <select name="map[<?= (int)$i ?>]" aria-label="Department for <?= e($role['label']) ?>">
                     <option value="0">not matched, skip</option>
                     <?php foreach ($stepOptions as $optId => $optLabel): ?>
                       <option value="<?= (int)$optId ?>" <?= $optId === $sid ? 'selected' : '' ?>><?= e($optLabel) ?></option>
@@ -624,7 +624,7 @@ function ideal_match_render(PDO $pdo, array $project, array $steps): void {
 
         <div class="actions">
           <button type="submit" name="action" value="match_apply"
-                  onclick="return confirm(<?= e(json_encode(sprintf("Set days per item on %d step%s of this project?\n\nIt changes this project's schedule and budget, and nothing on any other project.", $changing, $changing === 1 ? '' : 's'))) ?>);">Set these days per item</button>
+                  onclick="return confirm(<?= e(json_encode(sprintf("Set days per item on %d department%s of this project?\n\nIt changes this project's schedule and budget, and nothing on any other project.", $changing, $changing === 1 ? '' : 's'))) ?>);">Set these days per item</button>
           <button type="submit" name="action" value="match_remap" class="secondary">Preview again with these matches</button>
           <button type="submit" name="action" value="match_cancel" class="secondary" formnovalidate>Cancel</button>
         </div>

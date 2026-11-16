@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                 }
 
                 $split = gan_split_name($name);
-                if (!$split) { $unmatched[] = $name . ', name is not "item - step"'; continue; }
+                if (!$split) { $unmatched[] = $name . ', name is not "item - department"'; continue; }
                 [$itemName, $stepName] = $split;
 
                 $shotId = $shots[mb_strtoupper($itemName)] ?? null;
@@ -167,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['ganfile'])) {
                 $asset = $assets[mb_strtolower($itemName)] ?? null;
 
                 $step = $resolveStep($stepName, $asset, $shotId !== null);
-                if (!$step) { $unmatched[] = $name . ', no step called "' . $stepName . '" applies here'; continue; }
+                if (!$step) { $unmatched[] = $name . ', no department called "' . $stepName . '" applies here'; continue; }
                 $stepId = (int)$step['id'];
 
                 if ($shotId !== null)      { $itemKey = 's' . $shotId; $assetId = null; }
@@ -275,7 +275,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="lead">
   The round trip for the <strong>.gan</strong> export: refine the plan in GanttProject, bring
-  it back here. Tasks are matched on the shot or asset name and the step name, so keep those
+  it back here. Tasks are matched on the shot or asset name and the department name, so keep those
   intact, renaming a task in GanttProject means it won't be found. Anything imported is
   marked <strong>locked</strong>, so a later Regenerate won't undo it.
 </p>
@@ -354,7 +354,7 @@ require __DIR__ . '/includes/header.php';
     <h3>Not matched</h3>
     <p class="muted small">
       Skipped, and named rather than dropped quietly, usually a task renamed in GanttProject,
-      or a shot, asset or step that doesn't exist on this project.
+      or a shot, asset or department that doesn't exist on this project.
     </p>
     <ul class="plain-list">
       <?php foreach (array_slice($report['unmatched'], 0, 60) as $u): ?>

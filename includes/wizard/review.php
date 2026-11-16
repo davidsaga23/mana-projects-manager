@@ -15,7 +15,7 @@ function wizard_save_review(PDO $pdo, ?array $project): string {
 
     $steps = pipeline_steps($pdo, $projectId);
     if (!$steps) {
-        throw new RuntimeException('Add at least one pipeline step before finishing setup.');
+        throw new RuntimeException('Add at least one department before finishing setup.');
     }
 
     // Freeze the estimates BEFORE anything else can edit them. This is the one
@@ -53,7 +53,7 @@ function wizard_save_review(PDO $pdo, ?array $project): string {
         try {
             $n = capture_baseline($pdo, $projectId, 'setup complete');
             if ($n > 0) {
-                flash('ok', "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') .
+                flash('ok', "Recorded the starting estimate for $n department" . ($n === 1 ? '' : 's') .
                             '. Editing them later never overwrites this, so what the project ' .
                             'planned can be compared with what it actually took.');
             }
@@ -81,7 +81,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
     $assetCount = (int)$pdo->query("SELECT COUNT(*) FROM assets WHERE project_id = $projectId")->fetchColumn();
 
     $blockers = [];
-    if (!$steps) $blockers[] = 'There are no pipeline steps, so there is nothing to track.';
+    if (!$steps) $blockers[] = 'There are no departments, so there is nothing to track.';
 
     $warnings = [];
     if (!$project['delivery_date']) $warnings[] = 'No delivery date is set for the project.';
@@ -114,14 +114,14 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
         <dl>
           <dt>Shots</dt><dd><?= $shotCount ?></dd>
           <dt>Assets</dt><dd><?= $assetCount ?></dd>
-          <dt>Pipeline steps</dt><dd><?= count($steps) ?></dd>
+          <dt>Departments</dt><dd><?= count($steps) ?></dd>
         </dl>
       </div>
     </div>
 
     <h3>Workflow</h3>
     <table class="review-table">
-      <tr><th>Step</th><th>Applies to</th><th>Order</th><th>Dates</th></tr>
+      <tr><th>Department</th><th>Applies to</th><th>Order</th><th>Dates</th></tr>
       <?php foreach ($steps as $s): ?>
       <tr>
         <td class="wf-name">
@@ -142,7 +142,7 @@ function wizard_render_review(PDO $pdo, ?array $project): void {
 
     <table class="review-table quota-table">
       <tr>
-        <th>Step</th><th>Work</th><th>Working days</th>
+        <th>Department</th><th>Work</th><th>Working days</th>
         <th>Team per day</th><th>People</th><th>Each per day</th><th>Needs</th>
       </tr>
       <?php foreach ($quotas as $q): ?>

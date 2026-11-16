@@ -73,7 +73,7 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         // Every project owns its own copy of the statuses, editable from the
         // project screen. Copied, not referenced — same as pipeline templates.
         seed_project_statuses($pdo, $id);
-        flash('ok', 'Created "' . $name . '". Next, choose the pipeline steps.');
+        flash('ok', 'Created "' . $name . '". Next, choose the departments.');
     }
 
     // Early estimates, used by the quota only until a real breakdown exists.

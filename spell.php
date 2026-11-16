@@ -114,7 +114,7 @@ require __DIR__ . '/includes/header.php';
 <?php if (!$board['groups']): ?>
   <div class="empty-state">
     <h2>Nothing to show yet</h2>
-    <p>This show has no shots or assets, or no pipeline step covers them.
+    <p>This show has no shots or assets, or no department covers them.
       <a href="shots.php?project=<?= $projectId ?>">Add the breakdown</a> and they appear here.</p>
   </div>
 <?php else: ?>
@@ -158,8 +158,8 @@ require __DIR__ . '/includes/header.php';
             // if I'm a supervisor taking a look at what shots/assets are ready
             // for my department"). Step picks the department; Ready narrows to
             // the work that can actually start today. ?>
-      <select id="fStep" aria-label="Filter by pipeline step">
-        <option value="">Any step</option>
+      <select id="fStep" aria-label="Filter by department">
+        <option value="">Any department</option>
         <?php foreach ($board['steps'] as $st): ?>
           <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
         <?php endforeach; ?>

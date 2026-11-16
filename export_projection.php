@@ -68,11 +68,11 @@ const COL_DEPT = 0, COL_ROLE = 1, COL_ARTIST = 2, COL_RATETYPE = 3, COL_RATE = 4
 const COL_COUNT = 15;
 
 $header = [
-    'Department', 'Role / Position', 'Artist Name', 'Rate Type', 'Day Rate (' . $cur . ')',
+    'Phase', 'Role / Position', 'Artist Name', 'Rate Type', 'Day Rate (' . $cur . ')',
     // "step total" spelt out on the header, because this is the only column on
     // the row that is NOT one person's share — and reading it as theirs is the
     // mistake the per-second formula used to make.
-    'Total Days', 'Total Months', 'Projected Cost (' . $cur . ')', 'Units (step total)',
+    'Total Days', 'Total Months', 'Projected Cost (' . $cur . ')', 'Units (department total)',
     'Actual day rate', 'Actual Days', 'Actual Cost (' . $cur . ')', 'Projection vs actuals',
     'Monthly cost (ref)', 'Notes',
 ];
@@ -253,12 +253,12 @@ foreach ($proj['by_department'] as $dept => $group) {
             // that gets 'corrected' out of a sheet by the next person to open it.
             $note = $liveSecond
                 ? ($laneCount > 1
-                    ? 'Per second of footage, column I is the whole step, shared '
+                    ? 'Per second of footage, column I is the whole department, shared '
                       . $laneCount . ' ways, so this row is one share'
                     : 'Per second of footage, retakes lengthen the days, not the seconds')
                 : (!empty($row['supervision'])
                     ? 'Per-second rate on a supervision position, cannot be priced'
-                    : 'Per-second rate on a step not measured in seconds, cannot be priced');
+                    : 'Per-second rate on a department not measured in seconds, cannot be priced');
         }
         if (!empty($row['fx']) && $row['rate'] !== null) {
             $fxNote = 'Contract ' . number_format((float)$row['rate'], 2) . ' ' . $row['currency']
@@ -276,7 +276,7 @@ foreach ($proj['by_department'] as $dept => $group) {
         // its own, so its difference is minus what was invoiced, and the
         // department subtotal above it adds up with it.
         if (!empty($row['step_level'])) {
-            $note = 'Invoiced to the step, not to a position: '
+            $note = 'Invoiced to the department, not to a position: '
                   . implode(', ', array_map(fn($pp) => $pp['name'], $row['payees'] ?? []));
         }
         $cells[COL_NOTES] = ['v' => $note, 's' => xlsx_alt(XLSX_NOTE, $shade)];

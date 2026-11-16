@@ -631,7 +631,7 @@ function expense_projection(PDO $pdo, int $projectId): array {
     foreach ($payeesBy as $k => $ps) {
         [$holder, $sid] = array_map('intval', explode('|', $k));
         if ($holder !== 0) continue;
-        $st = $stepById[$sid] ?? ['id' => $sid, 'name' => 'Step no longer on the show', 'color' => '#8a8f98',
+        $st = $stepById[$sid] ?? ['id' => $sid, 'name' => 'Department no longer on the show', 'color' => '#8a8f98',
                                   'step_order' => 9999, 'applies_to' => 'project', 'applies_to_asset_type' => null,
                                   'tracks_seconds' => 0, 'department' => ''];
         $d = trim((string)($st['department'] ?? '')) ?: 'Unassigned';
@@ -1162,7 +1162,7 @@ function resolve_invoice_target(string $position, string $payee, array $position
     // sender IS the position holder reads exactly as it always did.
     $posCrew = ($stepId !== null && $holder !== $crewId) ? $holder : null;
     if ($posCrew !== null && !invoice_holder_available() && !($posCrew === 0 && $crewId === null)) {
-        throw new RuntimeException("Putting an invoice on somebody else's position, or on a whole step with a "
+        throw new RuntimeException("Putting an invoice on somebody else's position, or on a whole department with a "
             . 'person as the sender, needs finance_install_15.sql imported into the finance database. Nothing was saved.');
     }
     $out = ['crew_id' => $crewId, 'step_id' => $stepId, 'step_name' => $stepName, 'position_crew_id' => $posCrew];
