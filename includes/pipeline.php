@@ -605,7 +605,7 @@ function template_save_from_post(PDO $pdo, int $projectId, array $project): stri
          . ", $n step" . ($n === 1 ? '' : 's')
          . ', including which of them run in parallel'
          . (column_exists($pdo, 'pipeline_template_steps', 'department')
-            ? ' and which department each belongs to' : '')
+            ? ' and which phase each belongs to' : '')
          . '. It will be offered on new projects.';
 }
 

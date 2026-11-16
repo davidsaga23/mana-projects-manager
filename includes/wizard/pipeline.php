@@ -164,7 +164,7 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
     // steps by hand is the price of a feature meant to save exactly that.
     if ($action === 'fill_departments') {
         if (!column_exists($pdo, 'pipeline_steps', 'department')) {
-            throw new RuntimeException('The database update that adds departments has not been applied yet.');
+            throw new RuntimeException('The database update that adds phases has not been applied yet.');
         }
         wizard_pipeline_apply_edits($pdo, $projectId);   // don't discard typed edits
         $known = step_departments_known($pdo);
@@ -179,12 +179,12 @@ function wizard_save_pipeline(PDO $pdo, ?array $project): string {
             $filled += $upd->rowCount();
         }
         flash($filled ? 'ok' : 'warn', $filled
-            ? "Filled in $filled department" . ($filled === 1 ? '' : 's') .
-              ' from step names used on other projects. Only blanks were touched.'
-            : 'Nothing to fill, every step either has a department already, or is a name ' .
+            ? "Filled in $filled phase" . ($filled === 1 ? '' : 's') .
+              ' from department names used on other projects. Only blanks were touched.'
+            : 'Nothing to fill, every department either has a phase already, or is a name ' .
               'no other project has assigned one to.');
         if ($unknown) {
-            flash('warn', 'No department is known yet for: ' . implode(', ', array_slice($unknown, 0, 8)) .
+            flash('warn', 'No phase is known yet for: ' . implode(', ', array_slice($unknown, 0, 8)) .
                           (count($unknown) > 8 ? ' …' : '') . '. Set them once here and every ' .
                           'future project starts with them filled in.');
         }
@@ -399,10 +399,10 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         <?php if ($blankDepts > 0): ?>
           <div class="inline-form toggle-form">
             <button type="submit" name="action" value="fill_departments" class="secondary">
-              Fill in <?= $blankDepts ?> blank department<?= $blankDepts === 1 ? '' : 's' ?>
+              Fill in <?= $blankDepts ?> blank phase<?= $blankDepts === 1 ? '' : 's' ?>
             </button>
             <small>
-              From the same step names on other projects. A step's phase barely changes between
+              From the same department names on other projects. A department's phase barely changes between
               shows, so it is worth answering once, set them here and every future project
               starts with them already filled in.
             </small>
@@ -415,7 +415,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
         <tr>
           <th></th><th>Step</th>
           <?php if ($hasDept): ?>
-            <th title="Which phase of production this step belongs to. Groups the timeline and is the subtotal boundary on a budget.">Department</th>
+            <th title="Which phase of production this department belongs to. Groups the timeline and is the subtotal boundary on a budget.">Phase</th>
           <?php endif; ?>
           <th>Applies to</th>
           <th title="Progress measured in seconds of footage rather than a count of items">Measured in</th>
@@ -522,7 +522,7 @@ function wizard_render_pipeline(PDO $pdo, ?array $project): void {
       </datalist>
       <?php if ($hasDept): ?>
         <input name="new_department" id="new-step-department" list="dept-options"
-               size="14" placeholder="Department">
+               size="14" placeholder="Phase">
       <?php endif; ?>
       <select name="new_applies_to" id="new-step-applies-to"><?= applies_to_options('shot', $assetTypes) ?></select>
       <label class="inline">

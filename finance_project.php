@@ -1591,7 +1591,7 @@ $onEstimate = (int)($proj['rows_on_estimate'] ?? 0);
   <a class="button" href="export_projection.php?project=<?= $projectId ?>">Download as Excel ↓</a>
   <span class="muted small">
     Built live from the numbers below, in the fifteen-column shape of
-    <code>RTC_ExpenseProjection_v01.xlsx</code>, department bands, subtotals, grand total and the
+    <code>RTC_ExpenseProjection_v01.xlsx</code>, phase bands, subtotals, grand total and the
     summary block. Because it comes out of the same calculation this page draws, the file and the
     screen cannot disagree.
   </span>
@@ -1621,7 +1621,7 @@ if ($retakePct <= 0):
 <?php endif; ?>
 <p class="muted small">
   Laid out like <code>RTC_ExpenseProjection_v01.xlsx</code>: <strong>one row per person</strong>,
-  grouped by department with subtotals. Two artists on a step are two rows, because they are two
+  grouped by phase with subtotals. Two artists on a step are two rows, because they are two
   people who each get paid. Person-days come from the same <code>step_quota()</code> the dashboard
   and the CSV export use; the rate comes from each person's page.
   <strong>Computed every time this page loads</strong>, never stored, so it cannot disagree with the plan.
@@ -1629,7 +1629,7 @@ if ($retakePct <= 0):
   Rate column and it saves against them everywhere, the other rows they appear on here, and every
   future show they are booked on. A rate set on a <em>slot</em> is the exception: a slot exists only
   on this project, so its rate goes when the slot does.
-  <br><strong>Many at once:</strong> tick rows (or a whole department, or a whole role), type one
+  <br><strong>Many at once:</strong> tick rows (or a whole phase, or a whole role), type one
   rate in the bar and apply. If the ticks include real people you are asked first, because of the
   rule above.
 </p>
@@ -2013,7 +2013,7 @@ if ($retakePct <= 0):
     times a rate, which would be a second estimate rather than a fact. A dash in either means
     nothing was recorded, which is not the same as it having been free.
     <strong>Difference</strong> is projected minus actual: green means it cost less than planned.
-    On a subtotal it is the whole department's projection minus what has been invoiced so far, so
+    On a subtotal it is the whole phase's projection minus what has been invoiced so far, so
     it also counts the rows nobody has invoiced yet.
     <strong>Actual days</strong> is what was logged; <em>+ days</em> logs days for that person on
     that step from here, with no task, adding to what they logged (it counts on their statement too).
@@ -2543,7 +2543,7 @@ if ($retakePct <= 0):
   </div>
   <p class="muted small">
     <strong>Pays for</strong> a whole step puts the invoice on a line of its own under that step on the
-    projection, counted in the step's department. <strong>Sent by</strong> somebody other than the
+    projection, counted in the department's phase. <strong>Sent by</strong> somebody other than the
     person on the position keeps it on that position's row, and lists it on the sender's statement.
     <?php if (!$ivHolderReady): ?>
       <span class="warn-text">Sending an invoice from somebody other than the position's holder needs

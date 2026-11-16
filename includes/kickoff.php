@@ -279,7 +279,7 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         'texts' => [],
         'lists' => [
             'Positions' => [
-                'cols' => ['department' => ['Department', 'text'], 'person' => ['Person', 'text']],
+                'cols' => ['department' => ['Phase', 'text'], 'person' => ['Person', 'text']],
                 'rows' => $posRows,
             ],
         ],
@@ -455,7 +455,7 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         'lists'   => [
             'Pipeline' => [
                 'cols' => [
-                    'department' => ['Department', 'text'],
+                    'department' => ['Phase', 'text'],
                     'applies'    => ['Applies to', 'text'],
                     'per_unit'   => ['Days per item', 'num'],
                     'coverage'   => ['Coverage %', 'num'],

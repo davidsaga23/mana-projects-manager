@@ -68,7 +68,7 @@ const COL_DEPT = 0, COL_ROLE = 1, COL_ARTIST = 2, COL_RATETYPE = 3, COL_RATE = 4
 const COL_COUNT = 15;
 
 $header = [
-    'Department', 'Role / Position', 'Artist Name', 'Rate Type', 'Day Rate (' . $cur . ')',
+    'Phase', 'Role / Position', 'Artist Name', 'Rate Type', 'Day Rate (' . $cur . ')',
     // "step total" spelt out on the header, because this is the only column on
     // the row that is NOT one person's share — and reading it as theirs is the
     // mistake the per-second formula used to make.
