@@ -145,7 +145,7 @@ if ($episodeFilter && $episodeFilter !== 'all') $parts[] = $episodeFilter;
 if ($stepIds) {
     $parts[] = count($stepNames) === 1
         ? preg_replace('/[^A-Za-z0-9]/', '', $stepNames[0])
-        : count($stepNames) . 'steps';
+        : count($stepNames) . 'departments';
 }
 
 $filename = preg_replace('/[^A-Za-z0-9_-]/', '_', $project['code'] ?: $project['name'])
@@ -153,7 +153,7 @@ $filename = preg_replace('/[^A-Za-z0-9_-]/', '_', $project['code'] ?: $project['
           . '_' . date('Y-m-d') . '.gan';
 
 $filterDesc = 'Episodes: ' . ($episodeFilter && $episodeFilter !== 'all' ? $episodeFilter : 'all')
-            . ' | Steps: ' . ($stepIds ? implode(', ', $stepNames) : 'all')
+            . ' | Departments: ' . ($stepIds ? implode(', ', $stepNames) : 'all')
             . ' | ' . count($rows) . ' tasks';
 
 header('Content-Type: application/xml; charset=utf-8');

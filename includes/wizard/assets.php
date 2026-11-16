@@ -281,7 +281,7 @@ function wizard_save_assets(PDO $pdo, ?array $project): string {
         );
         $stmt->execute(array_merge([$into, $projectId], array_values($from)));
         flash('ok', sprintf(
-            'Moved %d asset%s onto "%s". Any step scoped to that type now counts them.',
+            'Moved %d asset%s onto "%s". Any department scoped to that type now counts them.',
             $stmt->rowCount(), $stmt->rowCount() === 1 ? '' : 's', $into
         ));
         return wizard_url($projectId, 5);
@@ -334,7 +334,7 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
     ?>
       <div class="flash flash-warn">
         <strong>Two spellings of the same type:</strong> <?= e(implode(' and ', $parts)) ?>.
-        These count as completely different types, a pipeline step scoped to one of them
+        These count as completely different types, a department scoped to one of them
         counts none of the other, and every quota and date derived from it is wrong without
         anything looking broken.
         <?php if (can_edit()): ?>
@@ -346,15 +346,15 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
             <button type="submit" name="action" value="merge_types" class="secondary">
               Move all <?= $moving ?> onto "<?= e($into) ?>"
             </button>
-            <small>Picked because a pipeline step is scoped to it.</small>
+            <small>Picked because a department is scoped to it.</small>
           </form>
         <?php endif; ?>
       </div>
     <?php endforeach; ?>
 
     <?php if (!$hasAssetSteps && $assets): ?>
-      <div class="flash flash-warn">No pipeline step applies to assets, so these won't be
-        scheduled or tracked. Add an asset step on the
+      <div class="flash flash-warn">No department applies to assets, so these won't be
+        scheduled or tracked. Add an asset department on the
         <a href="<?= e(wizard_url($projectId, 2)) ?>">Pipeline</a> screen if they should be.</div>
     <?php endif; ?>
 

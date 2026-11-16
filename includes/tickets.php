@@ -423,7 +423,7 @@ function move_ticket_to_project(PDO $pdo, int $ticketId, int $toProjectId): arra
     $dropped = [];
     if ($t['shot_id'])  $dropped[] = 'the shot';
     if ($t['asset_id']) $dropped[] = 'the asset';
-    if ($t['step_id'])  $dropped[] = 'the step';
+    if ($t['step_id'])  $dropped[] = 'the department';
 
     $pdo->beginTransaction();
     try {
@@ -523,7 +523,7 @@ function ticket_project_picker(array $ticket, array $targets): string {
 
     $confirm = $current
         ? ticket_ref($ticket) . ': move it to another project? Its reference will change, '
-          . 'and any shot, asset or step it points to will be cleared.'
+          . 'and any shot, asset or department it points to will be cleared.'
         : '';
     return '<form method="post" class="inline-form" style="margin:0;">'
          . '<input type="hidden" name="set_ticket_project" value="1">'
@@ -777,7 +777,7 @@ function ticket_about_from_post($raw): array {
  * $selected is a step id, or TICKET_ABOUT_PLATFORM, or '' for neither.
  */
 function ticket_step_options(array $steps, $selectedStep, string $about, bool $aboutReady): string {
-    $out = '<option value="">not step-specific</option>';
+    $out = '<option value="">not department-specific</option>';
     if ($aboutReady) {
         $sel = $about === TICKET_ABOUT_PLATFORM ? ' selected' : '';
         $out .= '<option value="' . TICKET_ABOUT_PLATFORM . '"' . $sel . '>'

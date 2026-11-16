@@ -934,7 +934,7 @@ function hire_candidate(PDO $pdo, int $projectId, int $hireId, array $in, string
                         && $slotMoney['terms'] > 0 && $theirs['terms'] === 0) {
                         $out[] = sprintf('That slot had a day rate of its own, which was an '
                                        . 'estimate for the position rather than a fact about %s. '
-                                       . 'It has not been carried over, so this step will show '
+                                       . 'It has not been carried over, so this department will show '
                                        . 'unpriced days until their rate is set under Finance '
                                        . 'management.', $name);
                     }

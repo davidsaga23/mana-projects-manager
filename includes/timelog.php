@@ -374,9 +374,9 @@ function tl_step_expr(PDO $pdo): string {
 function log_step_days(PDO $pdo, int $projectId, int $crewId, int $stepId, string $daysRaw,
                        string $day, float $hoursPerDay, int $userId): string {
     if (!time_logs_available($pdo) || !time_logs_have_step($pdo)) {
-        throw new RuntimeException('Typing days on a step needs migration 076. Open migrate.php to run it; nothing was saved.');
+        throw new RuntimeException('Typing days on a department needs migration 076. Open migrate.php to run it; nothing was saved.');
     }
-    if ($crewId <= 0 || $stepId <= 0) throw new RuntimeException('Days have to be logged against a person on a step.');
+    if ($crewId <= 0 || $stepId <= 0) throw new RuntimeException('Days have to be logged against a person in a department.');
     $clean = str_replace(',', '.', trim($daysRaw));
     if ($clean === '' || !is_numeric($clean)) {
         throw new RuntimeException('"' . $daysRaw . '" is not a number of days, nothing was logged.');
@@ -393,7 +393,7 @@ function log_step_days(PDO $pdo, int $projectId, int $crewId, int $stepId, strin
         'INSERT INTO time_logs (project_id, progress_id, ticket_id, step_id, crew_id, log_date, minutes, notes, entered_by)
          VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?)'
     )->execute([$projectId, $stepId, $crewId, $day, $minutes, 'Entered from Finance (Actual days)', $userId ?: null]);
-    return 'Logged ' . fmt_num((float)$clean, 2) . ' days (' . fmt_hours($minutes) . ') on the step, dated '
+    return 'Logged ' . fmt_num((float)$clean, 2) . ' days (' . fmt_hours($minutes) . ') on the department, dated '
          . date('j M', strtotime($day)) . '.';
 }
 

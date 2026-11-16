@@ -80,7 +80,7 @@
 
   function nameOf(id) {
     var g = svg.querySelector('.wf-node[data-step="' + id + '"]');
-    if (!g) return 'that step';
+    if (!g) return 'that department';
     var n = g.getAttribute('data-name');
     return nameCount[(n || '').trim().toLowerCase()] > 1
       ? n + ' (' + g.getAttribute('data-scope') + ')'
@@ -257,7 +257,7 @@
     } else {
       // Still say which way a drag goes while it is over empty space, since
       // that is exactly when somebody is deciding where to let go.
-      hint.textContent = 'Drop on the step that should wait for ' + nameOf(drag.source);
+      hint.textContent = 'Drop on the department that should wait for ' + nameOf(drag.source);
       hint.className = 'wf-hint';
       hint.style.left = (evt.clientX + 14) + 'px';
       hint.style.top = (evt.clientY + 14) + 'px';

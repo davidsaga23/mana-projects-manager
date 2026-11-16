@@ -279,7 +279,7 @@ function timeline_picture(PDO $pdo, array $project, ?array $steps = null): array
  * against that screen line by line.
  */
 function timeline_need_text(array $d): string {
-    if ($d['units'] <= 0) return 'Nothing to schedule for this step yet.';
+    if ($d['units'] <= 0) return 'Nothing to schedule for this department yet.';
     $work = fmt_rate($d['units']) . ' ' . $d['label'];
     if ($d['days'] === null) {
         return $work . ', ' . fmt_rate($d['person_days']) . ' person-days of work. Set how many '
@@ -303,7 +303,7 @@ function timeline_need_text(array $d): string {
  */
 function timeline_tracked_text(?array $t): string {
     if ($t === null || (float)$t['target'] <= 0) {
-        return 'Nothing to count yet: this step has no shots, assets or seconds against it.';
+        return 'Nothing to count yet: this department has no shots, assets or seconds against it.';
     }
     $fmt = function ($v) use ($t) {
         return $t['unit'] === 'sec' ? fmt_secs((float)$v) : (string)(int)round((float)$v);
@@ -415,7 +415,7 @@ function save_timeline_version(PDO $pdo, array $project, string $savedBy): array
     $projectId = (int)$project['id'];
     $pic = timeline_picture($pdo, $project);
     if (!$pic['general'] && !$pic['tasks']) {
-        throw new RuntimeException('There is nothing to save yet: no step has dates and no '
+        throw new RuntimeException('There is nothing to save yet: no department has dates and no '
                                  . 'schedule has been saved, so the timeline is empty.');
     }
 

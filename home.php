@@ -308,7 +308,7 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
             <td class="small">
               <?= e($dateFmt($w['from'])) ?> – <?= e($dateFmt($w['to'])) ?>
               <?php if ($w['source'] === 'department'): ?>
-                <div class="muted small">from your steps' dates; no contract dates yet</div>
+                <div class="muted small">from your departments' dates; no contract dates yet</div>
               <?php endif; ?>
             </td>
             <td class="num">
@@ -556,14 +556,14 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
   </p>
 
   <h3>What to put on your invoice <span class="muted">· <?= e(date('F Y', strtotime($monthFrom))) ?></span></h3>
-  <p class="muted small">One line per project and step. Click <strong>Copy</strong> to put a line on your clipboard and
+  <p class="muted small">One line per project and department. Click <strong>Copy</strong> to put a line on your clipboard and
     paste it into your invoice. It is information for your own invoice, not an invoice.
     <?= $monthTo < $monthEnd ? 'The month is not over yet: these figures count up to today.' : '' ?></p>
   <?php if (!$invoiceInfo['lines']): ?>
     <p class="muted">No time logged on your shows in <?= e(date('F', strtotime($monthFrom))) ?>.</p>
   <?php else: ?>
     <table class="review-table home-invoice">
-      <thead><tr><th>Project</th><th>Step</th><th>Rate</th><th class="num">Days / units</th><th class="num">Line total</th><th></th></tr></thead>
+      <thead><tr><th>Project</th><th>Department</th><th>Rate</th><th class="num">Days / units</th><th class="num">Line total</th><th></th></tr></thead>
       <tbody>
         <?php foreach ($invoiceInfo['lines'] as $i => $l): ?>
           <tr>

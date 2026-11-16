@@ -452,7 +452,7 @@ function sv_dates_fraction(string $start, string $end, string $today): float {
 function step_variance_verdict(array $v): array {
     $m = fn(float $x) => fmt_money_plain($x, 'USD');
     if ($v['budget'] === null) {
-        return ['muted', 'No approved budget yet', 'Each step is shown against its plan, but there is no budget to measure the reserve against.'];
+        return ['muted', 'No approved budget yet', 'Each department is shown against its plan, but there is no budget to measure the reserve against.'];
     }
     $lockedNames   = implode(' and ', array_map(fn($x) => $x[0], $v['locked_steps']));
     $expectedNames = implode(' and ', array_map(fn($x) => $x[0], $v['expected_steps']));
@@ -472,12 +472,12 @@ function step_variance_verdict(array $v): array {
         return ['err', $title, implode(' ', $parts)];
     }
     if ($v['locked'] + $v['expected'] < SV_CENT) {
-        return ['ok', 'On plan', 'No step has gone over its plan, and none is heading over at its current pace. Reserve: ' . $m($left) . '.'];
+        return ['ok', 'On plan', 'No department has gone over its plan, and none is heading over at its current pace. Reserve: ' . $m($left) . '.'];
     }
     $tight = $reserve > 0 && $left < 0.25 * $reserve;
     $parts[] = 'That leaves ' . $m($left) . ' of the ' . $m($reserve) . ' reserve'
              . ($tight ? ': one more slip and the show is over budget.' : '.');
-    return ['warn', $tight ? 'Not over budget yet, but the reserve is almost gone' : 'Within budget, but steps are over their plan',
+    return ['warn', $tight ? 'Not over budget yet, but the reserve is almost gone' : 'Within budget, but departments are over their plan',
             implode(' ', $parts)];
 }
 
@@ -500,7 +500,7 @@ function render_step_variance(array $v): void {
         return $reserve > SV_CENT ? max(0.0, min(100.0, $x / $reserve * 100)) : 0.0;
     };
     ?>
-<h3>Is the money on track <span class="muted">· every step against its own plan, never netted against another</span></h3>
+<h3>Is the money on track <span class="muted">· every department against its own plan, never netted against another</span></h3>
 
 <div class="sv-verdict sv-<?= e($vClass) ?>">
   <strong><?= e($vTitle) ?></strong>
@@ -508,8 +508,8 @@ function render_step_variance(array $v): void {
 </div>
 
 <?php if ($v['plan_source'] !== 'kickoff'): ?>
-  <p class="warn-text small"><?= e($v['plan_why']) ?>, so each step is judged against <strong>today's</strong>
-    expense projection, which moves whenever the plan does. Once the show is signed off, every step keeps
+  <p class="warn-text small"><?= e($v['plan_why']) ?>, so each department is judged against <strong>today's</strong>
+    expense projection, which moves whenever the plan does. Once the show is signed off, every department keeps
     the plan it was approved at.</p>
 <?php endif; ?>
 
@@ -517,7 +517,7 @@ function render_step_variance(array $v): void {
   <div class="sv-head<?= $v['locked'] > SV_CENT ? ' sv-locked' : '' ?>">
     <span class="sv-lbl">Overrun locked in</span>
     <span class="sv-big"><?= e($m($v['locked'])) ?></span>
-    <span class="muted small">finished steps that cost more than their plan</span>
+    <span class="muted small">finished departments that cost more than their plan</span>
     <?php if ($v['locked_steps']): ?><ul>
       <?php foreach ($v['locked_steps'] as [$n, $x]): ?><li><?= e($n) ?> +<?= e($m($x)) ?></li><?php endforeach; ?>
     </ul><?php endif; ?>
@@ -525,7 +525,7 @@ function render_step_variance(array $v): void {
   <div class="sv-head<?= $v['expected'] > SV_CENT ? ' sv-risk' : '' ?>">
     <span class="sv-lbl">Overrun expected</span>
     <span class="sv-big"><?= e($m($v['expected'])) ?></span>
-    <span class="muted small">running steps, at the pace they are actually going</span>
+    <span class="muted small">running departments, at the pace they are actually going</span>
     <?php if ($v['expected_steps']): ?><ul>
       <?php foreach ($v['expected_steps'] as [$n, $x]): ?><li><?= e($n) ?> +<?= e($m($x)) ?></li><?php endforeach; ?>
     </ul><?php endif; ?>
@@ -545,7 +545,7 @@ function render_step_variance(array $v): void {
         </div>
       <?php endif; ?>
       <span class="muted small"><?= e($m($v['reserve_base'])) ?> between the approved budget and the plan<?php
-        if ($v['saved'] > SV_CENT): ?>, + <?= e($m($v['saved'])) ?> that finished steps saved<?php endif; ?>.</span>
+        if ($v['saved'] > SV_CENT): ?>, + <?= e($m($v['saved'])) ?> that finished departments saved<?php endif; ?>.</span>
     <?php endif; ?>
   </div>
 </div>
@@ -577,7 +577,7 @@ function render_step_variance(array $v): void {
 <div class="sv-table">
 <table>
   <thead><tr>
-    <th>Step</th><th class="num">Plan</th><th class="num">Committed</th><th>Work done</th>
+    <th>Department</th><th class="num">Plan</th><th class="num">Committed</th><th>Work done</th>
     <th>Committed against plan</th><th class="num">Forecast at the end</th><th>Result</th>
   </tr></thead>
   <tbody>
@@ -669,29 +669,29 @@ function render_step_variance(array $v): void {
   <div class="flash flash-warn">
     <?= e(implode(', ', array_keys($v['unmatched']))) ?> <?= count($v['unmatched']) === 1 ? 'was' : 'were' ?> in the
     plan at sign-off (<?= e($m(array_sum($v['unmatched']))) ?>) but <?= count($v['unmatched']) === 1 ? 'is' : 'are' ?>
-    not a step today: renamed or removed. That money stays in the plan total and in the forecast, and is
-    not matched to any step above.</div>
+    not a department today: renamed or removed. That money stays in the plan total and in the forecast, and is
+    not matched to any department above.</div>
 <?php endif; ?>
 
 <details class="sv-how">
   <summary>How these numbers are worked out</summary>
   <ul>
-    <li><strong>Plan:</strong> each step's cost in the expense projection signed off at kick-off. It does not move
-      afterwards; a step added later has no plan, so all of its cost counts as over.</li>
+    <li><strong>Plan:</strong> each department's cost in the expense projection signed off at kick-off. It does not move
+      afterwards; a department added later has no plan, so all of its cost counts as over.</li>
     <li><strong>Spent so far:</strong> invoices marked paid, and other expenses with a paid date: money that has
       actually left, nothing else.</li>
-    <li><strong>Committed:</strong> for each person on each step, what they have invoiced (paid or not), plus the days
+    <li><strong>Committed:</strong> for each person in each department, what they have invoiced (paid or not), plus the days
       they have logged and not invoiced yet at their rate. Never "start date until today": the calendar measures time, not
       money. People paid per second or per job count the share of their fee the approved work has earned.
       Supervision counts its dates.</li>
-    <li><strong>Work done:</strong> approved items out of the step's items (seconds on a footage step), the same count
+    <li><strong>Work done:</strong> approved items out of the department's items (seconds on a footage department), the same count
       as the production dashboard.</li>
-    <li><strong>Forecast at the end:</strong> committed ÷ work done. Below 15% done, or with fewer than 3 items, the step
-      shows today's projection instead, because the first items through a step carry its set-up.</li>
-    <li><strong>Locked in</strong> is a finished step's committed cost above its plan; <strong>expected</strong> is a running
-      step's forecast above its plan. <strong>Reserve</strong> is the approved budget less the plan, plus what finished
-      steps saved. A saving reaches the reserve only once the step is finished and all of it is invoiced; a running
-      step that looks cheap adds nothing. None of these are netted against each other.</li>
+    <li><strong>Forecast at the end:</strong> committed ÷ work done. Below 15% done, or with fewer than 3 items, the department
+      shows today's projection instead, because the first items through a department carry its set-up.</li>
+    <li><strong>Locked in</strong> is a finished department's committed cost above its plan; <strong>expected</strong> is a running
+      department's forecast above its plan. <strong>Reserve</strong> is the approved budget less the plan, plus what finished
+      departments saved. A saving reaches the reserve only once the department is finished and all of it is invoiced; a running
+      department that looks cheap adds nothing. None of these are netted against each other.</li>
   </ul>
 </details>
 <?php

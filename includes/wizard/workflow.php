@@ -15,7 +15,7 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
     $projectId = (int)$project['id'];
     $steps = pipeline_steps($pdo, $projectId);
     if (!$steps) {
-        flash('warn', 'There are no pipeline steps yet, so there is no workflow to set.');
+        flash('warn', 'There are no departments yet, so there is no workflow to set.');
         return wizard_url($projectId, 2);
     }
 
@@ -74,7 +74,7 @@ function wizard_save_workflow(PDO $pdo, ?array $project): string {
     }
 
     flash('ok', $said . "Saved the workflow, $edges link" . ($edges === 1 ? '' : 's') . ', ' .
-                "$starters step" . ($starters === 1 ? '' : 's') . ' able to start immediately.');
+                "$starters department" . ($starters === 1 ? '' : 's') . ' able to start immediately.');
 
     return wizard_next_url($projectId, 3);
 }
@@ -85,8 +85,8 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
 
     if (!$steps) {
         ?>
-        <p class="lead">No pipeline steps yet.</p>
-        <p><a href="<?= e(wizard_url($projectId, 2)) ?>">← Add the pipeline steps first</a></p>
+        <p class="lead">No departments yet.</p>
+        <p><a href="<?= e(wizard_url($projectId, 2)) ?>">← Add the departments first</a></p>
         <?php
         return;
     }
@@ -96,7 +96,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
     foreach ($steps as $s) $stepsById[(int)$s['id']] = $s;
     $levels = workflow_levels($steps, $depsMap);
     ?>
-    <p class="lead">For each step, tick what has to finish before it can start. Steps waiting
+    <p class="lead">For each department, tick what has to finish before it can start. Departments waiting
        on the same things run <strong>side by side</strong>, you never set that directly,
        it's simply what the picture shows.</p>
 
@@ -124,7 +124,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
             // to find out whether it can be touched. ?>
       <p class="muted small wf-howto">
         <strong>Drag from the dot on the right of a box</strong> onto another box to make that
-        second step wait for the first. <strong>Click a line</strong> to remove it. Every change
+        second department wait for the first. <strong>Click a line</strong> to remove it. Every change
         saves at once and redraws the picture; the ticks below change with it.
       </p>
     <?php endif; ?>
@@ -132,14 +132,14 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
           // the picture as well as anybody. ?>
     <script src="assets/diagram-png.js<?= asset_ver('diagram-png.js') ?>"></script>
     <p class="muted small">Left to right: everything in the first column can start on day one,
-       and each column waits for the one before it. Steps stacked in the same column run at the
+       and each column waits for the one before it. Departments stacked in the same column run at the
        same time. This redraws when you save.</p>
 
     <h3>What waits for what</h3>
     <form method="post">
       <table class="deps-table">
         <thead>
-          <tr><th>Step</th><th>Can't start until these have finished</th></tr>
+          <tr><th>Department</th><th>Can't start until these have finished</th></tr>
         </thead>
         <tbody>
         <?php foreach ($steps as $s): $id = (int)$s['id']; $mine = $depsMap[$id] ?? []; ?>
@@ -191,7 +191,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
       // wipe the graph. Here the action rides on the button and the ticks come
       // with it, which is also what makes the promise below true.
       template_save_form($pdo, $project,
-          'Saves the steps AND this dependency graph, what waits for what, and therefore what '
+          'Saves the departments AND this dependency graph, what waits for what, and therefore what '
         . 'runs in parallel. Not dates or headcount, which belong to this project alone. The '
         . 'ticks above are saved first, so the template captures the shape on screen rather than '
         . 'the last one saved. New projects will be offered it alongside the built-in templates.',
@@ -199,7 +199,7 @@ function wizard_render_workflow(PDO $pdo, ?array $project): void {
       ?>
     </form>
 
-    <p class="muted small">Ticking nothing means a step can begin on day one. A loop, two steps
+    <p class="muted small">Ticking nothing means a department can begin on day one. A loop, two departments
        each waiting for the other, is refused with nothing saved, so the scheduler can never be
        handed one.</p>
 

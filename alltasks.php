@@ -588,7 +588,7 @@ require __DIR__ . '/includes/header.php';
     if (go)   go.textContent   = isTicket ? 'Create ticket' : 'Create task';
     if (hint) hint.textContent = isTicket
       ? 'A ticket needs an owner. It starts in the first column of whichever show you '
-        + 'picked. To tie it to a specific shot, asset or pipeline step, open the card '
+        + 'picked. To tie it to a specific shot, asset or department, open the card '
         + 'after creating it, or raise it on the show’s own board.'
       : 'A task starts in the first column of whichever board you picked, with no status if '
         + 'you leave it unfiled.';

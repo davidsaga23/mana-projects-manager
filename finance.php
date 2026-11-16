@@ -99,7 +99,7 @@ require __DIR__ . '/includes/header.php';
   <thead>
     <tr><th>Project</th><th>Status</th><th>Starts</th><th>Delivery</th>
         <th class="num" title="What we are internally allowed to spend on this show. Not what the client pays.">Approved budget</th>
-        <th class="num" title="Worked out afresh every time this page loads, from the current pipeline: person-days per step, the lanes staffed on it, and each person's rate. Never stored, so it cannot go stale when somebody changes a headcount.">Current forecast cost</th>
+        <th class="num" title="Worked out afresh every time this page loads, from the current pipeline: person-days per department, the lanes staffed on it, and each person's rate. Never stored, so it cannot go stale when somebody changes a headcount.">Current forecast cost</th>
         <th class="num" title="Approved production budget minus the current forecast cost: positive is under, negative is over. Not profit — the client fee takes no part in it. Means nothing until both exist.">Budget variance</th>
         <th class="num">Invoiced</th><th class="num">Paid</th><th></th></tr>
   </thead>

@@ -111,7 +111,7 @@ if ($planOver > 0) $attention[] = ['The saved plan finishes ' . $planOver . ' wo
                                    'schedule.php?project=' . $projectId, 'Look at the schedule'];
 if ($lateSteps) {
     $n = array_map(function ($s) { return $s['step']['name']; }, array_slice($lateSteps, 0, 4));
-    $attention[] = [count($lateSteps) . ' step' . (count($lateSteps) === 1 ? '' : 's') .
+    $attention[] = [count($lateSteps) . ' department' . (count($lateSteps) === 1 ? '' : 's') .
         ' finish past their own deadline, ' . implode(', ', $n) . (count($lateSteps) > 4 ? '…' : '') . '.',
         'timeline.php?project=' . $projectId, 'See the timeline'];
 }
@@ -132,7 +132,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <?php render_overall_progress($overall); ?>
 
 <?php // --- a card per step, each carrying its quota ------------------------ ?>
-<h3>Every step, and what it needs per day</h3>
+<h3>Every department, and what it needs per day</h3>
 <div class="step-cards">
   <?php foreach ($others as $s): ?>
     <?php
@@ -240,7 +240,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
   <span class="hdot green"></span> On target ·
   <span class="hdot amber"></span> At risk ·
   <span class="hdot red"></span> Critical,
-  judged against how much of the step's time has elapsed, not a flat percentage.
+  judged against how much of the department's time has elapsed, not a flat percentage.
 </p>
 
 <?php // --- trend + workload -------------------------------------------------- ?>
@@ -292,7 +292,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
       <table class="activity-table">
         <thead>
           <tr><th><?= $bucket === 'shot' ? 'Shot' : ($bucket === 'asset' ? 'Asset' : 'Deliverable') ?></th>
-              <th>Step</th><th>Was</th><th></th><th>Now</th><th>Type</th><th>Who</th><th>Source</th></tr>
+              <th>Department</th><th>Was</th><th></th><th>Now</th><th>Type</th><th>Who</th><th>Source</th></tr>
         </thead>
         <tbody>
         <?php foreach ($rowsA as $a): ?>

@@ -941,7 +941,7 @@ require __DIR__ . '/includes/header.php';
   <h3>Production tasks <span class="muted">· <?= count($tasks) ?></span></h3>
   <?php if (!$tasks): ?>
     <p class="muted">Nothing unfinished is assigned to you. Tasks appear here when somebody is
-       named on a step, from a Plaky import, the tracking grid or an item page.</p>
+       named on a department, from a Plaky import, the tracking grid or an item page.</p>
   <?php else: ?>
     <table class="mywork-table">
       <thead>
@@ -1370,7 +1370,7 @@ require __DIR__ . '/includes/header.php';
       if (go)   go.textContent   = isTicket ? 'Create ticket' : 'Create task';
       if (hint) hint.textContent = isTicket
         ? 'A ticket needs an owner. It starts in the first column of whichever show you '
-          + 'picked. To tie it to a specific shot, asset or pipeline step, open the card '
+          + 'picked. To tie it to a specific shot, asset or department, open the card '
           + 'after creating it, or raise it on the show’s own board.'
         : 'A task starts in the first column of whichever show you picked, assigned to you '
           + 'unless you change the owner, and with no status if you leave it unfiled.';

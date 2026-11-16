@@ -84,11 +84,11 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
 
 <form method="get" class="inline-form filter-bar">
-  <input name="q" value="<?= e($q) ?>" size="26" placeholder="Search step, project or reason">
+  <input name="q" value="<?= e($q) ?>" size="26" placeholder="Search department, project or reason">
   <?php // Submits on change, like the role picker and the status dropdown. ?>
   <select name="view" onchange="this.form.submit()">
     <option value="project" <?= $view === 'project' ? 'selected' : '' ?>>By project</option>
-    <option value="step"    <?= $view === 'step'    ? 'selected' : '' ?>>By step, across shows</option>
+    <option value="step"    <?= $view === 'step'    ? 'selected' : '' ?>>By department, across shows</option>
   </select>
   <button class="button secondary" type="submit">Search</button>
   <?php if ($filtered): ?>
@@ -143,7 +143,7 @@ require __DIR__ . '/includes/header.php';
           // Open it and it stays open while you tick, because ticking reloads
           // the page and the [open] attribute is rendered from the state. ?>
     <details class="filter-fold" <?= $selSteps ? 'open' : '' ?>>
-      <summary class="row-btn">Steps<?= $selSteps
+      <summary class="row-btn">Departments<?= $selSteps
             ? ': ' . count($selSteps) . ' of ' . count($allSteps) : ': all' ?></summary>
       <div class="filter-checks">
         <?php foreach ($allSteps as $st): $key = step_identity_key($st); ?>
@@ -184,7 +184,7 @@ function quota_head(string $first): void { ?>
           // rather than in a paragraph above the table, because the paragraph
           // is the thing David asked to take away. ?>
     <th class="num" title="Deliveries per person per day at the days per item this plan was priced at. This is the rate the expense projection costs the work with.">Ideal / day</th>
-    <th class="num" title="What the dates demanded of one person per day: the work in this step spread over the working days between its start and its deadline, divided by the people planned on it. A minimum above the ideal means the plan asked for a pace the studio does not believe in.">Minimum / day</th>
+    <th class="num" title="What the dates demanded of one person per day: the work in this department spread over the working days between its start and its deadline, divided by the people planned on it. A minimum above the ideal means the plan asked for a pace the studio does not believe in.">Minimum / day</th>
     <th class="num">Coverage</th>
     <th class="num">People</th>
     <th class="num">Retakes</th>
@@ -307,11 +307,11 @@ function quota_row(array $r, string $identity): void {
             e(str_replace('_', ' ', $b['project_status'])) ?></span>
       <span class="muted small">
         · captured <?= e(substr($b['captured_at'], 0, 16)) ?> · <?= e($b['reason']) ?>
-        · <?= count($b['rows']) ?> step<?= count($b['rows']) === 1 ? '' : 's' ?>
+        · <?= count($b['rows']) ?> department<?= count($b['rows']) === 1 ? '' : 's' ?>
       </span>
     </h3>
     <table class="grid-table history-table">
-      <?php quota_head('Step'); ?>
+      <?php quota_head('Department'); ?>
       <tbody>
         <?php foreach ($b['rows'] as $r): ?>
           <?php quota_row($r, sprintf('<strong>%s</strong><div class="muted small">%s</div>',

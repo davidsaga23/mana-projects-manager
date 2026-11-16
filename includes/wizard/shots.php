@@ -316,7 +316,7 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
         <label>Total seconds across all <?= count($shots) ?> shots
           <input type="number" name="total_seconds" step="0.1" min="0" placeholder="574">
         </label>
-        <small>A placeholder until real timings exist, steps measured in seconds need it
+        <small>A placeholder until real timings exist, departments measured in seconds need it
                to work out a quota. Overwrites every shot's current value.</small>
         <?php // Asks first (2026-10-27): it rewrites every shot's seconds, which
               // is what the expense projection prices, and there is no undo. ?>

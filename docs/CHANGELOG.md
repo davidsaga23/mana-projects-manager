@@ -18,6 +18,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 - The paragraph under Overall progress's four cards no longer shows.
 
+## 2026-11-16 — Words: steps are Departments, departments are Phases *(no migration)*
+
+- What Anima called a **step** (Animatic, BG Layout, Comp…) is now called a **Department** on every
+  screen, email, download and tour card: "Progress by department", "All departments", the
+  DEPARTMENT column and so on.
+- What Anima called a **department** (Pre-production / Production / Post-production) is now a
+  **Phase**: the Expense projection's bands and subtotals, the Workflow set-up column, the Kick-off
+  tables and the projection download's first column.
+- Wording only: the database, web addresses and saved data are unchanged. A person's own Department
+  field, the `{STEP}` naming code and other meanings of "step" (the set-up wizard's screens, the
+  import's stages, the CRM's "Next step") stay as they were.
+- Downloads: the progress CSV, staffing and workflow sheets now head the column "Department", and
+  the expense projection's first column reads "Phase". Nothing in Anima reads those headers back.
+
 ## 2026-11-16 — Project Overview: click a progress count to see what it counts *(no migration)*
 
 - In "Progress by step", the Tracked, Delivered and Approved numbers open the list behind them:

@@ -34,7 +34,7 @@ $lastImport = json_decode((string)project_setting($pdo, $projectId, 'last_import
     <input type="file" name="file" accept=".csv,text/csv" required
            data-drop="Drop the Plaky export here" data-drop-paste="no">
     <small>In Plaky: open the board → menu → Export → CSV. Export the whole board,
-           including subitems, the subitems are the pipeline steps.</small>
+           including subitems, the subitems are the departments.</small>
   </label>
 
   <div class="actions">
@@ -46,7 +46,7 @@ $lastImport = json_decode((string)project_setting($pdo, $projectId, 'last_import
 <ul class="plain-list">
   <li><strong>Parent rows</strong>, items with no parent of their own, become shots or
       assets, depending on how you map their group.</li>
-  <li><strong>Subitems</strong> become progress against a pipeline step: status and who is
+  <li><strong>Subitems</strong> become progress against a department: status and who is
       on it. Plaky's <em>Time spent</em> column is ignored, time is logged here instead.</li>
   <li>Existing records are <strong>updated, never duplicated</strong>, matched on episode and
       shot code, or on asset name.</li>

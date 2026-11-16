@@ -279,7 +279,7 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         'texts' => [],
         'lists' => [
             'Positions' => [
-                'cols' => ['department' => ['Department', 'text'], 'person' => ['Person', 'text']],
+                'cols' => ['department' => ['Phase', 'text'], 'person' => ['Person', 'text']],
                 'rows' => $posRows,
             ],
         ],
@@ -365,7 +365,7 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
                 'rows' => $tlRows,
             ],
             'Milestones' => [
-                'cols' => ['date' => ['Date', 'date'], 'step' => ['Step', 'text']],
+                'cols' => ['date' => ['Date', 'date'], 'step' => ['Department', 'text']],
                 'rows' => $msRows,
             ],
         ],
@@ -455,7 +455,7 @@ function kickoff_snapshot(PDO $pdo, array $project): array {
         'lists'   => [
             'Pipeline' => [
                 'cols' => [
-                    'department' => ['Department', 'text'],
+                    'department' => ['Phase', 'text'],
                     'applies'    => ['Applies to', 'text'],
                     'per_unit'   => ['Days per item', 'num'],
                     'coverage'   => ['Coverage %', 'num'],
@@ -916,7 +916,7 @@ function kickoff_request(PDO $pdo, array $project, array $signerIds): array {
         'Project: ' . $project['name'] . ' (' . $project['code'] . ')',
         'Sent by: ' . $who,
         'Dates: ' . ($setup['Start date'][0] ?: 'no start date') . ' to ' . ($setup['Delivery date'][0] ?: 'no delivery date'),
-        $setup['Pipeline steps'][0] . ' steps, ' . $setup['Shots'][0] . ' shots, ' . $setup['Assets'][0]
+        $setup['Pipeline steps'][0] . ' departments, ' . $setup['Shots'][0] . ' shots, ' . $setup['Assets'][0]
             . ' assets, head count ' . $setup['Head count'][0],
     ];
     $msgs = [];
@@ -1052,9 +1052,9 @@ function kickoff_decide(PDO $pdo, array $project, array $kickoff, string $decisi
     // Never blocks the approval; reported if it fails.
     try {
         $n = capture_baseline($pdo, $pid, 'kick-off sign-off');
-        if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
+        if ($n > 0) $msgs[] = "Recorded the starting estimate for $n department" . ($n === 1 ? '' : 's') . '.';
     } catch (Throwable $e) {
-        $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+        $msgs[] = 'The starting estimate per department could not be recorded: ' . $e->getMessage();
     }
 
     if ($to) {
@@ -1112,9 +1112,9 @@ function kickoff_override(PDO $pdo, array $project, array $kickoff, string $reas
     if (kickoff_kind($kickoff) !== 'replan') {
         try {
             $n = capture_baseline($pdo, (int)$project['id'], 'kick-off sign-off (override)');
-            if ($n > 0) $msgs[] = "Recorded the starting estimate for $n step" . ($n === 1 ? '' : 's') . '.';
+            if ($n > 0) $msgs[] = "Recorded the starting estimate for $n department" . ($n === 1 ? '' : 's') . '.';
         } catch (Throwable $e) {
-            $msgs[] = 'The starting estimate per step could not be recorded: ' . $e->getMessage();
+            $msgs[] = 'The starting estimate per department could not be recorded: ' . $e->getMessage();
         }
     }
 
@@ -1299,9 +1299,9 @@ function kickoff_render_section(string $title, array $was, ?array $now, string $
           </tbody>
         </table>
         <?php if ($costs !== null): ?>
-          <p class="muted small">Costs are the expense projection's labour, step by step. A step for all assets is
+          <p class="muted small">Costs are the expense projection's labour, department by department. A department for all assets is
             shared across the types by how many of each there are, and one for shots and assets by count too.
-            <?php if (($costs[2] ?? 0) > 0 || ($costs[3] ?? 0) > 0): ?>Project-wide steps belong to no shot or asset and are left out:
+            <?php if (($costs[2] ?? 0) > 0 || ($costs[3] ?? 0) > 0): ?>Project-wide departments belong to no shot or asset and are left out:
             <?= e(kickoff_fmt($costs[2], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[2] ?? 'kick-off')) ?>,
             <?= e(kickoff_fmt($costs[3], 'money', $currency)) ?> <?= e(lcfirst(kickoff_labels()[3] ?? 'now')) ?>.<?php endif; ?></p>
         <?php endif; ?>

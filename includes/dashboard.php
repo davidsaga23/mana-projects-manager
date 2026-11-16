@@ -690,7 +690,7 @@ function render_overall_progress(array $overall, bool $compact = false): void {
         <div>
           <h3>Overall progress</h3>
           <p class="muted small">
-            Every shot and asset, through every step,
+            Every shot and asset, through every department,
             <strong><?= (int)$overall['applicable'] ?></strong> tasks in total.
             <?php if ($overall['days_left'] !== null): ?>
               <span class="<?= $overall['days_left'] <= 5 ? 'warn-text' : '' ?>">

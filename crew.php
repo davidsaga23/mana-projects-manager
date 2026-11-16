@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'generate') {
             $r = sync_project_lanes($pdo, $projectId);
             if ($r['created'] === 0 && $r['existing'] === 0) {
-                flash('warn', 'No slots were created, no pipeline step has a headcount yet. ' .
+                flash('warn', 'No slots were created, no department has a headcount yet. ' .
                               'Set one on the Dates & headcount screen and come back.');
             } else {
                 flash('ok', sprintf(
@@ -179,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if (!empty($r['renamed'])) {
                 flash('ok', sprintf(
-                    'Renamed %d slot%s so two steps sharing a name can be told apart, ' .
+                    'Renamed %d slot%s so two departments sharing a name can be told apart, ' .
                     'they now carry what they apply to, e.g. "Concept Character 01". ' .
                     'Only unfilled slots were touched.',
                     $r['renamed'], $r['renamed'] === 1 ? '' : 's'
@@ -207,14 +207,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'clean_surplus') {
             $r = remove_surplus_lanes($pdo, $projectId);
             if ($r['removed'] === 0 && !$r['blocked']) {
-                flash('warn', 'Nothing to clean up, every slot matches its step\'s headcount.');
+                flash('warn', 'Nothing to clean up, every slot matches its department\'s headcount.');
             } else {
                 flash('ok', sprintf(
                     'Removed %d surplus slot%s.%s',
                     $r['removed'], $r['removed'] === 1 ? '' : 's',
                     $r['kept_people'] > 0
                         ? ' ' . $r['kept_people'] . ' of them held a real person, they were taken off '
-                          . 'this step but remain on the studio crew list.'
+                          . 'this department but remain on the studio crew list.'
                         : ''
                 ));
             }
@@ -422,7 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                       . 'exactly where they are.')
                     : (!$isSurplus
                         ? 'Re-running the schedule will not help either: this slot is still within the '
-                        . 'headcount planned for the step, so the next run fills it again. Lower the '
+                        . 'headcount planned for the department, so the next run fills it again. Lower the '
                         . 'headcount on Dates & headcount first if the slot is not wanted.'
                         : 'Re-running the schedule would move this work elsewhere, since the slot is '
                         . 'beyond the planned headcount.');
@@ -664,7 +664,7 @@ require __DIR__ . '/includes/header.php';
     <div class="flash flash-warn">
       <strong><?= $surplusCount ?></strong> slot<?= $surplusCount === 1 ? '' : 's' ?>
       <?= $surplusCount === 1 ? 'is' : 'are' ?> above what the headcount now asks for,
-      lowering a step's headcount never deletes people, because work may already be planned
+      lowering a department's headcount never deletes people, because work may already be planned
       against them. <?= $surplusCount === 1 ? 'It is' : 'They are' ?> highlighted below.
       Re-run the <a href="schedule.php?project=<?= $projectId ?>">schedule</a> first so that
       work moves onto the remaining slots, then remove the empty ones.
@@ -684,7 +684,7 @@ require __DIR__ . '/includes/header.php';
         <input type="hidden" name="action" value="generate">
         <button type="submit" <?= $missing === 0 ? 'disabled' : '' ?>
                 title="<?= $missing === 0
-                    ? 'Every step already has the slots its headcount asks for.'
+                    ? 'Every department already has the slots its headcount asks for.'
                     : e($missing . ' slot(s) the headcount asks for are missing.') ?>">
           <?= $lanes ? 'Add missing slots' : 'Create slots from the headcount' ?><?php
             if ($missing > 0): ?> (<?= $missing ?>)<?php endif; ?>
@@ -696,7 +696,7 @@ require __DIR__ . '/includes/header.php';
         <input type="hidden" name="action" value="clean_surplus">
         <button type="submit" class="secondary" <?= $surplusCount === 0 ? 'disabled' : '' ?>
                 title="<?= $surplusCount === 0
-                    ? 'No slot is above what its step\'s headcount asks for.'
+                    ? 'No slot is above what its department\'s headcount asks for.'
                     : e($surplusCount . ' slot(s) are above the current headcount.') ?>">
           Remove surplus slots<?php if ($surplusCount > 0): ?> (<?= $surplusCount ?>)<?php endif; ?>
         </button>
@@ -853,8 +853,8 @@ require __DIR__ . '/includes/header.php';
         <p>Create them from the headcount you already entered, and the scheduler will start
            assigning work to them by name.</p>
       <?php else: ?>
-        <p>Set a headcount per step on the <a href="wizard.php?project=<?= $projectId ?>&step=6">Dates
-           &amp; headcount</a> screen first, that is what says how many people each step needs.</p>
+        <p>Set a headcount per department on the <a href="wizard.php?project=<?= $projectId ?>&step=6">Dates
+           &amp; headcount</a> screen first, that is what says how many people each department needs.</p>
       <?php endif; ?>
     </div>
   <?php else: ?>
@@ -1032,7 +1032,7 @@ require __DIR__ . '/includes/header.php';
             <?php endif; ?>
             <?php if ($isSurplus): ?>
               <div class="warn-text small">
-                Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this step.
+                Beyond the <?= e(fmt_num($l['planned_headcount'])) ?> now planned for this department.
               </div>
             <?php endif; ?>
             <?php if ($isPh && $hiringReady): $live = $liveHere; ?>

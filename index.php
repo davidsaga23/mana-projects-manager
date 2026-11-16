@@ -321,7 +321,7 @@ require __DIR__ . '/includes/header.php';
   <table class="project-list">
     <tr>
       <th>Project code</th><th>Name</th><th>Type</th><th>Status</th>
-      <th>Steps</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
+      <th>Departments</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
     </tr>
     <?php foreach ($projects as $p): $pid = (int)$p['id']; ?>
     <tr>
@@ -390,13 +390,13 @@ require __DIR__ . '/includes/header.php';
         $pct = $pr['pct'] ?? null;
         ?>
         <?php if ($pct === null): ?>
-          <span class="pct-cap pct-none" title="Nothing to count yet - this project has no steps, shots or assets.">&mdash;</span>
+          <span class="pct-cap pct-none" title="Nothing to count yet - this project has no departments, shots or assets.">&mdash;</span>
         <?php else: ?>
           <?php // The fill is a gradient on the pill itself rather than a second
                 // element: one box, so it cannot drift out of line with the row
                 // of buttons beside it at any font size. ?>
           <span class="pct-cap" style="--fill: <?= (float)$pct ?>%"
-                title="<?= (int)$pr['approved'] ?> of <?= (int)$pr['applicable'] ?> tasks approved - every shot and asset through every step"><?= (int)$pct ?>%</span>
+                title="<?= (int)$pr['approved'] ?> of <?= (int)$pr['applicable'] ?> tasks approved - every shot and asset through every department"><?= (int)$pct ?>%</span>
         <?php endif; ?>
 
         <?php if ($p['status'] === 'setup'): ?>
@@ -444,7 +444,7 @@ require __DIR__ . '/includes/header.php';
                 <small class="muted">
                   Type <code><?= e($p['code']) ?></code> to confirm. Removes
                   <?= (int)$p['shot_count'] ?> shots, <?= (int)$p['asset_count'] ?> assets,
-                  <?= (int)$p['step_count'] ?> steps and everything tracked against them.
+                  <?= (int)$p['step_count'] ?> departments and everything tracked against them.
                   Refused while the project still has anything in the finance database,
                   <strong>set the status to archived instead</strong> to take it off this list
                   without destroying anything.

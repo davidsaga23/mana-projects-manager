@@ -601,7 +601,7 @@ require __DIR__ . '/includes/header.php';
         </datalist>
       </label>
       <?php endif; ?>
-      <label>Pipeline step
+      <label>Department
         <?php // Drawn by the same function the new-ticket form uses, so the two
               // cannot disagree about what is on offer. ?>
         <select name="step_id" <?= can_edit() ? '' : 'disabled' ?>>
@@ -725,7 +725,7 @@ require __DIR__ . '/includes/header.php';
           <?php endif; ?>
           <?= e($label) ?> becomes the next number on the project it goes to.
           <?php if ($projectId): ?>
-            Any shot, asset or step is cleared, because those belong to this show.
+            Any shot, asset or department is cleared, because those belong to this show.
           <?php else: ?>
             It joins the first column on that board.
           <?php endif; ?>
@@ -735,7 +735,7 @@ require __DIR__ . '/includes/header.php';
       <form method="post" class="inline-form"
             onsubmit="return confirm('<?= e($label) ?>: <?= $projectId ? 'move it to another project' : 'file it on this project' ?>?
 
-Its reference will change<?= $projectId ? ' and any shot, asset or step will be cleared' : '' ?>.');">
+Its reference will change<?= $projectId ? ' and any shot, asset or department will be cleared' : '' ?>.');">
         <select name="to_project" aria-label="Project to move this card to">
           <?php foreach ($others as $o): ?>
             <option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option>
