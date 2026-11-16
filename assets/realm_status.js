@@ -46,7 +46,7 @@ function render() {
     return '<button type="button" class="rstatpreset'+(F.kind===p.kind?' is-on':'')+'" data-statuspreset="'+esc(p.kind)+'"><span>'+esc(p.emoji)+'</span><b>'+esc(p.text)+'</b><small>'+esc(p.kind==='lunch'?'Takes you to the Diner':CLEAR[p.clear]||'')+'</small></button>';
   }).join('')+'</div>';
   h += '<div class="rpick"><span>Clear after</span><span class="rseg">'+m.clear.map(function (c) { return '<button type="button" data-statusclear="'+esc(c)+'" aria-pressed="'+(F.clear===c)+'">'+esc(CLEAR[c]||c)+'</button>'; }).join('')+'</span></div>';
-  if (F.kind==='lunch') h += '<p class="rstatnote">Your character goes to the Diner straight away, and back home when lunch ends.</p>';
+  if (F.kind==='lunch') h += '<p class="rstatnote">Your character goes to the Diner straight away, and back where you were when lunch ends.</p>';
   h += '<div class="rdacts">'+(s?'<button type="button" class="rbtn" data-statusclearnow="1">Clear status</button>':'')+'<span class="rgrow"></span><button type="button" class="rbtn" data-statuscancel="1">Cancel</button><button class="rbtn rprimary" id="statusSave"'+(F.text.trim()?'':' disabled')+'>Save</button></div>';
   $('statusForm').innerHTML = h;
 }

@@ -2304,7 +2304,7 @@ function renderInside() {
   var land = campOf(o.id), k = land ? CAMP[land] : null, mayDeco = (o.owner && o.owner.me) || (k && !k.closed);
   var hint = (o.owner && o.owner.me) ? ' Walk up to the bookshelf, the chest or the portrait and press Enter, or click them.' : !k ? '' : k.closed ? ' This camp belongs to a show you are not on, so its boards are covered.' : ' Click the bar, the scroll, the calendar or the board, or walk up to one and press Enter.';
   if (stallOf(o)) hint = ' The merchant sells things for gold: walk up and press Enter, or click.';
-  if (o.id==='diner') hint = lunching() ? ' Enjoy your lunch. Clear your status when you are done and you go back home.' : ' Pull up a stool. Set your status to Lunch and you come straight here.';
+  if (o.id==='diner') hint = lunching() ? ' Enjoy your lunch. Clear your status when you are done and you go back where you were.' : ' Pull up a stool. Set your status to Lunch and you come straight here.';
   bar.innerHTML = '<h2>'+esc(title(o.id))+'</h2><span>'+(names.length?'Here with you: '+esc(names.join(', '))+(hint?'.':''):'Nobody else is here right now.')+hint+'</span><span class="rgrow"></span>'+voiceBar(o)+((mayDeco && !DECO.on)?'<button type="button" class="rbtn" data-deco="1">Decorate</button>':'')+'<button type="button" class="rbtn rprimary" data-leave="1">Leave room</button>';
   /* The shared screen sits under this bar, however many lines the bar takes. */
   shareShow();
@@ -2453,7 +2453,8 @@ function teleport(id) { if (!spot(id)) return; var fx0 = {x:S.pos.x,y:S.pos.y}; 
 /* ---------- lunch (David, 2026-11-16: "a diner so people's avatars go immediately there when they set
    up their status 'Lunch'") ----------
    The SERVER moves the character (includes/realm_status.php): setting Lunch stands me inside the
-   Diner, and when it ends, by the clock or by clearing it, back home (REALM_LUNCH_BACK there). So
+   Diner, and when it ends, by the clock or by clearing it, back where I was before lunch (David,
+   2026-11-16: "Where they were"; REALM_LUNCH_BACK there). So
    everybody else sees it at once. This page only follows, with the teleport's sparkle: on the map
    or in whatever room I was in, a ring of sparks where I was, and the same closing in at the stool.
    Only when it CHANGES (or on opening the page while at lunch): walking out of the Diner during

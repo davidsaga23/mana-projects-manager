@@ -82,7 +82,8 @@ The **server** clears a status when its time is up, so nobody stays on "Lunch" f
 striped awning, DINER in neon and a burger sign; inside, a counter with stools, a jukebox and two
 booths. Anybody can walk in; it has its own channel (**The Diner**) and calls, like the Tavern.
 **Setting Lunch teleports you inside, onto a stool** (with the teleport sparkle), and everybody sees
-you there; **when lunch ends or is cleared you go back home**, inside your house. Walking out of the
+you there; **when lunch ends or is cleared you go back where you were** (David chose this the same
+day over "back home"; inside again if that door still lets you in). Walking out of the
 Diner during lunch is allowed. The "Village" zoom reaches a little further east to include it.
 Until migration 099 runs, the Diner works and the status window says an update is needed. A hook
 for the days-off calendar to set "Off" by itself is in place (`realm_status_set(..., 'calendar')`),
