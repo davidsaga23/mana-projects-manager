@@ -14,6 +14,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Dashboard: the "Counted in tasks" note is gone *(no migration)*
+
+- The paragraph under Overall progress's four cards no longer shows.
+
 ## 2026-11-16 — Words: steps are Departments, departments are Phases *(no migration)*
 
 - What Anima called a **step** (Animatic, BG Layout, Comp…) is now called a **Department** on every
