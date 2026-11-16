@@ -2487,7 +2487,12 @@ function badge() { var u = unread(), n = 0; Object.keys(u).forEach(function (k) 
    at "@Renata". The text is escaped BEFORE anything is added to it. */
 function rich(body) {
   var h = esc(body), ppl = ST.people.slice().sort(function (a, b) { return b.name.length-a.name.length; });
-  if (!ppl.length || h.indexOf('@') < 0) return h;
+  if (h.indexOf('@') < 0) return h;
+  /* @here and @channel (David, 2026-11-16) are pills of their own, drawn first so a person's name
+     can never swallow them. Not in a raven, where they ring nobody and stay plain words. The @ must
+     start a word, the rule realm_broadcast_word() uses on the server. */
+  if (!/^dm:/.test(CH.open || '')) h = h.replace(/(^|[^\w@.])@(here|channel)\b/gi,function (all, pre, w) { return pre+'<b class="rtag rbcast" title="'+(w.toLowerCase()==='here'?'Notified everyone here with the Realm open':'Notified everyone in this channel')+'">@'+w+'</b>'; });
+  if (!ppl.length) return h;
   var mine = me(), re = new RegExp('@('+ppl.map(function (p) { return esc(p.name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }).join('|')+')','gi');
   return h.replace(re,function (all, n) { return '<b class="rtag'+(mine && esc(mine.name).toLowerCase()===n.toLowerCase()?' is-me':'')+'">'+all+'</b>'; });
 }
@@ -2670,7 +2675,7 @@ function sugClose() { SUG.list = []; var el = $('chatSuggest'); if (el) { el.hid
 function sugDraw() {
   var el = $('chatSuggest'); if (!el) return;
   el.hidden = false;
-  el.innerHTML = SUG.list.map(function (p, i) { return '<button type="button" class="rrow'+(i===SUG.i?' is-on':'')+'" data-tag="'+i+'">@'+esc(p.name)+'</button>'; }).join('');
+  el.innerHTML = SUG.list.map(function (p, i) { return '<button type="button" class="rrow'+(i===SUG.i?' is-on':'')+(p.bc?' rbcastrow':'')+'" data-tag="'+i+'">@'+esc(p.name)+(p.bc?'<small>'+esc(p.bc)+'</small>':'')+'</button>'; }).join('');
 }
 function sugUpdate() {
   var inp = $('chatInput'), upto = inp.value.slice(0,inp.selectionStart), m = /(^|\s)@([^\s@]*)$/.exec(upto);
@@ -2678,6 +2683,9 @@ function sugUpdate() {
   var q = m[2].toLowerCase();
   SUG.at = upto.length-m[2].length-1; SUG.i = 0;
   SUG.list = ST.people.filter(function (p) { var n = p.name.toLowerCase(); return !p.me && n.split(' ').concat([n]).some(function (w) { return w.indexOf(q)===0; }); }).slice(0,6);
+  /* @here and @channel come after the people (David, 2026-11-16), and never in a raven. */
+  if (!/^dm:/.test(CH.open)) SUG.list = SUG.list.concat([{name:'here',bc:'everyone online in this channel'},{name:'channel',bc:'everyone in this channel'}]
+    .filter(function (b) { return b.name.indexOf(q)===0; }));
   if (SUG.list.length) sugDraw(); else sugClose();
 }
 function sugPick(i) {
@@ -2701,9 +2709,30 @@ if ($('chatInput')) {
 }
 if ($('chatFile')) $('chatFile').addEventListener('change',function () { offerPick(this.files[0]); });
 /* Guarded: a page drawn before chat existed has no form, and must not stop the map over it. */
-if ($('chatForm')) $('chatForm').addEventListener('submit',function (e) {
+/* @here / @channel (David, 2026-11-16): before such a message goes, the server says how many people
+   it would ring (GET reach=, which knows who is in a private channel; the page does not). From
+   REALM_BROADCAST_ASK people up (6) the sender is asked first; "Cancel" leaves the words in the box.
+   If the count cannot be had, the message goes anyway: the server decides who hears it either way. */
+function bcastWord(body) { return /(^|[^\w@.])@channel\b/i.test(body) ? 'channel' : (/(^|[^\w@.])@here\b/i.test(body) ? 'here' : ''); }
+var BC = {ok:false};
+function bcastCheck(body, go) {
+  var w = bcastWord(body), ch = CH.open;
+  if (!w || /^dm:/.test(ch)) { go(); return; }
+  fetch(R.api+'?reach='+encodeURIComponent(ch)+'&which='+w,{credentials:'same-origin',headers:{'Accept':'application/json'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (CH.open!==ch) return;
+      if (j && j.ok && j.n >= (j.ask || 6)
+          && !window.confirm('@'+w+' will notify '+j.n+' people'+(w==='here'?' who have the Realm open':' in this channel')+'. Send?')) { $('chatInput').focus(); return; }
+      go();
+    })
+    .catch(function () { if (CH.open===ch) go(); });
+}
+if ($('chatForm')) $('chatForm').addEventListener('submit',function chatSubmit(e) {
   e.preventDefault();
   var inp = $('chatInput'), body = inp.value.trim(), pic = PICK; if ((!body && !pic) || !CH.open || CH.open===THREADS) return;
+  if (!BC.ok && bcastWord(body)) { bcastCheck(body,function () { BC.ok = true; chatSubmit(e); }); return; }
+  BC.ok = false;
   var also = !!(CH.thread && $('chatAlso') && $('chatAlso').checked), thread = CH.thread;
   inp.value = ''; CH.busy = true; CH.keep = false; sugClose(); setPick(null);
   /* SENDING TAKES YOU TO THE BOTTOM (David, 2026-11-13: "when hit enter it should take you to the end

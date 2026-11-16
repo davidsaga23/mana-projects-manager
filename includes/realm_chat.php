@@ -28,6 +28,7 @@
 require_once __DIR__ . '/realm_made.php';
 // Slack's message actions (migration 096): forward, save, edit, delete.
 require_once __DIR__ . '/realm_msgact.php';
+require_once __DIR__ . '/realm_broadcast.php';   // @here and @channel (David, 2026-11-16)
 
 /** The longest message that is kept. Longer is cut, not refused. */
 const REALM_MESSAGE_MAX = 2000;
@@ -637,6 +638,9 @@ function realm_tag_bell(PDO $pdo, int $fromUid, string $channel, string $body, b
             if ($q->fetchColumn()) continue;
             notify_add($pdo, [$crew], ['kind' => 'tag', 'actor' => $actor, 'summary' => $summary]);
         }
+        // @here / @channel (includes/realm_broadcast.php): the same line, after the
+        // named people, so somebody both named and reached hears it once.
+        realm_broadcast_bell($pdo, $fromUid, $channel, $body, $actor, $summary);
     } catch (Throwable $e) {
         // The message was kept; only the bell is silent.
     }

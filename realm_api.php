@@ -362,6 +362,7 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // GET  threads=1                           the threads I follow (the "Threads" row)
 // GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
 // GET  chat=<channel>&at=<message id>      open a conversation at a found message
+// GET  reach=<channel>&which=here|channel how many an @here / @channel would ring
 // POST react=<message id>&emoji=<key>&after=<id>&from=<id>
 //                                          give or take back my reaction (migration
 //                                          093), then the same answer as chat=
@@ -418,6 +419,21 @@ if (isset($_GET['search'])) {
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'The search could not be run. Try again in a moment.']);
     }
+    exit;
+}
+// GET reach=<channel>&which=here|channel: how many people an @here / @channel
+// would ring (David, 2026-11-16). The page asks before sending a message that
+// carries one, and confirms first when it is REALM_BROADCAST_ASK or more. Only
+// a number comes back, and only for a channel this person may read, so a
+// private channel's size is never told to somebody outside it.
+if (isset($_GET['reach'])) {
+    $ch = (string)$_GET['reach'];
+    $which = (string)($_GET['which'] ?? '') === 'here' ? 'here' : 'channel';
+    if (!realm_chat_available($pdo) || empty(realm_channel_access($pdo, $uid, $ch, $mayAnnounce)['read'])) {
+        echo json_encode(['ok' => false, 'error' => 'That conversation is not yours to read.']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'n' => count(realm_broadcast_reach($pdo, $uid, $ch, $which)), 'ask' => REALM_BROADCAST_ASK]);
     exit;
 }
 // ---- channels people make (David, 2026-11-13, migration 097) ---------------
