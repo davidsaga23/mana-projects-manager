@@ -219,6 +219,7 @@ const FEATURE_SCRIPTS = [
     'statement.php'       => 'own_statement',
     // project tabs
     'project.php'         => 'overview',
+    'project_step_items.php' => 'overview',   // the lists behind the progress table's counts
     'brief.php'           => 'brief',
     'shots.php'           => 'shots',
     'shots_api.php'       => 'shots',
@@ -539,7 +540,7 @@ function feature_gate_request(PDO $pdo): ?array {
 function feature_request_project(PDO $pdo, string $script): int {
     // Spell's own files check the show themselves (board_projects()).
     $byProject = [
-        'project.php', 'brief.php', 'dashboard.php', 'crew.php', 'hiring.php', 'schedule.php',
+        'project.php', 'project_step_items.php', 'brief.php', 'dashboard.php', 'crew.php', 'hiring.php', 'schedule.php',
         'schedule_api.php', 'timeline.php', 'timeline_gan.php', 'timeline_import.php', 'shots.php',
         'shots_api.php', 'production.php', 'production_api.php', 'tasks.php', 'team.php', 'wizard.php',
         'import.php', 'statuses_edit.php', 'aliases.php', 'export.php', 'export_breakdown.php',
