@@ -380,6 +380,8 @@ $tunread = [];
 if (isset($_GET['unread'])) {
     echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce, $tunread) : [],
                       'tunread' => $tunread,
+                      // Activity (migration 098): the number on the Activity row.
+                      'activity' => realm_chat_available($pdo) ? realm_activity_count($pdo, $uid, $mayAnnounce) : 0,
                       'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
                       'spots' => realm_spots($pdo, $uid),
                       // Offers of a gift or a swap ride here too, like knocks, so they are seen in seconds.
@@ -397,10 +399,39 @@ if (isset($_GET['threads'])) {
     try {
         $list = realm_threads_list($pdo, $uid, $mayAnnounce);
         echo json_encode(['ok' => true, 'list' => $list, 'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread,
+                          'activity' => realm_activity_count($pdo, $uid, $mayAnnounce),
                           'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
                           'spots' => realm_spots($pdo, $uid), 'offers' => realm_offer_news($pdo, $uid)]);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'Threads could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+// GET  activity=1&kind=mention|thread|reaction|raven|''   my Activity list (migration 098)
+// POST activity_read=<row key>|all&kind=                  mark one row, or all, read; then the list
+// David, 2026-11-16: everything that is for me in one list, as in Slack. What is
+// in it, and the privacy rule, are in includes/realm_activity.php: it is always
+// the session's own account, and only places it may read. An open list asks
+// every few seconds, like the Threads list.
+if (isset($_GET['activity']) || isset($_POST['activity_read'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $bad = isset($_POST['activity_read']) ? realm_activity_mark($pdo, $uid, (string)$_POST['activity_read']) : '';
+        $kind = (string)($_POST['kind'] ?? ($_GET['kind'] ?? ''));
+        if (!in_array($kind, REALM_ACTIVITY_KINDS, true)) $kind = '';
+        $answer = ['ok' => true, 'kind' => $kind, 'list' => realm_activity($pdo, $uid, $mayAnnounce, $kind),
+                   'activity' => realm_activity_count($pdo, $uid, $mayAnnounce), 'actmark' => realm_activity_available($pdo),
+                   'days' => REALM_ACTIVITY_DAYS,
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread,
+                   'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
+                   'spots' => realm_spots($pdo, $uid), 'offers' => realm_offer_news($pdo, $uid)];
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Your activity could not be reached. Try again in a moment.']);
     }
     exit;
 }
@@ -618,7 +649,9 @@ if ($channel !== '') {
                    'threads' => $thread > 0 ? [] : realm_thread_counts($pdo, $channel, $from),
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
-                   'offers' => realm_offer_news($pdo, $uid)];
+                   'offers' => realm_offer_news($pdo, $uid),
+                   // Activity (migration 098): reading here may have read some of it.
+                   'activity' => realm_activity_count($pdo, $uid, $mayAnnounce)];
         // A channel somebody made (migration 097): its name, lock, members and
         // whether I may change it, for the head of the conversation.
         if (realm_made_num($channel) > 0) $answer['chan'] = realm_made_info($pdo, $uid, $channel);

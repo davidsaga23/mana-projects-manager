@@ -28,6 +28,8 @@
 require_once __DIR__ . '/realm_made.php';
 // Slack's message actions (migration 096): forward, save, edit, delete.
 require_once __DIR__ . '/realm_msgact.php';
+// "Activity": everything that is for me, in one list (migration 098).
+require_once __DIR__ . '/realm_activity.php';
 
 /** The longest message that is kept. Longer is cut, not refused. */
 const REALM_MESSAGE_MAX = 2000;
@@ -468,7 +470,10 @@ function realm_chat_summary(PDO $pdo, int $uid, bool $mayAnnounce): ?array {
             // edited and deleted; and my three most-used reactions for the bar.
             'acts' => function_exists('realm_msgact_available') && realm_msgact_available($pdo),
             'favs' => function_exists('realm_reaction_favs') ? realm_reaction_favs($pdo, $uid) : [],
-            'remind' => REALM_REMIND];
+            'remind' => REALM_REMIND,
+            // Activity (migration 098): how many rows of my Activity list are unread,
+            // and whether rows can be marked read yet.
+            'activity' => realm_activity_count($pdo, $uid, $mayAnnounce), 'actmark' => realm_activity_available($pdo)];
 }
 
 /**
