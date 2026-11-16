@@ -745,11 +745,8 @@ function render_overall_progress(array $overall, bool $compact = false): void {
             <?php else: ?><span class="muted small">no history yet</span><?php endif; ?>
           </div></div>
       </div>
-      <p class="muted small">
-        Counted in <strong>tasks</strong>, one item through one step, because that is the only
-        unit every step shares. A step measured in seconds and one measured in shots cannot be
-        added together, so each card below keeps its own unit.
-      </p>
+      <?php // The "Counted in tasks…" note under these cards is gone (David, 2026-11-16:
+            // "let's delete this text"); the cards' own "tasks/day" units say it. ?>
       <?php endif; ?>
     </section>
     <?php

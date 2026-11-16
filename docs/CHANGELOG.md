@@ -14,6 +14,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Dashboard: the "Counted in tasks" note is gone *(no migration)*
+
+- The paragraph under Overall progress's four cards no longer shows.
+
 ## 2026-11-16 — Project Overview: click a progress count to see what it counts *(no migration)*
 
 - In "Progress by step", the Tracked, Delivered and Approved numbers open the list behind them:
