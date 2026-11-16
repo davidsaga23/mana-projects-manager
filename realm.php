@@ -213,6 +213,9 @@ foreach (($state['people'] ?? []) as $p) {
   <?php /* Channels people make, public or private, for a show or studio-wide (migration 097). After
            realm_react.js: both answer every chat answer, and this one keeps the other's hook. */ ?>
   <script src="assets/realm_made.js<?= asset_ver('realm_made.js') ?>"></script>
+  <?php /* Activity: everything that is for me in one list (migration 098). After realm_react.js,
+           whose reaction pictures it borrows. */ ?>
+  <script src="assets/realm_activity.js<?= asset_ver('realm_activity.js') ?>"></script>
 <?php endif; ?>
 </body>
 </html>
