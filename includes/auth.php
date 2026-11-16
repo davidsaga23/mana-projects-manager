@@ -627,11 +627,14 @@ function artist_may_post(): bool {
         // `activity_read` (2026-11-16, migration 098): mark a row of my own
         // Activity list read, or all of it. Only the asker's own read marks
         // (realm_activity_mark()); nothing about anybody else changes.
+        // `set_status` (2026-11-16, migration 099): their own status line and
+        // emoji. ⚠ NO ID TO FORGE: realm_status_set() writes the session's own
+        // row; Lunch moves only that person into the Diner, which anybody may enter.
         'realm_api.php' => ['ping', 'set_door', 'set_look', 'arrive', 'say', 'knock', 'answer_knock', 'focus',
                             'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
                             'buy', 'offer', 'offer_answer', 'react',
                             'forward', 'save_msg', 'unsave_msg', 'edit_msg', 'delete_msg', 'unread_from', 'channel',
-                            'activity_read'],
+                            'activity_read', 'set_status'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

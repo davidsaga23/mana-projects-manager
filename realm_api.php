@@ -32,6 +32,9 @@
 //                                         the next step of an offer I made or was made (includes/realm_trade.php)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 // POST channel=new|rename|members|archive|leave  make or change a chat channel (further down, migration 097)
+// POST set_status=<kind>|''&emoji=&text=&clear=30m|1h|today|never
+//                                         my own status ("Lunch", "In review until 3"; migration 099).
+//                                         Lunch stands my character in the Diner; '' clears it.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -710,6 +713,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($error === '') $offered = true;
         } elseif (isset($_POST['arrive'])) {
             $error = realm_arrive($pdo, $uid, (string)$_POST['arrive'], (string)($_POST['inside'] ?? '0') === '1');
+        } elseif (isset($_POST['set_status'])) {
+            // The asker's own status (migration 099, includes/realm_status.php). No id is posted.
+            $error = realm_status_set($pdo, $uid, (string)$_POST['set_status'], (string)($_POST['emoji'] ?? ''),
+                                      (string)($_POST['text'] ?? ''), (string)($_POST['clear'] ?? ''));
         } else {
             $error = 'Nothing was asked.';
         }

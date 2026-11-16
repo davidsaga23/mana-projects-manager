@@ -14,6 +14,29 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — The Realm: status messages, and the Diner *(migration 099)*
+
+**Asked by David**: "Status messages: Let's also create a diner so people's avatars go immediately
+there when they set up their status 'Lunch'". **Status**, as in Slack: an emoji and a short line
+beside your name. Set from the new status button in the Realm's top bar (it shows your status once
+set) or from **Your character**: five ready-made ones (🍔 Lunch, 🎬 In review, 🎧 Focusing, 🤒 Out
+sick, 🌴 Off today), or your own words and an emoji from a list, and **Clear after** 30 minutes,
+1 hour, today or never. Shown beside the name in **People** (its words where the whereabouts were),
+on the card of a person's house, on the card over a character, and beside the writer's name in chat.
+The **server** clears a status when its time is up, so nobody stays on "Lunch" for a week.
+
+**The Diner** is a new place to meet at the east end of the second street: a roadside diner with a
+striped awning, DINER in neon and a burger sign; inside, a counter with stools, a jukebox and two
+booths. Anybody can walk in; it has its own channel (**The Diner**) and calls, like the Tavern.
+**Setting Lunch teleports you inside, onto a stool** (with the teleport sparkle), and everybody sees
+you there; **when lunch ends or is cleared you go back home**, inside your house. Walking out of the
+Diner during lunch is allowed. The "Village" zoom reaches a little further east to include it.
+Until migration 099 runs, the Diner works and the status window says an update is needed. A hook
+for the days-off calendar to set "Off" by itself is in place (`realm_status_set(..., 'calendar')`),
+not used yet.
+
+---
+
 ## 2026-11-16 — The Realm: Activity, everything for you in one list *(migration 098)*
 
 **Asked by David**: an Activity view, as in Slack, so nothing gets lost when channels are busy. An
