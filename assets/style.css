@@ -4229,6 +4229,9 @@ a.panel-tab:hover { text-decoration: none; color: var(--text); }
   font-size: 13px; font-weight: 600;
 }
 .bell-empty { padding: 14px; margin: 0; line-height: 1.5; }
+/* Desktop notifications (David, 2026-11-16): one quiet link-like button at the foot. */
+.bell-foot { border-top: 1px solid var(--border); padding: 6px 10px; }
+.bell-foot .bell-desk { background: none; border: 0; padding: 4px; color: var(--primary); font-size: 12.5px; cursor: pointer; width: auto; }
 .bell-list { list-style: none; margin: 0; padding: 0; }
 .bell-list li { border-bottom: 1px solid var(--border); }
 .bell-list li:last-child { border-bottom: 0; }

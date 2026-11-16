@@ -31,6 +31,9 @@
         // Somebody knocking at your door in the Realm counts too (migration 084).
         if (j.knocks && j.knocks.for_me) n += j.knocks.for_me.length;
         show(n);
+        // A knock as a desktop notification too (David, 2026-11-16; assets/desk-notify.js).
+        // Ravens and tags come through the bell, which knows who sent them.
+        if (window.AnimaNotify && j.knocks) window.AnimaNotify.knocks(j.knocks.for_me);
       })
       .catch(function () { /* the next ask may succeed */ });
   }

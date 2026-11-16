@@ -96,6 +96,11 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
 <title><?= e($pageTitle) ?> · Anima | Project manager</title>
 <?php // The square lockup is already a tab icon: dark field, centred mark. ?>
 <link rel="icon" href="assets/logo.webp<?= asset_ver('logo.webp') ?>" type="image/webp">
+<?php // INSTALL AS AN APP (David, 2026-11-12: "we can ask them to install the webpage as an
+      // app in windows so it always opens on the startup"). With this, Edge and Chrome offer
+      // "Install Anima"; the how-to is in the bell's Desktop notifications window and docs/. ?>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14161c">
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
 <body>
@@ -140,6 +145,10 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
                 <?php endforeach; ?>
               </ul>
             <?php endif; ?>
+            <?php // Desktop notifications with a sound (David, 2026-11-16). The button opens
+                  // a small window that explains, then asks the browser; nothing is asked on
+                  // page load. assets/desk-notify.js writes its words and does the rest. ?>
+            <div class="bell-foot"><button type="button" class="bell-desk" data-desknotify>Desktop notifications</button></div>
           </div>
         </div>
       <?php endif; ?>
@@ -313,6 +322,8 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       <?php endif; ?>
     </div>
   </div>
+<?php // Before bell.js and realm-nudge.js, which hand it what their polls bring back. ?>
+<?php if ($bell['on']): ?><script src="assets/desk-notify.js<?= asset_ver('desk-notify.js') ?>"></script><?php endif; ?>
 <?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
 <?php // The Admin / More menu above: open, close, keys. Tiny, no library. ?>
 <script defer src="assets/nav-menu.js<?= asset_ver('nav-menu.js') ?>"></script>

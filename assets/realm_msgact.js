@@ -166,6 +166,8 @@ function goTo(id) {
     .then(function (j) { if (!j || !j.ok) { toast((j && j.error) || 'That message could not be found.'); return; } R.findOpen(j.channel, j.id, j.thread); })
     .catch(function () { toast('That message could not be found.'); });
 }
+/* A desktop notification's reminder opens its message the same way (assets/desk-notify.js, via realm.js). */
+R.goMsg = goTo;
 
 /* ---------- mark unread ---------- */
 function markUnread(id) {

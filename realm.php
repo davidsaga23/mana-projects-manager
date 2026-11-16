@@ -61,6 +61,9 @@ foreach (($state['people'] ?? []) as $p) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anima Realm</title>
 <link rel="icon" href="assets/logo.webp<?= asset_ver('logo.webp') ?>" type="image/webp">
+<?php // Anima installs as an app from here too (David, 2026-11-12; see includes/header.php). ?>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14161c">
 <link rel="stylesheet" href="assets/realm.css<?= asset_ver('realm.css') ?>">
 </head>
 <body>
@@ -95,6 +98,9 @@ foreach (($state['people'] ?? []) as $p) {
            opens the window that sets it; "Lunch" walks you to the Diner. assets/realm_status.js. */ ?>
   <button type="button" class="rbtn rstatbtn" id="statusBtn">Set a status</button>
   <button type="button" class="rbtn" id="lookBtn">Your character</button>
+  <?php /* Desktop notifications with a sound (David, 2026-11-16): the Realm has no bell, so its
+           switch is here. assets/desk-notify.js writes the words and opens the window. */ ?>
+  <button type="button" class="rbtn" data-desknotify="short">Notifications</button>
   <?php endif; ?>
   <span class="rwho"><?= e(current_user_display()) ?></span>
 </header>
@@ -206,6 +212,9 @@ foreach (($state['people'] ?? []) as $p) {
       state: <?= json_encode($state, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>
     };
   </script>
+  <?php /* Desktop notifications (David, 2026-11-16): before realm.js, which hands it knocks, calls
+           and the bell's news. */ ?>
+  <script src="assets/desk-notify.js<?= asset_ver('desk-notify.js') ?>"></script>
   <script src="assets/realm.js<?= asset_ver('realm.js') ?>"></script>
   <?php /* Praise, mana and gold (migration 090): its own file, so the map's script stays as it was. */ ?>
   <script src="assets/realm_praise.js<?= asset_ver('realm_praise.js') ?>"></script>

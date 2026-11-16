@@ -6282,3 +6282,24 @@ house should be decorated with balloons, and colors so everyone knows."* Agreed 
   on 28 February in other years. The studio's time zone (config) decides what "today" is.
 - **Drawn in code like the rest of the map**: balloons, flags and confetti over the house's stamp, so
   the stamps themselves do not change; still for somebody who asked for less motion.
+## 2026-11-16 - Desktop notifications with a sound
+
+David chose "desktop notifications with sound" (wish of 2026-11-12: "so we can send sounds and
+reminders", and install Anima "as an app in windows so it always opens on the startup").
+- **Polling, not push.** The host cannot hold connections, so notifications ride on the polls that
+  already run (the bell every 30 s, the Realm button every 20 s, the Realm heartbeat every 25 s). With
+  notifications on, ONE hidden tab keeps polling the bell (a 70 s lease in localStorage) so a
+  background Anima still hears news. Web Push (service worker + VAPID keys) is the follow-up.
+- **The bell is the single source** for ravens, tags, reminders and tasks: its lines already carry
+  who, and a raven read in the Realm is already cleared from it. Knocks come from the knock news, calls
+  from who is in voice in the room (Realm page only).
+- **Never asked on page load**: the browser's question follows a click on a button that explains.
+- **Settings per computer** (localStorage), because the browser permission is per computer. No
+  migration.
+- **Nothing while you look at Anima**: an Anima tab in front with the keyboard (marked in localStorage,
+  fresh for 25 s) silences popups and sound everywhere; what arrived then counts as told.
+- **One tab speaks**: a told-already list in localStorage under a Web Lock, and the notification
+  `tag` is the same key.
+- **Who, never what** for ravens, as the bell decided: a notification may be seen by somebody else.
+- **Our own sound** (Web Audio, two notes); where the browser forbids sound in an untouched tab,
+  Windows' own notification sound plays instead; muted means neither.
