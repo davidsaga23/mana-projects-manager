@@ -32,6 +32,9 @@
 //                                         the next step of an offer I made or was made (includes/realm_trade.php)
 // POST stand=<x>,<y>                      the spot my character is standing on (further down)
 // POST channel=new|rename|members|archive|leave  make or change a chat channel (further down, migration 097)
+// POST set_status=<kind>|''&emoji=&text=&clear=30m|1h|today|never
+//                                         my own status ("Lunch", "In review until 3"; migration 099).
+//                                         Lunch stands my character in the Diner; '' clears it.
 
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
@@ -362,6 +365,7 @@ if (isset($_GET['camp']) || isset($_POST['camp_thing'])) {
 // GET  threads=1                           the threads I follow (the "Threads" row)
 // GET  search=<words>&before=<id>          search every conversation I may read (migration 094)
 // GET  chat=<channel>&at=<message id>      open a conversation at a found message
+// GET  reach=<channel>&which=here|channel how many an @here / @channel would ring
 // POST react=<message id>&emoji=<key>&after=<id>&from=<id>
 //                                          give or take back my reaction (migration
 //                                          093), then the same answer as chat=
@@ -380,6 +384,8 @@ $tunread = [];
 if (isset($_GET['unread'])) {
     echo json_encode(['ok' => true, 'unread' => realm_chat_available($pdo) ? realm_unread($pdo, $uid, $mayAnnounce, $tunread) : [],
                       'tunread' => $tunread,
+                      // Activity (migration 098): the number on the Activity row.
+                      'activity' => realm_chat_available($pdo) ? realm_activity_count($pdo, $uid, $mayAnnounce) : 0,
                       'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
                       'spots' => realm_spots($pdo, $uid),
                       // Offers of a gift or a swap ride here too, like knocks, so they are seen in seconds.
@@ -397,10 +403,39 @@ if (isset($_GET['threads'])) {
     try {
         $list = realm_threads_list($pdo, $uid, $mayAnnounce);
         echo json_encode(['ok' => true, 'list' => $list, 'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread,
+                          'activity' => realm_activity_count($pdo, $uid, $mayAnnounce),
                           'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
                           'spots' => realm_spots($pdo, $uid), 'offers' => realm_offer_news($pdo, $uid)]);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'Threads could not be reached. Try again in a moment.']);
+    }
+    exit;
+}
+// GET  activity=1&kind=mention|thread|reaction|raven|''   my Activity list (migration 098)
+// POST activity_read=<row key>|all&kind=                  mark one row, or all, read; then the list
+// David, 2026-11-16: everything that is for me in one list, as in Slack. What is
+// in it, and the privacy rule, are in includes/realm_activity.php: it is always
+// the session's own account, and only places it may read. An open list asks
+// every few seconds, like the Threads list.
+if (isset($_GET['activity']) || isset($_POST['activity_read'])) {
+    if (!realm_chat_available($pdo)) {
+        echo json_encode(['ok' => false, 'error' => 'Chat needs a database update first. An administrator opens migrate.php once.']);
+        exit;
+    }
+    try {
+        $bad = isset($_POST['activity_read']) ? realm_activity_mark($pdo, $uid, (string)$_POST['activity_read']) : '';
+        $kind = (string)($_POST['kind'] ?? ($_GET['kind'] ?? ''));
+        if (!in_array($kind, REALM_ACTIVITY_KINDS, true)) $kind = '';
+        $answer = ['ok' => true, 'kind' => $kind, 'list' => realm_activity($pdo, $uid, $mayAnnounce, $kind),
+                   'activity' => realm_activity_count($pdo, $uid, $mayAnnounce), 'actmark' => realm_activity_available($pdo),
+                   'days' => REALM_ACTIVITY_DAYS,
+                   'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread,
+                   'knocks' => realm_knock_news($pdo, $uid), 'voice' => realm_voice_here($pdo, $uid),
+                   'spots' => realm_spots($pdo, $uid), 'offers' => realm_offer_news($pdo, $uid)];
+        if ($bad !== '') $answer['error'] = $bad;
+        echo json_encode($answer);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Your activity could not be reached. Try again in a moment.']);
     }
     exit;
 }
@@ -418,6 +453,21 @@ if (isset($_GET['search'])) {
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'The search could not be run. Try again in a moment.']);
     }
+    exit;
+}
+// GET reach=<channel>&which=here|channel: how many people an @here / @channel
+// would ring (David, 2026-11-16). The page asks before sending a message that
+// carries one, and confirms first when it is REALM_BROADCAST_ASK or more. Only
+// a number comes back, and only for a channel this person may read, so a
+// private channel's size is never told to somebody outside it.
+if (isset($_GET['reach'])) {
+    $ch = (string)$_GET['reach'];
+    $which = (string)($_GET['which'] ?? '') === 'here' ? 'here' : 'channel';
+    if (!realm_chat_available($pdo) || empty(realm_channel_access($pdo, $uid, $ch, $mayAnnounce)['read'])) {
+        echo json_encode(['ok' => false, 'error' => 'That conversation is not yours to read.']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'n' => count(realm_broadcast_reach($pdo, $uid, $ch, $which)), 'ask' => REALM_BROADCAST_ASK]);
     exit;
 }
 // ---- channels people make (David, 2026-11-13, migration 097) ---------------
@@ -618,7 +668,9 @@ if ($channel !== '') {
                    'threads' => $thread > 0 ? [] : realm_thread_counts($pdo, $channel, $from),
                    'unread' => realm_unread($pdo, $uid, $mayAnnounce, $tunread), 'tunread' => $tunread, 'knocks' => realm_knock_news($pdo, $uid),
                    'voice' => realm_voice_here($pdo, $uid), 'spots' => realm_spots($pdo, $uid),
-                   'offers' => realm_offer_news($pdo, $uid)];
+                   'offers' => realm_offer_news($pdo, $uid),
+                   // Activity (migration 098): reading here may have read some of it.
+                   'activity' => realm_activity_count($pdo, $uid, $mayAnnounce)];
         // A channel somebody made (migration 097): its name, lock, members and
         // whether I may change it, for the head of the conversation.
         if (realm_made_num($channel) > 0) $answer['chan'] = realm_made_info($pdo, $uid, $channel);
@@ -677,6 +729,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($error === '') $offered = true;
         } elseif (isset($_POST['arrive'])) {
             $error = realm_arrive($pdo, $uid, (string)$_POST['arrive'], (string)($_POST['inside'] ?? '0') === '1');
+        } elseif (isset($_POST['set_status'])) {
+            // The asker's own status (migration 099, includes/realm_status.php). No id is posted.
+            $error = realm_status_set($pdo, $uid, (string)$_POST['set_status'], (string)($_POST['emoji'] ?? ''),
+                                      (string)($_POST['text'] ?? ''), (string)($_POST['clear'] ?? ''));
         } else {
             $error = 'Nothing was asked.';
         }

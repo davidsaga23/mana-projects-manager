@@ -266,6 +266,9 @@ small { color: var(--muted); font-size: 13px; }
 .rimg { display: block; max-width: 100%; max-height: 240px; border-radius: var(--radius-sm); margin-top: 4px; }
 .rtag { color: var(--primary); font-weight: 600; }
 .rtag.is-me { background: var(--primary); color: var(--on-primary); border-radius: 4px; padding: 0 4px; }
+/* @here and @channel (David, 2026-11-16): a pill that reads as "everybody", apart from a person's tag. */
+.rtag.rbcast { background: var(--primary-tint); color: var(--primary); border-radius: 4px; padding: 0 4px; }
+.rbcastrow { font-weight: 600; }
 /* Reactions on a message (David, 2026-11-13, migration 093; assets/realm_react.js): the chips under
    it. The buttons that give one are in the bar over the message (below). */
 .rmsg[data-msg] { position: relative; }
@@ -286,7 +289,7 @@ small { color: var(--muted); font-size: 13px; }
 .rcomposer input:not([type=file]) { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; transition: border-color var(--ease); }
 .rcomposer input::placeholder { color: var(--faint); }
 .rcomposer input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.rcomposer[hidden], .ralso[hidden], .rback[hidden] { display: none; }
+.rcomposer[hidden], .ralso[hidden], .rback[hidden], .rbtn.rback[hidden] { display: none; }
 /* The way back from a thread: a wide, drawn arrow (David, 2026-11-13: "wider arrow to go back
    please"), not the small text arrow it was. */
 .rbtn.rback { display: inline-flex; align-items: center; justify-content: center; min-width: 46px; padding: 5px 10px; }
@@ -695,4 +698,63 @@ dialog.rchandlg { width: min(460px, calc(100% - 32px)); max-height: calc(100% - 
   .rfold { position: static; transform: none; }
   .rchgroup { display: flex; align-items: center; flex: none; }
   .rrow.is-sub { padding-left: 10px; }
+}
+
+/* ACTIVITY (David, 2026-11-16, migration 098; assets/realm_activity.js): everything that is for me,
+   in the chat panel. A bar of filters and "Mark all as read" stays at the top while the rows scroll;
+   an unread row is tinted and carries a dot, as the Threads list marks what is new. */
+.ractbar { position: sticky; top: -12px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -12px calc(-1 * var(--chat-pad)) 0; padding: 10px var(--chat-pad); background: var(--surface); border-bottom: 1px solid var(--border-soft); }
+.ractfilters { display: flex; flex-wrap: wrap; gap: 4px; margin-right: auto; }
+.ractf { padding: 3px 10px; font: inherit; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 999px; color: var(--text-2); cursor: pointer; }
+.ractf:hover { border-color: var(--primary-border); }
+.ractf[aria-pressed="true"] { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+.ractlist { display: flex; flex-direction: column; gap: 6px; }
+.ractrow { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 8px 11px; font: inherit; color: var(--text-2); cursor: pointer; transition: border-color var(--ease); }
+.ractrow:hover, .ractrow:focus-visible { border-color: var(--primary-border); }
+.ractrow.is-new { border-color: var(--primary-border); background: var(--primary-tint); }
+.ractico { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); color: var(--primary); font-weight: 700; font-size: 14px; }
+.ractmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.racthead { display: flex; flex-wrap: wrap; gap: 0 5px; align-items: baseline; }
+.racthead b { color: var(--text); }
+.racthead small { margin-left: auto; font-size: 12px; color: var(--faint); }
+.ractemoji { font-size: 15px; }
+.ractwhere { font-size: 12px; color: var(--muted); }
+.ractbody { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.ractdot { flex: none; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--primary); }
+/* ---------- statuses (David, 2026-11-16, migration 099) ----------
+   Slack's status: an emoji beside a name, its words where the whereabouts were, and the window that
+   sets it (assets/realm_status.js). The top bar's button carries the emoji and as much of the words
+   as fits. */
+.rstat { font-style: normal; font-size: 13px; line-height: 1; flex: none; cursor: default; }
+.rmsghead .rstat { font-size: 12px; align-self: center; }
+/* A status's words give way before the name does: "You" must not shrink to "Y…" behind a long one. */
+.rrow small.rstattext { min-width: 0; flex-shrink: 20; }
+.rstatbtn { display: inline-flex; align-items: center; gap: 6px; max-width: 190px; }
+.rstatbtn-e { flex: none; }
+.rstatbtn-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcardstat, .rwhotip .rwhostat { color: var(--text); }
+.rcardstat small, .rwhostat small { color: var(--muted); }
+.rlookstat { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.rlookstat > span { color: var(--muted); width: 72px; flex: none; }
+.rlookstat b { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rlookstat b small { color: var(--muted); font-weight: 400; }
+.rstatrow { display: flex; gap: 8px; }
+.rstatrow input { flex: 1; min-width: 0; padding: 7px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius); font: inherit; }
+.rstatrow input:focus { outline: 2px solid var(--primary-border); outline-offset: 0; border-color: var(--primary); }
+.rstatemoji { font-size: 18px; line-height: 1; padding: 5px 9px; }
+.rstatgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.rstatgrid button { font-size: 18px; line-height: 1; padding: 6px 0; background: none; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; }
+.rstatgrid button:hover { background: var(--row-hover); border-color: var(--border); }
+.rstatgrid button[aria-pressed="true"] { background: var(--primary-tint); border-color: var(--primary-border); }
+.rstatpresets { display: flex; flex-direction: column; gap: 2px; }
+.rstatpreset { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; background: none; border: 1px solid transparent; border-radius: var(--radius); color: var(--text-2); cursor: pointer; text-align: left; font: inherit; }
+.rstatpreset:hover { background: var(--row-hover); color: var(--text); }
+.rstatpreset.is-on { background: var(--primary-tint); border-color: var(--primary-border); color: var(--text); }
+.rstatpreset span { font-size: 17px; width: 22px; text-align: center; }
+.rstatpreset b { font-weight: 500; }
+.rstatpreset small { margin-left: auto; color: var(--faint); }
+.rstatnote { margin: 0; color: var(--muted); }
+.rstatdlg .rdacts { align-items: center; }
+@media (max-width: 860px) {
+  .rstatbtn { max-width: 120px; }
 }

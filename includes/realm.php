@@ -43,6 +43,8 @@ require_once __DIR__ . '/realm_shop.php';
 require_once __DIR__ . '/realm_trade.php';
 // Each show's sky over its land (no migration): weather and fireworks, read from Anima.
 require_once __DIR__ . '/realm_weather.php';
+// Status messages and lunch in the Diner (migration 099, David 2026-11-16).
+require_once __DIR__ . '/realm_status.php';
 // Birthdays (migration 100): whose house is decorated today. Pure, never throws.
 require_once __DIR__ . '/birthday.php';
 
@@ -95,6 +97,13 @@ function realm_enter(PDO $pdo, int $uid): void {
             ->execute([$uid, REALM_KINDS[$uid % count(REALM_KINDS)], REALM_CLOAKS[$uid % count(REALM_CLOAKS)]]);
         $pdo->prepare('UPDATE realm_people SET place = ?, inside = 0,' . realm_spot_reset($pdo) . ' last_ping = NOW(), last_active = NOW() WHERE user_id = ?')
             ->execute(['user:' . $uid, $uid]);
+        // Somebody whose status is Lunch (migration 099) arrives at the Diner
+        // instead, inside, as setting it put them there. An expired lunch was
+        // cleared by the sweep first and leaves them at home.
+        if (realm_status_ready($pdo)) {
+            realm_status_sweep($pdo);
+            $pdo->prepare("UPDATE realm_people SET place = 'diner', inside = 1 WHERE user_id = ? AND status_kind = 'lunch'")->execute([$uid]);
+        }
 
         $q = $pdo->prepare('SELECT house_slot FROM realm_people WHERE user_id = ?');
         $q->execute([$uid]);
@@ -229,16 +238,17 @@ function realm_set_look(PDO $pdo, int $uid, array $in): string {
 }
 
 /**
- * Your character arrived somewhere. $place is 'tavern', 'council', 'land:<name>'
- * or 'user:<id>'; $inside says whether you went in or stopped at the door.
+ * Your character arrived somewhere. $place is 'tavern', 'council', 'diner',
+ * 'land:<name>' or 'user:<id>'; $inside says whether you went in or stopped at the door.
  *
  * ⚠ THE DOOR IS CHECKED HERE, not only on the screen: going INSIDE somebody
  * else's house needs their door open and them at home. Standing outside is
  * always allowed. Your own house is always yours to enter.
  */
 function realm_arrive(PDO $pdo, int $uid, string $place, bool $inside): string {
-    if ($place === 'tavern' || $place === 'council') {
-        // Always open.
+    if ($place === 'tavern' || $place === 'council' || $place === 'diner') {
+        // Always open. The Diner (David, 2026-11-16) is where lunch is eaten;
+        // anybody may walk in, as into the Tavern.
     } elseif (strpos($place, 'land:') === 0) {
         $land = substr($place, 5);
         $q = $pdo->prepare('SELECT 1 FROM realm_lands WHERE land = ?');
@@ -495,6 +505,9 @@ function shot_label_safe($episode, $shotCode): string {
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
     $clocks = realm_clocks($pdo);
+    // Statuses that ran out are cleared, and lunchers sent back, before anybody is read (migration 099).
+    realm_status_sweep($pdo);
+    $status = realm_status_ready($pdo);
     // Whose birthday is celebrated today (includes/birthday.php). Only this yes
     // or no leaves the server, and only on the day: never the date itself.
     $bdays = birthdays_today($pdo);
@@ -502,7 +515,9 @@ function realm_state(PDO $pdo, int $uid): array {
         $timer = function_exists('column_exists') && column_exists($pdo, 'time_timers', 'phase');
         // In voice (migration 085): a fresh voice row that names the room the person is in.
         $voice = realm_voice_available($pdo);
-        $sql = 'SELECT rp.user_id, rp.house_slot, rp.house_kind, rp.door, rp.place, rp.inside, rp.cloak, rp.hat, rp.pet,
+        $sql = 'SELECT rp.user_id, rp.house_slot, rp.house_kind, rp.door, rp.place, rp.inside, rp.cloak, rp.hat, rp.pet,' . ($status ? '
+                       rp.status_kind, rp.status_emoji, rp.status_text, rp.status_from,
+                       IF(rp.status_until IS NULL, NULL, TIMESTAMPDIFF(SECOND, NOW(), rp.status_until)) AS status_left,' : '') . '
                        TIMESTAMPDIFF(SECOND, rp.last_ping, NOW()) AS ping_age,
                        TIMESTAMPDIFF(MINUTE, rp.last_active, NOW()) AS idle_min,
                        u.display_name, u.username, u.crew_id AS crew_ref, c.name AS crew_name, ' . ($timer ? 't.phase' : 'NULL') . ' AS phase,
@@ -539,6 +554,8 @@ function realm_state(PDO $pdo, int $uid): array {
                 'pet'    => realm_look_known('pet', (string)$r['pet']) ? (string)$r['pet'] : 'none',
                 'me'     => $id === $uid,
                 'work'   => $clocks[(int)$r['crew_ref']] ?? null,
+                // "Lunch", "In review until 3" (migration 099): shown whether they are here or away.
+                'status' => $status ? realm_status_of($r) : null,
                 // David, 2026-11-16: "Their house should be decorated with balloons, and colors so everyone knows."
                 'birthday_today' => (int)$r['crew_ref'] > 0 && isset($bdays[(int)$r['crew_ref']]),
             ];
@@ -563,7 +580,9 @@ function realm_state(PDO $pdo, int $uid): array {
             // address-lookup service the browsers ask (includes/realm_voice.php).
             // `share`: has migration 088 run, so a screen can be shared in a call.
             'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice(),
-                        'share' => realm_share_available($pdo)]];
+                        'share' => realm_share_available($pdo)],
+            // The status picker's choices, and whether migration 099 has run.
+            'statuses' => realm_status_menu($pdo)];
 }
 
 // ---- knocking (migration 084) -------------------------------------------------
