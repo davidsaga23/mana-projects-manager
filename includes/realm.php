@@ -45,6 +45,8 @@ require_once __DIR__ . '/realm_trade.php';
 require_once __DIR__ . '/realm_weather.php';
 // Status messages and lunch in the Diner (migration 099, David 2026-11-16).
 require_once __DIR__ . '/realm_status.php';
+// Birthdays (migration 100): whose house is decorated today. Pure, never throws.
+require_once __DIR__ . '/birthday.php';
 
 /** How many plots the village has. Must match the plots assets/realm.js lays out. */
 const REALM_SLOTS = 26;
@@ -498,6 +500,7 @@ function shot_label_safe($episode, $shotCode): string {
  * it. `voice` is true while they are in the voice chat of the room they are
  * inside, and `muted` while their microphone is off there (migration 085). Clients and switched-off accounts are never listed.
  * `work` is the task their clock is running on (realm_clocks()), or null.
+ * `birthday_today` is true on the day their birthday is celebrated (migration 100).
  */
 function realm_state(PDO $pdo, int $uid): array {
     $people = [];
@@ -505,6 +508,9 @@ function realm_state(PDO $pdo, int $uid): array {
     // Statuses that ran out are cleared, and lunchers sent back, before anybody is read (migration 099).
     realm_status_sweep($pdo);
     $status = realm_status_ready($pdo);
+    // Whose birthday is celebrated today (includes/birthday.php). Only this yes
+    // or no leaves the server, and only on the day: never the date itself.
+    $bdays = birthdays_today($pdo);
     try {
         $timer = function_exists('column_exists') && column_exists($pdo, 'time_timers', 'phase');
         // In voice (migration 085): a fresh voice row that names the room the person is in.
@@ -550,6 +556,8 @@ function realm_state(PDO $pdo, int $uid): array {
                 'work'   => $clocks[(int)$r['crew_ref']] ?? null,
                 // "Lunch", "In review until 3" (migration 099): shown whether they are here or away.
                 'status' => $status ? realm_status_of($r) : null,
+                // David, 2026-11-16: "Their house should be decorated with balloons, and colors so everyone knows."
+                'birthday_today' => (int)$r['crew_ref'] > 0 && isset($bdays[(int)$r['crew_ref']]),
             ];
         }
     } catch (Throwable $e) {

@@ -13,6 +13,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/uploads.php';      // accept_upload(), for the profile picture
+require_once __DIR__ . '/birthday.php';     // birthday_available(), birthday_valid() (migration 100)
 
 /** Has migration 075 run? The profile's own fields: phone, bio and picture. */
 function home_profile_available(PDO $pdo): bool {
@@ -21,11 +22,13 @@ function home_profile_available(PDO $pdo): bool {
 
 /** A person's profile: name and email always; phone, bio and picture after 075. */
 function home_profile(PDO $pdo, int $crewId): array {
-    $cols = 'id, name, email' . (home_profile_available($pdo) ? ', phone, bio, photo_stored, photo_mime' : '');
+    $cols = 'id, name, email' . (home_profile_available($pdo) ? ', phone, bio, photo_stored, photo_mime' : '')
+          . (birthday_available($pdo) ? ', birth_month, birth_day' : '');
     $q = $pdo->prepare("SELECT {$cols} FROM crew WHERE id = ?");
     $q->execute([$crewId]);
     return ($q->fetch() ?: []) + ['name' => '', 'email' => '', 'phone' => null, 'bio' => null,
-                                   'photo_stored' => null, 'photo_mime' => null];
+                                   'photo_stored' => null, 'photo_mime' => null,
+                                   'birth_month' => null, 'birth_day' => null];
 }
 
 /**
@@ -75,5 +78,20 @@ function home_save_profile(PDO $pdo, int $crewId, array $in, ?array $photo, bool
 
     $pdo->prepare('UPDATE crew SET phone = ?, bio = ?, photo_stored = ?, photo_mime = ? WHERE id = ?')
         ->execute([$phone !== '' ? $phone : null, $bio !== '' ? $bio : null, $stored, $mime, $crewId]);
+
+    // THE BIRTHDAY (migration 100; David, 2026-11-16): month and day, never the
+    // year, both optional and both or neither. Only touched when the form sent the
+    // fields, so a form that does not offer them (or a database before 100) leaves
+    // a date that is already there alone.
+    if (birthday_available($pdo) && (array_key_exists('birth_month', $in) || array_key_exists('birth_day', $in))) {
+        $bm = (int)($in['birth_month'] ?? 0);
+        $bd = (int)($in['birth_day'] ?? 0);
+        if ($bm === 0 && $bd === 0) {
+            $bm = null; $bd = null;
+        } elseif (!birthday_valid($bm, $bd)) {
+            throw new RuntimeException('Your other details were saved, but that birthday is not a real date: pick a month and a day, or leave both empty.');
+        }
+        $pdo->prepare('UPDATE crew SET birth_month = ?, birth_day = ? WHERE id = ?')->execute([$bm, $bd, $crewId]);
+    }
     return $said;
 }

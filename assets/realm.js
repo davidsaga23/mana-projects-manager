@@ -364,7 +364,85 @@ function dinerArt(tint) {
   neon('DINER',-19,-57,tint); neon('DINER',-19,-57,tint);
   P1(-23,-59,46,1,shade(tint,30));
 }
-function buildHouses() { HOUSES = BLIST.map(function (o) { return {x:o.x,y:o.y,st:stamp(176,168,84,144,function () { houseArt(o); })}; }); }
+function buildHouses() { HOUSES = BLIST.map(function (o) { return {x:o.x,y:o.y,id:o.id,st:stamp(176,168,84,144,function () { houseArt(o); })}; }); }
+
+/* ---------- birthdays (David, 2026-11-16) ----------
+   "Celebrations: but only for birthdays, and only if they're available in their profile. Their house
+   should be decorated with balloons, and colors so everyone knows." The server sends `birthday_today`
+   for a person only on the day it is celebrated (includes/birthday.php: the birthday itself, or the
+   Friday before when it falls on a weekend), and never the date. On that day their house gets a bunch
+   of balloons tied to its corner, bobbing gently, a string of coloured flags under the eaves, and now
+   and then a puff of confetti over the roof; inside, balloons in the corners and flags along the wall.
+   Painted every frame over the house's stamp, so nothing about the stamps changes, and gone the next
+   day by itself. For somebody who asked for less motion (`calm`) the balloons stand still and there
+   is no confetti. */
+var BDAY_COLS = [TINT.ember,TINT.candle,TINT.mana,TINT.rose,TINT.spell,TINT.violet];
+/* Per house kind: the flags' two ends and their sag, where the balloons are tied, and the balloons
+   (offsets from the tie). The tie is the corner away from each kind's door and chimney. */
+var BDAY_AT = {
+  study:{flag:[-30,-36,30,-36,6],tie:[-24,-12],bal:[[-14,-58],[-6,-66],[2,-56],[-20,-46]]},
+  tower:{flag:[-19,-77,19,-77,5],tie:[-16,-18],bal:[[-16,-62],[-8,-70],[-1,-60],[-22,-50]]},
+  forge:{flag:[-34,-40,28,-40,7],tie:[-28,-14],bal:[[-14,-58],[-6,-66],[2,-56],[-20,-46]]}
+};
+function bdayOn(id) { var o = B[id]; return !!(o && o.owner && o.owner.birthday_today); }
+/* One balloon, its knot at the bottom: x,y is the middle of the balloon. */
+function balloon(c, x, y, col) {
+  x = Math.round(x); y = Math.round(y);
+  c.fillStyle = PAL.out; c.fillRect(x-4,y-6,8,1); c.fillRect(x-5,y-5,10,9); c.fillRect(x-4,y+4,8,1); c.fillRect(x-2,y+5,4,2);
+  c.fillStyle = col; c.fillRect(x-3,y-5,6,1); c.fillRect(x-4,y-4,8,7); c.fillRect(x-3,y+3,6,1); c.fillRect(x-1,y+4,2,2);
+  c.fillStyle = shade(col,-45); c.fillRect(x+2,y-1,2,4); c.fillRect(x-2,y+3,4,1);
+  c.fillStyle = PAL.hot; c.fillRect(x-3,y-3,2,2);
+}
+/* The string from the knot down to the tie, one pixel wide, with a slight wave in it. */
+function bstring(c, x0, y0, x1, y1, ph) {
+  var n = Math.max(1,Math.round(Math.abs(y1-y0))), k;
+  c.fillStyle = PAL.out;
+  for (k = 0; k <= n; k++) { var t = k/n; c.fillRect(Math.round(x0+(x1-x0)*t+Math.sin(t*3.14+ph)*1.2),Math.round(y0+(y1-y0)*t),1,1); }
+}
+/* A string of small triangular flags between two points, sagging in the middle. */
+function bunting(c, x0, y0, x1, y1, sag) {
+  var n = Math.max(2,Math.round(Math.abs(x1-x0)/6)), k, at = function (t) { return [x0+(x1-x0)*t,y0+(y1-y0)*t+sag*4*t*(1-t)]; };
+  c.fillStyle = PAL.out;
+  for (k = 0; k <= n*3; k++) { var p = at(k/(n*3)); c.fillRect(Math.round(p[0]),Math.round(p[1]),1,1); }
+  for (k = 0; k < n; k++) { var q = at((k+.5)/n), fx0 = Math.round(q[0])-2, fy = Math.round(q[1])+1, col = BDAY_COLS[k%BDAY_COLS.length];
+    c.fillStyle = PAL.out; c.fillRect(fx0-1,fy,7,2); c.fillRect(fx0,fy+2,5,2); c.fillRect(fx0+1,fy+4,3,2);
+    c.fillStyle = col; c.fillRect(fx0,fy,5,2); c.fillRect(fx0+1,fy+2,3,2); c.fillRect(fx0+2,fy+4,1,1); }
+}
+function balloons(c, tx, ty, list, seed) {
+  var now = Date.now();
+  list.forEach(function (b, i) {
+    var dy = calm ? 0 : Math.sin(now/650+i*1.9+seed)*2, dx = calm ? 0 : Math.sin(now/1100+i*2.3+seed)*1.5;
+    bstring(c,tx+b[0]+dx,ty+b[1]+dy+6,tx,ty,i+seed);
+  });
+  list.forEach(function (b, i) {
+    var dy = calm ? 0 : Math.sin(now/650+i*1.9+seed)*2, dx = calm ? 0 : Math.sin(now/1100+i*2.3+seed)*1.5;
+    balloon(c,tx+b[0]+dx,ty+b[1]+dy,BDAY_COLS[(i+seed)%BDAY_COLS.length]);
+  });
+  c.fillStyle = PAL.out; c.fillRect(Math.round(tx)-2,Math.round(ty)-1,4,3); c.fillStyle = PAL.hot; c.fillRect(Math.round(tx)-1,Math.round(ty),2,1);
+}
+/* On the map, over a house's stamp: x,y is the house's foot, as for the stamp. */
+function bdayDraw(c, id) {
+  var o = B[id], a = o && BDAY_AT[o.kind]; if (!a) return;
+  var fl = a.flag, seed = (o.x+o.y)%6;
+  bunting(c,o.x+fl[0],o.y+fl[1],o.x+fl[2],o.y+fl[3],fl[4]);
+  balloons(c,o.x+a.tie[0],o.y+a.tie[1],a.bal,seed);
+}
+/* Inside the house: flags along the top of the back wall and a bunch of balloons in each back corner,
+   painted right after the room itself, so the furniture and the people stand in front of them. */
+function bdayRoom(c) {
+  bunting(c,14,6,120,6,5); bunting(c,120,6,226,6,5);
+  balloons(c,16,58,[[2,-30],[9,-38],[-2,-22]],1);
+  balloons(c,224,58,[[-2,-30],[-9,-38],[2,-22]],4);
+}
+/* Now and then a puff of confetti over each decorated house that is on screen. */
+function bdayConfetti() {
+  if (calm || S.inside || document.hidden || !MT) return;
+  BLIST.forEach(function (o) {
+    var a = BDAY_AT[o.kind]; if (!a || !bdayOn(o.id) || Math.random() > .5) return;
+    var top = HIT[o.kind][1];
+    fx('confetti',o.x-6+Math.random()*12,o.y-top-6);
+  });
+}
 
 /* ---------- characters ---------- */
 /* One character, feet at x,y. Everybody shares the figure; cloak, headwear and companion differ. */
@@ -425,7 +503,7 @@ function zed(c, x, y) {
    NOTHING MOVES FOR SOMEBODY WHO ASKED FOR LESS MOTION (prefers-reduced-motion): fx() does nothing
    at all then, as the rest of the Realm already does (`calm`). */
 var FX = [], fxraf = 0;
-var FXMS = {poof:460,land:460,chest:900,shelf:800,portrait:760,praise:1500,firework:1400};
+var FXMS = {poof:460,land:460,chest:900,shelf:800,portrait:760,praise:1500,firework:1400,confetti:2200};
 function fx(kind, x, y, col) {
   if (calm || !FXMS[kind]) return;
   FX.push({k:kind,x:x,y:y,col:col||TINT.mana,t0:Date.now(),room:!!S.inside});
@@ -497,6 +575,15 @@ function fxPaint(c, room) {
       for (i = 0; i < 20; i++) { var fa = i*Math.PI/(i<12?6:4)+(i<12?0:.4), fr = (i<12?8+Math.sqrt(p)*52:5+Math.sqrt(p)*28), sz = i<12?7:5;
         px = Math.round(e.x+Math.cos(fa)*fr); py = Math.round(e.y+Math.sin(fa)*fr+p*p*22);
         c.fillStyle = PAL.out; c.fillRect(px-(sz>>1)-1,py-(sz>>1)-1,sz+2,sz+2); c.fillStyle = i<12 ? e.col : PAL.hot; c.fillRect(px-(sz>>1),py-(sz>>1),sz,sz); }
+      c.globalAlpha = 1; return;
+    }
+    if (e.k==='confetti') {
+      /* A birthday (bdayConfetti): small bits in the party colours thrown up over the roof, then
+         fluttering down on either side of it and fading. */
+      for (i = 0; i < 18; i++) { var ca = -Math.PI/2+(hsh(i,e.t0%997,3)-.5)*2.4, cv = 16+hsh(i,e.t0%997,5)*22, t = k*2.2;
+        px = Math.round(e.x+Math.cos(ca)*cv*t+Math.sin(t*5+i)*2); py = Math.round(e.y+Math.sin(ca)*cv*t+t*t*14);
+        c.globalAlpha = Math.max(0,1-Math.max(0,(k-.55)/.45));
+        c.fillStyle = BDAY_COLS[i%BDAY_COLS.length]; c.fillRect(px,py,(i+Math.floor(t*6))%2?3:2,(i+Math.floor(t*6))%2?2:3); }
       c.globalAlpha = 1; return;
     }
     if (e.k==='portrait') {
@@ -1444,7 +1531,7 @@ function drawRoom(c, cw, ch) {
   /* Back to front: whatever stands lower on the floor is nearer, and covers what is behind it. */
   var order = [];
   if (!home) { c.drawImage(roomArt(o.kind,o.tint).cv,0,0); (PROPS[o.kind]||[]).forEach(function (pr) { order.push({y:pr[2]+pr[4],prop:pr}); }); }
-  else c.drawImage(homeArt(lay,o.tint).cv,0,0);
+  else { c.drawImage(homeArt(lay,o.tint).cv,0,0); if (!deco && o.owner.birthday_today) bdayRoom(c); }
   /* A house's things, or a camp's: its fixtures and everybody's one decoration. */
   if (lay) lay.items.forEach(function (it) { if (THINGS[it[0]].z==='wall') paintThing(c,it,o); else order.push({y:it[2]+THINGS[it[0]].h,it:it}); });
   if (land) slayPaint(c,land);
@@ -1693,17 +1780,29 @@ function profView() {
   var p = PROF, body = $('profBody'); if (!body || !p) return;
   $('profTitle').textContent = p.mine ? 'Your profile' : p.name;
   var h = '<div class="rprof">'+(p.photo ? '<img class="rprofpic" src="'+esc(p.photo)+'" alt="">' : '<span class="rprofpic" aria-hidden="true">'+esc(p.name.charAt(0).toUpperCase())+'</span>')
-    +'<div class="rprofwho"><b>'+esc(p.name)+'</b>'+(p.role?'<small>'+esc(p.role)+'</small>':'')+(p.mine&&p.email?'<small>'+esc(p.email)+'</small>':'')+(p.mine&&p.phone?'<small>'+esc(p.phone)+'</small>':'')+'</div></div>'
+    +'<div class="rprofwho"><b>'+esc(p.name)+'</b>'+(p.birthday_today?'<small class="rbday">🎂 Birthday today</small>':'')+(p.role?'<small>'+esc(p.role)+'</small>':'')+(p.mine&&p.email?'<small>'+esc(p.email)+'</small>':'')+(p.mine&&p.phone?'<small>'+esc(p.phone)+'</small>':'')+(p.mine&&p.birth_label?'<small>Birthday '+esc(p.birth_label)+'</small>':'')+'</div></div>'
     +(p.bio ? '<p class="rprofbio">'+esc(p.bio).replace(/\n/g,'<br>')+'</p>' : '<p class="rprofbio is-none">'+(p.mine?'You have not written a bio yet.':'No bio written yet.')+'</p>')
-    +(p.mine ? '<small>'+(p.why ? esc(p.why) : 'Others see your name, role, bio and picture. Your email and phone are shown only to you here.')+'</small>' : '')
+    +(p.mine ? '<small>'+(p.why ? esc(p.why) : 'Others see your name, role, bio and picture. Your email, phone and birthday are shown only to you here.')+'</small>' : '')
     +(R.profExtra ? R.profExtra(p) : '')
     +'<div class="rdacts">'+(p.can_edit?'<button type="button" class="rbtn" data-profedit="1">Edit your profile</button>':'')+'<button type="button" class="rbtn" data-dlgclose="1">Close</button></div>';
   body.innerHTML = h;
+}
+/* THE BIRTHDAY in your own profile (migration 100; David, 2026-11-16): month and day, never the year,
+   both optional. Nobody else ever sees the date: on the day, your house is decorated (bdayDraw). */
+var BDAY_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function bdayPick(p) {
+  var m = '<option value="0">Month</option>', d = '<option value="0">Day</option>', i;
+  for (i = 1; i <= 12; i++) m += '<option value="'+i+'"'+(p.birth_month===i?' selected':'')+'>'+BDAY_MONTHS[i-1]+'</option>';
+  for (i = 1; i <= 31; i++) d += '<option value="'+i+'"'+(p.birth_day===i?' selected':'')+'>'+i+'</option>';
+  return '<label>Birthday <small>Month and day, no year. Optional.</small><span class="rbdaypick"><select name="birth_month" aria-label="Birthday month">'+m+'</select>'
+    +'<select name="birth_day" aria-label="Birthday day">'+d+'</select></span></label>'
+    +'<small>Nobody sees the date. On the day (or the Friday before, if it falls on a weekend) your house is decorated so everyone knows.</small>';
 }
 function profEdit() {
   var p = PROF, body = $('profBody'); if (!body || !p || !p.can_edit) return;
   body.innerHTML = '<form id="profForm" class="rprofform"><label>Phone<input name="phone" maxlength="50" value="'+esc(p.phone||'')+'" autocomplete="tel"></label>'
     +'<label>About you<textarea name="bio" rows="5" maxlength="2000">'+esc(p.bio||'')+'</textarea></label>'
+    +(p.birth_ready ? bdayPick(p) : '')
     +'<label>Profile picture <small>JPG, PNG, GIF or WebP</small><input type="file" name="photo" accept="image/png,image/jpeg,image/gif,image/webp"></label>'
     +(p.photo?'<label class="rcheck"><input type="checkbox" name="remove_photo" value="1"> Remove the picture you have now</label>':'')
     +'<small>This is the same profile as on Home in Anima. Saving here changes it there too.</small>'
@@ -2022,7 +2121,7 @@ function draw() {
     beastDownItems().forEach(function (d) { if (d.x>x0&&d.x<x1&&d.y>y0&&d.y<y1) list.push(d); });
     list.sort(function (a, b) { return a.y-b.y; });
     for (i = 0; i < list.length; i++) { var it = list[i];
-      if (it.st) { c.drawImage(it.st.cv,it.x-it.st.ox,it.y-(it.lift||0)-it.st.oy); continue; }
+      if (it.st) { c.drawImage(it.st.cv,it.x-it.st.ox,it.y-(it.lift||0)-it.st.oy); if (it.id && bdayOn(it.id)) bdayDraw(c,it.id); continue; }
       if (it.beast) { beastPaint(c,it.beast); continue; }
       if (it.beastDown) { beastDownPaint(c,it.beastDown); continue; }
       if (it.mine) { if (en) c.globalAlpha = Math.max(0,1-en); c.fillStyle = PAL.win; c.fillRect(mx-13,myy+2,26,2); c.fillRect(mx-13,myy,2,2); c.fillRect(mx+11,myy,2,2); }
@@ -2128,7 +2227,7 @@ function renderSide() {
     h += '</div></div>'; }
   var ravens = function (p) { var id = dmId(ST.me,p.id); return (p.me || id===CH.open) ? 0 : (un[id]||0); };
   h += '<div><h2>People</h2><div class="rrows">';
-  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"'+((ST.chat && !p.me)?' data-raven="'+dmId(ST.me,p.id)+'" title="Open your ravens with '+esc(firstName(p.name))+'"':'')+'><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+stChip(p)+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':'<small'+(stOf(p)?' class="rstattext" title="'+esc(stOf(p).text+'. '+whereWords(p))+'"':'')+'>'+esc(stOf(p)?stOf(p).text:whereWords(p))+'</small>')+'</button>'; });
+  ppl.forEach(function (p) { h += '<button type="button" class="rrow'+(p.state==='away'?' is-away':'')+(S.sel==='user:'+p.id?' is-on':'')+'" data-sel="user:'+p.id+'" data-center="1"'+((ST.chat && !p.me)?' data-raven="'+dmId(ST.me,p.id)+'" title="Open your ravens with '+esc(firstName(p.name))+'"':'')+'><i class="rdot '+(p.state==='away'?'':p.door)+'"></i><span>'+esc(p.me?'You':p.name)+'</span>'+stChip(p)+(ravens(p)?'<b class="rbadge" title="Unread ravens">'+ravens(p)+'</b>':p.birthday_today?'<small class="rbday" title="'+esc(whereWords(p))+'">🎂 Birthday today</small>':'<small'+(stOf(p)?' class="rstattext" title="'+esc(stOf(p).text+'. '+whereWords(p))+'"':'')+'>'+esc(stOf(p)?stOf(p).text:whereWords(p))+'</small>')+'</button>'; });
   if (!ppl.length) h += '<small style="padding:0 8px">Nobody has a house yet.</small>';
   h += '</div></div><div><h2>Places to meet</h2><div class="rrows">';
   var w = whereabouts();
@@ -2191,7 +2290,7 @@ function renderCard() {
     var btn = S.here===id && ajar ? '<button type="button" class="rbtn rprimary rsmall" data-knock="'+o.owner.id+'"'+((waiting||!KN.ready)?' disabled':'')+'>'+(waiting?'Knocking…':'Knock')+'</button>' :
       S.here===id ? '<button type="button" class="rbtn rprimary rsmall" data-enter="'+esc(id)+'"'+(why?' disabled':'')+'>Go inside</button>' : '<button type="button" class="rbtn rprimary rsmall" data-walk="'+esc(id)+'">Walk there</button><button type="button" class="rbtn rsmall" data-tele="'+esc(id)+'">Teleport</button>';
     var sto = o.owner ? stOf(o.owner) : null;
-    h = '<div class="rcard"><b>'+esc(title(id))+'</b>'+(sto?'<span class="rcardstat">'+esc(stWords(sto))+(stUntil(sto)?' <small>'+esc(stUntil(sto))+'</small>':'')+'</span>':'')+'<small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
+    h = '<div class="rcard"><b>'+esc(title(id))+'</b>'+(o.owner&&o.owner.birthday_today?'<small class="rbday">🎂 Birthday today'+(o.owner.me?'. Happy birthday!':'')+'</small>':'')+(sto?'<span class="rcardstat">'+esc(stWords(sto))+(stUntil(sto)?' <small>'+esc(stUntil(sto))+'</small>':'')+'</span>':'')+'<small>'+esc(sub)+'</small>'+(S.here===id&&why?'<small>'+esc(why)+'</small>':'')+'<div class="racts">'+btn+(chanFor(id)?'<button type="button" class="rbtn rsmall" data-chat="'+esc(chanFor(id))+'">'+(o.owner?'Send a raven':'Open chat')+'</button>':'')+'<button type="button" class="rbtn rsmall" data-close="1">Close</button></div></div>';
   }
   slot.innerHTML = h;
 }
@@ -4005,7 +4104,7 @@ function whoHit(e) {
 function whoTime(m) { m = Math.max(0,Math.floor(m)); var h = Math.floor(m/60), r = m%60; return h ? h+' h'+(r?' '+(r<10?'0':'')+r:'') : m+' min'; }
 function whoFill(id) {
   var p = person(id), el = whoBox(); if (!p || !el) return false;
-  var w = p.work, sto = stOf(p), h = '<b>'+esc(p.name)+(p.me?' (you)':'')+'</b>';
+  var w = p.work, sto = stOf(p), h = '<b>'+esc(p.name)+(p.me?' (you)':'')+'</b>'+(p.birthday_today?'<small class="rbday">🎂 Birthday today</small>':'');
   if (sto) h += '<span class="rwhostat">'+esc(stWords(sto))+(stUntil(sto)?' <small>'+esc(stUntil(sto))+'</small>':'')+'</span>';
   if (w) {
     var mins = w.mins + (w.tick ? (Date.now()-(ST.got||Date.now()))/60000 : 0);
@@ -4050,6 +4149,7 @@ if ($('mapbox')) {
 }
 if (!calm) setInterval(function () { S.frame++; draw(); },260);
 if (!calm) setInterval(skyCheer,1800);
+if (!calm) setInterval(bdayConfetti,9000);
 /* The first creature comes out sooner than the rest, so somebody who just arrived may catch one. */
 if (!calm && $('mapcv')) beastNext(20000+Math.random()*25000);
 window.addEventListener('resize',function () { draw(); shareShow(); });

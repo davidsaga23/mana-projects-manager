@@ -6268,3 +6268,17 @@ David: *"@here @channel too"*. Settled with him the same day:
 - **The same bell line as a personal tag** (kind `tag`, same summary), so somebody both named and
   reached hears it once, and the Activity view (which reads `@here`/`@channel` from the words) lists
   it like any mention. No migration.
+## 2026-11-16 — Birthdays in the Realm
+
+David: *"Celebrations: but only for birthdays, and only if they're available in their profile. Their
+house should be decorated with balloons, and colors so everyone knows."* Agreed with him the same day:
+- **Stored as month and day on `crew`** (`birth_month`, `birth_day`, migration 100), next to phone and
+  bio. **Never the year**, so nobody's age is kept or shown.
+- **Each person fills in their own**, in their own profile (Home, or the portrait in their Realm house:
+  the same `home_save_profile()`). Optional; left empty, there is no celebration.
+- **Nobody else sees the date.** The heartbeat carries only `birthday_today` (true or false), worked out
+  on the server; the date goes only to its owner's own profile. No list of upcoming birthdays.
+- **A weekend birthday is celebrated on the Friday before**, so the team is around to see it; 29 February
+  on 28 February in other years. The studio's time zone (config) decides what "today" is.
+- **Drawn in code like the rest of the map**: balloons, flags and confetti over the house's stamp, so
+  the stamps themselves do not change; still for somebody who asked for less motion.
