@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Dashboard: click a "Who is carrying what" number to see those tasks *(no migration)*
+
+- In "Who is carrying what", the Tasks and Still to do numbers open the list behind them: each task
+  (shot or asset), its department, its status and its due date, with a button that opens it in
+  Spell's side panel. A 0 stays plain text. The list loads on click (`dashboard_crew_tasks.php`) and
+  always matches the number: both use `workload_remaining_sql()` in `includes/dashboard.php`.
+
 ## 2026-11-16 — The Schedule tab is folded into the Timeline *(no migration)*
 
 - **No Schedule tab any more.** Its preview now opens on the Timeline from **Draft dates from the
