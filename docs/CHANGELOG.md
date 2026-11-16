@@ -14,6 +14,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Projects list: "Code" reads "Project code" *(no migration)*
+
+- The first column heading on the projects list (the home page) is now "Project code".
+
 ## 2026-11-16 — Freelancers change their own email on Home *(no migration)*
 
 **Asked by David**: "let's include email to the invoice details and to the profile". Asked which,
