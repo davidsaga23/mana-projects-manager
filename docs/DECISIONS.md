@@ -6311,3 +6311,20 @@ answered *"Where they were"*. `REALM_LUNCH_BACK` is now `'before'`: the place st
 began (`status_back`) is where they return, inside again if they were inside and that door still
 lets them in (`realm_arrive()`'s rules: an ajar door's pass lasts 10 minutes), otherwise outside
 that door, and failing that at their own door. Supersedes "back home" in the entry above.
+
+## 2026-11-16 — The Overview's progress counts open their lists, from one definition
+
+David, circling Delivered and Approved: *"when the cursor clicks those numbers we can see the list
+of shots or assets that that number is counting"*. Tracked does the same.
+
+- **One definition for the number and the list.** `progress_measure_sql('tracked'|'delivered'|
+  'approved')` is the WHERE both `dashboard_steps()` (the count) and `step_progress_items()` (the
+  list) use, so a list can never be longer or shorter than its number.
+- **The Overview table reads `dashboard_steps()`.** Its own query counted every progress row of a
+  step, including rows left over from an earlier scope (Color Script: "22 of 1"). The rows stay in
+  the database; they are just not counted. "of N" still counts N/A items, as it always did.
+- **Loaded on click** (`project_step_items.php`, HTML fragment), not with the page, since the
+  Overview is everybody's landing page. Gated by the Overview switch and project visibility; the
+  "open in Spell" button appears only for accounts with Spell.
+- **An inline row under the table line**, not a floating popover: it needs no positioning, works at
+  phone width, and one list is open at a time.
