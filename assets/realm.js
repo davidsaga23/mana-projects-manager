@@ -2153,7 +2153,44 @@ function applyState(st) {
   if (st.reminders && R.onReminders) R.onReminders(st.reminders);
   takeSpots(st.spots);
   skyNews();
+  deskBeat();
 }
+/* DESKTOP NOTIFICATIONS (David, 2026-11-16: "desktop notifications with sound"; assets/desk-notify.js
+   decides whether and how). The Realm has no bell of its own, so on the heartbeat it asks the bell's
+   question itself (on each 25-second beat, and only while notifications are on): ravens, tags and
+   reminders arrive that way, with who sent them. A call starting in the room I am in is noticed
+   here, from who is in voice. */
+var CALL = {room:null,n:0};
+function deskBeat() { if (window.AnimaNotify) { window.AnimaNotify.bellCheck(); callCheck(); } }
+function callCheck() {
+  if (!window.AnimaNotify || !ST) return;
+  /* -1 while I am in the call myself, so hanging up on people who carry on is not "a call started". */
+  var room = S.inside || null, n = !room ? 0 : VO.on ? -1 : voiceOthers(room).length;
+  /* Nobody was talking in this room a moment ago, and now somebody is, and I am not in it. Walking
+     into a room where a call is already going on is not news: I can see it. */
+  if (room && room===CALL.room && CALL.n===0 && n>0) {
+    var who = voiceOthers(room).map(function (p) { return firstName(p.name); });
+    window.AnimaNotify.ring({key:'call:'+room+':'+Math.floor(Date.now()/60000),kind:'calls',title:'A call started in '+title(room),
+      body:who.join(', ')+(who.length===1?' is':' are')+' talking. Click to join from the Realm.',href:'realm.php'});
+  }
+  CALL.room = room; CALL.n = n;
+}
+/* Clicking a notification while the Realm is open: open what it is about here, without reloading the
+   page (which would end a call). A raven opens the ravens with its sender; a reminder opens its
+   message; a knock or a call only brings the Realm to the front, where its notice is. Anything else
+   (a task) goes to its page. */
+if (window.AnimaNotify) window.AnimaNotify.onClick = function (n) {
+  if (n.kind==='knocks' || n.kind==='calls') return true;
+  var i = n.data || {};
+  if (i.kind==='raven' && ST) {
+    var p = ST.people.filter(function (x) { return !x.me && x.name===i.actor; })[0];
+    if (p) openChat(dmId(ST.me,p.id));
+    return true;
+  }
+  var m = /[?&]msg=(\d+)/.exec(n.href || '');
+  if (m && R.goMsg) { R.goMsg(+m[1]); return true; }
+  return /^realm\.php/.test(n.href || '');
+};
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
   return fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
@@ -2457,6 +2494,8 @@ function knockNotice(q) {
 }
 function takeKnocks(k) {
   if (!k) return;
+  /* A knock is a desktop notification too, for when I am in another program (assets/desk-notify.js). */
+  if (window.AnimaNotify) window.AnimaNotify.knocks(k.for_me);
   KN.ready = !!k.ready;
   (k.for_me || []).forEach(function (q) { if (!KN.shown[q.id]) { KN.shown[q.id] = true; knockNotice(q); } });
   var m = k.mine || null, was = KN.mine, changed = !!m && (!was || was.to!==m.to || was.status!==m.status);
@@ -3169,6 +3208,7 @@ function takeVoiceRoom(list) {
     if (!!p.voice!==v || !!p.muted!==m) { p.voice = v; p.muted = m; changed = true; }
   });
   if (changed) { renderInside(); renderSide(); draw(); }
+  callCheck();
 }
 function micWords(e) {
   var n = e && e.name;

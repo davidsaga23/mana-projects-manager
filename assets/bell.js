@@ -103,7 +103,8 @@
     if (!list) {
       list = document.createElement('ul');
       list.className = 'bell-list';
-      panel.appendChild(list);
+      // Above the "Desktop notifications" button, which stays at the foot.
+      panel.insertBefore(list, panel.querySelector('.bell-foot'));
     }
     list.innerHTML = items.map(function (i) {
       return '<li class="' + (i['new'] ? 'is-new' : '') + '"><a href="' + esc(i.href) + '">'
@@ -113,12 +114,18 @@
     }).join('');
   }
 
+  // Desktop notifications (David, 2026-11-16; assets/desk-notify.js) are handed every answer.
+  var desk = window.AnimaNotify || null;
+
   function poll() {
-    // A page nobody is looking at does not ask; it catches up when it is looked at.
-    if (document.hidden || !window.fetch) return;
+    if (!window.fetch) return;
+    // A page nobody is looking at does not ask; it catches up when it is looked at. EXCEPT, once
+    // desktop notifications are on, ONE hidden Anima tab keeps asking (desk.lead() decides which),
+    // because a notification is for exactly when nobody is looking at Anima.
+    if (document.hidden && !(desk && desk.lead())) return;
     fetch('notify_poll.php', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.json(); })
-      .then(paint)
+      .then(function (res) { paint(res); if (desk) desk.bell(res); })
       // Silent, like the clearing above: the bell simply stays as the page drew it.
       .catch(function () {});
   }
