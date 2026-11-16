@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Project Overview: click a progress count to see what it counts *(no migration)*
+
+- In "Progress by step", the Tracked, Delivered and Approved numbers open the list behind them:
+  each shot or asset (or the one whole-project deliverable), its status on that step, who has it,
+  and a button that opens the task in Spell's side panel. A 0 stays plain text. The list loads on
+  click (`project_step_items.php`), and its length always equals the number clicked: both use
+  `progress_measure_sql()` in `includes/dashboard.php`.
+- Fixed: Tracked read "22 of 1" on Color Script. The table counted every progress row of the step,
+  including the 21 shot rows left from before it was re-scoped to the whole project. It now reads
+  the same scoped numbers as the Dashboard. The old rows were not deleted.
+
 ## 2026-11-16 — Brief page: shorter, two columns, "The ask" reads "Brief" *(no migration)*
 
 - The paragraph under the Brief heading ("What the client asked for, in their terms…") no longer

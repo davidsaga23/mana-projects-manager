@@ -74,6 +74,80 @@ function progress_in_scope_sql(): string {
                  END))";
 }
 
+/**
+ * The SQL test behind ONE of the Overview's three counts: 'tracked', 'delivered'
+ * or 'approved', over the same aliases as progress_in_scope_sql().
+ *
+ * ⚠ ONE DEFINITION FOR THE NUMBER AND FOR THE LIST BEHIND IT (David, 2026-11-16,
+ * circling Delivered and Approved: "when the cursor clicks those numbers we can
+ * see the list of shots or assets that that number is counting"). The count in
+ * dashboard_steps() and the list in step_progress_items() both build their WHERE
+ * from here, so a list can never be one longer or shorter than the number that
+ * was clicked. Anything not one of the three is treated as 'tracked'.
+ */
+function progress_measure_sql(string $which): string {
+    $inScope = progress_in_scope_sql();
+    if ($which === 'delivered') return "({$inScope} AND pr.is_delivered = 1)";
+    if ($which === 'approved')  return "({$inScope} AND pr.is_approved = 1)";
+    return $inScope;
+}
+
+/**
+ * The shots, assets or whole-project deliverable behind one count in the
+ * Overview's progress table: one row per progress row, with what it is, its
+ * status on that step and who has it.
+ *
+ * Filtered by progress_measure_sql(), the same test dashboard_steps() sums, so
+ * count($rows) is the number on the screen. Shots first in episode/shot order,
+ * then assets by name. The co-assignees (progress_crew) come as one string, so
+ * a task with two people still lists once.
+ *
+ * @return array[] keys: progress_id, step_id, item_key, item, kind
+ *                 ('shot' | 'asset' | 'project'), status_name, status_color,
+ *                 is_blocked, assignee, assignee_raw, others
+ */
+function step_progress_items(PDO $pdo, int $projectId, int $stepId, string $which): array {
+    $stmt = $pdo->prepare(
+        'SELECT pr.id AS progress_id, pr.step_id, pr.item_key, pr.shot_id, pr.asset_id,
+                pr.assignee_raw,
+                sh.episode, sh.shot_code, a.name AS asset_name,
+                st.name AS status_name, st.color AS status_color, st.is_blocked,
+                c.name AS assignee,
+                (SELECT GROUP_CONCAT(c2.name ORDER BY c2.name SEPARATOR \', \')
+                   FROM progress_crew pc JOIN crew c2 ON c2.id = pc.crew_id
+                  WHERE pc.progress_id = pr.id
+                    AND (pr.crew_id IS NULL OR pc.crew_id <> pr.crew_id)) AS others
+           FROM pipeline_steps ps
+           JOIN progress pr ON pr.step_id = ps.id
+           LEFT JOIN statuses st ON st.id = pr.status_id
+           LEFT JOIN assets   a  ON a.id = pr.asset_id
+           LEFT JOIN shots    sh ON sh.id = pr.shot_id
+           LEFT JOIN crew     c  ON c.id = pr.crew_id
+          WHERE ps.id = ? AND ps.project_id = ?
+            AND ' . progress_measure_sql($which) . '
+          ORDER BY pr.shot_id IS NULL, sh.episode, sh.shot_code, a.name, pr.item_key'
+    );
+    $stmt->execute([$stepId, $projectId]);
+    $out = [];
+    foreach ($stmt as $r) {
+        if ($r['shot_id'] !== null) {
+            $kind = 'shot';
+            $item = shot_label($r['episode'] ?? '', $r['shot_code'] ?? '');
+        } elseif ($r['asset_id'] !== null) {
+            $kind = 'asset';
+            $item = (string)($r['asset_name'] ?? '');
+        } else {
+            $kind = 'project';
+            $item = 'Whole project';
+        }
+        if ($item === '') $item = (string)$r['item_key'];
+        $r['kind'] = $kind;
+        $r['item'] = $item;
+        $out[] = $r;
+    }
+    return $out;
+}
+
 function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null): array {
     $shotCount  = (int)$pdo->query("SELECT COUNT(*) FROM shots  WHERE project_id = $projectId")->fetchColumn();
 
@@ -103,9 +177,9 @@ function dashboard_steps(PDO $pdo, int $projectId, ?string $deliveryDate = null)
 
     $stmt = $pdo->prepare(
         'SELECT ps.*,
-                COALESCE(SUM(' . $inScope . '), 0) AS tracked,
-                COALESCE(SUM(' . $inScope . ' AND pr.is_delivered = 1), 0) AS delivered,
-                COALESCE(SUM(' . $inScope . ' AND pr.is_approved = 1), 0)  AS approved,
+                COALESCE(SUM(' . progress_measure_sql('tracked') . '), 0)   AS tracked,
+                COALESCE(SUM(' . progress_measure_sql('delivered') . '), 0) AS delivered,
+                COALESCE(SUM(' . progress_measure_sql('approved') . '), 0)  AS approved,
                 COALESCE(SUM(' . $inScope . ' AND st.is_blocked = 1), 0)   AS blocked,
                 COALESCE(SUM(' . $inScope . ' AND st.is_excluded = 1), 0)  AS excluded,
                 COUNT(pr.id) AS tracked_any

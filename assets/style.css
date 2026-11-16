@@ -5075,3 +5075,21 @@ body.rv-open { overflow: hidden; }
 .invoice-move-pick label, .invoice-move-confirm label { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; color: var(--muted); }
 .invoice-move-pick button, .invoice-move-confirm button { margin: 0; }
 .invoice-move-notes { margin: 12px 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+
+/* Overview's progress table: a count opens the list behind it (project_step_items.php,
+   assets/progress-lists.js, 2026-11-16). The count looks like the number it was, with
+   a dotted underline to say it can be clicked. */
+.psi-count { background: none; border: 0; margin: 0; padding: 0 2px; color: inherit; font: inherit;
+  cursor: pointer; text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
+.psi-count:hover, .psi-count.is-open { background: none; color: var(--primary); text-decoration-color: var(--primary); filter: none; }
+.psi-row > td { padding: 0 0 10px; }
+.psi-box { margin: 0 8px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; max-height: 360px; overflow: auto; }
+.psi-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
+.psi-close { margin: 0 0 0 auto; background: none; border: 0; padding: 0 6px; color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer; }
+.psi-close:hover { background: none; color: var(--text); filter: none; }
+.psi-table { width: 100%; font-size: 13px; }
+.psi-table th { text-align: left; }
+.psi-open { background: none; border: 0; margin: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; text-align: left; }
+.psi-open:hover { background: none; text-decoration: underline; filter: none; }
