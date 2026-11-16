@@ -6303,3 +6303,11 @@ reminders", and install Anima "as an app in windows so it always opens on the st
 - **Who, never what** for ravens, as the bell decided: a notification may be seen by somebody else.
 - **Our own sound** (Web Audio, two notes); where the browser forbids sound in an untouched tab,
   Windows' own notification sound plays instead; muted means neither.
+
+## 2026-11-16 — After lunch: back where they were
+
+Asked whether a character should go back home or back where they were when lunch ends, David
+answered *"Where they were"*. `REALM_LUNCH_BACK` is now `'before'`: the place stored when lunch
+began (`status_back`) is where they return, inside again if they were inside and that door still
+lets them in (`realm_arrive()`'s rules: an ajar door's pass lasts 10 minutes), otherwise outside
+that door, and failing that at their own door. Supersedes "back home" in the entry above.
