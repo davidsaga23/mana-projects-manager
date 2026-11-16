@@ -190,6 +190,11 @@ require __DIR__ . '/includes/header.php';
   </div>
 <?php endif; ?>
 
+<?php // Two columns (David, 2026-11-16): the brief itself on the left, the
+      // naming convention beside it on the right, instead of one long page.
+      // Below 1100px wide they stack again, brief first. ?>
+<div class="brief-columns">
+<div class="brief-main">
 <?php if ($brief && !empty($brief['updated_at'])): ?>
   <p class="muted small">
     Last updated <?= e(substr((string)$brief['updated_at'], 0, 16)) ?><?php
@@ -212,7 +217,7 @@ require __DIR__ . '/includes/header.php';
     </label>
   </div>
 
-  <label>The ask
+  <label>Brief
     <textarea name="summary" rows="6" placeholder="What the client wants, in their words."
               <?= can_edit() ? '' : 'disabled' ?>><?= e($brief['summary'] ?? '') ?></textarea>
     <small>The brief itself. Paste the email if that is what arrived.</small>
@@ -283,7 +288,9 @@ require __DIR__ . '/includes/header.php';
     <?php endforeach; ?>
   </div>
 <?php endif; ?>
+</div>
 
+<div class="brief-side">
 <?php if ($namingReady):
     // What the section draws from: the convention, every step with its code,
     // every asset type on the show with its code, and one worked example of
@@ -435,6 +442,8 @@ require __DIR__ . '/includes/header.php';
   });
   </script>
 <?php endif; ?>
+</div>
+</div>
 
 <p class="muted small">
   Files live in the same protected directory as ticket attachments, behind the same login and

@@ -2024,7 +2024,7 @@ function campBrief(b) {
   else if (b.empty) h = '<p class="rcnote">Nothing has been written in this show&#39;s Brief yet. Production fills it in on the Brief screen in Anima.</p>';
   else {
     h = '<div class="rpap rcscroll">'+(b.client ? '<p class="rpapclient">Client: <b>'+esc(b.client)+'</b></p>' : '');
-    [['The ask',b.summary],['Deliverables',b.deliverables],['Reference',b.reference],['Notes',b.notes]].forEach(function (s) { if (s[1]) h += '<h3>'+s[0]+'</h3><p>'+linked(s[1])+'</p>'; });
+    [['Brief',b.summary],['Deliverables',b.deliverables],['Reference',b.reference],['Notes',b.notes]].forEach(function (s) { if (s[1]) h += '<h3>'+s[0]+'</h3><p>'+linked(s[1])+'</p>'; });
     if (b.files && b.files.length) { h += '<h3>Files</h3><ul>';
       b.files.forEach(function (f) { if (String(f.url).indexOf('attachment.php?')===0) h += '<li><a href="'+esc(f.url)+'" target="_blank" rel="noopener">'+esc(f.name)+'</a>'+(f.size ? ' <small>'+esc(f.size)+'</small>' : '')+'</li>'; });
       h += '</ul>'; }

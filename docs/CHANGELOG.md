@@ -14,10 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-16 — Brief: the intro paragraph is gone *(no migration)*
+## 2026-11-16 — Brief page: shorter, two columns, "The ask" reads "Brief" *(no migration)*
 
 - The paragraph under the Brief heading ("What the client asked for, in their terms…") no longer
   shows. The page now opens on the "Last updated" line and the fields.
+- The naming convention sits in a second column beside the brief instead of below it (they stack
+  again on screens narrower than 1100px).
+- The main field is labelled "Brief" instead of "The ask", here and on the Realm's brief panel.
 
 ## 2026-11-16 — Project Overview: the Export buttons sit at the top right *(no migration)*
 
