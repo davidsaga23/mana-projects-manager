@@ -36,19 +36,14 @@ $stmt = $pdo->prepare(
 $stmt->execute([$projectId]);
 foreach ($stmt as $row) $assetTypeCounts[$row['t']] = (int)$row['n'];
 
-$stmt = $pdo->prepare(
-    'SELECT ps.id, ps.name, ps.applies_to, ps.applies_to_asset_type, ps.color, ps.deadline,
-            COUNT(pr.id)              AS tracked,
-            COALESCE(SUM(pr.is_delivered), 0) AS delivered,
-            COALESCE(SUM(pr.is_approved), 0)  AS approved
-       FROM pipeline_steps ps
-       LEFT JOIN progress pr ON pr.step_id = ps.id
-      WHERE ps.project_id = ?
-      GROUP BY ps.id, ps.name, ps.applies_to, ps.applies_to_asset_type, ps.color, ps.deadline, ps.step_order
-      ORDER BY ps.step_order, ps.id'
-);
-$stmt->execute([$projectId]);
-$steps = $stmt->fetchAll();
+// ⚠ THE PROGRESS TABLE READS dashboard_steps(), NOT A QUERY OF ITS OWN (2026-11-16).
+// It used to count COUNT(pr.id) over every progress row of the step, which is the
+// bug dashboard_steps() fixed on 2026-10-07 and this table never got: Color Script,
+// re-scoped from shots to the whole project, kept its 21 old shot rows and read
+// "22 of 1" tracked. Those rows are real data and stay; they are just not counted,
+// here or on the dashboard. One reader also means the lists behind each number
+// (project_step_items.php) agree with it, since both use progress_measure_sql().
+$steps = dashboard_steps($pdo, $projectId, $project['delivery_date'] ?: null);
 
 // Blocked work is remaining work, but it needs someone to unblock it rather than
 // an artist — so it is counted separately everywhere it appears.
@@ -133,7 +128,7 @@ arsort($assetTypeCounts);
 // The same headline the dashboard leads with. Computed here rather than passed
 // around, so the two screens can never show different numbers for the same day.
 $overall = dashboard_overall(
-    dashboard_steps($pdo, $projectId, $project['delivery_date'] ?: null),
+    $steps,
     $project['delivery_date'] ?: null,
     dashboard_pace($pdo, $projectId, $project['delivery_date'] ?: null)
 );
@@ -362,32 +357,56 @@ $startIn = $daysTo($project['start_date']);
   <?php endif; ?>
   <table class="review-table">
     <tr><th>Department</th><th>Applies to</th><th>Tracked</th><th>Delivered</th><th>Approved</th><th>Deadline</th></tr>
-    <?php foreach ($steps as $s):
-      // A whole-project step is one deliverable; a type-scoped step counts only
-      // the assets of that type, never all of them.
+    <?php foreach ($steps as $d):
+      $s    = $d['step'];
       $type = $s['applies_to_asset_type'] ?? null;
-      if ($s['applies_to'] === 'project') {
-          $applicable = 1;
-      } else {
-          $applicable = 0;
-          if (in_array($s['applies_to'], ['shot','both'], true))  $applicable += $shotCount;
-          if (in_array($s['applies_to'], ['asset','both'], true)) {
-              $applicable += ($type !== null && $type !== '')
-                  ? ($assetTypeCounts[$type] ?? 0)
-                  : $assetCount;
-          }
-      }
+      // "of N" is every item the step covers, N/A ones included, as this column
+      // has always read: step_applicable_count() with nothing excluded. A whole-
+      // project step is one deliverable; a type-scoped step counts only its type.
+      $applicable = step_applicable_count(array_merge($s, ['excluded' => 0]),
+                                          $shotCount, $assetTypeCounts, $assetCount);
+      // A count that opens the list behind it (David, 2026-11-16). A 0 stays plain
+      // text: there is nothing to list.
+      $countCell = function (int $n, string $what, bool $strong = false) use ($d, $projectId): string {
+          $txt = $strong ? '<strong>' . $n . '</strong>' : (string)$n;
+          if ($n <= 0) return $txt;
+          return '<button type="button" class="psi-count" data-project="' . $projectId . '"'
+               . ' data-step="' . (int)$d['step']['id'] . '" data-what="' . e($what) . '"'
+               . ' aria-expanded="false"'
+               . ' title="See the ' . $n . ' ' . e($what) . '">' . $txt . '</button>';
+      };
     ?>
     <tr>
       <td class="wf-name"><span class="dot" style="background:<?= e($s['color'] ?: '#ccc') ?>"></span><?= e($s['name']) ?></td>
       <td class="muted"><?= e(applies_to_phrase($s['applies_to'], $type)) ?></td>
-      <td><?= (int)$s['tracked'] ?> <span class="muted">of <?= $applicable ?></span></td>
-      <td><?= (int)$s['delivered'] ?></td>
-      <td><strong><?= (int)$s['approved'] ?></strong></td>
+      <td><?= $countCell((int)$d['tracked'], 'tracked') ?> <span class="muted">of <?= $applicable ?></span></td>
+      <td><?= $countCell((int)$d['delivered'], 'delivered') ?></td>
+      <td><?= $countCell((int)$d['approved'], 'approved', true) ?></td>
       <td class="muted"><?= e($s['deadline'] ?: '—') ?></td>
     </tr>
     <?php endforeach; ?>
   </table>
+<?php endif; ?>
+
+<?php if ($steps): ?>
+<?php // SPELL'S TASK PANEL, borrowed as Reviews and My tasks borrow it, so an item
+      // in one of the lists above opens in place, with its versions and notes. ?>
+<div class="board-panel-veil" id="boardVeil" hidden></div>
+<aside class="board-panel" id="boardPanel" role="dialog" aria-modal="true"
+       aria-label="Task details" hidden>
+  <button type="button" class="board-panel-close" id="boardPanelClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="board-panel-inner" id="boardPanelInner"></div>
+</aside>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
+<script src="assets/review-files.js<?= asset_ver('review-files.js') ?>"></script>
+<script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
+<script src="assets/progress-lists.js<?= asset_ver('progress-lists.js') ?>"></script>
 <?php endif; ?>
 
 </div>
