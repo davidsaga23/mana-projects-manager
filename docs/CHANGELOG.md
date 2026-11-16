@@ -25,6 +25,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   including the 21 shot rows left from before it was re-scoped to the whole project. It now reads
   the same scoped numbers as the Dashboard. The old rows were not deleted.
 
+## 2026-11-16 — Brief page: shorter, two columns, "The ask" reads "Brief" *(no migration)*
+
+- The paragraph under the Brief heading ("What the client asked for, in their terms…") no longer
+  shows. The page now opens on the "Last updated" line and the fields.
+- The naming convention sits in a second column beside the brief instead of below it (they stack
+  again on screens narrower than 1100px).
+- The main field is labelled "Brief" instead of "The ask", here and on the Realm's brief panel.
+- The note at the bottom of the page ("Files live in the same protected directory…") is gone.
+
 ## 2026-11-16 — Project Overview: the Export buttons sit at the top right *(no migration)*
 
 - Export progress, Export shot list and Export asset list moved from under the progress table to the

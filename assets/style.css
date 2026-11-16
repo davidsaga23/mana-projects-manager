@@ -2146,6 +2146,12 @@ body.lightbox-lock { overflow: hidden; }
 
 /* Project brief — prose, so the fields are wide and the measure stays readable. */
 .brief-form { max-width: 92ch; }
+/* Brief page: the brief on the left, the naming convention beside it
+   (David, 2026-11-16). Stacks again on narrower screens. */
+.brief-columns { display: grid; grid-template-columns: minmax(0, 92ch) minmax(0, 1fr);
+                 gap: 40px; align-items: start; }
+.brief-columns .brief-side > h3:first-child { margin-top: 0; }
+@media (max-width: 1100px) { .brief-columns { grid-template-columns: minmax(0, 1fr); } }
 .brief-form textarea {
   width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: var(--radius);
   font-family: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
