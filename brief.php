@@ -445,13 +445,6 @@ require __DIR__ . '/includes/header.php';
 </div>
 </div>
 
-<p class="muted small">
-  Files live in the same protected directory as ticket attachments, behind the same login and
-  the same checks, never on a guessable public URL. Contracts and rates are deliberately
-  <em>not</em> here: those are in the finance database, reachable from a person's page and only
-  by an administrator.
-</p>
-
 <script>
 window.TICKET_MAX_FILES = <?= (int)($config['upload_max_files'] ?? 5) ?>;
 window.TICKET_MAX_BYTES = <?= (int)($config['upload_max_bytes'] ?? 26214400) ?>;
