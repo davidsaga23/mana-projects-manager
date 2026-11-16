@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Project Overview: the tasks-scheduled and crew-slots line is gone *(no migration)*
+
+- Under Overall progress, "N tasks scheduled. N crew slots, N still a placeholder." no longer shows.
+  The crew figures are in the summary at the top; the schedule has its own tab.
+
 ## 2026-11-16 — Projects list: "Code" reads "Project code" *(no migration)*
 
 - The first column heading on the projects list (the home page) is now "Project code".
