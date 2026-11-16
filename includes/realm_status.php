@@ -30,9 +30,11 @@
 // not log time, start or stop a clock, or open the finance connection.
 
 /** Where a character goes when lunch ends: 'home' (inside their own house) or
- *  'before' (back where they were when they set it). David to choose
- *  (asked 2026-11-16); 'home' until he says otherwise. */
-const REALM_LUNCH_BACK = 'home';
+ *  'before' (back where they were when they set it, kept in status_back).
+ *  David, 2026-11-16, asked "back home, or back where they were?": "Where they
+ *  were". Inside again if they were inside and the door still lets them in
+ *  (realm_lunch_back() asks realm_arrive()), else at that door, else at home. */
+const REALM_LUNCH_BACK = 'before';
 
 /**
  * The ready-made statuses, in the order the picker shows them:
