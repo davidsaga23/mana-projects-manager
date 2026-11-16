@@ -32,6 +32,82 @@ message, log your time) and anything else the bell rings (task assigned, moved, 
 - Limits: rides on the existing polls (about 30 s late at most; about a minute in a long-hidden tab);
   nothing while every Anima tab is closed. Web Push proposed as a follow-up.
 
+---
+
+## 2026-11-16 — The Realm: birthdays decorate the person's house *(migration 100)*
+
+**Asked by David**: "Celebrations: but only for birthdays, and only if they're available in their
+profile. Their house should be decorated with balloons, and colors so everyone knows."
+
+Each person can add their **birthday, month and day only (no year)**, to their own profile: on Home's
+General info tab, or from the portrait in their Realm house. It is optional; nobody else ever sees the
+date. On the day, their house on the map gets a bunch of **balloons** tied to its corner that bob
+gently, a string of **coloured flags** under the eaves and, now and then, a puff of **confetti** over
+the roof; inside the house there are balloons in the corners and flags along the wall. Their row in
+**People**, their house card, the card over their character and their profile say **🎂 Birthday
+today**. A birthday on a Saturday or Sunday is celebrated on the **Friday before**; 29 February is
+celebrated on 28 February in other years. With "reduce motion" the balloons stand still and there is
+no confetti. No upcoming-birthdays list. Needs **migration 100**: until it runs the birthday field is
+not offered and no house is decorated.
+
+---
+
+## 2026-11-16 — Realm chat: @here and @channel *(no migration)*
+
+**Asked by David**: "@here @channel too", as in Slack. In any Realm channel (not in ravens),
+**@channel** rings everybody who can read the channel and **@here** only those of them who have the
+Realm open right now (idle counts as here). Each person gets what an @name tag gives: the line on
+Anima's bell ("Renata tagged you in The Tavern in the Realm"), the channel's unread count, and (once
+PR 252 ships it) the Activity view. Both show in the message as pills and are offered in the @ picker after the people.
+Before a message that would ring **6 people or more** the page asks "@channel will notify 18 people
+in this channel. Send?"; Cancel keeps the words in the box. Everybody may use them.
+A private channel rings only its members, and a show's channel only the people on that show.
+Files: `includes/realm_broadcast.php` (new), `includes/realm_chat.php`, `realm_api.php`
+(GET `reach=`), `assets/realm.js`, `assets/realm.css`.
+
+---
+
+## 2026-11-16 — The Realm: status messages, and the Diner *(migration 099)*
+
+**Asked by David**: "Status messages: Let's also create a diner so people's avatars go immediately
+there when they set up their status 'Lunch'". **Status**, as in Slack: an emoji and a short line
+beside your name. Set from the new status button in the Realm's top bar (it shows your status once
+set) or from **Your character**: five ready-made ones (🍔 Lunch, 🎬 In review, 🎧 Focusing, 🤒 Out
+sick, 🌴 Off today), or your own words and an emoji from a list, and **Clear after** 30 minutes,
+1 hour, today or never. Shown beside the name in **People** (its words where the whereabouts were),
+on the card of a person's house, on the card over a character, and beside the writer's name in chat.
+The **server** clears a status when its time is up, so nobody stays on "Lunch" for a week.
+
+**The Diner** is a new place to meet at the east end of the second street: a roadside diner with a
+striped awning, DINER in neon and a burger sign; inside, a counter with stools, a jukebox and two
+booths. Anybody can walk in; it has its own channel (**The Diner**) and calls, like the Tavern.
+**Setting Lunch teleports you inside, onto a stool** (with the teleport sparkle), and everybody sees
+you there; **when lunch ends or is cleared you go back home**, inside your house. Walking out of the
+Diner during lunch is allowed. The "Village" zoom reaches a little further east to include it.
+Until migration 099 runs, the Diner works and the status window says an update is needed. A hook
+for the days-off calendar to set "Off" by itself is in place (`realm_status_set(..., 'calendar')`),
+not used yet.
+
+---
+
+## 2026-11-16 — The Realm: Activity, everything for you in one list *(migration 098)*
+
+**Asked by David**: an Activity view, as in Slack, so nothing gets lost when channels are busy. An
+**Activity** row now sits at the top of the CHANNELS list, with a number for what is unread. It
+opens one list, newest first, of the last 30 days: messages that **tag you** (@your name, @here,
+@channel), **replies** in threads you started or replied in, **reactions** to your messages
+("Renata reacted 👍 to your message"), and **ravens** sent to you (a forwarded one says so). Each
+row says who, what, where and when, with the start of the message; clicking it opens that
+conversation or thread **at that message**, lit up, with a back arrow to Activity. Filters: All,
+Mentions, Threads, Reactions, Ravens. **Mark all as read**.
+
+Reading a conversation reads its rows too, so the Activity number and the channel numbers go down
+together. Only conversations you can read are in it: a private channel only for its members, a raven
+only for its two people. The number rides on the polling the Realm already does. Migration 098 only
+remembers rows marked read in the list; until it runs the list works, but reactions cannot be marked
+read and Mark all as read is greyed out. The bell: "Mark all as read" also quiets the Realm's raven
+and tag lines in Anima's bell, and opening a mention quiets the bell line from its sender.
+
 ## 2026-11-13 — Invoices: move an invoice to another project *(finance_install_19, optional)*
 
 **Asked by David**: "can we add a new button in the edit to change this invoice to another project?"

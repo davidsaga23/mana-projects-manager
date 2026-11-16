@@ -226,6 +226,10 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
             <?php if (home_profile_available($pdo)): ?>
               <tr><th>Phone</th><td><?= $profile['phone'] ? e((string)$profile['phone']) : '<span class="muted">not added</span>' ?></td></tr>
             <?php endif; ?>
+            <?php if (birthday_available($pdo)):
+                  $bdLabel = birthday_label((int)$profile['birth_month'], (int)$profile['birth_day']); ?>
+              <tr><th>Birthday</th><td><?= $bdLabel !== '' ? e($bdLabel) : '<span class="muted">not added</span>' ?></td></tr>
+            <?php endif; ?>
           </tbody>
         </table>
         <p class="muted small">Your name and email are what Anima uses to reach you; to change them, ask Production.</p>
@@ -249,6 +253,26 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
             <input name="phone" maxlength="50" value="<?= e((string)($profile['phone'] ?? '')) ?>" placeholder="+52 55 1234 5678"></label>
           <label>Bio <span class="muted small">(a few lines about you and your work)</span>
             <textarea name="bio" rows="4" maxlength="2000"><?= e((string)($profile['bio'] ?? '')) ?></textarea></label>
+          <?php if (birthday_available($pdo)):
+                // David, 2026-11-16: month and day only, never the year. Nobody
+                // else sees the date: on the day the Realm decorates your house. ?>
+            <fieldset class="home-birthday" style="border:0;padding:0;margin:0">
+              <legend>Birthday <span class="muted small">(optional: month and day, no year)</span></legend>
+              <select name="birth_month" aria-label="Birthday month">
+                <option value="0">Month</option>
+                <?php for ($bmI = 1; $bmI <= 12; $bmI++): ?>
+                  <option value="<?= $bmI ?>" <?= (int)$profile['birth_month'] === $bmI ? 'selected' : '' ?>><?= e(date('F', mktime(0, 0, 0, $bmI, 1, 2000))) ?></option>
+                <?php endfor; ?>
+              </select>
+              <select name="birth_day" aria-label="Birthday day">
+                <option value="0">Day</option>
+                <?php for ($bdI = 1; $bdI <= 31; $bdI++): ?>
+                  <option value="<?= $bdI ?>" <?= (int)$profile['birth_day'] === $bdI ? 'selected' : '' ?>><?= $bdI ?></option>
+                <?php endfor; ?>
+              </select>
+              <p class="muted small">Nobody sees the date. On the day (or the Friday before, if it falls on a weekend) your house in the Realm is decorated so everyone knows.</p>
+            </fieldset>
+          <?php endif; ?>
           <label>Profile picture <span class="muted small">(JPG, PNG, GIF or WebP)</span>
             <input type="file" name="photo" accept="image/jpeg,image/png,image/gif,image/webp"></label>
           <?php if (!empty($profile['photo_stored'])): ?>

@@ -6206,6 +6206,82 @@ David: *"can we add a new button in the edit to change this invoice to another p
   and a browser confirm.
 
 
+## 2026-11-16 — The Realm's Activity list
+
+David chose an Activity view, as in Slack; pitched to him as "your mentions, replies to your threads,
+and reactions to your messages, in one list".
+- **No log of events.** The list is read from the messages, threads and reactions already kept
+  (`includes/realm_activity.php`), so it cannot disagree with the conversations, and an edited or
+  deleted message changes or leaves it at once. Ravens to you are in it too; a forwarded message
+  sent to you arrives as a raven and says "forwarded you a message".
+- **Privacy is the chat's own**: every query is limited by `realm_channel_filter()`, the list the
+  unread counts and the Threads list use. Private channels count only for their members.
+- **Read is shared with the chat.** A row is read once its conversation (or thread) has been read
+  there, or it was clicked in the list, or "Mark all as read" came after it. Reactions have no
+  conversation read mark, so only the list reads them. Migration 098 (`realm_activity_reads`)
+  holds the list's own marks: one row per row clicked, and one `*` row for "everything before".
+- **The last 30 days.** Older news is still in the conversations and in search; the window keeps
+  the count cheap enough to ride on every poll (heartbeat, `?unread=1`, chat answers).
+- **The bell and Activity agree, they do not duplicate.** The bell is the nudge outside the Realm
+  (one line per sender, never the words); Activity is the full list inside it. "Mark all as read"
+  quiets the Realm's `raven` and `tag` lines in the bell; opening a mention quiets the `tag` line
+  from its sender; reading a raven already quieted its line.
+
+## 2026-11-16 — Realm statuses, and lunch in the Diner
+
+David: *"Status messages: Let's also create a diner so people's avatars go immediately there when
+they set up their status 'Lunch'"*.
+- **One status per person**, on their own `realm_people` row (migration 099), set only by them: no
+  id is posted (`set_status` in `artist_may_post()`, `realm_status_set()` writes the session's row).
+- **The server ends it.** `status_until` is checked on every look at the map (`realm_status_sweep()`
+  in `realm_state()` and on opening the Realm), and an expired one is never sent even if a sweep
+  failed. "Today" means until 23:59:59 on the studio's clock (`config.php` timezone).
+- **Emoji from a fixed list** (`REALM_STATUS_EMOJI`), so a form can never put anything else beside a
+  name; the words are free, one line, at most 80 characters.
+- **Lunch moves the character on the server**, not only on the screen, so everybody sees it at once:
+  inside the Diner on setting it; on clearing it, letting it run out, or switching to another status,
+  back **home, inside their own house** (`REALM_LUNCH_BACK = 'home'`). **Asked David** whether it
+  should be "back home" or "back where they were"; the place before lunch is stored
+  (`status_back`), so the other answer is a one-word change. Somebody who already walked out of the
+  Diner is left where they are.
+- **A status stays a ready-made one while it keeps that one's emoji**: "Lunch with Tim" with 🍔 is
+  still Lunch and goes to the Diner; picking another emoji makes it the person's own.
+- **The Diner is a place like the Tavern**: always open, its own channel `diner` and calls, no table
+  of its own. Placed at the east end of the second street (1215, 590), clear of every plot, road and
+  name; the Village zoom widened to 320..1310 to include it.
+- **Days-off calendar hook**: `realm_status_set($pdo, $uid, 'off', '', '', 'today', 'calendar')`.
+  It should leave a status the person set themselves alone (`from` is 'self'). Not built (David:
+  the calendar is done separately).
+## 2026-11-16 — Realm chat: @here and @channel
+
+David: *"@here @channel too"*. Settled with him the same day:
+- **Everybody in the Realm may use them**, not only Production or supervisors. The guard against
+  noise is the confirmation, not a rank.
+- **Idle counts as here**: @here rings everybody with the Realm open, online or idle (Slack rings only
+  the active ones). An idle person usually has the Realm in another tab while they work.
+- **Ask from 6 people up**: the page asks the server how many would be rung (GET `reach=`, worked out
+  from the database, so a private channel's members are never guessed by the page) and confirms at
+  `REALM_BROADCAST_ASK` (6) or more.
+- **Who "can read the channel"**: a private channel's members only; a show's channel (or a channel
+  made under a show) the people staffed on that show plus the see-all roles; a studio-wide channel
+  everybody in the Realm. Never the sender. Not in ravens.
+- **The same bell line as a personal tag** (kind `tag`, same summary), so somebody both named and
+  reached hears it once, and the Activity view (which reads `@here`/`@channel` from the words) lists
+  it like any mention. No migration.
+## 2026-11-16 — Birthdays in the Realm
+
+David: *"Celebrations: but only for birthdays, and only if they're available in their profile. Their
+house should be decorated with balloons, and colors so everyone knows."* Agreed with him the same day:
+- **Stored as month and day on `crew`** (`birth_month`, `birth_day`, migration 100), next to phone and
+  bio. **Never the year**, so nobody's age is kept or shown.
+- **Each person fills in their own**, in their own profile (Home, or the portrait in their Realm house:
+  the same `home_save_profile()`). Optional; left empty, there is no celebration.
+- **Nobody else sees the date.** The heartbeat carries only `birthday_today` (true or false), worked out
+  on the server; the date goes only to its owner's own profile. No list of upcoming birthdays.
+- **A weekend birthday is celebrated on the Friday before**, so the team is around to see it; 29 February
+  on 28 February in other years. The studio's time zone (config) decides what "today" is.
+- **Drawn in code like the rest of the map**: balloons, flags and confetti over the house's stamp, so
+  the stamps themselves do not change; still for somebody who asked for less motion.
 ## 2026-11-16 - Desktop notifications with a sound
 
 David chose "desktop notifications with sound" (wish of 2026-11-12: "so we can send sounds and

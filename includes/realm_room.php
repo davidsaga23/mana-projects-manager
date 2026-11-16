@@ -277,6 +277,27 @@ function realm_profile(PDO $pdo, int $uid, int $owner): ?array {
             $out['phone'] = trim((string)($r['phone'] ?? ''));
             $out['email'] = trim((string)($r['email'] ?? ''));
         }
+        // THE BIRTHDAY (migration 100; David, 2026-11-16). Anybody's profile says
+        // "Birthday today" on the day; the date itself (month and day, never a
+        // year) goes only to its owner, so they can see and change it.
+        $out['birthday_today'] = false;
+        if ($crew > 0 && function_exists('birthday_available') && birthday_available($pdo)) try {
+            $b = $pdo->prepare('SELECT birth_month, birth_day FROM crew WHERE id = ?');
+            $b->execute([$crew]);
+            $bd = $b->fetch() ?: ['birth_month' => null, 'birth_day' => null];
+            $bm = $bd['birth_month'] !== null ? (int)$bd['birth_month'] : null;
+            $dd = $bd['birth_day'] !== null ? (int)$bd['birth_day'] : null;
+            $out['birthday_today'] = birthday_is_today($bm, $dd);
+            if ($mine) {
+                $out['birth_ready'] = true;
+                $out['birth_month'] = (int)$bm;
+                $out['birth_day'] = (int)$dd;
+                $out['birth_label'] = birthday_label($bm, $dd);
+            }
+        } catch (Throwable $e) {
+            // A birthday that cannot be read never costs the rest of the profile.
+            $out['birthday_today'] = false;
+        }
         return $out;
     } catch (Throwable $e) {
         return null;
