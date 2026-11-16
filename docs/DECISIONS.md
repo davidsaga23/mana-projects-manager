@@ -6311,3 +6311,24 @@ answered *"Where they were"*. `REALM_LUNCH_BACK` is now `'before'`: the place st
 began (`status_back`) is where they return, inside again if they were inside and that door still
 lets them in (`realm_arrive()`'s rules: an ajar door's pass lasts 10 minutes), otherwise outside
 that door, and failing that at their own door. Supersedes "back home" in the entry above.
+
+## 2026-11-16 — On screen, a step is a Department and a department is a Phase
+
+David, looking at the Overview's "Progress by step" table: *"is there a way we can globally rename
+these as departments and Pre-production, production and post-production as phases?"* Animation
+studios call Animatic, BG Layout and the rest departments, and the pre/production/post grouping
+phases, so the app now says so.
+
+- **UI says Department = `pipeline_steps`** (a step: Animatic, BG Layout, Comp…).
+- **UI says Phase = `pipeline_steps.department`** (Pre-production / Production / Post-production).
+- **Visible words only.** Tables, columns, PHP names, `?step=` parameters, `step.php`, CSS classes
+  and code comments keep the old names: renaming them needs migrations and breaks bookmarks for no
+  visible gain. Read code with the mapping above.
+- **Kept on purpose:** `crew.department` (a person's own Department field, free text like
+  "Animation", which already fits the new meaning); the `{STEP}` naming token, which saved templates
+  use; other senses of "step" (wizard screens, import stages, the CRM's "Next step").
+- **Kick-off labels stay as they are for now** ("By step", "Steps with dates", "First step starts",
+  "Last step ends", "Pipeline steps", "Budget pool by step"). Each signed-off kick-off stores them as
+  keys, and today's figures are matched to the signed-off ones by that label. Renaming needs the
+  `$renamed` map in `kickoff_render_section()` extended to list titles too.
+- New screens use **Department** and **Phase**, never "step" for a pipeline step.

@@ -5,6 +5,13 @@ step. The owner is **David Salinas Garfias**, not a developer: explain trade-off
 and flag anything destructive before doing it. Deep context is in `START_HERE.md` and `docs/`
 (read `docs/HANDOFF.md` first); this file is the short version.
 
+## Words on screen
+
+- A **Department** on screen is a `pipeline_steps` row (Animatic, BG Layout, Comp…); a **Phase** is
+  `pipeline_steps.department` (Pre-production / Production / Post-production). Code, tables and
+  `?step=` keep the old names. Write new UI text with Department and Phase, never "step"
+  (David, 2026-11-16; `docs/DECISIONS.md`).
+
 ## Deploy — read before merging anything
 
 - **The live site is https://anima-mana.com** (David, 2026-11-12). `mana.davidsaga.com` is a legacy
