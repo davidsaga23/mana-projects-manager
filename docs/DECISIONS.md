@@ -6204,3 +6204,26 @@ David: *"can we add a new button in the edit to change this invoice to another p
   record should not be. The log is optional: without it the move still happens.
 - **Admins only** (`can_see_money()`, on the admin-only finance page), after a confirmation panel
   and a browser confirm.
+
+
+## 2026-11-16 — The Realm's Activity list
+
+David chose an Activity view, as in Slack; pitched to him as "your mentions, replies to your threads,
+and reactions to your messages, in one list".
+- **No log of events.** The list is read from the messages, threads and reactions already kept
+  (`includes/realm_activity.php`), so it cannot disagree with the conversations, and an edited or
+  deleted message changes or leaves it at once. Ravens to you are in it too; a forwarded message
+  sent to you arrives as a raven and says "forwarded you a message".
+- **Privacy is the chat's own**: every query is limited by `realm_channel_filter()`, the list the
+  unread counts and the Threads list use. Private channels count only for their members.
+- **Read is shared with the chat.** A row is read once its conversation (or thread) has been read
+  there, or it was clicked in the list, or "Mark all as read" came after it. Reactions have no
+  conversation read mark, so only the list reads them. Migration 098 (`realm_activity_reads`)
+  holds the list's own marks: one row per row clicked, and one `*` row for "everything before".
+- **The last 30 days.** Older news is still in the conversations and in search; the window keeps
+  the count cheap enough to ride on every poll (heartbeat, `?unread=1`, chat answers).
+- **The bell and Activity agree, they do not duplicate.** The bell is the nudge outside the Realm
+  (one line per sender, never the words); Activity is the full list inside it. "Mark all as read"
+  quiets the Realm's `raven` and `tag` lines in the bell; opening a mention quiets the `tag` line
+  from its sender; reading a raven already quieted its line.
+
