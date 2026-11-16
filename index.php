@@ -320,7 +320,7 @@ require __DIR__ . '/includes/header.php';
 <?php else: ?>
   <table class="project-list">
     <tr>
-      <th>Code</th><th>Name</th><th>Type</th><th>Status</th>
+      <th>Project code</th><th>Name</th><th>Type</th><th>Status</th>
       <th>Steps</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
     </tr>
     <?php foreach ($projects as $p): $pid = (int)$p['id']; ?>
