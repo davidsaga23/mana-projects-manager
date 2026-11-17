@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Who is carrying what: "Still to do" counts unfinished work, not future dates *(no migration)*
+
+**Reported by David**, with Dan's list open: "why is still showing 8 tasks to go for Dan when in the
+list they're all final?"
+
+- **"Still to do" now counts the tasks that are not finished**: not approved (Final, or whatever the
+  show calls its approved status) and not N/A. It used to count every task whose scheduled end
+  date was today or later, so finished work kept counting until its date passed.
+- The other side of the same fix: **a task that ran late and is still open now stays in "Still to
+  do"**. Before, it dropped out of the count the day after its scheduled date.
+- The list that opens when you click the number uses the same rule, so it always matches the number.
+
 ## 2026-11-17 — "Real pace" instead of "Actual" *(no migration)*
 
 **Asked by David**, with a picture of the Overall progress block: "let's change this for 'Real pace'
