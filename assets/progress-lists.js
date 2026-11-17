@@ -44,9 +44,12 @@
     btn.setAttribute('aria-expanded', 'true');
     btn.classList.add('is-open');
 
-    var url = 'project_step_items.php?project=' + encodeURIComponent(btn.getAttribute('data-project'))
+    // data-src: a count elsewhere names its own list (the Dashboard's Who is
+    // carrying what, 2026-11-16). Without it, the Overview's progress table.
+    var url = btn.getAttribute('data-src') ||
+              ('project_step_items.php?project=' + encodeURIComponent(btn.getAttribute('data-project'))
             + '&step=' + encodeURIComponent(btn.getAttribute('data-step'))
-            + '&what=' + encodeURIComponent(btn.getAttribute('data-what'));
+            + '&what=' + encodeURIComponent(btn.getAttribute('data-what')));
     fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
       .then(function (r) { return r.text(); })
       .then(function (html) {

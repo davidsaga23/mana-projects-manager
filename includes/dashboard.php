@@ -815,6 +815,20 @@ function dashboard_pace(PDO $pdo, int $projectId, ?string $deliveryDate, ?string
     ];
 }
 
+/**
+ * The SQL test for "still to do" in Who is carrying what, over the alias sc
+ * (schedule): a scheduled task whose last day is today or later. It takes ONE
+ * positional parameter, today's date.
+ *
+ * ⚠ ONE DEFINITION FOR THE NUMBER AND THE LIST (David, 2026-11-16: "if you click
+ * the number you can see the list of those tasks missing"). dashboard_workload()
+ * sums it and crew_workload_items() filters by it, so the list a click opens is
+ * always as long as the number clicked.
+ */
+function workload_remaining_sql(): string {
+    return '(sc.end_date >= ?)';
+}
+
 /** Who is carrying what: tasks, days and the next thing due, per crew slot. */
 function dashboard_workload(PDO $pdo, int $projectId, ?string $today = null): array {
     $today = $today ?: date('Y-m-d');
@@ -823,7 +837,7 @@ function dashboard_workload(PDO $pdo, int $projectId, ?string $today = null): ar
                 COUNT(sc.id) AS tasks,
                 MIN(sc.start_date) AS first_start,
                 MAX(sc.end_date)   AS last_end,
-                COALESCE(SUM(sc.end_date >= ?), 0) AS remaining
+                COALESCE(SUM(' . workload_remaining_sql() . '), 0) AS remaining
            FROM schedule sc
            JOIN crew c ON c.id = sc.crew_id
           WHERE sc.project_id = ?
@@ -832,6 +846,57 @@ function dashboard_workload(PDO $pdo, int $projectId, ?string $today = null): ar
     );
     $stmt->execute([$today, $projectId]);
     return $stmt->fetchAll();
+}
+
+/**
+ * The scheduled tasks behind one number in Who is carrying what: every task of
+ * this person on this show ('tasks'), or only those still to do ('remaining',
+ * workload_remaining_sql(), the test dashboard_workload() sums). Soonest due
+ * first, so the list reads as what has to happen next.
+ *
+ * The status comes from the task's progress row (same department and item), and
+ * the item from the schedule row's own shot or asset.
+ *
+ * @return array[] keys: step_id, item_key, item, kind ('shot'|'asset'|'project'),
+ *                 step_name, step_color, start_date, end_date, status_name,
+ *                 status_color, is_blocked
+ */
+function crew_workload_items(PDO $pdo, int $projectId, int $crewId, string $which, ?string $today = null): array {
+    $today  = $today ?: date('Y-m-d');
+    $filter = $which === 'remaining' ? ' AND ' . workload_remaining_sql() : '';
+    $stmt = $pdo->prepare(
+        'SELECT sc.step_id, sc.item_key, sc.shot_id, sc.asset_id, sc.start_date, sc.end_date,
+                ps.name AS step_name, ps.color AS step_color,
+                sh.episode, sh.shot_code, a.name AS asset_name,
+                st.name AS status_name, st.color AS status_color, st.is_blocked
+           FROM schedule sc
+           JOIN pipeline_steps ps ON ps.id = sc.step_id
+           LEFT JOIN shots    sh ON sh.id = sc.shot_id
+           LEFT JOIN assets   a  ON a.id = sc.asset_id
+           LEFT JOIN progress pr ON pr.step_id = sc.step_id AND pr.item_key = sc.item_key
+           LEFT JOIN statuses st ON st.id = pr.status_id
+          WHERE sc.project_id = ? AND sc.crew_id = ?' . $filter . '
+          ORDER BY sc.end_date, ps.step_order, sh.episode, sh.shot_code, a.name'
+    );
+    $stmt->execute($which === 'remaining' ? [$projectId, $crewId, $today] : [$projectId, $crewId]);
+    $out = [];
+    foreach ($stmt as $r) {
+        if ($r['shot_id'] !== null) {
+            $kind = 'shot';
+            $item = shot_label($r['episode'] ?? '', $r['shot_code'] ?? '');
+        } elseif ($r['asset_id'] !== null) {
+            $kind = 'asset';
+            $item = (string)($r['asset_name'] ?? '');
+        } else {
+            $kind = 'project';
+            $item = 'Whole project';
+        }
+        if ($item === '') $item = (string)$r['item_key'];
+        $r['kind'] = $kind;
+        $r['item'] = $item;
+        $out[] = $r;
+    }
+    return $out;
 }
 
 /**

@@ -330,16 +330,48 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <?php else: ?>
   <table class="review-table">
     <tr><th>Who</th><th class="num">Tasks</th><th class="num">Still to do</th><th>Runs</th></tr>
-    <?php foreach ($workload as $w): ?>
+    <?php foreach ($workload as $w):
+      // A number that opens the tasks behind it (David, 2026-11-16: "if you click
+      // the number you can see the list of those tasks missing"), from
+      // dashboard_crew_tasks.php. A 0 stays plain text: there is nothing to list.
+      $wlCell = function (int $n, string $what, string $label, bool $strong = false) use ($w, $projectId): string {
+          $txt = $strong ? '<strong>' . $n . '</strong>' : (string)$n;
+          if ($n <= 0) return $txt;
+          $src = 'dashboard_crew_tasks.php?project=' . $projectId . '&crew=' . (int)$w['id'] . '&what=' . $what;
+          return '<button type="button" class="psi-count" data-src="' . e($src) . '" aria-expanded="false"'
+               . ' title="See the ' . $n . ' ' . e($label) . '">' . $txt . '</button>';
+      };
+    ?>
     <tr>
       <td><strong><?= e($w['name']) ?></strong>
         <?php if ((int)$w['is_placeholder'] === 1): ?><span class="est-tag">slot</span><?php endif; ?></td>
-      <td class="num"><?= (int)$w['tasks'] ?></td>
-      <td class="num"><strong><?= (int)$w['remaining'] ?></strong></td>
+      <td class="num"><?= $wlCell((int)$w['tasks'], 'tasks', 'tasks') ?></td>
+      <td class="num"><?= $wlCell((int)$w['remaining'], 'remaining', 'still to do', true) ?></td>
       <td class="muted small"><?= e($w['first_start']) ?> → <?= e($w['last_end']) ?></td>
     </tr>
     <?php endforeach; ?>
   </table>
+<?php endif; ?>
+
+<?php if ($workload): ?>
+<?php // SPELL'S TASK PANEL, borrowed as the Overview, Reviews and My tasks borrow
+      // it, so a task in one of the lists above opens in place. ?>
+<div class="board-panel-veil" id="boardVeil" hidden></div>
+<aside class="board-panel" id="boardPanel" role="dialog" aria-modal="true"
+       aria-label="Task details" hidden>
+  <button type="button" class="board-panel-close" id="boardPanelClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="board-panel-inner" id="boardPanelInner"></div>
+</aside>
+<script src="assets/mentions.js<?= asset_ver('mentions.js') ?>"></script>
+<script src="assets/dropzone.js<?= asset_ver('dropzone.js') ?>"></script>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
+<script src="assets/board-screen.js<?= asset_ver('board-screen.js') ?>"></script>
+<script src="assets/review-files.js<?= asset_ver('review-files.js') ?>"></script>
+<script src="assets/review-viewer.js<?= asset_ver('review-viewer.js') ?>"></script>
+<script src="assets/progress-lists.js<?= asset_ver('progress-lists.js') ?>"></script>
 <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
