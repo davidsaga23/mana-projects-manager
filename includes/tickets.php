@@ -1210,8 +1210,11 @@ function create_ticket(PDO $pdo, ?int $projectId, array $in, array $files = [],
         if ($res['errors']) $notes[] = implode(' ', $res['errors']);
     }
     if ($crewId) {
-        [, $mailMsg] = notify_assignee($pdo, $ticketId, 'assigned');
-        $notes[] = $mailMsg;
+        // Their bell and the next email summary (David, 2026-11-17), not an
+        // email there and then. See includes/digest.php.
+        require_once __DIR__ . '/digest.php';
+        [, $mailMsg] = ticket_ring_assignee($pdo, $ticketId, 'assigned');
+        if ($mailMsg !== '') $notes[] = $mailMsg;
     }
 
     // The reference as people will see it, built the one way it is ever built.

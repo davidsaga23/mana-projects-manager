@@ -21,7 +21,8 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/board.php';
 require_once __DIR__ . '/includes/uploads.php';
-require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
+require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';   // digest_told_sentence(): who will hear of an @
 require_once __DIR__ . '/includes/naming.php';   // the show's file naming convention (067)
 require_once __DIR__ . '/includes/review.php';   // review_apply(), for Approve / Send back in the viewer
 require_once __DIR__ . '/includes/activity.php'; // log_status_change_by_id(), for the move to Pending review
@@ -317,13 +318,9 @@ if (isset($_POST['add_review'])) {
                     'progress_id' => $pid,
                 ], (int)(effective_crew_id($pdo) ?? 0));
 
-                [, $more] = notify_mentioned_task($pdo, array_keys($named),
-                    $label . ' is up for review: ' . $note, current_user_display(), [
-                        'project_id'   => $projectId, 'step_id' => $stepId, 'item_key' => $itemKey,
-                        'step_name'    => $stepName,  'item_name' => $itemName,
-                        'project_code' => (string)$project['code'],
-                        'project_name' => (string)$project['name'],
-                    ]);
+                // The email is the twice-a-day summary now, which reads the bell
+                // just rung (David, 2026-11-17; includes/digest.php).
+                $more = digest_told_sentence($pdo, array_diff(array_keys($named), [(int)(effective_crew_id($pdo) ?? 0)]));
                 if ($more !== '') $said .= ' ' . $more;
             }
         }

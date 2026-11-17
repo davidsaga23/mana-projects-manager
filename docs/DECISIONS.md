@@ -6407,3 +6407,34 @@ production or admins for approval. New requests should be available in bookings"
   `artist_may_post()`'s list for `home.php`. Asking always uses the session's own person, and
   withdrawing only deletes the asker's own pending row.
 
+## 2026-11-17 — Email summaries: read from the bell, sent by a cron job
+
+David: "instead of sending an email for each mention, new task or comment, let's send 2 instead.
+One at the beginning of the day (around 9 am PST) and one at the end (5 pm PST) with a summary of
+new stuff for that person."
+
+**Decided:**
+- **The summary reads the bell (`notifications`), not a list of its own.** Every per-item email
+  (ticket mentions, ticket assignment and status, board-task mentions, transcript cards) was
+  replaced by a bell line; board tasks, review notes and Realm ravens and tags already rang it. One
+  list means no second record for every writer to keep in step, a new bell kind reaches the
+  summary on its own, and "who may see this" is settled where the bell line is written (a private
+  Realm channel rings only its members). The bell holds no amounts, so neither does the summary.
+  Side effect, accepted: ticket mentions, assignments and status changes now ring the bell too.
+- **Only what is still unread.** Opening the bell marks everything read; what somebody saw in
+  Anima is left out of their email.
+- **Pacific time with daylight saving** (`America/Los_Angeles`), computed in PHP whatever the
+  server's or config's zone. Windows 9 am to 1 pm and 5 pm to 10 pm: a summary that misses its
+  window is skipped, and its items go in the next one (nobody gets a "morning" summary at 4 pm).
+- **Never twice:** each person's slot is claimed in `digest_people.last_slot` with an UPDATE only
+  one sender can win, before sending; `upto_id` remembers the last bell item looked at. A failed
+  send gives the claim back.
+- **A cPanel Cron Job every 15 minutes** runs `cron_digest.php` (CLI only, or `?key=` with
+  `cron_key`). The host holds no long-running process, and a page load cannot be relied on at 9 am.
+  **Fallback:** the bell's 30-second poll (`notify_poll.php`) runs it when a summary is 20 minutes
+  late and not sent, after answering the browser; `digest_web_fallback => false` turns it off.
+- **Still immediate:** days off (someone is waiting on an answer; kind `dayoff` is left out of the
+  summary so it is not said twice), invitations, kick-off, budget requests, log reminders, hires.
+- **First summary looks back 12 hours only**, so it is not a list of everything that ever rang.
+- The old mailer functions stay as wrappers that ring the bell, so a branch written before this
+  still works.

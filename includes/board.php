@@ -1320,15 +1320,17 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
     }
 
     $said = $version !== null ? 'Review posted.' : ($parent ? 'Reply posted.' : 'Comment posted.');
-    if ($mentions && function_exists('notify_mentioned_task')) {
-        // Naming somebody tells them, here as on a ticket — David settled that
-        // on 2026-10-06 ("not an option but something already built in by
-        // default"). The mailer opens SMTP inline, which is also why posting a
-        // comment with an @ in it takes a moment; see the note in ticket.php.
-        [, $more] = notify_mentioned_task($pdo, array_keys($mentions), $body,
-            current_user_display(), $ctx + ['project_id' => $projectId,
-                                            'step_id' => $stepId, 'item_key' => $itemKey]);
-        if ($more !== '') $said .= ' ' . $more;
+    // Naming somebody tells them, here as on a ticket (David, 2026-10-06). The
+    // bell above is that telling; the email is no longer sent here but in the
+    // 9 am / 5 pm Pacific summary, which reads the bell (David, 2026-11-17;
+    // includes/digest.php). The sentence still says who will hear.
+    if ($mentions && function_exists('digest_told_sentence')) {
+        try {
+            $more = digest_told_sentence($pdo, array_diff(array_keys($mentions), [(int)(effective_crew_id($pdo) ?? 0)]));
+            if ($more !== '') $said .= ' ' . $more;
+        } catch (Throwable $e) {
+            // Only the sentence is lost; the comment and the bell are saved.
+        }
     }
     return [$commentId, $said];
 }

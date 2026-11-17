@@ -16,6 +16,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';   // the bell + the twice-a-day email summary
 require_once __DIR__ . '/includes/tickets.php';
 require_login();
 
@@ -115,22 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_comment'])) {
 
     $notes = [$parentId ? 'Reply posted.' : 'Comment posted.'];
     if ($mentions) {
-        // ⚠ ALWAYS, since David asked for it on 2026-10-06: "make the email the
-        // people not an option but something already built in by default". It
-        // was a tick for one day, unticked by default, because this mailer opens
-        // SMTP INLINE and the page waits for the mail server before it returns.
-        // That cost has not gone away — it has been accepted. Naming somebody now
-        // means telling them, which is what everyone expects an @ to do, and the
-        // pause is the price.
+        // Naming somebody always tells them (David, 2026-10-06: "not an option
+        // but something already built in by default"). Until 2026-11-17 that
+        // meant an email sent there and then, with the page waiting on the mail
+        // server. Now it rings their BELL, and the email is the 9 am / 5 pm
+        // Pacific summary (includes/digest.php; David, 2026-11-17: "instead of
+        // sending an email for each mention, new task or comment, let's send 2
+        // instead"). Which also ends the pause on saving.
         //
-        // The fix for the pause is to move the mailer off the save path, which
-        // would also speed up creating a ticket and changing a status. It is on
-        // the roadmap and this is now its third caller.
-        //
-        // notify_mentioned() says who it reached AND who it could not: a mention
-        // that silently goes nowhere is worse than none, because the author has
-        // already moved on believing it landed.
-        [, $said] = notify_mentioned($pdo, $id, array_keys($mentions), $body, current_user_display());
+        // The sentence still says who will hear AND who has no email address:
+        // a mention that silently goes nowhere is worse than none.
+        [, $said] = ticket_ring_mentioned($pdo, $id, $commentId, array_keys($mentions), current_user_display());
         if ($said !== '') $notes[] = $said;
     }
     if ($hasFiles) {
@@ -259,16 +255,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
         $notes[] = 'No asset called "' . $typedAsset . '" in this project, so it was not linked.';
     }
 
-    // Notify on a genuine change of hands, or when the status moved — so the
-    // owner learns their work is wanted, or the reporter learns it is ready.
+    // Tell the owner on a genuine change of hands, or when the status moved,
+    // so they learn their work is wanted. Their bell, and the next email
+    // summary (2026-11-17; it was an email on the spot before).
     $crewChanged   = (int)($t['assigned_crew_id'] ?? 0) !== (int)($newCrew ?? 0);
     $statusChanged = (int)($t['status_id'] ?? 0) !== (int)($newStatus ?? 0);
     if ($newCrew && $crewChanged) {
-        [, $m] = notify_assignee($pdo, $id, 'assigned');
-        $notes[] = $m;
+        [, $m] = ticket_ring_assignee($pdo, $id, 'assigned');
+        if ($m !== '') $notes[] = $m;
     } elseif ($newCrew && $statusChanged) {
-        [, $m] = notify_assignee($pdo, $id, 'status');
-        $notes[] = $m;
+        [, $m] = ticket_ring_assignee($pdo, $id, 'status');
+        if ($m !== '') $notes[] = $m;
     }
 
     flash('ok', implode(' ', $notes));
@@ -546,8 +543,9 @@ require __DIR__ . '/includes/header.php';
       <textarea name="body" rows="3" id="commentBody"
                 placeholder="Reply, add what you found, or attach a reference… type @ to name somebody"></textarea>
     </label>
-    <?php // No tick and no explanation: naming somebody emails them, full stop
-          // (David, 2026-10-06). The placeholder on the box above already says
+    <?php // No tick and no explanation: naming somebody tells them, full stop
+          // (David, 2026-10-06): their bell, and the next twice-a-day email
+          // summary (2026-11-17). The placeholder on the box above already says
           // what @ does, and a line of small print explaining a thing that
           // always happens is just something to read every time. ?>
     <label>Attach files

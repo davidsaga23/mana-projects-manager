@@ -12,6 +12,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/uploads.php';
 require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';   // the bell + the twice-a-day email summary
 require_once __DIR__ . '/includes/tickets.php';
 require_login_json();
 
@@ -120,8 +121,9 @@ try {
 
         $notes = ['Saved.'];
         if ($crewId && (int)($t['assigned_crew_id'] ?? 0) !== $crewId) {
-            [, $m] = notify_assignee($pdo, $id, 'assigned');
-            $notes[] = $m;
+            // Their bell and the next email summary (2026-11-17), not an email now.
+            [, $m] = ticket_ring_assignee($pdo, $id, 'assigned');
+            if ($m !== '') $notes[] = $m;
         }
 
         echo json_encode(['ok' => true, 'message' => implode(' ', $notes)]);

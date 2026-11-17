@@ -68,3 +68,24 @@ foreach (notify_recent($pdo, $crewId) as $n) {
     ];
 }
 echo json_encode(['ok' => true, 'unseen' => notify_unseen($pdo, $crewId), 'items' => $items]);
+
+// THE EMAIL SUMMARIES' FALLBACK (David, 2026-11-17: two email summaries a day,
+// 9 am and 5 pm Pacific; includes/digest.php). The summaries are meant to be
+// sent by cron_digest.php from a cPanel Cron Job. If that job was never added,
+// or stops, this check, which somebody's open page makes every 30 seconds
+// anyway, sends them instead, 20 minutes late. With the cron job working it
+// finds the summary already sent and does nothing.
+//
+// ⚠ AFTER THE ANSWER ABOVE, AND NEVER ALLOWED TO BREAK IT: the bell has already
+// been sent to the browser, digest_web_fallback() hands the connection back
+// before writing any email, and nothing it does can throw out of here. Outside
+// the two windows (9 am to 1 pm, 5 pm to 10 pm, Pacific) it is one clock check.
+try {
+    $pacificHour = (int)(new DateTime('now', new DateTimeZone('America/Los_Angeles')))->format('G');
+    if (!in_preview() && (($pacificHour >= 9 && $pacificHour < 13) || ($pacificHour >= 17 && $pacificHour < 22))) {
+        require_once __DIR__ . '/includes/digest.php';
+        digest_web_fallback($pdo);
+    }
+} catch (Throwable $e) {
+    error_log('[Anima digest] poll fallback: ' . $e->getMessage());
+}

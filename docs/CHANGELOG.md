@@ -14,6 +14,26 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Email summaries: two a day instead of one email per thing *(migration 104)*
+
+**Asked by David**: "instead of sending an email for each mention, new task or comment, let's send 2
+instead. One at the beginning of the day (around 9 am PST) and one at the end (5 pm PST) with a
+summary of new stuff for that person."
+
+- **No more one-at-a-time emails** for an @mention (ticket or board task), a ticket assigned to you
+  or changing status, or cards made for you from a meeting transcript. They ring the **bell**
+  instead (tickets did not ring it before) and go in the next summary. Saving a comment with an @ no
+  longer waits on the mail server.
+- **Two summaries a day, 9 am and 5 pm Pacific**, listing what is new and still unread in that
+  person's bell, grouped (new tasks, mentions with the first lines of the comment, review notes,
+  updates on tasks you follow, the Realm), each with a link. **No email when nothing is new.**
+- **Each person chooses** on Home → General info → Email summaries: both (default), morning only,
+  end of day only, or none.
+- **Unchanged, still sent at once:** invitations, days off, kick-off sign-off, budget requests,
+  "log your time" emails, the hire note to admins.
+- **Set-up (David):** run migration 104, make sure `site_url` is in config.php, and add one cPanel
+  Cron Job every 15 minutes (`docs/EMAIL_DIGEST.md`). Without the cron job, the bell's 30-second
+  check sends them 20 minutes late.
 ## 2026-11-17 — The bell: clicked notifications fold under "Earlier", and a bigger bell *(migration 103)*
 
 **Asked by Tim** ("is it possible to have the notifications (once clicked on) get cleared from the

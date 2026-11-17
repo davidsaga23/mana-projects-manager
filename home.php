@@ -35,6 +35,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/home.php';
 require_once __DIR__ . '/includes/tickets.php';   // tickets_for_crew()
 require_once __DIR__ . '/includes/day_off_requests.php';
+require_once __DIR__ . '/includes/digest.php';   // which email summaries you get (104)
 require_login();
 
 $crewId = (int)(effective_crew_id($pdo) ?? 0);
@@ -63,6 +64,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
         flash('err', $e->getMessage());
     }
     header('Location: home.php?tab=general');
+    exit;
+}
+
+// --- which email summaries you get ------------------------------------------
+// David, 2026-11-17: two email summaries a day instead of an email per thing
+// (includes/digest.php). Everybody gets both until they choose otherwise.
+// ⚠ ALWAYS YOUR OWN: the person is $crewId, effective_crew_id(), and nothing
+// posted names anybody. The allow-list entry in includes/auth.php is the first
+// lock; this is the second.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_digest_pref'])) {
+    try {
+        if (preview_blocks_saving()) throw new RuntimeException('Nothing saves while you are previewing a role.');
+        flash('ok', digest_set_pref($pdo, $crewId, (string)($_POST['digest_pref'] ?? '')));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: home.php?tab=general#email-summaries');
     exit;
 }
 
@@ -403,6 +421,26 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
       <p class="muted small">Approved days off are never counted as days you forgot to log. To change one that is
         already approved, ask Production.</p>
     <?php endif; ?>
+  <?php endif; ?>
+
+  <?php // ---- Email summaries: which of the two daily emails you get. David,
+        // 2026-11-17. Before migration 104 the section is not drawn at all. ?>
+  <?php if (digest_available($pdo)): $myDigest = digest_pref($pdo, $crewId); ?>
+    <h3 id="email-summaries">Email summaries</h3>
+    <form method="post" class="home-digest">
+      <input type="hidden" name="save_digest_pref" value="1">
+      <label>Anima emails you a summary of what is new for you: mentions, new tasks, comments and review
+        notes, Realm messages.
+        <select name="digest_pref">
+          <?php foreach (digest_pref_options() as $k => $label): ?>
+            <option value="<?= e($k) ?>" <?= $k === $myDigest ? 'selected' : '' ?>><?= e($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <button type="submit">Save</button>
+    </form>
+    <p class="muted small">A summary is only sent when something is new, and leaves out anything you have already
+      seen in the bell. <?= $profile['email'] ? 'It goes to ' . e((string)$profile['email']) . '.' : 'You have no email address on file, so nothing can be sent: add one under <strong>Edit your profile</strong>.' ?></p>
   <?php endif; ?>
 
   <h3>Your shows</h3>
