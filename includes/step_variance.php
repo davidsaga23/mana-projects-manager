@@ -574,6 +574,15 @@ function render_step_variance(array $v): void {
     <?php if ($v['pct_done'] !== null): ?><span class="muted small"><?= e(fmt_num($v['pct_done'] * 100, 0)) ?>% of the work done, weighted by plan</span><?php endif; ?></div>
 </div>
 
+<?php // THE KEY ABOVE THE TABLE (David, 2026-11-17: "let's move these to the top of the
+      // table"): read before the bars it explains, not after scrolling past them. ?>
+<div class="sv-legend muted small">
+  <span><i class="sv-k-spent"></i>committed so far</span>
+  <span><i class="sv-k-over"></i>committed beyond the plan</span>
+  <span><i class="sv-k-fc"></i>still to commit (forecast)</span>
+  <span><i class="sv-k-fc-bad"></i>forecast past the plan</span>
+  <span><i class="sv-k-plan"></i>the plan</span>
+</div>
 <div class="sv-table">
 <table>
   <thead><tr>
@@ -648,13 +657,6 @@ function render_step_variance(array $v): void {
     <td class="muted">budget <?= e($m($v['budget'])) ?></td>
   </tr></tfoot>
 </table>
-</div>
-<div class="sv-legend muted small">
-  <span><i class="sv-k-spent"></i>committed so far</span>
-  <span><i class="sv-k-over"></i>committed beyond the plan</span>
-  <span><i class="sv-k-fc"></i>still to commit (forecast)</span>
-  <span><i class="sv-k-fc-bad"></i>forecast past the plan</span>
-  <span><i class="sv-k-plan"></i>the plan</span>
 </div>
 
 <?php foreach ($v['log_gaps'] as $gp): ?>
