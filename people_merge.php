@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Nothing was merged. To merge these records, type the name, %s, in the box.',
                 $expect !== '' ? $expect : 'exactly as it is written'));
         }
-        flash('ok', merge_crew($pdo, $keep, $lose, current_user_display()));
+        flash('ok', merge_crew($pdo, $keep, $lose, current_user_display(), (string)($_POST['rate'] ?? '')));
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
@@ -168,15 +168,23 @@ require __DIR__ . '/includes/header.php';
         made. That is the safe answer to a question that could not be asked, not a fault in the
         records.
       </div>
-    <?php elseif ($withTerms > 1): ?>
-      <div class="flash flash-warn">
-        <strong>These records carry different rates</strong> (<?= e(implode(', ', array_values($rates))) ?>),
-        so merging is refused rather than one of them being picked for you. Two rates for one person
-        is a real disagreement about what they cost. Decide which is right under Finance management,
-        set the others to the same rate or clear them, then come back. The same rate on several
-        records does not block a merge.
-      </div>
     <?php else: ?>
+      <?php if ($withTerms > 1):
+            // DIFFERENT RATES: PICK ONE (David, 2026-11-17, "Pick one rate"). The
+            // rate on the record pre-ticked to keep is pre-picked; nothing is
+            // merged until somebody presses the button with a rate chosen.
+            $bestSig = '';
+            foreach ($rows as $r) if ((int)$r['crew']['id'] === $best) $bestSig = (string)($r['money']['rate_sig'] ?? ''); ?>
+        <fieldset class="merge-rate">
+          <legend><strong>These records carry different rates.</strong> Pick the one this person keeps:</legend>
+          <?php foreach ($rates as $sig => $txt): ?>
+            <label class="inline"><input type="radio" name="rate" value="<?= e($sig) ?>"
+              <?= $sig === $bestSig ? 'checked' : '' ?> required> <?= e($txt) ?></label>
+          <?php endforeach; ?>
+          <p class="muted small">The others are dropped, and the change is written in the person's rate
+            history. Work already invoiced keeps the amount on its invoice.</p>
+        </fieldset>
+      <?php endif; ?>
       <div class="inline-form merge-confirm">
         <label class="inline">Type <strong><?= e($name) ?></strong> to confirm
           <input name="confirm_name" size="24" autocomplete="off"
