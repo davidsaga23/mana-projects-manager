@@ -109,7 +109,7 @@ function crew_usage(PDO $pdo, int $crewId): array {
  */
 function crew_money_footprint(int $crewId): array {
     $out = ['terms' => 0, 'invoices' => 0, 'log' => 0, 'total' => 0,
-            'reachable' => true, 'day_rate' => null];
+            'reachable' => true, 'day_rate' => null, 'rate_sig' => '', 'rate_text' => ''];
 
     if (!finance_configured()) return $out;           // definitively nothing there
     if (!can_see_money())      { $out['reachable'] = false; return $out; }
@@ -118,12 +118,16 @@ function crew_money_footprint(int $crewId): array {
 
     try {
         if (finance_column_exists('crew_terms', 'crew_id')) {
-            $q = $db->prepare('SELECT day_rate FROM crew_terms WHERE crew_id = ?');
+            $sal = finance_column_exists('crew_terms', 'monthly_salary');
+            $q = $db->prepare('SELECT day_rate, rate_unit, rate_currency' . ($sal ? ', monthly_salary' : '')
+                            . ' FROM crew_terms WHERE crew_id = ?');
             $q->execute([$crewId]);
             $row = $q->fetch();
             if ($row) {
                 $out['terms'] = 1;
                 $out['day_rate'] = $row['day_rate'];
+                $out['rate_sig'] = crew_rate_sig($row);
+                $out['rate_text'] = crew_rate_text($row);
             }
         }
         if (finance_column_exists('crew_terms_log', 'crew_id')) {
@@ -143,6 +147,45 @@ function crew_money_footprint(int $crewId): array {
 
     $out['total'] = $out['terms'] + $out['invoices'] + $out['log'];
     return $out;
+}
+
+/**
+ * WHAT A RATE IS, FOR TELLING TWO APART (David, 2026-11-17, on the Duplicate
+ * people screen: "how do I merge these duplicates?"). The screen refused every
+ * pair where both records had a crew_terms ROW, and its advice, "clear the
+ * other", could not work: clearing a rate under Finance management empties the
+ * row's day_rate but keeps the row, so the refusal never lifted. And the
+ * duplicates it exists for were made by registering the same hire into several
+ * slots, so they usually carry the SAME rate, which is no disagreement at all.
+ *
+ * So a clash is now two DIFFERENT rates, compared on what the rate actually is:
+ * amount, unit, currency and monthly salary. '' means "no rate" (an empty row).
+ */
+function crew_rate_sig(array $row): string {
+    $rate = $row['day_rate'] ?? null;
+    $sal  = $row['monthly_salary'] ?? null;
+    $hasRate = $rate !== null && $rate !== '' && (float)$rate > 0;
+    $hasSal  = $sal !== null && $sal !== '' && (float)$sal > 0;
+    if (!$hasRate && !$hasSal) return '';
+    return implode('|', [
+        $hasRate ? number_format((float)$rate, 2, '.', '') : '',
+        strtolower(trim((string)($row['rate_unit'] ?? 'day'))) ?: 'day',
+        strtoupper(trim((string)($row['rate_currency'] ?? 'USD'))) ?: 'USD',
+        $hasSal ? number_format((float)$sal, 2, '.', '') : '',
+    ]);
+}
+
+/** The rate in words for the screen, e.g. "USD 400/day". '' when there is none. Admin-only screen. */
+function crew_rate_text(array $row): string {
+    if (crew_rate_sig($row) === '') return '';
+    $sal = $row['monthly_salary'] ?? null;
+    if ($sal !== null && $sal !== '' && (float)$sal > 0) {
+        return strtoupper((string)($row['rate_currency'] ?? 'USD')) . ' ' . number_format((float)$sal, 0) . '/month salary';
+    }
+    $amt = (float)$row['day_rate'];
+    return strtoupper((string)($row['rate_currency'] ?: 'USD')) . ' '
+         . (floor($amt) == $amt ? number_format($amt, 0) : number_format($amt, 2))
+         . '/' . ((string)($row['rate_unit'] ?: 'day'));
 }
 
 /**
@@ -186,32 +229,59 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
           . 'answer to a question that could not be asked.');
     }
 
-    $moveTerms = [];       // loser ids whose day rate should move to the keeper
+    // ⚠ TWO DIFFERENT RATES ARE REFUSED, NOT GUESSED: that is a real disagreement
+    // about what the person costs, and picking one would silently reprice their
+    // work. The SAME rate on several records, or an emptied one, is not a
+    // disagreement (crew_rate_sig(), above): one row survives and the others go.
+    $moveTerms = [];       // the one loser id whose terms row moves to the keeper (at most one)
+    $dropTerms = [];       // ids whose terms row is deleted: copies, or emptied rows
+    $loseMoney = [];
+    $sigs = [];
+    if ($keepMoney['rate_sig'] !== '') $sigs[$keepMoney['rate_sig']] = $keepMoney['rate_text'];
     foreach ($loseIds as $id) {
         $m = crew_money_footprint($id);
         if (!$m['reachable']) {
             throw new RuntimeException('The finance database would not answer for one of those '
                                      . 'records, so nothing was merged.');
         }
-        if ($m['terms'] > 0) {
-            if ($keepMoney['terms'] > 0 || $moveTerms) {
-                // ⚠ REFUSED, NOT GUESSED. Two rates for one person is a real
-                // disagreement about what they cost, and resolving it by
-                // picking whichever row this loop met first would silently
-                // reprice somebody's work.
-                throw new RuntimeException(sprintf(
-                    'Both records carry a day rate, so nothing was merged. Open %s under Finance '
-                  . 'management, decide which rate is right and clear the other, then merge.',
-                    $byId[$keepId]['name']));
-            }
-            $moveTerms[] = $id;
+        $loseMoney[$id] = $m;
+        if ($m['rate_sig'] !== '') $sigs[$m['rate_sig']] = $m['rate_text'];
+    }
+    if (count($sigs) > 1) {
+        throw new RuntimeException(sprintf(
+            'These records carry different rates (%s), so nothing was merged. Open %s under Finance '
+          . 'management, decide which rate is right, set the others to the same or clear them, then merge.',
+            implode(', ', array_values($sigs)), $byId[$keepId]['name']));
+    }
+    // Which row survives: the keeper's if it holds the rate (or nobody holds one
+    // and the keeper has a row); else the loser's row that holds the rate, else
+    // the first loser row. Every other row is a copy or empty, and goes; its
+    // history (crew_terms_log) still moves to the keeper below.
+    $carrier = null;
+    $keeperRow = $keepMoney['terms'] > 0;
+    if (!($keeperRow && ($keepMoney['rate_sig'] !== '' || !$sigs))) {
+        foreach ($loseIds as $id) if ($loseMoney[$id]['terms'] > 0 && $loseMoney[$id]['rate_sig'] !== '') { $carrier = $id; break; }
+        if ($carrier === null && !$keeperRow) {
+            foreach ($loseIds as $id) if ($loseMoney[$id]['terms'] > 0) { $carrier = $id; break; }
         }
+    }
+    if ($carrier !== null) {
+        $moveTerms[] = $carrier;
+        if ($keeperRow) $dropTerms[] = $keepId;     // the keeper's own row is empty: the rate comes over
+    }
+    foreach ($loseIds as $id) {
+        if ($id !== $carrier && $loseMoney[$id]['terms'] > 0) $dropTerms[] = $id;
     }
 
     // ---- FINANCE FIRST. See the header for why the order is not arbitrary. --
     $moved = ['terms' => 0, 'invoices' => 0, 'log' => 0];
     if (finance_configured() && ($db = finance_db())) {
         try {
+            if ($dropTerms && finance_column_exists('crew_terms', 'crew_id')) {
+                // Copies and emptied rows, checked above to hold no rate that differs.
+                $del = $db->prepare('DELETE FROM crew_terms WHERE crew_id = ?');
+                foreach ($dropTerms as $id) $del->execute([$id]);
+            }
             if ($moveTerms && finance_column_exists('crew_terms', 'crew_id')) {
                 $up = $db->prepare('UPDATE crew_terms SET crew_id = ? WHERE crew_id = ?');
                 foreach ($moveTerms as $id) { $up->execute([$keepId, $id]); $moved['terms']++; }
