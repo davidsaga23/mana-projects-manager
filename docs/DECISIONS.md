@@ -6438,3 +6438,23 @@ new stuff for that person."
 - **First summary looks back 12 hours only**, so it is not a list of everything that ever rang.
 - The old mailer functions stay as wrappers that ring the bell, so a branch written before this
   still works.
+
+## 2026-11-17 — Set-password links for admin logins, from Users only, by admins only
+
+**Asked by David**, for Jorik, an admin who is on no show's crew and so has no person page: "yeah
+let's do the set password link". This **replaces "nobody for an admin login"** in the 2026-10-28
+entry above.
+
+**Decided:**
+- **An admin may send a set-password link for any other login, admins included,** from Users. Only
+  admins, and never for their own account (their own password is changed with Set password).
+- **An Admin login needs a confirmation tick** ("This gives full access to money and every show.
+  Send it?"), checked again on the server. The person page keeps refusing admin logins and points at
+  Users, so the confirmation cannot be gone round.
+- **Production keeps the person-page rules** (artist and supervisor logins). On Users, Production
+  may create an artist or supervisor with a link instead of a password, the same rule.
+- **Where it goes:** the login's own email (`users.email`, migration 049) if it has one, else its
+  linked person's. No new column was needed. For a login with neither, the admin types an address at
+  send time and it is saved on the login; an address already on file is never overwritten from here.
+  With no address at all, **Copy link** hands the link over to send by WhatsApp or Slack.
+- **Logged** in `user_invites` as before, and in the Access log.
