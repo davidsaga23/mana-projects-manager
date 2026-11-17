@@ -19,6 +19,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Under Milestones, the table and the Add milestone form sit behind "Show milestones (N)", closed
   when the page opens. The milestone markers on the charts are unchanged.
 
+## 2026-11-17 — Staffing: Start and End on the capsule line, saved when picked *(no migration)*
+
+- The Start and End date fields now sit on the same line as Freelance / Signed / Open contract,
+  instead of stacked under the name, and there is no Save button: picking a date saves it.
+
 ## 2026-11-17 — Timeline: help text behind an ⓘ *(no migration)*
 
 - The Timeline's "Drag a bar…" and Milestones explanations are hidden behind a small ⓘ that opens
