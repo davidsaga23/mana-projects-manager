@@ -667,14 +667,21 @@ function skyPaint(c, f) {
       if (k.w!=='cloud') cloud(c,x+30+drift(1),top+8,56,col,belly);
       if (dark) cloud(c,x-62+drift(2),top+14,50,col,belly);
     }
-    if (k.mile) {
-      /* The banner: a pennant in the show's colour on a pole beside the camp, for the rest of the day. */
-      var px = x+40, py = y-56, tint = TINT[{peaks:'mana',wood:'violet',ash:'ember',lake:'teal',moor:'rose'}[l.land]]||TINT.candle, txt = k.mile===100 ? 'DONE!' : k.mile+'%';
+    /* THE FLAG BESIDE THE CAMP (David, 2026-11-17: the flag said 75% while the project page said
+       86%, "Yes, show current %"). For a show I am on it always flies and carries the show's own
+       "of all work approved" figure (k.pct, the project page's number); on a day the show crosses
+       25, 50, 75 or 100% it also gets a gold edge and a star. For a show I am not on there is no
+       figure (the server sends none), so as before it flies only on a milestone day, with the
+       milestone. */
+    if (k.pct!==undefined && k.pct!==null || k.mile) {
+      var mine = k.pct!==undefined && k.pct!==null;
+      var px = x+40, py = y-56, tint = TINT[{peaks:'mana',wood:'violet',ash:'ember',lake:'teal',moor:'rose'}[l.land]]||TINT.candle, txt = mine ? (k.pct>=100 ? 'DONE!' : k.pct+'%') : (k.mile===100 ? 'DONE!' : k.mile+'%');
       c.fillStyle = PAL.out; c.fillRect(px-2,py-2,5,60); c.fillStyle = PAL.wood; c.fillRect(px-1,py,3,56);
       c.fillStyle = PAL.out; c.fillRect(px+1,py,40,18); c.fillRect(px+41,py+4,6,10);
       c.fillStyle = tint; c.fillRect(px+2,py+2,37,14); c.fillRect(px+39,py+5,5,8);
       c.font = 'bold 11px "Courier New", monospace'; c.textAlign = 'center'; c.fillStyle = PAL.out; c.fillText(txt,px+21,py+13); c.textAlign = 'start';
       c.fillStyle = PAL.hot; c.fillRect(px-1,py-4,3,3);
+      if (mine && k.mile) { c.fillStyle = TINT.candle; c.fillRect(px+2,py+1,37,1); c.fillRect(px+2,py+15,37,1); star(c,px+48,py+2,TINT.candle); }
     }
   });
 }

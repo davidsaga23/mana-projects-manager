@@ -569,6 +569,9 @@ function realm_state(PDO $pdo, int $uid): array {
     $skies = realm_skies($pdo);
     foreach ($lands as &$l) {
         $l['sky'] = ($l['claimed'] && isset($skies[$l['land']])) ? $skies[$l['land']] : realm_sky_none();
+        // The show's percentage only for those who may see the show (realm_lands() names it for
+        // them and says "Another show" to everybody else, with project_id 0).
+        if (empty($l['project_id'])) unset($l['sky']['pct']);
     }
     unset($l);
     return ['ok' => true, 'me' => $uid, 'people' => $people, 'lands' => $lands,
