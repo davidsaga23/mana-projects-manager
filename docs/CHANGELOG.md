@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — A colour per project *(no migration)*
+
+**Asked by David**: "add a color code per project and change the hue a little bit so when we're
+navigating anima we know visually which project we're on", then, on the projects list, "I still
+don't see the color codes here".
+
+- **Every project has a colour.** Inside a project, every page shows it: a thin bar across the top of
+  the window, the show's code tag beside its name, the underline of the current tab, and a very
+  faint wash over the page.
+- **The projects list** shows each show's code in its colour.
+- **Pick it on the project's Edit screen** (Basics), from eight colours, or leave it on Automatic,
+  which gives each show a colour no other show has chosen.
+- Identity only: **buttons stay blue and approved stays green on every show**, and the palette
+  leaves out blue, green, amber and red, so a show's colour never reads as a status.
+
 ## 2026-11-17 — Duplicate people: the same rate twice no longer blocks a merge *(no migration)*
 
 **Asked by David**, on the Duplicate people screen with Agustin Scavino and James Douglas Murphy
