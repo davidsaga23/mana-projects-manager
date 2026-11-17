@@ -94,11 +94,14 @@ require __DIR__ . '/includes/header.php';
     }
     $name = (string)$members[0]['name'];
     $moneyBlocked = false;
-    $withTerms = 0;
+    // Two DIFFERENT rates block the merge; the same rate twice, or an emptied
+    // one, does not (crew_rate_sig() in includes/people_merge.php).
+    $rates = [];
     foreach ($rows as $r) {
         if (!$r['money']['reachable']) $moneyBlocked = true;
-        if ($r['money']['terms'] > 0) $withTerms++;
+        if (($r['money']['rate_sig'] ?? '') !== '') $rates[$r['money']['rate_sig']] = $r['money']['rate_text'];
     }
+    $withTerms = count($rates);
   ?>
   <h3 class="history-head"><?= e($name) ?>
     <span class="muted small"><?= count($members) ?> records</span>
@@ -143,7 +146,7 @@ require __DIR__ . '/includes/header.php';
               <?php if (!$r['money']['reachable']): ?>
                 <span class="err">could not be read</span>
               <?php elseif ($r['money']['terms'] > 0): ?>
-                <strong>day rate</strong><?php if ($r['money']['invoices']): ?>
+                <strong><?= ($r['money']['rate_text'] ?? '') !== '' ? e($r['money']['rate_text']) : 'empty rate' ?></strong><?php if ($r['money']['invoices']): ?>
                   <span class="muted">&middot; <?= (int)$r['money']['invoices'] ?> inv</span>
                 <?php endif; ?>
               <?php elseif ($r['money']['invoices']): ?>
@@ -167,10 +170,11 @@ require __DIR__ . '/includes/header.php';
       </div>
     <?php elseif ($withTerms > 1): ?>
       <div class="flash flash-warn">
-        <strong>More than one of these carries a day rate</strong>, so merging is refused rather
-        than one of them being picked for you. Two rates for one person is a real disagreement
-        about what they cost. Decide which is right under Finance management, clear the other,
-        then come back.
+        <strong>These records carry different rates</strong> (<?= e(implode(', ', array_values($rates))) ?>),
+        so merging is refused rather than one of them being picked for you. Two rates for one person
+        is a real disagreement about what they cost. Decide which is right under Finance management,
+        set the others to the same rate or clear them, then come back. The same rate on several
+        records does not block a merge.
       </div>
     <?php else: ?>
       <div class="inline-form merge-confirm">
