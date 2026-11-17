@@ -817,8 +817,19 @@ function dashboard_pace(PDO $pdo, int $projectId, ?string $deliveryDate, ?string
 
 /**
  * The SQL test for "still to do" in Who is carrying what, over the alias sc
- * (schedule): a scheduled task whose last day is today or later. It takes ONE
- * positional parameter, today's date.
+ * (schedule): a scheduled task that is NOT FINISHED, whatever its dates. It
+ * takes no parameter.
+ *
+ * ⚠ FINISHED IS THE STATUS, NOT THE CALENDAR (David, 2026-11-17, with Dan's list
+ * showing eight tasks all marked Final: "why is still showing 8 tasks to go for
+ * Dan when in the list they're all final?"). This used to be "the task's last
+ * scheduled day is today or later", so approved work still counted until its
+ * date went by, and work that ran late and was still open dropped OUT of the
+ * count the day after its date. Now a task is done when its progress row on that
+ * department is approved (`progress.is_approved`, set from the status's maps_to,
+ * the same flag every approved count in Anima uses, never the word "Final",
+ * which each show names its own way) or its status is excluded (N/A). Late and
+ * still open = still to do. A task with no progress row yet is still to do.
  *
  * ⚠ ONE DEFINITION FOR THE NUMBER AND THE LIST (David, 2026-11-16: "if you click
  * the number you can see the list of those tasks missing"). dashboard_workload()
@@ -826,7 +837,10 @@ function dashboard_pace(PDO $pdo, int $projectId, ?string $deliveryDate, ?string
  * always as long as the number clicked.
  */
 function workload_remaining_sql(): string {
-    return '(sc.end_date >= ?)';
+    return '(NOT EXISTS (SELECT 1 FROM progress pd
+                           LEFT JOIN statuses sd ON sd.id = pd.status_id
+                          WHERE pd.step_id = sc.step_id AND pd.item_key = sc.item_key
+                            AND (pd.is_approved = 1 OR COALESCE(sd.is_excluded, 0) = 1)))';
 }
 
 /** Who is carrying what: tasks, days and the next thing due, per crew slot. */
@@ -844,7 +858,7 @@ function dashboard_workload(PDO $pdo, int $projectId, ?string $today = null): ar
           GROUP BY c.id, c.name, c.is_placeholder
           ORDER BY remaining DESC, c.name'
     );
-    $stmt->execute([$today, $projectId]);
+    $stmt->execute([$projectId]);
     return $stmt->fetchAll();
 }
 
@@ -878,7 +892,7 @@ function crew_workload_items(PDO $pdo, int $projectId, int $crewId, string $whic
           WHERE sc.project_id = ? AND sc.crew_id = ?' . $filter . '
           ORDER BY sc.end_date, ps.step_order, sh.episode, sh.shot_code, a.name'
     );
-    $stmt->execute($which === 'remaining' ? [$projectId, $crewId, $today] : [$projectId, $crewId]);
+    $stmt->execute([$projectId, $crewId]);
     $out = [];
     foreach ($stmt as $r) {
         if ($r['shot_id'] !== null) {
