@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — The Realm: a show's flag shows its real progress *(no migration)*
+
+**Asked by David**, with the project page saying 86% and the flag by the show's camp saying 75%:
+"why do I see 2 different completion percentages?", then "Yes, show current %".
+
+- The flag used to go up only on the day a show crossed 25, 50, 75 or 100%, and carried that
+  milestone, so "75%" read as the show's progress when it meant "passed 75% today".
+- **Now, for a show you are on, the flag always flies with the show's current figure**, the same
+  "of all work approved" number as the project page. On a milestone day it gets a gold edge and a
+  star.
+- For a show you are not on there is still no figure: its flag flies only on a milestone day, as
+  before.
+
 ## 2026-11-16 — The Realm is open to the whole studio *(no migration)*
 
 **Asked by David**: "let's remove the hard code and let's realm be available for everyone".
