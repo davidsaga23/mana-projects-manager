@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — The Realm is open to the whole studio *(no migration)*
+
+**Asked by David**: "let's remove the hard code and let's realm be available for everyone".
+
+- **Everybody in the studio now has the Realm**: editors (Production), supervisors and artists, as
+  well as admins. Until today only David and Renata could open it, through a list of names written
+  into the code; that list is gone.
+- **Clients never see it**, as decided on day one ("This is an internal development so no clients
+  allowed").
+- It is now an ordinary switch on **Users, Access**: it can still be turned off for a role or for one
+  person there.
+
 ## 2026-11-16 — Dashboard: click a "Who is carrying what" number to see those tasks *(no migration)*
 
 - In "Who is carrying what", the Tasks and Still to do numbers open the list behind them: each task
