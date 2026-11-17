@@ -14,6 +14,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Staffing: the intro paragraph about slots is gone *(no migration)*
+
+- "A crew is never complete until a show nearly is…" no longer shows at the top of Staffing.
+
 ## 2026-11-17 — Finance Overview: the reserve is always green on its bar *(no migration)*
 
 - The Reserve left bar now shows the reserve (green), what finished departments went over (red) and
