@@ -222,7 +222,7 @@ function notify_mark_seen(PDO $pdo, int $crewId): int {
 }
 
 /**
- * Has migration 102 (notifications.opened_at) run? Asked once per request; never throws.
+ * Has migration 103 (notifications.opened_at) run? Asked once per request; never throws.
  * Before it has, the bell shows every row in one list, as it always did.
  */
 function notify_opened_available(PDO $pdo): bool {
@@ -238,7 +238,7 @@ function notify_opened_available(PDO $pdo): bool {
 
 /**
  * Has this row been clicked (Tim, 2026-11-17: "once clicked on, get cleared from
- * the list")? False for every row until migration 102 runs.
+ * the list")? False for every row until migration 103 runs.
  */
 function notify_is_opened(array $n): bool {
     return !empty($n['opened_at']);

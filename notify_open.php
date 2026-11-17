@@ -5,7 +5,7 @@
 // get cleared from the list?" David: "a collapsible notification for past/read
 // notifications". assets/bell.js sends this (as a beacon, so it survives the page
 // changing) when a row of the bell is clicked; the row then moves under "Earlier"
-// (migration 102, notifications.opened_at).
+// (migration 103, notifications.opened_at).
 //
 // ⚠ YOUR OWN NOTIFICATIONS AND NOBODY ELSE'S. The id comes from the request, so
 // the update also requires crew_id to be the session's own: an id that is not

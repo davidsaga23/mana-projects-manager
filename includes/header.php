@@ -135,7 +135,7 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
               <?php // CLICKED ROWS LEAVE THE LIST (Tim, 2026-11-17: "once clicked on, get cleared
                     // from the list"; David: "a collapsible notification for past/read
                     // notifications"). What has not been opened stays on top; what has is folded
-                    // under Earlier (migration 102). assets/bell.js draws the same two parts. ?>
+                    // under Earlier (migration 103). assets/bell.js draws the same two parts. ?>
               <?php $bellNow = array_values(array_filter($bell['items'], fn($n) => !notify_is_opened($n)));
                     $bellOld = array_values(array_filter($bell['items'], fn($n) => notify_is_opened($n)));
                     $bellRow = function (array $n): void { ?>
