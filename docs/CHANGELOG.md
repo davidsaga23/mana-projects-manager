@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Staffing: Start and End on the capsule line, saved when picked *(no migration)*
+
+- The Start and End date fields now sit on the same line as Freelance / Signed / Open contract,
+  instead of stacked under the name, and there is no Save button: picking a date saves it.
+
 ## 2026-11-17 — Staffing: Start and End date fields right on each position *(no migration)*
 
 - For those who can edit Staffing, each filled position now shows two date pickers, **Start** and

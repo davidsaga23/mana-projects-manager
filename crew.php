@@ -1106,6 +1106,18 @@ require __DIR__ . '/includes/header.php';
                   // shipped. "Nobody has started the contract" is the single most
                   // actionable thing this line can say, so it is the one state it
                   // must not stay silent about. ?>
+            <?php // THE POSITION'S DATES (David, 2026-11-17), worked out first so
+                  // the Start and End fields can sit on the capsule line ("change
+                  // the UI to be in the same line"). The person's own dates on
+                  // this show when set; otherwise the department's window, which
+                  // is what the scheduler and statements fall back to. An empty
+                  // position shows the department's window only.
+              $deptSpan = $datesReady ? staffing_date_span($l['step_start'] ?: null, $l['step_deadline'] ?: null) : '';
+              $en = ($datesReady && !$isPh) ? ($engagements[(int)$l['crew_id']] ?? null) : null;
+              $ownSpan = $en ? staffing_date_span($en['start_date'] ?: null, $en['end_date'] ?: null) : '';
+              $others = $isPh ? [] : array_diff_key($posByCrew[(int)$l['crew_id']] ?? [], [(int)$l['id'] => true]);
+              $canDates = $datesReady && !$isPh && can_edit_area('staffing');
+            ?>
             <?php if (!$isPh):
               $money = can_see_money();
               $ct = $money ? ($lanePosTerms[(int)$l['crew_id'] . '|' . (int)$l['step_id']]
@@ -1122,7 +1134,7 @@ require __DIR__ . '/includes/header.php';
               // from the artist database, and it is not money, so everybody sees
               // it even where the contract half of this line is admin-only.
               $cType = $collabTypes[(int)$l['crew_id']] ?? null;
-              if ($cType !== null || $showState || $cUrl !== ''): ?>
+              if ($cType !== null || $showState || $cUrl !== '' || $canDates): ?>
               <div class="slot-contract">
                 <?php if ($cType !== null): ?>
                   <span class="collab-chip collab-<?= e($cType) ?>"
@@ -1148,57 +1160,49 @@ require __DIR__ . '/includes/header.php';
                   <a class="ct-chip ct-open" href="<?= e($cUrl) ?>" target="_blank" rel="noopener"
                      title="<?= e($cUrl) ?>">Open contract</a>
                 <?php endif; ?>
+                <?php // START AND END, ON THE SAME LINE, SAVED AS SOON AS A DATE IS
+                      // PICKED (David, 2026-11-17: "no need for the save button as
+                      // it will automatically save once you pick a date").
+                      //
+                      // ⚠ NOT ON EVERY KEYSTROKE. Typing a year into a date field
+                      // makes it briefly valid at 0002, 0020, 0202, and a change
+                      // event fires each time; saving then would store year 2.
+                      // So it saves only once the year reads 2000 or later, or the
+                      // field was cleared. The same dates:<id> handler, which still
+                      // refuses an end before the start. ?>
+                <?php if ($canDates): ?>
+                  <form method="post" class="slot-dates-form">
+                    <input type="hidden" name="action" value="dates:<?= (int)$l['id'] ?>">
+                    <label>Start
+                      <input type="date" name="start_date" value="<?= e($en['start_date'] ?? '') ?>"
+                             onchange="if (this.value === '' || this.value >= '2000') this.form.submit()"></label>
+                    <label>End
+                      <input type="date" name="end_date" value="<?= e($en['end_date'] ?? '') ?>"
+                             min="<?= e($en['start_date'] ?? '') ?>"
+                             onchange="if (this.value === '' || this.value >= '2000') this.form.submit()"></label>
+                  </form>
+                <?php endif; ?>
               </div>
             <?php endif; endif; ?>
-            <?php // THE POSITION'S DATES (David, 2026-11-17). The person's own
-                  // dates on this show when set; otherwise the department's
-                  // window, greyed and labelled, because that is what the
-                  // scheduler and statements fall back to. An empty position
-                  // shows the department's window only: nobody to agree dates
-                  // with yet. Edited in place, folded until asked for. ?>
-            <?php if ($datesReady):
-              $deptSpan = staffing_date_span($l['step_start'] ?: null, $l['step_deadline'] ?: null);
-              $en = $isPh ? null : ($engagements[(int)$l['crew_id']] ?? null);
-              $ownSpan = $en ? staffing_date_span($en['start_date'] ?: null, $en['end_date'] ?: null) : '';
-              $others = $isPh ? [] : array_diff_key($posByCrew[(int)$l['crew_id']] ?? [], [(int)$l['id'] => true]);
-              $canDates = !$isPh && can_edit_area('staffing');
-              if ($ownSpan !== '' || $deptSpan !== '' || $canDates): ?>
-              <?php // THE FIELDS THEMSELVES, ON THE ROW (David, 2026-11-17: "add
-                    // them like these editable dropdowns with just start and end
-                    // as text"), the date pickers the person page uses, labelled
-                    // just Start and End, rather than a line of text behind an
-                    // "Edit dates" link. Those who cannot edit Staffing still get
-                    // the line of text. ?>
+            <?php if ($datesReady): ?>
               <?php if ($canDates): ?>
-                <form method="post" class="slot-dates-form">
-                  <label>Start
-                    <input type="date" name="start_date" value="<?= e($en['start_date'] ?? '') ?>"
-                           onchange="this.form.end_date.min = this.value"></label>
-                  <label>End
-                    <input type="date" name="end_date" value="<?= e($en['end_date'] ?? '') ?>"
-                           min="<?= e($en['start_date'] ?? '') ?>"></label>
-                  <button type="submit" class="secondary" name="action"
-                          value="dates:<?= (int)$l['id'] ?>">Save</button>
-                </form>
                 <?php if ($ownSpan === '' && $deptSpan !== ''): ?>
                   <div class="muted small">Not set: following the department's dates, <?= e($deptSpan) ?>.</div>
                 <?php endif; ?>
-              <?php else: ?>
-              <div class="slot-dates">
-                <?php if ($ownSpan !== ''): ?>
-                  <span class="slot-dates-own"><?= e($ownSpan) ?></span>
-                <?php elseif ($deptSpan !== ''): ?>
-                  <span class="muted"><?= e($deptSpan) ?> · from the department's dates</span>
-                <?php else: ?>
-                  <span class="muted">No dates yet</span>
-                <?php endif; ?>
-              </div>
+              <?php elseif ($ownSpan !== '' || $deptSpan !== ''): ?>
+                <div class="slot-dates">
+                  <?php if ($ownSpan !== ''): ?>
+                    <span class="slot-dates-own"><?= e($ownSpan) ?></span>
+                  <?php else: ?>
+                    <span class="muted"><?= e($deptSpan) ?> · from the department's dates</span>
+                  <?php endif; ?>
+                </div>
               <?php endif; ?>
               <?php if ($others): ?>
                 <div class="muted small">Same dates as their other position here:
                   <?= e(implode(', ', $others)) ?>.</div>
               <?php endif; ?>
-            <?php endif; endif; ?>
+            <?php endif; ?>
             <?php // "placeholder" was internal vocabulary printed at a reader:
                   // it is the database's word for an empty position, not
                   // anybody's word for one. What the row needs to say is what
