@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Duplicate people: pick the rate to keep *(no migration)*
+
+**Decided by David**: Agustin Scavino (USD 150/flat and 200/flat) and James Douglas Murphy (USD
+200/day and 250/day) still could not be merged because their records carry different rates.
+Offered keeping each job's rate or picking one, he chose "Pick one rate".
+
+- When duplicates carry different rates, the screen now asks **which rate to keep** (the rate on
+  the record ticked to keep is pre-picked), and the merge goes ahead with it.
+- The other rates are dropped, and the person's **rate history** records the change, who made it
+  and which rates were dropped. Invoices already made keep their amounts.
+
 ## 2026-11-17 — A colour per project *(no migration)*
 
 **Asked by David**: "add a color code per project and change the hue a little bit so when we're
