@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — The bell: clicked notifications fold under "Earlier", and a bigger bell *(migration 102)*
+
+**Asked by Tim** ("is it possible to have the notifications (once clicked on) get cleared from the
+list?") and **David** ("a collapsible notification for past/read notifications", and "let's make the
+notification bell 50% larger").
+
+- **A notification you click leaves the list** and waits under a folded **Earlier** section at the
+  bottom of the bell; open it to see them. The rest stay on top until you click them.
+- The red count still clears when you open the bell, as before.
+- **The bell icon is 50% larger.**
+- Needs **migration 102**: until it runs the bell lists everything together, as it always did.
+
 ## 2026-11-17 — A colour per project *(no migration)*
 
 **Asked by David**: "add a color code per project and change the hue a little bit so when we're
