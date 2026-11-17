@@ -108,6 +108,14 @@ function realm_skies_now(PDO $pdo, ?string $today = null): array {
             $total = $o ? (int)$o['applicable'] : 0;
             $out[(string)$r['land']] = realm_sky_for($done, $total, $r['start_date'] ?: null,
                                                      $r['delivery_date'] ?: null, $log[$pid] ?? null, $today);
+            // THE FLAG SHOWS THE SHOW'S OWN FIGURE (David, 2026-11-17, with the project page
+            // reading 86% and the camp's flag 75%: "why do I see 2 different completion
+            // percentages?", then "Yes, show current %"). The flag used to fly only on a
+            // milestone day, carrying the milestone (75%), which read as the show's progress.
+            // `pct` is exactly the "of all work approved" figure of the project page
+            // (projects_overall_pct()). ⚠ realm_state() takes it off again for anybody who may
+            // not see that show, so the rule "only the mood travels" still holds for them.
+            if ($o && $o['pct'] !== null && $total > 0) $out[(string)$r['land']]['pct'] = (int)$o['pct'];
         }
     } catch (Throwable $e) {
         return [];
