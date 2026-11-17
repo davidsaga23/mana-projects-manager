@@ -5164,3 +5164,5 @@ body.rv-open { overflow: hidden; }
 .psi-table th { text-align: left; }
 .psi-open { background: none; border: 0; margin: 0; padding: 0; color: var(--primary); font: inherit; cursor: pointer; text-align: left; }
 .psi-open:hover { background: none; text-decoration: underline; filter: none; }
+/* The projects list sets its cells at 18px; a count's list opened under a row reads at list size (2026-11-17). */
+.project-list .psi-box td, .project-list .psi-box th { font-size: 13px; }

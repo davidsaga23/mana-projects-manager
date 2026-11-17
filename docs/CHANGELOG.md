@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Projects list: Departments, Shots, Assets and Head count open their lists *(no migration)*
+
+- On the projects list, clicking one of those numbers opens the list behind it under the row:
+  departments in pipeline order (colour, what they apply to, deadline, linking to the department
+  page); shots and assets (linking to the item page); the people in the head count (positions on
+  the show, engagement dates, linking to their person page). A 0 stays plain text. Lists load on
+  click (`project_count_list.php`) and respect who may see which show.
+- The head-count rule now lives once, in `head_count_where_sql()` (`includes/project_lists.php`),
+  used for both the number and its list, so they always match.
+
 ## 2026-11-17 — Hiring replaces the placeholder; the projects list loses Crew *(no migration)*
 
 - Putting a real person into a slot (hiring, or choosing them on Staffing) now deletes the placeholder

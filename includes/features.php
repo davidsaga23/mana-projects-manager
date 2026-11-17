@@ -490,7 +490,7 @@ function feature_gate_request(PDO $pdo): ?array {
 function feature_request_project(PDO $pdo, string $script): int {
     // Spell's own files check the show themselves (board_projects()).
     $byProject = [
-        'project.php', 'project_step_items.php', 'brief.php', 'dashboard.php', 'dashboard_crew_tasks.php', 'crew.php', 'hiring.php', 'schedule.php',
+        'project.php', 'project_step_items.php', 'project_count_list.php', 'brief.php', 'dashboard.php', 'dashboard_crew_tasks.php', 'crew.php', 'hiring.php', 'schedule.php',
         'schedule_api.php', 'timeline.php', 'timeline_gan.php', 'timeline_import.php', 'shots.php',
         'shots_api.php', 'production.php', 'production_api.php', 'tasks.php', 'team.php', 'wizard.php',
         'import.php', 'statuses_edit.php', 'aliases.php', 'export.php', 'export_breakdown.php',
