@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Duplicate people: the same rate twice no longer blocks a merge *(no migration)*
+
+**Asked by David**, on the Duplicate people screen with Agustin Scavino and James Douglas Murphy
+both refused: "how do I merge these duplicates?"
+
+- **A merge is now refused only when the records carry DIFFERENT rates.** The same rate on several
+  records (which is how these duplicates were made: one hire registered into several slots), or a
+  rate that was cleared, no longer blocks it. One rate row survives; the copies are deleted, and
+  every record's rate history still moves to the person kept.
+- Before, the screen refused whenever more than one record had a rate row at all, and its advice to
+  "clear the other" could never work: clearing a rate empties it but keeps the row.
+- **The Money column now shows each record's rate** (for example "USD 400/day", or "empty rate"),
+  and when the rates really differ the warning lists them.
+
 ## 2026-11-17 — Who is carrying what: "Still to do" counts unfinished work, not future dates *(no migration)*
 
 **Reported by David**, with Dan's list open: "why is still showing 8 tasks to go for Dan when in the
