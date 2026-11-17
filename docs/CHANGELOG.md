@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — "Approved over time" is wider, interactive, and shows the task total *(no migration)*
+
+- The chart on a project's **Dashboard** now fills the page width (it was a fixed ~600 px) and stays
+  readable on a phone: lines stretch, labels don't.
+- A **dotted line marks the total number of tasks**, labelled "Total · 145 tasks" on MSD. It is the
+  same total as **Overall progress**. The dashed line it replaces was the highest count of status
+  rows any daily snapshot had recorded (191 on MSD), which also counted rows for removed, excluded or
+  out-of-scope items, so it never matched the headline.
+- **Hover, tap or use the arrow keys** (after clicking or tabbing to the chart) to read any day: date,
+  approved, delivered and the % of the total, with a guide line following the cursor.
+- **Delivery** (red, dotted) and **Today** (grey, dotted) are marked and labelled when they fall in
+  the chart's range. Before, the only vertical line was the delivery date, unlabelled.
+- The department page's **Trend** chart got the same hover and keyboard read-out.
+
 ## 2026-11-16 — The Schedule tab is folded into the Timeline *(no migration)*
 
 - **No Schedule tab any more.** Its preview now opens on the Timeline from **Draft dates from the

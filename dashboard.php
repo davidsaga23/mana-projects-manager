@@ -246,7 +246,9 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
 <?php // --- trend + workload -------------------------------------------------- ?>
 <?php if ($pace): ?>
   <h3>Approved over time</h3>
-  <?= dashboard_burnup_svg($pace['points'], $delivery) ?>
+  <?php // The total line uses the same task count as Overall progress above. ?>
+  <?= dashboard_burnup_svg($pace['points'], $delivery, (int)$overall['applicable'], $today) ?>
+  <script defer src="assets/chart-hover.js<?= asset_ver('chart-hover.js') ?>"></script>
   <?php if (!$pace['confident']): ?>
     <p class="muted small">Two readings is arithmetic, not a trend, this firms up over a few days.</p>
   <?php endif; ?>
