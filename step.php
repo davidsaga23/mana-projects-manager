@@ -369,6 +369,7 @@ $idealPerDay = $idealDays > 0 ? 1 / $idealDays : null;
   <div class="trend-wrap">
     <?= step_trend_svg($trendRows, (float)$s['target'], $s['deadline'] ?: null, $unit) ?>
   </div>
+  <script defer src="assets/chart-hover.js<?= asset_ver('chart-hover.js') ?>"></script>
   <p class="dash-legend">
     <span class="legend-key"><span class="trend-swatch approved"></span> Approved</span>
     <span class="legend-key"><span class="trend-swatch delivered"></span> Delivered</span>

@@ -837,70 +837,149 @@ function dashboard_workload(PDO $pdo, int $projectId, ?string $today = null): ar
 /**
  * A burn-up: approved over time against the total that has to be reached.
  *
- * Plain SVG, like the workflow diagram — no library, and it prints. Returns ''
- * when there is too little history to draw anything honest.
+ * Plain SVG, like the workflow diagram, no library. Returns '' when there is too
+ * little history to draw anything honest.
+ *
+ * David, 2026-11-16: "let's make this graph wider and interactive with a dotted
+ * horizontal line to mark the total amount of tasks".
+ *
+ * ⚠ WHAT THE OLD CEILING WAS. Until that day the dashed line at the top was the
+ * largest SUM(items_total) any snapshot had recorded: every progress row on file,
+ * including rows for items that have since been removed, excluded, or sit outside
+ * a type-scoped department. On MSD that read 191 while Overall progress said 145
+ * tasks, two "totals" on one screen. The line now takes $total from the caller,
+ * which is dashboard_overall()'s `applicable`, the same 145 the headline uses.
+ * The snapshot sum is only a fallback for a caller that passes nothing.
+ *
+ * LAYOUT. The chart fills the content width, which a server-drawn SVG can only
+ * do by stretching (preserveAspectRatio="none"). Stretching is right for lines
+ * and wrong for letters (see step_trend_svg() for the day that was learned), so
+ * the lines are one stretched SVG and every label is HTML laid over it at a
+ * percentage of the width: crisp at any size, phone included. The plot's
+ * viewBox is 1000 wide and exactly as tall as the plot in pixels, so x/10 is a
+ * percentage and y is a pixel in both layers.
+ *
+ * INTERACTIVE. The points ride along as JSON in data-chart; assets/chart-hover.js
+ * draws the guide line, the dot and the tooltip, and handles the arrow keys.
+ * Without JS the chart is still complete, and each dot keeps its <title>.
+ *
+ * @param array       $points  dashboard_pace()['points']: snapshot_date, approved, delivered, total
+ * @param int|null    $total   tasks in the project, dashboard_overall()['applicable']
  */
-function dashboard_burnup_svg(array $points, ?string $deliveryDate = null, int $width = 640, int $height = 150): string {
+function dashboard_burnup_svg(array $points, ?string $deliveryDate = null, ?int $total = null,
+                              ?string $today = null, int $height = 240): string {
     if (count($points) < 2) return '';
+    $today = $today ?: date('Y-m-d');
 
-    $maxTotal = 0;
-    foreach ($points as $p) $maxTotal = max($maxTotal, (int)$p['total']);
-    if ($maxTotal <= 0) return '';
+    if ($total === null || $total <= 0) {
+        $total = 0;
+        foreach ($points as $p) $total = max($total, (int)$p['total']);
+    }
+    $top = $total;
+    foreach ($points as $p) $top = max($top, (int)$p['approved']);
+    if ($top <= 0) return '';
+    $max = $top * 1.1;          // air above the total line for its label
 
-    $padL = 34; $padR = 10; $padT = 10; $padB = 20;
-    $plotW = $width - $padL - $padR;
-    $plotH = $height - $padT - $padB;
+    $W = 1000;                                  // viewBox width, so x/10 = %
+    $plotH = $height - 12 - 28;                 // matches .bu-area's top/bottom in CSS
 
     $first = $points[0]['snapshot_date'];
-    // The x axis runs to the delivery date when there is one, so the gap between
-    // the line and the target is visible rather than cropped out.
-    $last  = $deliveryDate && $deliveryDate > $points[count($points) - 1]['snapshot_date']
-           ? $deliveryDate : $points[count($points) - 1]['snapshot_date'];
-    $totalDays = max(1, (int)(new DateTime($first))->diff(new DateTime($last))->format('%a'));
+    $lastSnap = $points[count($points) - 1]['snapshot_date'];
+    // The x axis runs to the delivery date when it is still ahead, so the gap
+    // between the line and the total is visible rather than cropped out.
+    $last = $deliveryDate && $deliveryDate > $lastSnap ? $deliveryDate : $lastSnap;
+    $span = max(1, (int)(new DateTime($first))->diff(new DateTime($last))->format('%a'));
 
-    $x = function ($date) use ($first, $totalDays, $padL, $plotW) {
+    $x = function (string $date) use ($first, $span, $W): float {
         $d = (int)(new DateTime($first))->diff(new DateTime($date))->format('%r%a');
-        return $padL + ($d / $totalDays) * $plotW;
+        return $d / $span * $W;
     };
-    $y = function ($v) use ($maxTotal, $padT, $plotH) {
-        return $padT + $plotH - ($v / $maxTotal) * $plotH;
-    };
+    $y = fn(float $v): float => $plotH - ($v / $max) * $plotH;
+    $f = fn(float $v): string => sprintf('%.1f', $v);
+    $pct = fn(float $xu): string => sprintf('%.2f%%', $xu / $W * 100);
 
-    $svg = '<svg class="burnup" viewBox="0 0 ' . $width . ' ' . $height . '" width="100%" '
-         . 'height="' . $height . '" xmlns="http://www.w3.org/2000/svg" role="img" '
-         . 'aria-label="Approved work over time">';
+    $svg = '<svg class="bu-plot" viewBox="0 0 ' . $W . ' ' . $plotH . '" preserveAspectRatio="none" '
+         . 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+    $html = '';
 
-    // The target: everything, by the delivery date.
-    $svg .= '<line x1="' . round($padL, 1) . '" y1="' . round($y($maxTotal), 1)
-          . '" x2="' . round($width - $padR, 1) . '" y2="' . round($y($maxTotal), 1)
-          . '" class="bu-target" />'
-          . '<text x="2" y="' . round($y($maxTotal) + 4, 1) . '" class="bu-axis">' . $maxTotal . '</text>'
-          . '<text x="2" y="' . round($y(0) + 4, 1) . '" class="bu-axis">0</text>';
+    // Guides at a quarter, half and three quarters of the total: on this chart
+    // a quarter of the show is a more useful reading than a round number.
+    foreach ([0, .25, .5, .75] as $q) {
+        $v = $total * $q;
+        $svg .= '<line class="bu-grid" x1="0" x2="' . $W . '" y1="' . $f($y($v)) . '" y2="' . $f($y($v)) . '"/>';
+        $html .= '<span class="bu-y" style="top:' . $f($y($v)) . 'px">' . (int)round($v) . '</span>';
+    }
+
+    // The total: every task in the project, dotted, labelled at the right.
+    if ($total > 0) {
+        $ty = $f($y($total));
+        $svg .= '<line class="bu-total" x1="0" x2="' . $W . '" y1="' . $ty . '" y2="' . $ty . '"/>';
+        $html .= '<span class="bu-y" style="top:' . $ty . 'px">' . $total . '</span>'
+               . '<span class="bu-total-label" style="top:' . $ty . 'px">Total · '
+               . $total . ' task' . ($total === 1 ? '' : 's') . '</span>';
+    }
+
+    // Delivery and today, as dotted verticals, when they fall inside the range.
+    // Delivery labelled near the top, today at the bottom, so they never collide
+    // when they are close.
+    if ($deliveryDate && $deliveryDate >= $first && $deliveryDate <= $last) {
+        $dx = $f($x($deliveryDate));
+        $svg .= '<line class="bu-delivery" x1="' . $dx . '" x2="' . $dx . '" y1="0" y2="' . $plotH . '"/>';
+        // Just under the total line: above it is where "Total · N tasks" sits,
+        // and the two collided whenever delivery was near the right edge.
+        $html .= '<span class="bu-vlabel bu-vlabel-top' . ($x($deliveryDate) > $W * .85 ? ' is-end' : '')
+               . '" style="left:' . $pct($x($deliveryDate)) . ';top:' . $f($y($total) + 5) . 'px">Delivery</span>';
+    }
+    if ($today >= $first && $today <= $last) {
+        $tx = $f($x($today));
+        $svg .= '<line class="bu-today" x1="' . $tx . '" x2="' . $tx . '" y1="0" y2="' . $plotH . '"/>';
+        $html .= '<span class="bu-vlabel bu-vlabel-bottom' . ($x($today) > $W * .85 ? ' is-end' : '')
+               . '" style="left:' . $pct($x($today)) . '">Today</span>';
+    }
 
     $d = '';
+    $data = [];
     foreach ($points as $i => $p) {
-        $d .= ($i ? ' L' : 'M') . round($x($p['snapshot_date']), 1) . ',' . round($y((int)$p['approved']), 1);
+        $px = $x($p['snapshot_date']);
+        $ap = (int)$p['approved'];
+        $d .= ($i ? ' L' : 'M') . $f($px) . ',' . $f($y($ap));
+
+        $lines = [$ap . ' approved' . ($total > 0 ? ' · ' . min(100, (int)round($ap / $total * 100)) . '% of ' . $total : '')];
+        if (isset($p['delivered'])) $lines[] = (int)$p['delivered'] . ' delivered';
+        $data[] = [
+            'x' => round($px / $W * 100, 3),
+            'ys' => [round($y($ap), 1)],
+            'title' => date('D j M Y', strtotime($p['snapshot_date'])),
+            'lines' => $lines,
+        ];
     }
-    $svg .= '<path d="' . $d . '" class="bu-line" fill="none" />';
+    $svg .= '<path d="' . $d . '" class="bu-line" fill="none"/>';
+    // Dots as near-zero-length round-capped paths, not circles: a circle in a
+    // stretched SVG becomes an ellipse, a non-scaling stroke stays round.
+    foreach ($points as $i => $p) {
+        $px = $f($x($p['snapshot_date']));
+        $py = $f($y((int)$p['approved']));
+        $svg .= '<path class="bu-dot" d="M' . $px . ',' . $py . 'h0.01">'
+              . '<title>' . e($p['snapshot_date'] . ': ' . $data[$i]['lines'][0]) . '</title></path>';
+    }
+    $svg .= '</svg>';
 
-    foreach ($points as $p) {
-        $svg .= '<circle cx="' . round($x($p['snapshot_date']), 1) . '" cy="'
-              . round($y((int)$p['approved']), 1) . '" r="2.5" class="bu-dot">'
-              . '<title>' . e($p['snapshot_date'] . ': ' . (int)$p['approved'] . ' of ' . (int)$p['total'] . ' approved')
-              . '</title></circle>';
+    // Date labels: first and last always, three between on a wide screen.
+    $dates = [[$first, 'start', ''], [$last, 'end', '']];
+    for ($k = 1; $k <= 3; $k++) {
+        $dates[] = [date('Y-m-d', strtotime($first . ' +' . (int)round($span * $k / 4) . ' days')), 'middle', ' bu-x-mid'];
+    }
+    foreach ($dates as [$dt, $anchor, $cls]) {
+        $html .= '<span class="bu-x bu-x-' . $anchor . $cls . '" style="left:' . $pct($x($dt)) . '">'
+               . e(date('M j', strtotime($dt))) . '</span>';
     }
 
-    if ($deliveryDate && $deliveryDate >= $first) {
-        $dx = round($x($deliveryDate), 1);
-        $svg .= '<line x1="' . $dx . '" y1="' . $padT . '" x2="' . $dx . '" y2="' . ($padT + $plotH)
-              . '" class="bu-delivery" />';
-    }
+    $label = 'Approved tasks over time, ' . date('M j', strtotime($first)) . ' to ' . date('M j', strtotime($last))
+           . ($total > 0 ? ', out of ' . $total . ' tasks' : '') . '. Use the arrow keys to step through the days.';
 
-    $svg .= '<text x="' . $padL . '" y="' . ($height - 6) . '" class="bu-axis">' . e($first) . '</text>'
-          . '<text x="' . ($width - $padR) . '" y="' . ($height - 6) . '" class="bu-axis" text-anchor="end">'
-          . e($last) . '</text>';
-
-    return $svg . '</svg>';
+    return '<div class="burnup chart-hover" style="height:' . $height . 'px" tabindex="0" role="group"'
+         . ' aria-label="' . e($label) . '" data-chart="' . e(json_encode($data)) . '">'
+         . '<div class="bu-area ch-area">' . $svg . $html . '</div></div>';
 }
 
 /**
@@ -1015,5 +1094,27 @@ function step_trend_svg(array $rows, float $target, ?string $deadline = null,
 
     $plot .= '</svg>';
     $text .= '</svg>';
-    return '<div class="trend-stack" style="height:' . $h . 'px">' . $plot . $text . '</div>';
+
+    // Hover and keyboard read-out, the same assets/chart-hover.js the Dashboard's
+    // "Approved over time" uses (2026-11-16), so the two charts behave alike.
+    // Here the whole stack is the hover area: x is a share of the full width,
+    // y is already pixels because the viewBox height is the element height.
+    $data = [];
+    foreach ($rows as $i => $r) {
+        $ap = (float)$r['approved'];
+        $data[] = [
+            'x' => round($x($i) / $w * 100, 3),
+            'ys' => [round($y($ap), 1), round($y($r['delivered']), 1)],
+            'title' => date('D j M Y', strtotime($r['date'])),
+            'lines' => [
+                fmt_unit($ap, $unitLabel) . ' approved'
+                    . ($target > 0 ? ' · ' . min(100, (int)round($ap / $target * 100)) . '% of target' : ''),
+                fmt_unit((float)$r['delivered'], $unitLabel) . ' delivered',
+            ],
+        ];
+    }
+    return '<div class="trend-stack chart-hover" style="height:' . $h . 'px" tabindex="0" role="group"'
+         . ' aria-label="' . e('Trend by day. Use the arrow keys to step through the days.') . '"'
+         . ' data-chart="' . e(json_encode($data)) . '"><div class="ch-area ch-area-full">'
+         . $plot . $text . '</div></div>';
 }
