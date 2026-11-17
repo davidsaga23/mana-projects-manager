@@ -2842,14 +2842,18 @@ body.lightbox-lock { overflow: hidden; }
 /* THE CONTRACT LINE on a filled staffing slot (David, 2026-10-05). Under the
    name, quiet, and read-only — changing a contract is still the Hiring screen. */
 .slot-contract { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
-/* A POSITION'S DATES, under the contract line (David, 2026-11-17). Editors get
-   the person page's date pickers, labelled Start and End, on the row itself;
-   everybody else a line of text. */
+/* A POSITION'S DATES (David, 2026-11-17). Editors get Start and End date
+   fields on the capsule line, saved as soon as a date is picked; everybody else
+   a line of text under it. Scoped under .review-table because
+   `.review-table form { display: inline }` (0,1,1) otherwise wins and stacks
+   the labels one under the other. */
 .slot-dates { display: flex; align-items: baseline; gap: 10px; margin-top: 3px; flex-wrap: wrap; font-size: 13px; }
-.slot-dates-form { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
-.slot-dates-form label { margin: 0; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-.slot-dates-form input[type="date"] { width: 170px; margin: 0; }
-.slot-dates-form button { margin: 0; }
+.review-table .slot-dates-form { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 0 6px; }
+.review-table .slot-dates-form label {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0;
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.review-table .slot-dates-form input[type="date"] { width: 140px; margin: 0; padding: 2px 6px; font-size: 12px; }
 .ct-chip {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
   padding: 1px 6px; border-radius: 10px; border: 1px solid;
