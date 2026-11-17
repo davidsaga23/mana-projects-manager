@@ -235,6 +235,43 @@ $projects = $pdo->query(
               p.created_at DESC"
 )->fetchAll();
 
+// HEAD COUNT (David, 2026-11-17: "let's add here another column with the head
+// count for each project").
+//
+// Not the same number as CREW, on purpose. CREW counts every crew_projects row,
+// and those rows include the placeholder slots ("Animation 02", migration 012)
+// that exist so a show can be planned before anyone is hired, plus team rows
+// (is_team) that stand for a group rather than a person. On a show still being
+// staffed most of CREW is empty slots. HEAD COUNT is the people: real, distinct
+// persons (not a slot, not a team), still active in the studio, whose
+// engagement on this show has not ended. Somebody booked to start later counts:
+// they are on the show, just not yet in. Somebody whose end date has passed
+// does not: they were on it.
+//
+// ONE grouped query for the whole list, like the progress figures below, not a
+// subquery per row. The end-date test is only added when migration 024's
+// column exists, so the page works (counting without dates) on a database that
+// never ran it. Any failure leaves the column blank rather than breaking the
+// list: a missing number is better than a missing projects page.
+$headCounts = [];
+try {
+    $hcEnd = column_exists($pdo, 'crew_projects', 'end_date')
+        ? ' AND (cp.end_date IS NULL OR cp.end_date >= CURDATE())'
+        : '';
+    $hcRows = $pdo->query(
+        "SELECT cp.project_id, COUNT(DISTINCT c.id) AS n
+           FROM crew_projects cp
+           JOIN crew c ON c.id = cp.crew_id
+          WHERE COALESCE(c.is_placeholder, 0) = 0
+            AND COALESCE(c.is_team, 0) = 0
+            AND c.active = 1{$hcEnd}
+          GROUP BY cp.project_id"
+    )->fetchAll();
+    foreach ($hcRows as $r) $headCounts[(int)$r['project_id']] = (int)$r['n'];
+} catch (Throwable $e) {
+    $headCounts = null;
+}
+
 // Drawn whether it is zero or not, so "there are none" and "they are hidden" are
 // never the same picture.
 // The count respects the same per-user scope as the list, so a scoped user is
@@ -321,7 +358,8 @@ require __DIR__ . '/includes/header.php';
   <table class="project-list">
     <tr>
       <th>Project code</th><th>Name</th><th>Type</th><th>Status</th>
-      <th>Departments</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
+      <th>Departments</th><th>Shots</th><th>Assets</th><th title="Every crew entry on the show, including empty placeholder slots and teams.">Crew</th>
+      <th title="Real people on the show: each counted once, no empty slots or teams, active, and not past their end date.">Head count</th><th>Delivery</th><th></th>
     </tr>
     <?php foreach ($projects as $p): $pid = (int)$p['id']; $pc = project_color($pdo, $pid); ?>
     <tr>
@@ -365,6 +403,7 @@ require __DIR__ . '/includes/header.php';
       <td><?= (int)$p['shot_count'] ?></td>
       <td><?= (int)$p['asset_count'] ?></td>
       <td><?= (int)$p['crew_count'] ?></td>
+      <td><?= $headCounts === null ? '&mdash;' : e((string)($headCounts[$pid] ?? 0)) ?></td>
       <td class="delivery"><?= e($p['delivery_date'] ?? '—') ?></td>
       <td class="row-actions">
         <?php // A FLEX ROW, not three inline links with a space between them.
