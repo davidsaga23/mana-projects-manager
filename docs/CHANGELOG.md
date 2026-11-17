@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Timeline: the milestones list folds away, closed by default *(no migration)*
+
+- Under Milestones, the table and the Add milestone form sit behind "Show milestones (N)", closed
+  when the page opens. The milestone markers on the charts are unchanged.
+
 ## 2026-11-17 — Staffing: Start and End on the capsule line, saved when picked *(no migration)*
 
 - The Start and End date fields now sit on the same line as Freelance / Signed / Open contract,
