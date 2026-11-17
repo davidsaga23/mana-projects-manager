@@ -735,7 +735,7 @@ function render_overall_progress(array $overall, bool $compact = false): void {
           <div class="kpi-value warn"><?= e(pace_text($overall['required_pace'], 'items')) ?>
             <span class="unit">tasks/day</span></div>
           <div class="muted small">across the whole team</div></div>
-        <div><div class="kpi-label">Actual, last 7 days</div>
+        <div><div class="kpi-label">Real pace, last 7 days</div>
           <div class="kpi-value status-<?= e($overall['status']) ?>">
             <?= $overall['actual_pace'] === null ? '—' : e(fmt_rate((float)$overall['actual_pace'])) ?>
             <span class="unit">tasks/day</span>

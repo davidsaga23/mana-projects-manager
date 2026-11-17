@@ -14,6 +14,15 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — "Real pace" instead of "Actual" *(no migration)*
+
+**Asked by David**, with a picture of the Overall progress block: "let's change this for 'Real pace'
+instead of 'Actual'".
+
+- The figure beside **Required pace** is now labelled **Real pace, last 7 days** (it was "Actual,
+  last 7 days"), on the project overview, the dashboard and each department's page. The number and
+  how it is worked out are unchanged.
+
 ## 2026-11-17 — The Realm: everyone with a login is in People and can be sent a raven *(no migration)*
 
 **Asked by David**: "let's also list in the people's section in realm all the people with active
