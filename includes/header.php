@@ -116,7 +116,8 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
                       : 'Notifications, none unread' ?>">
             <?php // Inline, like site_logo(): an icon file is a second request
                   // and a sprite is a third thing to keep in step. ?>
-            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" focusable="false">
+            <?php // 50% larger than the 17 px it was (David, 2026-11-17). ?>
+            <svg viewBox="0 0 20 20" width="26" height="26" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M10 2a5 5 0 0 0-5 5v3.1l-1.3 2.2a.8.8 0 0 0 .7 1.2h11.2a.8.8 0 0 0 .7-1.2L15 10.1V7a5 5 0 0 0-5-5Zm0 15.5a2.3 2.3 0 0 0 2.2-1.7H7.8A2.3 2.3 0 0 0 10 17.5Z"/>
             </svg>
             <?php if ($bell['unseen']): ?>
@@ -131,10 +132,15 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
               <p class="muted small bell-empty">Nothing yet. You are told here when somebody
                 assigns you a task, names you in a comment, or moves something you are on.</p>
             <?php else: ?>
-              <ul class="bell-list">
-                <?php foreach ($bell['items'] as $n): ?>
+              <?php // CLICKED ROWS LEAVE THE LIST (Tim, 2026-11-17: "once clicked on, get cleared
+                    // from the list"; David: "a collapsible notification for past/read
+                    // notifications"). What has not been opened stays on top; what has is folded
+                    // under Earlier (migration 103). assets/bell.js draws the same two parts. ?>
+              <?php $bellNow = array_values(array_filter($bell['items'], fn($n) => !notify_is_opened($n)));
+                    $bellOld = array_values(array_filter($bell['items'], fn($n) => notify_is_opened($n)));
+                    $bellRow = function (array $n): void { ?>
                   <li class="<?= $n['seen_at'] === null ? 'is-new' : '' ?>">
-                    <a href="<?= e(notify_link($n)) ?>">
+                    <a href="<?= e(notify_link($n)) ?>" data-notify="<?= (int)$n['id'] ?>">
                       <span class="bell-dot bell-<?= e($n['kind']) ?>" aria-hidden="true"></span>
                       <span class="bell-what"><strong><?= e($n['actor'] ?: 'Somebody') ?></strong>
                         <?= e(notify_verb((string)$n['kind'])) ?>
@@ -142,8 +148,21 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
                       <span class="bell-when muted"><?= e(date('j M', strtotime((string)$n['created_at']))) ?></span>
                     </a>
                   </li>
-                <?php endforeach; ?>
+              <?php }; ?>
+              <ul class="bell-list">
+                <?php foreach ($bellNow as $n) $bellRow($n); ?>
               </ul>
+              <?php if (!$bellNow): ?>
+                <p class="muted small bell-empty-now">Nothing new. Everything you have opened is under Earlier.</p>
+              <?php endif; ?>
+              <?php if ($bellOld): ?>
+                <details class="bell-earlier">
+                  <summary>Earlier <span class="muted">(<?= count($bellOld) ?>)</span></summary>
+                  <ul class="bell-list">
+                    <?php foreach ($bellOld as $n) $bellRow($n); ?>
+                  </ul>
+                </details>
+              <?php endif; ?>
             <?php endif; ?>
             <?php // Desktop notifications with a sound (David, 2026-11-16). The button opens
                   // a small window that explains, then asks the browser; nothing is asked on

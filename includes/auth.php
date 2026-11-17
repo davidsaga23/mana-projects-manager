@@ -642,6 +642,9 @@ function artist_may_post(): bool {
                             'buy', 'offer', 'offer_answer', 'react',
                             'forward', 'save_msg', 'unsave_msg', 'edit_msg', 'delete_msg', 'unread_from', 'channel',
                             'activity_read', 'set_status'],
+        // Tim, 2026-11-17: a clicked bell row moves under "Earlier". The id is
+        // checked against the asker's own crew id in notify_mark_opened().
+        'notify_open.php' => ['id'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

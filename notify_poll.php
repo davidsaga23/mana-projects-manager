@@ -64,6 +64,7 @@ foreach (notify_recent($pdo, $crewId) as $n) {
         'summary' => (string)($n['summary'] ?: 'a task'),
         'when'    => date('j M', strtotime((string)$n['created_at'])),
         'new'     => $n['seen_at'] === null,
+        'opened'  => notify_is_opened($n),
     ];
 }
 echo json_encode(['ok' => true, 'unseen' => notify_unseen($pdo, $crewId), 'items' => $items]);

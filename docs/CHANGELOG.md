@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+<<<<<<< HEAD
+## 2026-11-17 — The bell: clicked notifications fold under "Earlier", and a bigger bell *(migration 103)*
+
+**Asked by Tim** ("is it possible to have the notifications (once clicked on) get cleared from the
+list?") and **David** ("a collapsible notification for past/read notifications", and "let's make the
+notification bell 50% larger").
+
+- **A notification you click leaves the list** and waits under a folded **Earlier** section at the
+  bottom of the bell; open it to see them. The rest stay on top until you click them.
+- The red count still clears when you open the bell, as before.
+- **The bell icon is 50% larger.**
+- Needs **migration 103**: until it runs the bell lists everything together, as it always did.
+=======
 ## 2026-11-17 — Duplicate people: pick the rate to keep *(no migration)*
 
 **Decided by David**: Agustin Scavino (USD 150/flat and 200/flat) and James Douglas Murphy (USD
@@ -24,6 +37,7 @@ Offered keeping each job's rate or picking one, he chose "Pick one rate".
   the record ticked to keep is pre-picked), and the merge goes ahead with it.
 - The other rates are dropped, and the person's **rate history** records the change, who made it
   and which rates were dropped. Invoices already made keep their amounts.
+>>>>>>> b017b7f2c2d50c38cfcd9943d39be63bc0e03692
 
 ## 2026-11-17 — A colour per project *(no migration)*
 
