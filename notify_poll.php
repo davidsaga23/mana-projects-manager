@@ -54,8 +54,12 @@ if (!in_preview()) {
     }
 }
 $items = [];
-foreach (notify_recent($pdo, $crewId) as $n) {
+$recent = notify_recent($pdo, $crewId);
+// The latest version of each task, as a thumbnail (David, 2026-11-17; notify_thumbs()). One query.
+$thumbs = notify_thumbs($pdo, $recent);
+foreach ($recent as $n) {
     $items[] = [
+        'thumb'   => $thumbs[(int)$n['id']] ?? null,
         'id'      => (int)$n['id'],
         'href'    => notify_link($n),
         'kind'    => (string)$n['kind'],

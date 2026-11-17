@@ -4337,6 +4337,16 @@ a.panel-tab:hover { text-decoration: none; color: var(--text); }
 .bell-dayoff { background: var(--violet); }             /* days off asked for, and answered (101) */
 
 .bell-what { line-height: 1.45; }
+
+/* The task's latest version, small (David, 2026-11-17: "get the latest version as
+   a thumbnail in the notifications"). Only lines that have one get the column;
+   the rest keep the three-column row above. 16:9, as the shows are. */
+.bell-list a.has-thumb { grid-template-columns: 8px 56px 1fr auto; }
+.bell-thumb {
+  display: block; width: 56px; height: 32px; overflow: hidden;
+  border-radius: 4px; background: var(--surface-2);
+}
+.bell-thumb img, .bell-thumb video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .bell-when { white-space: nowrap; font-size: 11px; padding-top: 1px; }
 
 /* Files on a Board comment (David, 2026-10-22: "allow comments to attach

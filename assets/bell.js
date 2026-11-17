@@ -21,9 +21,22 @@
     btn.setAttribute('aria-expanded', 'false');
   }
 
+  // THUMBNAILS (David, 2026-11-17: "get the latest version as a thumbnail in the
+  // notifications"). They are drawn with data-src so a page that never opens the
+  // bell never fetches them; the first opening does. A film shows its first frame.
+  function wake() {
+    Array.prototype.forEach.call(panel.querySelectorAll('.bell-thumb [data-src]'), function (m) {
+      var src = m.getAttribute('data-src');
+      m.removeAttribute('data-src');
+      if (m.tagName === 'VIDEO') { m.preload = 'metadata'; m.src = src + '#t=0.1'; }
+      else m.src = src;
+    });
+  }
+
   function open() {
     panel.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
+    wake();
 
     // ⚠ ONCE PER PAGE. Opening the bell marks everything in it read, and the
     // count disappears immediately rather than on the next page load — a badge
@@ -92,6 +105,7 @@
     var items = res.items || [];
     var sig = n + '|' + items.map(function (i) { return i.id + (i['new'] ? 'n' : 's'); }).join(',');
     sig += '|' + items.map(function (i) { return i.opened ? 'o' : ''; }).join('');
+    sig += '|' + items.map(function (i) { return i.thumb ? i.thumb.url : ''; }).join(',');
     if (sig === drawn) return;
     drawn = sig;
 
@@ -103,9 +117,19 @@
     // CLICKED ROWS FOLD AWAY (Tim and David, 2026-11-17): not opened on top, opened
     // under "Earlier", the same two parts includes/header.php draws. Whether
     // Earlier was left open is kept across a redraw.
+    // The same thumbnail includes/header.php draws (notify_thumb_html()), or none.
+    var thumb = function (t) {
+      if (!t || !t.url) return '';
+      return '<span class="bell-thumb" aria-hidden="true">'
+        + (t.video ? '<video data-src="' + esc(t.url) + '" muted playsinline preload="none"></video>'
+                   : '<img data-src="' + esc(t.url) + '" alt="">')
+        + '</span>';
+    };
     var row = function (i) {
-      return '<li class="' + (i['new'] ? 'is-new' : '') + '"><a href="' + esc(i.href) + '" data-notify="' + Number(i.id) + '">'
-        + '<span class="bell-dot bell-' + esc(i.kind) + '" aria-hidden="true"></span>'
+      var th = thumb(i.thumb);
+      return '<li class="' + (i['new'] ? 'is-new' : '') + '"><a href="' + esc(i.href) + '" data-notify="' + Number(i.id) + '"'
+        + (th ? ' class="has-thumb"' : '') + '>'
+        + '<span class="bell-dot bell-' + esc(i.kind) + '" aria-hidden="true"></span>' + th
         + '<span class="bell-what"><strong>' + esc(i.actor) + '</strong> ' + esc(i.verb) + ' ' + esc(i.summary) + '</span>'
         + '<span class="bell-when muted">' + esc(i.when) + '</span></a></li>';
     };
