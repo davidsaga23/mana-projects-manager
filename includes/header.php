@@ -255,7 +255,19 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       // that the NEXT show can find them.
       if ($fa('artists')) $navGroups[0][] = ['href' => 'artists.php', 'label' => 'Artists pool'];
       // BOOKINGS (David, 2026-09-21): the same people across every show at once.
-      if ($fa('bookings')) $navGroups[0][] = ['href' => 'bookings.php', 'label' => 'Bookings'];
+      if ($fa('bookings')) {
+          // Days off asked for on Home and waiting for Production (migration
+          // 101), counted on the link for whoever answers them. One indexed
+          // COUNT; before 101 the table is missing and the catch makes it 0.
+          $dayOffWaiting = 0;
+          if (can_edit() && isset($pdo) && $pdo instanceof PDO) {
+              try {
+                  $dayOffWaiting = (int)$pdo->query("SELECT COUNT(*) FROM day_off_requests WHERE state = 'pending'")->fetchColumn();
+              } catch (Throwable $e) { $dayOffWaiting = 0; }
+          }
+          $navGroups[0][] = ['href' => $dayOffWaiting > 0 ? 'bookings.php?tab=days-off#requests' : 'bookings.php', 'label' => 'Bookings',
+                             'badge' => $dayOffWaiting, 'badgeTitle' => 'Days off waiting for approval'];
+      }
       // THE RECORDS (David, 2026-09-01: "check the records and see what we used
       // to charge certain slots or quotas"). Two links, because a quota is a
       // production question and a fee a money one. Fees are admin-only, like

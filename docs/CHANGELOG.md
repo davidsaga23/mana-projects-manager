@@ -14,6 +14,26 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-16 — Days off requests: ask on Home, Production approves on Bookings *(migration 101)*
+
+**Asked by David:** "let's add a button to request days off in peoples home page, that one need to
+be sent to production or admins for approval. New requests should be available in bookings".
+
+- **Request days off on Home**, a button at the top (every tab): first and last day, and a reason.
+  It is for the person's own record only. Under *General info*, **Your days off** lists each
+  request as *Waiting for approval* (with **Withdraw**) or *Declined* (with who and why), and the
+  approved days off coming up.
+- **Production and admins are told**: in the bell, and by email.
+- **Bookings → Days off** gets a **Requests** list at the top, with **Approve**, or **Decline**
+  with an optional note. A requested run is **outlined** on the calendar, not filled, so it is
+  never mistaken for an approved day off. The waiting count shows on the Bookings link and the
+  Days off tab.
+- **Approving** writes the real day off (the same as entering it there), so the scheduler, Home's
+  missing-log days, the 5 pm reminder and Bookings honour it. **A pending request counts nowhere.**
+  The person is told the answer in the bell and by email.
+- **Needs migration 101** (`migrate.php`). Until it runs, none of this appears and days off work
+  as before.
+
 ## 2026-11-16 — Dashboard: click a "Who is carrying what" number to see those tasks *(no migration)*
 
 - In "Who is carrying what", the Tasks and Still to do numbers open the list behind them: each task
