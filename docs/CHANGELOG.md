@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Bell: the task's latest version as a thumbnail *(no migration)*
+
+- David: "is it possible to get the latest version as a thumbnail in the notifications? So we can
+  easily visualize the task". Each bell line about a task (a Department on a shot or asset) now shows
+  a small 16:9 picture of the newest version put up on it; a film shows its first frame. Lines about
+  anything else, tasks with no version yet, or whose newest version is a PDF or other file, keep
+  their old layout.
+- One query for the whole list (`notify_thumbs()` in `includes/notify.php`), on the page and on the
+  30-second poll. The pictures load only when the bell is first opened, not on every page.
+- Same doors as Spell's panel: the Spell switch, only shows you are staffed on, only shows Spell
+  lists (set up, active, on hold). Before migration 063 or on any error, simply no pictures.
+
 ## 2026-11-17 — Projects list: Departments, Shots, Assets and Head count open their lists *(no migration)*
 
 - On the projects list, clicking one of those numbers opens the list behind it under the row:

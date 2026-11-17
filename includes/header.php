@@ -78,6 +78,8 @@ if (isset($pdo) && $pdo instanceof PDO && $fa('bell') && notify_available($pdo))
             'unseen' => notify_unseen($pdo, $bellCrew),
             'items'  => notify_recent($pdo, $bellCrew),
         ];
+        // The latest version of each task, as a thumbnail (David, 2026-11-17). One query; [] on any trouble.
+        $bell['thumbs'] = notify_thumbs($pdo, $bell['items']);
     }
 }
 // The Bug button (migration 062) and, for admins, how many reports are open.
@@ -138,10 +140,12 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
                     // under Earlier (migration 103). assets/bell.js draws the same two parts. ?>
               <?php $bellNow = array_values(array_filter($bell['items'], fn($n) => !notify_is_opened($n)));
                     $bellOld = array_values(array_filter($bell['items'], fn($n) => notify_is_opened($n)));
-                    $bellRow = function (array $n): void { ?>
+                    $bellThumbs = $bell['thumbs'] ?? [];
+                    $bellRow = function (array $n) use ($bellThumbs): void {
+                      $thumb = notify_thumb_html($bellThumbs[(int)$n['id']] ?? null); ?>
                   <li class="<?= $n['seen_at'] === null ? 'is-new' : '' ?>">
-                    <a href="<?= e(notify_link($n)) ?>" data-notify="<?= (int)$n['id'] ?>">
-                      <span class="bell-dot bell-<?= e($n['kind']) ?>" aria-hidden="true"></span>
+                    <a href="<?= e(notify_link($n)) ?>" data-notify="<?= (int)$n['id'] ?>"<?= $thumb ? ' class="has-thumb"' : '' ?>>
+                      <span class="bell-dot bell-<?= e($n['kind']) ?>" aria-hidden="true"></span><?= $thumb ?>
                       <span class="bell-what"><strong><?= e($n['actor'] ?: 'Somebody') ?></strong>
                         <?= e(notify_verb((string)$n['kind'])) ?>
                         <?= e($n['summary'] ?: 'a task') ?></span>

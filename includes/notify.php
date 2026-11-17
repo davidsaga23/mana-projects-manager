@@ -257,6 +257,112 @@ function notify_mark_opened(PDO $pdo, int $crewId, int $id): int {
     }
 }
 
+/**
+ * The latest version of each task the bell is talking about, for a thumbnail.
+ *
+ * David, 2026-11-17, looking at a bell full of "Renata Ruiz moved Comp on SH210
+ * → Ready to start": "is it possible to get the latest version as a thumbnail in
+ * the notifications? So we can easily visualize the task". So a line about a
+ * task (a Department on a shot or asset) carries a small picture of the newest
+ * version put up on it. A line about anything else, or about a task with nothing
+ * put up yet, or whose newest version is a PDF, carries none and reads as before.
+ *
+ * ⚠ ONE QUERY FOR THE WHOLE LIST, never one per line: this runs in the chrome of
+ * every page and on the 30-second poll.
+ *
+ * ⚠ ONLY WHAT SPELL'S PANEL WOULD SHOW YOU. The picture is the task's own
+ * version, so it follows the same doors as the panel that shows it: the Spell
+ * switch (feature_on('spell')), the shows this account is staffed on
+ * (visible_projects_sql(), as board_projects() scopes Spell) and the shows Spell
+ * lists at all (set up, active, on hold; never the Studio). A bell line about a
+ * show you can no longer open keeps its words and loses its picture.
+ *
+ * ⚠ NEVER THROWS, like everything here. Before migration 063 (versions) or on
+ * any error, the answer is "no pictures".
+ *
+ * @param array $items notification rows, as notify_recent() returns them
+ * @return array notification id => ['url' => attachment URL, 'video' => bool]
+ */
+function notify_thumbs(PDO $pdo, array $items): array {
+    if (!$items) return [];
+    try {
+        if (function_exists('feature_on') && !feature_on('spell')) return [];
+        if (!function_exists('column_exists') || !column_exists($pdo, 'progress_versions', 'version_no')) return [];
+
+        // Which tasks: every line that names a show, a Department and a shot or
+        // asset, each task once. Days off and saved Realm messages put other
+        // things in item_key but never a Department, so step_id leaves them out.
+        $tasks = [];
+        foreach ($items as $n) {
+            $p = (int)($n['project_id'] ?? 0);
+            $s = (int)($n['step_id'] ?? 0);
+            $k = (string)($n['item_key'] ?? '');
+            if ($p > 0 && $s > 0 && $k !== '') $tasks[$p . ':' . $s . ':' . $k] = [$p, $s, $k];
+        }
+        if (!$tasks) return [];
+
+        $where = [];
+        $args = [];
+        foreach ($tasks as [$p, $s, $k]) {
+            $where[] = '(pr.project_id = ? AND pr.step_id = ? AND pr.item_key = ?)';
+            array_push($args, $p, $s, $k);
+        }
+        $scope = function_exists('visible_projects_sql') ? visible_projects_sql($pdo, 'p.id') : '';
+        $studio = function_exists('studio_exclude_sql') ? studio_exclude_sql($pdo, 'p') : '';
+        $q = $pdo->prepare(
+            "SELECT pr.project_id, pr.step_id, pr.item_key, v.id, v.mime_type
+               FROM progress pr
+               JOIN projects p ON p.id = pr.project_id
+               JOIN progress_versions v ON v.progress_id = pr.id
+              WHERE (" . implode(' OR ', $where) . ")
+                AND p.status IN ('setup', 'active', 'on_hold')" . $studio
+                . ($scope !== '' ? ' AND ' . $scope : '') . "
+                AND v.version_no = (SELECT MAX(v2.version_no) FROM progress_versions v2
+                                     WHERE v2.progress_id = pr.id)"
+        );
+        $q->execute($args);
+        $latest = [];
+        foreach ($q as $r) {
+            $mime = (string)($r['mime_type'] ?? '');
+            $isVideo = strncmp($mime, 'video/', 6) === 0;
+            // Pictures and films only: a PDF or a .zip has nothing to show this small.
+            if (!$isVideo && strncmp($mime, 'image/', 6) !== 0) continue;
+            $latest[(int)$r['project_id'] . ':' . (int)$r['step_id'] . ':' . $r['item_key']] = [
+                'url'   => 'attachment.php?kind=version&id=' . (int)$r['id'],
+                'video' => $isVideo,
+            ];
+        }
+
+        $out = [];
+        foreach ($items as $n) {
+            $key = (int)($n['project_id'] ?? 0) . ':' . (int)($n['step_id'] ?? 0) . ':' . (string)($n['item_key'] ?? '');
+            if (isset($latest[$key])) $out[(int)$n['id']] = $latest[$key];
+        }
+        return $out;
+    } catch (Throwable $e) {
+        error_log('[Anima bell] thumbs: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * The thumbnail's markup for one bell line, or '' for none. Shared by
+ * includes/header.php; assets/bell.js writes the same thing from the poll.
+ *
+ * ⚠ data-src, NOT src: the panel is shut on every page load, and twenty
+ * full-size frames fetched for a list nobody opened would be paid on every
+ * page. assets/bell.js moves data-src to src the first time the bell opens.
+ */
+function notify_thumb_html(?array $t): string {
+    if (!$t) return '';
+    $url = e($t['url']);
+    return '<span class="bell-thumb" aria-hidden="true">'
+         . ($t['video']
+             ? '<video data-src="' . $url . '" muted playsinline preload="none"></video>'
+             : '<img data-src="' . $url . '" alt="">')
+         . '</span>';
+}
+
 /** Where a notification goes when you click it. */
 function notify_link(array $n): string {
     // A raven is read in the Realm, where the sender's name carries the unread mark.
