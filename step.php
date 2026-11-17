@@ -181,7 +181,7 @@ require __DIR__ . '/includes/header.php';
   <div><div class="kpi-label">Required pace</div>
     <div class="kpi-value warn"><?= e(pace_text($s['required_pace'], $unit)) ?></div>
     <div class="muted small">across the team</div></div>
-  <div><div class="kpi-label">Actual, last 7 days</div>
+  <div><div class="kpi-label">Real pace, last 7 days</div>
     <div class="kpi-value status-<?= e($s['status']) ?>">
       <?= $s['actual_pace'] === null ? '—' : e(fmt_unit((float)$s['actual_pace'], $unit)) ?></div>
     <div class="muted small">
