@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Hiring replaces the placeholder; the projects list loses Crew *(no migration)*
+
+- Putting a real person into a slot (hiring, or choosing them on Staffing) now deletes the placeholder
+  they replaced ("Animation 02"), so it no longer sits on the show's crew list. It is kept only if
+  something still holds it or time was logged against it.
+- Staffing offers **Tidy leftover placeholders (N)** for the ones earlier hires left behind.
+- The projects list no longer has a Crew column; Head count is the people on each show.
+
 ## 2026-11-17 — Users: a set-password link for any login, admins included *(no migration)*
 
 **Asked by David**, for Jorik (an admin who is on no show, so has no person page): "yeah let's do the

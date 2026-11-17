@@ -204,6 +204,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ));
             }
 
+        } elseif ($action === 'tidy_placeholders') {
+            // Left behind by hires made before a filled slot dropped its
+            // placeholder (David, 2026-11-17). The same guard as a hire: kept if
+            // anything still holds it or time was logged against it.
+            $ids = leftover_placeholders($pdo, $projectId);
+            $gone = 0;
+            foreach ($ids as $cid) if (drop_placeholder_if_unused($pdo, $cid)) $gone++;
+            $kept = count($ids) - $gone;
+            flash($gone > 0 ? 'ok' : 'warn', sprintf(
+                'Removed %d leftover placeholder%s from this show.%s',
+                $gone, $gone === 1 ? '' : 's',
+                $kept > 0 ? sprintf(' %d kept because time was logged against %s.',
+                                    $kept, $kept === 1 ? 'it' : 'them') : ''
+            ));
+
         } elseif ($action === 'clean_surplus') {
             $r = remove_surplus_lanes($pdo, $projectId);
             if ($r['removed'] === 0 && !$r['blocked']) {
@@ -701,6 +716,19 @@ require __DIR__ . '/includes/header.php';
           Remove surplus slots<?php if ($surplusCount > 0): ?> (<?= $surplusCount ?>)<?php endif; ?>
         </button>
       </form>
+
+      <?php // Placeholders a hire replaced before 2026-11-17, still on the crew list. ?>
+      <?php $leftover = count(leftover_placeholders($pdo, $projectId)); ?>
+      <?php if ($leftover > 0): ?>
+        <form method="post"
+              onsubmit="return confirm('Remove <?= $leftover ?> leftover placeholder(s) from this show? They are empty slots a hire already replaced. Any with logged time are kept.');">
+          <input type="hidden" name="action" value="tidy_placeholders">
+          <button type="submit" class="secondary"
+                  title="Empty placeholders that no slot or position holds any more.">
+            Tidy leftover placeholders (<?= $leftover ?>)
+          </button>
+        </form>
+      <?php endif; ?>
 
       <small>
         Adding never deletes anything. Removing only takes out slots above the headcount, and

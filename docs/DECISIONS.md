@@ -6458,3 +6458,15 @@ entry above.
   send time and it is saved on the login; an address already on file is never overwritten from here.
   With no address at all, **Copy link** hands the link over to send by WhatsApp or Slack.
 - **Logged** in `user_invites` as before, and in the Access log.
+
+## 2026-11-17 — A placeholder is deleted once a real person takes its place
+
+**Asked by David:** *"the crew can start with place holder but as we hire people those should be
+deleted because a real person is taking the place"*, and the projects list's Crew column removed
+(it counted placeholders and teams, and read as a second head count).
+
+**Decided:** `assign_crew_to_lane()` calls `drop_placeholder_if_unused()` for the slot's previous
+occupant: deleted when it is a placeholder that no slot, no supervision position and no time log
+holds (crew rows cascade, so hours would go with it). Supervision positions already did this.
+Staffing's "Tidy leftover placeholders" applies the same rule to placeholders earlier hires left.
+A slot's finance-side rate keyed on the placeholder is left unread, as the hire message already says.

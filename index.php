@@ -226,7 +226,6 @@ $projects = $pdo->query(
             (SELECT COUNT(*) FROM shots s WHERE s.project_id = p.id)  AS shot_count,
             (SELECT COUNT(*) FROM assets a WHERE a.project_id = p.id) AS asset_count,
             (SELECT COUNT(*) FROM pipeline_steps ps WHERE ps.project_id = p.id) AS step_count,
-            (SELECT COUNT(*) FROM crew_projects cp WHERE cp.project_id = p.id) AS crew_count,
             (SELECT setting_value FROM project_settings st
               WHERE st.project_id = p.id AND st.setting_key = 'wizard_step') AS wizard_step
      FROM projects p
@@ -236,7 +235,9 @@ $projects = $pdo->query(
 )->fetchAll();
 
 // HEAD COUNT (David, 2026-11-17: "let's add here another column with the head
-// count for each project").
+// count for each project"). The CREW column beside it was removed the same day
+// (David: "let's delete the crew then"): it counted every crew_projects row,
+// placeholders and teams included, and read as a second, larger head count.
 //
 // Not the same number as CREW, on purpose. CREW counts every crew_projects row,
 // and those rows include the placeholder slots ("Animation 02", migration 012)
@@ -358,7 +359,7 @@ require __DIR__ . '/includes/header.php';
   <table class="project-list">
     <tr>
       <th>Project code</th><th>Name</th><th>Type</th><th>Status</th>
-      <th>Departments</th><th>Shots</th><th>Assets</th><th title="Every crew entry on the show, including empty placeholder slots and teams.">Crew</th>
+      <th>Departments</th><th>Shots</th><th>Assets</th>
       <th title="Real people on the show: each counted once, no empty slots or teams, active, and not past their end date.">Head count</th><th>Delivery</th><th></th>
     </tr>
     <?php foreach ($projects as $p): $pid = (int)$p['id']; $pc = project_color($pdo, $pid); ?>
@@ -402,7 +403,6 @@ require __DIR__ . '/includes/header.php';
       <td><?= (int)$p['step_count'] ?></td>
       <td><?= (int)$p['shot_count'] ?></td>
       <td><?= (int)$p['asset_count'] ?></td>
-      <td><?= (int)$p['crew_count'] ?></td>
       <td><?= $headCounts === null ? '&mdash;' : e((string)($headCounts[$pid] ?? 0)) ?></td>
       <td class="delivery"><?= e($p['delivery_date'] ?? '—') ?></td>
       <td class="row-actions">
