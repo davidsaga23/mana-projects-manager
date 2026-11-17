@@ -184,7 +184,7 @@ function notify_unseen(PDO $pdo, int $crewId): int {
 }
 
 /** The last few, newest first — unread and read together, as a bell shows them. */
-function notify_recent(PDO $pdo, int $crewId, int $limit = 12): array {
+function notify_recent(PDO $pdo, int $crewId, int $limit = 20): array {
     if ($crewId <= 0 || !notify_available($pdo)) return [];
     try {
         $q = $pdo->prepare(
@@ -215,6 +215,42 @@ function notify_mark_seen(PDO $pdo, int $crewId): int {
     try {
         $q = $pdo->prepare('UPDATE notifications SET seen_at = NOW() WHERE crew_id = ? AND seen_at IS NULL');
         $q->execute([$crewId]);
+        return $q->rowCount();
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * Has migration 102 (notifications.opened_at) run? Asked once per request; never throws.
+ * Before it has, the bell shows every row in one list, as it always did.
+ */
+function notify_opened_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        $ok = function_exists('column_exists') && column_exists($pdo, 'notifications', 'opened_at');
+    } catch (Throwable $e) {
+        $ok = false;
+    }
+    return $ok;
+}
+
+/**
+ * Has this row been clicked (Tim, 2026-11-17: "once clicked on, get cleared from
+ * the list")? False for every row until migration 102 runs.
+ */
+function notify_is_opened(array $n): bool {
+    return !empty($n['opened_at']);
+}
+
+/** Mark ONE of $crewId's own notifications opened. 0 when it is not theirs or already opened. Never throws. */
+function notify_mark_opened(PDO $pdo, int $crewId, int $id): int {
+    if ($crewId <= 0 || $id <= 0 || !notify_available($pdo) || !notify_opened_available($pdo)) return 0;
+    try {
+        $q = $pdo->prepare('UPDATE notifications SET opened_at = NOW(), seen_at = COALESCE(seen_at, NOW())
+                             WHERE id = ? AND crew_id = ? AND opened_at IS NULL');
+        $q->execute([$id, $crewId]);
         return $q->rowCount();
     } catch (Throwable $e) {
         return 0;
