@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Timeline: the milestones list folds away, closed by default *(no migration)*
+
+- Under Milestones, the table and the Add milestone form sit behind "Show milestones (N)", closed
+  when the page opens. The milestone markers on the charts are unchanged.
+
 ## 2026-11-17 — Timeline: help text behind an ⓘ *(no migration)*
 
 - The Timeline's "Drag a bar…" and Milestones explanations are hidden behind a small ⓘ that opens

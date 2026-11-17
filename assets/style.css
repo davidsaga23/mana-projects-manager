@@ -2487,6 +2487,8 @@ body.lightbox-lock { overflow: hidden; }
   fill: var(--violet);
 }
 .ms-panel { margin-top: 12px; }
+.ms-fold > summary { cursor: pointer; color: var(--primary); font-size: 13px; margin: 4px 0; }
+.ms-fold > summary:hover { text-decoration: underline; }
 .ms-panel table { margin: 8px 0; }
 .ms-flag { color: var(--violet); font-weight: 700; }
 /* --- the calendar header ----------------------------------------------------

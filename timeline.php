@@ -524,6 +524,12 @@ if (!$embed) require __DIR__ . '/includes/header.php';
         </span></span>
       </h4>
 
+      <?php // FOLDED, CLOSED BY DEFAULT (David, 2026-11-17: "let's make this part
+            // collapsable and collapsed by default"). The list and the add form sit
+            // under one toggle; the markers on the charts are unaffected. ?>
+      <details class="ms-fold">
+        <summary><?= $milestones ? 'Show milestones (' . count($milestones) . ')' : 'Milestones' ?><?=
+          $editable ? ' and add one' : '' ?></summary>
       <?php if ($milestones): ?>
         <table>
           <tr><th>Date</th><th>Milestone</th><th>Notes</th><th></th></tr>
@@ -585,6 +591,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
           <button type="submit" class="secondary" name="milestone_action" value="add">Add milestone</button>
         </form>
       <?php endif; ?>
+      </details>
     </div>
   <?php endif; ?>
 </section>
