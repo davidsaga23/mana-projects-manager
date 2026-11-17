@@ -197,7 +197,7 @@ function crew_rate_text(array $row): string {
  * @param int   $keepId  the record that survives
  * @param int[] $loseIds the records folded into it
  */
-function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): string {
+function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = '', string $rateSig = ''): string {
     $loseIds = array_values(array_unique(array_filter(array_map('intval', $loseIds),
         fn($i) => $i > 0 && $i !== $keepId)));
     if ($keepId <= 0 || !$loseIds) {
@@ -247,20 +247,33 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
         $loseMoney[$id] = $m;
         if ($m['rate_sig'] !== '') $sigs[$m['rate_sig']] = $m['rate_text'];
     }
+    // DIFFERENT RATES: THE PERSON MERGING PICKS ONE (David, 2026-11-17, on Agustin
+    // Scavino at USD 150/flat and 200/flat and James Douglas Murphy at USD 200/day
+    // and 250/day: offered "keep each job's rate as a position rate" or "pick one
+    // rate", he chose "Pick one rate"). The screen asks which rate to keep and
+    // sends it as $rateSig (crew_rate_sig() of that record); the others are dropped
+    // and the change is written in the person's rate history (crew_terms_log).
+    // Without a pick that is one of the rates on these records, still refused:
+    // nothing is guessed.
+    $repriced = [];
     if (count($sigs) > 1) {
-        throw new RuntimeException(sprintf(
-            'These records carry different rates (%s), so nothing was merged. Open %s under Finance '
-          . 'management, decide which rate is right, set the others to the same or clear them, then merge.',
-            implode(', ', array_values($sigs)), $byId[$keepId]['name']));
+        if ($rateSig === '' || !isset($sigs[$rateSig])) {
+            throw new RuntimeException(sprintf(
+                'These records carry different rates (%s), so nothing was merged. Pick the rate to keep, '
+              . 'then merge.', implode(', ', array_values($sigs))));
+        }
+        foreach ($sigs as $sg => $txt) if ($sg !== $rateSig) $repriced[] = $txt;
+        $sigs = [$rateSig => $sigs[$rateSig]];
     }
-    // Which row survives: the keeper's if it holds the rate (or nobody holds one
-    // and the keeper has a row); else the loser's row that holds the rate, else
-    // the first loser row. Every other row is a copy or empty, and goes; its
-    // history (crew_terms_log) still moves to the keeper below.
+    $want = $sigs ? (string)array_key_first($sigs) : '';
+    // Which row survives: the keeper's if it holds the rate kept (or nobody holds
+    // one and the keeper has a row); else the duplicate's row that holds it, else
+    // the first duplicate row. Every other row is a copy, an emptied row, or a rate
+    // not chosen, and goes; its history (crew_terms_log) still moves to the keeper.
     $carrier = null;
     $keeperRow = $keepMoney['terms'] > 0;
-    if (!($keeperRow && ($keepMoney['rate_sig'] !== '' || !$sigs))) {
-        foreach ($loseIds as $id) if ($loseMoney[$id]['terms'] > 0 && $loseMoney[$id]['rate_sig'] !== '') { $carrier = $id; break; }
+    if (!($keeperRow && ($keepMoney['rate_sig'] === $want))) {
+        foreach ($loseIds as $id) if ($loseMoney[$id]['terms'] > 0 && $want !== '' && $loseMoney[$id]['rate_sig'] === $want) { $carrier = $id; break; }
         if ($carrier === null && !$keeperRow) {
             foreach ($loseIds as $id) if ($loseMoney[$id]['terms'] > 0) { $carrier = $id; break; }
         }
@@ -285,6 +298,13 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
             if ($moveTerms && finance_column_exists('crew_terms', 'crew_id')) {
                 $up = $db->prepare('UPDATE crew_terms SET crew_id = ? WHERE crew_id = ?');
                 foreach ($moveTerms as $id) { $up->execute([$keepId, $id]); $moved['terms']++; }
+            }
+            // A rate was chosen over others: say so in the person's rate history,
+            // as a line holding the rate now on file, by whoever merged.
+            if ($repriced && finance_column_exists('crew_terms_log', 'crew_id')) {
+                $db->prepare('INSERT INTO crew_terms_log (crew_id, crew_name, day_rate, rate_unit, rate_currency, changed_by)
+                              SELECT crew_id, crew_name, day_rate, rate_unit, rate_currency, ? FROM crew_terms WHERE crew_id = ?')
+                   ->execute([mb_substr(trim($who . ' (merged duplicates; dropped ' . implode(', ', $repriced) . ')'), 0, 100), $keepId]);
             }
             // invoice_headers (finance_install_12): a monthly invoice follows its
             // lines to the person kept; counted with the invoices.
@@ -363,6 +383,7 @@ function merge_crew(PDO $pdo, int $keepId, array $loseIds, string $who = ''): st
 
     $bits = [];
     if ($moved['terms'])    $bits[] = 'a day rate';
+    if ($repriced)          $bits[] = 'the rate kept is ' . $sigs[$want] . ' (dropped: ' . implode(', ', $repriced) . ')';
     if ($moved['invoices']) $bits[] = $moved['invoices'] . ' invoice'
                                     . ($moved['invoices'] === 1 ? '' : 's');
     return sprintf('Merged %d record%s into "%s". Everything they held, slots, scheduled work, '

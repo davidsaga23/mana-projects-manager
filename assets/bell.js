@@ -91,6 +91,7 @@
     if (!panel.hidden) return;
     var items = res.items || [];
     var sig = n + '|' + items.map(function (i) { return i.id + (i['new'] ? 'n' : 's'); }).join(',');
+    sig += '|' + items.map(function (i) { return i.opened ? 'o' : ''; }).join('');
     if (sig === drawn) return;
     drawn = sig;
 
@@ -99,20 +100,41 @@
     if (!items.length) return;
     var empty = panel.querySelector('.bell-empty');
     if (empty) empty.remove();
-    var list = panel.querySelector('.bell-list');
-    if (!list) {
-      list = document.createElement('ul');
-      list.className = 'bell-list';
-      // Above the "Desktop notifications" button, which stays at the foot.
-      panel.insertBefore(list, panel.querySelector('.bell-foot'));
-    }
-    list.innerHTML = items.map(function (i) {
-      return '<li class="' + (i['new'] ? 'is-new' : '') + '"><a href="' + esc(i.href) + '">'
+    // CLICKED ROWS FOLD AWAY (Tim and David, 2026-11-17): not opened on top, opened
+    // under "Earlier", the same two parts includes/header.php draws. Whether
+    // Earlier was left open is kept across a redraw.
+    var row = function (i) {
+      return '<li class="' + (i['new'] ? 'is-new' : '') + '"><a href="' + esc(i.href) + '" data-notify="' + Number(i.id) + '">'
         + '<span class="bell-dot bell-' + esc(i.kind) + '" aria-hidden="true"></span>'
         + '<span class="bell-what"><strong>' + esc(i.actor) + '</strong> ' + esc(i.verb) + ' ' + esc(i.summary) + '</span>'
         + '<span class="bell-when muted">' + esc(i.when) + '</span></a></li>';
-    }).join('');
+    };
+    var now = items.filter(function (i) { return !i.opened; }), old = items.filter(function (i) { return i.opened; });
+    var was = panel.querySelector('.bell-earlier'), wasOpen = !!(was && was.open);
+    Array.prototype.forEach.call(panel.querySelectorAll('.bell-list, .bell-earlier, .bell-empty-now'), function (el) { el.remove(); });
+    var html = '<ul class="bell-list">' + now.map(row).join('') + '</ul>'
+      + (now.length ? '' : '<p class="muted small bell-empty-now">Nothing new. Everything you have opened is under Earlier.</p>')
+      + (old.length ? '<details class="bell-earlier"' + (wasOpen ? ' open' : '') + '><summary>Earlier <span class="muted">(' + old.length + ')</span></summary>'
+        + '<ul class="bell-list">' + old.map(row).join('') + '</ul></details>' : '');
+    // Above the "Desktop notifications" button, which stays at the foot.
+    var foot = panel.querySelector('.bell-foot');
+    if (foot) foot.insertAdjacentHTML('beforebegin', html); else panel.insertAdjacentHTML('beforeend', html);
   }
+
+  // A clicked row is recorded as opened, so it waits under Earlier from now on.
+  // A beacon, because the click goes on to another page and an ordinary request
+  // would be cut off. The link itself is followed as normal.
+  panel.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[data-notify]') : null;
+    if (!a) return;
+    var id = a.getAttribute('data-notify');
+    try {
+      var body = new FormData(); body.append('id', id);
+      if (navigator.sendBeacon) navigator.sendBeacon('notify_open.php', body);
+      else fetch('notify_open.php', { method: 'POST', body: body, credentials: 'same-origin', keepalive: true });
+    } catch (err) { /* the row simply stays on top */ }
+    drawn = null;
+  });
 
   // Desktop notifications (David, 2026-11-16; assets/desk-notify.js) are handed every answer.
   var desk = window.AnimaNotify || null;

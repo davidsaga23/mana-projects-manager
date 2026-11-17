@@ -548,7 +548,7 @@ function artist_may_post(): bool {
         // withdraw_day_off_request() deletes it only WHERE crew_id is the asker's
         // own AND it is still pending. Answering a request is Production's, on
         // bookings.php, which is not on this list at all.
-        // save_digest_pref (2026-11-17, migration 102): which of the two daily
+        // save_digest_pref (2026-11-17, migration 104): which of the two daily
         // email summaries they get. ⚠ NO ID TO FORGE: digest_set_pref() is
         // handed effective_crew_id(), and the only thing posted is the choice.
         'home.php' => ['save_profile', 'request_day_off', 'withdraw_day_off', 'save_digest_pref'],
@@ -645,6 +645,9 @@ function artist_may_post(): bool {
                             'buy', 'offer', 'offer_answer', 'react',
                             'forward', 'save_msg', 'unsave_msg', 'edit_msg', 'delete_msg', 'unread_from', 'channel',
                             'activity_read', 'set_status'],
+        // Tim, 2026-11-17: a clicked bell row moves under "Earlier". The id is
+        // checked against the asker's own crew id in notify_mark_opened().
+        'notify_open.php' => ['id'],
     ];
     // ⚠ NOT IN THE LIST ABOVE, because it has no field to name. notify_seen.php
     // marks THE ASKER'S OWN bell as read and takes no id at all — the crew id

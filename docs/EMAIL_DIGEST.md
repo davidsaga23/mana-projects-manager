@@ -46,7 +46,7 @@ default), morning only, end of day only, or none.
 
 ### 1. Run the database update
 
-Open `https://anima-mana.com/migrate.php` and apply **102_email_digest** (two small new tables).
+Open `https://anima-mana.com/migrate.php` and apply **104_email_digest** (two small new tables).
 Until it runs, the one-at-a-time emails above have already stopped but no summary is sent; the bell
 still shows everything.
 
@@ -101,7 +101,7 @@ Without the key the page answers 403.
 - `notify_poll.php`: calls `digest_web_fallback()` after answering the bell.
 - The old `notify_mentioned()`, `notify_assignee()`, `notify_transcript_tasks()` and
   `notify_mentioned_task()` in `includes/mailer.php` stay as thin wrappers so older callers work.
-- Migration 102: `digest_people` (choice, last summary sent, last bell item looked at) and
+- Migration 104: `digest_people` (choice, last summary sent, last bell item looked at) and
   `digest_runs` (one row per run).
 - A summary that misses its window entirely (9 am to 1 pm, 5 pm to 10 pm) is skipped; what it would
   have listed is still unread and goes in the next one.

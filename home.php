@@ -35,7 +35,7 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/home.php';
 require_once __DIR__ . '/includes/tickets.php';   // tickets_for_crew()
 require_once __DIR__ . '/includes/day_off_requests.php';
-require_once __DIR__ . '/includes/digest.php';   // which email summaries you get (102)
+require_once __DIR__ . '/includes/digest.php';   // which email summaries you get (104)
 require_login();
 
 $crewId = (int)(effective_crew_id($pdo) ?? 0);
@@ -424,7 +424,7 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
   <?php endif; ?>
 
   <?php // ---- Email summaries: which of the two daily emails you get. David,
-        // 2026-11-17. Before migration 102 the section is not drawn at all. ?>
+        // 2026-11-17. Before migration 104 the section is not drawn at all. ?>
   <?php if (digest_available($pdo)): $myDigest = digest_pref($pdo, $crewId); ?>
     <h3 id="email-summaries">Email summaries</h3>
     <form method="post" class="home-digest">

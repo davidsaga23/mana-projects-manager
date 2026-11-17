@@ -1,4 +1,4 @@
--- 102 - Two email summaries a day instead of one email per thing.
+-- 104 - Two email summaries a day instead of one email per thing.
 --
 -- David, 2026-11-17: "instead of sending an email for each mention, new task
 -- or comment, let's send 2 instead. One at the beginning of the day (around

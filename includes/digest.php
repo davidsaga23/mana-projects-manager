@@ -1,6 +1,6 @@
 <?php
 /**
- * Two email summaries a day, instead of one email per thing (migration 102).
+ * Two email summaries a day, instead of one email per thing (migration 104).
  *
  * David, 2026-11-17: "instead of sending an email for each mention, new task or
  * comment, let's send 2 instead. One at the beginning of the day (around 9 am
@@ -72,7 +72,7 @@ const DIGEST_SLOTS = [
  */
 const DIGEST_SKIP_KINDS = ['reminder', 'later', 'dayoff'];
 
-/** Has migration 102 run? Until it has, nothing is sent and nothing breaks. */
+/** Has migration 104 run? Until it has, nothing is sent and nothing breaks. */
 function digest_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok === null) {
@@ -127,7 +127,7 @@ function digest_pref_options(): array {
     ];
 }
 
-/** This person's choice. 'both' when they never chose, or before migration 102. */
+/** This person's choice. 'both' when they never chose, or before migration 104. */
 function digest_pref(PDO $pdo, int $crewId): string {
     if ($crewId <= 0 || !digest_available($pdo)) return 'both';
     try {
@@ -143,7 +143,7 @@ function digest_pref(PDO $pdo, int $crewId): string {
 /** Save this person's choice. Throws a sentence for the flash message. */
 function digest_set_pref(PDO $pdo, int $crewId, string $pref): string {
     if (!digest_available($pdo)) {
-        throw new RuntimeException('Email summaries need database update 102, which has not been applied yet.');
+        throw new RuntimeException('Email summaries need database update 104, which has not been applied yet.');
     }
     $opts = digest_pref_options();
     if ($crewId <= 0 || !isset($opts[$pref])) throw new RuntimeException('That is not one of the choices.');
@@ -529,7 +529,7 @@ function digest_render(array $person, array $items, array $slot, ?DateTimeImmuta
 function digest_run(PDO $pdo, string $via, array $opt = []): array {
     global $config;
     $out = ['status' => '', 'slot' => null, 'sent' => 0, 'failed' => 0, 'empty' => 0, 'lines' => []];
-    if (!digest_available($pdo)) { $out['status'] = 'Database update 102 has not been applied yet.'; return $out; }
+    if (!digest_available($pdo)) { $out['status'] = 'Database update 104 has not been applied yet.'; return $out; }
 
     $now  = $opt['now'] ?? digest_now();
     $slot = !empty($opt['slot']) && isset(DIGEST_SLOTS[$opt['slot']]) ? digest_slot($now, $opt['slot']) : digest_due_slot($now);

@@ -14,7 +14,7 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
-## 2026-11-17 — Email summaries: two a day instead of one email per thing *(migration 102)*
+## 2026-11-17 — Email summaries: two a day instead of one email per thing *(migration 104)*
 
 **Asked by David**: "instead of sending an email for each mention, new task or comment, let's send 2
 instead. One at the beginning of the day (around 9 am PST) and one at the end (5 pm PST) with a
@@ -31,9 +31,35 @@ summary of new stuff for that person."
   end of day only, or none.
 - **Unchanged, still sent at once:** invitations, days off, kick-off sign-off, budget requests,
   "log your time" emails, the hire note to admins.
-- **Set-up (David):** run migration 102, make sure `site_url` is in config.php, and add one cPanel
+- **Set-up (David):** run migration 104, make sure `site_url` is in config.php, and add one cPanel
   Cron Job every 15 minutes (`docs/EMAIL_DIGEST.md`). Without the cron job, the bell's 30-second
   check sends them 20 minutes late.
+## 2026-11-17 — The bell: clicked notifications fold under "Earlier", and a bigger bell *(migration 103)*
+
+**Asked by Tim** ("is it possible to have the notifications (once clicked on) get cleared from the
+list?") and **David** ("a collapsible notification for past/read notifications", and "let's make the
+notification bell 50% larger").
+
+- **A notification you click leaves the list** and waits under a folded **Earlier** section at the
+  bottom of the bell; open it to see them. The rest stay on top until you click them.
+- The red count still clears when you open the bell, as before.
+- **The bell icon is 50% larger.**
+- Needs **migration 103**: until it runs the bell lists everything together, as it always did.
+
+---
+
+## 2026-11-17 — Duplicate people: pick the rate to keep *(no migration)*
+
+**Decided by David**: Agustin Scavino (USD 150/flat and 200/flat) and James Douglas Murphy (USD
+200/day and 250/day) still could not be merged because their records carry different rates.
+Offered keeping each job's rate or picking one, he chose "Pick one rate".
+
+- When duplicates carry different rates, the screen now asks **which rate to keep** (the rate on
+  the record ticked to keep is pre-picked), and the merge goes ahead with it.
+- The other rates are dropped, and the person's **rate history** records the change, who made it
+  and which rates were dropped. Invoices already made keep their amounts.
+
+---
 
 ## 2026-11-17 — A colour per project *(no migration)*
 
