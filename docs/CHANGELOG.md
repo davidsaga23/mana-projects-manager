@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Projects list: a Head count column *(no migration)*
+
+**Asked by David**: "let's add here another column with the head count for each project".
+
+- **Head count** sits next to **Crew** on the projects list. Crew still counts every crew entry on
+  the show, empty placeholder slots ("Animation 02") and teams included. Head count counts only
+  **real people**: each person once, no slots, no teams, still active in the studio, and not past
+  the end date of their engagement on that show (someone booked to start later counts).
+- Hovering either heading says what it counts. One query for the whole list; if it ever fails the
+  column shows a dash instead of breaking the page.
+
 ## 2026-11-17 — Email summaries: two a day instead of one email per thing *(migration 104)*
 
 **Asked by David**: "instead of sending an email for each mention, new task or comment, let's send 2
