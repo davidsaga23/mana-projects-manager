@@ -2054,6 +2054,9 @@ svg.trend { margin: 0; }
 .sv-reserve { display: flex; height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; margin: 8px 0 4px; }
 .sv-reserve i { display: block; height: 100%; }
 .sv-r-locked { background: var(--danger); } .sv-r-risk { background: var(--warn); } .sv-r-left { background: var(--ok); }
+/* The colour key under the reserve bar. */
+.sv-reserve-key i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: -1px; }
+.sv-reserve-key i:first-child { margin-left: 0; }
 .sv-table { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: var(--radius-md); }
 .sv-table table { min-width: 900px; }
 .sv-table td { vertical-align: top; }
