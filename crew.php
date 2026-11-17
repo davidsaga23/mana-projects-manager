@@ -647,13 +647,8 @@ require __DIR__ . '/includes/header.php';
   </p>
 <?php endif; ?>
 
-
-<p class="lead">
-  A crew is never complete until a show nearly is, people arrive as their department starts.
-  So the plan is built against <strong>slots</strong>, one per person the headcount asks for,
-  and a slot becomes a real person the day someone is hired into it. Everything already
-  planned for that slot becomes their work, with nothing moved.
-</p>
+<?php // The intro paragraph about slots that sat here is gone (David, 2026-11-17:
+      // "let's delete this text"). The reasoning stays at the top of this file. ?>
 
 <?php if (!$schemaReady): ?>
   <div class="flash flash-err">
