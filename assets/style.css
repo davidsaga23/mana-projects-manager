@@ -2842,6 +2842,10 @@ body.lightbox-lock { overflow: hidden; }
 .ct-declined { color: var(--danger); border-color: var(--danger-border); background: var(--danger-tint); }
 .ct-draft    { color: var(--text-2); border-color: var(--border-strong); background: var(--surface-2); }
 .ct-none     { color: var(--faint);  border-color: var(--border);        background: none; }
+/* "Open contract" on Staffing: the same capsule, in the link colour, so it reads
+   as the one clickable one of the three (David, 2026-11-17). */
+a.ct-open        { color: var(--primary); border-color: var(--primary); background: none; text-decoration: none; }
+a.ct-open:hover  { background: var(--primary-tint); }
 /* ⚠ Truncated HERE, not in PHP, so the whole address stays selectable and the
    tooltip carries it in full — the rule .reel-cell already follows. */
 .ct-link {

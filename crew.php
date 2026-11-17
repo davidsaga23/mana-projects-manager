@@ -1140,14 +1140,13 @@ require __DIR__ . '/includes/header.php';
                     <span class="muted small"><?= (int)$waiting ?> day<?= $waiting === 1 ? '' : 's' ?> out</span>
                   <?php endif; ?>
                 <?php endif; ?>
-                <?php // ⚠ TRUNCATED IN CSS, NOT IN PHP — the rule the reel column
-                      // on the artist grid already follows: the whole address
-                      // stays selectable and copyable, and the tooltip carries it
-                      // in full. Cutting the string here would hand somebody a
-                      // half URL they cannot paste anywhere. ?>
+                <?php // "OPEN CONTRACT", A CAPSULE like the two beside it (David,
+                      // 2026-11-17), in place of the raw Drive address, which
+                      // was a long blue string telling nobody anything. Opens in
+                      // a new tab; the full address is still in the tooltip. ?>
                 <?php if ($cUrl !== ''): ?>
-                  <a class="ct-link" href="<?= e($cUrl) ?>" target="_blank" rel="noopener"
-                     title="<?= e($cUrl) ?>"><?= e($cUrl) ?></a>
+                  <a class="ct-chip ct-open" href="<?= e($cUrl) ?>" target="_blank" rel="noopener"
+                     title="<?= e($cUrl) ?>">Open contract</a>
                 <?php endif; ?>
               </div>
             <?php endif; endif; ?>

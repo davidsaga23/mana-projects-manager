@@ -24,6 +24,8 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
   positions here is told the dates are shared. An end before the start is refused; dates outside
   the department's own dates save with a warning, and the flash says to re-run the schedule when the
   person already has planned work.
+- The contract's Drive address on each row is now an **Open contract** capsule, beside the Freelance
+  and Signed ones, that opens the contract in a new tab.
 
 ## 2026-11-17 — Staffing: the intro paragraph about slots is gone *(no migration)*
 
