@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Finance Overview: the reserve is always green on its bar *(no migration)*
+
+- The Reserve left bar now shows the reserve (green), what finished departments went over (red) and
+  what running ones are expected to go over (amber) side by side, each sized by its amount, with a
+  key. Any amount above a cent stays visible, so even 1 USD of reserve shows green.
+
 ## 2026-11-17 — Finance Overview: "locked in" reads "over budget" *(no migration)*
 
 - A finished department that cost more than its plan now shows "+X over budget", and the summary and

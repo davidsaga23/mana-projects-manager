@@ -497,8 +497,21 @@ function render_step_variance(array $v): void {
     [$vClass, $vTitle, $vText] = step_variance_verdict($v);
     $groups = ['finished' => 'Finished', 'running' => 'Running', 'not_started' => 'Not started'];
     $reserve = (float)($v['reserve'] ?? 0);
-    $resPct = function (float $x) use ($reserve): float {
-        return $reserve > SV_CENT ? max(0.0, min(100.0, $x / $reserve * 100)) : 0.0;
+    // THE RESERVE IS ALWAYS GREEN (David, 2026-11-17: "whatever is reserve should be
+    // green even if it's just 1 usd"). The bar used to draw the overruns as slices OF
+    // the reserve, so once they passed it the red and amber filled the bar and the
+    // reserve vanished. Now three parts side by side, each sized by its own amount:
+    // the reserve (green), what finished departments went over (red) and what running
+    // ones are expected to (amber). Anything above a cent gets a sliver you can see.
+    $resParts = [
+        ['sv-r-left',   $reserve,                       'Reserve'],
+        ['sv-r-locked', max(0.0, (float)$v['locked']),   'Over budget'],
+        ['sv-r-risk',   max(0.0, (float)$v['expected']), 'Expected over'],
+    ];
+    $resTotal = array_sum(array_column($resParts, 1));
+    $resPct = function (float $x) use ($resTotal): float {
+        if ($x <= SV_CENT || $resTotal <= SV_CENT) return 0.0;
+        return max(2.0, min(100.0, $x / $resTotal * 100));
     };
     ?>
 <h3>Is the money on track <span class="muted">· every department against its own plan, never netted against another</span></h3>
@@ -538,12 +551,12 @@ function render_step_variance(array $v): void {
     <?php else: ?>
       <span class="sv-big"><?= $v['left'] < -SV_CENT ? 'over by ' . e($m(-$v['left'])) : e($m($v['left'])) ?></span>
       <span class="muted small">of <?= e($m($reserve)) ?></span>
-      <?php if ($reserve > SV_CENT): ?>
-        <div class="sv-reserve" title="Reserve <?= e($m($reserve)) ?>">
-          <i class="sv-r-locked" style="width:<?= e(fmt_num($resPct($v['locked']), 1)) ?>%"></i><i
-             class="sv-r-risk" style="width:<?= e(fmt_num($resPct($v['expected']), 1)) ?>%"></i><i
-             class="sv-r-left" style="width:<?= e(fmt_num($resPct(max(0.0, (float)$v['left'])), 1)) ?>%"></i>
-        </div>
+      <?php if ($resTotal > SV_CENT): ?>
+        <div class="sv-reserve"><?php foreach ($resParts as [$cls, $amt, $lbl]):
+          if ($amt <= SV_CENT) continue; ?><i class="<?= $cls ?>" title="<?= e($lbl . ' ' . $m($amt)) ?>"
+             style="width:<?= e(fmt_num($resPct($amt), 1)) ?>%"></i><?php endforeach; ?></div>
+        <span class="sv-reserve-key muted small"><i class="sv-r-left"></i> reserve
+          <i class="sv-r-locked"></i> over budget <i class="sv-r-risk"></i> expected over</span>
       <?php endif; ?>
       <span class="muted small"><?= e($m($v['reserve_base'])) ?> between the approved budget and the plan<?php
         if ($v['saved'] > SV_CENT): ?>, + <?= e($m($v['saved'])) ?> that finished departments saved<?php endif; ?>.</span>
