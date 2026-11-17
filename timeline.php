@@ -475,7 +475,11 @@ if (!$embed) require __DIR__ . '/includes/header.php';
   </div>
   <div id="generalGantt" class="tl-chart"></div>
   <?php if ($editable): ?>
+    <?php // Behind an "i" (David, 2026-11-17: "let's create an 'i' icon (information) so
+          // when you hover you can see the text but it should be hidden at first sight").
+          // See .info-tip in assets/style.css: hover, keyboard focus or a tap opens it. ?>
     <p class="muted small tl-note">
+      <span class="info-tip" tabindex="0" aria-label="How to edit the timeline"><span class="info-tip-i">i</span><span class="info-tip-body" role="tooltip">
       Drag a bar to change that department's dates, it saves straight into
       <a href="<?= e('wizard.php?project=' . $projectId . '&step=6') ?>">Dates &amp; headcount</a>,
       so the two always agree. A moved bar keeps its <strong>working days</strong>: slid over a
@@ -486,6 +490,7 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       for what; a <strong class="dep-legend">red one</strong> means you have planned a department to
       start before the thing it waits for has finished. That is allowed here, it is a warning,
       not a wall, but the schedule will not be able to honour it.
+      </span></span>
       <?php // A drag here writes to a screen you are not looking at, which is
             // exactly when a silent save feels like a lost one. Elsewhere in
             // this file saving is silent because the bar you moved is the thing
@@ -500,8 +505,8 @@ if (!$embed) require __DIR__ . '/includes/header.php';
       <?= is_admin() ? '<a href="migrate.php">Apply it →</a>' : 'Ask an administrator to run it.' ?></p>
   <?php else: ?>
     <div class="ms-panel">
-      <h4>Milestones <span class="muted">· client reviews, deliveries, locks</span></h4>
-      <p class="muted small">
+      <h4>Milestones <span class="muted">· client reviews, deliveries, locks</span>
+        <span class="info-tip" tabindex="0" aria-label="About milestones"><span class="info-tip-i">i</span><span class="info-tip-body" role="tooltip">
         A date the plan has to be ready for, drawn as a
         <span class="ms-flag">dashed line</span> down both charts. Typed by hand and never moved
         by the scheduler, the point of a review date is that the work bends around it, not the
@@ -516,7 +521,8 @@ if (!$embed) require __DIR__ . '/includes/header.php';
             that department finishes, a review of work that will not exist yet.
           <?php endif; ?>
         <?php endif; ?>
-      </p>
+        </span></span>
+      </h4>
 
       <?php if ($milestones): ?>
         <table>
