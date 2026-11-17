@@ -1647,6 +1647,27 @@ button:focus-visible, a.button:focus-visible, .row-btn:focus-visible {
 .page-head { display: flex; align-items: baseline; justify-content: space-between;
              gap: 16px; flex-wrap: wrap; }
 .page-head .wizard-title { margin-bottom: 0; }
+/* AN "i" THAT HOLDS A SCREEN'S HELP TEXT (David, 2026-11-17: hidden at first sight,
+   shown on hover). Opens on hover, on keyboard focus, and on a tap, since a tap
+   focuses it. The body is a child of the icon, with an invisible bridge over the
+   gap, so the pointer can move into it and click a link inside. */
+.info-tip { position: relative; display: inline-block; vertical-align: middle; cursor: help;
+            outline: none; margin-left: 4px; }
+.info-tip-i { display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+              border: 1px solid var(--border-strong); color: var(--muted); font-style: normal;
+              font-weight: 700; font-size: 11px; line-height: 14px; text-align: center;
+              font-family: Georgia, serif; }
+.info-tip:hover .info-tip-i, .info-tip:focus .info-tip-i, .info-tip:focus-within .info-tip-i {
+              color: var(--text); border-color: var(--primary); }
+.info-tip-body { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 60;
+                 width: min(440px, 80vw); padding: 10px 12px; border-radius: 8px;
+                 background: var(--surface-2); border: 1px solid var(--border-strong);
+                 box-shadow: 0 8px 24px rgba(0,0,0,.35); color: var(--text-2);
+                 font-size: 12.5px; font-weight: 400; line-height: 1.5; letter-spacing: 0;
+                 text-transform: none; text-align: left; white-space: normal; cursor: auto; }
+.info-tip-body::before { content: ''; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.info-tip:hover .info-tip-body, .info-tip:focus .info-tip-body,
+.info-tip:focus-within .info-tip-body { display: block; }
 /* The project Overview's title with its three exports at the right. */
 .project-head { align-items: center; margin: 4px 0 14px; }
 .project-head .export-row { margin: 0; }

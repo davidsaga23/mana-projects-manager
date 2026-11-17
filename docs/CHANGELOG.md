@@ -19,6 +19,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - The Start and End date fields now sit on the same line as Freelance / Signed / Open contract,
   instead of stacked under the name, and there is no Save button: picking a date saves it.
 
+## 2026-11-17 — Timeline: help text behind an ⓘ *(no migration)*
+
+- The Timeline's "Drag a bar…" and Milestones explanations are hidden behind a small ⓘ that opens
+  on hover, keyboard focus or a tap. The "saved" note after a drag still shows on its own. The ⓘ
+  (`.info-tip` in `assets/style.css`) is reusable on any screen.
+
 ## 2026-11-17 — Staffing: Start and End date fields right on each position *(no migration)*
 
 - For those who can edit Staffing, each filled position now shows two date pickers, **Start** and
