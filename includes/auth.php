@@ -541,7 +541,14 @@ function artist_may_post(): bool {
         // migration 075). ⚠ THERE IS NO ID TO FORGE: home.php writes to
         // effective_crew_id() and nothing the form sends can name another
         // person. Name and email are not in that form at all.
-        'home.php' => ['save_profile'],
+        // request_day_off / withdraw_day_off (2026-11-16, migration 101): asking
+        // for their own days off, and taking back one nobody has answered.
+        // ⚠ NO ID TO FORGE for asking: request_day_off() is handed
+        // effective_crew_id(). Withdrawing posts a request id, and
+        // withdraw_day_off_request() deletes it only WHERE crew_id is the asker's
+        // own AND it is still pending. Answering a request is Production's, on
+        // bookings.php, which is not on this list at all.
+        'home.php' => ['save_profile', 'request_day_off', 'withdraw_day_off'],
         // save_invoice_details: the name, address, tax ID and bank details on
         // their own invoice (2026-11-11, finance_install_18). ⚠ NO ID TO FORGE
         // either: invoice.php saves to effective_crew_id() unless the asker is

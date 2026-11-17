@@ -28,6 +28,58 @@
   </div>
 <?php else: ?>
 
+<?php // ---- REQUESTS waiting for an answer (David, 2026-11-16: "New requests
+      // should be available in bookings"). At the top, whatever the filters,
+      // so none waits unseen. Approve writes the day off; decline can say why. ?>
+<?php if ($requestsOn && $seeAll): ?>
+  <div class="person-panel do-requests" id="requests">
+    <h3>Requests <span class="muted">· <?= count($pendingRequests) ?> waiting</span></h3>
+    <?php if (!$pendingRequests): ?>
+      <p class="muted small">Nobody is waiting for an answer. Requests made on Home appear here, and Production
+        and administrators are told in the bell and by email.</p>
+    <?php else: ?>
+      <table class="review-table">
+        <thead><tr><th>Person</th><th>Days</th><th class="num">Working days</th><th>Reason</th><th>Asked</th>
+          <?php if ($mayEdit): ?><th>Answer</th><?php endif; ?></tr></thead>
+        <tbody>
+        <?php foreach ($pendingRequests as $r): ?>
+          <tr id="req-<?= (int)$r['id'] ?>">
+            <td><a href="person.php?id=<?= (int)$r['crew_id'] ?>#days-off"><?= e((string)$r['name']) ?></a></td>
+            <td>
+              <a href="<?= e($selfQuery(['m' => substr((string)$r['from_date'], 0, 7)])) ?>#doGrid"><?= e(day_off_range_phrase((string)$r['from_date'], (string)$r['to_date'])) ?></a>
+            </td>
+            <td class="num"><?= working_days_between((string)$r['from_date'], (string)$r['to_date']) ?></td>
+            <td><span class="do-chip do-k-<?= days_off_kind((string)($r['reason'] ?? '')) ?>"><?= e((string)($r['reason'] ?? '') !== '' ? (string)$r['reason'] : 'Day off') ?></span></td>
+            <td class="muted small"><?= e(date('j M', strtotime((string)$r['requested_at']))) ?></td>
+            <?php if ($mayEdit): ?>
+              <td class="do-answer">
+                <form method="post" style="display:inline">
+                  <input type="hidden" name="action" value="approve">
+                  <input type="hidden" name="request_id" value="<?= (int)$r['id'] ?>">
+                  <?= days_off_keep_fields($month, $show, $dept) ?>
+                  <button type="submit" class="row-btn">Approve</button>
+                </form>
+                <details class="do-decline">
+                  <summary class="row-btn row-btn-danger">Decline</summary>
+                  <form method="post" class="stack">
+                    <input type="hidden" name="action" value="decline">
+                    <input type="hidden" name="request_id" value="<?= (int)$r['id'] ?>">
+                    <?= days_off_keep_fields($month, $show, $dept) ?>
+                    <label>Why <span class="muted small">(optional, <?= e((string)$r['name']) ?> sees it)</span>
+                      <input name="note" maxlength="255" placeholder="e.g. That's delivery week, can we move it?"></label>
+                    <div class="actions"><button type="submit" class="row-btn row-btn-danger">Decline request</button></div>
+                  </form>
+                </details>
+              </td>
+            <?php endif; ?>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <form method="get" action="bookings.php" class="do-toolbar">
   <input type="hidden" name="tab" value="days-off">
   <span class="do-nav">
@@ -63,6 +115,7 @@
     <span class="do-key do-k-course"></span>Course
     <span class="do-key do-k-other"></span>Other
     <span class="do-key do-k-closed"></span>Studio closed
+    <?php if ($requestsOn): ?><span class="do-key do-key-requested"></span>Asked for, not approved<?php endif; ?>
   </span>
 </form>
 
@@ -113,6 +166,7 @@
         </th>
         <?php foreach ($days as $d):
             $a = $byDay[$d['iso']] ?? null;
+            $rq = $a ? null : ($requestsByDay[$pid][$d['iso']] ?? null);   // a request, not yet a day off
             $closed = $d['weekend'] || $d['holiday'];
             if ($a && !$closed) $offCount++;
             $cls = 'do-cell';
@@ -126,13 +180,21 @@
                 if ($d['iso'] === min($a['to'], $monthEnd))     $cls .= ' is-end';
                 $title .= ' · ' . ($a['reason'] !== '' ? $a['reason'] : 'Day off')
                         . ' (' . $a['from'] . ($a['to'] !== $a['from'] ? ' to ' . $a['to'] : '') . ')';
+            } elseif ($rq) {
+                // Asked for on Home, not answered yet: outlined, never filled,
+                // because it is not a day off until somebody approves it.
+                $cls .= ' is-requested do-k-' . days_off_kind((string)($rq['reason'] ?? ''));
+                if ($d['iso'] === max((string)$rq['from_date'], $monthStart)) $cls .= ' is-start';
+                if ($d['iso'] === min((string)$rq['to_date'], $monthEnd))     $cls .= ' is-end';
+                $title .= ' · asked for, waiting for approval: ' . ((string)($rq['reason'] ?? '') !== '' ? $rq['reason'] : 'Day off')
+                        . ' (' . $rq['from_date'] . ($rq['to_date'] !== $rq['from_date'] ? ' to ' . $rq['to_date'] : '') . ')';
             } elseif ($d['holiday']) {
                 $title .= ' · ' . $d['holiday'];
             }
         ?>
           <td class="<?= $cls ?>" data-day="<?= $d['iso'] ?>" title="<?= e($title) ?>"<?php if ($a): ?>
               data-absence="<?= (int)$a['id'] ?>" data-from="<?= e($a['from']) ?>" data-to="<?= e($a['to']) ?>"
-              data-reason="<?= e($a['reason']) ?>"<?php endif; ?>></td>
+              data-reason="<?= e($a['reason']) ?>"<?php elseif ($rq): ?> data-request="<?= (int)$rq['id'] ?>"<?php endif; ?>></td>
         <?php endforeach; ?>
         <td class="do-total num"><?= $offCount ?: '' ?></td>
       </tr>

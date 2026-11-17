@@ -30,6 +30,7 @@
 // crew_absences (a migration).
 
 require_once __DIR__ . '/../absences.php';
+require_once __DIR__ . '/../day_off_requests.php';   // asking for days off (migration 101)
 require_once __DIR__ . '/../bookings.php';   // bookings_projects(): the shows still running
 require_once __DIR__ . '/../people.php';     // crew_departments()
 
@@ -71,6 +72,16 @@ $selfQuery = function (array $over = []) use ($month, $show, $dept): string {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$mayEdit) {
         flash('err', 'Only Production can enter days off. Nothing was saved.');
+    } elseif (in_array((string)($_POST['action'] ?? ''), ['approve', 'decline'], true)) {
+        // Answering a request somebody made on Home (David, 2026-11-16). The
+        // request id is all that is posted: whose it is, and that it is still
+        // pending, come from the row itself (decide_day_off_request()).
+        try {
+            flash('ok', decide_day_off_request($pdo, (int)($_POST['request_id'] ?? 0),
+                $_POST['action'] === 'approve', (string)($_POST['note'] ?? ''), current_user_display()));
+        } catch (Throwable $e) {
+            flash('err', $e->getMessage());
+        }
     } else {
         $crewId    = (int)($_POST['crew_id'] ?? 0);
         $absenceId = (int)($_POST['absence_id'] ?? 0);
@@ -142,6 +153,27 @@ $personIds = array_map(function ($p) { return (int)$p['id']; }, $people);
 
 // One query for the whole month, everybody on the grid.
 $absences = $personIds ? absences_between($pdo, $personIds, $monthStart, $monthEnd) : [];
+
+// Requests waiting for an answer (migration 101). All of them for the list at
+// the top, whatever the filters, so none is missed; the ones on the grid's
+// people this month are drawn on it, outlined, apart from approved days off.
+// An artist sees only their own (they asked on Home), never the list.
+$requestsOn = day_off_requests_available($pdo);
+$pendingRequests = ($requestsOn && $seeAll) ? day_off_requests_pending($pdo) : [];
+$requestsByDay = [];
+if ($requestsOn) {
+    $mine = $seeAll ? $pendingRequests
+        : array_values(array_filter(day_off_requests_for_crew($pdo, (int)$myCrewId, 50),
+            function ($r) { return $r['state'] === 'pending'; }));
+    foreach ($mine as $r) {
+        $pid = (int)$r['crew_id'];
+        if (!in_array($pid, $personIds, true) || $r['to_date'] < $monthStart || $r['from_date'] > $monthEnd) continue;
+        for ($d = new DateTime(max((string)$r['from_date'], $monthStart)), $i = 0;
+             $i < 40 && $d->format('Y-m-d') <= min((string)$r['to_date'], $monthEnd); $d->modify('+1 day'), $i++) {
+            $requestsByDay[$pid][$d->format('Y-m-d')] = $r;
+        }
+    }
+}
 
 // The days of the month, each with what the studio thinks of it.
 $holidays = non_working_days($pdo);

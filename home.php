@@ -34,6 +34,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/home.php';
 require_once __DIR__ . '/includes/tickets.php';   // tickets_for_crew()
+require_once __DIR__ . '/includes/day_off_requests.php';
 require_login();
 
 $crewId = (int)(effective_crew_id($pdo) ?? 0);
@@ -62,6 +63,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_profile'])) {
         flash('err', $e->getMessage());
     }
     header('Location: home.php?tab=general');
+    exit;
+}
+
+// --- ask for days off, or take back a request nobody has answered -----------
+// David, 2026-11-16: "a button to request days off in peoples home page, that
+// one need to be sent to production or admins for approval". ⚠ THE PERSON IS
+// ALWAYS $crewId, effective_crew_id(): asking names nobody, and withdrawing
+// deletes only WHERE crew_id is this person's AND the request is still pending
+// (withdraw_day_off_request()). Those are the second lock; the allow-list in
+// includes/auth.php is the first.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['request_day_off']) || isset($_POST['withdraw_day_off']))) {
+    try {
+        if (preview_blocks_saving()) throw new RuntimeException('Nothing saves while you are previewing a role.');
+        flash('ok', isset($_POST['withdraw_day_off'])
+            ? withdraw_day_off_request($pdo, $crewId, (int)$_POST['withdraw_day_off'])
+            : request_day_off($pdo, $crewId, (string)($_POST['from_date'] ?? ''), (string)($_POST['to_date'] ?? ''),
+                              (string)($_POST['reason'] ?? ''), current_user_display()));
+    } catch (Throwable $e) {
+        flash('err', $e->getMessage());
+    }
+    header('Location: home.php?tab=general#days-off');
     exit;
 }
 
@@ -187,8 +209,48 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
   <?php endif; ?>
   <h2 class="wizard-title">Home <span class="muted">· <?= e($personName) ?></span>
     <a class="button secondary statement-link" href="mytasks.php">My tasks</a>
+    <?php if (day_off_requests_available($pdo)): ?>
+      <button type="button" class="secondary statement-link" id="dayOffOpen">Request days off</button>
+    <?php endif; ?>
   </h2>
 </div>
+
+<?php if (day_off_requests_available($pdo)): ?>
+  <?php // The request form, a pop-up so the button works from every tab. ?>
+  <link rel="stylesheet" href="assets/days_off.css<?= asset_ver('days_off.css') ?>">
+  <dialog class="do-dialog" id="dayOffDialog" aria-labelledby="dayOffTitle">
+    <form method="post" class="stack">
+      <input type="hidden" name="request_day_off" value="1">
+      <h3 id="dayOffTitle">Request days off</h3>
+      <p class="muted small">Production or an administrator will approve or decline it, and you will be told
+        in the bell and by email. Until it is approved, the days still count as working days.</p>
+      <div class="row">
+        <label>First day <input type="date" name="from_date" required></label>
+        <label>Last day <input type="date" name="to_date"></label>
+      </div>
+      <label>Reason <input name="reason" maxlength="120" list="dayOffReasons" placeholder="e.g. Holiday"></label>
+      <datalist id="dayOffReasons"><option value="Holiday"><option value="Sick"><option value="Personal"><option value="Course"></datalist>
+      <p class="muted small">Leave the last day blank for a single day.</p>
+      <div class="actions">
+        <button type="submit">Send request</button>
+        <button type="button" class="secondary" id="dayOffCancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+  (function () {
+    var d = document.getElementById('dayOffDialog');
+    var open = document.getElementById('dayOffOpen');
+    if (!d || !open) return;
+    if (typeof d.showModal !== 'function') {   // a browser without <dialog>: send them to the list
+      open.addEventListener('click', function () { location.href = 'home.php?tab=general#days-off'; });
+      return;
+    }
+    open.addEventListener('click', function () { d.showModal(); });
+    document.getElementById('dayOffCancel').addEventListener('click', function () { d.close(); });
+  })();
+  </script>
+<?php endif; ?>
 
 <nav class="proj-tabs home-tabs" aria-label="Home">
   <?php foreach ($tabs as $k => $label): ?>
@@ -289,6 +351,59 @@ $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !=
       </details>
     <?php endif; ?>
   </div>
+
+  <?php // ---- Your days off: what you asked for and the answer, and what is coming up.
+        // David, 2026-11-16. Approved ones are the real days off (crew_absences);
+        // a request is only a question until Production answers it. ?>
+  <?php if (day_off_requests_available($pdo)):
+        $myRequests = day_off_requests_for_crew($pdo, $crewId, 10);
+        $myComing = array_values(array_filter(crew_absences($pdo, $crewId),
+            function ($a) { return (string)$a['to_date'] >= date('Y-m-d'); })); ?>
+    <h3 id="days-off">Your days off</h3>
+    <?php if (!$myRequests && !$myComing): ?>
+      <p class="muted small">Nothing asked for and nothing coming up. Use <strong>Request days off</strong> at the top.</p>
+    <?php else: ?>
+      <table class="review-table home-days-off">
+        <thead><tr><th>Days</th><th class="num">Working days</th><th>Reason</th><th>State</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($myRequests as $r): if ($r['state'] === 'approved') continue; ?>
+          <tr>
+            <td><?= e(day_off_range_phrase((string)$r['from_date'], (string)$r['to_date'])) ?></td>
+            <td class="num"><?= working_days_between((string)$r['from_date'], (string)$r['to_date']) ?></td>
+            <td><?= e((string)($r['reason'] ?? '')) ?: '<span class="muted">—</span>' ?></td>
+            <td>
+              <?php if ($r['state'] === 'pending'): ?>
+                <span class="do-state do-state-pending">Waiting for approval</span>
+              <?php else: ?>
+                <span class="do-state do-state-declined">Declined</span>
+                <span class="muted small">by <?= e((string)$r['decided_by']) ?><?= $r['note'] ? ': ' . e((string)$r['note']) : '' ?></span>
+              <?php endif; ?>
+            </td>
+            <td>
+              <?php if ($r['state'] === 'pending'): ?>
+                <form method="post" style="display:inline" onsubmit="return confirm('Withdraw this request?');">
+                  <input type="hidden" name="withdraw_day_off" value="<?= (int)$r['id'] ?>">
+                  <button type="submit" class="linkish">Withdraw</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php foreach ($myComing as $a): ?>
+          <tr>
+            <td><?= e(day_off_range_phrase((string)$a['from_date'], (string)$a['to_date'])) ?></td>
+            <td class="num"><?= working_days_between((string)$a['from_date'], (string)$a['to_date']) ?></td>
+            <td><?= e((string)($a['reason'] ?? '')) ?: '<span class="muted">—</span>' ?></td>
+            <td><span class="do-state do-state-approved">Approved</span></td>
+            <td></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      <p class="muted small">Approved days off are never counted as days you forgot to log. To change one that is
+        already approved, ask Production.</p>
+    <?php endif; ?>
+  <?php endif; ?>
 
   <h3>Your shows</h3>
   <?php if (!$shows): ?>

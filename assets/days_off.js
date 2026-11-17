@@ -88,6 +88,16 @@
     if (!cell) return;
     var row = cell.parentNode;
     e.preventDefault();
+    if (cell.hasAttribute('data-request')) {
+      // Asked for on Home and not answered: the answer is in the list at the
+      // top, so take them there rather than starting a new day off on top.
+      var row = document.getElementById('req-' + cell.getAttribute('data-request'));
+      if (row) {
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        row.classList.remove('is-flash'); void row.offsetWidth; row.classList.add('is-flash');
+      }
+      return;
+    }
     if (cell.hasAttribute('data-absence')) {
       // An existing day off: change or remove it, with its real dates even
       // when it runs into the next month.
