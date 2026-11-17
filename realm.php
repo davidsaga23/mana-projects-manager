@@ -38,6 +38,9 @@ $preview = in_preview();
 $state   = null;
 if ($ready && !$preview) {
     realm_enter($pdo, $uid);
+    // Everybody with an active login gets their house too, so they are in People and can be sent a
+    // raven before their first visit (David, 2026-11-17; includes/realm.php).
+    realm_seat_everyone($pdo);
     realm_sync_lands($pdo);
     $state = realm_state($pdo, $uid);
     // Chat (stage 2). Null until migration 082 has run, and the page then draws no chat at all.
