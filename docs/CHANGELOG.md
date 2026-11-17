@@ -14,6 +14,19 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Staffing: each position shows and edits its start and end dates *(no migration)*
+
+- A filled position shows its person's dates on this show ("12 Oct → 30 Nov 2026"). With none set,
+  it shows the department's dates greyed, "from the department's dates"; empty positions show only
+  that. **Edit dates** on the row opens two date fields and Save (Production only).
+- They are the same dates as the person page and Hiring (one pair per person per show), so Bookings,
+  statements, Home, head count and the scheduler's availability follow them. Somebody on two
+  positions here is told the dates are shared. An end before the start is refused; dates outside
+  the department's own dates save with a warning, and the flash says to re-run the schedule when the
+  person already has planned work.
+- The contract's Drive address on each row is now an **Open contract** capsule, beside the Freelance
+  and Signed ones, that opens the contract in a new tab.
+
 ## 2026-11-17 — Staffing: the intro paragraph about slots is gone *(no migration)*
 
 - "A crew is never complete until a show nearly is…" no longer shows at the top of Staffing.

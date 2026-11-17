@@ -2821,6 +2821,16 @@ body.lightbox-lock { overflow: hidden; }
 /* THE CONTRACT LINE on a filled staffing slot (David, 2026-10-05). Under the
    name, quiet, and read-only — changing a contract is still the Hiring screen. */
 .slot-contract { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+/* A POSITION'S DATES, under the contract line (David, 2026-11-17). "Edit dates"
+   is a quiet link that unfolds the two date inputs in place, on the row. */
+.slot-dates { display: flex; align-items: baseline; gap: 10px; margin-top: 3px; flex-wrap: wrap; font-size: 13px; }
+.slot-dates-edit > summary { cursor: pointer; color: var(--primary); font-size: 12px; list-style: none; }
+.slot-dates-edit > summary::-webkit-details-marker { display: none; }
+.slot-dates-edit[open] { flex-basis: 100%; }
+.slot-dates-form { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+.slot-dates-form label { font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
+.slot-dates-form input[type="date"] { width: auto; }
+.slot-dates-form button { margin-top: 0; }
 .ct-chip {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
   padding: 1px 6px; border-radius: 10px; border: 1px solid;
@@ -2832,6 +2842,10 @@ body.lightbox-lock { overflow: hidden; }
 .ct-declined { color: var(--danger); border-color: var(--danger-border); background: var(--danger-tint); }
 .ct-draft    { color: var(--text-2); border-color: var(--border-strong); background: var(--surface-2); }
 .ct-none     { color: var(--faint);  border-color: var(--border);        background: none; }
+/* "Open contract" on Staffing: the same capsule, in the link colour, so it reads
+   as the one clickable one of the three (David, 2026-11-17). */
+a.ct-open        { color: var(--primary); border-color: var(--primary); background: none; text-decoration: none; }
+a.ct-open:hover  { background: var(--primary-tint); }
 /* ⚠ Truncated HERE, not in PHP, so the whole address stays selectable and the
    tooltip carries it in full — the rule .reel-cell already follows. */
 .ct-link {
