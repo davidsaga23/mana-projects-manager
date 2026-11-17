@@ -143,6 +143,23 @@ function staffing_add_candidate(string $action, array $book): void {
     <?php
 }
 
+/**
+ * "12 Oct → 30 Nov 2026", for a position's dates. The year is said once when
+ * both ends share it. Either end may be missing: "from 12 Oct 2026",
+ * "until 30 Nov 2026", or '' when neither is set.
+ */
+function staffing_date_span(?string $start, ?string $end): string {
+    $ts = $start ? strtotime($start) : false;
+    $te = $end ? strtotime($end) : false;
+    if ($ts && $te) {
+        return (date('Y', $ts) === date('Y', $te) ? date('j M', $ts) : date('j M Y', $ts))
+             . ' → ' . date('j M Y', $te);
+    }
+    if ($ts) return 'from ' . date('j M Y', $ts);
+    if ($te) return 'until ' . date('j M Y', $te);
+    return '';
+}
+
 $projectId = (int)($_GET['project'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = ?');
 $stmt->execute([$projectId]);
@@ -245,6 +262,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     count($r['blocked']) === 1 ? 'it' : 'them',
                     implode(', ', $bits)
                 ));
+            }
+
+        } elseif (preg_match('/^dates:(\d+)$/', $action, $m)) {
+            // A POSITION'S DATES, edited on its row (David, 2026-11-17: "let's
+            // make available in this context the start and end date to show and
+            // edit").
+            //
+            // ⚠ THEY ARE THE PERSON'S DATES ON THIS SHOW, crew_projects.start_date
+            // / end_date, through the same set_engagement_dates() the person page
+            // and Hiring use. Not a new per-position field: head count, Bookings,
+            // statements, Home and the scheduler's availability all read
+            // crew_projects, so a date typed here is the date every one of them
+            // shows. Somebody holding two positions on one show has one pair of
+            // dates, and the row says so.
+            //
+            // The posted id is the POSITION; the person is read from it, and only
+            // a filled position of THIS show is accepted, so a forged id cannot
+            // set somebody's dates on another project.
+            if (!can_edit_area('staffing')) {
+                throw new RuntimeException('Only Production can change dates on Staffing.');
+            }
+            $q = $pdo->prepare(
+                'SELECT cl.crew_id, c.name, c.is_placeholder, ps.name AS step_name,
+                        ps.start_date AS step_start, ps.deadline AS step_deadline
+                   FROM crew_lanes cl
+                   JOIN crew c            ON c.id  = cl.crew_id
+                   JOIN pipeline_steps ps ON ps.id = cl.step_id
+                  WHERE cl.id = ? AND cl.project_id = ?'
+            );
+            $q->execute([(int)$m[1], $projectId]);
+            $pos = $q->fetch();
+            if (!$pos) throw new RuntimeException('That position no longer exists.');
+            if ((int)$pos['is_placeholder'] === 1) {
+                throw new RuntimeException('Nobody holds that position yet, so there are no dates to set.');
+            }
+            $crewId = (int)$pos['crew_id'];
+            $start  = trim((string)($_POST['start_date'] ?? ''));
+            $end    = trim((string)($_POST['end_date'] ?? ''));
+            // set_engagement_dates() refuses an end before the start, and saves nothing.
+            set_engagement_dates($pdo, $crewId, $projectId, $start, $end);
+            flash('ok', $start === '' && $end === ''
+                ? sprintf('Cleared %s\'s dates on this show. They now follow the department\'s dates.', $pos['name'])
+                : sprintf('%s is on this show %s.', $pos['name'], staffing_date_span($start ?: null, $end ?: null)));
+
+            // OUTSIDE THE DEPARTMENT'S WINDOW: said, not refused. Somebody often
+            // starts a week early to set up, or stays on for fixes.
+            $ds = $pos['step_start'] ?: null;
+            $de = $pos['step_deadline'] ?: null;
+            if (($start !== '' && $ds !== null && $start < $ds) || ($end !== '' && $de !== null && $end > $de)
+                || ($start !== '' && $de !== null && $start > $de) || ($end !== '' && $ds !== null && $end < $ds)) {
+                flash('warn', sprintf(
+                    'These dates run outside %s\'s own dates (%s). Saved anyway.',
+                    $pos['step_name'], staffing_date_span($ds, $de)
+                ));
+            }
+
+            // The scheduler reads these dates as when the person is available, so
+            // work already planned for them may now sit outside them.
+            $w = $pdo->prepare('SELECT COUNT(*) FROM schedule WHERE project_id = ? AND crew_id = ?');
+            $w->execute([$projectId, $crewId]);
+            if ((int)$w->fetchColumn() > 0) {
+                $clash = engagement_conflicts($pdo, $crewId, $projectId);
+                $bits = [];
+                if ($clash && $clash['before'] > 0) {
+                    $bits[] = $clash['before'] . ' task' . ($clash['before'] === 1 ? '' : 's') . ' before they start';
+                }
+                if ($clash && $clash['after'] > 0) {
+                    $bits[] = $clash['after'] . ' task' . ($clash['after'] === 1 ? '' : 's') . ' after they finish';
+                }
+                flash($bits ? 'warn' : 'ok', 'Re-run the schedule (Timeline, "Draft the dates again") so '
+                    . 'their work follows these dates.'
+                    . ($bits ? ' The plan has ' . implode(' and ', $bits) . ' right now.' : ''));
             }
 
         } elseif (preg_match('/^hire:(\d+)$/', $action, $m)) {
@@ -546,6 +635,28 @@ foreach ($lanes as $l) {
     }
 }
 $collabTypes = $schemaReady ? crew_collaborator_types($pdo, array_values($filledCrew)) : [];
+
+// EACH PERSON'S DATES ON THIS SHOW, for the dates line on a filled position
+// (David, 2026-11-17). One query for the page. They are per person per show
+// (crew_projects), so somebody holding two positions here has one pair of
+// dates; $posByCrew names their other positions on the row, so editing one is
+// not a surprise on the other.
+$engagements = [];
+$datesReady  = $schemaReady && engagement_dates_available($pdo);
+if ($datesReady) {
+    // Not project_engagements(): that leaves out team records, and a vendor
+    // holding a position (Grafiart) is one. Everybody on a position here counts.
+    $eq = $pdo->prepare('SELECT crew_id, start_date, end_date FROM crew_projects WHERE project_id = ?');
+    $eq->execute([$projectId]);
+    foreach ($eq as $en) $engagements[(int)$en['crew_id']] = $en;
+}
+$posByCrew = [];
+foreach ($lanes as $l) {
+    if ((int)($l['is_placeholder'] ?? 0) !== 1) {
+        $posByCrew[(int)$l['crew_id']][(int)$l['id']] =
+            $l['step_name'] . ' ' . str_pad((string)(int)$l['lane_no'], 2, '0', STR_PAD_LEFT);
+    }
+}
 $unfilled = $schemaReady ? unfilled_slot_count($pdo, $projectId) : 0;
 
 // Who is lined up for the empty slots. An unfilled slot with three candidates in
@@ -1039,6 +1150,55 @@ require __DIR__ . '/includes/header.php';
                      title="<?= e($cUrl) ?>"><?= e($cUrl) ?></a>
                 <?php endif; ?>
               </div>
+            <?php endif; endif; ?>
+            <?php // THE POSITION'S DATES (David, 2026-11-17). The person's own
+                  // dates on this show when set; otherwise the department's
+                  // window, greyed and labelled, because that is what the
+                  // scheduler and statements fall back to. An empty position
+                  // shows the department's window only: nobody to agree dates
+                  // with yet. Edited in place, folded until asked for. ?>
+            <?php if ($datesReady):
+              $deptSpan = staffing_date_span($l['step_start'] ?: null, $l['step_deadline'] ?: null);
+              $en = $isPh ? null : ($engagements[(int)$l['crew_id']] ?? null);
+              $ownSpan = $en ? staffing_date_span($en['start_date'] ?: null, $en['end_date'] ?: null) : '';
+              $others = $isPh ? [] : array_diff_key($posByCrew[(int)$l['crew_id']] ?? [], [(int)$l['id'] => true]);
+              $canDates = !$isPh && can_edit_area('staffing');
+              if ($ownSpan !== '' || $deptSpan !== '' || $canDates): ?>
+              <div class="slot-dates">
+                <?php if ($ownSpan !== ''): ?>
+                  <span class="slot-dates-own"><?= e($ownSpan) ?></span>
+                <?php elseif ($deptSpan !== ''): ?>
+                  <span class="muted"><?= e($deptSpan) ?> · from the department's dates</span>
+                <?php else: ?>
+                  <span class="muted">No dates yet</span>
+                <?php endif; ?>
+                <?php if ($canDates): ?>
+                  <details class="slot-dates-edit">
+                    <summary>Edit dates</summary>
+                    <form method="post" class="inline-form slot-dates-form">
+                      <label>Start
+                        <input type="date" name="start_date" value="<?= e($en['start_date'] ?? '') ?>"
+                               onchange="this.form.end_date.min = this.value">
+                      </label>
+                      <label>End
+                        <input type="date" name="end_date" value="<?= e($en['end_date'] ?? '') ?>"
+                               min="<?= e($en['start_date'] ?? '') ?>">
+                      </label>
+                      <button type="submit" class="secondary" name="action"
+                              value="dates:<?= (int)$l['id'] ?>">Save</button>
+                    </form>
+                    <div class="muted small">
+                      <?= e($l['name']) ?>'s dates on this whole show<?php if ($deptSpan !== ''): ?>;
+                      <?= e($l['step_name']) ?> runs <?= e($deptSpan) ?><?php endif; ?>.
+                      Leave both empty to follow the department's dates.
+                    </div>
+                  </details>
+                <?php endif; ?>
+              </div>
+              <?php if ($others): ?>
+                <div class="muted small">Same dates as their other position here:
+                  <?= e(implode(', ', $others)) ?>.</div>
+              <?php endif; ?>
             <?php endif; endif; ?>
             <?php // "placeholder" was internal vocabulary printed at a reader:
                   // it is the database's word for an empty position, not
