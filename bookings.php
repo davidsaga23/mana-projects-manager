@@ -28,6 +28,7 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/bookings.php';
+require_once __DIR__ . '/includes/day_off_requests.php';   // the Days off tab's count
 require_login();
 
 $projects   = bookings_projects($pdo);
@@ -44,7 +45,7 @@ if ($daysOffTab) {
 <div class="panel-tabs bk-tabs" role="tablist" aria-label="Display">
   <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=timeline">Timeline</a>
   <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=calendar">Calendar</a>
-  <a class="panel-tab is-on" role="tab" aria-selected="true" href="bookings.php?tab=days-off">Days off</a>
+  <a class="panel-tab is-on" role="tab" aria-selected="true" href="bookings.php?tab=days-off">Days off<?php if (can_edit() || is_supervisor()) { $doWait = day_off_requests_pending_count($pdo); if ($doWait > 0): ?> <span class="pending-badge" title="Days off waiting for approval"><?= $doWait ?></span><?php endif; } ?></a>
 </div>
 <?php
     require __DIR__ . '/includes/days_off/view.php';
@@ -92,7 +93,7 @@ require __DIR__ . '/includes/header.php';
     <button type="button" class="panel-tab is-on" role="tab" aria-selected="true" data-tab="timeline">Timeline</button>
     <button type="button" class="panel-tab" role="tab" aria-selected="false" data-tab="calendar">Calendar</button>
     <?php // Drawn by the server (see the top of this file), so a link, not a button. ?>
-    <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=days-off">Days off</a>
+    <a class="panel-tab" role="tab" aria-selected="false" href="bookings.php?tab=days-off">Days off<?php if (can_edit() || is_supervisor()) { $doWait = day_off_requests_pending_count($pdo); if ($doWait > 0): ?> <span class="pending-badge" title="Days off waiting for approval"><?= $doWait ?></span><?php endif; } ?></a>
   </div>
 
   <div class="bk-toolbar">

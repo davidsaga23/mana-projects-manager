@@ -35,6 +35,30 @@ function crew_absences(PDO $pdo, int $crewId): array {
 }
 
 /**
+ * The date rules for a day off, in one place: a request (includes/day_off_requests.php)
+ * is held to exactly what an absence is. Returns [from, to]; an empty "to" is a
+ * single day. Throws with the sentence to show.
+ */
+function absence_dates_check(string $from, string $to): array {
+    $from = trim($from);
+    $to   = trim($to) === '' ? $from : trim($to);
+    foreach ([$from, $to] as $d) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !checkdate((int)substr($d, 5, 2), (int)substr($d, 8, 2), (int)substr($d, 0, 4))) {
+            throw new RuntimeException('A day off needs a date in YYYY-MM-DD form, nothing was saved.');
+        }
+    }
+    if ($to < $from) {
+        throw new RuntimeException('The last day is before the first, nothing was saved.');
+    }
+    // The same cap the readers use: a typo of 2062 for 2026 is refused here
+    // rather than quietly clipped by every reader.
+    if ((new DateTime($from))->diff(new DateTime($to))->days > 366) {
+        throw new RuntimeException('That is more than a year of days off. Check the dates, nothing was saved.');
+    }
+    return [$from, $to];
+}
+
+/**
  * Record an absence. Returns the sentence the flash area shows.
  *
  * A one-day absence is from = to; an empty "to" means exactly that, because the
@@ -44,16 +68,7 @@ function add_crew_absence(PDO $pdo, int $crewId, string $from, string $to, strin
     if (!absences_available($pdo)) {
         throw new RuntimeException('The database update for days off (migration 060) has not been applied yet.');
     }
-    $from = trim($from);
-    $to   = trim($to) === '' ? $from : trim($to);
-    foreach ([$from, $to] as $d) {
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
-            throw new RuntimeException('A day off needs a date in YYYY-MM-DD form, nothing was saved.');
-        }
-    }
-    if ($to < $from) {
-        throw new RuntimeException('The last day is before the first, nothing was saved.');
-    }
+    [$from, $to] = absence_dates_check($from, $to);
     $reason = mb_substr(trim($reason), 0, 120);
     $pdo->prepare(
         'INSERT INTO crew_absences (crew_id, from_date, to_date, reason, created_by) VALUES (?, ?, ?, ?, ?)'

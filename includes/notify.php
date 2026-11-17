@@ -11,7 +11,8 @@
  *   status    a task you follow moved
  *
  * Since added: review (review notes on your version, 079) and reminder (log
- * your time, 080; includes/log_reminders.php).
+ * your time, 080; includes/log_reminders.php), and dayoff (a request for days
+ * off, and its answer, 101; includes/day_off_requests.php).
  *
  * ⚠ NOTHING IN HERE MAY THROW. Every writer below sits in the middle of a save
  * — a status change, an assignment, a posted comment — and a bell that cannot
@@ -109,9 +110,12 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag', 'later'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag', 'later', 'dayoff'], true)) return 0;
     // 'later' (a saved Realm message's reminder, migration 096): the same, no fallback.
     if ($kind === 'later' && !enum_has_value($pdo, 'notifications', 'kind', 'later')) return 0;
+    // 'dayoff' (a request for days off, or its answer, migration 101): no
+    // fallback, and none needed, since there are no requests before 101 runs.
+    if ($kind === 'dayoff' && !enum_has_value($pdo, 'notifications', 'kind', 'dayoff')) return 0;
     // 'raven' (a message left in the Realm for somebody who is away, migration
     // 082) has no fallback either: until 082 runs there are no ravens to ring for.
     if ($kind === 'raven' && !enum_has_value($pdo, 'notifications', 'kind', 'raven')) return 0;
@@ -221,6 +225,11 @@ function notify_mark_seen(PDO $pdo, int $crewId): int {
 function notify_link(array $n): string {
     // A raven is read in the Realm, where the sender's name carries the unread mark.
     if (in_array($n['kind'] ?? '', ['raven', 'tag'], true)) return 'realm.php';
+    // Days off (101): a request goes to where Production answers it, an answer
+    // to the asker's own list on Home.
+    if (($n['kind'] ?? '') === 'dayoff') {
+        return ($n['item_key'] ?? '') === 'approve' ? 'bookings.php?tab=days-off#requests' : 'home.php?tab=general#days-off';
+    }
     // A reminder about a saved Realm message (migration 096) opens the Realm AT
     // that message; item_key holds its id. The Realm checks it may still be read.
     if (($n['kind'] ?? '') === 'later') return 'realm.php' . (!empty($n['item_key']) ? '?msg=' . (int)$n['item_key'] : '');
@@ -249,7 +258,8 @@ function notify_verb(string $kind): string {
         'reminder' => 'asked you to log',     // + "your time for Tue 11 Nov" (080)
         'raven'    => 'sent you a raven',     // + "in the Realm" (082)
         'tag'      => 'tagged you in',        // + "The Tavern in the Realm" (083)
-        'later'    => 'about',                // "Reminder about Renata's message in the Realm" (096)
+        'later'    => 'about',
+        'dayoff'   => '',                     // the summary says it all: "asked for days off, Mon 24 Nov" (101)                // "Reminder about Renata's message in the Realm" (096)
     ];
     return $words[$kind] ?? 'changed';
 }
