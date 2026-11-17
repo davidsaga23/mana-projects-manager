@@ -323,9 +323,10 @@ require __DIR__ . '/includes/header.php';
       <th>Project code</th><th>Name</th><th>Type</th><th>Status</th>
       <th>Departments</th><th>Shots</th><th>Assets</th><th>Crew</th><th>Delivery</th><th></th>
     </tr>
-    <?php foreach ($projects as $p): $pid = (int)$p['id']; ?>
+    <?php foreach ($projects as $p): $pid = (int)$p['id']; $pc = project_color($pdo, $pid); ?>
     <tr>
-      <td><code><?= e($p['code']) ?></code></td>
+      <?php // The show's colour on its code (David, 2026-11-17), the same tag its pages carry. ?>
+      <td><code class="proj-chip"<?= $pc !== '' ? ' style="--proj:' . e($pc) . '"' : '' ?>><?= e($p['code']) ?></code></td>
       <td><a href="project.php?id=<?= $pid ?>"><?= e($p['name']) ?></a></td>
       <td><?= e($p['type']) ?></td>
       <td>
