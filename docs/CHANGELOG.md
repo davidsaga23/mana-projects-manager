@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Finance: the bars' colour key sits above the table *(no migration)*
+
+**Asked by David**: "let's move these to the top of the table".
+
+- On a project's Finance overview, the key for the bars (committed so far, committed beyond the
+  plan, still to commit, forecast past the plan, the plan) is now **above** the department table
+  instead of below it.
+
 ## 2026-11-17 — Bell: the task's latest version as a thumbnail *(no migration)*
 
 - David: "is it possible to get the latest version as a thumbnail in the notifications? So we can
