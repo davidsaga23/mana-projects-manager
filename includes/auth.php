@@ -548,7 +548,10 @@ function artist_may_post(): bool {
         // withdraw_day_off_request() deletes it only WHERE crew_id is the asker's
         // own AND it is still pending. Answering a request is Production's, on
         // bookings.php, which is not on this list at all.
-        'home.php' => ['save_profile', 'request_day_off', 'withdraw_day_off'],
+        // save_digest_pref (2026-11-17, migration 102): which of the two daily
+        // email summaries they get. ⚠ NO ID TO FORGE: digest_set_pref() is
+        // handed effective_crew_id(), and the only thing posted is the choice.
+        'home.php' => ['save_profile', 'request_day_off', 'withdraw_day_off', 'save_digest_pref'],
         // save_invoice_details: the name, address, tax ID and bank details on
         // their own invoice (2026-11-11, finance_install_18). ⚠ NO ID TO FORGE
         // either: invoice.php saves to effective_crew_id() unless the asker is

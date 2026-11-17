@@ -23,7 +23,8 @@ require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/board.php';
-require_once __DIR__ . '/includes/mailer.php';   // notify_mentioned_task()
+require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';   // digest_told_sentence(): who will hear of an @
 require_once __DIR__ . '/includes/uploads.php';  // files on a comment (migration 061)
 require_login();
 

@@ -140,6 +140,15 @@ return [
     // always was. Set it on the new host: 'https://anima-mana.com'.
     'site_url' => '',
 
+    // --- Email summaries (9 am and 5 pm Pacific; docs/EMAIL_DIGEST.md) ----------
+    // Sent by cron_digest.php from a cPanel Cron Job every 15 minutes, which
+    // needs site_url above set. Without a cron job the bell's 30-second check
+    // sends them 20 minutes late; false here switches that fallback off.
+    'digest_web_fallback' => true,
+    // Only for a host whose cron can fetch a URL but not run PHP: a long random
+    // string, then cron_digest.php?key=... '' keeps the URL shut (CLI still works).
+    'cron_key' => '',
+
     // Stops the whole site with a "back shortly" page (HTTP 503) before the
     // database is touched. true, or a sentence to show. Used to freeze the old
     // copy while the data is moved. preflight.php still answers.

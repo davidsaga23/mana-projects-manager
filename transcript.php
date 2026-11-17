@@ -28,7 +28,8 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/statuses.php';
 require_once __DIR__ . '/includes/tickets.php';
 require_once __DIR__ . '/includes/ai.php';
-require_once __DIR__ . '/includes/mailer.php';   // one summary email per assignee
+require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';   // each new card rings its person's bell
 require_login();
 
 // ⚠ A PROJECT IS OPTIONAL HERE, and that is the point (David, 2026-10-07: he
@@ -148,9 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
         $byProject = [];      // code => how many, for the report
         $unfiled = 0;         // cards created with no project at all
         $lastProject = 0;     // the one show to send him to, if there was only one
-        // ⚠ ONE EMAIL PER PERSON, so cards are gathered by owner here and the mail
-        // goes out AFTER the loop — not one send per card. Only assigned cards; an
-        // unfiled "nobody yet" card has no one to tell (David, 2026-10-20).
+        // Cards are gathered by owner here and their bells rung AFTER the loop
+        // (it was one email per person, David, 2026-10-20; since 2026-11-17 the
+        // twice-a-day summary is the one email). Only assigned cards; an
+        // unfiled "nobody yet" card has no one to tell.
         $emailBatch = [];     // crew_id => list of their new cards, for the summary
 
         foreach ($rows as $r) {
@@ -196,11 +198,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
                 $unfiled++;
             }
 
-            // Gather for the one-per-person summary email. Only when a real owner
-            // was picked; "nobody yet" is the expected answer and emails no one.
+            // Gather for the bell. Only when a real owner was picked; "nobody
+            // yet" is the expected answer and tells no one.
             if ($crewId) {
                 $newId = (int)$pdo->lastInsertId();
                 $emailBatch[$crewId][] = [
+                    'ticket_id' => $newId,
                     'title'    => mb_substr($title, 0, 255),
                     'project'  => $to ? ($known[$to]['code'] . ' · ' . $known[$to]['name']) : '',
                     'priority' => $priority,
@@ -230,11 +233,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
         }
         if (!$made) $said[] = 'Nothing was ticked, so nothing was created.';
 
-        // One summary email per person who got cards. Never fatal — a mail outage
-        // must not lose the cards that were just written — and it says on screen
-        // who was reached and who had no address, the same way the rest does.
+        // Each card rings its person's bell, and the twice-a-day email summary
+        // lists them together (David, 2026-11-17; it was one email per person
+        // sent from here before). Never fatal, and it says on screen who will
+        // hear and who has no email address, the same way the rest does.
         if ($emailBatch) {
-            [, $mailMsg] = notify_transcript_tasks($pdo, $emailBatch);
+            [, $mailMsg] = ticket_ring_transcript($pdo, $emailBatch);
             if ($mailMsg !== '') $said[] = $mailMsg;
         }
 

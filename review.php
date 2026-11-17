@@ -26,7 +26,8 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/review.php';
 require_once __DIR__ . '/includes/uploads.php';   // version_label(), attachment_is_image()
-require_once __DIR__ . '/includes/mailer.php';    // notify_mentioned_task(), for @ in a note
+require_once __DIR__ . '/includes/mailer.php';
+require_once __DIR__ . '/includes/digest.php';    // digest_told_sentence(), for @ in a note
 require_login();
 
 $stages = review_stages();
