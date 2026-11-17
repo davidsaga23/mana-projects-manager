@@ -12,7 +12,8 @@
 // own plan from the kick-off sign-off, and the answer comes in three figures
 // that are kept apart on purpose:
 //
-//   locked in  finished steps that cost more than their plan. No later saving
+//   locked in  finished steps that cost more than their plan (shown as "Over budget",
+//              David, 2026-11-17). No later saving
 //              can undo it.
 //   expected   running steps heading past their plan at the pace they are
 //              ACTUALLY going, not the pace the plan assumed.
@@ -515,7 +516,7 @@ function render_step_variance(array $v): void {
 
 <div class="sv-heads">
   <div class="sv-head<?= $v['locked'] > SV_CENT ? ' sv-locked' : '' ?>">
-    <span class="sv-lbl">Overrun locked in</span>
+    <span class="sv-lbl">Over budget</span>
     <span class="sv-big"><?= e($m($v['locked'])) ?></span>
     <span class="muted small">finished departments that cost more than their plan</span>
     <?php if ($v['locked_steps']): ?><ul>
@@ -626,7 +627,7 @@ function render_step_variance(array $v): void {
         <?php if (!$r['readable'] && $r['state'] !== 'finished'): ?><span class="sv-sub">today's projection</span><?php endif; ?></td>
       <td>
         <?php if ($r['state'] === 'finished' && $r['diff'] > SV_CENT): ?>
-          <span class="sv-chip sv-chip-locked">+<?= e($m($r['diff'])) ?> locked in</span>
+          <span class="sv-chip sv-chip-locked">+<?= e($m($r['diff'])) ?> over budget</span>
           <?php if ($plan > SV_CENT): ?><span class="sv-sub"><?= e(fmt_num($r['diff'] / $plan * 100, 0)) ?>% over</span><?php endif; ?>
         <?php elseif ($r['state'] === 'finished' && $r['diff'] < -SV_CENT && $r['saving_pending']): ?>
           <span class="sv-chip"><?= e($m(-$r['diff'])) ?> under so far</span>
@@ -690,7 +691,7 @@ function render_step_variance(array $v): void {
       as the production dashboard.</li>
     <li><strong>Forecast at the end:</strong> committed ÷ work done. Below 15% done, or with fewer than 3 items, the department
       shows today's projection instead, because the first items through a department carry its set-up.</li>
-    <li><strong>Locked in</strong> is a finished department's committed cost above its plan; <strong>expected</strong> is a running
+    <li><strong>Over budget</strong> is a finished department's committed cost above its plan; <strong>expected</strong> is a running
       department's forecast above its plan. <strong>Reserve</strong> is the approved budget less the plan, plus what finished
       departments saved. A saving reaches the reserve only once the department is finished and all of it is invoiced; a running
       department that looks cheap adds nothing. None of these are netted against each other.</li>

@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Finance Overview: "locked in" reads "over budget" *(no migration)*
+
+- A finished department that cost more than its plan now shows "+X over budget", and the summary and
+  legend say "Over budget" instead of "Overrun locked in" / "Locked in".
+
 ## 2026-11-17 — Finance: the bars' colour key sits above the table *(no migration)*
 
 **Asked by David**: "let's move these to the top of the table".
