@@ -254,19 +254,19 @@ $projects = $pdo->query(
 // column exists, so the page works (counting without dates) on a database that
 // never ran it. Any failure leaves the column blank rather than breaking the
 // list: a missing number is better than a missing projects page.
+//
+// ⚠ THE RULE IS head_count_where_sql() (includes/project_lists.php, 2026-11-17),
+// the same WHERE the list a click on the number opens is read with, so the list
+// is always as long as the number.
+require_once __DIR__ . '/includes/project_lists.php';
 $headCounts = [];
 try {
-    $hcEnd = column_exists($pdo, 'crew_projects', 'end_date')
-        ? ' AND (cp.end_date IS NULL OR cp.end_date >= CURDATE())'
-        : '';
     $hcRows = $pdo->query(
-        "SELECT cp.project_id, COUNT(DISTINCT c.id) AS n
+        'SELECT cp.project_id, COUNT(DISTINCT c.id) AS n
            FROM crew_projects cp
            JOIN crew c ON c.id = cp.crew_id
-          WHERE COALESCE(c.is_placeholder, 0) = 0
-            AND COALESCE(c.is_team, 0) = 0
-            AND c.active = 1{$hcEnd}
-          GROUP BY cp.project_id"
+          WHERE ' . head_count_where_sql($pdo) . '
+          GROUP BY cp.project_id'
     )->fetchAll();
     foreach ($hcRows as $r) $headCounts[(int)$r['project_id']] = (int)$r['n'];
 } catch (Throwable $e) {
@@ -362,7 +362,14 @@ require __DIR__ . '/includes/header.php';
       <th>Departments</th><th>Shots</th><th>Assets</th>
       <th title="Real people on the show: each counted once, no empty slots or teams, active, and not past their end date.">Head count</th><th>Delivery</th><th></th>
     </tr>
-    <?php foreach ($projects as $p): $pid = (int)$p['id']; $pc = project_color($pdo, $pid); ?>
+    <?php
+    $countCell = function (int $pid, int $n, string $what): string {
+        if ($n <= 0) return (string)$n;
+        $src = 'project_count_list.php?project=' . $pid . '&what=' . $what;
+        return '<button type="button" class="psi-count" data-src="' . e($src) . '" aria-expanded="false"'
+             . ' title="See the ' . $n . ' ' . e($what) . '">' . $n . '</button>';
+    };
+    foreach ($projects as $p): $pid = (int)$p['id']; $pc = project_color($pdo, $pid); ?>
     <tr>
       <?php // The show's colour on its code (David, 2026-11-17), the same tag its pages carry. ?>
       <td><code class="proj-chip"<?= $pc !== '' ? ' style="--proj:' . e($pc) . '"' : '' ?>><?= e($p['code']) ?></code></td>
@@ -400,10 +407,13 @@ require __DIR__ . '/includes/header.php';
             $kickoffOpen[$pid] === 'pending' ? 'waiting for sign-off' : 'changes asked for' ?></a>
         <?php endif; ?>
       </td>
-      <td><?= (int)$p['step_count'] ?></td>
-      <td><?= (int)$p['shot_count'] ?></td>
-      <td><?= (int)$p['asset_count'] ?></td>
-      <td><?= $headCounts === null ? '&mdash;' : e((string)($headCounts[$pid] ?? 0)) ?></td>
+      <?php // Each count opens the list behind it (David, 2026-11-17: "can we make
+            // these clickable to show the list of that count?"), from
+            // project_count_list.php. A 0 stays plain text. ?>
+      <td><?= $countCell($pid, (int)$p['step_count'], 'departments') ?></td>
+      <td><?= $countCell($pid, (int)$p['shot_count'], 'shots') ?></td>
+      <td><?= $countCell($pid, (int)$p['asset_count'], 'assets') ?></td>
+      <td><?= $headCounts === null ? '&mdash;' : $countCell($pid, (int)($headCounts[$pid] ?? 0), 'people') ?></td>
       <td class="delivery"><?= e($p['delivery_date'] ?? '—') ?></td>
       <td class="row-actions">
         <?php // A FLEX ROW, not three inline links with a space between them.
@@ -498,6 +508,7 @@ require __DIR__ . '/includes/header.php';
     </tr>
     <?php endforeach; ?>
   </table>
+  <script src="assets/progress-lists.js<?= asset_ver('progress-lists.js') ?>"></script>
 <?php endif; ?>
 
 </div>
