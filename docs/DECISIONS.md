@@ -6377,3 +6377,33 @@ Asked whether the scheduler should go, he agreed to keep its engine and drop the
   what every bar on the Timeline saves through; under its own "Schedule" switch, turning that off
   silently broke the Timeline's drags. The "Schedule" switch is removed.
 
+## 2026-11-16 — Days off requests: a table of their own, answered on Bookings
+
+David: "let's add a button to request days off in peoples home page, that one need to be sent to
+production or admins for approval. New requests should be available in bookings".
+
+**Decided:**
+- **Requests are their own table (`day_off_requests`, migration 101), not a state column on
+  `crew_absences`.** Everything that plans around a day off reads `crew_absences` and treats
+  every row as approved: the scheduler, Home's missing-log days, the 5 pm log reminder, Bookings
+  and the Realm. With a state column, each of those (and every future reader) would need
+  "approved only", and the one that forgot would let somebody skip logging on a day nobody
+  agreed to. Kept apart, `crew_absences` still means "approved days off", the rows already there
+  are approved by definition, and "only approved days count" holds without touching any reader.
+- **Approving goes through `add_crew_absence()`** inside the same transaction as the answer, and
+  the request keeps the id of the day off it became (`absence_id`). A request is never approved
+  without its day off.
+- **Declined requests are kept** with who declined and the optional note, so the person sees the
+  answer on Home. **Withdrawing deletes** a pending request: nobody decided anything.
+- **The same date rules for both**: `absence_dates_check()` in `includes/absences.php` now
+  holds them for an absence and a request alike. It also refuses a range of more than a year,
+  which every reader already clipped at 400 days.
+- **Who answers:** anybody who can edit Bookings (Production and admins, the `bookings_edit`
+  switch). Who is told: every active admin and Production login (bell for those linked to a
+  person, email to everyone with an address), never the asker about their own request.
+- **The count** of waiting requests shows on the Bookings link in the menu (Production only, one
+  indexed COUNT that reads 0 before the migration) and on the Days off tab.
+- **Asking needs no new permission**: `request_day_off` and `withdraw_day_off` are on
+  `artist_may_post()`'s list for `home.php`. Asking always uses the session's own person, and
+  withdrawing only deletes the asker's own pending row.
+

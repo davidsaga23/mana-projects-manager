@@ -314,8 +314,10 @@ person's days off. A saved schedule moves only when it is re-run.
 
 ✅ **2026-11-12: the Days off tab on Bookings** (`bookings.php?tab=days-off`): everybody's days off on one month grid,
 entered by Production by dragging across days. `crew_days_off_between()` is the shared lookup the
-Realm streak reads. **Next, if David wants it:** artists requesting their own days off for
-Production to approve (needs a state on `crew_absences`, a migration). The original note:
+Realm streak reads.
+
+✅ **2026-11-16: asking for days off** (migration 101): a Request days off button on Home, answered
+on Bookings → Days off; only approved days count anywhere. The original note:
 
 
 `working_days_between()` currently counts Mon–Fri and nothing else. If someone
