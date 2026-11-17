@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Staffing: Start and End date fields right on each position *(no migration)*
+
+- For those who can edit Staffing, each filled position now shows two date pickers, **Start** and
+  **End**, with Save, instead of a line of text behind "Edit dates". When none are set, a grey
+  line says it is following the department's dates. Everybody else still sees the dates as text.
+
 ## 2026-11-17 — Staffing: each position shows and edits its start and end dates *(no migration)*
 
 - A filled position shows its person's dates on this show ("12 Oct → 30 Nov 2026"). With none set,

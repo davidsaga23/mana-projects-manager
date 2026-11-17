@@ -1163,6 +1163,27 @@ require __DIR__ . '/includes/header.php';
               $others = $isPh ? [] : array_diff_key($posByCrew[(int)$l['crew_id']] ?? [], [(int)$l['id'] => true]);
               $canDates = !$isPh && can_edit_area('staffing');
               if ($ownSpan !== '' || $deptSpan !== '' || $canDates): ?>
+              <?php // THE FIELDS THEMSELVES, ON THE ROW (David, 2026-11-17: "add
+                    // them like these editable dropdowns with just start and end
+                    // as text"), the date pickers the person page uses, labelled
+                    // just Start and End, rather than a line of text behind an
+                    // "Edit dates" link. Those who cannot edit Staffing still get
+                    // the line of text. ?>
+              <?php if ($canDates): ?>
+                <form method="post" class="slot-dates-form">
+                  <label>Start
+                    <input type="date" name="start_date" value="<?= e($en['start_date'] ?? '') ?>"
+                           onchange="this.form.end_date.min = this.value"></label>
+                  <label>End
+                    <input type="date" name="end_date" value="<?= e($en['end_date'] ?? '') ?>"
+                           min="<?= e($en['start_date'] ?? '') ?>"></label>
+                  <button type="submit" class="secondary" name="action"
+                          value="dates:<?= (int)$l['id'] ?>">Save</button>
+                </form>
+                <?php if ($ownSpan === '' && $deptSpan !== ''): ?>
+                  <div class="muted small">Not set: following the department's dates, <?= e($deptSpan) ?>.</div>
+                <?php endif; ?>
+              <?php else: ?>
               <div class="slot-dates">
                 <?php if ($ownSpan !== ''): ?>
                   <span class="slot-dates-own"><?= e($ownSpan) ?></span>
@@ -1171,29 +1192,8 @@ require __DIR__ . '/includes/header.php';
                 <?php else: ?>
                   <span class="muted">No dates yet</span>
                 <?php endif; ?>
-                <?php if ($canDates): ?>
-                  <details class="slot-dates-edit">
-                    <summary>Edit dates</summary>
-                    <form method="post" class="inline-form slot-dates-form">
-                      <label>Start
-                        <input type="date" name="start_date" value="<?= e($en['start_date'] ?? '') ?>"
-                               onchange="this.form.end_date.min = this.value">
-                      </label>
-                      <label>End
-                        <input type="date" name="end_date" value="<?= e($en['end_date'] ?? '') ?>"
-                               min="<?= e($en['start_date'] ?? '') ?>">
-                      </label>
-                      <button type="submit" class="secondary" name="action"
-                              value="dates:<?= (int)$l['id'] ?>">Save</button>
-                    </form>
-                    <div class="muted small">
-                      <?= e($l['name']) ?>'s dates on this whole show<?php if ($deptSpan !== ''): ?>;
-                      <?= e($l['step_name']) ?> runs <?= e($deptSpan) ?><?php endif; ?>.
-                      Leave both empty to follow the department's dates.
-                    </div>
-                  </details>
-                <?php endif; ?>
               </div>
+              <?php endif; ?>
               <?php if ($others): ?>
                 <div class="muted small">Same dates as their other position here:
                   <?= e(implode(', ', $others)) ?>.</div>
