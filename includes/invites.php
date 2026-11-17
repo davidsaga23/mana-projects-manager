@@ -22,11 +22,18 @@
 //
 // Who may press the buttons: Production and admins (can_edit()), the same people
 // who staff the show. A link can only ever be sent for an ARTIST or SUPERVISOR
-// login by Production; an admin may also send one for a Production login; NOBODY
-// may send one for an admin login from here. The reasoning: whoever can send a
-// link can, in the worst case, read it off the screen when the email fails (see
-// invite_issue()), so it must never let somebody take over an account more
-// powerful than their own. Admin passwords stay on Users, by hand.
+// login by Production; an admin may also send one for a Production login. The
+// reasoning: whoever can send a link can, in the worst case, read it off the
+// screen when the email fails (see invite_issue()), so it must never let
+// somebody take over an account more powerful than their own.
+//
+// ADMIN LOGINS, since 2026-11-17. David wanted a way in for Jorik, an admin who
+// is on no show's crew and so has no person page ("yeah let's do the set
+// password link"). So an admin may send a link for an admin login too, ONLY from
+// Users (users.php, "Set-password link" on each row) and only after ticking that
+// it gives full access to money and every show. Never for their own account.
+// The person page still refuses admin logins and points at Users, so the
+// confirmation cannot be skipped by going round it.
 
 require_once __DIR__ . '/mailer.php';
 
@@ -60,9 +67,13 @@ function crew_login(PDO $pdo, int $crewId): ?array {
     return $u;
 }
 
-/** May the current account send a link for a login with this role? See the header. */
+/**
+ * May the current account send a link for a login with this role? See the header.
+ * ⚠ TRUE FOR AN ADMIN LOGIN when the sender is an admin, but only Users asks the
+ * confirmation that needs, so any other screen must still refuse 'admin' itself.
+ */
 function may_send_invite_for(string $role): bool {
-    if ($role === 'admin') return false;
+    if ($role === 'admin') return is_admin();
     // "Person page: create a login" switched off (migration 077).
     if (function_exists('feature_on') && !feature_on('invite')) return false;
     if ($role === 'editor') return is_admin();
@@ -238,6 +249,28 @@ function invite_issue(PDO $pdo, array $user, string $email, string $kind,
         return [false, 'The email to ' . $email . ' failed (' . $e->getMessage() . '). Copy the link below and '
                      . 'send it to them privately; it works once, for ' . INVITE_DAYS . ' days.', $url];
     }
+}
+
+/**
+ * The box a freshly made link is shown in, with its Copy button. Shared by the
+ * person page and Users so the two cannot drift. $copied: the sender asked for
+ * the link (Copy link) rather than it being shown because the email failed.
+ */
+function invite_link_box(string $link, bool $copied, string $name): string {
+    $intro = $copied
+        ? '<strong>Here is the link.</strong> Send it to ' . e($name) . ' privately (WhatsApp, Slack).'
+        : '<strong>The link was not emailed.</strong> Copy it and send it to ' . e($name) . ' privately.';
+    return '<div class="flash ' . ($copied ? 'flash-ok' : 'flash-warn') . '">' . $intro
+        . ' It works once, for ' . INVITE_DAYS . ' days, and is not shown again.'
+        . '<span class="invite-copy">'
+        . '<input type="text" readonly value="' . e($link) . '" onclick="this.select()" id="inviteLinkBox">'
+        . '<button type="button" class="secondary" onclick="(function (b) {'
+        . ' var box = document.getElementById(\'inviteLinkBox\');'
+        . ' var done = function (ok) { b.textContent = ok ? \'Copied\' : \'Select and copy it\'; };'
+        . ' if (navigator.clipboard &amp;&amp; window.isSecureContext) {'
+        . ' navigator.clipboard.writeText(box.value).then(function () { done(true); }, function () { done(false); });'
+        . ' } else { box.select(); var ok = false; try { ok = document.execCommand(\'copy\'); } catch (e) {} done(ok); }'
+        . ' })(this)">Copy link</button></span></div>';
 }
 
 /** The latest link sent for a login, for the person page's "last sent" line. */

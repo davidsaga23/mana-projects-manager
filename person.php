@@ -157,7 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can_edit()
             // same rules, the only difference is whether the link is emailed.
             $login = crew_login($pdo, $crewId);
             if ($login === null) throw new RuntimeException('This person has no login yet, use Create user instead.');
-            if (!may_send_invite_for((string)$login['role'])) {
+            // An admin login only from Users, which asks for the confirmation
+            // (invites.php, 2026-11-17); may_send_invite_for() alone would let
+            // an admin through here without it.
+            if ($login['role'] === 'admin' || !may_send_invite_for((string)$login['role'])) {
                 throw new RuntimeException($login['role'] === 'admin'
                     ? 'Administrator passwords are not reset from here; do it on the Users screen.'
                     : 'Only an administrator can send a link for a Production login.');
@@ -613,25 +616,7 @@ require __DIR__ . '/includes/header.php';
     </p>
   <?php else: ?>
     <?php if ($inviteLink !== ''): ?>
-      <div class="flash <?= $inviteCopied ? 'flash-ok' : 'flash-warn' ?>">
-        <?php if ($inviteCopied): ?>
-          <strong>Here is the link.</strong> Send it to <?= e($person['name']) ?> privately (WhatsApp,
-          Slack). It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
-        <?php else: ?>
-          <strong>The link was not emailed.</strong> Copy it and send it to <?= e($person['name']) ?>
-          privately. It works once, for <?= INVITE_DAYS ?> days, and is not shown again.
-        <?php endif; ?>
-        <span class="invite-copy">
-          <input type="text" readonly value="<?= e($inviteLink) ?>" onclick="this.select()" id="inviteLinkBox">
-          <button type="button" class="secondary" onclick="(function (b) {
-              var box = document.getElementById('inviteLinkBox');
-              var done = function (ok) { b.textContent = ok ? 'Copied' : 'Select and copy it'; };
-              if (navigator.clipboard &amp;&amp; window.isSecureContext) {
-                navigator.clipboard.writeText(box.value).then(function () { done(true); }, function () { done(false); });
-              } else { box.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} done(ok); }
-            })(this)">Copy link</button>
-        </span>
-      </div>
+      <?= invite_link_box($inviteLink, $inviteCopied, (string)$person['name']) ?>
     <?php endif; ?>
 
     <?php if ($login === null): ?>
@@ -687,7 +672,7 @@ require __DIR__ . '/includes/header.php';
         </p>
       <?php endif; ?>
 
-      <?php if (may_send_invite_for($role)): ?>
+      <?php if ($role !== 'admin' && may_send_invite_for($role)): ?>
         <p class="muted small">
           <strong>Resend link</strong> emails them a fresh one-time link to set a new password and
           log in, for someone coming back on a new show or who has forgotten it. <strong>Copy link</strong>
@@ -711,7 +696,8 @@ require __DIR__ . '/includes/header.php';
           </div>
         </form>
       <?php elseif ($role === 'admin'): ?>
-        <p class="muted small">An administrator's password is not reset from here; that is done on Users.</p>
+        <p class="muted small">An administrator's link is not sent from here: an admin sends it from
+          Users, which asks to confirm it first.</p>
       <?php else: ?>
         <p class="muted small">Only an administrator can send a link for a Production login.</p>
       <?php endif; ?>

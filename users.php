@@ -29,6 +29,7 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/crew.php';
 require_once __DIR__ . '/includes/budget_lock.php';
+require_once __DIR__ . '/includes/invites.php';
 // The "users" switch is checked by require_login() (features.php). This second
 // lock keeps the screen to the two roles it was designed for, whatever a switch
 // says: it is locked off for every other role in FEATURES anyway.
@@ -102,6 +103,37 @@ $hasBudgetTik = budget_lock_ready($pdo);
 // answers written in includes/features.php apply and the grid says so.
 $hasFeatures = features_available($pdo);
 
+// One-time set-password links (migration 071, includes/invites.php), and the
+// login's own email (migration 049) they are sent to when it has no person.
+$hasInvites   = invites_available($pdo);
+$hasUserEmail = column_exists($pdo, 'users', 'email');
+
+/**
+ * The address typed on a send or add form: '' or a valid address, else an
+ * exception. Shared by both so they refuse the same things.
+ */
+function users_typed_email(): string {
+    $email = trim((string)($_POST['email'] ?? ''));
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('"' . $email . '" is not a valid email address, nothing was sent.');
+    }
+    return $email;
+}
+
+/** Make and email (or hand back) a link for a login, log it, and say what happened. */
+function users_send_link(PDO $pdo, array $target, string $email, bool $copy, string $kind, bool $reactivated): void {
+    [$sent, $said, $link] = invite_issue($pdo, $target, $email, $kind, ['id' => 0, 'name' => ''],
+                                         current_user_display(), $reactivated, !$copy);
+    access_log($pdo, 'password', null, $copy ? 'set-password link copied'
+        : ($sent ? 'set-password link emailed to ' . $email : 'set-password link made, not emailed'), (int)$target['id']);
+    flash($sent ? 'ok' : 'warn', $said);
+    if ($link !== '') {
+        $_SESSION['invite_link']        = $link;
+        $_SESSION['invite_link_copied'] = $copy;
+        $_SESSION['invite_link_name']   = (string)($target['display_name'] ?: $target['username']);
+    }
+}
+
 $tab = (string)($_GET['tab'] ?? 'people');
 if (!in_array($tab, ['people', 'roles', 'log', 'person'], true)) $tab = 'people';
 
@@ -119,8 +151,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('The Supervisor role needs migration 047, run it on the Migrations screen first.');
             }
 
+            // NO PASSWORD = SEND A LINK (David, 2026-11-17). Leaving the password
+            // blank creates the login with a password nobody knows and emails a
+            // one-time set-password link at once, instead of a temporary password
+            // passed on by hand. Same rule as everywhere a link is sent:
+            // may_send_invite_for(), and the admin confirmation for an Admin.
+            $sendLink = $password === '';
+            $email    = users_typed_email();
             if ($username === '')        throw new RuntimeException('A username is required.');
-            if (strlen($password) < 8)   throw new RuntimeException('The password must be at least 8 characters.');
+            if (!$sendLink && strlen($password) < 8) throw new RuntimeException('The password must be at least 8 characters.');
+            if ($sendLink) {
+                if (!$hasInvites) throw new RuntimeException('Sending a link needs migration 071; type a password instead, or run it first.');
+                if (!may_send_invite_for($role)) throw new RuntimeException('Your account cannot send a link for that role; type a password instead.');
+                if ($role === 'admin' && empty($_POST['confirm_admin'])) {
+                    throw new RuntimeException('Nothing was created: tick that an Admin gets full access to money and every show.');
+                }
+            }
 
             $chk = $pdo->prepare('SELECT id FROM users WHERE username = ?');
             $chk->execute([$username]);
@@ -128,14 +174,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->prepare(
                 'INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)'
-            )->execute([$username, password_hash($password, PASSWORD_DEFAULT), $display ?: $username, $role]);
+            )->execute([$username, password_hash($sendLink ? bin2hex(random_bytes(24)) : $password, PASSWORD_DEFAULT),
+                        $display ?: $username, $role]);
+            $newId = (int)$pdo->lastInsertId();
+            if ($email !== '' && $hasUserEmail) {
+                $pdo->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $newId]);
+            }
             // A new account has no changes of its own: it gets its role's
             // switches, which is the safe default for somebody nobody has
             // thought about yet.
-            access_log($pdo, 'account', null, 'created as ' . $role, (int)$pdo->lastInsertId());
+            access_log($pdo, 'account', null, 'created as ' . $role, $newId);
 
-            flash('ok', "Created the account \"$username\" as $role. Send the password through " .
-                        'something private, a password manager or a direct message, not email.');
+            if ($sendLink) {
+                flash('ok', "Created the account \"$username\" as $role.");
+                users_send_link($pdo, ['id' => $newId, 'username' => $username, 'display_name' => $display ?: $username],
+                                $email, false, 'create', false);
+            } else {
+                flash('ok', "Created the account \"$username\" as $role. Send the password through " .
+                            'something private, a password manager or a direct message, not email.');
+            }
+        }
+
+        if ($action === 'send_link') {
+            // "Set-password link" on a row: an existing login, admins included
+            // (David, 2026-11-17, for Jorik). ADMINS ONLY, never your own
+            // account, and an Admin login needs the confirmation ticked.
+            if (!$isAdmin) throw new RuntimeException('Only an administrator sends a set-password link from Users.');
+            if (!$hasInvites) throw new RuntimeException('Set-password links need migration 071, run it on the Migrations screen first.');
+            $id = (int)($_POST['user_id'] ?? 0);
+            if ($id === $currentUserId) {
+                throw new RuntimeException('Not for your own account. Change your own password with Set password.');
+            }
+            $target = users_target($pdo, $id);
+            if (!may_send_invite_for($target['role'])) throw new RuntimeException('Your account cannot send a link for that login.');
+            if ($target['role'] === 'admin' && empty($_POST['confirm_admin'])) {
+                throw new RuntimeException('Nothing was sent: tick that this gives full access to money and every show.');
+            }
+            $copy  = ($_POST['how'] ?? '') === 'copy';
+            $email = $copy ? '' : users_typed_email();
+
+            $st = $pdo->prepare('SELECT u.active, u.last_login'
+                . ($hasCrewLink ? ', c.email AS crew_email' : '') . ' FROM users u'
+                . ($hasCrewLink ? ' LEFT JOIN crew c ON c.id = u.crew_id' : '') . ' WHERE u.id = ?');
+            $st->execute([$id]);
+            $row = $st->fetch() ?: [];
+            // The address typed is remembered on the login only when it had
+            // none at all, so the next link goes there without asking. An
+            // address already on file is never overwritten from here.
+            $known = invite_address($pdo, $id, (string)($row['crew_email'] ?? ''));
+            if ($email !== '' && $hasUserEmail && $known === '') {
+                $pdo->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $id]);
+            }
+            if (!$copy && $email === '') $email = $known;
+            // As on the person page: a link to a switched-off login could not
+            // be used, so sending one switches it back on, and says so.
+            $reactivated = (int)($row['active'] ?? 1) !== 1;
+            if ($reactivated) {
+                $pdo->prepare('UPDATE users SET active = 1 WHERE id = ?')->execute([$id]);
+                access_log($pdo, 'active', null, 'on (set-password link)', $id);
+                flash('ok', 'The account "' . $target['username'] . '" had been switched off; it is switched back on.');
+            }
+            // Somebody who has never logged in is told they have been given a
+            // login, not that this is a way "back in".
+            users_send_link($pdo, $target, $email, $copy, empty($row['last_login']) ? 'create' : 'resend', $reactivated);
         }
 
         if ($action === 'set_role') {
@@ -390,6 +491,7 @@ $users = $pdo->query(
     'SELECT u.id, u.username, u.display_name, u.role, u.active, u.created_at, '
     . ($hasLastSeen ? 'COALESCE(u.last_seen, u.last_login)' : 'u.last_login') . ' AS last_seen'
     . ($hasCrewLink ? ', u.crew_id, c.name AS crew_name, c.email AS crew_email' : '')
+    . ($hasUserEmail ? ', u.email AS own_email' : '')
     . ($hasSalaried ? ', u.is_salaried' : '')
     . ($hasSignsOff ? ', u.signs_off_kickoff' : '')
     . ($hasBudgetTik ? ', u.changes_budget' : '')
@@ -422,6 +524,13 @@ $unlinked = $hasCrewLink
     ? count(array_filter($users, fn($u) => (int)$u['active'] === 1 && empty($u['crew_id'])))
     : 0;
 
+// A link just made that has to be passed on by hand (Copy link, or the email
+// failed). Shown once, at the top of People.
+$inviteLink   = (string)($_SESSION['invite_link'] ?? '');
+$inviteCopied = !empty($_SESSION['invite_link_copied']);
+$inviteName   = (string)($_SESSION['invite_link_name'] ?? '');
+unset($_SESSION['invite_link'], $_SESSION['invite_link_copied'], $_SESSION['invite_link_name']);
+
 $roleName = fn(string $r): string => ['admin' => 'Admin', 'editor' => 'Production', 'supervisor' => 'Supervisor',
                                       'artist' => 'Artist', 'client' => 'Client'][$r] ?? $r;
 $lockSvg = '<svg viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M3 5V4a3 3 0 0 1 6 0v1h.5a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5v-5a.5.5 0 0 1 .5-.5zm1.3 0h3.4V4a1.7 1.7 0 0 0-3.4 0z"/></svg>';
@@ -449,6 +558,10 @@ require __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <?php if ($tab === 'people'): ?>
+
+<?php if ($inviteLink !== ''): ?>
+  <?= invite_link_box($inviteLink, $inviteCopied, $inviteName) ?>
+<?php endif; ?>
 
 <?php // The instant "log your time" pop-up (David, 2026-11-11: "a button for
       // admins to send an instant pop up"). Its own screen, log_reminders.php,
@@ -591,6 +704,30 @@ require __DIR__ . '/includes/header.php';
               <button type="submit" class="secondary">Change</button>
             </form>
           </details>
+          <?php // SET-PASSWORD LINK (David, 2026-11-17): admins only, never
+                // for yourself. The address box starts with the one Anima
+                // knows (the login's own, else its person's); typing one for a
+                // login that has none also saves it there. An Admin login
+                // needs the box ticked, and the server checks it again. ?>
+          <?php if ($isAdmin && $hasInvites && !$isSelf):
+                $known = trim((string)($u['own_email'] ?? '')) ?: trim((string)($u['crew_email'] ?? '')); ?>
+            <details class="inline-actions pw-edit">
+              <summary class="row-btn">Set-password link</summary>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_link">
+                <input type="hidden" name="user_id" value="<?= $id ?>">
+                <input type="email" name="email" value="<?= e($known) ?>"
+                       placeholder="<?= $known === '' ? 'no email known, type one or copy the link' : '' ?>">
+                <?php if ($u['role'] === 'admin'): ?>
+                  <label class="inline small warn-text"><input type="checkbox" name="confirm_admin" value="1" required>
+                    This gives full access to money and every show. Send it?</label>
+                <?php endif; ?>
+                <button type="submit" name="how" value="email" class="secondary">Email link</button>
+                <button type="submit" name="how" value="copy" class="secondary"
+                        title="Makes a fresh one-time link and shows it here instead of emailing it">Copy link</button>
+              </form>
+            </details>
+          <?php endif; ?>
           <?php if (!$isSelf): ?>
             <form method="post" class="inline-form"
                   onsubmit="return confirm('Delete <?= e(addslashes($u['username'])) ?> permanently? Switching the account off is usually better.');">
@@ -701,9 +838,17 @@ require __DIR__ . '/includes/header.php';
     <label>Display name <input name="display_name" placeholder="e.g. Renata Ruiz"></label>
   </div>
   <div class="row">
-    <label>Password <input type="password" name="password" required minlength="8" placeholder="At least 8 characters"></label>
+    <?php if ($hasInvites): ?>
+      <label>Email <input type="email" name="email" placeholder="where their set-password link goes"></label>
+      <label>Password <input type="password" name="password" minlength="8" autocomplete="new-password"
+             placeholder="Leave blank to email them a link"></label>
+    <?php else: ?>
+      <label>Password <input type="password" name="password" required minlength="8" placeholder="At least 8 characters"></label>
+    <?php endif; ?>
+  </div>
+  <div class="row">
     <label>Role
-      <select name="role">
+      <select name="role" id="addRole">
         <option value="artist" selected>Artist, their own work, the shows they are on</option>
         <?php if ($hasSupervisor): ?>
         <option value="supervisor">Supervisor, an artist who also reviews, reads Timeline and Staffing, and edits Shots</option>
@@ -715,12 +860,30 @@ require __DIR__ . '/includes/header.php';
       </select>
     </label>
   </div>
+  <?php if ($hasInvites && $isAdmin): ?>
+    <label class="inline small warn-text" id="addAdminConfirm">
+      <input type="checkbox" name="confirm_admin" value="1">
+      Only for an Admin sent a link: this gives full access to money and every show. Send it?</label>
+    <script>
+      (function () {
+        var role = document.getElementById('addRole'), box = document.getElementById('addAdminConfirm');
+        var sync = function () { box.style.display = role.value === 'admin' ? '' : 'none'; };
+        role.addEventListener('change', sync); sync();
+      })();
+    </script>
+  <?php endif; ?>
   <div class="actions"><button type="submit">Create account</button></div>
 </form>
 <p class="muted small">
-  A new account gets its role's switches from Access by role, and nothing of its own. Send the
-  password through something private, a password manager or a direct message. Ask them to change it
-  once they're in.
+  A new account gets its role's switches from Access by role, and nothing of its own.
+  <?php if ($hasInvites): ?>
+    <strong>Leave the password blank</strong> and they are emailed a one-time link to choose their own,
+    good for <?= INVITE_DAYS ?> days; with no email, the link is shown here to send on WhatsApp or Slack.
+    If you type a password instead, send it through something private, never email.
+  <?php else: ?>
+    Send the password through something private, a password manager or a direct message. Ask them to
+    change it once they're in.
+  <?php endif; ?>
 </p>
 
 <?php elseif ($tab === 'roles'): ?>
