@@ -1219,7 +1219,18 @@ button.linkish:hover { background: none; color: var(--primary-hover); }
    rather than turning it blue. margin-bottom -1px sits the underline ON the
    bar's hairline instead of a pixel above it. */
 .proj-tab:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
-.proj-tab.current { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); background: transparent; }
+.proj-tab.current { color: var(--text); font-weight: 600; border-bottom-color: var(--proj, var(--primary)); background: transparent; }
+/* THE SHOW'S COLOUR (David, 2026-11-17; includes/project_color.php): its code tag, on the
+   project header and the projects list. Identity only: buttons stay blue, approved green. */
+code.proj-chip { font-weight: 700; padding: 1px 7px; border-radius: 5px;
+  color: color-mix(in srgb, var(--proj, #8a8a8a) 70%, #ffffff);
+  background: color-mix(in srgb, var(--proj, #8a8a8a) 24%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--proj, #8a8a8a) 55%, var(--surface-2)); }
+.proj-colors { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.proj-colors legend { padding: 0 4px; }
+.proj-colors small { flex-basis: 100%; }
+.proj-color-opt { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; cursor: pointer; }
+.proj-swatch { width: 18px; height: 18px; border-radius: 5px; background: var(--proj); display: inline-block; }
 /* The set-up-and-fix screens read one notch quieter than the daily ones. */
 .proj-tab.tab-data { color: var(--muted); font-size: 13px; }
 .proj-tab-sep { width: 1px; height: 18px; background: var(--border); margin: 0 8px; }

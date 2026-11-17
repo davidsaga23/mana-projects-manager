@@ -53,7 +53,8 @@ const PROJECT_TABS_SHOWN_TO_SUPERVISORS = [
 
 /** Is this tab, or a link to it, one a viewer should not be shown? */
 
-require_once __DIR__ . '/studio.php';        // the Studio is filtered out below
+require_once __DIR__ . '/studio.php';
+require_once __DIR__ . '/project_color.php';   // the show's colour (David, 2026-11-17)        // the Studio is filtered out below
 
 function hidden_from_viewers(string $key): bool {
     // SINCE MIGRATION 077 (2026-11-05) THE ACCESS SWITCHES ANSWER THIS, and the
@@ -231,10 +232,15 @@ function project_section_nav(array $project, string $section, string $tab = ''):
         $sections[] = ['key' => 'finance', 'label' => 'Finance management',
                        'href' => 'finance_project.php?project=' . $projectId . '&tab=overview'];
     }
+    // The show's colour for the whole page: the bar across the top, the faint
+    // wash, and --proj for the tag and the current tab (includes/project_color.php).
+    $projColor = ($pdo instanceof PDO) ? project_color($pdo, $projectId) : '';
+    echo project_color_page_style($projColor);
     ?>
     <div class="proj-bar-title">
       <a href="index.php" class="muted">Projects</a>
       <span class="muted">/</span>
+      <?php if ($projColor !== ''): ?><code class="proj-chip"><?= e((string)$project['code']) ?></code><?php endif; ?>
       <?php // THE NAME IS THE CONTROL. A separate "switch project" button beside
             // it would be a second thing meaning the same thing; the show you
             // are on is already written here, so it is the show you change.

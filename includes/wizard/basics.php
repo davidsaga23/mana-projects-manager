@@ -5,6 +5,7 @@
 // decides any number depends on migration 034 (ideal quotas per project).
 require_once __DIR__ . '/../standards.php';
 require_once __DIR__ . '/../project_types.php';
+require_once __DIR__ . '/../project_color.php';
 
 function wizard_save_basics(PDO $pdo, ?array $project): string {
     $name     = trim($_POST['name'] ?? '');
@@ -76,6 +77,12 @@ function wizard_save_basics(PDO $pdo, ?array $project): string {
         flash('ok', 'Created "' . $name . '". Next, choose the departments.');
     }
 
+    // The show's colour (David, 2026-11-17): one of the palette, or '' for Automatic.
+    if (isset($_POST['color'])) {
+        $col = strtolower(trim((string)$_POST['color']));
+        if ($col === '' || in_array($col, PROJECT_PALETTE, true)) set_project_setting($pdo, $id, 'color', $col);
+    }
+
     // Early estimates, used by the quota only until a real breakdown exists.
     foreach (['estimated_seconds', 'estimated_shots', 'estimated_assets'] as $key) {
         $v = trim($_POST[$key] ?? '');
@@ -114,6 +121,22 @@ function wizard_render_basics(PDO $pdo, ?array $project): void {
                placeholder="STFC2">
         <small>A short tag used in exports and file names. Letters and numbers only.</small>
       </label>
+
+      <?php // THE SHOW'S COLOUR (David, 2026-11-17): marks every page of this project, so you can tell
+            // at a glance which show you are in. Automatic picks a colour no other show has chosen. ?>
+      <?php $chosen = $project ? project_color_chosen($pdo, (int)$project['id']) : '';
+            $auto = $project ? project_color($pdo, (int)$project['id']) : ''; ?>
+      <fieldset class="proj-colors">
+        <legend>Colour</legend>
+        <label class="proj-color-opt"><input type="radio" name="color" value="" <?= $chosen === '' ? 'checked' : '' ?>>
+          <span class="proj-swatch" style="--proj:<?= e($auto !== '' ? $auto : '#888888') ?>"></span> Automatic</label>
+        <?php foreach (PROJECT_PALETTE as $nm => $hex): ?>
+          <label class="proj-color-opt"><input type="radio" name="color" value="<?= e($hex) ?>" <?= $chosen === $hex ? 'checked' : '' ?>>
+            <span class="proj-swatch" style="--proj:<?= e($hex) ?>"></span> <?= e(ucfirst($nm)) ?></label>
+        <?php endforeach; ?>
+        <small>Marks every page of this show: a thin bar across the top, the code tag and the current tab.
+          Buttons stay blue and approved stays green on every show.</small>
+      </fieldset>
 
       <?php
       // A type created from the panel below comes back PICKED and not saved, and
