@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Users: a set-password link for any login, admins included *(no migration)*
+
+**Asked by David**, for Jorik (an admin who is on no show, so has no person page): "yeah let's do the
+set password link".
+
+- **On Users, each login has "Set-password link"** (admins only, never your own account): **Email
+  link** or **Copy link**, the same one-time link as the person page (works once, for 7 days, and
+  replaces any earlier one). The address box starts with the one Anima knows; for a login with none,
+  the address typed is saved on it. With no address, Copy link still works.
+- **Admin logins too**, after ticking "This gives full access to money and every show. Send it?".
+  The person page still never sends one for an admin; it points at Users.
+- **Add someone: leave the password blank** and the new login is emailed a link at once, instead of
+  a temporary password passed on by hand. An Admin added this way needs the same tick.
+- Every link is logged as before, and now also in the **Access log** (who, whose, emailed or copied).
+- A switched-off login is switched back on by sending it a link, and the page says so.
+
 ## 2026-11-17 — Email summaries: two a day instead of one email per thing *(migration 104)*
 
 **Asked by David**: "instead of sending an email for each mention, new task or comment, let's send 2
