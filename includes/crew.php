@@ -302,6 +302,58 @@ function remove_surplus_lanes(PDO $pdo, int $projectId): array {
  * undoes the lot - which is the behaviour you want anyway: a hire that half
  * happened is worse than one that did not.
  */
+/**
+ * A PLACEHOLDER GOES ONCE A REAL PERSON TAKES ITS PLACE.
+ *
+ * David, 2026-11-17: "the crew can start with place holder but as we hire people
+ * those should be deleted because a real person is taking the place". Filling a
+ * slot used to point the slot at the person and leave the placeholder ("Animation
+ * 02") behind on the show's crew list, so a staffed show still listed its empty
+ * slots: MSD read Crew 51 against 23 real people.
+ *
+ * Deleted only when nothing holds it: no slot, no supervision position, and no
+ * logged time. The last one matters because crew rows cascade, and deleting a
+ * row with hours on it would delete the hours. Its crew_projects link goes with
+ * it (ON DELETE CASCADE). Its day rate in the finance database, if the slot had
+ * one, was an estimate for the position and is left there unread; the hiring
+ * message already says it is not carried over.
+ *
+ * @return bool whether it was deleted
+ */
+function drop_placeholder_if_unused(PDO $pdo, int $crewId): bool {
+    if ($crewId <= 0) return false;
+    $sql = 'DELETE FROM crew WHERE id = ? AND is_placeholder = 1
+              AND NOT EXISTS (SELECT 1 FROM crew_lanes WHERE crew_id = crew.id)';
+    if (column_exists($pdo, 'supervision_positions', 'crew_id')) {
+        $sql .= ' AND NOT EXISTS (SELECT 1 FROM supervision_positions WHERE crew_id = crew.id)';
+    }
+    if (column_exists($pdo, 'time_logs', 'crew_id')) {
+        $sql .= ' AND NOT EXISTS (SELECT 1 FROM time_logs WHERE crew_id = crew.id)';
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$crewId]);
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Placeholders still on a show's crew list that no slot or position holds any
+ * more: the ones left behind by hires made before drop_placeholder_if_unused()
+ * existed. Staffing offers to tidy them.
+ *
+ * @return int[] crew ids
+ */
+function leftover_placeholders(PDO $pdo, int $projectId): array {
+    $sql = 'SELECT c.id FROM crew_projects cp JOIN crew c ON c.id = cp.crew_id
+             WHERE cp.project_id = ? AND c.is_placeholder = 1
+               AND NOT EXISTS (SELECT 1 FROM crew_lanes cl WHERE cl.crew_id = c.id)';
+    if (column_exists($pdo, 'supervision_positions', 'crew_id')) {
+        $sql .= ' AND NOT EXISTS (SELECT 1 FROM supervision_positions sp WHERE sp.crew_id = c.id)';
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$projectId]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
 function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId): void {
     $stmt = $pdo->prepare('SELECT * FROM crew_lanes WHERE id = ? AND project_id = ?');
     $stmt->execute([$laneId, $projectId]);
@@ -321,6 +373,11 @@ function assign_crew_to_lane(PDO $pdo, int $projectId, int $laneId, int $crewId)
         $pdo->prepare(
             'UPDATE schedule SET crew_id = ? WHERE step_id = ? AND lane = ? AND project_id = ?'
         )->execute([$crewId, (int)$lane['step_id'], (int)$lane['lane_no'], $projectId]);
+
+        // The placeholder this person replaced goes, once nothing holds it. A
+        // real person who was in the slot is never touched: the helper only
+        // deletes rows marked is_placeholder.
+        if ((int)$lane['crew_id'] !== $crewId) drop_placeholder_if_unused($pdo, (int)$lane['crew_id']);
 
         if ($own) $pdo->commit();
     } catch (Throwable $e) {
