@@ -673,19 +673,9 @@ if (!$embed) require __DIR__ . '/includes/header.php';
     </div>
   </div>
 
-  <p class="muted small">
-    <?php if ($version !== null): ?>
-      <?= count($tasks) ?> task<?= count($tasks) === 1 ? ' was' : 's were' ?> scheduled when this
-      version was saved · the name to the <strong>left</strong> of each bar is who was on it ·
-      <span class="warn-text">amber outline</span> = hand-locked at the time.
-    <?php else: ?>
-      <?= count($tasks) ?> task<?= count($tasks) === 1 ? '' : 's' ?> scheduled ·
-      the name to the <strong>left</strong> of each bar is who is on it, a placeholder slot
-      until somebody is hired · <span class="warn-text">amber outline</span> = hand-locked, the
-      scheduler won't move it · double-click a bar to edit it, or drag it, and it keeps its
-      working days.
-    <?php endif; ?>
-  </p>
+  <?php // The "N tasks scheduled · the name to the left of each bar… · amber outline =
+        // hand-locked…" line under this heading is gone (David, 2026-11-17: "let's
+        // delete this text"). ?>
   <div id="detailedGantt" class="tl-chart tl-chart-tall"></div>
 </section>
 <?php elseif ($general): ?>
