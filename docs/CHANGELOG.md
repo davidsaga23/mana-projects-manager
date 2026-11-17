@@ -14,6 +14,20 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — The Realm: everyone with a login is in People and can be sent a raven *(no migration)*
+
+**Asked by David**: "let's also list in the people's section in realm all the people with active
+users that can be DM in realm, that includes Tim, Jorik, Junior, Diego and Angelys".
+
+- **Everybody with an active login now has a house and is listed under People**, even before their
+  first visit. Until today a person appeared only after opening the Realm once, and could not be
+  sent a raven before that.
+- Someone who has not come in yet shows as **away**, with their house unlit on the map. A raven left
+  for them waits, and their bell and the Realm button's count tell them about it.
+- Clients are never included, nor anyone switched off for the Realm on Users, Access.
+
+---
+
 ## 2026-11-17 — The Realm: a show's flag shows its real progress *(no migration)*
 
 **Asked by David**, with the project page saying 86% and the flag by the show's camp saying 75%:

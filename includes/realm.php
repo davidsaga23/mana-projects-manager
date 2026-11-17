@@ -105,6 +105,18 @@ function realm_enter(PDO $pdo, int $uid): void {
             $pdo->prepare("UPDATE realm_people SET place = 'diner', inside = 1 WHERE user_id = ? AND status_kind = 'lunch'")->execute([$uid]);
         }
 
+        realm_give_house($pdo, $uid);
+    } catch (Throwable $e) {
+        // The page still draws; it says the person has no house yet.
+    }
+}
+
+/**
+ * Give $uid the first free plot, if they have a realm_people row and no plot yet.
+ * Taken out of realm_enter() so realm_seat_everyone() can use it too. Never throws.
+ */
+function realm_give_house(PDO $pdo, int $uid): void {
+    try {
         $q = $pdo->prepare('SELECT house_slot FROM realm_people WHERE user_id = ?');
         $q->execute([$uid]);
         if ($q->fetchColumn() !== null) return;
@@ -126,6 +138,46 @@ function realm_enter(PDO $pdo, int $uid): void {
         }
     } catch (Throwable $e) {
         // The page still draws; it says the person has no house yet.
+    }
+}
+
+/**
+ * EVERYBODY WITH AN ACTIVE LOGIN LIVES IN THE VILLAGE (David, 2026-11-17: "let's also list in the
+ * people's section in realm all the people with active users that can be DM in realm, that includes
+ * Tim, Jorik, Junior, Diego and Angelys").
+ *
+ * A person used to get their row, and their house, the first time THEY opened the Realm
+ * (realm_enter()). Until then they were missing from People, had no house on the map, and could not
+ * be sent a raven, because a raven needs the other end to live in the Realm
+ * (realm_channel_access()). Now, whenever anybody opens the Realm, every active login that may see
+ * it gets a row and a plot: they show in People as away, their house stands unlit with its door
+ * open, and a raven can be left for them, which their bell and the Realm button's count announce.
+ *
+ *   * WHO: active users (`users.active = 1`), not clients, and only those the `realm` switch is on
+ *     for (feature_for_user(): somebody switched off on Users, Access stays out).
+ *   * NOTHING ELSE CHANGES FOR THEM: no ping, so they are away; their look is the same default
+ *     realm_enter() gives (house and cloak from their id), which they can change on their first visit.
+ *   * CHEAP: called when the Realm page is opened, not on the heartbeat. One query lists who is
+ *     missing; usually nobody is, and nothing is written.
+ *   * If the village's REALM_SLOTS plots run out, the people left over have a row but no house, and
+ *     the page's existing note ("Every plot in the village is taken") covers them.
+ * Never throws.
+ */
+function realm_seat_everyone(PDO $pdo): void {
+    try {
+        $rows = $pdo->query("SELECT u.id, u.role FROM users u
+                          LEFT JOIN realm_people rp ON rp.user_id = u.id
+                              WHERE u.active = 1 AND u.role <> 'client' AND (rp.user_id IS NULL OR rp.house_slot IS NULL)
+                           ORDER BY u.id")->fetchAll();
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            if (function_exists('feature_for_user') && !feature_for_user('realm', $id, (string)$r['role'])) continue;
+            $pdo->prepare('INSERT IGNORE INTO realm_people (user_id, house_kind, cloak, created_at) VALUES (?, ?, ?, NOW())')
+                ->execute([$id, REALM_KINDS[$id % count(REALM_KINDS)], REALM_CLOAKS[$id % count(REALM_CLOAKS)]]);
+            realm_give_house($pdo, $id);
+        }
+    } catch (Throwable $e) {
+        // The village is drawn with whoever already lives in it.
     }
 }
 
