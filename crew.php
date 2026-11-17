@@ -1185,11 +1185,10 @@ require __DIR__ . '/includes/header.php';
               </div>
             <?php endif; endif; ?>
             <?php if ($datesReady): ?>
-              <?php if ($canDates): ?>
-                <?php if ($ownSpan === '' && $deptSpan !== ''): ?>
-                  <div class="muted small">Not set: following the department's dates, <?= e($deptSpan) ?>.</div>
-                <?php endif; ?>
-              <?php elseif ($ownSpan !== '' || $deptSpan !== ''): ?>
+              <?php // No "Not set: following the department's dates" line under
+                    // the fields any more (David, 2026-11-17: "let's delete this
+                    // text"). Empty fields already say it is not set. ?>
+              <?php if (!$canDates && ($ownSpan !== '' || $deptSpan !== '')): ?>
                 <div class="slot-dates">
                   <?php if ($ownSpan !== ''): ?>
                     <span class="slot-dates-own"><?= e($ownSpan) ?></span>

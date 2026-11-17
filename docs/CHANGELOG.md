@@ -14,6 +14,10 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Staffing: no "Not set: following the department's dates" line *(no migration)*
+
+- The grey line under empty Start / End fields on Staffing is gone.
+
 ## 2026-11-17 — Timeline: the milestones list folds away, closed by default *(no migration)*
 
 - Under Milestones, the table and the Add milestone form sit behind "Show milestones (N)", closed
