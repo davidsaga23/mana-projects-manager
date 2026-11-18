@@ -4942,6 +4942,7 @@ body.rv-open { overflow: hidden; }
   font-size: 15px; line-height: 1;
 }
 .rv-btn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+a.rv-download { text-decoration: none; color: var(--text); display: inline-flex; align-items: center; }
 .rv-top {
   display: flex; align-items: center; gap: 12px; padding: 10px 16px;
   border-bottom: 1px solid var(--border); background: var(--surface);
