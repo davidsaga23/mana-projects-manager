@@ -56,6 +56,27 @@ $maySetAny = $mayEdit;
 // to want its tasks loaded on demand instead.
 $openByDefault = false;
 
+// THE ASSET TYPES THIS SHOW HAS (David, 2026-11-18: "let's also add some assets
+// filters for BG, CH and environments"). Read off the board's own asset groups
+// rather than written down here, so the dropdown offers only what the show
+// actually holds, and a show that names its kinds "Character" or "Environment"
+// (the setup defaults) is matched by what is stored. The value is the stored
+// type lower-cased, which is how board_data() keys the group too, so "BG" and
+// "bg" typed on two assets are one choice. The label is the studio's shorthand
+// where one is known, and the stored text otherwise.
+$assetTypes = [];
+foreach ($board['groups'] as $g) {
+    if (strpos((string)$g['key'], 'pre:') !== 0) continue;
+    $raw = trim((string)($g['detail'] ?? ''));
+    if ($raw === '') continue;                     // an asset with no type has nothing to pick
+    $low = strtolower($raw);
+    $label = $raw;
+    if (in_array($low, ['bg', 'bgs', 'background', 'backgrounds'], true)) $label = 'BG';
+    elseif (in_array($low, ['ch', 'chs', 'char', 'chars', 'character', 'characters'], true)) $label = 'CH';
+    elseif (in_array($low, ['env', 'envs', 'environment', 'environments'], true)) $label = 'Environments';
+    $assetTypes[$low] = ['label' => $label, 'raw' => $raw];
+}
+
 $pageTitle = 'Spell';
 require __DIR__ . '/includes/header.php';
 // THE SHOW'S COLOUR ON SPELL TOO (David, 2026-11-18: "let's also use the project
@@ -153,7 +174,11 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
   <?php // Filters on the three columns worth filtering. Frames belongs to the
         // shot, and Link and Notes are filled on 6 and 2 rows of MSD's 147, so
         // a dropdown on either would be furniture. ?>
-  <div class="board-filters">
+  <?php // ⚠ REMEMBERED UNTIL MIDNIGHT PACIFIC, PER PERSON AND PER SHOW (David,
+        // 2026-11-18: "if someone applies a filter it sticks like that until next
+        // day"). board-screen.js keeps it in this browser under this key. ?>
+  <div class="board-filters"
+       data-remember="anima.spell.u<?= (int)($_SESSION['user_id'] ?? 0) ?>.p<?= (int)$projectId ?>">
     <?php // ⚠ THE FIRST CELL CARRIES THREE THINGS, because the filter bar
           // lines up ONLY while its children land in the same grid tracks as
           // the headings above. Step and Ready match no column — they narrow
@@ -176,6 +201,17 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
         <option value="">All tasks</option>
         <option value="1">Ready to start</option>
       </select>
+      <?php // ⚠ A SHOT IS NOT AN ASSET, so picking a type hides every shot and
+            // every whole-show deliverable and leaves that type's assets. Only
+            // offered when the show has a typed asset at all. ?>
+      <?php if ($assetTypes): ?>
+        <select id="fAssetType" aria-label="Filter by asset type">
+          <option value="">Any asset type</option>
+          <?php foreach ($assetTypes as $val => $t): ?>
+            <option value="<?= e($val) ?>" title="<?= e($t['raw']) ?>"><?= e($t['label']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php endif; ?>
     </div>
     <?php // Copy URL, Version and Notes have nothing to filter. ?>
     <div></div>
@@ -243,6 +279,11 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
       <button type="button" class="board-filter-clear" id="boardClear" hidden>Clear</button>
     </div>
   </div>
+  <?php // Said out loud, so a board that opens already filtered is not a mystery. ?>
+  <p class="board-filter-kept muted small" id="boardKept" hidden>
+    Filters kept until midnight ·
+    <button type="button" class="board-filter-kept-clear" id="boardKeptClear">Clear</button>
+  </p>
 </div>
 
 <?php foreach ($board['groups'] as $g): ?>
@@ -294,7 +335,8 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
         $self = $item['self'];
         $open = $openByDefault && $item['tasks'];
         ?>
-        <div class="board-item<?= $open ? ' is-open' : '' ?>" data-item="<?= e($item['item_key']) ?>">
+        <div class="board-item<?= $open ? ' is-open' : '' ?>" data-item="<?= e($item['item_key']) ?>"
+             data-asset-type="<?= $item['kind'] === 'asset' ? e(strtolower(trim((string)($g['detail'] ?? '')))) : '' ?>">
           <div class="board-row board-row-item"
                data-search="<?= e(strtolower($item['name'])) ?>">
             <div class="board-cell-name">

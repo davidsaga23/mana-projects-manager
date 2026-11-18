@@ -211,6 +211,7 @@
       var shut = section.classList.toggle('is-shut');
       caret.classList.toggle('is-open', !shut);
       caret.setAttribute('aria-expanded', shut ? 'false' : 'true');
+      keepForDay();                          // kept for the day, like the filters
       return;
     }
 
@@ -219,6 +220,7 @@
     var open = item.classList.toggle('is-open');
     caret.setAttribute('aria-expanded', open ? 'true' : 'false');
     noteOpen(item, open);
+    keepForDay();
   });
 
   /**
@@ -240,6 +242,7 @@
       if (c) c.setAttribute('aria-expanded', open ? 'true' : 'false');
       noteOpen(item, open);
     });
+    keepForDay();
   }
 
   function unshutGroup(section) {
@@ -400,6 +403,8 @@
   // A supervisor's two: which department, and what can start today.
   var fStep = document.getElementById('fStep');
   var fReady = document.getElementById('fReady');
+  // Asset type (David, 2026-11-18): BG, CH, Environments, as the show names them.
+  var fAssetType = document.getElementById('fAssetType');
   var fDue = document.getElementById('fDue');
   var fDueOn = document.getElementById('fDueOn');
   var fDueOnDate = document.getElementById('fDueOnDate');
@@ -407,6 +412,8 @@
   var fDueFrom = document.getElementById('fDueFrom');
   var fDueTo = document.getElementById('fDueTo');
   var clearBtn = document.getElementById('boardClear');
+  var keptEl = document.getElementById('boardKept');
+  var filtersBar = document.querySelector('.board-filters[data-remember]');
   var countEl = document.getElementById('boardCount');
   var wasOpen = null;                 // what was expanded before filtering began
 
@@ -487,12 +494,13 @@
     var du = fDue ? fDue.value : '';
     var sp = fStep ? fStep.value : '';
     var rd = fReady ? fReady.value : '';
+    var at = fAssetType ? fAssetType.value : '';
 
     // The extra boxes belong to their own choice and nothing else.
     if (fDueOn) fDueOn.hidden = du !== 'on';
     if (fDueRange) fDueRange.hidden = du !== 'range';
 
-    var on = q !== '' || st !== '' || cr !== '' || du !== '' || sp !== '' || rd !== '';
+    var on = q !== '' || st !== '' || cr !== '' || du !== '' || sp !== '' || rd !== '' || at !== '';
 
     // Remember the board as the person left it, once, so Clear can restore it.
     if (on && wasOpen === null) {
@@ -508,12 +516,17 @@
       var itemHit = itemRow && (itemRow.getAttribute('data-search') || '').indexOf(q) !== -1;
       var tasks = item.querySelectorAll('.board-row-task');
       var any = false;
+      // ⚠ A SHOT IS NOT AN ASSET: with a type picked, shots and whole-show
+      // deliverables carry no type and drop out, and only that type's assets
+      // (with the departments scoped to them) stay.
+      var typeOk = at === '' || item.getAttribute('data-asset-type') === at;
 
       Array.prototype.forEach.call(tasks, function (r) {
         all++;
         // The search matches a shot OR a task; the three dropdowns are about a
         // task alone, so a shot's name never satisfies them.
-        var hit = (q === '' || itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1)
+        var hit = typeOk
+               && (q === '' || itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1)
                && (st === '' || r.getAttribute('data-status') === st)
                && (cr === '' || r.getAttribute('data-crew') === cr)
                && (sp === '' || r.getAttribute('data-step-id') === sp)
@@ -529,31 +542,149 @@
         return;
       }
       // A row with no tasks at all (a whole-show deliverable) rides on its name.
-      item.hidden = tasks.length ? !any : !itemHit;
+      item.hidden = tasks.length ? !any : !(itemHit && typeOk);
       if (any) item.classList.add('is-open');
+    });
+
+    // A group left with nothing in it says nothing but its own name, and with an
+    // asset type picked that would be every Production heading on the show.
+    Array.prototype.forEach.call(document.querySelectorAll('.board-group'), function (g) {
+      g.hidden = on && !g.querySelector('.board-item:not([hidden])');
     });
 
     if (!on) wasOpen = null;
     if (clearBtn) clearBtn.hidden = !on;
+    if (keptEl) keptEl.hidden = !on;
     if (countEl) {
       countEl.textContent = on ? (shown + ' of ' + all + ' tasks match') : '';
       countEl.classList.toggle('is-empty', on && shown === 0);
     }
   }
 
-  if (search) search.addEventListener('input', applyFilters);
-  [fStatus, fCrew, fStep, fReady, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
-    if (el) el.addEventListener('change', applyFilters);
+  var filterEls = [fStatus, fCrew, fStep, fReady, fAssetType, fDue, fDueOnDate, fDueFrom, fDueTo];
+  if (search) search.addEventListener('input', function () { applyFilters(); keepForDay(); });
+  filterEls.forEach(function (el) {
+    if (el) el.addEventListener('change', function () { applyFilters(); keepForDay(); });
   });
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function () {
-      if (search) search.value = '';
-      [fStatus, fCrew, fStep, fReady, fDue, fDueOnDate, fDueFrom, fDueTo].forEach(function (el) {
-        if (el) el.value = '';
-      });
-      applyFilters();
-    });
+  function clearFilters() {
+    if (search) search.value = '';
+    filterEls.forEach(function (el) { if (el) el.value = ''; });
+    applyFilters();
+    keepForDay();                          // the filters leave the memory with it
   }
+  if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+  var keptClear = document.getElementById('boardKeptClear');
+  if (keptClear) keptClear.addEventListener('click', clearFilters);
+
+  // --- remembered until midnight Pacific -------------------------------------
+  //
+  // David, 2026-11-18: "let's add persistent memory for a day (resets at 12 am
+  // PST) to spell. If someone applies a filter it sticks like that until next
+  // day." Kept in this browser (localStorage), one entry per person and per show
+  // (the key spell.php writes on the filter bar), stamped with the PACIFIC date
+  // it was saved on. A different Pacific date when the page loads means it is
+  // tomorrow at the studio, and the entry is dropped.
+  //
+  // ⚠ PACIFIC, NOT THE BROWSER'S OWN ZONE: the studio's clock is Los Angeles,
+  // so somebody working from Madrid resets at the studio's midnight too. Intl
+  // knows the daylight-saving dates; nothing here does arithmetic on hours.
+  //
+  // ⚠ WHAT IS OPEN IS REMEMBERED THE SAME WAY, so coming back to a board you had
+  // laid out finds it laid out. While a filter is on, the board's own open
+  // state is `wasOpen` (filtering opens the shots it matches), so that is what
+  // is kept, never the shots a filter opened by itself.
+  var memKey = filtersBar ? filtersBar.getAttribute('data-remember') : '';
+  function pacificDay() {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+    } catch (e) { return ''; }
+  }
+  function memRead() {
+    if (!memKey) return null;
+    try {
+      var raw = window.localStorage.getItem(memKey);
+      if (!raw) return null;
+      var m = JSON.parse(raw);
+      if (!m || !m.day || m.day !== pacificDay()) { window.localStorage.removeItem(memKey); return null; }
+      return m;
+    } catch (e) { return null; }
+  }
+  function keepForDay() {
+    if (!memKey) return;
+    var f = {};
+    if (search && search.value.trim() !== '') f.q = search.value;
+    filterEls.forEach(function (el) { if (el && el.value !== '') f[el.id] = el.value; });
+
+    var open = [];
+    if (wasOpen) {
+      Object.keys(wasOpen).forEach(function (k) { if (wasOpen[k]) open.push(k); });
+    } else {
+      Array.prototype.forEach.call(document.querySelectorAll('.board-item.is-open'), function (it) {
+        open.push(it.getAttribute('data-item'));
+      });
+    }
+    var shut = [];
+    Array.prototype.forEach.call(document.querySelectorAll('.board-group.is-shut'), function (g) {
+      shut.push(g.getAttribute('data-group'));
+    });
+
+    try {
+      // Everything back at its default is nothing to remember.
+      if (!Object.keys(f).length && !open.length && !shut.length) {
+        window.localStorage.removeItem(memKey);
+      } else {
+        window.localStorage.setItem(memKey, JSON.stringify({
+          day: pacificDay(), f: f, open: open, shut: shut
+        }));
+      }
+    } catch (e) { /* a private window or storage switched off: the board works without it */ }
+  }
+
+  (function restore() {
+    var m = memRead();
+    if (!m) return;
+
+    // What was open and what was folded away, before any filter runs, so the
+    // filters take their "before" snapshot from the board as it was left.
+    (m.open || []).forEach(function (k) {
+      var item = document.querySelector('.board-item[data-item="' + CSS.escape(k) + '"]');
+      if (!item || !item.querySelector('.board-row-task')) return;
+      item.classList.add('is-open');
+      var c = item.querySelector('.board-row-item .board-caret');
+      if (c) c.setAttribute('aria-expanded', 'true');
+    });
+    (m.shut || []).forEach(function (k) {
+      var g = document.querySelector('.board-group[data-group="' + CSS.escape(k) + '"]');
+      if (!g) return;
+      g.classList.add('is-shut');
+      var c = g.querySelector('.board-group-head .board-caret');
+      if (c) { c.classList.remove('is-open'); c.setAttribute('aria-expanded', 'false'); }
+    });
+
+    // ⚠ A LINK WINS OVER THE MEMORY. Somebody following ?open= from a
+    // notification, My tasks or Slack came to see THAT task, and a filter left
+    // on from this morning could hide it. So the remembered filters sit this
+    // page view out and stay remembered for the next plain visit, unless the
+    // person changes a filter here, which saves what they now have. The other
+    // names are for any link that one day carries a filter of its own.
+    var q = new URLSearchParams(window.location.search);
+    var linked = ['open', 'q', 'status', 'crew', 'step', 'type', 'due'].some(function (p) { return q.has(p); });
+    if (linked) return;
+
+    var f = m.f || {};
+    if (search && typeof f.q === 'string') search.value = f.q;
+    filterEls.forEach(function (el) {
+      if (!el || typeof f[el.id] !== 'string') return;
+      // A choice no longer on the list (somebody left the show) is dropped,
+      // rather than leaving the box reading "Anybody" over a filtered board.
+      if (el.tagName === 'SELECT'
+          && !Array.prototype.some.call(el.options, function (o) { return o.value === f[el.id]; })) return;
+      el.value = f[el.id];
+    });
+    applyFilters();
+  }());
 
   // ⚠ A ROW CARRIES WHAT THE FILTERS READ, so a cell that has just been saved
   // has to update it — otherwise a task moved to Final stays visible under a
