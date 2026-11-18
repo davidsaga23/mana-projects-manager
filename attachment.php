@@ -47,6 +47,9 @@ if (basename($a['stored_name']) !== $a['stored_name'] || !is_file($path)) {
 $mime = $a['mime_type'] ?: 'application/octet-stream';
 // Shown in the page for media the browser can render; downloaded otherwise.
 $disposition = (attachment_is_image($mime) || attachment_is_video($mime)) ? 'inline' : 'attachment';
+// ?download=1 saves it instead, even a picture or a video: the review viewer's
+// Download button (David, 2026-11-18: "let's add a download button to this view").
+if (!empty($_GET['download'])) $disposition = 'attachment';
 $safeName = str_replace(['"', "\r", "\n"], '', $a['original_name']);
 $size = filesize($path);
 

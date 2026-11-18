@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-18 — Review viewer: a Download button *(no migration)*
+
+- The review viewer's top bar has a Download button that saves the version on screen under its
+  original name (`attachment.php?…&download=1`).
+
 ## 2026-11-18 — Production tracking: the tabs are each department's phase *(no migration)*
 
 - The tabs used to be fixed: assets were "Pre-production", shots "Production" and every whole-project

@@ -204,6 +204,14 @@
     zoom.appendChild(btn('rv-btn rv-fit', '100%', 'Actual size (1)', function () { setScale(1); }));
     top.appendChild(zoom);
 
+    // DOWNLOAD the version on screen (David, 2026-11-18). A link, not a button: the
+    // file comes from attachment.php with ?download=1, which sends it as a download
+    // under its original name; load() keeps it pointing at the version shown.
+    S.dl = el('a', 'rv-btn rv-download', 'Download');
+    S.dl.title = 'Download this version';
+    S.dl.setAttribute('download', '');
+    top.appendChild(S.dl);
+
     if (S.actions.length) {
       var verdict = el('div', 'rv-verdict');
       S.actions.forEach(function (a) {
@@ -437,6 +445,10 @@
     S.pick.value = String(S.idx);
     S.nameEl.textContent = v.name;
     S.nameEl.title = v.name;
+    if (S.dl) {
+      S.dl.href = v.src + (v.src.indexOf('?') === -1 ? '?' : '&') + 'download=1';
+      if (v.name) S.dl.setAttribute('download', v.name);
+    }
     S.notesTitle.textContent = 'Review notes on ' + v.label;
     showNotes();
     S.status.hidden = false;
