@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-18 — Spell shows each project's colour *(no migration)*
+
+- Spell now carries the show's colour like every project page: the thin bar across the top, the
+  faint wash, the coloured code tag beside the title, and a dot per show on the switcher, with the
+  current show filled in its colour.
+
 ## 2026-11-17 — Finance Overview: Where the show is, Cost to date and Cost by phase removed *(no migration)*
 
 - The Overview no longer shows those three sections, their explanations, the notes under Cost to date
