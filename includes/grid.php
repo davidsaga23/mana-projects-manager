@@ -177,8 +177,14 @@ function grid_progress(PDO $pdo, int $projectId): array {
  *   'none'  — the step covers it and nothing has been recorded yet
  *   status  — a row from `statuses`
  */
-function build_grid(PDO $pdo, int $projectId, string $scope): array {
+function build_grid(PDO $pdo, int $projectId, string $scope, ?array $onlyStepIds = null): array {
     $steps    = grid_steps($pdo, $projectId, $scope);
+    // Only these departments (Production tracking draws one phase at a time,
+    // 2026-11-18), so the columns, the totals and "ready" all follow the phase.
+    if ($onlyStepIds !== null) {
+        $keep  = array_flip(array_map('intval', $onlyStepIds));
+        $steps = array_values(array_filter($steps, fn($s) => isset($keep[(int)$s['id']])));
+    }
     $items    = grid_items($pdo, $projectId, $scope);
     $progress = grid_progress($pdo, $projectId);
     $statuses = statuses_by_id($pdo, $projectId);

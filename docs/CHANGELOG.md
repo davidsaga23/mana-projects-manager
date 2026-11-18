@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-18 — Production tracking: the tabs are each department's phase *(no migration)*
+
+- The tabs used to be fixed: assets were "Pre-production", shots "Production" and every whole-project
+  department (Animatic, Color Script…) "Post-production", whatever phase it had. Now each tab is a
+  phase as set in Set-up, in pipeline order, and shows only that phase's departments. When a phase
+  holds more than one kind of work, a small switch picks Assets, Shots or Whole-show deliverables.
+  Departments with no phase appear under "No phase". Old ?scope= links still open the right tab.
+
 ## 2026-11-18 — Spell shows each project's colour *(no migration)*
 
 - Spell now carries the show's colour like every project page: the thin bar across the top, the

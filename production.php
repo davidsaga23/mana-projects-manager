@@ -39,47 +39,63 @@ if (!$project) {
 
 $selfUrl = 'production.php?project=' . $projectId;
 
-// THE THREE PHASES, named as the studio names them (David, 2026-08-15).
+// THE TABS ARE THE PHASES each department was given in Set-up (David, 2026-11-18:
+// "those departments that are considered for the whole project end up in the
+// production tracking in the post-production section ... where they end up landing
+// should be defined in the setup stage when you pick the phases").
 //
-// Underneath they are the three item scopes the schema already has, which is why
-// this needed no new data: assets are what gets built before shots can be made,
-// shots are the show itself, and a whole-project step is a deliverable for the
-// finished film — an animatic, a music track, the mix, the master.
-//
-// The scope names stay 'asset' / 'shot' / 'project' everywhere in the code. Only
-// the LABELS are the studio's. A step's `department` column (migration 015) is
-// the more precise long-term answer — see ROADMAP — but it is free text, blank on
-// every existing project, and driving these tabs from it today would show three
-// empty screens.
-$phases = [
-    'asset'   => ['label' => 'Pre-production', 'noun' => 'asset',
+// They used to be the three item scopes wearing phase names: assets were always
+// "Pre-production", shots "Production" and every whole-project department
+// "Post-production", so an Animatic or a Color Script set to Pre-production still
+// landed in Post-production. Now a tab is a phase (`pipeline_steps.department`, in
+// the order the pipeline first reaches it), and inside it a small switch picks which
+// KIND of work to draw when a phase holds more than one: assets, shots, or whole-show
+// deliverables. The scope names stay 'asset' / 'shot' / 'project' in the code.
+$scopeInfo = [
+    'asset'   => ['label' => 'Assets', 'noun' => 'asset',
                   'blurb' => 'Characters, environments, props, everything built before a shot can be made.'],
-    'shot'    => ['label' => 'Production',     'noun' => 'shot',
+    'shot'    => ['label' => 'Shots', 'noun' => 'shot',
                   'blurb' => 'The shots themselves, through the pipeline.'],
-    'project' => ['label' => 'Post-production','noun' => 'deliverable',
-                  'blurb' => 'Whole-show deliverables, SFX, music, the mix, the master. One row, because each of these is one piece of work for the whole film rather than one per shot.'],
+    'project' => ['label' => 'Whole-show deliverables', 'noun' => 'deliverable',
+                  'blurb' => 'Whole-show deliverables, an animatic, a color script, music, the mix, the master. One row, because each is one piece of work for the whole film rather than one per shot.'],
 ];
-$scope = $_GET['scope'] ?? 'asset';
-if (!isset($phases[$scope])) $scope = 'asset';
-$phase = $phases[$scope];
+$stepRows = $pdo->prepare('SELECT id, applies_to, department FROM pipeline_steps
+                            WHERE project_id = ? ORDER BY step_order, name');
+$stepRows->execute([$projectId]);
+$byPhase = [];   // phase label => ['ids' => [...], 'scopes' => [scope => n]]
+foreach ($stepRows->fetchAll() as $s) {
+    $ph = trim((string)($s['department'] ?? ''));
+    if ($ph === '') $ph = 'No phase';
+    $byPhase[$ph] = $byPhase[$ph] ?? ['ids' => [], 'scopes' => []];
+    $byPhase[$ph]['ids'][] = (int)$s['id'];
+    $a = (string)$s['applies_to'];
+    foreach ($a === 'both' ? ['asset', 'shot'] : [$a === 'project' ? 'project' : $a] as $sc) {
+        if (isset($scopeInfo[$sc])) $byPhase[$ph]['scopes'][$sc] = ($byPhase[$ph]['scopes'][$sc] ?? 0) + 1;
+    }
+}
+if (!$byPhase) $byPhase = ['No phase' => ['ids' => [], 'scopes' => []]];
 
-$grid     = build_grid($pdo, $projectId, $scope);
+// Which phase: ?phase=, or an old ?scope= link mapped to the first phase holding
+// that kind of work, or else the first phase.
+$phaseName = (string)($_GET['phase'] ?? '');
+if (!isset($byPhase[$phaseName])) {
+    $phaseName = array_key_first($byPhase);
+    $legacy = (string)($_GET['scope'] ?? '');
+    foreach ($byPhase as $ph => $info) {
+        if ($legacy !== '' && isset($info['scopes'][$legacy])) { $phaseName = $ph; break; }
+    }
+}
+$phaseScopes = array_values(array_filter(['asset', 'shot', 'project'],
+    fn($sc) => isset($byPhase[$phaseName]['scopes'][$sc])));
+$scope = (string)($_GET['scope'] ?? '');
+if (!in_array($scope, $phaseScopes, true)) $scope = $phaseScopes[0] ?? 'shot';
+$phase = ['label' => $phaseName] + $scopeInfo[$scope];
+
+$grid     = build_grid($pdo, $projectId, $scope, $byPhase[$phaseName]['ids']);
 $statuses = $grid['statuses'];
 $episodic = (string)project_setting($pdo, $projectId, 'episodic', '') === '1';
 
-// How much each phase has to show, so a tab can say so rather than opening an
-// empty screen with no explanation.
-$counts = [];
-foreach (['shot' => 'shots', 'asset' => 'assets'] as $k => $table) {
-    $q = $pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE project_id = ?");
-    $q->execute([$projectId]);
-    $counts[$k] = (int)$q->fetchColumn();
-}
-// Post-production is counted in STEPS, not items: there is always exactly one
-// "show", so the useful number is how many whole-show deliverables exist.
-$q = $pdo->prepare("SELECT COUNT(*) FROM pipeline_steps WHERE project_id = ? AND applies_to = 'project'");
-$q->execute([$projectId]);
-$counts['project'] = (int)$q->fetchColumn();
+// Each phase tab says how many departments it holds.
 
 // Two steps can share a name and differ only in scope — "Concept (Characters)"
 // and "Concept (Environments)". Only then is the tag worth the clutter.
@@ -99,12 +115,22 @@ require __DIR__ . '/includes/header.php';
     Production tracking <span class="muted">· <?= e($project['name']) ?></span>
   </h2>
   <div class="board-tools">
-    <?php foreach ($phases as $key => $ph): ?>
-      <a class="button<?= $scope === $key ? '' : ' secondary-link' ?>"
-         href="<?= e($selfUrl) ?>&amp;scope=<?= e($key) ?>"><?= e($ph['label']) ?> (<?= (int)$counts[$key] ?>)</a>
+    <?php foreach ($byPhase as $ph => $info): ?>
+      <a class="button<?= $ph === $phaseName ? '' : ' secondary-link' ?>"
+         href="<?= e($selfUrl . '&phase=' . rawurlencode($ph)) ?>"><?= e($ph) ?> (<?= count($info['ids']) ?>)</a>
     <?php endforeach; ?>
   </div>
 </div>
+
+<?php if (count($phaseScopes) > 1): ?>
+  <p class="board-tools" style="margin:0 0 8px;">
+    <?php foreach ($phaseScopes as $sc): ?>
+      <a class="board-chip<?= $sc === $scope ? ' is-on' : '' ?>"
+         href="<?= e($selfUrl . '&phase=' . rawurlencode($phaseName) . '&scope=' . $sc) ?>"><?= e($scopeInfo[$sc]['label']) ?>
+        (<?= (int)$byPhase[$phaseName]['scopes'][$sc] ?>)</a>
+    <?php endforeach; ?>
+  </p>
+<?php endif; ?>
 
 <p class="lead">
   <?= e($phase['blurb']) ?>
