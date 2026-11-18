@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Shots: the "all broken down" line is gone; the warning stays *(no migration)*
+
+- When every shot is broken down, the Shots page no longer prints "All N shots are broken down…".
+  The yellow warning for shots with nothing linked still shows whenever it applies.
+
 ## 2026-11-17 — Timeline: the Detailed schedule explanation line is gone *(no migration)*
 
 - "N tasks scheduled · the name to the left of each bar… · amber outline = hand-locked…" no longer

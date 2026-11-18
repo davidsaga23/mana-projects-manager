@@ -106,21 +106,10 @@ require __DIR__ . '/includes/header.php';
     <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a> on the Timeline afterwards;
     a saved plan is a snapshot and will not improve by itself.
   </div>
-<?php else: ?>
-  <p class="muted small">
-    All <?= $progress['total'] ?> shots are broken down, <?= $progress['links'] ?>
-    asset<?= $progress['links'] === 1 ? '' : 's' ?> placed<?php
-      // Said rather than folded into the count above: a cell marked N/A is a
-      // decision somebody made, not an asset they placed.
-      $naCount = (int)($progress['na'] ?? 0);
-      if ($naCount > 0) {
-          echo ', ' . $naCount . ' cell' . ($naCount === 1 ? '' : 's') . ' marked N/A';
-      }
-    ?>.
-    <a href="timeline.php?project=<?= $projectId ?>#draft">Draft the dates again</a> on the Timeline to use it:
-    a saved plan is a snapshot and does not update itself.
-  </p>
 <?php endif; ?>
+<?php // The "All N shots are broken down, N assets placed…" line shown when nothing
+      // is missing is gone (David, 2026-11-17: "let's delete this text but keep the
+      // yellow warnings"). The warning above still appears whenever a shot is empty. ?>
 
 <?php
 // FRAMES AND FOOTAGE, TOTALLED (David, 2026-09-22), above the table and again
