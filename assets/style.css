@@ -4233,6 +4233,14 @@ a.panel-tab:hover { text-decoration: none; color: var(--text); }
   color: var(--text-2); font-size: 12.5px; cursor: pointer; white-space: nowrap;
 }
 .board-filter-actions button:hover { background: var(--surface-2); color: var(--text); }
+/* "Filters kept until midnight · Clear" (2026-11-18): a quiet line under the
+   filters, so a board that opens already filtered says why. */
+.board-filter-kept { margin: -4px 0 0; padding: 0 14px 8px; }
+.board-filter-kept[hidden] { display: none; }
+.board-filter-kept-clear {
+  margin: 0; padding: 0; border: 0; background: none; min-height: 0;
+  color: var(--primary); font: inherit; text-decoration: underline; cursor: pointer;
+}
 
 /* A task's name opens its panel. It is a real <button> so the keyboard reaches
    it, but it must read as the name of a task — the app's default button style
