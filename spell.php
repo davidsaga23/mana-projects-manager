@@ -58,6 +58,12 @@ $openByDefault = false;
 
 $pageTitle = 'Spell';
 require __DIR__ . '/includes/header.php';
+// THE SHOW'S COLOUR ON SPELL TOO (David, 2026-11-18: "let's also use the project
+// color code in spell so we know which project we're in"). Spell draws its own head
+// rather than project_section_nav(), so it gets the same bar, wash and --proj here,
+// plus a dot per show on the switcher and the code tag beside the title.
+require_once __DIR__ . '/includes/project_color.php';
+if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$projectId));
 ?>
 
 <?php if (!$projects): ?>
@@ -71,7 +77,9 @@ require __DIR__ . '/includes/header.php';
 <div class="board-head">
   <div class="board-shows" role="group" aria-label="Show">
     <?php foreach ($projects as $p): ?>
-      <a class="board-chip <?= (int)$p['id'] === $projectId ? 'is-on' : '' ?>"
+      <?php $chipColor = project_color($pdo, (int)$p['id']); ?>
+      <a class="board-chip <?= (int)$p['id'] === $projectId ? 'is-on' : '' ?>"<?=
+           $chipColor !== '' ? ' style="--proj:' . e($chipColor) . '"' : '' ?>
          href="spell.php?project=<?= (int)$p['id'] ?>"><?= e($p['code'] ?: $p['name']) ?></a>
     <?php endforeach; ?>
   </div>
@@ -79,7 +87,7 @@ require __DIR__ . '/includes/header.php';
 
 <div class="board-title">
   <div>
-    <h2><?= e($project['name']) ?></h2>
+    <h2><?php if (!empty($project['code'])): ?><code class="proj-chip"><?= e($project['code']) ?></code> <?php endif; ?><?= e($project['name']) ?></h2>
     <p class="muted small">
       <?= (int)($board['counts']['items'] ?? 0) ?> shots and assets ·
       <?= (int)($board['counts']['tasks'] ?? 0) ?> tasks ·
