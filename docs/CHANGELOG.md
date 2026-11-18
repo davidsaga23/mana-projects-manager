@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-18 — Spell remembers filters until midnight, and filters by asset type *(no migration)*
+
+- A filter set on Spell (department, tasks, asset type, status, assignee, due date, search) stays
+  on when you come back, switch pages or reload, until 12:00 am Pacific, then resets. It is per
+  person, per show and per browser; what you expanded or collapsed is kept the same way. A small
+  "Filters kept until midnight · Clear" line shows while one is on. A link that opens a task
+  (`?open=`) ignores the remembered filters for that visit, so the task is never hidden.
+- New "Any asset type" dropdown, built from the show's own asset types: BG, CH and Environments are
+  labelled that way whatever spelling Set-up stored (Background, Character, Environment…); other
+  types show as written. Picking one hides shots and whole-show deliverables, since they are not
+  assets. Groups left empty by any filter are now hidden too.
+
 ## 2026-11-18 — Review viewer: a Download button *(no migration)*
 
 - The review viewer's top bar has a Download button that saves the version on screen under its
