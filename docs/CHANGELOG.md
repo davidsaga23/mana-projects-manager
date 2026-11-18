@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Timeline: the Detailed schedule explanation line is gone *(no migration)*
+
+- "N tasks scheduled · the name to the left of each bar… · amber outline = hand-locked…" no longer
+  shows under Detailed schedule.
+
 ## 2026-11-17 — Staffing: no "Not set: following the department's dates" line *(no migration)*
 
 - The grey line under empty Start / End fields on Staffing is gone.
