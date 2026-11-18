@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-17 — Finance Overview: Where the show is, Cost to date and Cost by phase removed *(no migration)*
+
+- The Overview no longer shows those three sections, their explanations, the notes under Cost to date
+  (contract obligations, logged hours with no rate, flat fees) or the person-by-person arithmetic.
+  "Is the money on track" and the money strip stay, as does the budget form.
+
 ## 2026-11-17 — Shots: the "all broken down" line is gone; the warning stays *(no migration)*
 
 - When every shot is broken down, the Shots page no longer prints "All N shots are broken down…".
