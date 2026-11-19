@@ -175,7 +175,17 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
           </div>
         </div>
       <?php endif; ?>
-      <span><?= e(current_user_display()) ?></span>
+      <?php // ON A PHONE, ONE ☰ BUTTON (David, 2026-11-19, picking it over a bottom tab bar:
+            // the bar wrapped into three rows of buttons and took a third of the screen). The
+            // links below sit in <nav class="topnav">, which on a computer is display: contents
+            // and so changes nothing; at phone width it is the panel this button opens
+            // (assets/style.css, assets/nav-menu.js). The button is not drawn on a computer. ?>
+      <button type="button" class="topnav-toggle" id="topNavBtn" aria-expanded="false"
+              aria-controls="topNav" aria-label="Menu"><svg viewBox="0 0 20 20" width="24" height="24"
+              aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 5.25h14v1.5H3zm0 4h14v1.5H3zm0 4h14v1.5H3z"/></svg><span
+              class="topnav-count" id="topNavCount" hidden></span></button>
+      <nav class="topnav" id="topNav" aria-label="Pages">
+      <span class="topnav-me"><?= e(current_user_display()) ?></span>
       <?php // Names the role being WORN, so the top bar and the app agree about
             // who you are while a preview is running. ?>
       <?php if (in_user_preview()): $pu = preview_user(); ?>
@@ -355,6 +365,7 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
         </div>
       </div>
       <?php endif; ?>
+      </nav>
     </div>
   </div>
 <?php // Before bell.js and realm-nudge.js, which hand it what their polls bring back. ?>

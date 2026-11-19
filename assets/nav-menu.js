@@ -78,3 +78,41 @@
     if (isOpen() && ev.relatedTarget && !box.contains(ev.relatedTarget)) shut(false);
   });
 })();
+
+// The ☰ button on a phone (David, 2026-11-19). At phone width the top bar is one
+// slim row, logo, bell and this button, and the page links (<nav class="topnav">
+// in includes/header.php) open under it as a list. The Admin / More links are laid
+// out flat inside that list (style.css), so they need nothing from the code above.
+(function () {
+  'use strict';
+
+  var btn = document.getElementById('topNavBtn');
+  var nav = document.getElementById('topNav');
+  if (!btn || !nav) return;
+
+  // A dot on ☰ while something inside wants you: a new task, reviews waiting,
+  // invoices to pay, migrations or bugs. The numbers are in the list itself.
+  var dot = document.getElementById('topNavCount');
+  if (dot && nav.querySelector('.mytasks-badge.is-new, .pending-badge')) dot.hidden = false;
+
+  function isOpen() { return nav.classList.contains('is-open'); }
+  function set(open) {
+    nav.classList.toggle('is-open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    set(!isOpen());
+  });
+  document.addEventListener('click', function (e) {
+    if (isOpen() && !nav.contains(e.target)) set(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && isOpen()) { set(false); btn.focus(); }
+  });
+  // Back on a computer-wide window, the list is the bar again: nothing left open.
+  window.addEventListener('resize', function () {
+    if (isOpen() && window.getComputedStyle(btn).display === 'none') set(false);
+  });
+}());
