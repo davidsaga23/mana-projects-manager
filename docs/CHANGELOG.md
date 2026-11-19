@@ -14,6 +14,21 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — iPhone: the Install button walks you through every step *(no migration)*
+
+- On an iPhone, **Install Reviews as an app** now opens a step-by-step guide (`assets/install-guide.js`)
+  instead of a paragraph of text:
+  1. **Start** downloads the app.
+  2. Tap Allow, then Close, shown with drawings of those exact boxes.
+  3. What to tap in Settings: Profile Downloaded → Install → passcode → Install. It explains that
+     "Not Verified" is normal.
+  4. Open Reviews from the home screen.
+- Coming back from Settings moves the guide to the last step by itself, and it resumes if the page
+  reloads (kept 20 minutes). "I can't find Profile Downloaded" explains the 8-minute expiry and
+  downloads it again.
+- In Chrome or another browser on an iPhone, it says to open the page in Safari and copies the link.
+- iPhone still needs the person's own taps in Settings; no web page can approve an install for them.
+
 ## 2026-11-19 — Top bar on a phone: one row and a ☰ menu *(no migration)*
 
 - On a phone the top bar used to wrap into three rows of buttons. It is now one slim row: the logo,
