@@ -2619,6 +2619,7 @@ document.addEventListener('click',function (e) {
   else if ((b = t.closest('[data-enter]'))) goInside(b.getAttribute('data-enter'));
   else if (t.closest('[data-close]')) { S.sel = null; renderCard(); renderSide(); }
   else if ((b = t.closest('[data-voice]'))) { var vw = b.getAttribute('data-voice'); if (vw==='join') voiceJoin(); else if (vw==='mute') voiceMute(); else voiceStop(true); }
+  else if (t.closest('[data-scribelang]')) scribeNextLang();
   else if ((b = t.closest('[data-share]'))) { var sa = b.getAttribute('data-share');
     if (sa==='start') shareStart(); else if (sa==='stop') shareStop(); else if (sa==='full') shareFull();
     else { SH.hide = sa==='hide'; renderInside(); } }
@@ -2811,7 +2812,9 @@ function msgHTML(m) {
   var main = m.fwd ? '<div class="rfwd"><small class="rfwdfrom">Forwarded from '+esc(m.fwd.where)+' &middot; '+esc(m.fwd.name)+(m.fwd.at ? ' &middot; '+esc(m.fwd.at) : '')+'</small>'+body+pic+'</div>' : body+(m.deleted ? '' : pic);
   var cls = 'rmsg'+(m.mine?' is-mine':'')+(m.deleted?' is-deleted':'')+(inThread && m.id===CH.thread?' is-parent':'');
   var h = '<div class="'+cls+'" data-msg="'+(+m.id)+'" data-v="'+esc(m.v||'')+'"'+(m.fwd?' data-fwd="1"':'')+' tabindex="0">'+(m.deleted ? '' : barHTML(m, top && !inThread))
-        +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b>'+(m.user?stChip(person(m.user)):'')+'<small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main+foot+'</div>';
+        +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b>'+(m.user?stChip(person(m.user)):'')+'<small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main
+        /* Call notes (migration 106): the full transcript, for the people who were in the call. */
+        +(m.call && !m.deleted ? '<a class="rcalllink" href="realm_call.php?id='+(+m.call)+'" target="_blank" rel="noopener">Read the full transcript</a>' : '')+foot+'</div>';
   return inThread && m.id===CH.thread ? h+'<p class="rthrline" id="thrLine">Replies</p>' : h;
 }
 /* THE BAR OVER A MESSAGE, in Slack's order: three quick reactions (my three most used, from the
@@ -3477,7 +3480,7 @@ if ($('focusBody')) {
    VO.peers is one entry per other person: {pc the line, ok whether sound can flow, el the hidden
    player their voice comes out of, an what measures their loudness for the speaking mark}. */
 var VO = {on:false,joining:false,sid:0,place:null,stream:null,ctx:null,mine:null,peers:{},out:[],busy:0,timer:0,meter:0,flush:0,
-  muted:false,talk:{},talkSig:'',tries:{},dead:{},seen:{},misses:0,cid:0,asked:0,blocked:false};
+  muted:false,talk:{},talkSig:'',tries:{},dead:{},seen:{},misses:0,cid:0,asked:0,blocked:false,scribeOn:false};
 function voiceReady() { return !!(ST.voice && ST.voice.ready); }
 function voiceCan() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
 function voicePost(fields) {
@@ -3536,6 +3539,8 @@ function voiceJoin() {
       if (S.inside!==place) { voicePost({voice:'leave',sid:v.sid}).catch(function () {}); fail(''); return; }
       VO.joining = false; VO.on = true; VO.sid = v.sid; VO.place = place; VO.muted = false; VO.misses = 0; VO.busy = 0; VO.out = [];
       VO.tries = {}; VO.dead = {}; VO.seen = {}; VO.talk = {};
+      /* The call is written down (migration 106) when the server put me on its list. */
+      VO.scribeOn = !!(v.scribe && v.scribe.on); scribeStart();
       voiceEars();
       VO.timer = setInterval(voiceBeat,1000); VO.meter = setInterval(voiceMeter,150);
       voiceTake(j); renderInside(); renderSide(); draw();
@@ -3546,6 +3551,7 @@ function voiceJoin() {
 function voiceQuiet() {
   /* A shared screen belongs to the call: leaving the call, by any road, ends it. */
   shareQuiet();
+  scribeStop();
   clearInterval(VO.timer); clearInterval(VO.meter); clearTimeout(VO.flush); VO.timer = VO.meter = VO.flush = 0;
   Object.keys(VO.peers).forEach(function (k) { voiceDrop(+k); });
   if (VO.stream) VO.stream.getTracks().forEach(function (t) { t.stop(); });
@@ -3555,7 +3561,8 @@ function voiceQuiet() {
 /* Leave voice. `tell` is false when the server is the one that said so. */
 function voiceStop(tell) {
   if (!VO.on && !VO.joining) return;
-  if (VO.on && tell) voicePost({voice:'leave',sid:VO.sid}).catch(function () { /* the server notices within 15 seconds anyway */ });
+  /* What was just said is sent BEFORE the leave: the server takes lines only from somebody still in the call. */
+  if (VO.on && tell) { var lsid = VO.sid; scribeFlush().then(function () { return voicePost({voice:'leave',sid:lsid}); }).catch(function () { /* the server notices within 15 seconds anyway */ }); }
   VO.joining = false; VO.asked++; voiceQuiet(); renderInside(); renderSide(); draw();
 }
 /* Queue a note for somebody, and send it within a fifth of a second instead of at the next beat:
@@ -3710,6 +3717,8 @@ function voiceMute() {
   VO.muted = !VO.muted;
   VO.stream.getAudioTracks().forEach(function (t) { t.enabled = !VO.muted; });
   if (VO.muted) delete VO.talk[ST.me];
+  /* Muted is not written down either: the browser stops listening until Unmute. */
+  if (VO.muted) scribePause(); else scribeRun();
   renderInside(); draw();
 }
 /* A browser that refused to play sound until a click: this is the click. */
@@ -3718,6 +3727,91 @@ function voiceWake() {
   if (VO.ctx && VO.ctx.state==='suspended') { try { VO.ctx.resume(); } catch (e) { /* the marks stay still, the voices still play */ } }
   if (!VO.blocked) return; VO.blocked = false;
   Object.keys(VO.peers).forEach(function (k) { var el = VO.peers[k].el; if (el) { var pr = el.play(); if (pr && pr.catch) pr.catch(function () { VO.blocked = true; }); } });
+}
+/* ---------- the scribe (migration 106) ----------
+   David, 2026-11-19: "can we add an automatic transcript of any call in any room happening in realm?",
+   keeping the call in the Realm and bringing no new paid service. So EACH PAGE WRITES DOWN ITS OWN
+   PERSON with the speech recognition the browser already has (Chrome, Edge, Safari; Firefox has none,
+   and says so), and sends only the text, every few seconds. The server names the speaker from the
+   login. When the call ends, Claude writes the notes into the room's chat (includes/realm_scribe.php).
+
+   NOBODY IS WRITTEN DOWN BY SURPRISE: the bar says so before Join call, and shows a red mark during
+   the call. Muted is not written down: the browser stops listening until Unmute.
+
+   The browser's recognition stops by itself after a silence or a network hiccup; it is started again
+   at once, and after five failures in a row the mark says your voice is no longer written down.
+   One language per person, chosen on the mark (remembered by this browser). */
+var SC = {rec:null,want:false,lines:[],timer:0,fails:0,state:'off'};
+var SCRIBE_LANGS = [['en-US','English'],['es-MX','Español']];
+function scribeCan() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+function scribeLang() {
+  var l = ''; try { l = localStorage.getItem('realm.scribeLang') || ''; } catch (e) { /* the browser's own language */ }
+  if (!l) l = /^es/i.test(navigator.language || '') ? 'es-MX' : 'en-US';
+  return l;
+}
+function scribeLangName(l) { var n = l; SCRIBE_LANGS.forEach(function (x) { if (x[0]===l) n = x[1]; }); return n; }
+function scribeStart() {
+  SC.lines = []; SC.fails = 0; SC.want = false; SC.state = 'off';
+  if (!VO.scribeOn) return;
+  if (!scribeCan()) { SC.state = 'cant'; return; }
+  SC.want = true; SC.timer = setInterval(function () { scribeFlush(); },8000);
+  scribeRun();
+}
+function scribeRun() {
+  if (!SC.want || !VO.on || VO.muted || SC.rec) return;
+  var C = window.SpeechRecognition || window.webkitSpeechRecognition, r;
+  try { r = new C(); } catch (e) { SC.state = 'cant'; SC.want = false; renderInside(); return; }
+  r.continuous = true; r.interimResults = false; r.lang = scribeLang();
+  r.onresult = function (e) {
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (!e.results[i].isFinal) continue;
+      var t = String(e.results[i][0].transcript || '').trim();
+      if (t) SC.lines.push({t:Date.now(),text:t,lang:r.lang});
+    }
+    SC.fails = 0;
+  };
+  r.onerror = function (e) {
+    if (e.error==='not-allowed' || e.error==='service-not-allowed') { SC.want = false; SC.state = 'err'; renderInside(); }
+    else if (e.error!=='no-speech' && e.error!=='aborted') SC.fails++;
+  };
+  r.onend = function () {
+    if (SC.rec===r) SC.rec = null;
+    if (!SC.want || !VO.on || VO.muted) return;
+    if (SC.fails >= 5) { SC.want = false; SC.state = 'err'; renderInside(); return; }
+    setTimeout(scribeRun,SC.fails ? 1500*SC.fails : 250);
+  };
+  SC.rec = r;
+  try { r.start(); if (SC.state!=='on') { SC.state = 'on'; renderInside(); } }
+  catch (e) { SC.rec = null; SC.fails++; setTimeout(scribeRun,1500); }
+}
+/* Stop listening for now (muted, or changing language). What was already heard still arrives. */
+function scribePause() { var r = SC.rec; SC.rec = null; if (r) { try { r.stop(); } catch (e) { /* already stopped */ } } }
+function scribeStop() { SC.want = false; clearInterval(SC.timer); SC.timer = 0; scribePause(); SC.state = 'off'; }
+/* Send what was heard. Always answers a promise, so a leave can wait for it. */
+function scribeFlush() {
+  if (!SC.lines.length || !VO.on) return Promise.resolve();
+  var out = SC.lines.splice(0,60);
+  return voicePost({scribe:JSON.stringify(out),sid:VO.sid}).then(function (j) {
+    if (SC.lines.length && j && j.ok) return scribeFlush();
+  }).catch(function () { SC.lines = out.concat(SC.lines).slice(-300); });
+}
+function scribeNextLang() {
+  var l = scribeLang(), i = 0;
+  SCRIBE_LANGS.forEach(function (x, k) { if (x[0]===l) i = k+1; });
+  l = SCRIBE_LANGS[i % SCRIBE_LANGS.length][0];
+  try { localStorage.setItem('realm.scribeLang',l); } catch (e) { /* this page only */ }
+  scribePause(); renderInside(); setTimeout(scribeRun,300);
+}
+/* The red mark in the bar while the call is written down, and what it says about MY voice. */
+function scribeBadge() {
+  if (!VO.on || !VO.scribeOn) return '';
+  var mine = SC.state==='cant' ? 'This browser cannot write down your voice; use Chrome, Edge or Safari.'
+    : SC.state==='err' ? 'Your voice stopped being written down. Leave and join the call again.'
+    : VO.muted ? 'You are muted, so nothing of yours is written down.' : '';
+  return '<span class="rscribe" title="Everything said in this call is written down. When it ends, its notes are posted in this room’s chat. Use headphones, or the others’ words may be written down as yours.">'
+    +'<i class="rscribedot" aria-hidden="true"></i>Transcribing'
+    +(SC.want ? ' <button type="button" class="rscribelang" data-scribelang="1" title="The language your voice is written down in. Click to change.">'+esc(scribeLangName(scribeLang()))+'</button>' : '')
+    +'</span>'+(mine ? '<small class="rscribewarn">'+esc(mine)+'</small>' : '');
 }
 /* The voice part of the room's bar: Join call, or Mute and Leave call, and who is talking. */
 function voiceBar(o) {
@@ -3733,7 +3827,7 @@ function voiceBar(o) {
     else if (sw) sb = SH.hide ? '<button type="button" class="rbtn rsmall" data-share="show">Show screen</button>' : '';
     else if (shareReady() && shareCan()) sb = '<button type="button" class="rbtn rsmall" data-share="start"'+(SH.asking?' disabled':'')+'>Share screen</button>';
     h += '<i class="rlive'+(VO.muted?' is-muted':'')+'"></i><small>'+esc(others.length ? 'In a call with '+names.join(', ')+'.' : 'In a call. Nobody else has joined yet.')+(VO.muted?' You are muted.':'')
-      +esc(SH.want ? ' You are sharing your screen.' : sw ? ' '+shareName(sw)+' is sharing a screen.' : '')+'</small>'
+      +esc(SH.want ? ' You are sharing your screen.' : sw ? ' '+shareName(sw)+' is sharing a screen.' : '')+'</small>'+scribeBadge()
       +'<button type="button" class="rbtn rsmall" data-voice="mute" aria-pressed="'+VO.muted+'">'+(VO.muted?'Unmute':'Mute')+'</button>'+sb
       +'<button type="button" class="rbtn rsmall" data-voice="leave">Leave call</button>';
   } else {
@@ -3742,6 +3836,7 @@ function voiceBar(o) {
     var sees = others.filter(function (p) { return p.id===SH.who; })[0];
     h += (others.length ? '<small>'+esc((full ? 'The call is full, '+cap+' people are talking.' : who.join(', ')+(who.length>1?' are':' is')+' in a call.')
       +(sees ? ' '+firstName(sees.name)+' is sharing a screen'+(full?'.':', join the call to see it.') : ''))+'</small>' : '')
+      +(ST.voice.scribe ? '<small class="rscribenote">Calls here are transcribed. The notes go to this room\u2019s chat.</small>' : '')
       +'<button type="button" class="rbtn rsmall" data-voice="join"'+((VO.joining||full)?' disabled':'')+'>'+(VO.joining?'Joining…':'Join call')+'</button>';
   }
   return h+'</span>';
@@ -4002,6 +4097,8 @@ function shareMark(c, x, y) {
 /* Closing the page hangs up at once instead of after the server's 15 seconds. */
 window.addEventListener('pagehide',function () {
   if (!VO.on) return;
+  /* The last sentences first, so they are taken while I am still in the call. */
+  try { if (SC.lines.length && navigator.sendBeacon) { var s = new URLSearchParams(); s.append('scribe',JSON.stringify(SC.lines.splice(0,60))); s.append('sid',VO.sid); navigator.sendBeacon(R.api,s); } } catch (e) { /* those few lines are lost */ }
   try { var b = new URLSearchParams(); b.append('voice','leave'); b.append('sid',VO.sid); if (navigator.sendBeacon) navigator.sendBeacon(R.api,b); } catch (e) { /* the server notices by itself */ }
   voiceQuiet();
 });

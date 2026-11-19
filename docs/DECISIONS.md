@@ -6492,3 +6492,34 @@ together including the text"*, and a pin on the picture like Frame.io's (numbere
   the viewer keeps them and says so; leaving the page asks first.
 - **A new frame rate re-finds each note's frame by its time**, instead of clearing the drawing as
   before.
+
+## 2026-11-19 — Realm calls are written down, and their notes posted in the room's chat
+
+**Asked by David:** *"can we add an automatic transcript of any call in any room happening in
+realm?"* Compared that day: Google Meet's own transcription (needs the call moved to a Meet tab;
+Meet cannot be embedded in another site), a paid speech-to-text API (Gemini or OpenAI, a new
+bill: the Workspace plan does not include the Gemini API), and the browser's own recognition. David:
+*"I don't like people be taken to a different tab"* and *"I'm good to pay anthropic because we
+already have some credits for API keys but I don't want to bring a new service to the mix"*.
+Claude cannot do speech-to-text (the API takes text, images and documents, not audio).
+
+**Decided:**
+- **Each browser writes down its own person** with the Web Speech API, and sends only text
+  (`scribe` on `realm_api.php`). The speaker is the session's login, so every line is named
+  correctly without guessing. Chrome and Edge do this recognition on Google's / Microsoft's
+  servers; that is the browser's free feature, under no account of Mana's. Firefox has none.
+- **Muted is not written down**: the browser stops listening. One language per person (English or
+  Español), chosen on the mark.
+- **A call ends when nobody is left in its voice** for 20 seconds, noticed by the next Realm request
+  (the hosting has no background worker); the notes are written after that request has answered.
+- **Claude writes "Agreed:" and "To do:"** (Opus 5.5, low effort, a few cents a call), posted
+  unsigned as "Call notes" in the room's channel; for a house, a raven from the owner's side to
+  each guest. Under 25 words in the whole call: no notes.
+- **The full transcript is for the people who were in the call, and admins** (`realm_call.php`),
+  not for everyone who reads the room's chat. Kept with no expiry for now.
+- **Told before, marked during**: a line before Join call, a red "Transcribing" mark in the call,
+  and a headphones hint (speakers can make the others' words land under your name).
+
+Open for David: whether anyone may opt out of a call being written down, whether transcripts
+should be deleted after a while, and whether the notes should ring the bell.
+

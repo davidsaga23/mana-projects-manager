@@ -635,7 +635,11 @@ function realm_state(PDO $pdo, int $uid): array {
             // address-lookup service the browsers ask (includes/realm_voice.php).
             // `share`: has migration 088 run, so a screen can be shared in a call.
             'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice(),
-                        'share' => realm_share_available($pdo)],
+                        'share' => realm_share_available($pdo),
+                        // `scribe`: has migration 106 run, so calls are written down and
+                        // their notes posted (includes/realm_scribe.php). Only on the pages
+                        // that load that file; false anywhere else.
+                        'scribe' => function_exists('realm_scribe_available') && realm_scribe_available($pdo)],
             // The status picker's choices, and whether migration 099 has run.
             'statuses' => realm_status_menu($pdo)];
 }

@@ -203,6 +203,19 @@ small { color: var(--muted); font-size: 13px; }
 .rvoice .rbtn[aria-pressed="true"] { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
 .rlive { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
 .rlive.is-muted { background: var(--danger); }
+/* The scribe (migration 106): the red "Transcribing" mark while a call is written down, the
+   language of MY voice on it, and the line before Join call that says calls are transcribed. */
+.rscribe { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border: 1px solid var(--danger);
+  border-radius: 999px; background: var(--danger-tint); color: var(--danger); font-size: 12px; font-weight: 600; }
+.rscribedot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex: 0 0 auto; }
+@media (prefers-reduced-motion: no-preference) { .rscribedot { animation: rscribe-pulse 2s ease-in-out infinite; } }
+@keyframes rscribe-pulse { 50% { opacity: .35; } }
+.rscribelang { border: 0; background: none; padding: 0 0 0 4px; color: inherit; font: inherit; font-weight: 400;
+  text-decoration: underline dotted; cursor: pointer; }
+.rvoice .rscribewarn { color: var(--danger); }
+.rvoice .rscribenote { flex-basis: 100%; }
+/* "Read the full transcript" under a call's notes in the chat. */
+.rcalllink { display: inline-block; margin-top: 4px; font-size: 12px; }
 /* A shared screen in a call (David, 2026-11-13). .rshare is the panel a viewer watches in: it lies
    over the room and under the room's bar, whose height assets/realm.js measures (top is set there).
    .rsharing is the band across the very top of the page for the one who is sharing: "yes to the

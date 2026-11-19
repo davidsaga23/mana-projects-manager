@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — Realm: every call written down, notes in the room's chat *(migration 106)*
+
+- **Calls are transcribed.** In any Realm room, each person's browser writes down their own voice
+  with the speech recognition it already has (Chrome, Edge, Safari) and sends only the text to
+  Anima. No new service, no new key; the sound still never passes through Anima.
+- **Call notes in the room's chat.** When the last person leaves, Claude (the Anthropic key already
+  in `config.php`) writes the agreements and the to-dos, posted in the room's channel as "Call
+  notes" with a "Read the full transcript" link. A house has no channel, so its notes go by raven
+  to each guest. A call with almost nothing said gets no notes.
+- **Everybody is told.** The room says calls are transcribed before Join call; a red pulsing
+  "Transcribing" mark shows during the call, with each person's language (English or Español,
+  remembered by the browser). Muted is not written down. Firefox cannot do it and says so.
+- **The transcript page** (`realm_call.php`): the calls you were in, who, when, the notes and every
+  line. Only the people in the call and admins can read it. Notes that failed can be written again.
+- Dormant until migration 106 runs.
+
 ## 2026-11-19 — Review viewer: several notes at once, and numbered pins *(migration 105, optional)*
 
 - **A note per frame.** In the review viewer, each frame of a video (or the picture, for an image)
