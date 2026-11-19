@@ -6470,3 +6470,33 @@ occupant: deleted when it is a placeholder that no slot, no supervision position
 holds (crew rows cascade, so hours would go with it). Supervision positions already did this.
 Staffing's "Tidy leftover placeholders" applies the same rule to placeholders earlier hires left.
 A slot's finance-side rate keyed on the placeholder is left unread, as the hire message already says.
+
+## 2026-11-19 — An hourly Google Sheet copy of Spell, with a reviewed way back
+
+David, after a morning he could not open Anima (a stuck login, not an outage): a spreadsheet to fall back
+on, "especially for Spell", updated hourly.
+
+**Decided (agreed with David the same day):**
+- **One way automatically (Anima → Sheet), the other way only by hand.** A two-way sync was turned down:
+  a sort or fill-down in the sheet would silently rewrite real statuses, edits made in both places would
+  overwrite each other unseen, and when Anima is down its cron is down too.
+- **The hourly copy never overwrites unreviewed edits.** Before rewriting a tab it reads it back and
+  compares with a snapshot of what it last wrote (`sheet_backup_tabs`, migration 105). Any difference in
+  Status or Assignee, or a missing headings row, leaves that tab alone until Production finishes its
+  review. Otherwise the first run after an outage would wipe out the outage's work.
+- **Only Status and Assignee come back**; the other columns are read-only, greyed and protected with a
+  warning (not a hard lock, which would need every editor named on it).
+- **Applied through Spell's own save.** The status and assignee code moved out of `board_api.php` into
+  `includes/board_write.php` unchanged, so a change brought back from the sheet writes the same history,
+  Timeline entry and bells as one made on Spell. History source `sheet`.
+- **Conflicts are shown, not resolved:** where Anima also changed the cell since the copy, the row says
+  **Both changed** and starts unticked. A change Anima cannot use (unknown status or person, a task no
+  longer on Spell, a row pasted twice with different values) is listed with the reason and cannot be ticked.
+- **One spreadsheet, one tab per show,** plus a Read me tab: one link for the studio to bookmark and share
+  once, rather than a new file per show. Rows are matched by an Anima ID column, so sorting is safe.
+- **A person makes the spreadsheet, Anima fills it.** A service account has no Drive storage of its own,
+  so it edits a sheet shared with it rather than creating one. Access is one Drive folder shared with it.
+- **No Google library:** sign-in is a JWT signed RS256 with openssl and plain cURL, because the project has
+  no Composer. This is the second outbound connection after the Anthropic call.
+- **Noticing an outage is not Anima's job:** a free external uptime monitor (e.g. UptimeRobot) is
+  recommended in the set-up guide, not built.
