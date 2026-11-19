@@ -1493,6 +1493,20 @@ function board_version_links_available(PDO $pdo): bool {
     return $ok;
 }
 
+/**
+ * Has migration 105 run? A review note can then say WHICH FRAME of a video it
+ * is about and WHERE on the picture its numbered pin sits (David, 2026-11-19,
+ * showing Frame.io: a teardrop pin on the image with the note's #number). The
+ * pin is stored as a fraction of the width and height, so it lands on the same
+ * spot at any zoom and on any screen. Before 105 the frame is still in the
+ * note's text and the pin is still painted into the picture sent with it.
+ */
+function board_review_pins_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'ticket_comments', 'pin_x');
+    return $ok;
+}
+
 /** Has migration 065 run? A review is a comment that names its version. */
 function board_reviews_available(PDO $pdo): bool {
     static $ok = null;
@@ -1578,7 +1592,8 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     $named   = [];      // comment id => [names as written]
     if ($reviewsOn && $progressId) {
         $q = $pdo->prepare(
-            'SELECT c.id, c.version_id, c.body, c.created_at, u.display_name
+            'SELECT c.id, c.version_id, c.body, c.created_at, u.display_name'
+            . (board_review_pins_available($pdo) ? ', c.review_frame, c.pin_x, c.pin_y' : '') . '
                FROM ticket_comments c
                LEFT JOIN users u ON u.id = c.user_id
               WHERE c.progress_id = ? AND c.version_id IS NOT NULL
@@ -1685,10 +1700,24 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                 $out .= '<div class="version-reviews" id="vr' . $vid . '"' . ($isTop ? '' : ' hidden') . '>'
                       . '<div class="version-reviews-title">Review notes on '
                       . e(version_label((int)$v['version_no'])) . '</div>';
-                foreach ($mine as $r) {
+                foreach ($mine as $no => $r) {
                     $cid = (int)$r['id'];
-                    $out .= '<div class="comment version-review" id="bc' . $cid . '">'
-                          . '<div class="comment-head"><strong>'
+                    // THE NOTE'S NUMBER AND ITS PLACE ON THE PICTURE (David,
+                    // 2026-11-19, from Frame.io: "#3" on the note, the same 3 on
+                    // a pin on the frame). Numbered in the order they were made
+                    // on this version, so the number never changes once seen.
+                    // The data-* are how assets/review-viewer.js puts the pins
+                    // back and jumps to the frame; they are empty before 105.
+                    $at = ' data-note-no="' . ($no + 1) . '"';
+                    if (isset($r['review_frame']) && $r['review_frame'] !== null) {
+                        $at .= ' data-frame="' . (int)$r['review_frame'] . '"';
+                    }
+                    if (isset($r['pin_x'], $r['pin_y']) && $r['pin_x'] !== null && $r['pin_y'] !== null) {
+                        $at .= ' data-pin-x="' . e((string)(float)$r['pin_x']) . '"'
+                             . ' data-pin-y="' . e((string)(float)$r['pin_y']) . '"';
+                    }
+                    $out .= '<div class="comment version-review" id="bc' . $cid . '"' . $at . '>'
+                          . '<div class="comment-head"><span class="version-review-no">#' . ($no + 1) . '</span><strong>'
                           . e($r['display_name'] ?? 'Someone') . '</strong><span class="muted small">'
                           . e(date('j M Y · g:i A', strtotime((string)$r['created_at']))) . '</span>'
                           // A review is the thing most worth pasting into Slack:
@@ -1849,7 +1878,9 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                   . '<form class="comment-form board-version-form board-review-form" method="post"'
                   . ' enctype="multipart/form-data"'
                   . ' data-project="' . $projectId . '" data-step="' . $stepId . '"'
-                  . ' data-item="' . e($itemKey) . '">'
+                  . ' data-item="' . e($itemKey) . '"'
+                  // Whether a note's frame and pin can be saved (migration 105).
+                  . (board_review_pins_available($pdo) ? ' data-pins="1"' : '') . '>'
                   . '<input type="hidden" name="add_review" value="1">'
                   . '<label class="board-review-version">Reviewing <select name="version_id"'
                   . ' aria-label="Which version this review is about">' . $opts . '</select></label>'

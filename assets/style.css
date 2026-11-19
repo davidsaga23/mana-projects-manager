@@ -5153,6 +5153,57 @@ html.rq-app { touch-action: pan-x pan-y; }
   .rv-bottom .rv-verdict button { height: 48px; font-size: 16px; }
 }
 
+/* Several notes at once, and numbered pins (David, 2026-11-19, "like Frame.io").
+   A note's #number on the Versions tab and in the viewer; the pins over the
+   picture; the marks over the scrubber; the list of notes not published yet. */
+.version-review-no { margin-right: 6px; font-size: 12px; font-weight: 700; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+.rv-pins { position: absolute; inset: 0; pointer-events: none; }
+/* A teardrop: a square with three round corners, turned so the sharp one points
+   down onto the spot. The margins put that point exactly on left/top. */
+.rv-pin { position: absolute; width: 26px; height: 26px; margin: -31px 0 0 -13px; padding: 0;
+  border-radius: 50% 50% 50% 0; transform: rotate(-45deg); pointer-events: auto; cursor: pointer;
+  background: #111; border: 2px solid #fff; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center; transition: transform var(--ease); }
+.rv-pin-no { transform: rotate(45deg); font-size: 12px; font-weight: 700; line-height: 1; }
+.rv-pin.is-draft { background: #ffd400; color: #111; border-color: #111; }
+.rv-pin.is-hl, .rv-pin:hover { transform: rotate(-45deg) scale(1.2); background: var(--primary-fill); color: var(--on-primary); }
+.rv-canvas.is-pin { cursor: copy; }
+.rv-notes .version-review.rv-note-jump { cursor: pointer; }
+.rv-notes .version-review { border-radius: 6px; transition: background var(--ease); }
+.rv-notes .version-review.is-hl { background: var(--primary-tint); box-shadow: inset 3px 0 0 var(--primary); }
+.rv-scrub-wrap { position: relative; padding-top: 16px; }
+.rv-marks { position: absolute; left: 0; right: 0; top: 0; height: 16px; }
+.rv .rv-mark { position: absolute; top: 0; transform: translateX(-50%); min-width: 16px; height: 15px; padding: 0 3px;
+  border-radius: 4px 4px 4px 0; font-size: 10px; font-weight: 700; line-height: 15px; cursor: pointer;
+  background: var(--surface-3); color: var(--text); border: 1px solid var(--border-strong); }
+.rv .rv-mark.is-draft { background: #ffd400; color: #111; border-color: #111; }
+.rv .rv-mark:hover { background: var(--primary-fill); color: var(--on-primary); }
+.rv-drafts { margin: 0 0 8px; padding: 6px 10px; border: 1px solid var(--warn-border); border-radius: var(--radius-sm);
+  background: var(--warn-tint); }
+.rv-drafts[hidden] { display: none; }
+.rv-drafts-head { display: flex; align-items: baseline; gap: 4px; font-size: 13px; }
+.rv .rv-drafts-clear { margin-left: auto; padding: 0 4px; background: none; border: 0; font-size: 12.5px; }
+.rv-drafts-list { list-style: none; margin: 4px 0 0; padding: 0; max-height: 132px; overflow-y: auto; }
+.rv-draft { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 5px; font-size: 13px; cursor: pointer; }
+.rv-draft:hover { background: var(--surface-3); }
+.rv-draft.is-here { background: var(--surface-2); box-shadow: inset 3px 0 0 #ffd400; }
+.rv-draft-no { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rv-draft-at { color: #d4a800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rv-draft-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-draft-bits { font-size: 12px; white-space: nowrap; }
+.rv .rv-draft-btn { width: 26px; height: 26px; padding: 0; background: none; border: 1px solid transparent;
+  border-radius: 5px; color: var(--text-2); font-size: 14px; }
+.rv .rv-draft-btn:hover { background: var(--surface-3); border-color: var(--border); color: var(--text); }
+.rv .rv-draft-del:hover { color: var(--danger, #e5484d); }
+@media (max-width: 700px) {
+  .rv-drafts-list { max-height: 96px; }
+  .rv-drafts-head > .muted { display: none; }
+  .rv-draft { min-height: 36px; }
+  .rv .rv-draft-btn { width: 36px; height: 36px; }
+  .rv-pin { width: 30px; height: 30px; margin: -36px 0 0 -15px; }
+}
+
 /* Home (home.php, 2026-10-28): one person's shows, logs, notes and invoice information. */
 .home-missing a { margin-left: 8px; }
 .home-shows td { vertical-align: top; }

@@ -183,6 +183,31 @@ if (isset($_POST['add_review'])) {
                 ],
                 $hasFiles, (int)($_POST['version_id'] ?? 0) ?: null
             );
+            // WHICH FRAME, AND WHERE THE PIN IS (David, 2026-11-19: several
+            // notes at once, each on its frame, with a numbered pin "like
+            // Frame.io"). The viewer sends each note of a batch as its own
+            // add_review, so this is one note's frame and pin. The pin is a
+            // fraction of the picture, 0 to 1 each way; anything else is
+            // dropped rather than stored. Before migration 105 there is nowhere
+            // to keep them: the frame is still in the text, the pin still
+            // painted into the picture, so nothing is lost but the clickable pin.
+            // ⚠ NEVER A FAILURE: the note is saved by now, and a red line here
+            // would make the viewer keep it and send it a second time.
+            if (board_review_pins_available($pdo)) try {
+                $frame = (string)($_POST['frame'] ?? '');
+                $px = (string)($_POST['pin_x'] ?? '');
+                $py = (string)($_POST['pin_y'] ?? '');
+                $frame = ctype_digit($frame) ? (int)$frame : null;
+                $pin = is_numeric($px) && is_numeric($py)
+                    && (float)$px >= 0 && (float)$px <= 1 && (float)$py >= 0 && (float)$py <= 1;
+                if ($frame !== null || $pin) {
+                    $pdo->prepare('UPDATE ticket_comments SET review_frame = ?, pin_x = ?, pin_y = ? WHERE id = ?')
+                        ->execute([$frame, $pin ? round((float)$px, 5) : null, $pin ? round((float)$py, 5) : null,
+                                   $commentId]);
+                }
+            } catch (Throwable $e) {
+                // the note stands without its clickable pin; the picture still shows it
+            }
             if ($hasFiles) {
                 $res = save_ticket_attachments($pdo, $files, 0, $commentId, $userId);
                 if ($res['saved'])  $said .= ' ' . $res['saved'] . ' file(s) attached.';
