@@ -95,12 +95,14 @@ require __DIR__ . '/includes/header.php';
       // screen and it should save the page as if it was an app in both android and iPhone
       // ... ideally only visible if you're opening it in a mobile device"). Drawn hidden;
       // the script at the bottom shows it only on a phone or tablet that has not installed
-      // it yet. Android's browser opens its own install window; an iPhone has no such
-      // window for a website, so there the button shows the two taps to do in Safari. ?>
+      // it yet. Then: "the install button needs to do the actual install, not just tell the
+      // user how to do it". On Android it does: the browser's own install window, made
+      // possible by review-sw.js. An iPhone gives a website no way to install itself, so
+      // there the button can only show the taps to do in Safari's Share menu. ?>
 <div class="rq-install" id="rqInstall" hidden>
   <button type="button" class="rq-install-btn" id="rqInstallBtn">
     <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 1.5h8A1.5 1.5 0 0 1 15.5 3v14a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 17V3A1.5 1.5 0 0 1 6 1.5Zm0 1.5v14h8V3H6Zm4 2.5a.75.75 0 0 1 .75.75v4.19l1.22-1.22a.75.75 0 1 1 1.06 1.06l-2.5 2.5a.75.75 0 0 1-1.06 0l-2.5-2.5a.75.75 0 1 1 1.06-1.06l1.22 1.22V6.25A.75.75 0 0 1 10 5.5Z"/></svg>
-    Install Reviews as an app
+    <span id="rqInstallLabel">Install Reviews as an app</span>
   </button>
   <button type="button" class="rq-install-x" id="rqInstallX" aria-label="Hide the install button" title="Hide this for a month">×</button>
   <div class="rq-install-help" id="rqInstallHelp" hidden></div>
@@ -116,6 +118,24 @@ require __DIR__ . '/includes/header.php';
   var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var android = /Android/i.test(ua);
   if (!ios && !android && !/Mobile/i.test(ua)) return;   // a computer: never shown
+
+  // NO PINCH-ZOOMING THE PAGE ON A PHONE (David, 2026-11-19: "don't allow zoom in or out
+  // with the fingers"; the page only, not a picture in the review viewer, which keeps
+  // its own pinch in assets/review-viewer.js). So it handles like an app, not a web page.
+  // Android reads the viewport; Safari ignores that, so its own pinch gesture is stopped.
+  try {
+    var vp = document.querySelector('meta[name="viewport"]');
+    if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+    document.documentElement.classList.add('rq-app');
+    ['gesturestart', 'gesturechange'].forEach(function (g) {
+      document.addEventListener(g, function (e) { e.preventDefault(); }, { passive: false });
+    });
+  } catch (e) { /* zoom stays allowed: nothing breaks */ }
+
+  // The do-nothing service worker Android needs before it offers to install (see the file).
+  try {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('review-sw.js', { scope: './' }).catch(function () {});
+  } catch (e) { /* the menu steps still work */ }
   var installed = false;
   try {
     installed = navigator.standalone === true
@@ -151,29 +171,74 @@ require __DIR__ . '/includes/header.php';
   } catch (e) { /* private window: show it */ }
 
   var btn = document.getElementById('rqInstallBtn');
+  var label = document.getElementById('rqInstallLabel');
   var help = document.getElementById('rqInstallHelp');
-  var evt = null;
-  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); evt = e; });
+  var LABEL = label.textContent;
+  var evt = null, wantedAt = 0;
+
+  function say(html) { help.innerHTML = html; help.hidden = false; }
+
+  /** The browser's own "Install app" window. */
+  function install(e) {
+    evt = null;
+    help.hidden = true;
+    var retry = function () { evt = e; label.textContent = 'Tap again to install'; };
+    try {
+      var p = e.prompt();
+      if (p && p.catch) p.catch(retry);   // refused without a fresh tap: one more tap does it
+    } catch (err) { retry(); return; }
+    if (e.userChoice && e.userChoice.then) {
+      e.userChoice.then(function (c) {
+        if (c && c.outcome === 'accepted') box.hidden = true;
+        else label.textContent = LABEL;
+      }, function () {});
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    evt = e;
+    // Tapped before the browser was ready: install now, while that tap still counts
+    // (a browser lets an install window open only within a few seconds of a tap).
+    if (wantedAt) {
+      var fresh = Date.now() - wantedAt < 4500;
+      wantedAt = 0;
+      if (fresh) install(e); else label.textContent = 'Tap again to install';
+    }
+  });
   window.addEventListener('appinstalled', function () { box.hidden = true; });
   box.hidden = false;
 
   btn.addEventListener('click', function () {
-    if (evt) {
-      // Android (Chrome, Edge, Samsung): the browser's own "Install app" window.
-      var e = evt;
-      evt = null;
-      try { var p = e.prompt(); if (p && p.catch) p.catch(function () {}); } catch (err) { /* used */ }
+    if (evt) { install(evt); return; }
+    if (ios) {
+      // iPhone: the Web Clip profile (review_app.php says why). Only Safari can hand
+      // a profile to the phone; Chrome or Firefox on an iPhone just save the file.
+      if (/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua)) {
+        say('<strong>Open this page in Safari to install.</strong> An iPhone only installs apps like this '
+          + 'from Safari. Or, here: tap <strong>Share</strong> <span class="rq-install-icon" aria-hidden="true">⬆︎</span> '
+          + 'beside the address, then <strong>Add to Home Screen</strong>.');
+        return;
+      }
+      window.location.href = 'review_app.php';
+      say('<strong>Two more taps on the iPhone:</strong> tap <strong>Allow</strong>, then open '
+        + '<strong>Settings</strong>, tap <strong>Profile Downloaded</strong> near the top, and '
+        + '<strong>Install</strong> (it asks for your passcode). The <strong>Reviews</strong> icon then '
+        + 'appears on your home screen and opens full screen, like an app. Sign in once inside it.');
       return;
     }
-    help.innerHTML = ios
-      ? '<strong>On iPhone:</strong> tap the <strong>Share</strong> button '
-        + '<span class="rq-install-icon" aria-hidden="true">⬆︎</span> (at the bottom in Safari, beside the address in Chrome), '
-        + 'scroll down, tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>. '
-        + 'Reviews then opens from its own icon, full screen, like an app.'
-      : '<strong>On Android:</strong> open the browser menu <strong>⋮</strong> (top right) and tap '
-        + '<strong>Install app</strong> or <strong>Add to Home screen</strong>. '
-        + 'Reviews then opens from its own icon, full screen, like an app.';
-    help.hidden = !help.hidden;
+    if (wantedAt) return;
+    // Android, but the browser has not offered yet: wait a moment for it.
+    wantedAt = Date.now();
+    label.textContent = 'Getting the install ready…';
+    setTimeout(function () {
+      if (!wantedAt) return;
+      wantedAt = 0;
+      label.textContent = LABEL;
+      say('This browser did not offer to install. If <strong>Reviews</strong> is already on your home '
+        + 'screen, open it from there. Otherwise open the browser menu <strong>⋮</strong> (top right) and '
+        + 'tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.');
+    }, 8000);
   });
   document.getElementById('rqInstallX').addEventListener('click', function () {
     box.hidden = true;

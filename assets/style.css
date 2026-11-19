@@ -5047,6 +5047,9 @@ a.rv-download { text-decoration: none; color: var(--text); display: inline-flex;
    review-viewer.js, so the stage takes none of the browser's own gestures. */
 .rv-stage { touch-action: none; }
 .rq-filter-toggle, .rv-notes-toggle { display: none; }
+/* Reviews on a phone: scroll, but no pinch or double-tap zoom of the page (David,
+   2026-11-19). review.php adds the class on a phone only; the viewer keeps its own pinch. */
+html.rq-app { touch-action: pan-x pan-y; }
 /* Install Reviews as a phone app (2026-11-19). Shown by review.php's script on a phone only. */
 .rq-install { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
 .rq-install[hidden] { display: none; }
