@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — Top bar on a phone: one row and a ☰ menu *(no migration)*
+
+- On a phone the top bar used to wrap into three rows of buttons. It is now one slim row: the logo,
+  the bell and a ☰ button. ☰ opens every page as a list with its count (My tasks, Reviews,
+  Invoices…), the page you are on highlighted, and Admin's links laid out flat at the end. A red dot
+  on ☰ says something inside is waiting. Tapping outside or pressing Escape closes it.
+- On a computer the top bar is unchanged.
+
 ## 2026-11-19 — Reviews app: a real install on Android and iPhone *(no migration)*
 
 - **Android**: the Install button now opens the browser's own "Install app" window. A small service
