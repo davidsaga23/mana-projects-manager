@@ -157,7 +157,7 @@ require __DIR__ . '/includes/header.php';
     [['link', { rel: 'apple-touch-icon', href: 'assets/icon-192.png' }],
      ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
      ['meta', { name: 'mobile-web-app-capable', content: 'yes' }],
-     ['meta', { name: 'apple-mobile-web-app-title', content: 'Reviews' }],
+     ['meta', { name: 'apple-mobile-web-app-title', content: 'Anima Reviews' }],
      ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }]
     ].forEach(function (t) {
       var n = document.createElement(t[0]);

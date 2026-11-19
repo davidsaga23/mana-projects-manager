@@ -1,6 +1,6 @@
 {
   "name": "Anima Reviews",
-  "short_name": "Reviews",
+  "short_name": "Anima Reviews",
   "description": "Approve or send for retake on the go: Anima's Reviews screen as a phone app.",
   "id": "./review.php",
   "start_url": "./review.php",
