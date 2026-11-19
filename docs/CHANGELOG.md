@@ -14,6 +14,16 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — iPhone install: Share → Add to Home Screen, on one screen *(no migration)*
+
+- The profile route (approve in Settings, "Not Verified") is gone: David found it too complicated.
+  On an iPhone, **Install Reviews as an app** now shows the three Share-menu taps on one screen, each
+  drawn with the place to tap ringed: ⋯ → Share, **Add to Home Screen**, **Add**. Chrome on an
+  iPhone is shown its Share button at the top right instead. `review_app.php` is removed.
+- A website cannot install itself on an iPhone: Safari has no install API or prompt, so those taps
+  are the person's. Since iOS 26 the result opens full screen as a web app, named Reviews, with the
+  Anima icon.
+
 ## 2026-11-19 — iPhone: the Install button walks you through every step *(no migration)*
 
 - On an iPhone, **Install Reviews as an app** now opens a step-by-step guide (`assets/install-guide.js`)
