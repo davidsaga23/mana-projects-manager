@@ -97,8 +97,9 @@ require __DIR__ . '/includes/header.php';
       // the script at the bottom shows it only on a phone or tablet that has not installed
       // it yet. Then: "the install button needs to do the actual install, not just tell the
       // user how to do it". On Android it does: the browser's own install window, made
-      // possible by review-sw.js. An iPhone gives a website no way to install itself, so
-      // there the button can only show the taps to do in Safari's Share menu. ?>
+      // possible by review-sw.js. An iPhone gives a website no way to install itself
+      // (no API, no prompt), so there it opens a drawn guide to Share → Add to Home
+      // Screen → Add ("do the same but with the share button", David, 2026-11-19). ?>
 <div class="rq-install" id="rqInstall" hidden>
   <button type="button" class="rq-install-btn" id="rqInstallBtn">
     <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 1.5h8A1.5 1.5 0 0 1 15.5 3v14a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 17V3A1.5 1.5 0 0 1 6 1.5Zm0 1.5v14h8V3H6Zm4 2.5a.75.75 0 0 1 .75.75v4.19l1.22-1.22a.75.75 0 1 1 1.06 1.06l-2.5 2.5a.75.75 0 0 1-1.06 0l-2.5-2.5a.75.75 0 1 1 1.06-1.06l1.22 1.22V6.25A.75.75 0 0 1 10 5.5Z"/></svg>
@@ -209,16 +210,13 @@ require __DIR__ . '/includes/header.php';
   });
   window.addEventListener('appinstalled', function () { box.hidden = true; });
   box.hidden = false;
-  // Part-way through the iPhone guide (back from Settings, page reloaded): carry on.
-  if (ios && window.animaInstallGuide) window.animaInstallGuide.resume();
 
   btn.addEventListener('click', function () {
     if (evt) { install(evt); return; }
     if (ios) {
-      // iPhone: the Web Clip profile (review_app.php says why), with a step-by-step
-      // guide through iOS's own approval screens (assets/install-guide.js). Only Safari
-      // can hand a profile to the phone; Chrome or Firefox there get "open in Safari".
-      if (window.animaInstallGuide) window.animaInstallGuide.open(!/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua));
+      // iPhone: no website can install itself there, so the button opens a guide to
+      // the three taps, Share → Add to Home Screen → Add (assets/install-guide.js).
+      if (window.animaInstallGuide) window.animaInstallGuide.open(/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua));
       return;
     }
     if (wantedAt) return;
