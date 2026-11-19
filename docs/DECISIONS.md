@@ -6470,3 +6470,25 @@ occupant: deleted when it is a placeholder that no slot, no supervision position
 holds (crew rows cascade, so hours would go with it). Supervision positions already did this.
 Staffing's "Tidy leftover placeholders" applies the same rule to placeholders earlier hires left.
 A slot's finance-side rate keyed on the placeholder is left unread, as the hire message already says.
+
+## 2026-11-19 — Review notes: a draft per frame, published together, with numbered pins
+
+**Asked by David:** *"Right now if you paint on a frame and move to a different frame, it deletes the
+first one. We need to be able to leave several notes at once and then we can publish them all
+together including the text"*, and a pin on the picture like Frame.io's (numbered teardrop, the same
+#number on the note).
+
+**Decided:**
+- **A draft per frame** (per version): text, strokes and pin. A picture has one. The review box
+  shows the note of the frame on screen; pausing on another frame swaps it.
+- **Publishing sends one `add_review` per note**, one after the other, rather than a new batch
+  endpoint: the mentions, bell, emails and files already work per review, and a failure halfway
+  leaves the unsent notes waiting instead of half-saved. Attached files go with the first note.
+- **The pin is a fraction of the picture** (0–1 each way) on `ticket_comments` (migration 105, with
+  the frame), so it lands on the same spot at any size. It is also painted into the JPEG sent with
+  the note, so emails and the Versions tab show it, and nothing is lost before 105 runs.
+- **Numbers are the order of the notes on that version**, so a #3 never changes once seen.
+- **Backed up in the browser's localStorage per task** (14 days), never the picked files. Closing
+  the viewer keeps them and says so; leaving the page asks first.
+- **A new frame rate re-finds each note's frame by its time**, instead of clearing the drawing as
+  before.

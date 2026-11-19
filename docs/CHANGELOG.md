@@ -14,6 +14,25 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — Review viewer: several notes at once, and numbered pins *(migration 105, optional)*
+
+- **A note per frame.** In the review viewer, each frame of a video (or the picture, for an image)
+  keeps its own note: text, drawing and pin. Moving to another frame no longer wipes the first; going
+  back brings it back. The notes waiting are listed above the box (#number, timecode, text) with
+  edit and delete, and marked in yellow over the scrubber.
+- **"Publish N notes"** sends them all, each as its own review on its frame with its drawing, so the
+  bell, the @mentions and the emails work for every one. Attached files go with the first. If one
+  fails, the ones already sent stay sent and the rest wait.
+- **Kept in this browser.** The notes waiting are saved as you go, so a refresh or a closed viewer
+  does not lose them; they come back when the viewer opens on that task again (forgotten after 14
+  days). Leaving the page asks first.
+- **Pins, like Frame.io.** A 📍 tool (or N): click the picture to drop a numbered pin, then type the
+  note. Published notes show their pins on their frame; hovering or clicking a note lights its pin and
+  jumps to its frame, and the other way round. Notes are numbered (#1, #2…) on the Versions tab too.
+- **Migration 105** (`ticket_comments.review_frame`, `pin_x`, `pin_y`) keeps the frame and the
+  clickable pin. Before it runs everything works: the frame is in the note's text, and the pin is
+  painted into the picture sent with the note.
+
 ## 2026-11-19 — iPhone install guide redrawn from the real iOS 26 screens *(no migration)*
 
 - Redrawn from David's screen recording of the install on his iPhone:
