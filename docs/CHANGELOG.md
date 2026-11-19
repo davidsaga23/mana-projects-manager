@@ -14,6 +14,22 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — iPhone install guide redrawn from the real iOS 26 screens *(no migration)*
+
+- Redrawn from David's screen recording of the install on his iPhone:
+  1. **≡** at the left of the address;
+  2. **Share** in the floating menu;
+  3. **View More** among the share sheet's round buttons;
+  4. **Add to Home Screen** in the list;
+  5. **Add** (blue, top right), with Open as Web App on.
+
+  Each step is a drawing in iOS 26's style with the place to tap ringed in yellow, and it ends
+  with the home-screen icon.
+- Fix: the app now comes out as **Anima Reviews** and opens on Reviews. The recording showed it
+  saved as "Anima", opening on the home page, because iOS read the site-wide manifest before the
+  page's script could swap it. `includes/header.php` now names `manifest-review.json` on the Reviews
+  page on a phone, with its iPhone title and icon.
+
 ## 2026-11-19 — iPhone install: Share → Add to Home Screen, on one screen *(no migration)*
 
 - The profile route (approve in Settings, "Not Verified") is gone: David found it too complicated.
