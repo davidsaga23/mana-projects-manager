@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — Reviews work on a phone *(no migration)*
+
+- On a phone the Reviews cards stack one per row (two on a wide phone) with big Approve and Retake
+  buttons, and the show chips fold behind one "Show: …" button.
+- The review viewer fills the phone screen: the top bar wraps into two rows, the pen tools sit in a
+  strip under it, Approve and Retake move to the bottom under the review box, and a Notes button
+  shows the review notes (also on tablets, where the notes column was hidden).
+- Fingers on the picture: pinch to zoom, drag to move about when zoomed, swipe left or right at fit
+  size for the older or newer version. On a touch screen the pen starts off; tap ✎ to draw, and a
+  second finger turns a line into a pinch. Videos play in the page, not the phone's own player.
+- Desktop is unchanged.
+
 ## 2026-11-18 — Spell remembers filters until midnight, and filters by asset type *(no migration)*
 
 - A filter set on Spell (department, tasks, asset type, status, assignee, due date, search) stays
