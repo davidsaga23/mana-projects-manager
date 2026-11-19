@@ -47,6 +47,7 @@ require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passe
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_once __DIR__ . '/includes/realm_focus.php';
 require_once __DIR__ . '/includes/realm_praise.php';
+require_once __DIR__ . '/includes/realm_scribe.php';  // calls written down, notes posted (migration 105)
 require_login_json();
 
 header('Content-Type: application/json');
@@ -192,6 +193,9 @@ if (isset($_POST['voice'])) {
             $sid = (int)$joined['sid'];
             $answer = realm_voice_poll($pdo, $uid, $sid, false, []);
             $answer['sid'] = $sid;
+            // The call is written down (migration 105): put me on its list. The page was
+            // told before the microphone opened, and shows the mark while this is true.
+            $answer['scribe'] = realm_scribe_join($pdo, $uid);
         } elseif ($what === 'leave') {
             realm_voice_leave($pdo, $uid, $sid);
             $answer = $none;
@@ -211,6 +215,27 @@ if (isset($_POST['voice'])) {
         echo json_encode($reply);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'error' => 'The call could not be reached. Try again in a moment.']);
+    }
+    // The last person to leave is usually the one who ends the call: its notes are
+    // written now, after the answer above has gone (includes/realm_scribe.php).
+    if ($what === 'leave') realm_scribe_tidy($pdo);
+    exit;
+}
+
+// ---- what a call said (David, 2026-11-19, migration 105) ---------------------
+// POST scribe=<JSON [{t, text, lang}]>&sid=<n>   the sentences MY browser heard ME say
+//
+// ⚠ ONE FIELD, `scribe`, is what artist_may_post() names. No user id is posted:
+// the lines are written as the session's own login, and realm_scribe_take()
+// checks this window is in a call in a room the person is really inside, as a
+// voice request is checked. The sound never comes here, only the browser's text.
+if (isset($_POST['scribe'])) {
+    $lines = json_decode((string)$_POST['scribe'], true);
+    try {
+        $why = realm_scribe_take($pdo, $uid, (int)($_POST['sid'] ?? 0), is_array($lines) ? $lines : []);
+        echo json_encode(['ok' => $why === '', 'error' => $why]);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'The transcript could not be saved.']);
     }
     exit;
 }
@@ -755,3 +780,7 @@ if ($offered) $state['offered'] = true;
 if ($reminders) $state['reminders'] = $reminders;
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);
+// Calls that nobody is in any more get their notes written (migration 105): the
+// heartbeat is what notices a call whose last person just closed the page. After
+// the answer, and one small query when no call is open.
+realm_scribe_tidy($pdo);

@@ -644,7 +644,15 @@ function artist_may_post(): bool {
                             'task_status', 'voice', 'save_room', 'save_profile', 'stand', 'praise', 'camp_thing',
                             'buy', 'offer', 'offer_answer', 'react',
                             'forward', 'save_msg', 'unsave_msg', 'edit_msg', 'delete_msg', 'unread_from', 'channel',
-                            'activity_read', 'set_status'],
+                            'activity_read', 'set_status', 'scribe'],
+        // `scribe` (2026-11-19, migration 105): the sentences the asker's own
+        // browser heard them say in a call. ⚠ NO ID TO FORGE: the lines are written
+        // as the session's own login, and realm_scribe_take() checks the window is
+        // in a call in a room the person is really inside.
+        // realm_call.php `retry` (same day): write a call's notes again when they
+        // failed. Its second lock is realm_scribe_may_read(): only somebody who was
+        // in that call (or an admin) may ask.
+        'realm_call.php' => ['retry'],
         // Tim, 2026-11-17: a clicked bell row moves under "Earlier". The id is
         // checked against the asker's own crew id in notify_mark_opened().
         'notify_open.php' => ['id'],

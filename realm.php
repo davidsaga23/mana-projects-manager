@@ -30,6 +30,7 @@ require_once __DIR__ . '/includes/studio.php';
 require_once __DIR__ . '/includes/realm.php';
 require_once __DIR__ . '/includes/realm_chat.php';
 require_once __DIR__ . '/includes/realm_praise.php';
+require_once __DIR__ . '/includes/realm_scribe.php';  // whether calls are written down (migration 105)
 require_login();
 
 $uid     = realm_user_id();
