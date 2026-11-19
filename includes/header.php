@@ -101,7 +101,19 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
 <?php // INSTALL AS AN APP (David, 2026-11-12: "we can ask them to install the webpage as an
       // app in windows so it always opens on the startup"). With this, Edge and Chrome offer
       // "Install Anima"; the how-to is in the bell's Desktop notifications window and docs/. ?>
-<link rel="manifest" href="manifest.json">
+<?php // THE REVIEWS APP ON A PHONE (David, 2026-11-19). Saved from the Reviews page on a phone,
+      // it should be "Anima Reviews" and open on Reviews, so that page names its own manifest.
+      // ⚠ HERE, NOT IN JAVASCRIPT: David's screen recording showed iOS reading the manifest
+      // before review.php's script could swap it (the app came out as "Anima", opening on
+      // index.php). Only on a phone, so installing Anima on a computer from Reviews still
+      // installs the whole of Anima. ?>
+<?php $reviewApp = basename($_SERVER['SCRIPT_NAME'] ?? '') === 'review.php'
+          && preg_match('/iPhone|iPad|iPod|Android|Mobile/i', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')); ?>
+<link rel="manifest" href="<?= $reviewApp ? 'manifest-review.json' : 'manifest.json' ?>">
+<?php if ($reviewApp): ?>
+<meta name="apple-mobile-web-app-title" content="Anima Reviews">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<?php endif; ?>
 <meta name="theme-color" content="#14161c">
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
 </head>
