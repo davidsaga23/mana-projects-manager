@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — Reviews app: a real install on Android and iPhone *(no migration)*
+
+- **Android**: the Install button now opens the browser's own "Install app" window. A small service
+  worker (`review-sw.js`) makes Chrome and Samsung offer it. It caches nothing: every page still
+  comes from the server. A tap made before the browser is ready installs as soon as it is.
+- **iPhone**: Safari has no install window, so the button downloads a configuration profile holding a
+  full-screen "Web Clip" (`review_app.php`). The person taps **Allow**, then **Settings → Profile
+  Downloaded → Install**, and the Reviews icon appears. The profile is unsigned, so Settings
+  labels it "Not Verified". Chrome on iPhone is told to open the page in Safari.
+- On a phone the Reviews page no longer zooms with a pinch or double tap, so it handles like an
+  app. A picture in the review viewer can still be pinched.
+
 ## 2026-11-19 — Reviews work on a phone *(no migration)*
 
 - On a phone the Reviews cards stack one per row (two on a wide phone) with big Approve and Retake
