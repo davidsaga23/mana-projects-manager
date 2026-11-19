@@ -51,6 +51,15 @@
 
   var S = null;   // the open viewer's state; null while closed
 
+  // ON A PHONE (David, 2026-11-19: "review on the go"). The same width as the
+  // phone rules in assets/style.css. There the verdicts move from the top bar
+  // to the bottom, under the review box, where a thumb reaches them.
+  var PHONE = window.matchMedia ? window.matchMedia('(max-width: 700px)') : null;
+  function isPhone() { return !!(PHONE && PHONE.matches); }
+  // A finger, not a mouse: the pen starts off, so a finger pans and swipes
+  // until ✎ is tapped. A pen started on would turn every swipe into a line.
+  function isTouch() { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); }
+
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -120,7 +129,8 @@
       pane: pane, versions: versions, idx: idx, canDraw: !!reviewForm,
       who: reviewForm, media: null, w: 0, h: 0, scale: 1, fitted: true,
       strokes: [], live: null, drawFrame: null,
-      color: COLORS[0], size: SIZES[1].px, pen: !!reviewForm,
+      color: COLORS[0], size: SIZES[1].px, pen: !!reviewForm && !isTouch(),
+      touches: {}, pinch: null, swipe: null,
       fps: savedRate(), speed: 1, loop: true,
       actions: (opts && opts.actions) || []
     };
@@ -138,6 +148,7 @@
     document.body.classList.remove('rv-open');
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onResize);
+    if (PHONE && PHONE.removeListener) PHONE.removeListener(placeVerdict);
     S = null;
   }
 
@@ -212,8 +223,18 @@
     S.dl.setAttribute('download', '');
     top.appendChild(S.dl);
 
+    // The notes column is hidden on a narrow screen (style.css, 900px); there
+    // this button lays it over the picture instead. Not drawn wider than that.
+    S.notesBtn = btn('rv-btn rv-notes-toggle', 'Notes', 'Show the review notes on this version', function () {
+      var on = S.root.classList.toggle('rv-notes-open');
+      S.notesBtn.classList.toggle('is-on', on);
+    });
+    top.appendChild(S.notesBtn);
+
+    S.verdict = null;
     if (S.actions.length) {
       var verdict = el('div', 'rv-verdict');
+      S.verdict = verdict;
       S.actions.forEach(function (a) {
         verdict.appendChild(btn('rv-verdict-btn ' + (a.cls || ''), a.label, a.title || '', function () {
           if (unposted() && !window.confirm('The review you are writing has not been posted and will be lost. '
@@ -253,9 +274,24 @@
 
     root.appendChild(body);
     if (S.canDraw) root.appendChild(buildCompose());
+    // Where the verdicts go on a phone: the bottom edge, under the review box.
+    S.bottom = el('div', 'rv-bottom');
+    S.bottom.hidden = true;
+    root.appendChild(S.bottom);
 
     document.body.appendChild(root);
     S.root = root;
+    S.top = top;
+    placeVerdict();
+    if (PHONE && PHONE.addListener) PHONE.addListener(placeVerdict);
+    setPen(S.pen);
+
+    // Fingers on the picture: two pinch and pan, one pans (or, at fit size,
+    // swipes to the next version) while the pen is off. Capture phase, so a
+    // second finger is known before the canvas's penDown would start a line.
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(function (ev) {
+      S.stage.addEventListener(ev, onTouch, true);
+    });
 
     S.canvas.addEventListener('pointerdown', penDown);
     S.canvas.addEventListener('pointermove', penMove);
@@ -475,6 +511,10 @@
       m.className = 'rv-media';
       m.preload = 'auto';
       m.playsInline = true;
+      // The attributes too: older iPhones read only these, and without them
+      // a video jumps to the phone's own full-screen player on Play.
+      m.setAttribute('playsinline', '');
+      m.setAttribute('webkit-playsinline', '');
       m.muted = true;   // sound is one click away; a review room is often shared
       m.loop = S.loop;
       m.playbackRate = S.speed;
@@ -696,6 +736,102 @@
 
   function onResize() { if (S && S.fitted) layout(); }
 
+  /** The verdicts: in the top bar on a computer, along the bottom on a phone. */
+  function placeVerdict() {
+    if (!S || !S.verdict) return;
+    var phone = isPhone();
+    (phone ? S.bottom : S.top).appendChild(S.verdict);
+    S.bottom.hidden = !phone;
+  }
+
+  // --- fingers ------------------------------------------------------------------------
+  //
+  // The stage has touch-action: none (style.css), so the browser leaves every
+  // finger to this: the page itself never scrolls or zooms under the viewer,
+  // and a line drawn with a finger stays a line. Mouse and pen-tablet input
+  // never come here; they work exactly as before.
+
+  var SWIPE_PX = 60;
+
+  function onTouch(e) {
+    if (!S || e.pointerType !== 'touch') return;
+    var T = S.touches, id = e.pointerId;
+    if (e.type === 'pointerdown') {
+      T[id] = { x: e.clientX, y: e.clientY };
+      var ids = Object.keys(T);
+      // Keep hearing this finger when it slides off the picture, so its
+      // lifting is never missed. Not a finger drawing a line: the canvas
+      // holds on to that one itself.
+      if (!(ids.length === 1 && S.pen && e.target === S.canvas)) {
+        try { S.stage.setPointerCapture(id); } catch (err) { /* already gone */ }
+      }
+      if (ids.length === 2) {
+        // A second finger: this is a pinch, not a line. Drop the line the
+        // first finger had just started.
+        if (S.live) {
+          S.strokes.pop();
+          S.live = null;
+          if (!S.strokes.length) S.drawFrame = null;
+          paint();
+          drawState();
+        }
+        S.swipe = null;
+        if (!S.w) return;
+        var a = T[ids[0]], b = T[ids[1]];
+        var r = S.frame.getBoundingClientRect();
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        S.pinch = {
+          d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), scale: S.scale,
+          // The point of the picture between the fingers, in its own pixels.
+          fx: (mx - r.left) / S.scale, fy: (my - r.top) / S.scale
+        };
+      } else if (ids.length === 1 && !(S.pen && e.target === S.canvas)) {
+        S.swipe = { id: id, x: e.clientX, y: e.clientY,
+                    sl: S.stage.scrollLeft, st: S.stage.scrollTop };
+      }
+      return;
+    }
+    if (!T[id]) return;
+    if (e.type === 'pointermove') {
+      T[id] = { x: e.clientX, y: e.clientY };
+      var keys = Object.keys(T);
+      if (S.pinch && keys.length >= 2) {
+        e.preventDefault();
+        var p = T[keys[0]], q = T[keys[1]];
+        var cx = (p.x + q.x) / 2, cy = (p.y + q.y) / 2;
+        S.fitted = false;
+        S.scale = Math.max(0.05, Math.min(8, S.pinch.scale * Math.hypot(p.x - q.x, p.y - q.y) / S.pinch.d));
+        layout();
+        // Keep that same point of the picture between the fingers.
+        var nr = S.frame.getBoundingClientRect();
+        S.stage.scrollLeft += nr.left + S.pinch.fx * S.scale - cx;
+        S.stage.scrollTop += nr.top + S.pinch.fy * S.scale - cy;
+      } else if (S.swipe && S.swipe.id === id && !S.fitted) {
+        // Zoomed in: one finger moves the picture about.
+        S.stage.scrollLeft = S.swipe.sl - (e.clientX - S.swipe.x);
+        S.stage.scrollTop = S.swipe.st - (e.clientY - S.swipe.y);
+      }
+      return;
+    }
+    // pointerup / pointercancel
+    delete T[id];
+    if (S.pinch) {
+      if (Object.keys(T).length < 2) {
+        S.pinch = null;
+        // Pinched smaller than the screen: back to fit, rather than a postage stamp.
+        if (S.w && S.scale <= fitScale() + 0.001) { S.fitted = true; layout(); }
+      }
+      return;
+    }
+    var sw = S.swipe;
+    S.swipe = null;
+    if (!sw || sw.id !== id || e.type !== 'pointerup' || !S.fitted) return;
+    var dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    // At fit size a sideways swipe walks the versions, as the arrow keys do:
+    // to the left for the older one, to the right for the newer one.
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > 1.5 * Math.abs(dy)) go(dx < 0 ? S.idx + 1 : S.idx - 1);
+  }
+
   // --- the pen ------------------------------------------------------------------------
 
   function setPen(on) {
@@ -714,7 +850,7 @@
   }
 
   function penDown(e) {
-    if (!S || !S.pen || !S.w || e.button !== 0) return;
+    if (!S || !S.pen || !S.w || e.button !== 0 || S.pinch) return;
     e.preventDefault();
     if (isVideo()) {
       // You draw on a still. Pressing the pen on a playing video stops it on

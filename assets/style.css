@@ -5040,6 +5040,61 @@ a.rv-download { text-decoration: none; color: var(--text); display: inline-flex;
   .rv-top { flex-wrap: wrap; }
 }
 
+/* Reviews and the viewer ON A PHONE (David, 2026-11-19: "review on the go").
+   Bigger tap targets, the show chips behind one button, and in the viewer the
+   verdicts along the bottom (review-viewer.js moves them), the pen tools in a
+   strip and the notes behind a button. Fingers on the picture are handled by
+   review-viewer.js, so the stage takes none of the browser's own gestures. */
+.rv-stage { touch-action: none; }
+.rq-filter-toggle, .rv-notes-toggle { display: none; }
+.rv-bottom[hidden] { display: none; }
+@media (max-width: 900px) {
+  .rv-notes-toggle { display: inline-flex; align-items: center; }
+  .rv-body { position: relative; }
+  .rv-notes-open .rv-side { display: flex; position: absolute; inset: 0; z-index: 5; width: auto; border-left: 0; }
+}
+@media (max-width: 700px) {
+  .rq-filter-toggle { display: block; width: 100%; min-height: 44px; margin: 4px 0 8px; text-align: left; }
+  .review-shows:not(.is-open) { display: none; }
+  .rq-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+  .rq-buttons button { min-height: 48px; font-size: 16px; }
+  .rq-links { gap: 12px; font-size: 14px; }
+  .rq-links a, .rq-links button { min-height: 40px; display: inline-flex; align-items: center; }
+  .rq-links button { padding: 0 12px; font-size: 14px; }
+
+  .rv-top { gap: 8px; padding: max(8px, env(safe-area-inset-top)) 10px 8px; }
+  .rv-title { flex: 1 1 0; }
+  .rv-nav { order: 2; flex: 1 1 50%; min-width: 0; }   /* 50%: its own row, beside zoom */
+  .rv-nav .rv-pick { flex: 1; min-width: 0; }
+  .rv-zoom { order: 3; }
+  .rv-pct, .rv-zoom > .rv-fit:last-child { display: none; }   /* pinch does it */
+  .rv-btn { min-width: 40px; height: 40px; }
+  .rv-pick { height: 40px; font-size: 16px; }   /* 16px: iPhone zooms the page on a smaller box */
+
+  .rv-body { flex-direction: column; }
+  .rv-tools { flex-direction: row; flex-shrink: 0; overflow-x: auto; padding: 6px 10px;
+    border-right: 0; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+  .rv-tools-gap { width: 1px; height: 24px; margin: 0 4px; flex-shrink: 0; }
+  .rv-tool, .rv-swatch { flex-shrink: 0; }
+  .rv-stage { padding: 8px; }
+
+  .rv-transport { padding: 6px 10px 8px; }
+  .rv-transport-gap { display: none; }
+  .rv-counter { margin-left: 4px; font-size: 12px; }
+
+  .rv-compose { padding: 8px 10px; }
+  .rv-box { min-height: 40px; font-size: 16px; }
+  .rv-compose-row { flex-wrap: wrap; gap: 8px; }
+  .rv-draw-say { display: none; }
+  .rv-attach { min-height: 40px; display: inline-flex; align-items: center; }
+  .rv .rv-post { margin-left: auto; min-height: 40px; }
+
+  .rv-bottom { padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border); background: var(--surface); }
+  .rv-bottom .rv-verdict { display: grid; grid-template-columns: 1fr 1fr; padding-left: 0; border-left: 0; }
+  .rv-bottom .rv-verdict button { height: 48px; font-size: 16px; }
+}
+
 /* Home (home.php, 2026-10-28): one person's shows, logs, notes and invoice information. */
 .home-missing a { margin-left: 8px; }
 .home-shows td { vertical-align: top; }

@@ -113,7 +113,13 @@ foreach ($warnings as [$missing, $named, $button]):
 <?php endforeach; ?>
 
 <?php if (count($shows) > 1): ?>
-  <p class="board-projects review-shows">
+  <?php // ON A PHONE THE CHIPS FOLD BEHIND ONE BUTTON (David, 2026-11-19: "a mobile app
+        // version of the review tab to review on the go"). The button is only drawn at
+        // phone width (assets/style.css); on a desktop the chips show as they always did. ?>
+  <button type="button" class="secondary rq-filter-toggle" aria-expanded="false" aria-controls="rqShows">
+    Show: <?= $only ? e($shows[$only]['code']) . ' (' . $shows[$only]['n'] . ')' : 'All shows (' . count($queue) . ')' ?> ▾
+  </button>
+  <p class="board-projects review-shows" id="rqShows">
     <a class="board-chip<?= $only ? '' : ' is-on' ?>" href="review.php">All shows (<?= count($queue) ?>)</a>
     <?php foreach ($shows as $pid => $s): ?>
       <a class="board-chip<?= $only === $pid ? ' is-on' : '' ?>" href="review.php?project=<?= $pid ?>"><?= e($s['code']) ?> (<?= $s['n'] ?>)</a>
@@ -282,6 +288,16 @@ document.addEventListener('click', function (e) {
       if (spell) window.location.href = spell.href;
     });
 });
+// The show chips' fold-out button, on a phone.
+(function () {
+  var b = document.querySelector('.rq-filter-toggle');
+  var chips = document.getElementById('rqShows');
+  if (!b || !chips) return;
+  b.addEventListener('click', function () {
+    var open = chips.classList.toggle('is-open');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}());
 // A status changed or a version put up in the panel moves the task on this
 // list (or off it), so the list is reloaded when the panel closes after
 // anything was saved in it. The same as My tasks.
