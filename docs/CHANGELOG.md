@@ -14,6 +14,23 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-19 — A Google Sheet copy of Spell for when Anima is down *(migration 105)*
+
+**Asked by David** after a morning he could not open Anima: a spreadsheet, especially for Spell, updated hourly.
+
+- **Every hour** a cPanel cron job (`cron_sheet_backup.php`) copies Spell into one Google Sheet: a tab per show,
+  a row per task with phase, group, shot or asset, shot status, department, status, assignee, latest version,
+  due date, frames, notes and link, and "Last updated …" at the top. Status and Assignee have dropdowns; every
+  other column is grey and warns if typed in. A "Read me" tab explains the rules.
+- **Edits come back only when Production approves them**, on the new **Sheet backup** screen (menu, Production
+  only): every changed Status or Assignee is listed (e.g. SH040 Comp: In progress → Pending review), changes
+  also made in Anima since the copy are flagged **Both changed**, and only ticked ones are applied. They are
+  saved through Spell's own save, so history and bells behave normally.
+- **The hourly copy never overwrites unreviewed edits:** a tab with changes waiting is left alone and says so,
+  and the menu shows a count. **Finish review** rewrites the tab and the hourly copy carries on.
+- Set-up (Google service account, Drive folder, key on the server, config, cron) is in `docs/SHEET_BACKUP.md`.
+- Spell's status and assignee saving moved into `includes/board_write.php`, unchanged, so both screens share it.
+
 ## 2026-11-19 — iPhone: the Install button walks you through every step *(no migration)*
 
 - On an iPhone, **Install Reviews as an app** now opens a step-by-step guide (`assets/install-guide.js`)

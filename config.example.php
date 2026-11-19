@@ -35,8 +35,9 @@ return [
     // -------------------------------------------------------------------------
     // Anthropic API — reading a call transcript into tasks (transcript.php)
     // -------------------------------------------------------------------------
-    // The ONLY thing in this platform that sends anything outside this server.
-    // Leave it out and the Transcript screen says so and does nothing else; no
+    // One of two things that send anything outside this server; the other is the
+    // Google Sheet backup further down, which sends Spell's statuses to Mana's
+    // own Google Drive. Leave it out and the Transcript screen says so and does nothing else; no
     // other screen is affected.
     //
     // ⚠ A TRANSCRIPT LEAVES THE BUILDING when this is set, and it costs a small
@@ -148,6 +149,21 @@ return [
     // Only for a host whose cron can fetch a URL but not run PHP: a long random
     // string, then cron_digest.php?key=... '' keeps the URL shut (CLI still works).
     'cron_key' => '',
+
+    // --- Google Sheet backup of Spell (docs/SHEET_BACKUP.md) -------------------
+    // Every hour cron_sheet_backup.php copies Spell into a Google Sheet, one tab
+    // per show, for the studio to work from if Anima is down. Leave both empty
+    // and it is switched off: the cron job does nothing and the Sheet backup
+    // screen says it is not set up.
+    //
+    // Where the service account's key file is ON THE SERVER: the .json Google
+    // downloads. ⚠ A SECRET: put it OUTSIDE public_html so no browser can fetch
+    // it, e.g. '/home/ACCOUNT/private/anima-sheet-backup.json'. Never in git.
+    'google_service_account_json' => '',
+    // The backup spreadsheet: its id (the long part of its address between /d/
+    // and /edit) or the whole address. Made by a person in the shared Drive
+    // folder; Anima only fills it.
+    'google_backup_sheet_id' => '',
 
     // Stops the whole site with a "back shortly" page (HTTP 503) before the
     // database is touched. true, or a sentence to show. Used to freeze the old

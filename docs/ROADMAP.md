@@ -1455,3 +1455,11 @@ CSV import and export, behind the "Commercial" switch (admins only). Decisions i
 - PDF export of a quote.
 - Reminders for overdue follow-ups (the bell is the obvious place).
 
+## Outage backup: Spell in a Google Sheet — BUILT 2026-11-19 (migration 105), waiting for David's go-ahead
+
+Hourly copy to Google Sheets and a reviewed catch-up screen (`docs/SHEET_BACKUP.md`). Left for later, if wanted:
+
+- Bringing back more than Status and Assignee (due dates, notes), each with the same review.
+- Status colours in the sheet (conditional formatting per status).
+- Removing tabs of shows that have wrapped.
+- My tasks and the Timeline in the sheet as well as Spell.

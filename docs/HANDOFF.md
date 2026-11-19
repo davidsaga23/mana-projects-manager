@@ -112,7 +112,12 @@ as done by the admin) from the Users page. `preview_blocks_saving()` is the gate
 `includes/ai.php` is the **only** outbound API call in the whole platform. It powers the
 "transcript → tasks" feature and uses an Anthropic API key set in `config.php`. It is slow (says
 so on screen), costs money per use, and can fail (reported honestly). Any future AI assistant
-should reuse this shape. Nothing else in the app talks to the outside world.
+should reuse this shape.
+
+**Second outbound call (2026-11-19):** the Google Sheet backup (`includes/google_sheets.php`) writes Spell to
+a Google Sheet in Mana's own Drive every hour and reads it back for the catch-up screen. It uses a
+service-account key kept outside `public_html`, set in `config.php`; see `docs/SHEET_BACKUP.md`. Nothing
+else in the app talks to the outside world.
 
 One exception that is NOT the server: while somebody is in a voice chat in the Realm, **their
 browser** asks Google's public address-lookup service (STUN) for its own internet address, so two
