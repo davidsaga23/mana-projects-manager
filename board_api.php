@@ -26,6 +26,7 @@ require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/notify.php';   // the bell beside your name (migration 060)
 require_once __DIR__ . '/includes/task_events.php';   // the task's Timeline (migration 066)
+require_once __DIR__ . '/includes/board_write.php';   // saving a status or an assignee, shared with sheet_backup.php
 require_login_json();
 
 header('Content-Type: application/json');
@@ -72,52 +73,18 @@ try {
         exit;
     }
 
-    if (!$projectId || !$stepId || $itemKey === '') {
-        throw new RuntimeException('A project, a department and an item are all required.');
-    }
-
     // ---- the row named must really be this project's -----------------------
     //
     // Every id below arrives from the browser. The board greys out what does
-    // not apply, but the screen is a convenience and this is the guard.
-    $chk = $pdo->prepare('SELECT * FROM pipeline_steps WHERE id = ? AND project_id = ?');
-    $chk->execute([$stepId, $projectId]);
-    $step = $chk->fetch();
-    if (!$step) throw new RuntimeException('That department is not part of this project.');
-
-    $kind   = substr($itemKey, 0, 1);
-    $itemId = (int)substr($itemKey, 1);
-    if (!in_array($kind, ['s', 'a', 'p'], true) || $itemId <= 0) {
-        throw new RuntimeException('That item reference is not one this screen can set.');
-    }
-    $scope   = ['s' => 'shot', 'a' => 'asset', 'p' => 'project'][$kind];
-    $itemRow = ['asset_type' => null];
-
-    if ($kind === 'p') {
-        if ($itemId !== $projectId) {
-            throw new RuntimeException('That deliverable belongs to a different project.');
-        }
-    } else {
-        $table = $kind === 's' ? 'shots' : 'assets';
-        $own = $pdo->prepare("SELECT id FROM {$table} WHERE id = ? AND project_id = ?");
-        $own->execute([$itemId, $projectId]);
-        if (!$own->fetchColumn()) throw new RuntimeException('That item is not part of this project.');
-        if ($kind === 'a') {
-            $t = $pdo->prepare('SELECT asset_type FROM assets WHERE id = ?');
-            $t->execute([$itemId]);
-            $itemRow['asset_type'] = $t->fetchColumn() ?: null;
-        }
-    }
-
-    if (!step_covers_item($step, $itemRow, $scope)) {
-        throw new RuntimeException('"' . $step['name'] . '" does not apply to that item.');
-    }
-
-    // The cell as it stands. Read once, before anything is written: a log that
-    // cannot say what a thing changed FROM is half a log.
-    $cur = $pdo->prepare('SELECT * FROM progress WHERE step_id = ? AND item_key = ?');
-    $cur->execute([$stepId, $itemKey]);
-    $cell = $cur->fetch() ?: null;
+    // not apply, but the screen is a convenience and this is the guard. The
+    // checks live in board_cell_context() (includes/board_write.php), shared
+    // with the Google Sheet catch-up so both refuse the same things.
+    $ctx    = board_cell_context($pdo, $projectId, $stepId, $itemKey);
+    $step   = $ctx['step'];
+    $kind   = $ctx['kind'];
+    $itemId = $ctx['item_id'];
+    // The cell as it stands, read before anything is written.
+    $cell   = $ctx['cell'];
 
     /**
      * Is this task the asker's own? The second lock, beside artist_may_post():
@@ -134,49 +101,14 @@ try {
         return (bool)$q->fetchColumn();
     };
 
-    /**
-     * What this task is called, for the sentence in somebody's bell.
-     *
-     * ⚠ READ ONCE AND STORED IN THE NOTIFICATION, never re-derived later — the
-     * same choice migration 021 made for progress_log, and migration 060
-     * repeats: a notification is a record of a moment, and a step renamed next
-     * week must not rewrite what it said today.
-     */
-    $taskName = function () use ($pdo, $step, $kind, $itemId): string {
-        $name = '';
-        if ($kind === 's') {
-            $q = $pdo->prepare('SELECT shot_code FROM shots WHERE id = ?');
-            $q->execute([$itemId]);
-            $name = (string)$q->fetchColumn();
-        } elseif ($kind === 'a') {
-            $q = $pdo->prepare('SELECT name FROM assets WHERE id = ?');
-            $q->execute([$itemId]);
-            $name = (string)$q->fetchColumn();
-        }
-        return $name !== '' ? ($step['name'] . ' on ' . $name) : (string)$step['name'];
-    };
-
     /** The row's id after a write, which an upsert does not hand back. */
-    $progressIdNow = function () use ($pdo, $stepId, $itemKey): int {
-        $q = $pdo->prepare('SELECT id FROM progress WHERE step_id = ? AND item_key = ?');
-        $q->execute([$stepId, $itemKey]);
-        return (int)$q->fetchColumn();
+    $progressIdNow = function () use ($pdo, $ctx): int {
+        return board_cell_progress_id($pdo, $ctx);
     };
 
     /** Write the cell, creating it when the importer never made one. */
-    $upsert = function (array $set) use ($pdo, $projectId, $stepId, $itemKey, $kind, $itemId) {
-        $cols = array_keys($set);
-        $place = implode(', ', array_fill(0, count($cols), '?'));
-        $dupes = implode(', ', array_map(fn($c) => "{$c} = VALUES({$c})", $cols));
-        $sql = 'INSERT INTO progress (project_id, step_id, shot_id, asset_id, item_key, '
-             . implode(', ', $cols) . ') VALUES (?, ?, ?, ?, ?, ' . $place . ')'
-             . ' ON DUPLICATE KEY UPDATE ' . $dupes;
-        $pdo->prepare($sql)->execute(array_merge([
-            $projectId, $stepId,
-            $kind === 's' ? $itemId : null,
-            $kind === 'a' ? $itemId : null,
-            $itemKey,
-        ], array_values($set)));
+    $upsert = function (array $set) use ($pdo, $ctx) {
+        board_cell_upsert($pdo, $ctx, $set);
     };
 
     // ---- the status, the one everybody uses --------------------------------
@@ -197,35 +129,9 @@ try {
         if (!status_self_serve($status)) throw new RuntimeException(status_self_serve_refusal());
         if (!$isMine()) throw new RuntimeException('That task is not assigned to you.');
 
-        $was = $cell && $cell['status_id'] !== null ? (int)$cell['status_id'] : null;
-        $flags = status_flags($status);
-        $upsert([
-            'status_id'    => $statusId,
-            'is_delivered' => $flags['is_delivered'],
-            'is_approved'  => $flags['is_approved'],
-        ]);
-
-        // Everybody following this task, which is nobody to tick and nobody to
-        // forget to tick — see notify_subscribers(). The person who moved it is
-        // dropped inside notify_add(), so this cannot ring your own bell.
-        $pid = $progressIdNow();
-        notify_add($pdo, notify_subscribers($pdo, $pid), [
-            'kind'        => 'status',
-            'actor'       => current_user_display(),
-            'summary'     => $taskName() . ' → ' . ($status['name'] ?? 'Not started'),
-            'project_id'  => $projectId,
-            'step_id'     => $stepId,
-            'item_key'    => $itemKey,
-            'progress_id' => $pid,
-        ], (int)(effective_crew_id($pdo) ?? 0));
-
-        log_status_change_by_id($pdo, $projectId, $step, $itemKey, $was, $statusId, [
-            'item_name'  => null,
-            'shot_id'    => $kind === 's' ? $itemId : null,
-            'asset_id'   => $kind === 'a' ? $itemId : null,
-            'source'     => 'board',
-            'changed_by' => current_user_display(),
-        ]);
+        // The write, the bell and the log: board_set_status(), the same one the
+        // Google Sheet catch-up uses, so a status reads the same however it came.
+        $flags = board_set_status($pdo, $ctx, $statusId, 'board')['flags'];
 
         echo json_encode([
             'ok'       => true,
@@ -247,43 +153,9 @@ try {
     if (isset($_POST['set_crew'])) {
         $raw = trim((string)($_POST['crew_id'] ?? ''));
         $crewId = $raw === '' ? null : (int)$raw;
-        if ($crewId !== null) {
-            // A real person, never a slot: "Animation 02" is a position, and a
-            // task cannot be told it belongs to one.
-            $q = $pdo->prepare(
-                'SELECT name FROM crew
-                  WHERE id = ? AND COALESCE(is_placeholder, 0) = 0 AND COALESCE(is_team, 0) = 0'
-            );
-            $q->execute([$crewId]);
-            $name = $q->fetchColumn();
-            if (!$name) throw new RuntimeException('That is not somebody a task can be given to.');
-        }
-        $upsert(['crew_id' => $crewId]);
-
-        // On the task's Timeline: from whom to whom, in names, read now.
-        $wasName = null;
-        if ($cell && $cell['crew_id']) {
-            $w = $pdo->prepare('SELECT name FROM crew WHERE id = ?');
-            $w->execute([(int)$cell['crew_id']]);
-            $wasName = $w->fetchColumn() ?: null;
-        }
-        task_event_log($pdo, $progressIdNow(), 'assignee', $wasName, $crewId !== null ? $name : null);
-
-        // ⚠ ONLY THE NEW OWNER, and only when there is one. Clearing an
-        // assignee tells nobody: "you no longer have this" is not news anybody
-        // needs at the top of their screen, and the person who DID have it
-        // finds out the moment they look at the board.
-        if ($crewId !== null) {
-            notify_add($pdo, [$crewId], [
-                'kind'        => 'assigned',
-                'actor'       => current_user_display(),
-                'summary'     => $taskName(),
-                'project_id'  => $projectId,
-                'step_id'     => $stepId,
-                'item_key'    => $itemKey,
-                'progress_id' => $progressIdNow(),
-            ], (int)(effective_crew_id($pdo) ?? 0));
-        }
+        // Who may be given a task, the Timeline entry and the new owner's bell
+        // all live in board_set_crew(), shared with the Google Sheet catch-up.
+        $name = board_set_crew($pdo, $ctx, $crewId)['person'];
 
         echo json_encode([
             'ok'      => true,

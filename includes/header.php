@@ -312,6 +312,20 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
       // USERS for Production too (David, 2026-11-05), through its switch.
       // Email and Migrations stay admin-only and are not switches.
       if ($fa('users') && (is_admin() || can_edit())) $navGroups[1][] = ['href' => 'users.php', 'label' => 'Users'];
+      // SHEET BACKUP (David, 2026-11-19): the hourly Google Sheet copy of Spell,
+      // and where Production brings its edits back after an outage. The count
+      // is shows whose tab has edits waiting; before migration 105 the table
+      // is missing and the catch makes it 0.
+      if (can_edit()) {
+          $sheetWaiting = 0;
+          if (isset($pdo) && $pdo instanceof PDO) {
+              try {
+                  $sheetWaiting = (int)$pdo->query('SELECT COUNT(*) FROM sheet_backup_tabs WHERE paused_at IS NOT NULL')->fetchColumn();
+              } catch (Throwable $e) { $sheetWaiting = 0; }
+          }
+          $navGroups[1][] = ['href' => 'sheet_backup.php', 'label' => 'Sheet backup',
+                             'badge' => $sheetWaiting, 'badgeTitle' => 'Shows with sheet changes waiting for review'];
+      }
       if (is_admin()) {
           $navGroups[1][] = ['href' => 'smtp_test.php', 'label' => 'Email'];
           $navGroups[1][] = ['href' => 'migrate.php', 'label' => 'Migrations',
