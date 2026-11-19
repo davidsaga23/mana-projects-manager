@@ -91,6 +91,97 @@ require __DIR__ . '/includes/header.php';
 
 <h2 class="wizard-title"><?= count($stages) > 1 ? 'Reviews' : e(REVIEW_STAGES[$stages[0]]['label']) ?>
   <span class="muted">· <?= count($queue) ?> waiting on you</span></h2>
+<?php // INSTALL ON A PHONE (David, 2026-11-19: "add a install mobile app in the review
+      // screen and it should save the page as if it was an app in both android and iPhone
+      // ... ideally only visible if you're opening it in a mobile device"). Drawn hidden;
+      // the script at the bottom shows it only on a phone or tablet that has not installed
+      // it yet. Android's browser opens its own install window; an iPhone has no such
+      // window for a website, so there the button shows the two taps to do in Safari. ?>
+<div class="rq-install" id="rqInstall" hidden>
+  <button type="button" class="rq-install-btn" id="rqInstallBtn">
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 1.5h8A1.5 1.5 0 0 1 15.5 3v14a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 17V3A1.5 1.5 0 0 1 6 1.5Zm0 1.5v14h8V3H6Zm4 2.5a.75.75 0 0 1 .75.75v4.19l1.22-1.22a.75.75 0 1 1 1.06 1.06l-2.5 2.5a.75.75 0 0 1-1.06 0l-2.5-2.5a.75.75 0 1 1 1.06-1.06l1.22 1.22V6.25A.75.75 0 0 1 10 5.5Z"/></svg>
+    Install Reviews as an app
+  </button>
+  <button type="button" class="rq-install-x" id="rqInstallX" aria-label="Hide the install button" title="Hide this for a month">×</button>
+  <div class="rq-install-help" id="rqInstallHelp" hidden></div>
+</div>
+<script>
+// Run here, not at the bottom: the manifest has to be swapped, and the browser's
+// install event caught, before the page finishes loading.
+(function () {
+  'use strict';
+  var box = document.getElementById('rqInstall');
+  if (!box) return;
+  var ua = navigator.userAgent || '';
+  var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var android = /Android/i.test(ua);
+  if (!ios && !android && !/Mobile/i.test(ua)) return;   // a computer: never shown
+  var installed = false;
+  try {
+    installed = navigator.standalone === true
+      || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  } catch (e) { /* treat as not installed */ }
+  if (installed) return;
+
+  // THE APP OPENS ON REVIEWS. On a phone this page points at manifest-review.json
+  // ("Anima Reviews", starting at review.php) instead of the site's manifest.json,
+  // which starts at the home page. Only on a phone, so installing Anima on a
+  // computer from this page still installs the whole of Anima.
+  try {
+    var link = document.querySelector('link[rel="manifest"]');
+    if (link) link.setAttribute('href', 'manifest-review.json');
+    // The iPhone's own tags: its home-screen icon, its name under the icon, and
+    // opening without Safari's bars around it.
+    [['link', { rel: 'apple-touch-icon', href: 'assets/icon-192.png' }],
+     ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
+     ['meta', { name: 'mobile-web-app-capable', content: 'yes' }],
+     ['meta', { name: 'apple-mobile-web-app-title', content: 'Reviews' }],
+     ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }]
+    ].forEach(function (t) {
+      var n = document.createElement(t[0]);
+      Object.keys(t[1]).forEach(function (k) { n.setAttribute(k, t[1][k]); });
+      document.head.appendChild(n);
+    });
+  } catch (e) { /* the button still explains the taps */ }
+
+  var KEY = 'anima.rqInstallHidden';
+  try {
+    var hiddenAt = parseInt(window.localStorage.getItem(KEY), 10);
+    if (hiddenAt && Date.now() - hiddenAt < 30 * 864e5) return;   // hidden for a month
+  } catch (e) { /* private window: show it */ }
+
+  var btn = document.getElementById('rqInstallBtn');
+  var help = document.getElementById('rqInstallHelp');
+  var evt = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); evt = e; });
+  window.addEventListener('appinstalled', function () { box.hidden = true; });
+  box.hidden = false;
+
+  btn.addEventListener('click', function () {
+    if (evt) {
+      // Android (Chrome, Edge, Samsung): the browser's own "Install app" window.
+      var e = evt;
+      evt = null;
+      try { var p = e.prompt(); if (p && p.catch) p.catch(function () {}); } catch (err) { /* used */ }
+      return;
+    }
+    help.innerHTML = ios
+      ? '<strong>On iPhone:</strong> tap the <strong>Share</strong> button '
+        + '<span class="rq-install-icon" aria-hidden="true">⬆︎</span> (at the bottom in Safari, beside the address in Chrome), '
+        + 'scroll down, tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>. '
+        + 'Reviews then opens from its own icon, full screen, like an app.'
+      : '<strong>On Android:</strong> open the browser menu <strong>⋮</strong> (top right) and tap '
+        + '<strong>Install app</strong> or <strong>Add to Home screen</strong>. '
+        + 'Reviews then opens from its own icon, full screen, like an app.';
+    help.hidden = !help.hidden;
+  });
+  document.getElementById('rqInstallX').addEventListener('click', function () {
+    box.hidden = true;
+    try { window.localStorage.setItem(KEY, String(Date.now())); } catch (e) { /* fine */ }
+  });
+}());
+</script>
+
 <p class="lead">
   Everything waiting for your review on the shows you can see, newest version first.
   <strong>Approve</strong> moves it on: <?= implode('; ', array_map($stageLine, $stages)) ?>.
@@ -113,7 +204,13 @@ foreach ($warnings as [$missing, $named, $button]):
 <?php endforeach; ?>
 
 <?php if (count($shows) > 1): ?>
-  <p class="board-projects review-shows">
+  <?php // ON A PHONE THE CHIPS FOLD BEHIND ONE BUTTON (David, 2026-11-19: "a mobile app
+        // version of the review tab to review on the go"). The button is only drawn at
+        // phone width (assets/style.css); on a desktop the chips show as they always did. ?>
+  <button type="button" class="secondary rq-filter-toggle" aria-expanded="false" aria-controls="rqShows">
+    Show: <?= $only ? e($shows[$only]['code']) . ' (' . $shows[$only]['n'] . ')' : 'All shows (' . count($queue) . ')' ?> ▾
+  </button>
+  <p class="board-projects review-shows" id="rqShows">
     <a class="board-chip<?= $only ? '' : ' is-on' ?>" href="review.php">All shows (<?= count($queue) ?>)</a>
     <?php foreach ($shows as $pid => $s): ?>
       <a class="board-chip<?= $only === $pid ? ' is-on' : '' ?>" href="review.php?project=<?= $pid ?>"><?= e($s['code']) ?> (<?= $s['n'] ?>)</a>
@@ -282,6 +379,16 @@ document.addEventListener('click', function (e) {
       if (spell) window.location.href = spell.href;
     });
 });
+// The show chips' fold-out button, on a phone.
+(function () {
+  var b = document.querySelector('.rq-filter-toggle');
+  var chips = document.getElementById('rqShows');
+  if (!b || !chips) return;
+  b.addEventListener('click', function () {
+    var open = chips.classList.toggle('is-open');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}());
 // A status changed or a version put up in the panel moves the task on this
 // list (or off it), so the list is reloaded when the panel closes after
 // anything was saved in it. The same as My tasks.
