@@ -24,6 +24,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 - Fingers on the picture: pinch to zoom, drag to move about when zoomed, swipe left or right at fit
   size for the older or newer version. On a touch screen the pen starts off; tap ✎ to draw, and a
   second finger turns a line into a pinch. Videos play in the page, not the phone's own player.
+- **Install Reviews as an app**: on a phone or tablet (never on a computer) the Reviews page shows
+  an "Install Reviews as an app" button. On Android it opens the browser's install window, or says
+  which menu item to tap. On iPhone it shows the two taps in Safari (Share → Add to Home Screen),
+  because iPhones have no install window for websites. The app is "Anima Reviews" (`manifest-review.json`):
+  its own icon, full screen, opening on Reviews. The × hides the button for a month. Once installed it
+  no longer shows.
 - Desktop is unchanged.
 
 ## 2026-11-18 — Spell remembers filters until midnight, and filters by asset type *(no migration)*
