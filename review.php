@@ -107,6 +107,7 @@ require __DIR__ . '/includes/header.php';
   <button type="button" class="rq-install-x" id="rqInstallX" aria-label="Hide the install button" title="Hide this for a month">×</button>
   <div class="rq-install-help" id="rqInstallHelp" hidden></div>
 </div>
+<script src="assets/install-guide.js<?= asset_ver('install-guide.js') ?>"></script>
 <script>
 // Run here, not at the bottom: the manifest has to be swapped, and the browser's
 // install event caught, before the page finishes loading.
@@ -208,23 +209,16 @@ require __DIR__ . '/includes/header.php';
   });
   window.addEventListener('appinstalled', function () { box.hidden = true; });
   box.hidden = false;
+  // Part-way through the iPhone guide (back from Settings, page reloaded): carry on.
+  if (ios && window.animaInstallGuide) window.animaInstallGuide.resume();
 
   btn.addEventListener('click', function () {
     if (evt) { install(evt); return; }
     if (ios) {
-      // iPhone: the Web Clip profile (review_app.php says why). Only Safari can hand
-      // a profile to the phone; Chrome or Firefox on an iPhone just save the file.
-      if (/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua)) {
-        say('<strong>Open this page in Safari to install.</strong> An iPhone only installs apps like this '
-          + 'from Safari. Or, here: tap <strong>Share</strong> <span class="rq-install-icon" aria-hidden="true">⬆︎</span> '
-          + 'beside the address, then <strong>Add to Home Screen</strong>.');
-        return;
-      }
-      window.location.href = 'review_app.php';
-      say('<strong>Two more taps on the iPhone:</strong> tap <strong>Allow</strong>, then open '
-        + '<strong>Settings</strong>, tap <strong>Profile Downloaded</strong> near the top, and '
-        + '<strong>Install</strong> (it asks for your passcode). The <strong>Reviews</strong> icon then '
-        + 'appears on your home screen and opens full screen, like an app. Sign in once inside it.');
+      // iPhone: the Web Clip profile (review_app.php says why), with a step-by-step
+      // guide through iOS's own approval screens (assets/install-guide.js). Only Safari
+      // can hand a profile to the phone; Chrome or Firefox there get "open in Safari".
+      if (window.animaInstallGuide) window.animaInstallGuide.open(!/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua));
       return;
     }
     if (wantedAt) return;
