@@ -5047,6 +5047,16 @@ a.rv-download { text-decoration: none; color: var(--text); display: inline-flex;
    review-viewer.js, so the stage takes none of the browser's own gestures. */
 .rv-stage { touch-action: none; }
 .rq-filter-toggle, .rv-notes-toggle { display: none; }
+/* Install Reviews as a phone app (2026-11-19). Shown by review.php's script on a phone only. */
+.rq-install { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
+.rq-install[hidden] { display: none; }
+.rq-install-btn { flex: 1; margin: 0; min-height: 44px; display: inline-flex; align-items: center;
+  justify-content: center; gap: 8px; font-weight: 600; }
+.rq-install-x { margin: 0; width: 44px; min-height: 44px; padding: 0; font-size: 20px;
+  background: none; color: var(--muted); border: 1px solid var(--border); }
+.rq-install-help { flex-basis: 100%; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--surface-2); font-size: 14px; line-height: 1.5; }
+.rq-install-help[hidden] { display: none; }
 .rv-bottom[hidden] { display: none; }
 @media (max-width: 900px) {
   .rv-notes-toggle { display: inline-flex; align-items: center; }
