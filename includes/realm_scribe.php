@@ -1,6 +1,6 @@
 <?php
 // The Realm's scribe: a written record of every call, and "Call notes" in the
-// room's chat when it ends (migration 105).
+// room's chat when it ends (migration 106).
 //
 // David, 2026-11-19: "can we add an automatic transcript of any call in any room
 // happening in realm?" Compared that day with moving calls to Google Meet, he
@@ -49,7 +49,7 @@ const REALM_SCRIBE_SEND_MAX = 200000;
 /** A call with nobody left in it for this long has ended. Covers a quick drop and rejoin. */
 const REALM_SCRIBE_GRACE_SECONDS = 20;
 
-/** Have the tables arrived (migration 105)? Asked once per request; never throws. */
+/** Have the tables arrived (migration 106)? Asked once per request; never throws. */
 function realm_scribe_available(PDO $pdo): bool {
     static $ok = null;
     if ($ok !== null) return $ok;

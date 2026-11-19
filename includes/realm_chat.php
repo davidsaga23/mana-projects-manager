@@ -151,7 +151,7 @@ function realm_message_query(PDO $pdo, string $channel, int $thread): array {
           // Message actions (migration 096): edited, deleted, and where a forwarded copy came from.
           . ($acts ? ', m.edited_at, m.deleted_at, m.fwd_from, m.fwd_channel, m.fwd_user, m.fwd_at, fu.display_name AS fwd_display, fu.username AS fwd_username, fc.name AS fwd_crew'
                    : ', NULL AS edited_at, NULL AS deleted_at, NULL AS fwd_from');
-    // Call notes (migration 105, includes/realm_scribe.php): a message the scribe
+    // Call notes (migration 106, includes/realm_scribe.php): a message the scribe
     // posted is signed "Call notes" and links to its call's transcript.
     $notes = function_exists('realm_scribe_available') && realm_scribe_available($pdo);
     $cols .= $notes ? ', cm.call_id' : ', NULL AS call_id';
@@ -211,7 +211,7 @@ function realm_message_out(PDO $pdo, array $r, int $uid): array {
         'user' => (int)$r['user_id'],
         'name' => ($r['call_id'] ?? null) !== null ? 'Call notes'
                 : ($r['user_id'] === null ? 'Somebody who left' : trim((string)($r['crew_name'] ?: ($r['display_name'] ?: $r['username'])))),
-        // The call whose notes these are (migration 105): the page links to its transcript.
+        // The call whose notes these are (migration 106): the page links to its transcript.
         'call' => (int)($r['call_id'] ?? 0),
         'body' => (string)$r['body'],
         // True when realm_image.php?id=<this id> has a picture to serve.

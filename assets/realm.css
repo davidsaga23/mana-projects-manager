@@ -203,7 +203,7 @@ small { color: var(--muted); font-size: 13px; }
 .rvoice .rbtn[aria-pressed="true"] { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
 .rlive { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
 .rlive.is-muted { background: var(--danger); }
-/* The scribe (migration 105): the red "Transcribing" mark while a call is written down, the
+/* The scribe (migration 106): the red "Transcribing" mark while a call is written down, the
    language of MY voice on it, and the line before Join call that says calls are transcribed. */
 .rscribe { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border: 1px solid var(--danger);
   border-radius: 999px; background: var(--danger-tint); color: var(--danger); font-size: 12px; font-weight: 600; }

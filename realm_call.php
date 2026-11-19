@@ -1,5 +1,5 @@
 <?php
-// A Realm call's transcript and notes (migration 105, includes/realm_scribe.php).
+// A Realm call's transcript and notes (migration 106, includes/realm_scribe.php).
 //
 // David, 2026-11-19: "can we add an automatic transcript of any call in any room
 // happening in realm?" The notes (to-dos and agreements) are posted in the

@@ -47,7 +47,7 @@ require_once __DIR__ . '/includes/uploads.php';  // a picture in a message passe
 require_once __DIR__ . '/includes/notify.php';   // a raven for somebody away rings the bell
 require_once __DIR__ . '/includes/realm_focus.php';
 require_once __DIR__ . '/includes/realm_praise.php';
-require_once __DIR__ . '/includes/realm_scribe.php';  // calls written down, notes posted (migration 105)
+require_once __DIR__ . '/includes/realm_scribe.php';  // calls written down, notes posted (migration 106)
 require_login_json();
 
 header('Content-Type: application/json');
@@ -193,7 +193,7 @@ if (isset($_POST['voice'])) {
             $sid = (int)$joined['sid'];
             $answer = realm_voice_poll($pdo, $uid, $sid, false, []);
             $answer['sid'] = $sid;
-            // The call is written down (migration 105): put me on its list. The page was
+            // The call is written down (migration 106): put me on its list. The page was
             // told before the microphone opened, and shows the mark while this is true.
             $answer['scribe'] = realm_scribe_join($pdo, $uid);
         } elseif ($what === 'leave') {
@@ -222,7 +222,7 @@ if (isset($_POST['voice'])) {
     exit;
 }
 
-// ---- what a call said (David, 2026-11-19, migration 105) ---------------------
+// ---- what a call said (David, 2026-11-19, migration 106) ---------------------
 // POST scribe=<JSON [{t, text, lang}]>&sid=<n>   the sentences MY browser heard ME say
 //
 // ⚠ ONE FIELD, `scribe`, is what artist_may_post() names. No user id is posted:
@@ -780,7 +780,7 @@ if ($offered) $state['offered'] = true;
 if ($reminders) $state['reminders'] = $reminders;
 if ($error !== '') $state['error'] = $error;
 echo json_encode($state);
-// Calls that nobody is in any more get their notes written (migration 105): the
+// Calls that nobody is in any more get their notes written (migration 106): the
 // heartbeat is what notices a call whose last person just closed the page. After
 // the answer, and one small query when no call is open.
 realm_scribe_tidy($pdo);

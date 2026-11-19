@@ -636,7 +636,7 @@ function realm_state(PDO $pdo, int $uid): array {
             // `share`: has migration 088 run, so a screen can be shared in a call.
             'voice' => ['ready' => realm_voice_available($pdo), 'cap' => REALM_VOICE_CAP, 'ice' => realm_voice_ice(),
                         'share' => realm_share_available($pdo),
-                        // `scribe`: has migration 105 run, so calls are written down and
+                        // `scribe`: has migration 106 run, so calls are written down and
                         // their notes posted (includes/realm_scribe.php). Only on the pages
                         // that load that file; false anywhere else.
                         'scribe' => function_exists('realm_scribe_available') && realm_scribe_available($pdo)],

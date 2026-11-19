@@ -2813,7 +2813,7 @@ function msgHTML(m) {
   var cls = 'rmsg'+(m.mine?' is-mine':'')+(m.deleted?' is-deleted':'')+(inThread && m.id===CH.thread?' is-parent':'');
   var h = '<div class="'+cls+'" data-msg="'+(+m.id)+'" data-v="'+esc(m.v||'')+'"'+(m.fwd?' data-fwd="1"':'')+' tabindex="0">'+(m.deleted ? '' : barHTML(m, top && !inThread))
         +'<div class="rmsghead"><b>'+esc(m.mine?'You':m.name)+'</b>'+(m.user?stChip(person(m.user)):'')+'<small>'+esc(m.at)+'</small>'+(m.edited?'<small class="redited">(edited)</small>':'')+'<small class="rsavedmark" data-savedmark="1"></small></div>'+from+main
-        /* Call notes (migration 105): the full transcript, for the people who were in the call. */
+        /* Call notes (migration 106): the full transcript, for the people who were in the call. */
         +(m.call && !m.deleted ? '<a class="rcalllink" href="realm_call.php?id='+(+m.call)+'" target="_blank" rel="noopener">Read the full transcript</a>' : '')+foot+'</div>';
   return inThread && m.id===CH.thread ? h+'<p class="rthrline" id="thrLine">Replies</p>' : h;
 }
@@ -3539,7 +3539,7 @@ function voiceJoin() {
       if (S.inside!==place) { voicePost({voice:'leave',sid:v.sid}).catch(function () {}); fail(''); return; }
       VO.joining = false; VO.on = true; VO.sid = v.sid; VO.place = place; VO.muted = false; VO.misses = 0; VO.busy = 0; VO.out = [];
       VO.tries = {}; VO.dead = {}; VO.seen = {}; VO.talk = {};
-      /* The call is written down (migration 105) when the server put me on its list. */
+      /* The call is written down (migration 106) when the server put me on its list. */
       VO.scribeOn = !!(v.scribe && v.scribe.on); scribeStart();
       voiceEars();
       VO.timer = setInterval(voiceBeat,1000); VO.meter = setInterval(voiceMeter,150);
@@ -3728,7 +3728,7 @@ function voiceWake() {
   if (!VO.blocked) return; VO.blocked = false;
   Object.keys(VO.peers).forEach(function (k) { var el = VO.peers[k].el; if (el) { var pr = el.play(); if (pr && pr.catch) pr.catch(function () { VO.blocked = true; }); } });
 }
-/* ---------- the scribe (migration 105) ----------
+/* ---------- the scribe (migration 106) ----------
    David, 2026-11-19: "can we add an automatic transcript of any call in any room happening in realm?",
    keeping the call in the Realm and bringing no new paid service. So EACH PAGE WRITES DOWN ITS OWN
    PERSON with the speech recognition the browser already has (Chrome, Edge, Safari; Firefox has none,

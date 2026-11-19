@@ -215,7 +215,7 @@ const FEATURE_SCRIPTS = [
     'realm.php'           => 'realm',
     'realm_api.php'       => 'realm',
     'realm_image.php'     => 'realm',
-    'realm_call.php'      => 'realm',   // a Realm call's transcript (migration 105)
+    'realm_call.php'      => 'realm',   // a Realm call's transcript (migration 106)
     // Admins read anybody's; anybody else their own (statement.php decides whose).
     'statement.php'       => 'own_statement',
     // project tabs
