@@ -123,7 +123,7 @@ require __DIR__ . '/includes/header.php';
     <label class="inline" data-tab-only="calendar" hidden><input type="checkbox" id="bkCalAllCrew">
       <span>Show crew every week</span></label>
     <label class="inline bk-cal-who" data-tab-only="calendar" hidden>Person
-      <select id="bkCalPerson"><option value="">Everybody</option></select></label>
+      <select id="bkCalPerson" data-multi data-multi-label=""><option value="">Everybody</option></select></label>
   </div>
 
   <?php // One chip per show: its colour on the By person chart, and a switch to

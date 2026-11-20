@@ -374,6 +374,11 @@ require_once __DIR__ . '/project_nav.php';
 // never loads this file keeps working exactly as before.
 require_once __DIR__ . '/features.php';
 
+// Pick-several filters read from the address, with Include / Exclude (David,
+// 2026-11-20): filter_get(), filter_hit() and friends. Pure functions, no
+// database, safe on every page.
+require_once __DIR__ . '/filters.php';
+
 function working_days_list(string $from, string $to): array {
     $holidays = non_working_days();
     $f = new DateTime($from);

@@ -1,0 +1,122 @@
+/* Pick-several filter dropdowns (assets/multi-filter.js, David 2026-11-20).
+   In its own file rather than style.css because every page loads it from
+   includes/header.php and style.css is the file every feature edits.
+   Colours are style.css's :root roles; nothing here holds a literal colour
+   except the veil behind the phone sheet, the same one Spell's panel uses.
+   ⚠ `button.` ON EVERY BUTTON RULE: the global `button` look (blue, 16px top
+   margin) and rules like `.inline-form button` would otherwise win. */
+
+/* The real <select> stays in the page (it is what a form posts and what the
+   page's script reads) but is never seen. */
+select.mf-native { display: none !important; }
+
+/* The chip is drawn like the dropdown it replaces: the global field look, a
+   caret on the right, and the words clipped rather than wrapped. */
+button.mf-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: 100%; max-width: 100%; min-width: 0; margin: 0;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--text-2);
+  font: inherit; font-size: 15px; font-weight: 400; text-align: left; cursor: pointer;
+  transition: border-color var(--ease);
+}
+button.mf-chip[hidden] { display: none; }
+button.mf-chip:hover { border-color: var(--border-strong); background: var(--surface-2); }
+button.mf-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.mf-chip .mf-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-chip .mf-caret {
+  flex: 0 0 auto; width: 7px; height: 7px; margin: -3px 2px 0 0;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg); opacity: .7;
+}
+.mf-chip[aria-expanded="true"] .mf-caret { transform: rotate(225deg); margin-top: 3px; }
+/* Something picked: the words firm up and the edge says so. Exclude is told
+   apart at a glance (amber), because "not Final" read as "Final" would be the
+   opposite of the board you are looking at. */
+button.mf-chip.is-on { color: var(--text); border-color: var(--primary-border); background: var(--primary-tint); }
+button.mf-chip.is-not { border-color: var(--warn-border); background: var(--warn-tint); }
+
+/* In the compact filter bars the chip takes their size. */
+.board-filters button.mf-chip,
+button.mf-chip.mf-small { min-height: 30px; padding: 4px 8px; border-radius: 7px; font-size: 12.5px; }
+.board-filter-lead button.mf-chip { flex: 0 1 auto; width: auto; min-width: 96px; max-width: 170px; }
+/* Stacked (Spell at 900px and under), the lead cell may wrap rather than
+   squeeze its two chips down to their carets. */
+@media (max-width: 900px) { .board-filter-lead { flex-wrap: wrap; } }
+th button.mf-chip { min-height: 26px; margin-top: 3px; padding: 3px 7px; font-size: 12px; border-radius: 6px; }
+/* Beside other controls in a bar (the inline forms, Days off, the CRM), the
+   chip sizes to its words like the dropdown did, instead of taking the row. */
+.inline-form button.mf-chip, label.inline button.mf-chip, .filter-bar button.mf-chip,
+.do-toolbar button.mf-chip, .filters button.mf-chip { width: auto; max-width: 280px; }
+/* Reviews' show picker stands alone above the queue. */
+.rq-show-form { margin: 4px 0 12px; }
+.rq-show-form button.mf-chip { width: auto; min-width: 220px; max-width: 100%; }
+
+/* On a phone every chip is a thumb's height, and Reviews' takes the row. */
+@media (max-width: 640px) {
+  button.mf-chip { min-height: 40px; }
+  .rq-show-form button.mf-chip { width: 100%; min-height: 44px; }
+}
+
+/* --- the list ------------------------------------------------------------- */
+.mf-panel {
+  position: fixed; z-index: 1000;
+  display: flex; flex-direction: column; max-height: min(420px, 70vh);
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop); font-size: 14px;
+}
+.mf-mode { display: flex; gap: 4px; padding: 8px 8px 6px; }
+button.mf-mode-btn {
+  flex: 1 1 0; margin: 0; padding: 5px 8px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid var(--border); color: var(--text-2);
+  font-size: 13px; font-weight: 400; cursor: pointer;
+}
+button.mf-mode-btn:hover { background: var(--surface-2); color: var(--text); }
+button.mf-mode-btn[aria-pressed="true"] { background: var(--primary-tint); border-color: var(--primary-border); color: var(--text); }
+button.mf-mode-btn[data-x="1"][aria-pressed="true"] { background: var(--warn-tint); border-color: var(--warn-border); }
+.mf-panel .mf-search { margin: 0 8px 6px; width: auto; padding: 6px 9px; font-size: 14px; }
+.mf-list { overflow-y: auto; padding: 2px 4px 4px; overscroll-behavior: contain; }
+.mf-group {
+  padding: 8px 8px 3px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted);
+}
+.mf-panel .mf-group[hidden], .mf-panel label.mf-opt[hidden] { display: none; }
+/* Overrides the global `label` (block, bold, 12px margin) for a row of ticks. */
+.mf-panel label.mf-opt {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  font-weight: 400; font-size: 14px; color: var(--text); cursor: pointer;
+}
+.mf-panel label.mf-opt:hover { background: var(--surface-2); }
+.mf-opt input { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--primary); }
+.mf-opt input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.mf-opt span { min-width: 0; overflow-wrap: anywhere; }
+.mf-none { margin: 8px; color: var(--muted); font-size: 13px; }
+.mf-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 6px 8px; border-top: 1px solid var(--border-soft);
+}
+button.mf-clear, button.mf-clear:hover {
+  margin: 0; padding: 4px 6px; background: none; border: 0;
+  color: var(--primary); font-size: 13px; text-decoration: underline; cursor: pointer;
+}
+button.mf-done { margin: 0; padding: 5px 14px; font-size: 13px; border-radius: var(--radius-sm); }
+
+/* On a phone the list is a sheet along the bottom, thumb-sized, the way the
+   Reviews tab works on a phone (PRs #303/#305). */
+.mf-panel.is-sheet {
+  left: 0; right: 0; bottom: 0; top: auto; width: auto;
+  max-height: 75vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.mf-panel.is-sheet label.mf-opt { padding: 11px 10px; font-size: 16px; }
+.mf-panel.is-sheet .mf-opt input { width: 20px; height: 20px; }
+.mf-panel.is-sheet .mf-search { font-size: 16px; padding: 9px 10px; } /* 16px: iOS does not zoom */
+.mf-panel.is-sheet button.mf-mode-btn { padding: 9px 8px; font-size: 15px; }
+.mf-panel.is-sheet button.mf-done { padding: 9px 20px; font-size: 15px; }
+html.mf-sheet-open body::after {
+  content: ""; position: fixed; inset: 0; z-index: 999; background: rgba(0, 0, 0, .45);
+}
+
+@media print { .mf-panel { display: none; } }

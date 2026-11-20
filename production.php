@@ -242,8 +242,9 @@ require __DIR__ . '/includes/header.php';
   <div class="board-head" style="margin:0 0 10px;">
     <h3 style="margin:0;"><?= e($phase['label']) ?> tracking</h3>
     <label class="inline muted small">Show
-      <select id="groupFilter">
-        <option value="all">Everything</option>
+      <?php // Pick-several, with Include / Exclude (David, 2026-11-20). ?>
+      <select id="groupFilter" data-multi data-multi-label="">
+        <option value="">Everything</option>
         <?php foreach ($grid['per_group'] as $group => $g): ?>
           <option value="<?= e($group) ?>"><?= e($group) ?> (<?= (int)$g['ready'] ?>/<?= (int)$g['items'] ?> ready)</option>
         <?php endforeach; ?>

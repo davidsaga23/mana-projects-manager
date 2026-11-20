@@ -54,13 +54,19 @@ $nextMonth  = (clone $first)->modify('+1 month')->format('Y-m');
 // year, off the grid. 'all' is everybody in Anima, for the rare case.
 $show = (string)($_GET['show'] ?? $_POST['show'] ?? 'any');
 if ($show !== 'any' && $show !== 'all' && !ctype_digit($show)) $show = 'any';
-$dept = (string)($_GET['dept'] ?? $_POST['dept'] ?? '');
+// Department: several, or all but some (David, 2026-11-20, pick-several
+// filters). A filter_get() result; ?dept=Animation still means just Animation.
+$dept = filter_get('dept', array_key_exists('dept', $_GET) ? $_GET : $_POST);
 
 $selfQuery = function (array $over = []) use ($month, $show, $dept): string {
-    $q = array_merge(['tab' => 'days-off', 'm' => $month, 'show' => $show, 'dept' => $dept], $over);
+    $q = array_merge(['tab' => 'days-off', 'm' => $month, 'show' => $show], $over);
+    // `'dept' => ''` in $over is "drop the department filter".
+    $keepDept = !array_key_exists('dept', $over);
+    unset($q['dept']);
     $q = array_filter($q, function ($v) { return $v !== '' && $v !== null; });
     if (($q['show'] ?? '') === 'any') unset($q['show']);
-    return 'bookings.php?' . http_build_query($q);
+    $d = $keepDept ? filter_query('dept', $dept) : '';
+    return 'bookings.php?' . http_build_query($q) . ($d !== '' ? '&' . $d : '');
 };
 
 // --- saving: add, change, remove ---------------------------------------------
@@ -138,9 +144,10 @@ if (!$seeAll) {
         $where[] = "(c.id IN (SELECT crew_id FROM crew_projects WHERE project_id IN ($in))
                   OR c.id IN (SELECT crew_id FROM crew_lanes WHERE project_id IN ($in)))";
     }
-    if ($hasDept && $dept !== '') {
-        $where[] = 'c.department = ?';
-        $args[]  = $dept;
+    if ($hasDept && $dept['on']) {
+        $where[] = 'c.department ' . ($dept['not'] ? 'NOT ' : '') . 'IN ('
+                 . implode(',', array_fill(0, count($dept['in']), '?')) . ')';
+        array_push($args, ...$dept['in']);
     }
     $stmt = $pdo->prepare(
         'SELECT c.id, c.name, c.role' . ($hasDept ? ', c.department' : '') . '
@@ -201,9 +208,11 @@ function days_off_kind(string $reason): string {
 }
 
 /** The month and filters, carried through a save so the page comes back as it was. */
-function days_off_keep_fields(string $month, string $show, string $dept): string {
-    return '<input type="hidden" name="tab" value="days-off">'
+function days_off_keep_fields(string $month, string $show, array $dept): string {
+    $out = '<input type="hidden" name="tab" value="days-off">'
          . '<input type="hidden" name="m" value="' . e($month) . '">'
-         . '<input type="hidden" name="show" value="' . e($show) . '">'
-         . '<input type="hidden" name="dept" value="' . e($dept) . '">';
+         . '<input type="hidden" name="show" value="' . e($show) . '">';
+    foreach ($dept['in'] ?? [] as $d) $out .= '<input type="hidden" name="dept[]" value="' . e($d) . '">';
+    if (!empty($dept['not'])) $out .= '<input type="hidden" name="dept_not" value="1">';
+    return $out;
 }

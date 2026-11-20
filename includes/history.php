@@ -226,7 +226,11 @@ function quota_history_by_step(array $batches): array {
  *
  * @return array department => step label => rows
  */
-function fee_history(PDO $pdo, string $q = '', int $proj = 0, bool $slotsOnly = false): array {
+/**
+ * $proj is one project id (0 = all), or a filter_get() result: several shows,
+ * or every show EXCEPT those (David, 2026-11-20, pick-several filters).
+ */
+function fee_history(PDO $pdo, string $q = '', $proj = 0, bool $slotsOnly = false): array {
     if (!can_see_money()) return [];
 
     $sql = 'SELECT cl.project_id, cl.step_id, cl.crew_id, cl.lane_no,
@@ -241,9 +245,16 @@ function fee_history(PDO $pdo, string $q = '', int $proj = 0, bool $slotsOnly = 
               JOIN projects p        ON p.id  = cl.project_id
              WHERE 1=1';
     $args = [];
-    if ($proj > 0)  {
+    if (is_array($proj)) {
+        $ids = array_values(array_filter(array_map('intval', $proj['in'] ?? []), fn($i) => $i > 0));
+        if ($ids) {
+            $sql .= ' AND cl.project_id ' . (!empty($proj['not']) ? 'NOT ' : '') . 'IN ('
+                  . implode(',', array_fill(0, count($ids), '?')) . ')';
+            array_push($args, ...$ids);
+        }
+    } elseif ((int)$proj > 0) {
         $sql .= ' AND cl.project_id = ?';
-        $args[] = $proj;
+        $args[] = (int)$proj;
     }
     if ($slotsOnly) {
         $sql .= ' AND c.is_placeholder = 1';

@@ -207,15 +207,17 @@ require __DIR__ . '/includes/header.php';
   </h2>
   <div class="board-tools">
     <label class="inline muted small">Show
-      <select id="filterType">
-        <option value="all">Everything</option>
+      <?php // Pick-several, with Include / Exclude (David, 2026-11-20): see
+            // assets/multi-filter.js. The empty option is "nothing picked". ?>
+      <select id="filterType" data-multi data-multi-label="">
+        <option value="">Everything</option>
         <option value="task">Tasks only</option>
         <option value="ticket">Tickets only</option>
       </select>
     </label>
     <label class="inline muted small">Owner
-      <select id="filterAssignee">
-        <option value="all">Anyone</option>
+      <select id="filterAssignee" data-multi data-multi-label="">
+        <option value="">Anyone</option>
         <option value="none">Nobody</option>
         <?php foreach ($assignees as $c): ?>
           <option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option>
@@ -223,8 +225,8 @@ require __DIR__ . '/includes/header.php';
       </select>
     </label>
     <label class="inline muted small">Due
-      <select id="filterDue">
-        <option value="all">Any date</option>
+      <select id="filterDue" data-multi data-multi-label="">
+        <option value="">Any date</option>
         <option value="overdue">Overdue</option>
         <option value="today">Today</option>
         <option value="week">Next 7 days</option>
