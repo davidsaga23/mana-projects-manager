@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — Reviews: departments in pipeline order *(no migration)*
+
+On the **Approved** tab of Reviews, the department chips now run in the show's pipeline order
+(Concept → … → Comp) instead of A → Z, and the **Department** sort follows the same order. A
+department two shows share takes the earliest place either show gives it.
+
 ## 2026-11-20 — Assign and change status on many tasks at once *(no migration)*
 
 - **Spell's selection bar has Assign… and Change status…** for Production: tick tasks (or a shot,

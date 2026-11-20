@@ -105,11 +105,19 @@ $sorts = [
     'show'  => 'Show',
 ];
 if ($onApproved) {
+    // IN PIPELINE ORDER, NOT A → Z (David, 2026-11-20: "let's put these in the
+    // pipeline/workflow order instead of alphabetically"). Each show sets its own
+    // order (pipeline_steps.step_order), so a name shared by two shows takes the
+    // earliest place either gives it; a tie falls back to the name.
+    $deptPlace = [];   // name => its place in the pipeline
     foreach ($shown as $t) {
         $n = (string)$t['step_name'];
         $depts[$n] = ($depts[$n] ?? 0) + 1;
+        $o = (int)($t['step_order'] ?? 0);
+        $deptPlace[$n] = isset($deptPlace[$n]) ? min($deptPlace[$n], $o) : $o;
     }
-    uksort($depts, 'strnatcasecmp');
+    $byPlace = fn(string $a, string $b): int => ($deptPlace[$a] <=> $deptPlace[$b]) ?: strnatcasecmp($a, $b);
+    uksort($depts, $byPlace);
     $pickedDepts = array_values(array_filter(array_map('strval', (array)($_GET['dept'] ?? [])),
         fn($d) => isset($depts[$d])));
     if ($pickedDepts) {
@@ -122,7 +130,7 @@ if ($onApproved) {
         'old'  => fn($a, $b) => strcmp($when($a), $when($b)),
         'az'   => fn($a, $b) => $byName($a, $b) ?: strnatcasecmp((string)$a['step_name'], (string)$b['step_name']),
         'za'   => fn($a, $b) => $byName($b, $a) ?: strnatcasecmp((string)$a['step_name'], (string)$b['step_name']),
-        'dept' => fn($a, $b) => strnatcasecmp((string)$a['step_name'], (string)$b['step_name']) ?: $byName($a, $b),
+        'dept' => fn($a, $b) => $byPlace((string)$a['step_name'], (string)$b['step_name']) ?: $byName($a, $b),
         'show' => fn($a, $b) => strnatcasecmp((string)$a['project_code'], (string)$b['project_code']) ?: $byName($a, $b),
         default => fn($a, $b) => strcmp($when($b), $when($a)),
     });
