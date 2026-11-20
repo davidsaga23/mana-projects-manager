@@ -26,6 +26,7 @@ require_once __DIR__ . '/includes/calendar.php';
 require_once __DIR__ . '/includes/activity.php';
 require_once __DIR__ . '/includes/notify.php';   // the bell beside your name (migration 060)
 require_once __DIR__ . '/includes/task_events.php';   // the task's Timeline (migration 066)
+require_once __DIR__ . '/includes/task_follow.php';   // subscribing to tasks (migration 108)
 require_login_json();
 
 header('Content-Type: application/json');
@@ -69,6 +70,49 @@ try {
         $pdo->prepare("UPDATE {$table} SET notes = ? WHERE id = ? AND project_id = ?")
             ->execute([$value === '' ? null : $value, $itemId, $projectId]);
         echo json_encode(['ok' => true, 'value' => $value, 'message' => 'Saved.']);
+        exit;
+    }
+
+    // ---- subscribing to tasks, one or many ---------------------------------
+    //
+    // David, 2026-11-20: "a way to select all or by and the tasks and add a
+    // subscription button ... whoever is subscribed to a task, will get
+    // notifications on all the tasks they're subscribed to". The ticked rows on
+    // Spell, or the bell in a task's panel, arrive here as one request.
+    //
+    // ⚠ ALWAYS THE ASKER, NEVER AN ID FROM THE FORM. The person subscribed is
+    // effective_crew_id(), so nobody can sign somebody else up, and so an artist
+    // may post this (artist_may_post() lists it). The second lock is the show:
+    // it must be one board_projects() gives THIS account, the same door Spell,
+    // the task panel and comments use. task_follow_set() then checks every task
+    // is that show's own Department on that show's own shot or asset.
+    if (isset($_POST['follow_tasks'])) {
+        // board_projects() lives with the rest of Spell; loaded here only, so a
+        // status change does not pay for parsing it.
+        require_once __DIR__ . '/includes/board.php';
+        $allowed = false;
+        foreach (board_projects($pdo) as $p) if ((int)$p['id'] === $projectId) $allowed = true;
+        if (!$allowed) throw new RuntimeException('That show is not one you can see.');
+
+        $raw = json_decode((string)($_POST['tasks'] ?? '[]'), true);
+        if (!is_array($raw) || !$raw) throw new RuntimeException('No tasks were selected.');
+        // A show the size of MSD is ~1,500 tasks; this is a ceiling on a bad
+        // request, not on anything a person would select.
+        if (count($raw) > 5000) throw new RuntimeException('That is more tasks than one request can take.');
+        $tasks = [];
+        foreach ($raw as $k) {
+            $parts = explode(':', (string)$k, 2);
+            if (count($parts) === 2) $tasks[] = [(int)$parts[0], trim($parts[1])];
+        }
+
+        $on = (string)($_POST['on'] ?? '1') === '1';
+        $res = task_follow_set($pdo, (int)(effective_crew_id($pdo) ?? 0), $projectId, $tasks, $on);
+        $n = $res['changed'];
+        $msg = $on
+            ? ('Subscribed to ' . $n . ' task' . ($n === 1 ? '' : 's') . '. You will hear about every change.')
+            : ('Unsubscribed from ' . $n . ' task' . ($n === 1 ? '' : 's') . '.');
+        if ($res['skipped']) $msg .= ' ' . $res['skipped'] . ' could not be found on this show and were left alone.';
+        echo json_encode(['ok' => true, 'on' => $on, 'changed' => $n, 'skipped' => $res['skipped'], 'message' => $msg]);
         exit;
     }
 
@@ -285,6 +329,12 @@ try {
             ], (int)(effective_crew_id($pdo) ?? 0));
         }
 
+        // And whoever subscribed to it on Spell (migration 108), minus the new
+        // owner, who has just had their own "assigned you" above.
+        task_follow_ring($pdo, $projectId, $stepId, $itemKey, $progressIdNow(), $taskName(),
+            $crewId !== null ? ('given to ' . $name) : 'nobody on it now',
+            $crewId !== null ? [$crewId] : []);
+
         echo json_encode([
             'ok'      => true,
             'crew_id' => $crewId,
@@ -315,6 +365,9 @@ try {
         // did, so the change has something to hang on.
         if ($cell === null) $upsert(['notes' => null]);
         task_event_log($pdo, $progressIdNow(), 'due', $row['end_date'] ?? null, $due !== '' ? $due : null);
+        // Whoever subscribed to it on Spell (migration 108).
+        task_follow_ring($pdo, $projectId, $stepId, $itemKey, $progressIdNow(), $taskName(),
+            $due !== '' ? ('due ' . date('j M', strtotime($due))) : 'due date cleared');
 
         if ($due === '') {
             // Clearing a date removes the hand-planned row rather than storing

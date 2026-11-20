@@ -576,6 +576,8 @@
       countEl.textContent = on ? (shown + ' of ' + all + ' tasks match') : '';
       countEl.classList.toggle('is-empty', on && shown === 0);
     }
+    // The selection drops what the filters just hid (subscribing, below).
+    document.dispatchEvent(new CustomEvent('board:filtered'));
   }
 
   var filterEls = [fStatus, fCrew, fStep, fReady, fAssetType, fDue, fDueOnDate, fDueFrom, fDueTo];
@@ -1495,5 +1497,195 @@
     paneReady: paneReady,
     timelineRefresh: timelineRefresh
   };
+
+  // --- subscribing to tasks (David, 2026-11-20, migration 108) ---------------
+  //
+  // "a way to select all or by and the tasks and add a subscription button,
+  // that will basically means that whoever is subscribed to a task, will get
+  // notifications on all the tasks they're subscribed to".
+  //
+  // A box on every task row (.board-pick), one on each shot or asset that ticks
+  // all of its tasks (.board-pick-item), and one in the heading (#boardPickAll).
+  // Shift-click ticks the run between the last box and this one. While anything
+  // is ticked the bar at the bottom says how many and offers Subscribe,
+  // Unsubscribe and Clear; each is ONE post to board_api.php for the lot.
+  //
+  // ⚠ "ALL" IS WHAT THE FILTERS SHOW. A row the filters hid (hidden on the row,
+  // its shot or its group) is never ticked by "all", a shot's box or a shift
+  // run, and is unticked the moment a filter hides it, so the number on the bar
+  // is always the tasks you can see. A row inside a SHUT shot still counts:
+  // shutting a shot is tidying, not filtering, and the shot's box says so.
+  //
+  // The panel's bell (.board-follow-btn) is the same post for one task.
+
+  function followPost(projectId, keys, on) {
+    var body = new URLSearchParams();
+    body.set('follow_tasks', '1');
+    body.set('project_id', projectId);
+    body.set('on', on ? '1' : '0');
+    body.set('tasks', JSON.stringify(keys));
+    return fetch('board_api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      credentials: 'same-origin'
+    }).then(function (r) {
+      return r.json().catch(function () {
+        throw new Error('The server did not answer in a way this page understands. '
+                      + 'Your session may have expired — reload the page.');
+      });
+    }).then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'That did not save.');
+      return data;
+    });
+  }
+
+  function pickKey(cb) {
+    var item = cb.closest('.board-item');
+    return cb.getAttribute('data-step') + ':' + (item ? item.getAttribute('data-item') : '');
+  }
+
+  // The little bell on the row of each task just (un)subscribed.
+  function markFollowing(keys, on) {
+    keys.forEach(function (k) {
+      var at = k.indexOf(':');
+      var step = k.slice(0, at), itemKey = k.slice(at + 1);
+      var btn = document.querySelector('.board-row-task .board-open-task[data-step="' + step + '"][data-item="'
+                                        + (window.CSS && CSS.escape ? CSS.escape(itemKey) : itemKey) + '"]');
+      var bell = btn ? btn.parentNode.querySelector('.board-following') : null;
+      if (bell) bell.hidden = !on;
+    });
+  }
+
+  // The panel's own button: one task.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.board-follow-btn');
+    if (!btn || btn.disabled) return;
+    var on = btn.getAttribute('aria-pressed') !== 'true';
+    var key = btn.getAttribute('data-step') + ':' + btn.getAttribute('data-item');
+    btn.disabled = true;
+    followPost(btn.getAttribute('data-project'), [key], on).then(function (data) {
+      btn.disabled = false;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.classList.toggle('is-on', on);
+      var label = btn.querySelector('span');
+      if (label) label.textContent = on ? 'Subscribed' : 'Subscribe';
+      btn.title = on ? 'You subscribed to this task. Press to stop hearing about it.'
+                     : 'Hear about every change to this task in your bell and your email summary.';
+      markFollowing([key], on);
+      say(on ? 'Subscribed. You will hear about every change to this task.' : 'Unsubscribed from this task.', false);
+    }).catch(function (err) {
+      btn.disabled = false;
+      say(err.message, true);
+    });
+  });
+
+  var pickBar = document.getElementById('boardPickBar');
+  if (pickBar) {
+    var pickAll = document.getElementById('boardPickAll');
+    var pickCount = document.getElementById('boardPickCount');
+    var pickOn = document.getElementById('boardPickOn');
+    var pickOff = document.getElementById('boardPickOff');
+    var pickClear = document.getElementById('boardPickClear');
+    var lastPick = null;
+
+    function allPicks() { return Array.prototype.slice.call(document.querySelectorAll('.board-pick')); }
+
+    // Shown by the filters: not hidden on its row, its shot or its group.
+    function shown(el) {
+      var row = el.closest('.board-row');
+      var item = el.closest('.board-item');
+      var group = el.closest('.board-group');
+      return !(row && row.hidden) && !(item && item.hidden) && !(group && group.hidden);
+    }
+
+    function syncPicks() {
+      var picks = allPicks();
+      var vis = picks.filter(shown);
+      var ticked = picks.filter(function (c) { return c.checked; });
+
+      // Each shot's box: ticked when all its shown tasks are, half when some.
+      Array.prototype.forEach.call(document.querySelectorAll('.board-pick-item'), function (box) {
+        var mine = Array.prototype.filter.call(box.closest('.board-item').querySelectorAll('.board-pick'), shown);
+        var on = mine.filter(function (c) { return c.checked; }).length;
+        box.checked = mine.length > 0 && on === mine.length;
+        box.indeterminate = on > 0 && on < mine.length;
+      });
+      if (pickAll) {
+        var onAll = vis.filter(function (c) { return c.checked; }).length;
+        pickAll.checked = vis.length > 0 && onAll === vis.length;
+        pickAll.indeterminate = onAll > 0 && onAll < vis.length;
+      }
+
+      pickBar.hidden = ticked.length === 0;
+      document.body.classList.toggle('has-pickbar', ticked.length > 0);
+      if (pickCount) pickCount.textContent = ticked.length + (ticked.length === 1 ? ' task' : ' tasks') + ' selected';
+      Array.prototype.forEach.call(document.querySelectorAll('.board-row'), function (row) {
+        var c = row.querySelector('.board-pick');
+        row.classList.toggle('is-picked', !!(c && c.checked));
+      });
+    }
+
+    function setPicks(list, on) { list.forEach(function (c) { c.checked = on; }); }
+
+    // A task's box. `click` rather than `change`, because only the click knows
+    // whether Shift was held.
+    document.addEventListener('click', function (e) {
+      var cb = e.target.closest('.board-pick');
+      if (!cb) return;
+      if (e.shiftKey && lastPick && lastPick !== cb && document.contains(lastPick)) {
+        var vis = allPicks().filter(shown);
+        var a = vis.indexOf(lastPick), b = vis.indexOf(cb);
+        if (a !== -1 && b !== -1) setPicks(vis.slice(Math.min(a, b), Math.max(a, b) + 1), cb.checked);
+      }
+      lastPick = cb;
+      syncPicks();
+    });
+
+    // A shot's or asset's box: all of its tasks the filters show.
+    document.addEventListener('change', function (e) {
+      var box = e.target.closest('.board-pick-item');
+      if (!box) return;
+      setPicks(Array.prototype.filter.call(box.closest('.board-item').querySelectorAll('.board-pick'), shown), box.checked);
+      syncPicks();
+    });
+
+    if (pickAll) pickAll.addEventListener('change', function () {
+      if (pickAll.checked) setPicks(allPicks().filter(shown), true);
+      else setPicks(allPicks(), false);
+      syncPicks();
+    });
+
+    // A filter that hides a ticked task unticks it.
+    document.addEventListener('board:filtered', function () {
+      allPicks().forEach(function (c) { if (c.checked && !shown(c)) c.checked = false; });
+      syncPicks();
+    });
+
+    function clearPicks() { setPicks(allPicks(), false); lastPick = null; syncPicks(); }
+    if (pickClear) pickClear.addEventListener('click', clearPicks);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !pickBar.hidden && (!panel || panel.hidden)) clearPicks();
+    });
+
+    function sendPicks(on) {
+      var keys = allPicks().filter(function (c) { return c.checked; }).map(pickKey);
+      if (!keys.length) return;
+      pickOn.disabled = pickOff.disabled = true;
+      followPost(pickBar.getAttribute('data-project'), keys, on).then(function (data) {
+        pickOn.disabled = pickOff.disabled = false;
+        markFollowing(keys, on);
+        clearPicks();
+        say(data.message || 'Saved.', false);
+      }).catch(function (err) {
+        pickOn.disabled = pickOff.disabled = false;
+        say(err.message, true);
+      });
+    }
+    if (pickOn) pickOn.addEventListener('click', function () { sendPicks(true); });
+    if (pickOff) pickOff.addEventListener('click', function () { sendPicks(false); });
+
+    syncPicks();
+  }
 
 }());

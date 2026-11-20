@@ -502,7 +502,11 @@ function artist_may_post(): bool {
         // not named on, and the two-status limit is a third in
         // status_self_serve(). Nothing else on that screen is in this list, so
         // an artist cannot assign work, move a date or type a link.
-        'board_api.php' => ['set_status'],
+        // follow_tasks (2026-11-20, migration 108): subscribing YOURSELF to tasks
+        // on Spell, one or many. ⚠ NO ID TO FORGE: board_api.php subscribes
+        // effective_crew_id() and nobody else, and refuses a show board_projects()
+        // does not give this account, so it reaches only what they already see.
+        'board_api.php' => ['set_status', 'follow_tasks'],
         // add_comment: saying something about a task on the Board (2026-10-22).
         // ⚠ WIDER THAN THE REST OF THIS LIST ON PURPOSE, and the only entry
         // here that is not about the asker's OWN row. An artist may comment on
