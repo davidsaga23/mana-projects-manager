@@ -6601,6 +6601,21 @@ notifications on all the tasks they're subscribed to".
   tidying, not filtering); a task the filters hid never does, and a filter that hides a ticked task
   unticks it, so the count on the bar always matches the filters.
 
+## 2026-11-20 — Bulk Assign and Change status on Spell are Production's, saved task by task
+
+David: "let's also add 'Assign' and 'Change status' so we can do bulk actions with those tasks".
+
+- **Production only.** `bulk_status` and `bulk_crew` are not on the artist allow-list, and
+  `board_api.php` checks `can_edit()` again. Artists may already set two statuses on their own tasks
+  one row at a time; a bulk version would need that same per-task ownership and two-status check
+  on every row, and nobody asked for it.
+- **One request, but every task saved as a single change would be** (`includes/board_bulk.php`):
+  progress flags, `progress_log`, the Timeline, the "assigned you" bell, and the followers' and
+  subscribers' bells, one per task, so the bell and the email summary read the same as if each
+  change had been made by hand. A task already holding the value is skipped and rings nobody.
+- **The selection stays ticked after a bulk change**, so a status and an assignee can be given to
+  the same tasks one after the other. Subscribe and Unsubscribe still clear it.
+
 ## 2026-11-20 — Fewer requests before a bigger server
 
 **Why:** after the move to KnownHost (shared cPanel, LiteSpeed), Anima spun and timed out. Support

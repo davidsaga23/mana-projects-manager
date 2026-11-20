@@ -119,6 +119,46 @@ try {
         exit;
     }
 
+    // ---- Assign / Change status on many tasks at once -----------------------
+    //
+    // David, 2026-11-20: "let's also add 'Assign' and 'Change status' so we can
+    // do bulk actions with those tasks". The ticked rows on Spell, one request.
+    // ⚠ PRODUCTION ONLY: neither field is on artist_may_post()'s list, and this
+    // is the second lock. includes/board_bulk.php saves each task exactly as
+    // set_status / set_crew below would.
+    if (isset($_POST['bulk_status']) || isset($_POST['bulk_crew'])) {
+        if (!can_edit()) throw new RuntimeException('Your account cannot change this.');
+        require_once __DIR__ . '/includes/board.php';
+        require_once __DIR__ . '/includes/board_bulk.php';
+        $allowed = false;
+        foreach (board_projects($pdo) as $p) if ((int)$p['id'] === $projectId) $allowed = true;
+        if (!$allowed) throw new RuntimeException('That show is not one you can see.');
+
+        $raw = json_decode((string)($_POST['tasks'] ?? '[]'), true);
+        if (!is_array($raw) || !$raw) throw new RuntimeException('No tasks were selected.');
+        if (count($raw) > 5000) throw new RuntimeException('That is more tasks than one request can take.');
+        $tasks = [];
+        foreach ($raw as $k) {
+            $parts = explode(':', (string)$k, 2);
+            if (count($parts) === 2) $tasks[] = [(int)$parts[0], trim($parts[1])];
+        }
+
+        $v = trim((string)($_POST['value'] ?? ''));
+        $value = $v === '' ? null : (int)$v;
+        $plural = fn(int $n) => $n . ' task' . ($n === 1 ? '' : 's');
+        if (isset($_POST['bulk_status'])) {
+            $res = board_bulk_status($pdo, $projectId, $tasks, $value);
+            $msg = $plural($res['changed']) . ' set to ' . ($res['name'] ?? 'no status') . '.';
+        } else {
+            $res = board_bulk_crew($pdo, $projectId, $tasks, $value);
+            $msg = $plural($res['changed']) . ($res['person'] !== null ? ' given to ' . $res['person'] . '.' : ' now with nobody on them.');
+        }
+        if ($res['same'])    $msg .= ' ' . $plural($res['same']) . ' already had it.';
+        if ($res['skipped']) $msg .= ' ' . $plural($res['skipped']) . ' could not be found on this show and were left alone.';
+        echo json_encode($res + ['ok' => true, 'message' => $msg]);
+        exit;
+    }
+
     if (!$projectId || !$stepId || $itemKey === '') {
         throw new RuntimeException('A project, a department and an item are all required.');
     }
