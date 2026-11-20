@@ -1456,3 +1456,14 @@ CSV import and export, behind the "Commercial" switch (admins only). Decisions i
 - PDF export of a quote.
 - Reminders for overdue follow-ups (the bell is the obvious place).
 
+## Pick-several filters — BUILT 2026-11-20 (no migration)
+
+Every filter dropdown picks several and can exclude (DECISIONS.md, 2026-11-20). Left for later:
+
+- **The CRM's Status** could pick several too, once the funnel's click and "Open deals only" are
+  reworked to sit beside a list of statuses.
+- **Days off's "who"** (everybody on a show / one show / everybody in Anima) could become a
+  pick-several list of shows.
+- The old `.rq-filter-toggle` / `.review-shows` phone rules in `assets/style.css` are no longer
+  drawn by Reviews and can be removed in a quiet moment.
+
