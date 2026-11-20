@@ -183,7 +183,9 @@
       if (!countCell) return;
       // Set on the CELL, not the row: `position: sticky` applies to the <td>
       // under border-collapse, and a `top` on the <tr> is simply ignored.
-      countCell.style.top = headRow.getBoundingClientRect().height + 'px';
+      // Plus --th-top: on a table that scrolls with the page the headings sit
+      // under the pinned top bar (assets/pin-top.js), so this row does too.
+      countCell.style.top = 'calc(var(--th-top, 0px) + ' + headRow.getBoundingClientRect().height + 'px)';
     }
     window.addEventListener('resize', placeCountRow);
     if (window.ResizeObserver) new ResizeObserver(placeCountRow).observe(headRow);
