@@ -160,7 +160,7 @@ function board_item_status(array $tasks): array {
     $started = array_filter($live, fn($t) => $t['begun']);
     if ($started) return ['name' => 'In progress', 'color' => 'var(--warn)'];
 
-    return ['name' => 'Not started', 'color' => 'var(--violet)'];
+    return ['name' => 'Waiting to start', 'color' => 'var(--violet)'];
 }
 
 /**
@@ -185,14 +185,19 @@ function board_item_bar(array $tasks, array $statusMap): array {
     $total = count($live);
     if ($total === 0) return ['segments' => [], 'done' => 0, 'total' => 0];
 
-    // Gather by status, keeping "nothing recorded" as its own bucket.
+    // Gather by status. Nothing recorded counts as the show's Waiting to start
+    // (David, 2026-11-20), as Spell's dropdown now shows it; a show without one
+    // keeps it as its own bucket.
+    $waitRow = status_waiting($statusMap);
+    $waitId = $waitRow ? (int)$waitRow['id'] : null;
     $buckets = [];
     foreach ($live as $t) {
-        $key = $t['status_id'] === null ? 'none' : (string)$t['status_id'];
+        $sid = $t['status_id'] ?? $waitId;
+        $key = $sid === null ? 'none' : (string)$sid;
         if (!isset($buckets[$key])) {
-            $s = $t['status_id'] !== null ? ($statusMap[$t['status_id']] ?? null) : null;
+            $s = $sid !== null ? ($statusMap[$sid] ?? null) : null;
             $buckets[$key] = [
-                'name'  => $s['name'] ?? 'Not started',
+                'name'  => $s['name'] ?? 'Waiting to start',
                 'color' => $s ? ($s['color'] ?: 'var(--border-strong)') : 'var(--border-strong)',
                 'n'     => 0,
                 'rank'  => board_status_rank($s),
@@ -487,7 +492,7 @@ function board_data(PDO $pdo, int $projectId): array {
             'tasks'     => [],
             'self'      => $row,            // this row IS the work
             'status'    => [
-                'name'  => $row['status_name'] ?: 'Not started',
+                'name'  => $row['status_name'] ?: 'Waiting to start',
                 'color' => $row['status_color'] ?: 'var(--violet)',
             ],
         ]);
@@ -611,6 +616,14 @@ function board_cell_attrs(array $t, int $projectId): string {
  */
 function board_status_cell(array $t, array $statuses, int $projectId,
                            bool $mayChange, int $myCrewId, bool $mayEdit): string {
+    // NO STATUS READS AS WAITING TO START (David, 2026-11-20: "let's also delete
+    // the not started and make Waiting to Start the default status"). Drawn as
+    // that status, selected, so the dropdown has no blank "Not started" any more.
+    if ($t['status_id'] === null && ($wait = status_waiting($statuses))) {
+        $t['status_id']    = (int)$wait['id'];
+        $t['status_name']  = (string)$wait['name'];
+        $t['status_color'] = (string)($wait['color'] ?? '');
+    }
     $color = $t['status_color'] ?: '';
     $style = $color !== ''
         ? 'background:' . board_tint($color) . ';color:' . e($color) . ';'
@@ -618,16 +631,16 @@ function board_status_cell(array $t, array $statuses, int $projectId,
 
     if (!$mayChange) {
         return '<div class="board-cell"><span class="board-pill" style="' . $style . '">'
-             . e($t['status_name'] ?: 'Not started') . '</span></div>';
+             . e($t['status_name'] ?: 'Waiting to start') . '</span></div>';
     }
 
     $out = '<div class="board-cell"><select class="board-status"' . board_cell_attrs($t, $projectId)
          . ' style="' . $style . '" aria-label="Status of ' . e($t['step']) . '">';
-    // "Not started" is only offered to Production: an artist clearing a status
-    // is not a thing anybody asked for, and it reads as undoing somebody's work.
-    if ($mayEdit || $t['status_id'] === null) {
-        $out .= '<option value=""' . ($t['status_id'] === null ? ' selected' : '')
-              . ($mayEdit ? '' : ' disabled') . '>Not started</option>';
+    // The blank choice is gone (David, 2026-11-20). It is only drawn for a show
+    // with no "Waiting to start" status, where a task with none must still show
+    // something rather than silently picking the first status in the list.
+    if ($t['status_id'] === null) {
+        $out .= '<option value="" selected' . ($mayEdit ? '' : ' disabled') . '>Waiting to start</option>';
     }
     foreach ($statuses as $s) {
         $id = (int)$s['id'];

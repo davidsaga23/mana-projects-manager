@@ -34,6 +34,13 @@ children process limit: 10"); past it, pages spin, logins look stuck and pop-ups
   Claude reads a transcript or writes call notes, while statements and invoices are worked out,
   while an email is sent, and on every Board save.
 
+## 2026-11-20 — Statuses: Ready for approval, Approved, Waiting to start by default *(migration 107)*
+
+- **Ready for review** is now **Ready for approval**, and **Completed** is now **Approved**. Reviews treats the old and
+  new names as the same status, so nothing breaks before or after migration 107 renames them.
+- The blank **Not started** choice is gone from Spell's and My tasks' status dropdowns. A task with no status
+  reads as its show's **Waiting to start**, and migration 107 writes that status into those tasks.
+
 ## 2026-11-19 — Realm: every call written down, notes in the room's chat *(migration 106)*
 
 - **Calls are transcribed.** In any Realm room, each person's browser writes down their own voice
