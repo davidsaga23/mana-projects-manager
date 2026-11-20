@@ -14,6 +14,18 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — Assign and change status on many tasks at once *(no migration)*
+
+- **Spell's selection bar has Assign… and Change status…** for Production: tick tasks (or a shot,
+  or "select all"), pick a person or a status, and every ticked task changes in one go. The rows,
+  the shot's bar and its status update in place; the tasks stay ticked for the next change.
+- Each task is saved exactly as changing it on its own row would be: the dashboards' flags, the
+  status log, the task's Timeline, an "assigned you" bell for the new owner, and a bell for anybody
+  following or subscribed. A task that already had that person or status is left alone and tells
+  nobody.
+- Artists and supervisors still change their own tasks one at a time; the bar offers them Subscribe
+  only. A Production login with no person linked now gets the tick boxes too (without Subscribe).
+
 ## 2026-11-20 — Subscribe to tasks on Spell *(migration 108)*
 
 - **Tick boxes on Spell:** one on every task, one on each shot or asset for all of its tasks, and
