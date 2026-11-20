@@ -46,10 +46,16 @@
 
 /** David, 2026-11-12: "3-5 people talking informally". */
 const REALM_VOICE_CAP = 5;
-/** A voice row not touched for this many seconds means that page is closed. */
-const REALM_VOICE_SECONDS = 15;
-/** A signal older than this is ignored: the connection it was for has moved on. */
-const REALM_SIGNAL_SECONDS = 30;
+/**
+ * A voice row not touched for this many seconds means that page is closed.
+ * 15 until 2026-11-20, when a call that is up stopped asking every second and
+ * asks every 10 instead (KnownHost's limit of ten PHP requests at once; see
+ * "fewer requests" in assets/realm.js): 35 leaves room for a late answer or
+ * two. A page that closes normally says goodbye at once (sendBeacon).
+ */
+const REALM_VOICE_SECONDS = 35;
+/** A signal older than this is ignored: the connection it was for has moved on. 30 until 2026-11-20. */
+const REALM_SIGNAL_SECONDS = 60;
 /**
  * The longest signal taken, in characters. An audio-only offer is a few
  * thousand; the offer for a shared screen lists every picture format the browser

@@ -71,7 +71,31 @@ foreach ($recent as $n) {
         'opened'  => notify_is_opened($n),
     ];
 }
-echo json_encode(['ok' => true, 'unseen' => notify_unseen($pdo, $crewId), 'items' => $items]);
+$answer = ['ok' => true, 'unseen' => notify_unseen($pdo, $crewId), 'items' => $items];
+
+// THE REALM BUTTON'S NUMBER RIDES HERE TOO (KnownHost, 2026-11-19: "Reached max
+// children process limit: 10"). Every Anima page used to make two polls: this
+// one, and assets/realm-nudge.js asking realm_api.php?unread=1 every 20 seconds
+// (which also worked out voice, positions and offers the button never shows).
+// Now assets/bell.js asks with realm=1 and hands the answer on, so a page makes
+// one request every 30 seconds instead of five a minute. Only what the button
+// shows: the unread count, and who is knocking at my door. Never breaks the bell.
+if (isset($_GET['realm']) && !in_preview()
+    && (!function_exists('feature_on') || feature_on('realm'))) {
+    try {
+        require_once __DIR__ . '/includes/studio.php';
+        require_once __DIR__ . '/includes/realm.php';
+        require_once __DIR__ . '/includes/realm_chat.php';
+        if (realm_available($pdo)) {
+            $ruid = realm_user_id();
+            $unread = realm_chat_available($pdo) ? realm_unread($pdo, $ruid, can_edit()) : [];
+            $answer['realm'] = ['ok' => true, 'unread' => $unread, 'knocks' => realm_knock_news($pdo, $ruid)];
+        }
+    } catch (Throwable $e) {
+        error_log('[Anima bell] realm count: ' . $e->getMessage());
+    }
+}
+echo json_encode($answer);
 
 // THE EMAIL SUMMARIES' FALLBACK (David, 2026-11-17: two email summaries a day,
 // 9 am and 5 pm Pacific; includes/digest.php). The summaries are meant to be

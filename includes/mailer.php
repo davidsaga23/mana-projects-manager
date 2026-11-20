@@ -57,6 +57,21 @@ class SmtpMailer
      * @throws RuntimeException on any transport failure
      */
     public function send(array $to, string $subject, string $htmlBody, string $textBody): void {
+        // Talking to the mail server can take seconds (up to smtp_timeout per
+        // step). The person's session is let go meanwhile, so their other tabs
+        // are not queued behind it (KnownHost, 2026-11-19; includes/auth.php),
+        // and taken back after, with anything written to it in between. Not once
+        // the page has started printing: then it could not be taken back.
+        $released = function_exists('session_release') && session_status() === PHP_SESSION_ACTIVE && !headers_sent();
+        if ($released) session_release();
+        try {
+            $this->deliver($to, $subject, $htmlBody, $textBody);
+        } finally {
+            if ($released) session_resume();
+        }
+    }
+
+    private function deliver(array $to, string $subject, string $htmlBody, string $textBody): void {
         $host = $this->cfg['smtp_host'];
         $port = (int)($this->cfg['smtp_port'] ?? 587);
         $secure = strtolower($this->cfg['smtp_secure'] ?? 'tls');

@@ -163,21 +163,53 @@
   // Desktop notifications (David, 2026-11-16; assets/desk-notify.js) are handed every answer.
   var desk = window.AnimaNotify || null;
 
-  function poll() {
-    if (!window.fetch) return;
+  // ---- one request for the whole top bar (KnownHost, 2026-11-19) ----------------------------
+  // The hosting plan runs at most ten PHP requests at once, and Anima was reaching that limit:
+  // pages spun and logins looked stuck. Every page used to poll twice, this bell and the Realm
+  // button's count (assets/realm-nudge.js, every 20 seconds). Now this poll carries both: with the
+  // Realm button on the page it asks notify_poll.php?realm=1 and hands the Realm part to whoever
+  // registered with AnimaPulse.realm(). One request every 30 seconds, nothing while hidden.
+  //
+  // BACKING OFF. A request that fails (the server busy, a time-out) doubles the wait before the
+  // next one, up to five minutes, and the first success puts it back to 30 seconds: a server that
+  // is struggling is not hammered by every open page at once.
+  var realmLink = document.getElementById('navRealm');
+  var realmTold = [];
+  var lastAsk = 0, fails = 0, quietUntil = 0, asking = false;
+  var EVERY = 30000;
+
+  function poll(force) {
+    if (!window.fetch || asking) return;
     // A page nobody is looking at does not ask; it catches up when it is looked at. EXCEPT, once
     // desktop notifications are on, ONE hidden Anima tab keeps asking (desk.lead() decides which),
     // because a notification is for exactly when nobody is looking at Anima.
     if (document.hidden && !(desk && desk.lead())) return;
-    fetch('notify_poll.php', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-      .then(function (r) { return r.json(); })
-      .then(function (res) { paint(res); if (desk) desk.bell(res); })
+    if (!force && Date.now() < quietUntil) return;
+    asking = true; lastAsk = Date.now();
+    fetch('notify_poll.php' + (realmLink ? '?realm=1' : ''), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (res) {
+        asking = false; fails = 0; quietUntil = 0;
+        paint(res); if (desk) desk.bell(res);
+        if (res && res.realm) realmTold.forEach(function (fn) { try { fn(res.realm); } catch (e) { /* the bell goes on */ } });
+      })
       // Silent, like the clearing above: the bell simply stays as the page drew it.
-      .catch(function () {});
+      .catch(function () {
+        asking = false; fails = Math.min(fails + 1, 4);
+        quietUntil = Date.now() + Math.min(EVERY * Math.pow(2, fails), 300000);
+      });
   }
 
-  setInterval(poll, 30000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  window.AnimaPulse = {
+    // assets/realm-nudge.js: called with {unread, knocks} after every poll that brought them.
+    realm: function (fn) { realmTold.push(fn); },
+    // Ask now, once, unless a poll went out in the last few seconds.
+    now: function () { if (Date.now() - lastAsk > 5000) poll(true); }
+  };
+
+  setInterval(poll, EVERY);
+  // Back in front: one request at once, unless the last one was a moment ago.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - lastAsk > 10000) poll(); });
 
   btn.addEventListener('click', function (e) {
     e.stopPropagation();

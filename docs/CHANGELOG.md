@@ -14,6 +14,26 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — Fewer background requests, so Anima fits the hosting's limit *(no migration)*
+
+KnownHost found Anima hitting the plan's limit of **10 PHP requests at once** ("Reached max
+children process limit: 10"); past it, pages spin, logins look stuck and pop-ups cannot close.
+
+- **One request for the top bar.** Every Anima page polled twice (the bell every 30 seconds, the
+  Realm button's count every 20). The bell's request now brings both: one every 30 seconds.
+- **Nothing is asked from a hidden tab** (except one tab, when desktop notifications are on, and
+  the Realm's heartbeat, slowed to once a minute so you still show as here). Coming back to a tab
+  asks once, at once.
+- **The Realm asks less often:** unread counts every 15 seconds (5 when you share a room with
+  somebody), an open conversation every 5 (was 3), a call's signalling every second only while a
+  line is connecting and every 10 once it is up (was every second throughout), the transcript
+  every 30 seconds (was 8). A call's "still here" window on the server went from 15 to 35 seconds.
+- **Backing off.** A request that fails waits twice as long before trying again, up to five
+  minutes, then returns to normal on the first success.
+- **One slow request no longer blocks your other tabs.** The login session is let go while
+  Claude reads a transcript or writes call notes, while statements and invoices are worked out,
+  while an email is sent, and on every Board save.
+
 ## 2026-11-20 — Reviews: departments in pipeline order *(no migration)*
 
 On the **Approved** tab of Reviews, the department chips now run in the show's pipeline order

@@ -111,7 +111,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['read'])) {
         $text = file_get_contents($_FILES['file']['tmp_name']);
         if ($text === false) throw new RuntimeException('That file could not be read.');
 
+        // The model may take minutes: the session is let go meanwhile, so this
+        // person's other tabs and the bell are not queued behind it (KnownHost,
+        // 2026-11-19; session_release() in includes/auth.php). Taken back below,
+        // before anything is written to it.
+        session_release();
         $res = ai_extract_tasks($text, $assignees, $projects);
+        session_resume();
         if (!$res['ok']) throw new RuntimeException($res['error']);
 
         if (!$res['tasks']) {
@@ -123,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['read'])) {
         $_SESSION['transcript'][$projectId] = ['tasks' => $res['tasks'], 'note' => $res['usage'],
                                               'name' => $_FILES['file']['name'] ?? 'transcript.md'];
     } catch (Throwable $e) {
+        session_resume();   // a no-op unless the model's call threw before taking it back
         flash('err', $e->getMessage());
     }
     header('Location: ' . $selfUrl);
