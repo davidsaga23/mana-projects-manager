@@ -3907,6 +3907,43 @@ button.secondary.danger:hover { background: var(--danger-border); }
 }
 .board-note-bar.is-bad { background: var(--danger-tint-2); border-color: var(--danger-border); }
 
+/* SUBSCRIBING TO TASKS (David, 2026-11-20, migration 108): a tick box on each
+   task, shot and the heading, and the bar that appears while any is ticked.
+   assets/board-screen.js says what "all" means (what the filters show). */
+.board-pick, .board-pick-item, .board-pick-all {
+  width: 16px; height: 16px; min-height: 0; margin: 0; flex: none;
+  accent-color: var(--primary); cursor: pointer;
+}
+.board-pick-blank { width: 16px; flex: none; }
+.board-head-name { display: flex; align-items: flex-end; gap: 9px; }
+.board-row.is-picked { background: var(--primary-tint); }
+.board-following { display: inline-flex; color: var(--primary); flex: none; }
+.board-following[hidden] { display: none; }
+.board-pickbar {
+  /* Bottom centre: the toast and the 🐞 button own the bottom-right corner. */
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60;
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px;
+  background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5); font-size: 13.5px; white-space: nowrap;
+}
+.board-pickbar[hidden] { display: none; }
+.board-pickbar-count { color: var(--text); font-weight: 600; margin-right: 6px; }
+.board-pickbar-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 12px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-size: 13px; cursor: pointer;
+}
+.board-pickbar-btn.is-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
+.board-pickbar-btn.is-quiet { background: transparent; color: var(--text-2); }
+.board-pickbar-btn:disabled { opacity: .55; cursor: progress; }
+body.has-pickbar .board-foot { margin-bottom: 72px; }   /* the last rows clear the bar */
+.board-follow-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; min-height: 32px; padding: 5px 12px;
+  border-radius: 8px; border: 1px solid var(--border); background: transparent;
+  color: var(--text-2); font-size: 13px; cursor: pointer;
+}
+.board-follow-btn.is-on { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+
 @media (max-width: 900px) {
   /* Below this the seven columns stop being a table and become stacked rows,
      each cell labelled by its own aria-label. A board nobody can read on a
@@ -4456,6 +4493,7 @@ a.panel-tab:hover { text-decoration: none; color: var(--text); }
 .bell-mention  { background: var(--primary); }
 .bell-assigned { background: var(--warn); }
 .bell-status   { background: var(--ok); }
+.bell-update   { background: var(--ok); }                 /* a task subscribed to on Spell changed (108) */
 .bell-review   { background: var(--warn, #F5B041); }
 .bell-reminder { background: var(--warn, #F5B041); }   /* log your time (080) */
 .bell-dayoff { background: var(--violet); }             /* days off asked for, and answered (101) */

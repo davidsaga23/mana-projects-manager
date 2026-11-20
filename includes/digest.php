@@ -344,6 +344,9 @@ function digest_groups(): array {
 
 function digest_group_of(string $kind): string {
     if (in_array($kind, ['raven', 'tag'], true)) return 'realm';
+    // A change on a task subscribed to on Spell (migration 108) is an update on a
+    // task you follow, which is exactly what that group already says.
+    if ($kind === 'update') return 'status';
     return isset(digest_groups()[$kind]) ? $kind : 'other';
 }
 
@@ -391,7 +394,9 @@ function digest_items_for(PDO $pdo, int $crewId, ?int $uptoId): array {
     // for this person BECAUSE of that comment, on a task they are on.
     $cids = [];
     foreach ($rows as $r) {
-        if (!empty($r['comment_id']) && in_array($r['kind'], ['mention', 'review'], true)) $cids[] = (int)$r['comment_id'];
+        // 'update' too (108): a new comment on a task the person subscribed to,
+        // on a show they can see, which is why they were rung at all.
+        if (!empty($r['comment_id']) && in_array($r['kind'], ['mention', 'review', 'update'], true)) $cids[] = (int)$r['comment_id'];
     }
     $snips = [];
     if ($cids) {
@@ -403,7 +408,7 @@ function digest_items_for(PDO $pdo, int $crewId, ?int $uptoId): array {
     foreach ($rows as &$r) {
         $p = $projects[(int)($r['project_id'] ?? 0)] ?? null;
         $r['_project'] = $p ? trim(($p['code'] ? $p['code'] . ' · ' : '') . $p['name']) : '';
-        $r['_snippet'] = (!empty($r['comment_id']) && in_array($r['kind'], ['mention', 'review'], true))
+        $r['_snippet'] = (!empty($r['comment_id']) && in_array($r['kind'], ['mention', 'review', 'update'], true))
             ? ($snips[(int)$r['comment_id']] ?? '') : '';
     }
     unset($r);
