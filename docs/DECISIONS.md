@@ -6570,3 +6570,33 @@ inside the review of any version?"*
   checks the note is a review note on that task, and a delete is your own reply or an admin's.
 - **The bell rings for the conversation**: the note's author, earlier repliers and the version's
   uploader, as a `review` bell, minus the writer and anybody @named (who get their mention bell).
+
+
+## 2026-11-20 — Subscribing to tasks on Spell, and what a subscriber hears
+
+David, on Spell's task rows: "we need a way to select all or by and the tasks and add a
+subscription button, that will basically means that whoever is subscribed to a task, will get
+notifications on all the tasks they're subscribed to".
+
+- **There was no subscribers table to reuse.** Migration 060 decided you follow a task by being on
+  it, speaking on it or being named on it, and nothing was stored. That rule stays. Migration 108
+  adds `task_subscriptions` for the two choices it could not express: subscribed by hand
+  (`following = 1`) and unsubscribed (`following = 0`, which mutes even the derived follow).
+  `notify_subscribers()` applies them last, so every place that already rang followers (status
+  changes, a version moving a task to Pending review, review notes) reaches subscribers with no
+  change of its own.
+- **Keyed by the task (step + item), not `progress.id`**, so subscribing to untouched tasks does not
+  create empty progress rows.
+- **The events that rang nobody now ring the hand-subscribed only**, as a new bell kind `update`
+  ("Ana updated Comp on SH020 · due 14 Jan"): plain comments and replies, a new assignee, a moved
+  due date, a version put up while the task was already in review. Not the derived followers: making
+  every plain comment ring everybody on a task would change the bell for all to serve the few who
+  asked. The email summary lists `update` with the other updates on tasks you follow.
+- **Unsubscribing never silences what is addressed to you:** "assigned you" and @mentions still ring.
+- **Always the asker.** `follow_tasks` in `board_api.php` subscribes `effective_crew_id()` and nobody
+  else, on a show `board_projects()` gives that account, so it is on the artist allow-list.
+  Production subscribing other people was left out; it would need a person picker and a rule for
+  whether that person can see the show, and nobody asked for it yet.
+- **"Select all" is what the filters show.** A task inside a shut shot still counts (shutting is
+  tidying, not filtering); a task the filters hid never does, and a filter that hides a ticked task
+  unticks it, so the count on the bar always matches the filters.
