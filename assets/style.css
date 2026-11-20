@@ -3936,6 +3936,14 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-pickbar-btn.is-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff); }
 .board-pickbar-btn.is-quiet { background: transparent; color: var(--text-2); }
 .board-pickbar-btn:disabled { opacity: .55; cursor: progress; }
+/* Assign… and Change status… (2026-11-20): dropdowns that act the moment one is picked. */
+.board-pickbar-select {
+  width: auto; max-width: 190px; min-height: 32px; padding: 4px 8px; border-radius: 8px;
+  background: var(--primary); border-color: var(--primary); color: var(--on-primary, #fff);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.board-pickbar-select option, .board-pickbar-select optgroup { background: var(--surface-2); color: var(--text); font-weight: 400; }
+.board-pickbar-select:disabled { opacity: .55; cursor: progress; }
 body.has-pickbar .board-foot { margin-bottom: 72px; }   /* the last rows clear the bar */
 .board-follow-btn {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; min-height: 32px; padding: 5px 12px;
