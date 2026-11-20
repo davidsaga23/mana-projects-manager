@@ -6,10 +6,13 @@
 // version to bring the conversation to slack". Reached from the Reviews button
 // in the top bar, beside My tasks, which carries the count.
 //
-// Supervisors and Production see Pending review and approve to Ready for
-// review; admins (Jorik, Tim) see both stages (2026-10-29), each card saying
-// which, and approve each to its next status. Anyone may send it to Retake instead. The rules are
-// in includes/review.php.
+// THREE TABS (David, 2026-11-20): Pending approvals (Ready for approval, the last
+// sign-off, for Jorik and Tim), Supervisor approvals (Pending review) and Approved
+// (Approved or Final, with a department filter and a sort). Admins and Production
+// see all three, supervisors the last two; Production only looks at Pending
+// approvals. Who sees which is review_tabs(), who may approve is review_stages(),
+// both in includes/review_badge.php; review_apply() in includes/review.php checks
+// the verdict again. Anyone who may approve may send to Retake instead.
 //
 // A GRID OF CARDS, AND THE PICTURE OPENS SPELL'S VIEWER (David, 2026-10-29: "a
 // grid of cards instead of one item per line/box ... Once a supervisor clicks
@@ -31,11 +34,19 @@ require_once __DIR__ . '/includes/digest.php';    // digest_told_sentence(), for
 require_login();
 
 $stages = review_stages();
-if (!$stages) {
+$tabs = review_tabs();
+if (!$stages || !$tabs) {
     flash('err', 'Reviews are for supervisors, Production and admins.');
     header('Location: index.php');
     exit;
 }
+
+// THE TAB (David, 2026-11-20; who sees which is review_tabs()). The first one
+// opens where this account has work to approve: Pending approvals for an admin,
+// Supervisor approvals for everybody else.
+$tab = (string)($_GET['tab'] ?? $_POST['tab'] ?? '');
+if (!in_array($tab, $tabs, true)) $tab = in_array('final', $stages, true) ? 'final' : 'supervisor';
+$onApproved = $tab === 'approved';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
@@ -46,15 +57,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
-    header('Location: review.php' . (isset($_POST['project']) && $_POST['project'] !== ''
-        ? '?project=' . (int)$_POST['project'] : ''));
+    $back = ['tab' => $tab];
+    if (isset($_POST['project']) && $_POST['project'] !== '') $back['project'] = (int)$_POST['project'];
+    header('Location: review.php?' . http_build_query($back));
     exit;
 }
 
-$queue = review_queue($pdo);
+$queue = review_queue($pdo, review_tab_names($tab));
+// The count on each tab. The open one is the list itself; the others are one COUNT each.
+$tabCount = [];
+foreach ($tabs as $k) $tabCount[$k] = $k === $tab ? count($queue) : review_tab_count($pdo, review_tab_names($k));
 
-// One chip per show that has something waiting, so a long queue can be cut down
-// to the show you are on today. All of them by default.
+// One chip per show that has something on this tab, so a long list can be cut
+// down to the show you are on today. All of them by default.
 $shows = [];
 foreach ($queue as $t) {
     $pid = (int)$t['project_id'];
@@ -65,13 +80,63 @@ $only = (int)($_GET['project'] ?? 0);
 if ($only && !isset($shows[$only])) $only = 0;
 $shown = $only ? array_values(array_filter($queue, fn($t) => (int)$t['project_id'] === $only)) : $queue;
 
+// APPROVED: A DEPARTMENT FILTER AND A SORT (David, 2026-11-20: "We need to have a
+// filter (single or multiple selection) by department and to have a sort button
+// (alphabetical, by date, etc) so they're organized properly"). Departments by
+// NAME, so "CH Layout" on two shows is one chip. Both ride in the address, so a
+// filtered list can be bookmarked or sent.
+$depts = [];       // name => how many, on the show(s) shown
+$pickedDepts = [];
+$sort = 'new';
+$sorts = [
+    'new'   => 'Newest first',
+    'old'   => 'Oldest first',
+    'az'    => 'Shot / asset A → Z',
+    'za'    => 'Shot / asset Z → A',
+    'dept'  => 'Department',
+    'show'  => 'Show',
+];
+if ($onApproved) {
+    foreach ($shown as $t) {
+        $n = (string)$t['step_name'];
+        $depts[$n] = ($depts[$n] ?? 0) + 1;
+    }
+    uksort($depts, 'strnatcasecmp');
+    $pickedDepts = array_values(array_filter(array_map('strval', (array)($_GET['dept'] ?? [])),
+        fn($d) => isset($depts[$d])));
+    if ($pickedDepts) {
+        $shown = array_values(array_filter($shown, fn($t) => in_array((string)$t['step_name'], $pickedDepts, true)));
+    }
+    $sort = isset($sorts[(string)($_GET['sort'] ?? '')]) ? (string)$_GET['sort'] : 'new';
+    $when = fn($t) => (string)($t['version']['created_at'] ?? $t['updated_at']);
+    $byName = fn($a, $b) => strnatcasecmp((string)$a['item_name'], (string)$b['item_name']);
+    usort($shown, match ($sort) {
+        'old'  => fn($a, $b) => strcmp($when($a), $when($b)),
+        'az'   => fn($a, $b) => $byName($a, $b) ?: strnatcasecmp((string)$a['step_name'], (string)$b['step_name']),
+        'za'   => fn($a, $b) => $byName($b, $a) ?: strnatcasecmp((string)$a['step_name'], (string)$b['step_name']),
+        'dept' => fn($a, $b) => strnatcasecmp((string)$a['step_name'], (string)$b['step_name']) ?: $byName($a, $b),
+        'show' => fn($a, $b) => strnatcasecmp((string)$a['project_code'], (string)$b['project_code']) ?: $byName($a, $b),
+        default => fn($a, $b) => strcmp($when($b), $when($a)),
+    });
+}
+
+/** This page's address with some of its settings changed (null drops one). */
+$here = function (array $change = []) use ($tab, $only, $pickedDepts, $sort): string {
+    $q = ['tab' => $tab, 'project' => $only ?: null, 'dept' => $pickedDepts ?: null,
+          'sort' => $sort !== 'new' ? $sort : null];
+    foreach ($change as $k => $v) $q[$k] = $v;
+    return 'review.php?' . http_build_query(array_filter($q, fn($v) => $v !== null && $v !== [] && $v !== ''));
+};
+
 // The two statuses the verdicts move to, per show, worked out once rather than
 // per card. A show missing one gets a warning and that button off, rather than
-// a button that is only refused after the click.
+// a button that is only refused after the click. Only for cards this account
+// can give a verdict on (a 'stage' it reviews).
 // Approve is per stage: keyed [stage][show].
 $noApprove = [];
 $noRetake = [];
 foreach ($queue as $t) {
+    if (!$t['stage']) continue;
     $pid = (int)$t['project_id'];
     $to = REVIEW_STAGES[$t['stage']]['to'];
     if (!isset($noApprove[$t['stage']][$pid]) && !review_status_named($pdo, $pid, $to)) {
@@ -81,16 +146,22 @@ foreach ($queue as $t) {
         $noRetake[$pid] = $shows[$pid]['code'];
     }
 }
-// How the stages read in the sentences below: "Pending review → Ready For Review".
-$stageLine = fn(string $k) => '<strong>' . e(ucwords(REVIEW_STAGES[$k]['from'])) . '</strong> → <strong>'
-                            . e(ucwords(REVIEW_STAGES[$k]['to'])) . '</strong>';
+// The statuses as they read on screen since David's rename (2026-11-20, migration 107).
+$statusWord = ['ready for review' => 'Ready for approval', 'complete' => 'Approved', 'pending review' => 'Pending review'];
 
 $pageTitle = 'Reviews';
 require __DIR__ . '/includes/header.php';
 ?>
 
-<h2 class="wizard-title"><?= count($stages) > 1 ? 'Reviews' : e(REVIEW_STAGES[$stages[0]]['label']) ?>
-  <span class="muted">· <?= count($queue) ?> waiting on you</span></h2>
+<h2 class="wizard-title">Reviews</h2>
+
+<div class="panel-tabs rq-tabs" role="tablist" aria-label="Reviews">
+  <?php foreach ($tabs as $k): ?>
+    <a class="panel-tab<?= $k === $tab ? ' is-on' : '' ?>" role="tab" aria-selected="<?= $k === $tab ? 'true' : 'false' ?>"
+       href="review.php?tab=<?= e($k) ?>"><?= e(REVIEW_TABS[$k]) ?><?php if ($tabCount[$k] > 0): ?> <span
+       class="<?= $k === 'approved' ? 'mytasks-badge' : 'mytasks-badge is-new' ?>"><?= (int)$tabCount[$k] ?></span><?php endif; ?></a>
+  <?php endforeach; ?>
+</div>
 <?php // INSTALL ON A PHONE (David, 2026-11-19: "add a install mobile app in the review
       // screen and it should save the page as if it was an app in both android and iPhone
       // ... ideally only visible if you're opening it in a mobile device"). Drawn hidden;
@@ -239,17 +310,26 @@ require __DIR__ . '/includes/header.php';
 }());
 </script>
 
-<p class="lead">
-  Everything waiting for your review on the shows you can see, newest version first.
-  <strong>Approve</strong> moves it on: <?= implode('; ', array_map($stageLine, $stages)) ?>.
-  <strong>Retake</strong> moves it to <strong>Retake</strong>. Click the picture to open it in the review
-  viewer, the same one as in Spell: step through it, draw on it, write notes and attach images. Approve and
-  Retake are also at the top of the viewer.
+<?php // What each tab is, in a line. ?>
+<p class="lead rq-lead">
+  <?php if ($tab === 'final'): ?>
+    Work the supervisors have approved, now <strong>Ready for approval</strong>: the last sign-off, for
+    Jorik and Tim. <strong>Approve</strong> moves it to <strong>Approved</strong>, <strong>Retake</strong> to
+    <strong>Retake</strong>.<?php if (!in_array('final', $stages, true)): ?> You can open and comment on
+    these; Jorik and Tim approve them.<?php endif; ?>
+  <?php elseif ($tab === 'supervisor'): ?>
+    New versions in <strong>Pending review</strong>, waiting for a supervisor. <strong>Approve</strong> moves it to
+    <strong>Ready for approval</strong>, <strong>Retake</strong> to <strong>Retake</strong>.
+  <?php else: ?>
+    Everything <strong>Approved</strong> or <strong>Final</strong> on the shows you can see. Pick departments and
+    a sort below.
+  <?php endif; ?>
+  Click a picture to open it in the review viewer.
 </p>
 
 <?php
 $warnings = [];
-foreach ($noApprove as $k => $missing) $warnings[] = [$missing, ucwords(REVIEW_STAGES[$k]['to']), 'Approve'];
+foreach ($noApprove as $k => $missing) $warnings[] = [$missing, $statusWord[REVIEW_STAGES[$k]['to']] ?? ucwords(REVIEW_STAGES[$k]['to']), 'Approve'];
 $warnings[] = [$noRetake, 'Retake', 'Retake'];
 foreach ($warnings as [$missing, $named, $button]):
     if (!$missing) continue; ?>
@@ -268,22 +348,59 @@ foreach ($warnings as [$missing, $named, $button]):
     Show: <?= $only ? e($shows[$only]['code']) . ' (' . $shows[$only]['n'] . ')' : 'All shows (' . count($queue) . ')' ?> ▾
   </button>
   <p class="board-projects review-shows" id="rqShows">
-    <a class="board-chip<?= $only ? '' : ' is-on' ?>" href="review.php">All shows (<?= count($queue) ?>)</a>
+    <a class="board-chip<?= $only ? '' : ' is-on' ?>" href="<?= e($here(['project' => null, 'dept' => null])) ?>">All shows (<?= count($queue) ?>)</a>
     <?php foreach ($shows as $pid => $s): ?>
-      <a class="board-chip<?= $only === $pid ? ' is-on' : '' ?>" href="review.php?project=<?= $pid ?>"><?= e($s['code']) ?> (<?= $s['n'] ?>)</a>
+      <a class="board-chip<?= $only === $pid ? ' is-on' : '' ?>" href="<?= e($here(['project' => $pid, 'dept' => null])) ?>"><?= e($s['code']) ?> (<?= $s['n'] ?>)</a>
     <?php endforeach; ?>
   </p>
 <?php endif; ?>
 
+<?php if ($onApproved && $depts): ?>
+  <?php // DEPARTMENTS, any number of them: a chip toggles itself in or out of the
+        // list; "All departments" clears it. Then the sort. Plain links and a plain
+        // form, so it all works before any script and the address keeps the choice. ?>
+  <div class="rq-approved-tools">
+    <p class="board-projects rq-depts" aria-label="Departments">
+      <a class="board-chip<?= $pickedDepts ? '' : ' is-on' ?>" href="<?= e($here(['dept' => null])) ?>">All departments</a>
+      <?php foreach ($depts as $d => $n):
+          $on = in_array($d, $pickedDepts, true);
+          $next = $on ? array_values(array_diff($pickedDepts, [$d])) : array_merge($pickedDepts, [$d]); ?>
+        <a class="board-chip<?= $on ? ' is-on' : '' ?>" aria-pressed="<?= $on ? 'true' : 'false' ?>"
+           href="<?= e($here(['dept' => $next ?: null])) ?>"><?= $on ? '✓ ' : '' ?><?= e($d) ?> (<?= (int)$n ?>)</a>
+      <?php endforeach; ?>
+    </p>
+    <form method="get" class="rq-sort">
+      <input type="hidden" name="tab" value="approved">
+      <?php if ($only): ?><input type="hidden" name="project" value="<?= (int)$only ?>"><?php endif; ?>
+      <?php foreach ($pickedDepts as $d): ?><input type="hidden" name="dept[]" value="<?= e($d) ?>"><?php endforeach; ?>
+      <label>Sort
+        <select name="sort" onchange="this.form.submit()">
+          <?php foreach ($sorts as $k => $label): ?>
+            <option value="<?= e($k) ?>"<?= $k === $sort ? ' selected' : '' ?>><?= e($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <noscript><button type="submit" class="secondary">Sort</button></noscript>
+    </form>
+  </div>
+<?php endif; ?>
+
 <?php if (!$shown): ?>
-  <div class="empty-state"><p>Nothing is waiting for your review. Tasks arrive here when they are set to
-    <?= implode(' or ', array_map(fn($k) => '<strong>' . e(ucwords(REVIEW_STAGES[$k]['from'])) . '</strong>', $stages)) ?>.</p></div>
+  <div class="empty-state"><p>
+    <?php if ($tab === 'final'): ?>Nothing is waiting for the last sign-off. Tasks arrive here when a supervisor approves them (<strong>Ready for approval</strong>).
+    <?php elseif ($tab === 'supervisor'): ?>Nothing is waiting for a supervisor. Tasks arrive here when an artist puts a version up (<strong>Pending review</strong>).
+    <?php elseif ($pickedDepts): ?>Nothing approved in those departments. <a href="<?= e($here(['dept' => null])) ?>">Show every department</a>.
+    <?php else: ?>Nothing is Approved or Final yet on the shows you can see.<?php endif; ?>
+  </p></div>
 <?php else: ?>
   <ul class="rq-grid">
   <?php foreach ($shown as $t):
       $pid = (int)$t['project_id'];
-      $to = ucwords(REVIEW_STAGES[$t['stage']]['to']);
-      $offApprove = isset($noApprove[$t['stage']][$pid]);
+      // Can this account give the verdict on this card? Only on a stage it reviews
+      // (review_stages()): never on Approved, and Production only looks at Pending approvals.
+      $canAct = !empty($t['stage']);
+      $to = $canAct ? ($statusWord[REVIEW_STAGES[$t['stage']]['to']] ?? ucwords(REVIEW_STAGES[$t['stage']]['to'])) : '';
+      $offApprove = $canAct && isset($noApprove[$t['stage']][$pid]);
       $v = $t['version'];
       $openPath = board_task_path($pid, (int)$t['step_id'], (string)$t['item_key'], 'versions', $v ? 'v' . (int)$v['id'] : '');
       $mime = $v ? (string)($v['mime_type'] ?? '') : '';
@@ -337,9 +454,9 @@ foreach ($warnings as [$missing, $named, $button]):
                   title="Open <?= e($t['item_name'] . ' · ' . $t['step_name']) ?>"><strong><?= e($t['item_name']) ?> · <?= e($t['step_name']) ?></strong></button>
           <span class="muted small rq-show" title="<?= e((string)$t['project_name']) ?>"><?= e($t['project_code']) ?></span>
         </div>
-        <?php if (count($stages) > 1): ?>
-          <?php // Which stage, when this page shows both: the status it is in now. ?>
-          <span class="rq-stage is-<?= e($t['stage']) ?>"><?= e((string)$t['status_name']) ?></span>
+        <?php if ($onApproved): ?>
+          <?php // Approved or Final: which one. ?>
+          <span class="rq-stage is-done"><?= e((string)$t['status_name']) ?></span>
         <?php endif; ?>
         <div class="muted small rq-meta">
           <?= $t['crew_name'] ? e($t['crew_name']) : 'Nobody assigned' ?>
@@ -356,6 +473,8 @@ foreach ($warnings as [$missing, $named, $button]):
       <form method="post" class="rq-verdict">
         <input type="hidden" name="progress_id" value="<?= (int)$t['id'] ?>">
         <input type="hidden" name="project" value="<?= $only ?: '' ?>">
+        <input type="hidden" name="tab" value="<?= e($tab) ?>">
+        <?php if ($canAct): ?>
         <div class="rq-buttons">
           <button type="submit" name="action" value="approve"
                   title="<?= $offApprove ? e($t['project_code'] . ' has no ' . $to . ' status') : 'Moves it to ' . e($to) ?>"
@@ -364,6 +483,9 @@ foreach ($warnings as [$missing, $named, $button]):
                   title="<?= isset($noRetake[$pid]) ? e($t['project_code'] . ' has no Retake status') : 'Moves it to Retake' ?>"
                   <?= isset($noRetake[$pid]) ? 'disabled' : '' ?>>Retake</button>
         </div>
+        <?php elseif ($tab === 'final'): ?>
+          <p class="muted small rq-lookonly">Jorik and Tim approve these.</p>
+        <?php endif; ?>
         <div class="rq-links">
           <a href="<?= e($openPath) ?>">Open in Spell</a>
           <button type="button" class="secondary board-copy-url" data-copy="<?= e($openPath) ?>"

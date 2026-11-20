@@ -34,6 +34,18 @@ children process limit: 10"); past it, pages spin, logins look stuck and pop-ups
   Claude reads a transcript or writes call notes, while statements and invoices are worked out,
   while an email is sent, and on every Board save.
 
+## 2026-11-20 — Reviews in three tabs *(no migration)*
+
+- **Pending approvals**: tasks in Ready for approval, the last sign-off. Jorik and Tim approve them;
+  Production can see them but not approve them.
+- **Supervisor approvals**: tasks in Pending review, for the supervisors (and Production and admins).
+- **Approved**: everything Approved or Final on the shows you can see. It has department chips (pick
+  one or several) and a Sort: newest, oldest, shot/asset A→Z or Z→A, department, show. Both stay
+  in the address, so a filtered list can be bookmarked or sent. The cards have no verdict buttons.
+- Who sees which: admins and Production get all three tabs, supervisors get Supervisor approvals and
+  Approved, and anybody else gets no Reviews button (unchanged). Each tab shows its count; the
+  top-bar count is still what waits on you.
+
 ## 2026-11-20 — Statuses: Ready for approval, Approved, Waiting to start by default *(migration 107)*
 
 - **Ready for review** is now **Ready for approval**, and **Completed** is now **Approved**. Reviews treats the old and
