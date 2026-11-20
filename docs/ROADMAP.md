@@ -177,7 +177,7 @@ and both are large enough to stall the rest if started early.
 
 | Feature | Side | Depends on | Notes |
 |---|---|---|---|
-| Online version review (Frame.io / Dropbox Replay style) | P | media hosting | **Largest item. Read the caution below.** In-app viewer built 2026-10-27 (draw, frame by frame); several notes per frame, published together, and numbered pins 2026-11-19 (migration 105) |
+| Online version review (Frame.io / Dropbox Replay style) | P | media hosting | **Largest item. Read the caution below.** In-app viewer built 2026-10-27 (draw, frame by frame); several notes per frame, published together, and numbered pins 2026-11-19 (migration 105); replies under each note 2026-11-20 |
 | Own tracking system — replacing Plaky | P | Phase 3 | The status grid, plus artist logins if artists update their own work. Phase 3 deliberately builds the status model so this becomes screens, not schema. **The grid half is now specified below and is Phase 8** |
 
 ---

@@ -574,7 +574,12 @@ function artist_may_post(): bool {
         // add_review (2026-10-22): a supervisor's review of a version. The field
         // is allowed here so a SUPERVISOR (artist permissions plus) can post it;
         // board_version.php refuses it from anybody board_is_reviewer() says no to.
-        'board_version.php' => ['add_version', 'delete_version', 'add_review'],
+        // add_reply / delete_reply (2026-11-20): answering a review note, and
+        // taking back your own answer. Wide like add_comment above, for the same
+        // reason: the artist answering the note is who it is for. board_version.php
+        // checks the note is a review note on THIS task, and that a reply being
+        // deleted is the asker's own unless they are an admin.
+        'board_version.php' => ['add_version', 'delete_version', 'add_review', 'add_reply', 'delete_reply'],
         // report_bug: the Bug button on every screen (migration 062, 2026-10-22).
         // About the APPLICATION, not anyone's work, so it writes nothing an
         // artist could not otherwise touch: one new row in bug_reports, filed

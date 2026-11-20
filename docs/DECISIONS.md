@@ -6553,6 +6553,24 @@ version, Fee quotas' "by project / by department", Days off's "on a show / every
 finance's "On the show" date, and the CRM's Status (the funnel sets it with a click, and "Open deals
 only" is a group of statuses). The Artists positions box was already ticks.
 
+## 2026-11-20 — Replies to review notes
+
+**Asked by David:** *"can we implement a reply to this note so we can keep the conversation going
+inside the review of any version?"*
+
+**Decided:**
+- **A reply is a comment whose `parent_id` is the note** (migration 039, already live) and which
+  names no version. So no migration, it is never counted, numbered or pinned as a note, and the
+  Comments tab threads it under the note too.
+- **One flat thread under each note**, oldest first. Replies to replies (possible on the Comments
+  tab) are hung on the note they started from.
+- **Posted to `board_version.php` (`add_reply`, `delete_reply`)**, so the answer is the Versions
+  pane re-drawn, which the viewer already knows how to take back in. Both are on the artist
+  allow-list, like `add_comment`: the artist answering the note is who this is for. The handler
+  checks the note is a review note on that task, and a delete is your own reply or an admin's.
+- **The bell rings for the conversation**: the note's author, earlier repliers and the version's
+  uploader, as a `review` bell, minus the writer and anybody @named (who get their mention bell).
+
 ## 2026-11-20 — Fewer requests before a bigger server
 
 **Why:** after the move to KnownHost (shared cPanel, LiteSpeed), Anima spun and timed out. Support

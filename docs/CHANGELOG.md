@@ -34,6 +34,18 @@ children process limit: 10"); past it, pages spin, logins look stuck and pop-ups
   Claude reads a transcript or writes call notes, while statements and invoices are worked out,
   while an email is sent, and on every Board save.
 
+## 2026-11-20 — Reply to a review note *(no migration)*
+
+- **Every review note has a Reply button**, on the Versions tab and in the viewer's notes beside
+  the picture. The replies sit under the note, oldest first, so the artist and the reviewer can talk
+  it through on the version itself. @names work in a reply as in a note.
+- **Anybody who can open the task may reply**, the artist included, as anybody may comment. Your
+  own reply (or any, for an admin) has an × to delete it.
+- **Who hears:** the note's author, everybody who already replied to it and whoever put the version
+  up get a bell; anybody @named gets the mention bell instead.
+- A reply is an ordinary comment threaded under the note, so it also shows under that note on the
+  Comments tab, and never counts as a note of its own (#numbers and pins are unchanged).
+
 ## 2026-11-20 — The top bar stays on screen *(no migration)*
 
 - **The top bar (logo, bell, Home, Spell, … Admin) stays at the top of the window** when you scroll,
