@@ -390,6 +390,8 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
 <?php if ($bell['on']): ?><script src="assets/bell.js<?= asset_ver('bell.js') ?>"></script><?php endif; ?>
 <?php // The Admin / More menu above: open, close, keys. Tiny, no library. ?>
 <script defer src="assets/nav-menu.js<?= asset_ver('nav-menu.js') ?>"></script>
+<?php // The top bar stays on screen when scrolling (David, 2026-11-20); this stacks it. ?>
+<script defer src="assets/pin-top.js<?= asset_ver('pin-top.js') ?>"></script>
 <?php // The unread count on the Realm button, kept fresh (David, 2026-11-12: "I need to be
       // on that page"). Only for somebody who has the Realm; see assets/realm-nudge.js. ?>
 <?php if (function_exists('feature_on') && feature_on('realm')): ?><script defer src="assets/realm-nudge.js<?= asset_ver('realm-nudge.js') ?>"></script><?php endif; ?>
