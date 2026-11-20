@@ -67,6 +67,10 @@ $openByDefault = false;
 require_once __DIR__ . '/includes/task_follow.php';
 $followReady = $projectId && $myCrewId > 0 && task_follow_available($pdo);
 $followMine  = $followReady ? task_follow_mine($pdo, $myCrewId, $projectId) : [];
+// THE TICK BOXES ALSO CARRY Assign and Change status (David, 2026-11-20), which
+// are Production's and need no person or migration, so a Production login that
+// is not linked to a person still gets the boxes and the bar, without Subscribe.
+$pickReady = $projectId && ($followReady || $mayEdit);
 
 // THE ASSET TYPES THIS SHOW HAS (David, 2026-11-18: "let's also add some assets
 // filters for BG, CH and environments"). Read off the board's own asset groups
@@ -170,7 +174,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
   <div class="board-grid-head">
     <?php // ⚠ "ALL" MEANS ALL THE FILTERS SHOW, not all on the show: with Status:
           // Retake picked, ticking this selects the retakes. assets/board-screen.js. ?>
-    <div class="board-head-name"><?php if ($followReady): ?><input type="checkbox" class="board-pick-all" id="boardPickAll"
+    <div class="board-head-name"><?php if ($pickReady): ?><input type="checkbox" class="board-pick-all" id="boardPickAll"
          aria-label="Select every task the filters show" title="Select every task the filters show"><?php endif; ?>Shot and task</div>
     <?php // Unlabelled on purpose: the button says what it does, and "URL" over
           // a column of buttons reading "Copy URL" is the same word twice. ?>
@@ -357,7 +361,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
           <div class="board-row board-row-item"
                data-search="<?= e(strtolower($item['name'])) ?>">
             <div class="board-cell-name">
-              <?php if ($followReady): ?>
+              <?php if ($pickReady): ?>
                 <?php if ($self): ?>
                   <?php // A whole-show deliverable IS a task: its box is a task's box. ?>
                   <input type="checkbox" class="board-pick" data-step="<?= (int)$self['step_id'] ?>"
@@ -454,7 +458,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
                  data-ready="<?= !empty($t['ready']) ? '1' : '0' ?>"
                  data-due="<?= e((string)($t['due'] ?? '')) ?>">
               <div class="board-cell-name board-task-name">
-                <?php if ($followReady): ?>
+                <?php if ($pickReady): ?>
                   <input type="checkbox" class="board-pick" data-step="<?= (int)$t['step_id'] ?>"
                          aria-label="Select <?= e($t['step']) ?> on <?= e($item['name']) ?>">
                 <?php endif; ?>
@@ -526,12 +530,37 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
 
 <?php // THE SELECTION BAR: only while something is ticked. One request for the
       // lot (board_api.php, follow_tasks), always for the person looking. ?>
-<?php if ($followReady): ?>
+<?php if ($pickReady): ?>
 <div class="board-pickbar" id="boardPickBar" data-project="<?= (int)$projectId ?>" role="region"
      aria-label="Selected tasks" hidden>
   <span class="board-pickbar-count" id="boardPickCount" aria-live="polite"></span>
-  <button type="button" class="board-pickbar-btn is-primary" id="boardPickOn"><?= task_follow_bell_svg(14) ?> Subscribe</button>
-  <button type="button" class="board-pickbar-btn" id="boardPickOff">Unsubscribe</button>
+  <?php // ASSIGN and CHANGE STATUS (David, 2026-11-20): Production's, like the
+        // same two dropdowns on a row. Choosing applies at once to every ticked
+        // task (board_api.php bulk_crew / bulk_status); the dropdown then goes back
+        // to its label, ready for the next selection. ?>
+  <?php if ($mayEdit): ?>
+    <select class="board-pickbar-select" id="boardPickCrew" aria-label="Assign the selected tasks to">
+      <option value="__pick" selected>Assign…</option>
+      <option value="">Nobody</option>
+      <?php $onShow = array_filter($crew, fn($c) => $c['on_show']); $offShow = array_filter($crew, fn($c) => !$c['on_show']); ?>
+      <?php if ($onShow): ?><optgroup label="On this show">
+        <?php foreach ($onShow as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?>
+      </optgroup><?php endif; ?>
+      <?php if ($offShow): ?><optgroup label="Other people">
+        <?php foreach ($offShow as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?>
+      </optgroup><?php endif; ?>
+    </select>
+    <select class="board-pickbar-select" id="boardPickStatus" aria-label="Change the status of the selected tasks">
+      <option value="__pick" selected>Change status…</option>
+      <?php foreach ($board['statuses'] as $s): ?>
+        <option value="<?= (int)$s['id'] ?>" data-color="<?= e($s['color'] ?: '') ?>"><?= e($s['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+  <?php endif; ?>
+  <?php if ($followReady): ?>
+    <button type="button" class="board-pickbar-btn" id="boardPickOn"><?= task_follow_bell_svg(14) ?> Subscribe</button>
+    <button type="button" class="board-pickbar-btn" id="boardPickOff">Unsubscribe</button>
+  <?php endif; ?>
   <button type="button" class="board-pickbar-btn is-quiet" id="boardPickClear">Clear</button>
 </div>
 <?php endif; ?>

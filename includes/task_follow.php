@@ -158,20 +158,7 @@ function task_follow_set(PDO $pdo, int $crewId, int $projectId, array $tasks, bo
         throw new RuntimeException('This login is not linked to a person, so there is nobody to subscribe. An administrator links it on the Users screen.');
     }
 
-    // The show's Departments, shots and assets, read once for the whole batch.
-    $q = $pdo->prepare('SELECT * FROM pipeline_steps WHERE project_id = ?');
-    $q->execute([$projectId]);
-    $steps = [];
-    foreach ($q as $s) $steps[(int)$s['id']] = $s;
-
-    $q = $pdo->prepare('SELECT id FROM shots WHERE project_id = ?');
-    $q->execute([$projectId]);
-    $shots = array_flip(array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN)));
-
-    $q = $pdo->prepare('SELECT id, asset_type FROM assets WHERE project_id = ?');
-    $q->execute([$projectId]);
-    $assets = [];
-    foreach ($q as $a) $assets[(int)$a['id']] = $a['asset_type'];
+    $checked = board_tasks_checked($pdo, $projectId, $tasks);
 
     $write = $pdo->prepare(
         'INSERT INTO task_subscriptions (step_id, item_key, crew_id, project_id, following)
@@ -180,30 +167,10 @@ function task_follow_set(PDO $pdo, int $crewId, int $projectId, array $tasks, bo
     );
 
     $changed = 0;
-    $skipped = 0;
-    $seen = [];
     $pdo->beginTransaction();
     try {
-        foreach ($tasks as $t) {
-            $stepId  = (int)($t[0] ?? 0);
-            $itemKey = trim((string)($t[1] ?? ''));
-            if (isset($seen[$stepId . ':' . $itemKey])) continue;
-            $seen[$stepId . ':' . $itemKey] = true;
-
-            $step = $steps[$stepId] ?? null;
-            $kind = substr($itemKey, 0, 1);
-            $itemId = (int)substr($itemKey, 1);
-            $ok = $step !== null && $itemId > 0 && strlen($itemKey) <= 20;
-            if ($ok) {
-                if ($kind === 's')      $ok = isset($shots[$itemId]) && step_covers_item($step, ['asset_type' => null], 'shot');
-                elseif ($kind === 'a')  $ok = array_key_exists($itemId, $assets)
-                                           && step_covers_item($step, ['asset_type' => $assets[$itemId]], 'asset');
-                elseif ($kind === 'p')  $ok = $itemId === $projectId && step_covers_item($step, ['asset_type' => null], 'project');
-                else                    $ok = false;
-            }
-            if (!$ok) { $skipped++; continue; }
-
-            $write->execute([$stepId, $itemKey, $crewId, $projectId, $on ? 1 : 0]);
+        foreach ($checked['tasks'] as $t) {
+            $write->execute([$t['step_id'], $t['item_key'], $crewId, $projectId, $on ? 1 : 0]);
             $changed++;
         }
         $pdo->commit();
@@ -211,5 +178,73 @@ function task_follow_set(PDO $pdo, int $crewId, int $projectId, array $tasks, bo
         $pdo->rollBack();
         throw $e;
     }
-    return ['changed' => $changed, 'skipped' => $skipped];
+    return ['changed' => $changed, 'skipped' => $checked['skipped']];
+}
+
+/**
+ * Which of the tasks a browser named really are tasks of this show — used by
+ * every bulk action on Spell's selection bar (subscribe, assign, change status).
+ *
+ * The same three checks board_api.php makes on one cell: the Department is this
+ * show's, the shot or asset is this show's, and the Department applies to it.
+ * Anything that fails is counted and left out, never written. Each task once.
+ *
+ * @param array $tasks list of [stepId, itemKey]
+ * @return array{tasks: array<int, array{step_id:int, item_key:string, step:array, kind:string,
+ *                     item_id:int, item_name:string, name:string}>, skipped:int}
+ */
+function board_tasks_checked(PDO $pdo, int $projectId, array $tasks): array {
+    // The show's Departments, shots and assets, read once for the whole batch.
+    $q = $pdo->prepare('SELECT * FROM pipeline_steps WHERE project_id = ?');
+    $q->execute([$projectId]);
+    $steps = [];
+    foreach ($q as $s) $steps[(int)$s['id']] = $s;
+
+    $q = $pdo->prepare('SELECT id, shot_code FROM shots WHERE project_id = ?');
+    $q->execute([$projectId]);
+    $shots = [];
+    foreach ($q as $s) $shots[(int)$s['id']] = (string)$s['shot_code'];
+
+    $q = $pdo->prepare('SELECT id, name, asset_type FROM assets WHERE project_id = ?');
+    $q->execute([$projectId]);
+    $assets = [];
+    foreach ($q as $a) $assets[(int)$a['id']] = $a;
+
+    $out = [];
+    $skipped = 0;
+    $seen = [];
+    foreach ($tasks as $t) {
+        $stepId  = (int)($t[0] ?? 0);
+        $itemKey = trim((string)($t[1] ?? ''));
+        if (isset($seen[$stepId . ':' . $itemKey])) continue;
+        $seen[$stepId . ':' . $itemKey] = true;
+
+        $step = $steps[$stepId] ?? null;
+        $kind = substr($itemKey, 0, 1);
+        $itemId = (int)substr($itemKey, 1);
+        $itemName = '';
+        $ok = $step !== null && $itemId > 0 && strlen($itemKey) <= 20;
+        if ($ok) {
+            if ($kind === 's') {
+                $ok = isset($shots[$itemId]) && step_covers_item($step, ['asset_type' => null], 'shot');
+                $itemName = $shots[$itemId] ?? '';
+            } elseif ($kind === 'a') {
+                $ok = isset($assets[$itemId])
+                   && step_covers_item($step, ['asset_type' => $assets[$itemId]['asset_type']], 'asset');
+                $itemName = (string)($assets[$itemId]['name'] ?? '');
+            } elseif ($kind === 'p') {
+                $ok = $itemId === $projectId && step_covers_item($step, ['asset_type' => null], 'project');
+            } else {
+                $ok = false;
+            }
+        }
+        if (!$ok) { $skipped++; continue; }
+        $out[] = [
+            'step_id' => $stepId, 'item_key' => $itemKey, 'step' => $step,
+            'kind' => $kind, 'item_id' => $itemId, 'item_name' => $itemName,
+            // What the bell calls it, as board_api.php's $taskName() does.
+            'name' => $itemName !== '' ? ($step['name'] . ' on ' . $itemName) : (string)$step['name'],
+        ];
+    }
+    return ['tasks' => $out, 'skipped' => $skipped];
 }

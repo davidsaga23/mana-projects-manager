@@ -1668,22 +1668,93 @@
       if (e.key === 'Escape' && !pickBar.hidden && (!panel || panel.hidden)) clearPicks();
     });
 
+    var pickCrew = document.getElementById('boardPickCrew');
+    var pickStatus = document.getElementById('boardPickStatus');
+    var barControls = [pickOn, pickOff, pickCrew, pickStatus].filter(Boolean);
+    function busy(on) { barControls.forEach(function (c) { c.disabled = on; }); }
+
     function sendPicks(on) {
       var keys = allPicks().filter(function (c) { return c.checked; }).map(pickKey);
       if (!keys.length) return;
-      pickOn.disabled = pickOff.disabled = true;
+      busy(true);
       followPost(pickBar.getAttribute('data-project'), keys, on).then(function (data) {
-        pickOn.disabled = pickOff.disabled = false;
+        busy(false);
         markFollowing(keys, on);
         clearPicks();
         say(data.message || 'Saved.', false);
       }).catch(function (err) {
-        pickOn.disabled = pickOff.disabled = false;
+        busy(false);
         say(err.message, true);
       });
     }
     if (pickOn) pickOn.addEventListener('click', function () { sendPicks(true); });
     if (pickOff) pickOff.addEventListener('click', function () { sendPicks(false); });
+
+    // ASSIGN and CHANGE STATUS on every ticked task (David, 2026-11-20). One
+    // post; when it is agreed, each ticked row's own dropdown is set to match,
+    // so the row, its shot's bar and the filters read the new value without a
+    // reload. The selection stays ticked, so a status and an assignee can be
+    // given to the same tasks one after the other.
+    function bulkApply(sel, field) {
+      var value = sel.value;
+      if (value === '__pick') return;
+      var ticked = allPicks().filter(function (c) { return c.checked; });
+      var keys = ticked.map(pickKey);
+      if (!keys.length) { sel.value = '__pick'; return; }
+
+      var body = new URLSearchParams();
+      body.set(field, '1');
+      body.set('project_id', pickBar.getAttribute('data-project'));
+      body.set('value', value);
+      body.set('tasks', JSON.stringify(keys));
+      busy(true);
+      fetch('board_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        credentials: 'same-origin'
+      }).then(function (r) {
+        return r.json().catch(function () {
+          throw new Error('The server did not answer in a way this page understands. '
+                        + 'Your session may have expired — reload the page.');
+        });
+      }).then(function (data) {
+        if (!data.ok) throw new Error(data.error || 'That did not save.');
+        busy(false);
+        sel.value = '__pick';
+        var items = [], groups = [];
+        ticked.forEach(function (c) {
+          var row = c.closest('.board-row');
+          var ctl = row && row.querySelector(field === 'bulk_status' ? '.board-status' : '.board-crew');
+          if (ctl && ctl.tagName === 'SELECT') {
+            ctl.value = value;
+            ctl.setAttribute('data-was', value);
+            if (field === 'bulk_status') {
+              ctl.style.background = data.color ? tint(data.color) : '';
+              ctl.style.color = data.color || '';
+            }
+          }
+          if (row && row.classList.contains('board-row-task')) {
+            row.setAttribute(field === 'bulk_status' ? 'data-status' : 'data-crew', value === '' ? '__none' : value);
+          }
+          var item = c.closest('.board-item');
+          if (item && items.indexOf(item) === -1) items.push(item);
+          var group = c.closest('.board-group');
+          if (group && groups.indexOf(group) === -1) groups.push(group);
+        });
+        if (field === 'bulk_status') {
+          items.forEach(function (it) { redrawDerived(it); redrawBar(it); });
+          groups.forEach(redrawGroupBar);
+        }
+        say(data.message || 'Saved.', false);
+      }).catch(function (err) {
+        busy(false);
+        sel.value = '__pick';
+        say(err.message, true);
+      });
+    }
+    if (pickCrew) pickCrew.addEventListener('change', function () { bulkApply(pickCrew, 'bulk_crew'); });
+    if (pickStatus) pickStatus.addEventListener('change', function () { bulkApply(pickStatus, 'bulk_status'); });
 
     syncPicks();
   }
