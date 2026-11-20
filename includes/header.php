@@ -327,10 +327,10 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
 
       // The application itself: accounts, mail, the database, the reports.
       // USERS for Production too (David, 2026-11-05), through its switch.
-      // Email and Migrations stay admin-only and are not switches.
+      // Migrations stays admin-only and is not a switch. The Email diagnostic page
+      // (smtp_test.php) was removed once mail worked on the new host (David, 2026-11-20).
       if ($fa('users') && (is_admin() || can_edit())) $navGroups[1][] = ['href' => 'users.php', 'label' => 'Users'];
       if (is_admin()) {
-          $navGroups[1][] = ['href' => 'smtp_test.php', 'label' => 'Email'];
           $navGroups[1][] = ['href' => 'migrate.php', 'label' => 'Migrations',
               'badge' => (int)$pendingMigrations, 'badgeTitle' => 'Database updates waiting',
               'warn' => $pendingMigrations > 0];

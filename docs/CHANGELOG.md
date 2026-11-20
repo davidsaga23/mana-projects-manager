@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — Admin: Email diagnostic page removed *(no migration)*
+
+- The **Email** page under Admin (`smtp_test.php`) is gone: mail works on the new host, so the diagnostic is
+  no longer needed. Its link is removed from the Admin menu.
+
 ## 2026-11-20 — Reply to a review note *(no migration)*
 
 - **Every review note has a Reply button**, on the Versions tab and in the viewer's notes beside
