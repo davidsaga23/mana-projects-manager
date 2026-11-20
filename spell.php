@@ -191,13 +191,13 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
             // if I'm a supervisor taking a look at what shots/assets are ready
             // for my department"). Step picks the department; Ready narrows to
             // the work that can actually start today. ?>
-      <select id="fStep" aria-label="Filter by department">
+      <select id="fStep" aria-label="Filter by department" data-multi data-multi-label="Department">
         <option value="">Any department</option>
         <?php foreach ($board['steps'] as $st): ?>
           <option value="<?= (int)$st['id'] ?>"><?= e($st['name']) ?></option>
         <?php endforeach; ?>
       </select>
-      <select id="fReady" aria-label="Filter by whether the work can start">
+      <select id="fReady" aria-label="Filter by whether the work can start" data-multi data-multi-label="">
         <option value="">All tasks</option>
         <option value="1">Ready to start</option>
       </select>
@@ -205,7 +205,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
             // every whole-show deliverable and leaves that type's assets. Only
             // offered when the show has a typed asset at all. ?>
       <?php if ($assetTypes): ?>
-        <select id="fAssetType" aria-label="Filter by asset type">
+        <select id="fAssetType" aria-label="Filter by asset type" data-multi data-multi-label="Type">
           <option value="">Any asset type</option>
           <?php foreach ($assetTypes as $val => $t): ?>
             <option value="<?= e($val) ?>" title="<?= e($t['raw']) ?>"><?= e($t['label']) ?></option>
@@ -218,7 +218,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
     <div></div>
     <div></div>
     <div>
-      <select id="fStatus" aria-label="Filter by status">
+      <select id="fStatus" aria-label="Filter by status" data-multi data-multi-label="Status">
         <option value="">Any status</option>
         <option value="__none">Not started</option>
         <?php foreach ($board['statuses'] as $s): ?>
@@ -227,7 +227,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
       </select>
     </div>
     <div>
-      <select id="fCrew" aria-label="Filter by who it is assigned to">
+      <select id="fCrew" aria-label="Filter by who it is assigned to" data-multi data-multi-label="Assignee">
         <option value="">Anybody</option>
         <option value="__none">Nobody yet</option>
         <?php // The show's crew, then "Other people": only those holding a task
@@ -246,7 +246,7 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
       </select>
     </div>
     <div class="board-due-filter">
-      <select id="fDue" aria-label="Filter by due date">
+      <select id="fDue" aria-label="Filter by due date" data-multi data-multi-label="Due">
         <option value="">Any date</option>
         <option value="late">Overdue</option>
         <option value="today">Today</option>

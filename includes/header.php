@@ -116,6 +116,11 @@ $tourBoot = $fa('tour') ? tour_boot(isset($pdo) && $pdo instanceof PDO ? $pdo : 
 <?php endif; ?>
 <meta name="theme-color" content="#14161c">
 <link rel="stylesheet" href="assets/style.css<?= asset_ver('style.css') ?>">
+<?php // Pick-several filters with Include / Exclude (David, 2026-11-20). In the
+      // head and NOT deferred, so a page's own script can already ask it what is
+      // ticked when it runs. Small, and builds nothing until the page is read. ?>
+<link rel="stylesheet" href="assets/multi-filter.css<?= asset_ver('multi-filter.css') ?>">
+<script src="assets/multi-filter.js<?= asset_ver('multi-filter.js') ?>"></script>
 </head>
 <body>
 <div class="wrap">

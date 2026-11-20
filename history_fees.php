@@ -35,7 +35,12 @@ require_once __DIR__ . '/includes/history.php';
 require_admin();
 
 $q         = trim((string)($_GET['q'] ?? ''));
-$proj      = (int)($_GET['project'] ?? 0);
+// Several shows, or every show but some (David, 2026-11-20). An old link's
+// ?project=0 meant "all projects" and is dropped like any blank.
+$proj      = filter_get('project');
+$proj['in'] = array_values(array_filter($proj['in'], fn($v) => (int)$v > 0));
+$proj['on'] = $proj['in'] !== [];
+if (!$proj['on']) $proj['not'] = false;
 $slotsOnly = !empty($_GET['slots']);
 
 $configured = finance_configured();
@@ -70,10 +75,10 @@ require __DIR__ . '/includes/header.php';
 
 <form method="get" class="inline-form filter-bar">
   <input name="q" value="<?= e($q) ?>" size="26" placeholder="Search department, person, slot or project">
-  <select name="project" onchange="this.form.submit()">
-    <option value="0">All projects</option>
+  <select name="project" onchange="this.form.submit()" aria-label="Filter by project"<?= filter_select_attrs($proj, 'Project') ?>>
+    <option value="">All projects</option>
     <?php foreach ($projects as $p): ?>
-      <option value="<?= (int)$p['id'] ?>" <?= $proj === (int)$p['id'] ? 'selected' : '' ?>>
+      <option value="<?= (int)$p['id'] ?>"<?= filter_sel($proj, (int)$p['id']) ?>>
         <?= e($p['code'] . ' · ' . $p['name']) ?>
       </option>
     <?php endforeach; ?>
@@ -87,7 +92,7 @@ require __DIR__ . '/includes/header.php';
     Slots only
   </label>
   <button class="button secondary" type="submit">Search</button>
-  <?php if ($q !== '' || $proj > 0 || $slotsOnly): ?>
+  <?php if ($q !== '' || $proj['on'] || $slotsOnly): ?>
     <a class="button secondary" href="history_fees.php">Clear</a>
   <?php endif; ?>
 </form>
@@ -107,7 +112,7 @@ require __DIR__ . '/includes/header.php';
 
 <?php if (!$groups): ?>
   <p class="muted">
-    <?= $q !== '' || $proj > 0 || $slotsOnly
+    <?= $q !== '' || $proj['on'] || $slotsOnly
         ? 'Nothing matches that.'
         : 'No positions have been created yet. They appear once a project has a pipeline with '
           . 'headcount on it.' ?>

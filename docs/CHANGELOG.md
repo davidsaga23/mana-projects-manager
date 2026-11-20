@@ -14,6 +14,24 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — Filters pick several, and can exclude *(no migration)*
+
+- **Every filter dropdown picks one or more**, as ticks, with a search box when the list is long.
+  The chip says what is on: "Status: In progress, Pending review", or "Status: 3 selected".
+- **Include / Exclude** in each list. Exclude is "everything except the ticked ones"; the chip turns
+  amber and reads "Status: not Final". Each list has Clear and Done, works by keyboard (↓ opens,
+  ↑/↓ move, Space ticks, Esc closes) and opens as a sheet along the bottom on a phone.
+- **Where:** Spell (department, ready, asset type, status, assignee, due), the column filters of the
+  Shots, Artists, Studio tasks and My tasks grids, the Tasks board, Production tracking, the
+  Timeline's episode (and its .gan export), Reviews' show picker (in place of a chip per show),
+  Kick-off's department and person, the Bookings calendar's person, the CRM's type, source, owner
+  and follow-up, project finance's statement filters (position, rate, status), Shots' episode (and
+  its Excel export), Days off's department, Fee history's project, and the set-up wizard's lists.
+- **Old links still work** (`?status=3`, `?episode=EP01`, `?project=12`), and Spell's filters kept
+  until midnight from before today come back as they were.
+- One control for all of them: `assets/multi-filter.js` + `assets/multi-filter.css`, loaded by the
+  header; `includes/filters.php` reads the address on the server.
+
 ## 2026-11-20 — Reviews in three tabs *(no migration)*
 
 - **Pending approvals**: tasks in Ready for approval, the last sign-off. Jorik and Tim approve them;

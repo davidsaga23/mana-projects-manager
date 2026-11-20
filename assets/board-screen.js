@@ -487,20 +487,37 @@
     return true;
   }
 
+  // ⚠ EVERY DROPDOWN HERE PICKS SEVERAL, with Include / Exclude (David,
+  // 2026-11-20: "Multiple selection … Reverse selection: exclude from filtering
+  // the selected options"). assets/multi-filter.js draws them; the <select>
+  // still holds the ticks, so these read it through MultiFilter. A row passes
+  // when its value is ANY of the ticked ones, or NONE of them under Exclude.
+  var MF = window.MultiFilter || {
+    // Without the control (it failed to load) the plain dropdowns still work.
+    state: function (el) { return { values: el && el.value ? [el.value] : [], exclude: false }; },
+    active: function (el) { return !!(el && el.value); },
+    matches: function (el, v) { return !el || !el.value || el.value === v; },
+    set: function (el, v) { if (el) el.value = Array.isArray(v) ? (v[0] || '') : v; },
+    clear: function (el) { if (el) el.value = ''; }
+  };
+  function dueOk(due) {
+    if (!fDue) return true;
+    var s = MF.state(fDue);
+    if (!s.values.length) return true;
+    var hit = s.values.some(function (w) { return dueMatches(w, due); });
+    return s.exclude ? !hit : hit;
+  }
+
   function applyFilters() {
     var q = search ? search.value.trim().toLowerCase() : '';
-    var st = fStatus ? fStatus.value : '';
-    var cr = fCrew ? fCrew.value : '';
-    var du = fDue ? fDue.value : '';
-    var sp = fStep ? fStep.value : '';
-    var rd = fReady ? fReady.value : '';
-    var at = fAssetType ? fAssetType.value : '';
+    var dues = fDue ? MF.state(fDue).values : [];
 
     // The extra boxes belong to their own choice and nothing else.
-    if (fDueOn) fDueOn.hidden = du !== 'on';
-    if (fDueRange) fDueRange.hidden = du !== 'range';
+    if (fDueOn) fDueOn.hidden = dues.indexOf('on') === -1;
+    if (fDueRange) fDueRange.hidden = dues.indexOf('range') === -1;
 
-    var on = q !== '' || st !== '' || cr !== '' || du !== '' || sp !== '' || rd !== '' || at !== '';
+    var on = q !== '' || [fStatus, fCrew, fDue, fStep, fReady, fAssetType]
+      .some(function (el) { return el && MF.active(el); });
 
     // Remember the board as the person left it, once, so Clear can restore it.
     if (on && wasOpen === null) {
@@ -519,7 +536,7 @@
       // ⚠ A SHOT IS NOT AN ASSET: with a type picked, shots and whole-show
       // deliverables carry no type and drop out, and only that type's assets
       // (with the departments scoped to them) stay.
-      var typeOk = at === '' || item.getAttribute('data-asset-type') === at;
+      var typeOk = !fAssetType || MF.matches(fAssetType, item.getAttribute('data-asset-type') || '');
 
       Array.prototype.forEach.call(tasks, function (r) {
         all++;
@@ -527,11 +544,11 @@
         // task alone, so a shot's name never satisfies them.
         var hit = typeOk
                && (q === '' || itemHit || (r.getAttribute('data-search') || '').indexOf(q) !== -1)
-               && (st === '' || r.getAttribute('data-status') === st)
-               && (cr === '' || r.getAttribute('data-crew') === cr)
-               && (sp === '' || r.getAttribute('data-step-id') === sp)
-               && (rd === '' || r.getAttribute('data-ready') === rd)
-               && dueMatches(du, r.getAttribute('data-due') || '');
+               && (!fStatus || MF.matches(fStatus, r.getAttribute('data-status')))
+               && (!fCrew || MF.matches(fCrew, r.getAttribute('data-crew')))
+               && (!fStep || MF.matches(fStep, r.getAttribute('data-step-id')))
+               && (!fReady || MF.matches(fReady, r.getAttribute('data-ready')))
+               && dueOk(r.getAttribute('data-due') || '');
         r.hidden = on && !hit;
         if (hit) { any = true; shown++; }
       });
@@ -568,7 +585,10 @@
   });
   function clearFilters() {
     if (search) search.value = '';
-    filterEls.forEach(function (el) { if (el) el.value = ''; });
+    filterEls.forEach(function (el) {
+      if (!el) return;
+      if (el.tagName === 'SELECT') MF.clear(el); else el.value = '';
+    });
     applyFilters();
     keepForDay();                          // the filters leave the memory with it
   }
@@ -615,7 +635,18 @@
     if (!memKey) return;
     var f = {};
     if (search && search.value.trim() !== '') f.q = search.value;
-    filterEls.forEach(function (el) { if (el && el.value !== '') f[el.id] = el.value; });
+    // A dropdown is kept as { v: [ticked], x: excluding? }; a date box as its
+    // text. Entries saved before 2026-11-20 hold one string per dropdown, and
+    // restore() below still reads those.
+    filterEls.forEach(function (el) {
+      if (!el) return;
+      if (el.tagName === 'SELECT') {
+        var s = MF.state(el);
+        if (s.values.length) f[el.id] = { v: s.values, x: s.exclude };
+      } else if (el.value !== '') {
+        f[el.id] = el.value;
+      }
+    });
 
     var open = [];
     if (wasOpen) {
@@ -676,12 +707,21 @@
     var f = m.f || {};
     if (search && typeof f.q === 'string') search.value = f.q;
     filterEls.forEach(function (el) {
-      if (!el || typeof f[el.id] !== 'string') return;
+      if (!el || f[el.id] == null) return;
+      var kept = f[el.id];
+      if (el.tagName !== 'SELECT') {
+        if (typeof kept === 'string') el.value = kept;
+        return;
+      }
+      // An old entry is one string, meaning "only this one".
+      var vals = typeof kept === 'string' ? [kept] : (Array.isArray(kept.v) ? kept.v : []);
       // A choice no longer on the list (somebody left the show) is dropped,
       // rather than leaving the box reading "Anybody" over a filtered board.
-      if (el.tagName === 'SELECT'
-          && !Array.prototype.some.call(el.options, function (o) { return o.value === f[el.id]; })) return;
-      el.value = f[el.id];
+      vals = vals.filter(function (v) {
+        return typeof v === 'string' && v !== ''
+          && Array.prototype.some.call(el.options, function (o) { return o.value === v; });
+      });
+      if (vals.length) MF.set(el, vals, typeof kept === 'object' && kept.x === true);
     });
     applyFilters();
   }());

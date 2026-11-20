@@ -32,12 +32,19 @@ if (!$project) {
 }
 
 $episodes = breakdown_episodes($pdo, $projectId);
-$episode  = (string)($_GET['episode'] ?? '');
-if ($episode !== '' && !in_array($episode, $episodes, true)) $episode = '';
+// ⚠ SEVERAL EPISODES, OR ALL BUT SOME (David, 2026-11-20). An old link's
+// ?episode=EP01 still means just EP01. An episode no longer on the show is
+// dropped, as before. $episode is the filter in words, for the headings.
+$epF = filter_get('episode');
+$epF['in'] = array_values(array_intersect($epF['in'], $episodes));
+$epF['on'] = $epF['in'] !== [];
+if (!$epF['on']) $epF['not'] = false;
+$episode = filter_words($epF);
 
 $types    = breakdown_asset_types($pdo, $projectId);
 $byType   = breakdown_assets($pdo, $projectId);
-$rows     = breakdown_rows($pdo, $projectId, $episode);
+$rows     = array_values(array_filter(breakdown_rows($pdo, $projectId),
+                fn($r) => filter_hit($epF, $r['episode'])));
 $progress = breakdown_progress($pdo, $projectId);
 
 // Only the columns worth drawing. A project with one asset type gets one column
@@ -71,16 +78,16 @@ require __DIR__ . '/includes/header.php';
   <input type="hidden" name="project" value="<?= $projectId ?>">
   <?php if (count($episodes) > 1): ?>
     <label class="inline">Episode
-      <select name="episode" onchange="this.form.submit()">
+      <select name="episode" onchange="this.form.submit()"<?= filter_select_attrs($epF, '') ?>>
         <option value="">All episodes</option>
         <?php foreach ($episodes as $ep): if ($ep === '') continue; ?>
-          <option value="<?= e($ep) ?>" <?= $episode === $ep ? 'selected' : '' ?>><?= e($ep) ?></option>
+          <option value="<?= e($ep) ?>"<?= filter_sel($epF, $ep) ?>><?= e($ep) ?></option>
         <?php endforeach; ?>
       </select>
     </label>
   <?php endif; ?>
   <a class="button secondary" href="export_breakdown.php?project=<?= $projectId ?><?php
-     if ($episode !== '') echo '&amp;episode=' . urlencode($episode); ?>">Export breakdown ↓</a>
+     if ($epF['on']) echo '&amp;' . e(filter_query('episode', $epF)); ?>">Export breakdown ↓</a>
 </form>
 
 <?php // WHY THIS SCREEN CHANGES THE PLAN, said once and only while it is true.

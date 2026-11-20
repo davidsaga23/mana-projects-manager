@@ -25,7 +25,13 @@ if (!$project) {
     exit('That project no longer exists.');
 }
 
-$episodeFilter = trim($_GET['ep'] ?? '') ?: null;
+// Several episodes, or all but some (David, 2026-11-20, pick-several filters).
+// ?ep=EP01 still means just EP01; the old ?ep=all is "every episode".
+$epF = filter_get('ep');
+$epF['in'] = array_values(array_diff($epF['in'], ['all']));
+$epF['on'] = $epF['in'] !== [];
+if (!$epF['on']) $epF['not'] = false;
+$episodeFilter = filter_words($epF) ?: null;
 $stepIds = array_values(array_filter(array_map('intval',
     explode(',', trim($_GET['steps'] ?? '')))));
 
@@ -42,9 +48,12 @@ $sql = "SELECT sc.start_date, sc.end_date, sc.is_manual,
           LEFT JOIN progress pr ON pr.step_id = sc.step_id AND pr.item_key = sc.item_key
          WHERE sc.project_id = ?";
 $params = [$projectId];
-if ($episodeFilter && $episodeFilter !== 'all') {
-    $sql .= ' AND sh.episode = ?';
-    $params[] = $episodeFilter;
+if ($epF['on']) {
+    $marks = implode(',', array_fill(0, count($epF['in']), '?'));
+    // Excluding keeps the assets, which belong to no episode, as the screen does.
+    $sql .= $epF['not'] ? " AND (sh.episode IS NULL OR sh.episode NOT IN ($marks))"
+                        : " AND sh.episode IN ($marks)";
+    array_push($params, ...$epF['in']);
 }
 if ($stepIds) {
     $sql .= ' AND ps.id IN (' . implode(',', array_fill(0, count($stepIds), '?')) . ')';
@@ -141,7 +150,7 @@ $viewDate = min(array_column($rows, 'start_date'));
 // quietly giving you everything.
 $stepNames = array_values(array_unique(array_column($rows, 'step_name')));
 $parts = [];
-if ($episodeFilter && $episodeFilter !== 'all') $parts[] = $episodeFilter;
+if ($episodeFilter) $parts[] = preg_replace('/[^A-Za-z0-9]+/', '-', $episodeFilter);
 if ($stepIds) {
     $parts[] = count($stepNames) === 1
         ? preg_replace('/[^A-Za-z0-9]/', '', $stepNames[0])
@@ -152,7 +161,7 @@ $filename = preg_replace('/[^A-Za-z0-9_-]/', '_', $project['code'] ?: $project['
           . '_DetailedSchedule' . ($parts ? '_' . implode('_', $parts) : '_All')
           . '_' . date('Y-m-d') . '.gan';
 
-$filterDesc = 'Episodes: ' . ($episodeFilter && $episodeFilter !== 'all' ? $episodeFilter : 'all')
+$filterDesc = 'Episodes: ' . ($episodeFilter ?: 'all')
             . ' | Departments: ' . ($stepIds ? implode(', ', $stepNames) : 'all')
             . ' | ' . count($rows) . ' tasks';
 

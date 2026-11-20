@@ -49,12 +49,18 @@ if (!xlsx_available()) {
     exit;
 }
 
-$episode = (string)($_GET['episode'] ?? '');
 $episodes = breakdown_episodes($pdo, $projectId);
-if ($episode !== '' && !in_array($episode, $episodes, true)) $episode = '';
+// The episodes the Shots screen was filtered to: several, or all but some
+// (2026-11-20). ?episode=EP01 still means just EP01.
+$epF = filter_get('episode');
+$epF['in'] = array_values(array_intersect($epF['in'], $episodes));
+$epF['on'] = $epF['in'] !== [];
+if (!$epF['on']) $epF['not'] = false;
+$episode = filter_words($epF);
 
 $types = breakdown_asset_types($pdo, $projectId);
-$rows  = breakdown_rows($pdo, $projectId, $episode);
+$rows  = array_values(array_filter(breakdown_rows($pdo, $projectId),
+            fn($r) => filter_hit($epF, $r['episode'])));
 if (!$rows) {
     flash('warn', 'There are no shots to export.');
     header('Location: ' . $back);

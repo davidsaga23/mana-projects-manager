@@ -79,11 +79,15 @@ $views = [
   <section class="filters" aria-label="Filters">
     <input id="flt-q" class="q" type="search" placeholder="Client, contact, email or tag" aria-label="Search client or contact">
     <select id="flt-stage" aria-label="Status"></select>
-    <select id="flt-type" aria-label="Project type"></select>
-    <select id="flt-source" aria-label="Source"></select>
-    <select id="flt-owner" aria-label="Owner"></select>
+    <?php // Type, Source, Owner and Follow-up pick several, with Include /
+          // Exclude (David, 2026-11-20): assets/multi-filter.js. Status stays a
+          // single choice: the funnel above sets it by a click, and "Open deals
+          // only" is a group of statuses, not one. ?>
+    <select id="flt-type" aria-label="Project type" data-multi data-multi-label="Type"></select>
+    <select id="flt-source" aria-label="Source" data-multi data-multi-label="Source"></select>
+    <select id="flt-owner" aria-label="Owner" data-multi data-multi-label="Owner"></select>
     <span class="range"><span class="lbl">Value</span><input id="flt-min" type="number" min="0" step="1000" inputmode="numeric" placeholder="Min $" aria-label="Minimum value"> – <input id="flt-max" type="number" min="0" step="1000" inputmode="numeric" placeholder="Max $" aria-label="Maximum value"></span>
-    <select id="flt-due" aria-label="Follow-up">
+    <select id="flt-due" aria-label="Follow-up" data-multi data-multi-label="Follow-up">
       <option value="">Any follow-up</option><option value="overdue">Overdue</option><option value="week">Due in next 7 days</option><option value="none">No follow-up set</option>
     </select>
     <button type="button" class="btn link" id="flt-clear" hidden>Clear filters</button>

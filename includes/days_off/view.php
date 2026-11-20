@@ -99,10 +99,10 @@
       </select></label>
     <?php if ($hasDept): ?>
       <label class="inline">Department
-        <select name="dept" onchange="this.form.submit()">
+        <select name="dept" onchange="this.form.submit()"<?= filter_select_attrs($dept, '') ?>>
           <option value="">All</option>
           <?php foreach (crew_departments($pdo) as $dname): ?>
-            <option value="<?= e($dname) ?>"<?= $dept === $dname ? ' selected' : '' ?>><?= e($dname) ?></option>
+            <option value="<?= e($dname) ?>"<?= filter_sel($dept, $dname) ?>><?= e($dname) ?></option>
           <?php endforeach; ?>
         </select></label>
     <?php endif; ?>
