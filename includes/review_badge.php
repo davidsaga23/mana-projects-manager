@@ -14,6 +14,23 @@ const REVIEW_STAGES = [
     'final'      => ['from' => 'ready for review', 'to' => 'complete',         'label' => 'Final review'],
 ];
 
+/**
+ * Other spellings of a stage's status name (David, 2026-11-20 renamed Ready for
+ * review to "Ready for approval" and Completed to "Approved"). Kept HERE, not
+ * read from REQUIRED_STATUS_NAMES, because the top bar loads this file on every
+ * page and statuses.php is not always loaded with it.
+ */
+const REVIEW_NAME_ALIASES = [
+    'pending review'   => ['pending review'],
+    'ready for review' => ['ready for review', 'ready for approval'],
+    'complete'         => ['complete', 'completed', 'approved'],
+];
+
+/** Every spelling that counts as this stage status name. */
+function review_name_spellings(string $name): array {
+    return REVIEW_NAME_ALIASES[$name] ?? [$name];
+}
+
 /** A status name as compared here: lower case, single spaces. */
 function review_norm(string $name): string {
     return strtolower(trim(preg_replace('/\s+/', ' ', $name)));
@@ -51,7 +68,11 @@ function review_stages(): array {
 
 /** The statuses ("from") that put a task in this account's queue. */
 function review_from_names(): array {
-    return array_map(fn($k) => REVIEW_STAGES[$k]['from'], review_stages());
+    $out = [];
+    foreach (review_stages() as $k) {
+        foreach (review_name_spellings(REVIEW_STAGES[$k]['from']) as $n) $out[] = $n;
+    }
+    return array_values(array_unique($out));
 }
 
 /**

@@ -985,8 +985,14 @@ require __DIR__ . '/includes/header.php';
                     // offered (status_self_serve()); the current status still
                     // shows, greyed, so the box says where the work stands. ?>
               <select name="status_id" onchange="this.form.submit()" <?= $canSetStatus ? '' : 'disabled' ?>>
-                <?php if (can_edit() || $row['status_id'] === null): ?>
-                  <option value="" <?= can_edit() ? '' : 'disabled' ?>>not started</option>
+                <?php // No blank "not started" any more (David, 2026-11-20): a task with no
+                      // status reads as the show's Waiting to start, selected. A show
+                      // without that status keeps the blank, so the box still says something.
+                      $waitRow = $row['status_id'] === null
+                          ? status_waiting(array_values($statusesByProject[$pid] ?? [])) : null;
+                      if ($waitRow) $row['status_id'] = (int)$waitRow['id']; ?>
+                <?php if ($row['status_id'] === null): ?>
+                  <option value="" selected <?= can_edit() ? '' : 'disabled' ?>>waiting to start</option>
                 <?php endif; ?>
                 <?php foreach (($statusesByProject[$pid] ?? []) as $sid => $s): ?>
                   <?php if ((int)($s['is_excluded'] ?? 0) === 1) continue; ?>
