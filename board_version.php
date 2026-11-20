@@ -218,6 +218,150 @@ if (isset($_POST['add_review'])) {
             $bad = $e->getMessage();
         }
     }
+// --- reply to a review note ---------------------------------------------------
+//
+// David, 2026-11-20: "can we implement a reply to this note so we can keep the
+// conversation going inside the review of any version?" A reply is a comment
+// whose parent is the note (migration 039) and which names no version, so it is
+// never counted as a note of its own; board_versions_html() draws it under the
+// note, and the Comments tab threads it there too.
+//
+// ⚠ ANYBODY WHO CAN OPEN THE TASK MAY REPLY, as anybody may comment
+// (board_comment.php): the artist answering "push the pose" is who this is for.
+// What is checked: the note is a REVIEW NOTE ON THIS TASK. The request already
+// proved the task is on a show this account can see; a note id from another
+// show matches nothing here.
+//
+// Who hears: the note's author, everybody who has replied to it, and whoever
+// put the version up — the people in that conversation — minus the writer and
+// anybody the reply @names, who has just had their mention bell. Rung as a
+// 'review', the bell kind that already leads to the version's notes.
+} elseif (isset($_POST['add_reply'])) {
+    $noteId = (int)($_POST['reply_to'] ?? 0);
+    $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+    $note = null;
+    if (ticket_threads_available($pdo) && board_reviews_available($pdo) && $pid) {
+        $q = $pdo->prepare('SELECT id, user_id, version_id FROM ticket_comments
+                             WHERE id = ? AND progress_id = ? AND version_id IS NOT NULL');
+        $q->execute([$noteId, $pid]);
+        $note = $q->fetch() ?: null;
+    }
+    if (!ticket_threads_available($pdo)) {
+        $bad = 'Replies need database update 039.';
+    } elseif (!$note) {
+        $bad = 'That review note is not on this task any more.';
+    } else {
+        $files = isset($_FILES['attachments']) ? normalize_files_array($_FILES['attachments']) : [];
+        $hasFiles = (bool)array_filter($files, fn($f) => ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        $pq = $pdo->prepare('SELECT code, name FROM projects WHERE id = ?');
+        $pq->execute([$projectId]);
+        $project = $pq->fetch() ?: ['code' => '', 'name' => ''];
+        $ctx = [
+            'step_name'    => (string)$detail['step']['name'],
+            'item_name'    => (string)$detail['item']['name'],
+            'project_code' => (string)$project['code'],
+            'project_name' => (string)$project['name'],
+        ];
+        try {
+            [$commentId, $said] = board_comment_add(
+                $pdo, $projectId, $stepId, $itemKey, (string)($_POST['body'] ?? ''), (int)$note['id'],
+                $userId, $ctx, $hasFiles, null
+            );
+            if ($hasFiles) {
+                $res = save_ticket_attachments($pdo, $files, 0, $commentId, $userId);
+                if ($res['saved'])  $said .= ' ' . $res['saved'] . ' file(s) attached.';
+                if ($res['errors']) $said .= ' ' . implode(' ', $res['errors']);
+            }
+
+            // The bell for the people in the conversation. ⚠ NEVER A FAILURE:
+            // the reply is saved by now, and a red line would make it look lost.
+            try {
+                $userIds = [(int)$note['user_id']];
+                $rq = $pdo->prepare('SELECT DISTINCT user_id FROM ticket_comments WHERE parent_id = ?');
+                $rq->execute([(int)$note['id']]);
+                foreach ($rq->fetchAll(PDO::FETCH_COLUMN) as $u) $userIds[] = (int)$u;
+                $vq = $pdo->prepare('SELECT uploaded_by FROM progress_versions WHERE id = ?');
+                $vq->execute([(int)$note['version_id']]);
+                $userIds[] = (int)$vq->fetchColumn();
+                $userIds = array_values(array_unique(array_filter($userIds)));
+                $tell = [];
+                if ($userIds) {
+                    $cq = $pdo->prepare('SELECT crew_id FROM users WHERE crew_id IS NOT NULL AND id IN ('
+                        . implode(',', array_fill(0, count($userIds), '?')) . ')');
+                    $cq->execute($userIds);
+                    foreach ($cq->fetchAll(PDO::FETCH_COLUMN) as $c) $tell[(int)$c] = true;
+                }
+                $me = (int)(effective_crew_id($pdo) ?? 0);
+                unset($tell[$me]);
+                $mq = $pdo->prepare('SELECT crew_id FROM ticket_mentions WHERE comment_id = ?');
+                try {
+                    $mq->execute([$commentId]);
+                    foreach ($mq->fetchAll(PDO::FETCH_COLUMN) as $c) unset($tell[(int)$c]);
+                } catch (Throwable $e) {
+                    // before the mentions table: nobody was named, nobody to skip
+                }
+                if ($tell) {
+                    notify_add($pdo, array_keys($tell), [
+                        'kind'        => 'review',
+                        'actor'       => current_user_display(),
+                        'summary'     => trim($ctx['step_name'] . ' on ' . $ctx['item_name'], ' on '),
+                        'project_id'  => $projectId,
+                        'step_id'     => $stepId,
+                        'item_key'    => $itemKey,
+                        'progress_id' => $pid,
+                        'comment_id'  => $commentId,
+                    ], $me);
+                }
+            } catch (Throwable $e) {
+                error_log('[Anima bell] review reply: ' . $e->getMessage());
+            }
+        } catch (Throwable $e) {
+            $bad = $e->getMessage();
+        }
+    }
+// --- take a reply back --------------------------------------------------------
+//
+// Yours, or an admin's: the rule board_comment.php keeps for every comment, and
+// the same refusal when somebody else has answered it (only reachable from the
+// Comments tab, which threads replies to replies). Its files leave the server
+// first, while their stored names are still readable.
+} elseif (isset($_POST['delete_reply'])) {
+    $rid = (int)$_POST['delete_reply'];
+    $pid = (int)board_task_progress_id($pdo, $projectId, $stepId, $itemKey);
+    $q = $pdo->prepare('SELECT id, user_id FROM ticket_comments
+                         WHERE id = ? AND progress_id = ? AND version_id IS NULL AND parent_id IS NOT NULL');
+    try {
+        $q->execute([$rid, $pid]);
+        $rp = $q->fetch();
+    } catch (Throwable $e) {
+        $rp = false;   // before migration 039 there are no replies to delete
+    }
+    if (!$rp || !$pid) {
+        $bad = 'That reply is already gone.';
+    } elseif (!is_admin() && ((int)$rp['user_id'] !== $userId || $userId <= 0)) {
+        $bad = 'You can only delete replies you wrote yourself.';
+    } else {
+        $kq = $pdo->prepare('SELECT id, user_id FROM ticket_comments WHERE parent_id = ?');
+        $kq->execute([$rid]);
+        $kids = $kq->fetchAll();
+        if (array_filter($kids, fn($k) => (int)$k['user_id'] !== $userId) && !is_admin()) {
+            $bad = 'Somebody has answered this reply, so it can only be deleted by an administrator.';
+        } else {
+            $ids = array_merge([$rid], array_map(fn($k) => (int)$k['id'], $kids));
+            try {
+                $fq = $pdo->prepare('SELECT stored_name FROM ticket_attachments WHERE comment_id IN ('
+                    . implode(',', array_fill(0, count($ids), '?')) . ')');
+                $fq->execute($ids);
+                foreach ($fq->fetchAll(PDO::FETCH_COLUMN) as $stored) {
+                    @unlink(upload_dir_path() . '/' . basename((string)$stored));
+                }
+            } catch (Throwable $e) {
+                // no attachments table: no files to remove
+            }
+            $pdo->prepare('DELETE FROM ticket_comments WHERE id = ?')->execute([$rid]);
+            $said = 'Reply deleted.';
+        }
+    }
 // --- take the latest version back -------------------------------------------
 //
 // ⚠ THE LATEST ONLY, and that is a rule rather than an oversight. Versions are

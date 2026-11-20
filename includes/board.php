@@ -1603,6 +1603,7 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
     $reviews = [];      // version id => [comment rows]
     $files   = [];      // comment id => [attachments]
     $named   = [];      // comment id => [names as written]
+    $replies = [];      // note id => [reply rows], oldest first
     if ($reviewsOn && $progressId) {
         $q = $pdo->prepare(
             'SELECT c.id, c.version_id, c.body, c.created_at, u.display_name'
@@ -1615,6 +1616,42 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
         $q->execute([(int)$progressId]);
         $ids = [];
         foreach ($q as $r) { $reviews[(int)$r['version_id']][] = $r; $ids[] = (int)$r['id']; }
+
+        // REPLIES TO A NOTE (David, 2026-11-20: "a reply to this note so we can
+        // keep the conversation going inside the review of any version"). A
+        // reply is an ordinary comment whose parent_id is the note (migration
+        // 039), with no version of its own — so it is never counted or numbered
+        // as a note, and the Comments tab threads it under the note as well.
+        // Replies to replies (the Comments tab allows them) are read a level
+        // at a time and hung on the note they started from: here the
+        // conversation is one flat thread under each note, oldest first.
+        if ($ids && ticket_threads_available($pdo)) {
+            $rootOf = array_combine($ids, $ids);
+            $level = $ids;
+            for ($depth = 0; $level && $depth < 6; $depth++) {
+                $rq = $pdo->query(
+                    'SELECT c.id, c.parent_id, c.user_id, c.body, c.created_at, u.display_name
+                       FROM ticket_comments c
+                       LEFT JOIN users u ON u.id = c.user_id
+                      WHERE c.parent_id IN (' . implode(',', $level) . ') AND c.version_id IS NULL
+                      ORDER BY c.created_at, c.id'
+                );
+                $level = [];
+                foreach ($rq as $r) {
+                    $rid = (int)$r['id'];
+                    if (isset($rootOf[$rid])) continue;
+                    $rootOf[$rid] = $rootOf[(int)$r['parent_id']];
+                    $replies[$rootOf[$rid]][] = $r;
+                    $ids[] = $rid;
+                    $level[] = $rid;
+                }
+            }
+            // A level at a time reads them by depth; the thread reads by time.
+            foreach ($replies as &$list) {
+                usort($list, fn($a, $b) => [$a['created_at'], (int)$a['id']] <=> [$b['created_at'], (int)$b['id']]);
+            }
+            unset($list);
+        }
         if ($ids) {
             $in = implode(',', $ids);
             try {
@@ -1710,7 +1747,18 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
             // current version, shut on older ones, whose notes have been acted on
             // and would only push their own pictures off screen.
             if ($mine) {
-                $out .= '<div class="version-reviews" id="vr' . $vid . '"' . ($isTop ? '' : ' hidden') . '>'
+                // Who and where a reply goes (assets/review-viewer.js reads these,
+                // in the pane and in the viewer's copy of this thread alike), and
+                // the people its box can @name. Anybody who can open the task may
+                // reply, as anybody may comment: the artist answering the note is
+                // the whole point.
+                $canReply = $mayPost && ticket_threads_available($pdo);
+                $out .= '<div class="version-reviews" id="vr' . $vid . '"' . ($isTop ? '' : ' hidden')
+                      . ($canReply
+                          ? ' data-project="' . $projectId . '" data-step="' . $stepId . '" data-item="' . e($itemKey) . '"'
+                            . ' data-people="' . e(json_encode(array_map(fn($p) => ['name' => $p['name']], $people),
+                                                                 JSON_UNESCAPED_UNICODE)) . '"'
+                          : '') . '>'
                       . '<div class="version-reviews-title">Review notes on '
                       . e(version_label((int)$v['version_no'])) . '</div>';
                 foreach ($mine as $no => $r) {
@@ -1752,6 +1800,46 @@ function board_versions_html(PDO $pdo, int $projectId, int $stepId, string $item
                             ob_start();
                             render_attachment($a, false);
                             $out .= ob_get_clean();
+                        }
+                        $out .= '</div>';
+                    }
+                    // The conversation under the note, then the way to add to it.
+                    // The reply box itself is built by assets/review-viewer.js
+                    // when Reply is pressed, so a pane of twenty notes is not
+                    // twenty empty forms.
+                    if (!empty($replies[$cid]) || $canReply) {
+                        $out .= '<div class="version-replies">';
+                        foreach ($replies[$cid] ?? [] as $rp) {
+                            $rid = (int)$rp['id'];
+                            $out .= '<div class="version-reply" id="bc' . $rid . '">'
+                                  . '<div class="comment-head"><strong>' . e($rp['display_name'] ?? 'Someone')
+                                  . '</strong><span class="muted small">'
+                                  . e(date('j M Y · g:i A', strtotime((string)$rp['created_at']))) . '</span>';
+                            // Yours to take back, or an admin's — the rule every
+                            // comment keeps (board_comment.php).
+                            if ($mayPost && (is_admin() || ((int)$rp['user_id'] === $myUserId && $myUserId > 0))) {
+                                $out .= '<button type="button" class="link-danger version-reply-del" data-reply="'
+                                      . $rid . '" title="Delete this reply">&times;</button>';
+                            }
+                            $out .= '</div>';
+                            if ((string)$rp['body'] !== '(attachment)') {
+                                $out .= '<div class="comment-body">'
+                                      . ticket_render_body((string)$rp['body'], $named[$rid] ?? []) . '</div>';
+                            }
+                            if (!empty($files[$rid])) {
+                                $out .= '<div class="attachment-grid">';
+                                foreach ($files[$rid] as $a) {
+                                    ob_start();
+                                    render_attachment($a, false);
+                                    $out .= ob_get_clean();
+                                }
+                                $out .= '</div>';
+                            }
+                            $out .= '</div>';
+                        }
+                        if ($canReply) {
+                            $out .= '<button type="button" class="version-reply-btn" data-reply-note="' . $cid . '">'
+                                  . 'Reply</button>';
                         }
                         $out .= '</div>';
                     }
