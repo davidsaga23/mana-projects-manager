@@ -49,9 +49,12 @@ function seed_project_statuses(PDO $pdo, int $projectId): int {
 const REQUIRED_STATUS_NAMES = [
     'in progress'      => ['in progress'],
     'pending review'   => ['pending review'],
-    'ready for review' => ['ready for review'],
+    // Renamed on screen (David, 2026-11-20): Ready for review is now "Ready for
+    // approval" and Completed is now "Approved". The old spellings still count, so
+    // a show keeps working before migration 107 renames its rows.
+    'ready for review' => ['ready for review', 'ready for approval'],
     'retake'           => ['retake'],
-    'complete'         => ['complete', 'completed'],
+    'complete'         => ['complete', 'completed', 'approved'],
 ];
 
 function status_name_norm(string $name): string {
@@ -73,6 +76,22 @@ function status_required_covered(array $statuses, string $key, int $exceptId): b
         if ((int)$s['id'] !== $exceptId && status_required_key((string)$s['name']) === $key) return true;
     }
     return false;
+}
+
+/**
+ * The status a task with none recorded reads as: the show's "Waiting to start".
+ *
+ * David, 2026-11-20: "let's also delete the not started and make Waiting to Start
+ * the default status". "Not started" was never a status row, only what Spell drew
+ * for a task with no status at all, so it is retired by drawing that task as
+ * Waiting to start instead (and migration 107 writes it into the rows). Null when
+ * the show has no such status, and then the old blank choice stays.
+ */
+function status_waiting(array $statuses): ?array {
+    foreach ($statuses as $s) {
+        if (status_name_norm((string)($s['name'] ?? '')) === 'waiting to start') return $s;
+    }
+    return null;
 }
 
 /** A project's statuses, in display order. */

@@ -54,7 +54,7 @@ function review_status_named(PDO $pdo, int $projectId, string $name): ?array {
 function review_stage_of(string $statusName): ?string {
     $name = review_norm($statusName);
     foreach (review_stages() as $k) {
-        if (REVIEW_STAGES[$k]['from'] === $name) return $k;
+        if (in_array($name, review_name_spellings(REVIEW_STAGES[$k]['from']), true)) return $k;
     }
     return null;
 }

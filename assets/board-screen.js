@@ -190,7 +190,7 @@
       if (opt.getAttribute('data-begun') === '1') started++;
     });
 
-    var name = 'Not started', color = 'var(--violet)';
+    var name = 'Waiting to start', color = 'var(--violet)';
     if (live > 0 && done === live) { name = 'Finished'; color = 'var(--ok)'; }
     else if (started > 0) { name = 'In progress'; color = 'var(--warn)'; }
 
@@ -338,7 +338,7 @@
       var key = opt.value === '' ? '__none' : opt.value;
       if (!buckets[key]) {
         buckets[key] = {
-          name: opt.value === '' ? 'Not started' : (opt.textContent || '').trim(),
+          name: opt.value === '' ? 'Waiting to start' : (opt.textContent || '').trim(),
           color: opt.getAttribute('data-color') || 'var(--border-strong)',
           rank: rankOf(opt),
           order: opt.index,

@@ -212,7 +212,7 @@ try {
         notify_add($pdo, notify_subscribers($pdo, $pid), [
             'kind'        => 'status',
             'actor'       => current_user_display(),
-            'summary'     => $taskName() . ' → ' . ($status['name'] ?? 'Not started'),
+            'summary'     => $taskName() . ' → ' . ($status['name'] ?? 'Waiting to start'),
             'project_id'  => $projectId,
             'step_id'     => $stepId,
             'item_key'    => $itemKey,
