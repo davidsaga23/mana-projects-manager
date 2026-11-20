@@ -6523,3 +6523,29 @@ Claude cannot do speech-to-text (the API takes text, images and documents, not a
 Open for David: whether anyone may opt out of a call being written down, whether transcripts
 should be deleted after a while, and whether the notes should ring the bell.
 
+## 2026-11-20 — Fewer requests before a bigger server
+
+**Why:** after the move to KnownHost (shared cPanel, LiteSpeed), Anima spun and timed out. Support
+(2026-11-19) found repeated "Reached max children process limit: 10, extra: 3" and 512 requests in
+9 minutes. Agreed with David: cut the requests first, and only then decide whether to pay for a VPS.
+
+**What made the load:** background polling, mostly the Realm (unread counts every 3 to 8 seconds,
+chat every 3, a call's signalling every second), plus two polls on every Anima page. And PHP's
+session lock: every request holds the person's session file to the end, so one slow request (an AI
+call of up to three minutes, a statement of up to 90 seconds) made that person's other requests
+wait, each holding one of the ten processes while doing nothing.
+
+**Decided:**
+- **Hidden tabs ask nothing**, except the single desktop-notification tab and the Realm heartbeat
+  (every 60 seconds hidden; "here" lasts 90). A call keeps going in the background.
+- **Paces:** Realm unread 15 s (5 s sharing a room), chat 5 s, voice 1 s while connecting and 10 s
+  once connected (`REALM_VOICE_SECONDS` 15 → 35, `REALM_SIGNAL_SECONDS` 30 → 60), transcript 30 s.
+  A new person in a call may take up to about 10 seconds longer to be heard.
+- **One top-bar poll:** `notify_poll.php?realm=1` carries the Realm button's count; realm-nudge.js
+  listens to bell.js and polls by itself only where the bell is off.
+- **Back-off:** a failed request doubles its wait, capped (five minutes; ten seconds for a call).
+- **`session_release()` / `session_resume()`** (includes/auth.php) around slow work; resume puts
+  back whatever the slow part wrote (a flash message) so callers need not know.
+
+**Not done:** true push (WebSockets / a service worker), which shared hosting cannot run well;
+that, or a VPS, is the next step if the limit is still reached.
