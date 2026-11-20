@@ -95,7 +95,9 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
   </div>
 <?php else: ?>
 
-<div class="board-head">
+<?php // data-pin: the show chips stay under the top bar while the board scrolls
+      // (David, 2026-11-20). assets/pin-top.js stacks them; style.css explains. ?>
+<div class="board-head" data-pin>
   <div class="board-shows" role="group" aria-label="Show">
     <?php foreach ($projects as $p): ?>
       <?php $chipColor = project_color($pdo, (int)$p['id']); ?>

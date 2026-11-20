@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-20 — The top bar stays on screen *(no migration)*
+
+- **The top bar (logo, bell, Home, Spell, … Admin) stays at the top of the window** when you scroll,
+  on every page and on a phone. On Spell the row of show chips (FCM, MST, …) stays under it too.
+- Everything else that already stuck to the top (table headings, Spell's filter row, the colour
+  key, the bulk rates) now sticks just under the bar instead of sliding behind it.
+  `assets/pin-top.js` measures the bar; `assets/style.css` (by `.topbar`) explains the rule.
+
 ## 2026-11-20 — Filters pick several, and can exclude *(no migration)*
 
 - **Every filter dropdown picks one or more**, as ticks, with a search box when the list is long.
