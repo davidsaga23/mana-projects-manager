@@ -34,6 +34,22 @@ children process limit: 10"); past it, pages spin, logins look stuck and pop-ups
   Claude reads a transcript or writes call notes, while statements and invoices are worked out,
   while an email is sent, and on every Board save.
 
+## 2026-11-20 — Subscribe to tasks on Spell *(migration 108)*
+
+- **Tick boxes on Spell:** one on every task, one on each shot or asset for all of its tasks, and
+  one in the heading for every task the filters show (with Status: Retake picked, that is the
+  retakes). Shift-click ticks a run. A filter that hides a ticked task unticks it.
+- **A bar at the bottom while anything is ticked:** "N tasks selected · Subscribe · Unsubscribe ·
+  Clear" (Esc clears too). One request for the lot. A small bell marks the tasks you subscribed to.
+- **Subscribe in the task panel:** a bell button under the task's name, pressed when you hear about
+  that task (because you subscribed, or because you are on it or have spoken on it).
+- **What a subscriber hears**, in the bell and the 9 am / 5 pm email summary: status changes, new
+  versions, review notes, comments and replies, a new assignee, a moved due date.
+- **Unsubscribe mutes a task**, even one you would hear about because you are on it. Being handed a
+  task or @named still reaches you.
+- Anybody may subscribe themselves to tasks on shows they can see, artists included; nobody can
+  subscribe somebody else.
+
 ## 2026-11-20 — Admin: Email diagnostic page removed *(no migration)*
 
 - The **Email** page under Admin (`smtp_test.php`) is gone: mail works on the new host, so the diagnostic is

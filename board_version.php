@@ -492,6 +492,17 @@ if (isset($_POST['add_review'])) {
                 $more = digest_told_sentence($pdo, array_diff(array_keys($named), [(int)(effective_crew_id($pdo) ?? 0)]));
                 if ($more !== '') $said .= ' ' . $more;
             }
+
+            // A version put up while the task was ALREADY in review (or approved)
+            // moved no status, so the bell above rang nobody. Whoever subscribed
+            // to the task on Spell still wants to know (David, 2026-11-20,
+            // migration 108). When the status did move, they were rung with it.
+            if ($moved === '') {
+                require_once __DIR__ . '/includes/task_follow.php';
+                task_follow_ring($pdo, $projectId, $stepId, $itemKey, $pid,
+                    trim((string)$detail['step']['name'] . ' on ' . (string)$detail['item']['name'], ' on'),
+                    $label . ' put up', array_keys($named));
+            }
         }
         // Reported, never swallowed: a file that silently vanishes looks exactly
         // like one that worked.

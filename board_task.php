@@ -111,6 +111,28 @@ if ($progressId && $myCrewId > 0 && ticket_mentions_available($pdo)
     <?php endif; ?>
   </p>
   <h2><?= e($t['step']) ?></h2>
+  <?php // SUBSCRIBE TO THIS ONE TASK (David, 2026-11-20, migration 108). Pressed
+        // means you hear about it: because you subscribed, or because you are on
+        // it, have spoken on it or were named on it (notify_subscribers(), which
+        // already applies anybody's own choice). Saved by assets/board-screen.js
+        // through board_api.php's follow_tasks, the same post the Spell bar sends. ?>
+  <?php require_once __DIR__ . '/includes/task_follow.php';
+        if ($myCrewId > 0 && task_follow_available($pdo) && !preview_blocks_saving()):
+          $chosen = task_follow_choices($pdo, $stepId, $itemKey);
+          $handOn  = in_array($myCrewId, $chosen['on'], true);
+          $handOff = in_array($myCrewId, $chosen['off'], true);
+          $derived = !$handOn && !$handOff && $progressId
+                     && in_array($myCrewId, notify_subscribers($pdo, (int)$progressId), true);
+          $following = $handOn || $derived; ?>
+    <button type="button" class="board-follow-btn<?= $following ? ' is-on' : '' ?>"
+            data-project="<?= (int)$projectId ?>" data-step="<?= (int)$stepId ?>" data-item="<?= e($itemKey) ?>"
+            aria-pressed="<?= $following ? 'true' : 'false' ?>"
+            title="<?= $derived ? 'You hear about this task because you are on it or have spoken on it. Press to stop.'
+                 : ($following ? 'You subscribed to this task. Press to stop hearing about it.'
+                               : 'Hear about every change to this task in your bell and your email summary.') ?>">
+      <?= task_follow_bell_svg(15) ?><span><?= $following ? 'Subscribed' : 'Subscribe' ?></span>
+    </button>
+  <?php endif; ?>
 </div>
 
 <div class="panel-tabs" role="tablist">

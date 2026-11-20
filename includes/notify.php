@@ -38,6 +38,10 @@ function notify_available(PDO $pdo): bool {
  * which is why a freelancer is following their own work from the moment it
  * becomes theirs without ever being taught the word "subscription".
  *
+ * Since migration 108 (David, 2026-11-20) a person may also subscribe or
+ * unsubscribe by hand on Spell; those choices are applied last, on top of the
+ * derived list. includes/task_follow.php holds them.
+ *
  * @return int[] crew ids, each once
  */
 function notify_subscribers(PDO $pdo, int $progressId): array {
@@ -83,6 +87,19 @@ function notify_subscribers(PDO $pdo, int $progressId): array {
     } catch (Throwable $e) {
         error_log('[Anima bell] subscribers: ' . $e->getMessage());
     }
+
+    // ⚠ AND WHAT PEOPLE CHOSE ON SPELL (David, 2026-11-20, migration 108): the
+    // hand-subscribed join, the unsubscribed leave, even when the rules above
+    // would have them. Loaded only here, so the chrome on every page stays light;
+    // it never throws, and before 108 it changes nothing.
+    try {
+        require_once __DIR__ . '/task_follow.php';
+        $chosen = task_follow_choices_by_progress($pdo, $progressId);
+        foreach ($chosen['on'] as $id)  $found[$id] = true;
+        foreach ($chosen['off'] as $id) unset($found[$id]);
+    } catch (Throwable $e) {
+        error_log('[Anima bell] subscriptions: ' . $e->getMessage());
+    }
     return array_keys($found);
 }
 
@@ -110,7 +127,10 @@ function notify_add(PDO $pdo, array $crewIds, array $n, int $exceptCrewId = 0): 
     if (!$want) return 0;
 
     $kind = (string)($n['kind'] ?? '');
-    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag', 'later', 'dayoff'], true)) return 0;
+    if (!in_array($kind, ['mention', 'assigned', 'status', 'review', 'reminder', 'raven', 'tag', 'later', 'dayoff', 'update'], true)) return 0;
+    // 'update' (a change on a task you subscribed to on Spell, migration 108):
+    // no fallback, and none needed, since nobody is subscribed before 108 runs.
+    if ($kind === 'update' && !enum_has_value($pdo, 'notifications', 'kind', 'update')) return 0;
     // 'later' (a saved Realm message's reminder, migration 096): the same, no fallback.
     if ($kind === 'later' && !enum_has_value($pdo, 'notifications', 'kind', 'later')) return 0;
     // 'dayoff' (a request for days off, or its answer, migration 101): no
@@ -401,6 +421,7 @@ function notify_verb(string $kind): string {
         'raven'    => 'sent you a raven',     // + "in the Realm" (082)
         'tag'      => 'tagged you in',        // + "The Tavern in the Realm" (083)
         'later'    => 'about',
+        'update'   => 'updated',                // + "Comp on SH020 · due 14 Jan" (108)
         'dayoff'   => '',                     // the summary says it all: "asked for days off, Mon 24 Nov" (101)                // "Reminder about Renata's message in the Realm" (096)
     ];
     return $words[$kind] ?? 'changed';

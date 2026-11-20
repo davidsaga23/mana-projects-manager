@@ -1332,6 +1332,17 @@ function board_comment_add(PDO $pdo, int $projectId, int $stepId, string $itemKe
         }
     }
 
+    // A plain comment or reply also rings whoever SUBSCRIBED to the task on Spell
+    // (David, 2026-11-20, migration 108), minus anybody it named, who has just
+    // had their mention. A review note already reached them above, through
+    // notify_subscribers().
+    if ($version === null) {
+        require_once __DIR__ . '/task_follow.php';
+        task_follow_ring($pdo, $projectId, $stepId, $itemKey, $progressId,
+            trim(trim((string)($ctx['step_name'] ?? '')) . ' on ' . trim((string)($ctx['item_name'] ?? '')), ' on '),
+            $parent ? 'new reply' : 'new comment', array_keys($mentions), $commentId);
+    }
+
     $said = $version !== null ? 'Review posted.' : ($parent ? 'Reply posted.' : 'Comment posted.');
     // Naming somebody tells them, here as on a ticket (David, 2026-10-06). The
     // bell above is that telling; the email is no longer sent here but in the

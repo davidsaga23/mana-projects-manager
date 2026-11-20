@@ -56,6 +56,18 @@ $maySetAny = $mayEdit;
 // to want its tasks loaded on demand instead.
 $openByDefault = false;
 
+// SUBSCRIBING TO TASKS (David, 2026-11-20: "a way to select all or by and the
+// tasks and add a subscription button"). A tick box on every task row, one on
+// each shot or asset for all of its tasks, and "select all" in the heading; the
+// bar that appears while anything is ticked subscribes YOU to them. Drawn only
+// once migration 108 has run and only for a login linked to a person, since a
+// subscription is a person's (an unlinked admin login has nobody to tell).
+// $followMine is this person's own choices on this show, one query, so a row
+// can show the small bell of a task they subscribed to.
+require_once __DIR__ . '/includes/task_follow.php';
+$followReady = $projectId && $myCrewId > 0 && task_follow_available($pdo);
+$followMine  = $followReady ? task_follow_mine($pdo, $myCrewId, $projectId) : [];
+
 // THE ASSET TYPES THIS SHOW HAS (David, 2026-11-18: "let's also add some assets
 // filters for BG, CH and environments"). Read off the board's own asset groups
 // rather than written down here, so the dropdown offers only what the show
@@ -156,7 +168,10 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
       // that got you there has scrolled away too. Both ride at the top. ?>
 <div class="board-sticky">
   <div class="board-grid-head">
-    <div>Shot and task</div>
+    <?php // ⚠ "ALL" MEANS ALL THE FILTERS SHOW, not all on the show: with Status:
+          // Retake picked, ticking this selects the retakes. assets/board-screen.js. ?>
+    <div class="board-head-name"><?php if ($followReady): ?><input type="checkbox" class="board-pick-all" id="boardPickAll"
+         aria-label="Select every task the filters show" title="Select every task the filters show"><?php endif; ?>Shot and task</div>
     <?php // Unlabelled on purpose: the button says what it does, and "URL" over
           // a column of buttons reading "Copy URL" is the same word twice. ?>
     <div></div>
@@ -342,6 +357,18 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
           <div class="board-row board-row-item"
                data-search="<?= e(strtolower($item['name'])) ?>">
             <div class="board-cell-name">
+              <?php if ($followReady): ?>
+                <?php if ($self): ?>
+                  <?php // A whole-show deliverable IS a task: its box is a task's box. ?>
+                  <input type="checkbox" class="board-pick" data-step="<?= (int)$self['step_id'] ?>"
+                         aria-label="Select <?= e($item['name']) ?>">
+                <?php elseif ($item['tasks']): ?>
+                  <input type="checkbox" class="board-pick-item"
+                         aria-label="Select every task on <?= e($item['name']) ?>">
+                <?php else: ?>
+                  <span class="board-pick-blank" aria-hidden="true"></span>
+                <?php endif; ?>
+              <?php endif; ?>
               <?php if ($item['tasks']): ?>
                 <button type="button" class="board-caret" aria-expanded="<?= $open ? 'true' : 'false' ?>"
                         aria-label="Show the tasks on <?= e($item['name']) ?>">
@@ -427,6 +454,10 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
                  data-ready="<?= !empty($t['ready']) ? '1' : '0' ?>"
                  data-due="<?= e((string)($t['due'] ?? '')) ?>">
               <div class="board-cell-name board-task-name">
+                <?php if ($followReady): ?>
+                  <input type="checkbox" class="board-pick" data-step="<?= (int)$t['step_id'] ?>"
+                         aria-label="Select <?= e($t['step']) ?> on <?= e($item['name']) ?>">
+                <?php endif; ?>
                 <span class="board-dot board-dot-step" style="background:<?= e($t['step_color'] ?: 'var(--step-default)') ?>"></span>
                 <?php // ⚠ A REAL BUTTON, not a div that listens for clicks: it
                       // is reached by Tab, pressed with the keyboard and read
@@ -455,6 +486,12 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
                         data-project="<?= $projectId ?>" data-step="<?= (int)$t['step_id'] ?>"
                         data-item="<?= e($t['item_key']) ?>"
                         aria-label="Open <?= e($t['step']) ?> on <?= e($item['name']) ?>"><?= e($t['step']) ?></button>
+                <?php if ($followReady): ?>
+                  <?php // The small bell: a task YOU subscribed to by hand. Kept in
+                        // the page either way so subscribing can show it at once. ?>
+                  <span class="board-following" title="You subscribed to this task"
+                        <?= !empty($followMine[(int)$t['step_id'] . ':' . $t['item_key']]) ? '' : 'hidden' ?>><?= task_follow_bell_svg(13) ?></span>
+                <?php endif; ?>
               </div>
               <?= board_copy_cell($t, $projectId, (string)$item['name']) ?>
               <?= board_version_cell($t) ?>
@@ -486,6 +523,18 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
   </button>
   <div class="board-panel-inner" id="boardPanelInner"></div>
 </aside>
+
+<?php // THE SELECTION BAR: only while something is ticked. One request for the
+      // lot (board_api.php, follow_tasks), always for the person looking. ?>
+<?php if ($followReady): ?>
+<div class="board-pickbar" id="boardPickBar" data-project="<?= (int)$projectId ?>" role="region"
+     aria-label="Selected tasks" hidden>
+  <span class="board-pickbar-count" id="boardPickCount" aria-live="polite"></span>
+  <button type="button" class="board-pickbar-btn is-primary" id="boardPickOn"><?= task_follow_bell_svg(14) ?> Subscribe</button>
+  <button type="button" class="board-pickbar-btn" id="boardPickOff">Unsubscribe</button>
+  <button type="button" class="board-pickbar-btn is-quiet" id="boardPickClear">Clear</button>
+</div>
+<?php endif; ?>
 
 <p class="muted small board-foot">
   A shot's status comes from its tasks. Due dates set here also move the
