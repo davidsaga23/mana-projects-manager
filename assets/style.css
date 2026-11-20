@@ -3945,6 +3945,18 @@ button.secondary.danger:hover { background: var(--danger-border); }
 .board-pickbar-select option, .board-pickbar-select optgroup { background: var(--surface-2); color: var(--text); font-weight: 400; }
 .board-pickbar-select:disabled { opacity: .55; cursor: progress; }
 body.has-pickbar .board-foot { margin-bottom: 72px; }   /* the last rows clear the bar */
+/* ⚠ ONE SIZE FOR EVERY CONTROL IN THE BAR (David, 2026-11-20: "let's make all
+   the buttons the same size"). The dropdowns took the global field's padding and
+   a width set by their longest name, so they stood taller and twice as wide as
+   the buttons beside them. Same height, width, radius and text here; a
+   dropdown's names still show in full when it is opened. */
+.board-pickbar .board-pickbar-btn, .board-pickbar .board-pickbar-select {
+  box-sizing: border-box; height: 32px; min-height: 32px; margin: 0;
+  padding: 0 12px; border-radius: 8px; border-width: 1px; border-style: solid;
+  font-size: 13px; font-weight: 600; line-height: 30px;
+}
+.board-pickbar .board-pickbar-btn, .board-pickbar .board-pickbar-select { width: 148px; justify-content: center; }
+.board-pickbar .board-pickbar-select { max-width: 148px; padding: 0 6px 0 12px; }
 .board-follow-btn {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; min-height: 32px; padding: 5px 12px;
   border-radius: 8px; border: 1px solid var(--border); background: transparent;
