@@ -237,7 +237,7 @@ foreach (['Exchange rates (frankfurter)' => 'https://api.frankfurter.dev/v1/late
          $code ? 'Reachable (an error code from Anthropic without a key is expected).' : 'Not reachable from this server.');
 }
 $add('Outside services', 'Email', 'warn',
-     'Not tested here. Log in as an admin and open smtp_test.php, then send yourself a test.');
+     'Not tested here. Trigger a notification (a comment that @mentions you) and check it arrives.');
 
 $count = ['ok' => 0, 'warn' => 0, 'bad' => 0];
 foreach ($checks as $c) $count[$c[2]]++;

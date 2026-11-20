@@ -71,8 +71,7 @@ return [
     // it differs on purpose: it is what recipients see as the sender.
     //
     // Exact host/port for the mailbox: cPanel > Email Accounts > "Connect
-    // Devices" on that address. Or open smtp_test.php in the app, which probes
-    // every plausible combination and tells you which one authenticates.
+    // Devices" on that address.
     //
     // Port and encryption MUST match: 465 = 'ssl' (implicit), 587 = 'tls'
     // (STARTTLS). Mixing them does not error — it hangs until the timeout,
