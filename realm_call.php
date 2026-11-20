@@ -33,6 +33,9 @@ if ($ready && $id > 0 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['
     // The second lock behind artist_may_post(): only somebody who was in the call.
     if (realm_scribe_may_read($pdo, $uid, $id)) {
         @set_time_limit(240);   // Anthropic may take most of a minute
+        // ...so the session is let go meanwhile (KnownHost, 2026-11-19;
+        // session_release() in includes/auth.php), and taken back for the flash.
+        session_release();
         $why = realm_scribe_retry($pdo, $id);
         if ($why === '') {
             $q = $pdo->prepare('SELECT status, note FROM realm_calls WHERE id = ?');
@@ -40,6 +43,7 @@ if ($ready && $id > 0 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['
             $after = $q->fetch() ?: [];
             if (($after['status'] ?? '') !== 'done') $why = (string)($after['note'] ?? '') ?: 'The notes could not be written.';
         }
+        session_resume();
         flash($why === '' ? 'ok' : 'err', $why === '' ? 'The notes were written again and posted in the room\'s chat.' : $why);
     }
     header('Location: ' . $self);

@@ -29,6 +29,9 @@ require_once __DIR__ . '/includes/task_events.php';   // the task's Timeline (mi
 require_login_json();
 
 header('Content-Type: application/json');
+// Nothing below writes to the session, and holding it would queue this person's
+// other tabs (and the bell) behind every save on the Board (KnownHost, 2026-11-19).
+session_release();
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

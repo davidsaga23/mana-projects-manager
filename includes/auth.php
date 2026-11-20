@@ -67,6 +67,50 @@ if (!headers_sent()) {
     header('Pragma: no-cache');
 }
 
+/**
+ * Let go of the session file while something slow runs, and take it back after.
+ *
+ * WHY (KnownHost support, 2026-11-19: "Reached max children process limit: 10").
+ * PHP locks a person's session file for the WHOLE of every request that opened
+ * it. Their other requests (the bell, the Realm, a second tab) then wait for that
+ * lock, and every one that waits holds one of the ten PHP processes the hosting
+ * plan allows, doing nothing. One AI call (up to three minutes) or one slow
+ * statement could so tie up several processes for a single person.
+ *
+ * session_release() writes the session and unlocks it; $_SESSION stays readable.
+ * session_resume() locks it again before anything is written, and puts back any
+ * top-level key the slow part changed in the meantime (a flash() message, a
+ * cache), so a caller does not have to know which ones that was. Both are safe
+ * to call when there is no session (cron) and never throw.
+ *
+ * ⚠ RESUME BEFORE THE PAGE IS PRINTED. A session cannot be reopened once output
+ * has begun; then the changes made while released are lost (a flash message
+ * shows once more, a cache is filled again). A JSON endpoint that writes nothing
+ * to the session can simply release and never resume.
+ */
+function session_release(): void {
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    $GLOBALS['__session_before_release'] = $_SESSION;
+    session_write_close();
+}
+
+function session_resume(): void {
+    if (session_status() === PHP_SESSION_ACTIVE || !array_key_exists('__session_before_release', $GLOBALS)) return;
+    $before = $GLOBALS['__session_before_release'];
+    unset($GLOBALS['__session_before_release']);
+    if (headers_sent()) return;
+    $now = $_SESSION;
+    // Same id, name and settings as the first start; this one may wait briefly
+    // for another of the person's requests to finish with the file.
+    if (!@session_start()) return;
+    foreach ($now as $k => $v) {
+        if (!array_key_exists($k, $before) || $before[$k] !== $v) $_SESSION[$k] = $v;
+    }
+    foreach ($before as $k => $v) {
+        if (!array_key_exists($k, $now)) unset($_SESSION[$k]);
+    }
+}
+
 function is_logged_in(): bool {
     return !empty($_SESSION['user_id']);
 }

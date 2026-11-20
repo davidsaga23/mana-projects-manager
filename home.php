@@ -195,6 +195,11 @@ $tryPart = function (string $part, callable $fn, $fallback) use (&$invoiceErrors
 };
 if ($tab === 'invoice') {
     if (function_exists('set_time_limit')) @set_time_limit(90);   // a statement per show adds up
+    // ...so the session is let go while they are worked out, and this person's
+    // other tabs, the bell and the Realm are not queued behind them (KnownHost,
+    // 2026-11-19; session_release() in includes/auth.php). Taken back below,
+    // before the page is printed.
+    session_release();
     $terms = $tryPart('your contract', fn() => own_crew_term($crewId), null);
     // Their positions with a contract of their own (finance_install_13):
     // [project id][step id] => row, their own only.
@@ -214,6 +219,7 @@ if ($tab === 'invoice') {
     }
 }
 
+session_resume();   // a no-op unless the invoice tab let the session go above
 $pageTitle = 'Home';
 require __DIR__ . '/includes/header.php';
 $tabUrl = fn(string $t) => 'home.php?tab=' . $t . ($t === 'invoice' && $month !== date('Y-m') ? '&month=' . $month : '');

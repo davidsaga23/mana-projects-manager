@@ -1436,9 +1436,9 @@ function standOf(p, i) {
 
    RECEIVING costs no request of its own. Where the others stand comes back with what this page asks
    anyway: the unread counts, an open conversation, the voice beat, the heartbeat, and my own `stand`.
-   The one change: the unread counts are asked every 3 seconds instead of every 8 while I share a
-   room with somebody, or for 15 seconds after anybody I can see has moved. A quiet village asks
-   exactly what it asked before.
+   The one change: the unread counts are asked every 5 seconds instead of every 15 while I share a
+   room with somebody, or for 15 seconds after anybody I can see has moved. (Every 3 and 8 until
+   2026-11-20; see "fewer requests".) A quiet village asks exactly what it asked before.
 
    SHOWING. A spot arrives a second or three late and in jumps, so nobody is drawn AT the spot: each
    character walks from where this page last drew them to where they now are, round the furniture or
@@ -2405,10 +2405,27 @@ if (window.AnimaNotify) window.AnimaNotify.onClick = function (n) {
 function send(fields) {
   var body = new URLSearchParams(); Object.keys(fields).forEach(function (k) { body.append(k,fields[k]); });
   return fetch(R.api,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); })
-    .then(function (j) { if (j && j.error) toast(j.error); if (j && j.people) applyState(j); return j; })
-    .catch(function () { /* A missed beat is corrected by the next one. */ return null; });
+    .then(function (r) { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function (j) { netOk('beat'); if (j && j.error) toast(j.error); if (j && j.people) applyState(j); return j; })
+    .catch(function () { /* A missed beat is corrected by the next one. */ netBad('beat',25000); return null; });
 }
+/* ---------- fewer requests (KnownHost, 2026-11-19) ----------
+   The hosting plan runs at most ten PHP requests at once ("Reached max children process limit:
+   10"), and when that is reached pages spin and logins look stuck. The Realm was most of the load:
+   unread counts every 3 to 8 seconds, chat every 3, voice every second. So, from 2026-11-20:
+     * nothing is asked while the window is hidden, except the heartbeat (slowed to a minute, so the
+       character still shows as here) and a call, which goes on in the background;
+     * coming back into view asks once, at once;
+     * the unread counts and who stands where: every 15 seconds, every 5 while I share a room with
+       somebody or somebody I can see has just moved; an open conversation every 5;
+     * a call's signalling every second only while a line is being made or mended, else every 10;
+     * BACKING OFF: a request that fails doubles the wait before that kind is asked again, up to
+       five minutes, and the first success puts it back. An overloaded server is not hammered.
+   NET[kind] is that kind's failures and the time before which it is not asked again. */
+var NET = {};
+function netWait(k) { var n = NET[k]; return !!(n && Date.now() < n.until); }
+function netBad(k, base) { var n = NET[k] || (NET[k] = {fails:0,until:0}); n.fails = Math.min(n.fails+1,5); n.until = Date.now()+Math.min(base*Math.pow(2,n.fails),300000); }
+function netOk(k) { delete NET[k]; }
 
 /* ---------- moving ---------- */
 function setView(v) { var w = Math.max(420,Math.min(1600,v.w)), h = w*.625; S.view = {x:Math.max(0,Math.min(1600-w,v.x)),y:Math.max(0,Math.min(1000-h,v.y)),w:w,h:h}; var s = $('mapsvg'); if (s) s.setAttribute('viewBox',vb()); draw(); }
@@ -2727,11 +2744,16 @@ function takeUnread(u, tu) {
     toast('A raven from '+(who ? firstName(who.name) : 'somebody')+'. Click here to read it.',k);
   });
   ST.chat.unread = u; renderSide(); badge();
+  /* The Realm button on Anima's other pages keeps its last count for a minute (assets/realm-nudge.js);
+     it may be out of date now, so it is dropped and the next page asks afresh. */
+  try { localStorage.removeItem('anima.realmNudge'); } catch (e) { /* nothing kept */ }
 }
+var UNREAD = {last:Date.now()};   /* when the unread counts were last asked (the ticker near the end) */
 function askUnread() {
-  if (!ST.chat || CH.open || document.hidden) return;
+  if (!ST.chat || CH.open || document.hidden || netWait('unread')) return;
+  UNREAD.last = Date.now();
   fetch(R.api+'?unread=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(function (j) { if (j && j.ok) { if (j.activity!=null) ST.chat.activity = j.activity; takeUnread(j.unread,j.tunread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () {});
+    .then(function (r) { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function (j) { netOk('unread'); if (j && j.ok) { if (j.activity!=null) ST.chat.activity = j.activity; takeUnread(j.unread,j.tunread); takeKnocks(j.knocks); if (R.onOffers) R.onOffers(j.offers); if (!VO.on) takeVoiceRoom(j.voice); takeSpots(j.spots); } }).catch(function () { netBad('unread',15000); });
 }
 /* Is this conversation the talk of the room I am standing in? The room's own channel, or, in MY
    house, my ravens with a visitor who is inside it: the owner must see a guest speak too. */
@@ -2931,21 +2953,23 @@ function takeNews(j) {
   takeSpots(j.spots);
 }
 function chatAsk() {
-  if (!CH.open || CH.busy || document.hidden) return; CH.busy = true;
+  if (!CH.open || CH.busy || document.hidden || netWait('chat')) return; CH.busy = true;
   if (CH.open===ACTIVITY) { if (R.actAsk) R.actAsk(); else CH.busy = false; return; }
   if (CH.open===THREADS) {
     fetch(R.api+'?threads=1',{credentials:'same-origin',headers:{'Accept':'application/json'}})
-      .then(function (r) { return r.json(); }).then(threadsTake).catch(function () { CH.busy = false; });
+      .then(chatOk).then(threadsTake).catch(chatBad);
     return;
   }
   fetch(R.api+'?chat='+encodeURIComponent(CH.open)+'&after='+CH.last+'&from='+CH.first+(CH.keep ? '&keep=1' : '')+(CH.thread ? '&thread='+CH.thread : (FIND.jump && !CH.last ? '&at='+FIND.jump : '')),{credentials:'same-origin',headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); }).then(chatTake).catch(function () { CH.busy = false; });
+    .then(chatOk).then(chatTake).catch(chatBad);
 }
+function chatOk(r) { if (!r.ok) throw new Error('HTTP '+r.status); netOk('chat'); return r.json(); }
+function chatBad() { CH.busy = false; netBad('chat',5000); }
 /* Show a conversation in the panel: a channel (thread 0), one message's thread, or the list. */
 function chatShow(id, thread, from) {
   CH.open = id; CH.thread = thread||0; CH.from = from||''; CH.last = 0; CH.first = 0; CH.seen = false; CH.busy = false; CH.keep = false; TH.counts = {}; setPick(null); sugClose();
   $('chat').hidden = false; $('chat').parentNode.classList.add('with-chat'); chatWide(CH.wide); chatMode(); $('chatMsgs').innerHTML = '';
-  clearInterval(CH.timer); CH.timer = setInterval(chatAsk,3000); chatAsk(); renderSide(); badge(); draw();
+  clearInterval(CH.timer); CH.timer = setInterval(chatAsk,5000); chatAsk(); renderSide(); badge(); draw();
   if (id!==THREADS && id!==ACTIVITY) $('chatInput').focus();
 }
 function openChat(id) {
@@ -3493,8 +3517,8 @@ function isMuted(p) { return p.me || p.id===ST.me ? VO.muted : !!p.muted; }
 function isTalking(id) { return (VO.talk[id]||0) > Date.now(); }
 /* The others in voice in the room `id`. */
 function voiceOthers(id) { return ST.people.filter(function (p) { return !p.me && p.voice && p.inside && p.place===id && p.state!=='away'; }); }
-/* Fresh word on who is in voice in the room I am in: every second from my own voice request, or
-   every few seconds with the unread counts and chat. The map's own copy is up to 25 seconds old. */
+/* Fresh word on who is in voice in the room I am in: from my own voice request (every 1 to 10
+   seconds), or every few seconds with the unread counts and chat. The map's own copy is up to 25 seconds old. */
 function takeVoiceRoom(list) {
   if (!list || !S.inside) return;
   var idx = {}, changed = false, sharer = 0;
@@ -3542,7 +3566,8 @@ function voiceJoin() {
       /* The call is written down (migration 106) when the server put me on its list. */
       VO.scribeOn = !!(v.scribe && v.scribe.on); scribeStart();
       voiceEars();
-      VO.timer = setInterval(voiceBeat,1000); VO.meter = setInterval(voiceMeter,150);
+      VO.okAt = Date.now(); VO.hot = Date.now()+20000;
+      VO.timer = setInterval(voiceTick,1000); VO.meter = setInterval(voiceMeter,150);
       voiceTake(j); renderInside(); renderSide(); draw();
     }).catch(function () { if (mine===VO.asked) fail('The call could not be reached. Try again in a moment.'); });
   },function (e) { if (mine===VO.asked) fail(micWords(e)); });
@@ -3557,12 +3582,13 @@ function voiceQuiet() {
   if (VO.stream) VO.stream.getTracks().forEach(function (t) { t.stop(); });
   if (VO.ctx) { try { VO.ctx.close(); } catch (e) { /* already closed */ } }
   VO.on = false; VO.sid = 0; VO.place = null; VO.stream = null; VO.ctx = null; VO.mine = null; VO.out = []; VO.busy = 0; VO.talk = {}; VO.talkSig = ''; VO.muted = false;
+  VO.roster = []; VO.rosterSig = ''; VO.rosterAt = 0; VO.hot = 0; VO.beatAt = 0;
 }
 /* Leave voice. `tell` is false when the server is the one that said so. */
 function voiceStop(tell) {
   if (!VO.on && !VO.joining) return;
   /* What was just said is sent BEFORE the leave: the server takes lines only from somebody still in the call. */
-  if (VO.on && tell) { var lsid = VO.sid; scribeFlush().then(function () { return voicePost({voice:'leave',sid:lsid}); }).catch(function () { /* the server notices within 15 seconds anyway */ }); }
+  if (VO.on && tell) { var lsid = VO.sid; scribeFlush().then(function () { return voicePost({voice:'leave',sid:lsid}); }).catch(function () { /* the server notices within 35 seconds anyway */ }); }
   VO.joining = false; VO.asked++; voiceQuiet(); renderInside(); renderSide(); draw();
 }
 /* Queue a note for somebody, and send it within a fifth of a second instead of at the next beat:
@@ -3571,19 +3597,46 @@ function voiceOut(to, kind, body) {
   VO.out.push({to:to,kind:kind,body:JSON.stringify(body)});
   if (!VO.flush) VO.flush = setTimeout(function () { VO.flush = 0; voiceBeat(); },200);
 }
-/* The once-a-second request. It keeps running while the window is hidden: a call goes on when
-   somebody switches to another tab, and browsers do not slow a page that holds a live call. */
+/* Is a line being made or mended? Then the signalling must be quick: an offer, its answer and the
+   addresses go back and forth in a few seconds. Otherwise the call's sound flows directly between
+   the browsers, and the server only needs to hear now and then that I am still in it. */
+function voiceHot() {
+  if (Date.now() < VO.hot || VO.out.length || SH.asking || (SH.want && !SH.on)) return true;
+  var hot = false, fresh = Date.now()-(VO.rosterAt||0) < 60000;
+  /* Somebody in the call with no working line to me yet: quick, but only for a minute after the
+     list last changed, so a line that will never come (a network that blocks it) is not waited for
+     once a second for the rest of the call. A line being made times out by itself (voicePeer). */
+  if (fresh) (VO.roster||[]).forEach(function (id) { var P = VO.peers[id]; if (!VO.dead[id] && !(P && P.ok)) hot = true; });
+  Object.keys(VO.peers).forEach(function (k) { if (!VO.peers[k].ok) hot = true; });
+  if (SH.on) Object.keys(SH.peers).forEach(function (k) { if (!SH.peers[k].ok && !SH.dead[k]) hot = true; });
+  if (fresh && SH.who && SH.who!==ST.me && !SH.hide && !(SH.view && (SH.view.ok || SH.view.bad))) hot = true;
+  return hot;
+}
+/* Every second, decide whether a beat is due: each second while hot, every 10 seconds once every
+   line is up (KnownHost, 2026-11-19; see "fewer requests" above). After a failure the wait doubles,
+   up to 10 seconds, so a struggling server is not asked once a second. */
+function voiceTick() {
+  if (!VO.on) return;
+  var gap = voiceHot() ? 1000 : 10000;
+  if (VO.misses) gap = Math.max(gap,Math.min(10000,1000*Math.pow(2,VO.misses)));
+  if (Date.now()-(VO.beatAt||0) >= gap-50) voiceBeat();
+}
+/* The request itself: sent by voiceTick, and at once when there is something to say. It keeps
+   running while the window is hidden: a call goes on when somebody switches to another tab, and
+   browsers do not slow a page that holds a live call. */
 function voiceBeat() {
   if (!VO.on) return;
   /* One at a time; but a request that never comes back must not stop the beat for good. */
   if (VO.busy && Date.now()-VO.busy < 8000) return;
-  var out = VO.out, sid = VO.sid, sh = SH.want; VO.out = []; VO.busy = Date.now();
+  var out = VO.out, sid = VO.sid, sh = SH.want; VO.out = []; VO.busy = VO.beatAt = Date.now();
+  /* Left after 20 misses in a row, or 45 seconds without an answer: by then the server has taken
+     me off the call anyway (REALM_VOICE_SECONDS in includes/realm_voice.php). */
   var missed = function () { VO.busy = 0; VO.out = out.concat(VO.out).slice(-40);
-    if (++VO.misses >= 20) { voiceStop(false); toast('The call lost touch with Anima, so you left it. Check your connection, then press Join call again.'); } };
+    if (++VO.misses >= 20 || Date.now()-VO.okAt > 45000) { voiceStop(false); toast('The call lost touch with Anima, so you left it. Check your connection, then press Join call again.'); } };
   voicePost({voice:'poll',sid:sid,muted:VO.muted?1:0,share:sh?1:0,out:JSON.stringify(out)}).then(function (j) {
     if (!VO.on || VO.sid!==sid) return;
     if (!j || !j.ok || !j.voice) { missed(); return; }
-    VO.busy = 0; VO.misses = 0; voiceTake(j,sh); if (VO.on) takeSpots(j.spots);
+    VO.busy = 0; VO.misses = 0; VO.okAt = Date.now(); voiceTake(j,sh); if (VO.on) takeSpots(j.spots);
     if (VO.on && VO.out.length) voiceBeat();
   }).catch(function () { if (VO.on && VO.sid===sid) missed(); });
 }
@@ -3593,8 +3646,11 @@ function voiceBeat() {
 function voiceTake(j, asked) {
   var v = j.voice;
   if (!v.in) { voiceStop(false); if (v.why) toast(v.why); return; }
-  var idx = {};
-  (v.people||[]).forEach(function (r) { idx[r.id] = r; });
+  var idx = {}, sig = '';
+  (v.people||[]).forEach(function (r) { idx[r.id] = r; sig += r.id+':'+r.sid+(r.share?'s':'')+','; });
+  /* Somebody joined, left or started sharing, or a note arrived: quick for the next 15 seconds. */
+  if (sig!==VO.rosterSig || (v.signals && v.signals.length)) { if (sig!==VO.rosterSig) VO.rosterAt = Date.now(); VO.rosterSig = sig; VO.hot = Date.now()+15000; }
+  VO.roster = (v.people||[]).filter(function (r) { return r.id!==ST.me; }).map(function (r) { return r.id; });
   Object.keys(VO.peers).forEach(function (k) { if (!idx[k]) voiceDrop(+k); });
   Object.keys(VO.seen).forEach(function (k) { if (!idx[k]) { delete VO.seen[k]; delete VO.tries[k]; delete VO.dead[k]; } });
   (v.people||[]).forEach(function (r) {
@@ -3719,7 +3775,7 @@ function voiceMute() {
   if (VO.muted) delete VO.talk[ST.me];
   /* Muted is not written down either: the browser stops listening until Unmute. */
   if (VO.muted) scribePause(); else scribeRun();
-  renderInside(); draw();
+  renderInside(); draw(); voiceBeat();
 }
 /* A browser that refused to play sound until a click: this is the click. */
 function voiceWake() {
@@ -3754,7 +3810,7 @@ function scribeStart() {
   SC.lines = []; SC.fails = 0; SC.want = false; SC.state = 'off';
   if (!VO.scribeOn) return;
   if (!scribeCan()) { SC.state = 'cant'; return; }
-  SC.want = true; SC.timer = setInterval(function () { scribeFlush(); },8000);
+  SC.want = true; SC.timer = setInterval(function () { scribeFlush(); },30000);
   scribeRun();
 }
 function scribeRun() {
@@ -4094,7 +4150,7 @@ function shareMark(c, x, y) {
   c.fillStyle = TINT.mana; c.fillRect(bx+1,by+1,9,6);
   c.fillStyle = PAL.veil; c.fillRect(bx+2,by+5,7,1);
 }
-/* Closing the page hangs up at once instead of after the server's 15 seconds. */
+/* Closing the page hangs up at once instead of after the server's 35 seconds. */
 window.addEventListener('pagehide',function () {
   if (!VO.on) return;
   /* The last sentences first, so they are taken while I am still in the call. */
@@ -4179,18 +4235,30 @@ window.addEventListener('pagehide',keepSpot);
 setInterval(keepSpot,5000);
 /* The heartbeat. One small request every 25 seconds says I am still here and brings back where
    everybody else is. `active` is whether I touched the page since the last one. */
-setInterval(function () { var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); },25000);
-/* With no conversation open, ask for unread counts every 8 seconds. An open conversation already
-   brings them every 3. Not asked while the window is hidden.
-   The same answer says where the people I can see are standing (takeSpots), so it is asked every 3
-   seconds instead while that is worth watching: I share a room with somebody, or somebody I can
-   see has moved in the last 15 seconds. Voice brings its own every second, and then this waits. */
-var beatN = 0;
+/* Every 25 seconds; every 60 while the window is hidden and I am not in a call, which is still
+   inside the 90 seconds that count as "here" (REALM_ONLINE_SECONDS), so the character stays. */
+var BEAT = {last:Date.now()};
+function beat() { BEAT.last = Date.now(); var a = S.touched ? 1 : 0; S.touched = false; send({ping:1,active:a}); }
 setInterval(function () {
-  beatN++;
+  if (netWait('beat')) return;
+  if (Date.now()-BEAT.last >= (document.hidden && !VO.on ? 60000 : 25000)-100) beat();
+},5000);
+/* With no conversation open, ask for unread counts every 15 seconds. An open conversation brings
+   them every 5. Not asked while the window is hidden.
+   The same answer says where the people I can see are standing (takeSpots), so it is asked every 5
+   seconds instead while that is worth watching: I share a room with somebody, or somebody I can
+   see has moved in the last 15 seconds. In a call the voice request brings them, and this keeps to
+   15. (Every 3 and 8 seconds before 2026-11-20; see "fewer requests".) */
+setInterval(function () {
   var watch = SP.ready && !VO.on && ((S.inside && B[S.inside] && roomPeople(B[S.inside]).length > 0) || Date.now() < SP.hot);
-  if (beatN%(watch?3:8)===0) askUnread();
+  if (Date.now()-UNREAD.last >= (watch?5000:15000)-100) askUnread();
 },1000);
+/* Back in view after being hidden: catch up once, at once, rather than at the next turn. */
+document.addEventListener('visibilitychange',function () {
+  if (document.hidden) return;
+  if (Date.now()-BEAT.last > 10000 && !netWait('beat')) beat();
+  if (CH.open) chatAsk(); else askUnread();
+});
 /* The focus desk: the readout every second, the server's word every minute and whenever the window
    comes back into view. On a page with no desk in it, none of this runs. */
 /* The chest and the portrait: see-through buttons over the drawn things, like the shelf below. */
