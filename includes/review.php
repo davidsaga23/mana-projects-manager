@@ -75,7 +75,7 @@ function review_queue(PDO $pdo, ?array $statusNames = null): array {
     $q = $pdo->prepare(
         'SELECT pr.id, pr.project_id, pr.step_id, pr.item_key, pr.status_id, pr.updated_at,
                 p.code AS project_code, p.name AS project_name,
-                ps.name AS step_name, ps.color AS step_color,
+                ps.name AS step_name, ps.color AS step_color, ps.step_order,
                 sh.shot_code, sh.episode, a.name AS asset_name,
                 c.name AS crew_name, st.name AS status_name
            FROM progress pr
