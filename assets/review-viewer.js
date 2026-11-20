@@ -956,7 +956,7 @@
       var fa = node.getAttribute('data-frame');
       var f = fa !== null && fa !== '' ? parseInt(fa, 10) : null;
       if (f === null) {
-        var body = node.querySelector('.comment-body');
+        var body = node.querySelector(':scope > .comment-body');   // the note's, not a reply's
         var m = /^\s*Frame (\d+) \(/.exec(body ? body.textContent : '');
         if (m) f = parseInt(m[1], 10) - 1;
       }
@@ -1735,6 +1735,8 @@
     if (e.key === 'Escape') {
       // The lightbox over a note's picture closes first.
       if (document.querySelector('.lightbox.is-open')) return;
+      // A reply being written closes itself, not the viewer (see replies below).
+      if (e.target && e.target.closest && e.target.closest('.version-reply-form')) return;
       e.preventDefault();
       close(false);
       return;
@@ -1763,6 +1765,162 @@
     else if (k === 'p' || k === 'P') { setTool(S.tool === 'pen' ? null : 'pen'); }
     else if (k === 'n' || k === 'N') { setTool(S.tool === 'pin' ? null : 'pin'); }
   }
+
+  // --- replies to a note ---------------------------------------------------------------
+  //
+  // David, 2026-11-20: "can we implement a reply to this note so we can keep the
+  // conversation going inside the review of any version?" includes/board.php
+  // draws each note's replies and a Reply button under it; the box is built here
+  // when the button is pressed. Delegated from the document, because the same
+  // thread is in two places: the Versions pane, and the viewer's copy of it
+  // beside the picture. Either way the answer is the Versions pane re-drawn,
+  // which goes back into the pane — and, with the viewer open, through
+  // applyPane(), so the viewer's copy, its pins and its drafts follow.
+
+  /** Where a reply posts, and what it can @name: the thread's own data-*. */
+  function replyThread(node) {
+    return node.closest('.version-reviews[data-project]');
+  }
+
+  function openReply(btnNode) {
+    var note = btnNode.closest('.version-review'), thread = replyThread(btnNode);
+    if (!note || !thread) return;
+    var form = note.querySelector('.version-reply-form');
+    if (!form) {
+      form = el('div', 'version-reply-form');
+      form.setAttribute('data-reply-note', btnNode.getAttribute('data-reply-note'));
+      var box = document.createElement('textarea');
+      box.className = 'version-reply-box';
+      box.rows = 2;
+      box.placeholder = 'Reply… type @ to name somebody';
+      box.setAttribute('aria-label', 'Your reply to this note');
+      var row = el('div', 'version-reply-actions');
+      var say = el('span', 'version-reply-say small', '');
+      var cancel = el('button', 'secondary version-reply-cancel', 'Cancel');
+      cancel.type = 'button';
+      cancel.setAttribute('data-reply-cancel', '1');
+      var send = el('button', 'version-reply-send', 'Reply');
+      send.type = 'button';
+      send.setAttribute('data-reply-send', '1');
+      row.appendChild(say);
+      row.appendChild(cancel);
+      row.appendChild(send);
+      form.appendChild(box);
+      form.appendChild(row);
+      btnNode.parentNode.insertBefore(form, btnNode);
+      var people = [];
+      try { people = JSON.parse(thread.getAttribute('data-people') || '[]'); } catch (err) { people = []; }
+      if (window.animaMentions) window.animaMentions.attach(box, people);
+    }
+    btnNode.hidden = true;
+    form.querySelector('textarea').focus();
+  }
+
+  function closeReply(form) {
+    var note = form.closest('.version-review');
+    form.remove();
+    var b = note ? note.querySelector('.version-reply-btn') : null;
+    if (b) b.hidden = false;
+  }
+
+  /**
+   * Post to board_version.php from a thread, and put the pane it sends back in
+   * place. ⚠ A REFUSAL KEEPS WHAT WAS TYPED: the server answers 200 with its own
+   * red line first, and then the pane is NOT replaced, so the box stays as it was.
+   */
+  function replyPost(from, fields, onBad) {
+    var thread = replyThread(from);
+    if (!thread) return;
+    var inViewer = !!(S && S.notes && S.notes.contains(from));
+    var pane = inViewer ? S.pane : from.closest('[data-pane]');
+    if (!pane) { onBad('This thread is not in a Versions pane.'); return; }
+    var data = new FormData();
+    Object.keys(fields).forEach(function (k) { data.append(k, fields[k]); });
+    data.append('project_id', thread.getAttribute('data-project'));
+    data.append('step_id', thread.getAttribute('data-step'));
+    data.append('item_key', thread.getAttribute('data-item'));
+    // The re-drawn pane shuts every thread but the current version's: the ones
+    // open now stay open, the one being answered first of all.
+    var keepOpen = [];
+    pane.querySelectorAll('.version-reviews[id]').forEach(function (t) { if (!t.hidden) keepOpen.push(t.id); });
+    if (!inViewer && thread.id && keepOpen.indexOf(thread.id) === -1) keepOpen.push(thread.id);
+
+    fetch('board_version.php', { method: 'POST', body: data, credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var probe = document.createElement('div');
+        probe.innerHTML = html;
+        var bad = probe.querySelector(':scope > p.err');
+        if (bad) { onBad(bad.textContent); return; }
+        if (inViewer && S) {
+          applyPane(html);
+          S.notes.scrollTop = S.notes.scrollHeight;
+        } else {
+          pane.innerHTML = html;
+          if (window.animaBoard) {
+            window.animaBoard.paneReady('versions');
+            window.animaBoard.timelineRefresh();
+          }
+        }
+        keepOpen.forEach(function (id) {
+          var t = pane.querySelector('#' + CSS.escape(id));
+          if (!t) return;
+          t.hidden = false;
+          var opener = pane.querySelector('[data-version-reviews="' + id + '"]');
+          if (opener) opener.setAttribute('aria-expanded', 'true');
+        });
+      })
+      .catch(function () { onBad('Could not reach the server.'); });
+  }
+
+  function sendReply(form) {
+    var box = form.querySelector('textarea');
+    var send = form.querySelector('[data-reply-send]');
+    var say = form.querySelector('.version-reply-say');
+    if (!box.value.trim()) { box.focus(); return; }
+    if (send.disabled) return;
+    send.disabled = true;
+    say.textContent = 'Posting…';
+    say.classList.remove('err');
+    replyPost(form, { add_reply: '1', reply_to: form.getAttribute('data-reply-note'), body: box.value },
+      function (why) {
+        send.disabled = false;
+        say.textContent = why + ' Your reply is still here.';
+        say.classList.add('err');
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest ? e.target : null;
+    if (!t) return;
+    var b = t.closest('.version-reply-btn');
+    if (b) { e.preventDefault(); openReply(b); return; }
+    var form = t.closest('.version-reply-form');
+    if (form && t.closest('[data-reply-cancel]')) { closeReply(form); return; }
+    if (form && t.closest('[data-reply-send]')) { sendReply(form); return; }
+    var del = t.closest('.version-reply-del');
+    if (del) {
+      e.preventDefault();
+      if (!window.confirm('Delete this reply? It cannot be undone.')) return;
+      del.disabled = true;
+      replyPost(del, { delete_reply: del.getAttribute('data-reply') }, function (why) {
+        del.disabled = false;
+        window.alert(why);
+      });
+    }
+  });
+
+  // Ctrl/⌘+Enter sends, Escape puts the box away. The viewer's own keys
+  // (onKey) leave a reply box alone while it has the cursor.
+  document.addEventListener('keydown', function (e) {
+    var form = e.target && e.target.closest ? e.target.closest('.version-reply-form') : null;
+    if (!form) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendReply(form); }
+    else if (e.key === 'Escape' && !e.defaultPrevented) {
+      e.preventDefault();
+      closeReply(form);
+    }
+  });
 
   // --- the way in ---------------------------------------------------------------------
 

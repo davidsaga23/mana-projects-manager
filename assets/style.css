@@ -5434,3 +5434,26 @@ html.rq-app { touch-action: pan-x pan-y; }
 .psi-open:hover { background: none; text-decoration: underline; filter: none; }
 /* The projects list sets its cells at 18px; a count's list opened under a row reads at list size (2026-11-17). */
 .project-list .psi-box td, .project-list .psi-box th { font-size: 13px; }
+
+/* Replies to a review note (David, 2026-11-20: "keep the conversation going
+   inside the review of any version"). Under the note, indented once with a rule
+   on the left, the way a reply reads on the Comments tab; the box opens in place. */
+.version-replies { margin: 6px 0 4px 18px; padding-left: 10px; border-left: 2px solid var(--border-strong); }
+.version-reply { padding: 4px 0; }
+.version-reply + .version-reply { border-top: 1px solid var(--border-soft); }
+.version-reply .comment-head { font-size: 13px; }
+.version-reply .comment-body { font-size: 13.5px; }
+.version-reply-del { margin-left: auto; padding: 0 4px; background: none; border: 0; font-size: 15px; line-height: 1; }
+.version-reply-btn {
+  margin: 4px 0 2px; padding: 2px 9px; min-height: 0;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: transparent; color: var(--text-2); font-size: 11.5px; font-weight: 500; cursor: pointer;
+}
+.version-reply-btn:hover { background: transparent; border-color: var(--border-strong); color: var(--text); }
+.version-reply-btn[hidden] { display: none; }
+.version-reply-form { margin: 6px 0 4px; }
+.version-reply-box { width: 100%; min-height: 52px; font-size: 13.5px; resize: vertical; }
+.version-reply-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.version-reply-say { margin-right: auto; color: var(--muted); }
+.version-reply-say.err { color: var(--danger); }
+.version-reply-actions button { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
