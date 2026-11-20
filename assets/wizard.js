@@ -535,11 +535,16 @@
     var attr = sel.getAttribute('data-filter-attr') || 'data-filter-value';
     var noun = sel.getAttribute('data-filter-noun') || 'items';
     var items = container.querySelectorAll('[' + attr + ']');
-    var want = sel.value;
+    // Several, or all but some (David, 2026-11-20): assets/multi-filter.js.
+    // '__none' is the option for a row with no value (no type, no episode).
+    var MF = window.MultiFilter;
+    var want = MF ? MF.active(sel) : !!sel.value;
+    var same = function (w, got) { return w === '__none' ? got === '' : got === w; };
     var shown = 0;
 
     for (var i = 0; i < items.length; i++) {
-      var match = !want || items[i].getAttribute(attr) === want;
+      var got = items[i].getAttribute(attr) || '';
+      var match = !want || (MF ? MF.matches(sel, got, same) : same(sel.value, got));
       items[i].style.display = match ? '' : 'none';
       if (match) shown++;
     }
@@ -563,6 +568,10 @@
   for (var k = 0; k < selects.length; k++) {
     (function (sel) {
       sel.addEventListener('change', function () { apply(sel); });
+      if (window.MultiFilter) {
+        sel.setAttribute('data-multi-label', '');
+        window.MultiFilter.enhance(sel);
+      }
     })(selects[k]);
   }
 })();

@@ -6523,6 +6523,36 @@ Claude cannot do speech-to-text (the API takes text, images and documents, not a
 Open for David: whether anyone may opt out of a call being written down, whether transcripts
 should be deleted after a while, and whether the notes should ring the bell.
 
+## 2026-11-20 — Every filter dropdown picks several, with Include / Exclude
+
+**Asked by David:** *"for all the drop down menus, we need a way to do all these things: 1. Multiple
+selection: be able to pick one or more options from those menus. 2. Reverse selection: exclude from
+filtering the selected options."*
+
+**Decided:**
+- **One control, everywhere** (`assets/multi-filter.js`, `assets/multi-filter.css`). A page writes
+  an ordinary `<select data-multi>`; the script hides it and draws a chip. The select stays the
+  source of truth (its selected options and a `data-exclude` attribute), so forms post it and each
+  page's own script reads it with `MultiFilter.state()` / `matches()`.
+- **Ticked values are ORed**: a row passes when it is ANY of them, or NONE of them under Exclude.
+  Different filters still AND together, as before.
+- **Filters that run in the browser narrow the rows on every tick. Filters that reload the page
+  submit once, when the list closes**, so the page never reloads under the hand ticking it.
+- **The address:** `?status[]=3&status[]=5`, plus `status_not=1` for Exclude, read by
+  `filter_get()` in `includes/filters.php`. A single `?status=3` still means "only 3", so every old
+  link, bookmark and notification keeps working. A comma is not a separator (names hold commas).
+- **Spell's remembered filters** (until midnight Pacific) are stored as `{ v: [...], x: bool }` per
+  dropdown; the one-string entries saved before still restore.
+- **Reviews' chip per show became one dropdown of the shows**, which on a phone opens as the sheet
+  along the bottom (the job the chips' fold-out button did since 2026-11-19).
+
+**Left as single choices, on purpose:** fields that SET one value (a task's status, a role, a
+project's status, a candidate's stage), and pickers that choose WHICH view or document to show
+rather than filter rows: Statements' show, Dashboard's day, Kick-off's compare from/to, Timeline's
+version, Fee quotas' "by project / by department", Days off's "on a show / everybody", project
+finance's "On the show" date, and the CRM's Status (the funnel sets it with a click, and "Open deals
+only" is a group of statuses). The Artists positions box was already ticks.
+
 ## 2026-11-20 — Fewer requests before a bigger server
 
 **Why:** after the move to KnownHost (shared cPanel, LiteSpeed), Anima spun and timed out. Support

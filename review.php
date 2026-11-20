@@ -57,9 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Throwable $e) {
         flash('err', $e->getMessage());
     }
-    $back = ['tab' => $tab];
-    if (isset($_POST['project']) && $_POST['project'] !== '') $back['project'] = (int)$_POST['project'];
-    header('Location: review.php?' . http_build_query($back));
+    // Back to the tab and the list as it was filtered: several shows, or all but some.
+    $back = http_build_query(['tab' => $tab]);
+    $proj = filter_query('project', filter_get('project', $_POST));
+    header('Location: review.php?' . $back . ($proj !== '' ? '&' . $proj : ''));
     exit;
 }
 
@@ -76,9 +77,16 @@ foreach ($queue as $t) {
     $shows[$pid] = ($shows[$pid] ?? ['code' => $t['project_code'], 'n' => 0]);
     $shows[$pid]['n']++;
 }
-$only = (int)($_GET['project'] ?? 0);
-if ($only && !isset($shows[$only])) $only = 0;
-$shown = $only ? array_values(array_filter($queue, fn($t) => (int)$t['project_id'] === $only)) : $queue;
+// ⚠ SEVERAL SHOWS, OR ALL BUT SOME (David, 2026-11-20: "Multiple selection …
+// Reverse selection"). One dropdown of the shows, drawn by assets/multi-filter.js
+// (a sheet along the bottom on a phone). ?project=12 from an older link still
+// means just that show; a show with nothing waiting is dropped.
+$only = filter_get('project');
+$only['in'] = array_values(array_unique(array_map(fn($v) => (string)(int)$v,
+                 array_filter($only['in'], fn($v) => isset($shows[(int)$v])))));
+$only['on'] = $only['in'] !== [];
+if (!$only['on']) $only['not'] = false;
+$shown = array_values(array_filter($queue, fn($t) => filter_hit($only, (string)(int)$t['project_id'])));
 
 // APPROVED: A DEPARTMENT FILTER AND A SORT (David, 2026-11-20: "We need to have a
 // filter (single or multiple selection) by department and to have a sort button
@@ -122,7 +130,9 @@ if ($onApproved) {
 
 /** This page's address with some of its settings changed (null drops one). */
 $here = function (array $change = []) use ($tab, $only, $pickedDepts, $sort): string {
-    $q = ['tab' => $tab, 'project' => $only ?: null, 'dept' => $pickedDepts ?: null,
+    // The show filter rides as project[] (+ project_not), as the dropdown posts it.
+    $q = ['tab' => $tab, 'project' => $only['on'] ? $only['in'] : null,
+          'project_not' => $only['not'] ? '1' : null, 'dept' => $pickedDepts ?: null,
           'sort' => $sort !== 'new' ? $sort : null];
     foreach ($change as $k => $v) $q[$k] = $v;
     return 'review.php?' . http_build_query(array_filter($q, fn($v) => $v !== null && $v !== [] && $v !== ''));
@@ -341,18 +351,22 @@ foreach ($warnings as [$missing, $named, $button]):
 <?php endforeach; ?>
 
 <?php if (count($shows) > 1): ?>
-  <?php // ON A PHONE THE CHIPS FOLD BEHIND ONE BUTTON (David, 2026-11-19: "a mobile app
-        // version of the review tab to review on the go"). The button is only drawn at
-        // phone width (assets/style.css); on a desktop the chips show as they always did. ?>
-  <button type="button" class="secondary rq-filter-toggle" aria-expanded="false" aria-controls="rqShows">
-    Show: <?= $only ? e($shows[$only]['code']) . ' (' . $shows[$only]['n'] . ')' : 'All shows (' . count($queue) . ')' ?> ▾
-  </button>
-  <p class="board-projects review-shows" id="rqShows">
-    <a class="board-chip<?= $only ? '' : ' is-on' ?>" href="<?= e($here(['project' => null, 'dept' => null])) ?>">All shows (<?= count($queue) ?>)</a>
-    <?php foreach ($shows as $pid => $s): ?>
-      <a class="board-chip<?= $only === $pid ? ' is-on' : '' ?>" href="<?= e($here(['project' => $pid, 'dept' => null])) ?>"><?= e($s['code']) ?> (<?= $s['n'] ?>)</a>
-    <?php endforeach; ?>
-  </p>
+  <?php // ONE DROPDOWN OF THE SHOWS (2026-11-20), in place of a chip per show:
+        // pick several, or Exclude to hide some. On a phone it opens as a sheet
+        // along the bottom, which is what the chips' fold-out button did
+        // (David, 2026-11-19: "a mobile app version of the review tab"). It keeps
+        // the tab and the sort; the departments start again, as the chips did. ?>
+  <form method="get" class="rq-show-form">
+    <input type="hidden" name="tab" value="<?= e($tab) ?>">
+    <?php if ($sort !== 'new'): ?><input type="hidden" name="sort" value="<?= e($sort) ?>"><?php endif; ?>
+    <select name="project" onchange="this.form.submit()" aria-label="Filter by show"<?= filter_select_attrs($only, 'Show') ?>>
+      <option value="">All shows (<?= count($queue) ?>)</option>
+      <?php foreach ($shows as $pid => $s): ?>
+        <option value="<?= (int)$pid ?>"<?= filter_sel($only, (string)$pid) ?>><?= e($s['code']) ?> (<?= $s['n'] ?>)</option>
+      <?php endforeach; ?>
+    </select>
+    <noscript><button type="submit" class="secondary">Show</button></noscript>
+  </form>
 <?php endif; ?>
 
 <?php if ($onApproved && $depts): ?>
@@ -371,7 +385,8 @@ foreach ($warnings as [$missing, $named, $button]):
     </p>
     <form method="get" class="rq-sort">
       <input type="hidden" name="tab" value="approved">
-      <?php if ($only): ?><input type="hidden" name="project" value="<?= (int)$only ?>"><?php endif; ?>
+      <?php foreach ($only['in'] as $op): ?><input type="hidden" name="project[]" value="<?= e($op) ?>"><?php endforeach; ?>
+      <?php if ($only['not']): ?><input type="hidden" name="project_not" value="1"><?php endif; ?>
       <?php foreach ($pickedDepts as $d): ?><input type="hidden" name="dept[]" value="<?= e($d) ?>"><?php endforeach; ?>
       <label>Sort
         <select name="sort" onchange="this.form.submit()">
@@ -472,7 +487,8 @@ foreach ($warnings as [$missing, $named, $button]):
 
       <form method="post" class="rq-verdict">
         <input type="hidden" name="progress_id" value="<?= (int)$t['id'] ?>">
-        <input type="hidden" name="project" value="<?= $only ?: '' ?>">
+        <?php foreach ($only['in'] as $op): ?><input type="hidden" name="project[]" value="<?= e($op) ?>"><?php endforeach; ?>
+        <?php if ($only['not']): ?><input type="hidden" name="project_not" value="1"><?php endif; ?>
         <input type="hidden" name="tab" value="<?= e($tab) ?>">
         <?php if ($canAct): ?>
         <div class="rq-buttons">
@@ -558,16 +574,6 @@ document.addEventListener('click', function (e) {
       if (spell) window.location.href = spell.href;
     });
 });
-// The show chips' fold-out button, on a phone.
-(function () {
-  var b = document.querySelector('.rq-filter-toggle');
-  var chips = document.getElementById('rqShows');
-  if (!b || !chips) return;
-  b.addEventListener('click', function () {
-    var open = chips.classList.toggle('is-open');
-    b.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-}());
 // A status changed or a version put up in the panel moves the task on this
 // list (or off it), so the list is reloaded when the panel closes after
 // anything was saved in it. The same as My tasks.

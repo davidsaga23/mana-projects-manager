@@ -372,7 +372,8 @@ function wizard_render_assets(PDO $pdo, ?array $project): void {
                   data-filter-note="asset-filter-note" data-filter-noun="assets">
             <option value="">all types (<?= count($assets) ?>)</option>
             <?php foreach ($typeCounts as $t => $n): ?>
-              <option value="<?= e($t) ?>"><?= $t === '' ? 'No type' : e($t) ?> (<?= $n ?>)</option>
+              <?php // '__none', not '': the empty value is "all types". ?>
+              <option value="<?= $t === '' ? '__none' : e($t) ?>"><?= $t === '' ? 'No type' : e($t) ?> (<?= $n ?>)</option>
             <?php endforeach; ?>
           </select>
         </label>

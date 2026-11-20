@@ -132,13 +132,17 @@
   // --- group filter ---------------------------------------------------------
   const filter = document.getElementById('groupFilter');
   if (filter) {
+    // Several groups, or all but some (David, 2026-11-20): assets/multi-filter.js.
+    const pass = function (g) {
+      return window.MultiFilter ? window.MultiFilter.matches(filter, g)
+                                : (filter.value === '' || filter.value === g);
+    };
     filter.addEventListener('change', function () {
-      const val = this.value;
       document.querySelectorAll('.track-group, .track-row').forEach(function (row) {
-        row.style.display = (val === 'all' || row.dataset.group === val) ? '' : 'none';
+        row.style.display = pass(row.dataset.group) ? '' : 'none';
       });
       document.querySelectorAll('.donut-card').forEach(function (card) {
-        card.style.display = (val === 'all' || card.dataset.group === val) ? '' : 'none';
+        card.style.display = pass(card.dataset.group) ? '' : 'none';
       });
     });
   }

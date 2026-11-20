@@ -90,26 +90,26 @@
     const dueEl  = document.getElementById('filterDue');
     if (!typeEl || !crewEl || !dueEl) return;
 
-    const type = typeEl.value, crew = crewEl.value, due = dueEl.value;
+    // Each picks several, with Include / Exclude (David, 2026-11-20); a card
+    // passes on ANY ticked value, or NONE of them under Exclude.
+    // assets/multi-filter.js; a plain dropdown still works if it is missing.
+    const MF = window.MultiFilter || {
+      matches: (el, v, same) => !el.value || (same ? same(el.value, v) : el.value === v)
+    };
     const today = todayStr();
     const weekEnd = plusDaysStr(7);
+    const dueIs = (want, d) => {
+      if (want === 'overdue') return !!d && d < today;
+      if (want === 'today')   return d === today;
+      if (want === 'week')    return !!d && d >= today && d <= weekEnd;
+      if (want === 'nodate')  return !d;
+      return true;
+    };
 
     document.querySelectorAll('.board-card').forEach(card => {
-      let show = true;
-
-      if (type !== 'all' && card.dataset.type !== type) show = false;
-
-      if (show && crew !== 'all') {
-        show = (card.dataset.crew === crew);
-      }
-
-      if (show && due !== 'all') {
-        const d = card.dataset.due;
-        if (due === 'overdue')      show = !!d && d < today;
-        else if (due === 'today')   show = d === today;
-        else if (due === 'week')    show = !!d && d >= today && d <= weekEnd;
-        else if (due === 'nodate')  show = !d;
-      }
+      const show = MF.matches(typeEl, card.dataset.type)
+        && MF.matches(crewEl, card.dataset.crew)
+        && MF.matches(dueEl, card.dataset.due || '', dueIs);
 
       card.classList.toggle('filtered-out', !show);
     });

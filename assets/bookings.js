@@ -385,7 +385,14 @@
                      'August', 'September', 'October', 'November', 'December'];
 
   var calMonth = (function () { var d = parseYmd(BK.today); return new Date(d.getFullYear(), d.getMonth(), 1); })();
-  var calPerson = '';           // a crew id as text, or '' for everybody
+  // Who the calendar shows: several people, or everybody but some (David,
+  // 2026-11-20, pick-several filters). Crew ids as text; none ticked is everybody.
+  var calPick = { v: [], x: false };
+  function personOk(id) {
+    if (!calPick.v.length) return true;
+    var hit = calPick.v.indexOf(String(id)) !== -1;
+    return calPick.x ? !hit : hit;
+  }
   var calDays = {};             // 'YYYY-MM-DD' -> that day's entries, for the popover
   var calOpenWeeks = {};        // a week's Monday -> true while its crew is shown
   var calAllCrew = load('calcrew', '0') === '1';
@@ -409,7 +416,7 @@
     var out = [];
     BK.bookings.forEach(function (b) {
       if (!shown(b.project_id) || b.start > day || b.end < day) return;
-      if (calPerson && String(b.person_id) !== calPerson) return;
+      if (!personOk(b.person_id)) return;
       var hits = clashes.filter(function (c) {
         return (c.a === b.lane_id || c.b === b.lane_id) && c.from <= day && day <= c.to;
       });
@@ -441,7 +448,7 @@
     var who = {}, out = [];
     BK.bookings.forEach(function (b) {
       if (!shown(b.project_id) || who[b.person_id]) return;
-      if (calPerson && String(b.person_id) !== calPerson) return;
+      if (!personOk(b.person_id)) return;
       who[b.person_id] = true;
       var a = offOn(b.person_id, day);
       if (a) out.push({ id: b.person_id, name: b.person, off: a });
@@ -497,11 +504,17 @@
     people.sort(function (a, b) { return a.name.localeCompare(b.name); });
     // A person whose shows are all switched off leaves the list, and the
     // calendar goes back to everybody rather than to an empty month.
-    if (calPerson && !seen[calPerson]) calPerson = '';
-    sel.innerHTML = '<option value="">Everybody</option>' + people.map(function (p) {
-      return '<option value="' + escapeHtml(p.id) + '"' + (p.id === calPerson ? ' selected' : '') + '>'
+    calPick.v = calPick.v.filter(function (id) { return seen[id]; });
+    if (!calPick.v.length) calPick.x = false;
+    var html = '<option value="">Everybody</option>' + people.map(function (p) {
+      return '<option value="' + escapeHtml(p.id) + '"' + (calPick.v.indexOf(p.id) !== -1 ? ' selected' : '') + '>'
            + escapeHtml(p.name) + '</option>';
     }).join('');
+    // Only redrawn when the list itself changed, so a list open on screen
+    // keeps its ticks under the hand ticking them.
+    if (sel.getAttribute('data-html') !== html) { sel.innerHTML = html; sel.setAttribute('data-html', html); }
+    if (window.MultiFilter) window.MultiFilter.set(sel, calPick.v, calPick.x);
+    else sel.value = calPick.v[0] || '';
   }
 
   function drawCalendar(onlyClashes) {
@@ -526,7 +539,7 @@
       html += '<div class="bk-cal-dow' + (i >= 5 ? ' is-weekend' : '') + '">' + w + '</div>';
     });
     // The filters that ask for names open every week; so does the toolbar box.
-    var forced = onlyClashes || !!calPerson;
+    var forced = onlyClashes || calPick.v.length > 0;
     while (d <= last) {
       var monday = fmtDate(d);
       var open = forced || calAllCrew || !!calOpenWeeks[monday];
@@ -578,7 +591,7 @@
     if (!anyone) {
       html += '<div class="bk-empty">' + escapeHtml(
         onlyClashes ? 'Nobody is on two shows at once in ' + MONTHS_LONG[m] + '.'
-        : calPerson ? 'Not booked in ' + MONTHS_LONG[m] + ' on the shows shown.'
+        : calPick.v.length ? 'Not booked in ' + MONTHS_LONG[m] + ' on the shows shown.'
         : 'Nobody is booked in ' + MONTHS_LONG[m] + ' on the shows shown.') + '</div>';
     }
     el.innerHTML = html;
@@ -753,7 +766,15 @@
     });
   }
   if ($('bkCalPerson')) {
-    $('bkCalPerson').addEventListener('change', function () { calPerson = this.value; render(); });
+    $('bkCalPerson').addEventListener('change', function () {
+      if (window.MultiFilter) {
+        var s = window.MultiFilter.state(this);
+        calPick = { v: s.values, x: s.exclude };
+      } else {
+        calPick = { v: this.value ? [this.value] : [], x: false };
+      }
+      render();
+    });
   }
   $('bkZoomIn').addEventListener('click', function () {
     zoomIdx = clamp(zoomIdx + 1, 0, ZOOM.length - 1); save('zoom', zoomIdx); render();

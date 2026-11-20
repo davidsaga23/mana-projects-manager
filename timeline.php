@@ -604,8 +604,9 @@ if (!$embed) require __DIR__ . '/includes/header.php';
     <div class="tl-controls">
       <?php if ($episodic && $episodes): ?>
         <label class="muted small">Episode
-          <select id="episodeFilter">
-            <option value="all">All episodes</option>
+          <?php // Pick-several, with Include / Exclude (David, 2026-11-20). ?>
+          <select id="episodeFilter" data-multi data-multi-label="">
+            <option value="">All episodes</option>
             <?php foreach ($episodes as $ep): ?>
               <option value="<?= e($ep) ?>"><?= e($ep) ?></option>
             <?php endforeach; ?>

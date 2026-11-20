@@ -2405,14 +2405,14 @@ function invAddRows() {
     <div class="inline-form stmt-filter-bar" id="stmtFilter" hidden>
       <label>Artist <input type="search" id="stmtFilterName" placeholder="Search by name" autocomplete="off"></label>
       <label>Position
-        <select id="stmtFilterPos"><option value="">All positions</option></select></label>
+        <select id="stmtFilterPos" data-multi data-multi-label=""><option value="">All positions</option></select></label>
       <label>Rate
-        <select id="stmtFilterRate"><option value="">Any rate</option>
+        <select id="stmtFilterRate" data-multi data-multi-label=""><option value="">Any rate</option>
           <option value="day">Per day</option><option value="hour">Per hour</option>
           <option value="second">Per second</option><option value="flat">Flat fee</option>
         </select></label>
       <label>Status
-        <select id="stmtFilterStatus"><option value="">All</option>
+        <select id="stmtFilterStatus" data-multi data-multi-label=""><option value="">All</option>
           <option value="left">Left to invoice</option>
           <option value="over">Invoiced ahead of logged</option>
           <option value="nolog">Nothing logged</option>
@@ -2556,28 +2556,41 @@ function invAddRows() {
       function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
       function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 
+      // Position, Rate and Status pick several, with Include / Exclude (David,
+      // 2026-11-20): assets/multi-filter.js. A row passes on ANY ticked, or
+      // NONE under Exclude. A plain dropdown still works without it.
+      var MF = window.MultiFilter || {
+        state: function (el) { return { values: el.value ? [el.value] : [], exclude: false }; },
+        matches: function (el, v, same) { return !el.value || (same ? same(el.value, v) : el.value === v); },
+        set: function (el, v) { el.value = v[0] || ''; }, clear: function (el) { el.value = ''; }
+      };
+      function statusIs(status, tr) {
+        var left = num(tr, 'left'), due = num(tr, 'due');
+        if (status === 'left') return left !== null && left > 0;
+        // Left to invoice never goes below zero since 2026-11-11 (it is
+        // the work still to do), so over-invoiced is the "ahead of
+        // logged" case: more invoiced than the logged time has earned.
+        if (status === 'over') return due !== null && num(tr, 'inv') > due + 0.005;
+        if (status === 'nolog') return !(num(tr, 'hours') > 0) && !(num(tr, 'secs') > 0);
+        // Settled: nothing left to invoice, something earned, and all of
+        // it invoiced. Somebody with nothing earned yet is not settled.
+        if (status === 'settled') return left !== null && left === 0 && due !== null && due > 0 && num(tr, 'inv') >= due - 0.005;
+        return true;
+      }
       function apply(persist) {
-        var q = nameIn.value.trim().toLowerCase(), pos = posSel.value, rate = rateSel.value, status = statusSel.value, when = whenSel.value;
+        var q = nameIn.value.trim().toLowerCase(), when = whenSel.value;
+        var pos = MF.state(posSel).values.length, rate = MF.state(rateSel).values.length,
+            status = MF.state(statusSel).values.length;
         dateIn.hidden = when !== 'date';
         var on = when === 'today' ? today() : (when === 'date' ? dateIn.value : '');
         var shown = [];
         rows.forEach(function (tr) {
           var ok = true;
           if (q && (tr.getAttribute('data-name') || '').toLowerCase().indexOf(q) === -1) ok = false;
-          if (ok && pos && ('|' + tr.getAttribute('data-positions') + '|').indexOf('|' + pos + '|') === -1) ok = false;
-          if (ok && rate && (' ' + tr.getAttribute('data-units') + ' ').indexOf(' ' + rate + ' ') === -1) ok = false;
-          if (ok && status) {
-            var left = num(tr, 'left'), due = num(tr, 'due');
-            if (status === 'left') ok = left !== null && left > 0;
-            // Left to invoice never goes below zero since 2026-11-11 (it is
-            // the work still to do), so over-invoiced is the "ahead of
-            // logged" case: more invoiced than the logged time has earned.
-            else if (status === 'over') ok = due !== null && num(tr, 'inv') > due + 0.005;
-            else if (status === 'nolog') ok = !(num(tr, 'hours') > 0) && !(num(tr, 'secs') > 0);
-            // Settled: nothing left to invoice, something earned, and all of
-            // it invoiced. Somebody with nothing earned yet is not settled.
-            else if (status === 'settled') ok = left !== null && left === 0 && due !== null && due > 0 && num(tr, 'inv') >= due - 0.005;
-          }
+          // A person on two steps holds two positions and is paid in two units.
+          if (ok && pos) ok = MF.matches(posSel, (tr.getAttribute('data-positions') || '').split('|').filter(Boolean));
+          if (ok && rate) ok = MF.matches(rateSel, (tr.getAttribute('data-units') || '').split(' ').filter(Boolean));
+          if (ok && status) ok = MF.matches(statusSel, tr, function (st, row) { return statusIs(st, row); });
           // On the show on a date: inside their Dates. A missing end is open,
           // so a row with no dates at all (salaried, say) is never hidden.
           if (ok && on) {
@@ -2612,14 +2625,20 @@ function invAddRows() {
             + '<td class="num"><strong>' + cell('inv') + '</strong></td>'
             + '<td class="num"><strong>' + cell('left') + '</strong></td><td></td></tr>';
         }
-        if (persist) save({ q: nameIn.value, pos: pos, rate: rate, status: status, when: when, date: dateIn.value });
+        var kept = function (el) { var s = MF.state(el); return s.values.length ? { v: s.values, x: s.exclude } : ''; };
+        if (persist) save({ q: nameIn.value, pos: kept(posSel), rate: kept(rateSel), status: kept(statusSel), when: when, date: dateIn.value });
       }
 
       var s = load();
       nameIn.value = s.q || '';
-      if (s.pos && posSeen[s.pos]) posSel.value = s.pos;
-      if (s.rate && rateSel.querySelector('option[value="' + s.rate + '"]')) rateSel.value = s.rate;
-      if (s.status) statusSel.value = s.status;
+      // Kept as { v, x } since 2026-11-20; an older entry is one string.
+      function restore(el, k) {
+        var p = typeof k === 'string' ? { v: k ? [k] : [], x: false } : (k || { v: [], x: false });
+        var have = Array.prototype.map.call(el.options, function (o) { return o.value; });
+        var v = (p.v || []).filter(function (x) { return x && have.indexOf(x) !== -1; });
+        if (v.length) MF.set(el, v, !!p.x);
+      }
+      restore(posSel, s.pos); restore(rateSel, s.rate); restore(statusSel, s.status);
       if (s.when) whenSel.value = s.when;
       dateIn.value = s.date || '';
       if (whenSel.value === 'date' && !dateIn.value) dateIn.value = today();
@@ -2632,7 +2651,7 @@ function invAddRows() {
       });
       clearA.addEventListener('click', function (e) {
         e.preventDefault();
-        nameIn.value = ''; posSel.value = ''; rateSel.value = ''; statusSel.value = ''; whenSel.value = ''; dateIn.value = '';
+        nameIn.value = ''; MF.clear(posSel); MF.clear(rateSel); MF.clear(statusSel); whenSel.value = ''; dateIn.value = '';
         apply(true);
       });
       bar.hidden = false;

@@ -235,7 +235,8 @@ function wizard_render_shots(PDO $pdo, ?array $project): void {
                   data-filter-note="shot-filter-note" data-filter-noun="episodes">
             <option value="">all episodes (<?= count($shots) ?> shots)</option>
             <?php foreach ($byEpisode as $ep => $rows): ?>
-              <option value="<?= e($ep) ?>"><?= $ep === '' ? 'No episode' : e($ep) ?> (<?= count($rows) ?>)</option>
+              <?php // '__none', not '': the empty value is "all episodes". ?>
+              <option value="<?= $ep === '' ? '__none' : e($ep) ?>"><?= $ep === '' ? 'No episode' : e($ep) ?> (<?= count($rows) ?>)</option>
             <?php endforeach; ?>
           </select>
         </label>

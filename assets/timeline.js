@@ -928,11 +928,16 @@
 
   function filtered() {
     var epEl = $('episodeFilter');
-    var ep = epEl ? epEl.value : 'all';
+    // Several episodes, or all but some (David, 2026-11-20): assets/multi-filter.js.
+    var epOk = function (e) {
+      if (!epEl) return true;
+      if (window.MultiFilter) return window.MultiFilter.matches(epEl, e == null ? '' : String(e));
+      return epEl.value === '' || epEl.value === e;
+    };
     var steps = selectedStepIds();
     var hide = $('hideCompleted') && $('hideCompleted').checked;
     var out = window.DETAILED_TASKS.filter(function (t) {
-      if (ep !== 'all' && t.episode !== ep) return false;
+      if (!epOk(t.episode)) return false;
       if (steps.length && steps.indexOf(String(t.step_id)) === -1) return false;
       if (hide && t.is_approved) return false;
       return true;
@@ -1519,7 +1524,13 @@
     var qs = new URLSearchParams();
     qs.set('project', window.TL_PROJECT);
     var epEl = $('episodeFilter');
-    if (epEl && epEl.value && epEl.value !== 'all') qs.set('ep', epEl.value);
+    if (epEl && window.MultiFilter) {
+      var es = window.MultiFilter.state(epEl);
+      es.values.forEach(function (v) { qs.append('ep[]', v); });
+      if (es.exclude && es.values.length) qs.set('ep_not', '1');
+    } else if (epEl && epEl.value) {
+      qs.set('ep', epEl.value);
+    }
     var steps = selectedStepIds();
     if (steps.length) qs.set('steps', steps.join(','));
     window.location.href = 'timeline_gan.php?' + qs.toString();

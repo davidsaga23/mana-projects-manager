@@ -167,28 +167,39 @@ function renderContactsEd() {
 }
 
 /* ---------- filtering ---------- */
+// ⚠ TYPE, SOURCE, OWNER AND FOLLOW-UP PICK SEVERAL, with Include / Exclude
+// (David, 2026-11-20). Kept in `filters` as { v: [ticked], x: excluding }; an
+// entry remembered before then is one string, read as "only this one".
+const MULTI_F = ["type", "source", "owner", "due"];
+const fPick = k => {
+  const v = filters[k];
+  if (!v) return { v: [], x: false };
+  if (typeof v === "string") return { v: [v], x: false };
+  return { v: Array.isArray(v.v) ? v.v.map(String) : [], x: !!v.x };
+};
+const fPass = (k, test) => { const p = fPick(k); if (!p.v.length) return true; const hit = p.v.some(test); return p.x ? !hit : hit; };
+const ownerIs = (want, id) => want === "me" ? id === me.id : want === "none" ? !id : id === want;
 function applyFilters(list, ignoreStage) {
   const f = filters, q = f.q.trim().toLowerCase();
   const min = f.min === "" ? null : +f.min, max = f.max === "" ? null : +f.max;
   return list.filter(l => {
     if (q && ![l.company, ...l.contacts.flatMap(c => [c.name, c.title, c.email]), l.projectType, l.nextStep, (l.tags || []).join(" ")].join(" ").toLowerCase().includes(q)) return false;
     if (!ignoreStage && f.stage) { if (f.stage === "open" ? !OPEN.has(l.stage) : l.stage !== f.stage) return false; }
-    if (f.type && (l.projectType || "") !== f.type) return false;
-    if (f.source && (l.source || "") !== f.source) return false;
-    if (f.owner === "me" ? l.ownerId !== me.id : f.owner === "none" ? !!l.ownerId : f.owner && l.ownerId !== f.owner) return false;
+    if (!fPass("type", t => (l.projectType || "") === t)) return false;
+    if (!fPass("source", s => (l.source || "") === s)) return false;
+    if (!fPass("owner", o => ownerIs(o, l.ownerId))) return false;
     const v = +l.value || 0;
     if (min != null && v < min) return false;
     if (max != null && v > max) return false;
-    if (f.due) {
-      const d = l.followUp ? dayDiff(l.followUp) : null;
-      if (f.due === "overdue" && !(d != null && d < 0 && OPEN.has(l.stage))) return false;
-      if (f.due === "week" && !(d != null && d >= 0 && d <= 7)) return false;
-      if (f.due === "none" && l.followUp) return false;
-    }
+    const d = l.followUp ? dayDiff(l.followUp) : null;
+    if (!fPass("due", w => w === "overdue" ? (d != null && d < 0 && OPEN.has(l.stage))
+                        : w === "week" ? (d != null && d >= 0 && d <= 7)
+                        : w === "none" ? !l.followUp : true)) return false;
     return true;
   });
 }
-const activeFilterCount = () => Object.keys(EMPTY_FILTERS).filter(k => filters[k] !== "").length;
+const activeFilterCount = () => Object.keys(EMPTY_FILTERS)
+  .filter(k => MULTI_F.includes(k) ? fPick(k).v.length > 0 : filters[k] !== "").length;
 function stageOptionsFor(v) {
   if (v === "pipeline") return [["", "All pipeline stages"], ["open", "Open deals only"], ...PIPE.map(k => [k, STAGE[k].label])];
   if (v === "followups") return [["", "All open stages"], ...[...OPEN].map(k => [k, STAGE[k].label])];
@@ -198,6 +209,13 @@ function stageOptionsFor(v) {
 function fillSelect(el, opts, value) {
   const html = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
   if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+  // A pick-several filter is handed { v, x } (or an old one-value string).
+  if (window.MultiFilter && el.hasAttribute("data-multi")) {
+    const p = typeof value === "string" ? { v: value ? [value] : [], x: false } : (value || { v: [], x: false });
+    window.MultiFilter.set(el, (p.v || []).filter(v => opts.some(o => o[0] === v)), !!p.x);
+    el.classList.toggle("is-on", window.MultiFilter.active(el));
+    return;
+  }
   el.value = opts.some(o => o[0] === value) ? value : "";
   el.classList.toggle("is-on", el.value !== "");
 }
@@ -210,15 +228,16 @@ function renderFilters() {
   if (so) { if (!so.some(o => o[0] === filters.stage)) filters.stage = ""; fillSelect(st, so, filters.stage); }
   else filters.stage = "";
   const types = distinct("projectType");
-  if (filters.type && !types.includes(filters.type)) types.push(filters.type);
+  fPick("type").v.forEach(t => { if (!types.includes(t)) types.push(t); });
   fillSelect($("#flt-type"), [["", "All project types"], ...types.map(t => [t, t])], filters.type);
   const srcs = [...new Set([...SOURCES, ...distinct("source")])];
   fillSelect($("#flt-source"), [["", "All sources"], ...srcs.map(s => [s, s])], filters.source);
   const ownerIds = [...new Set([...leads.map(l => l.ownerId), ...proposals.map(p => p.ownerId)].filter(id => id && id !== me.id))];
   const oo = [["", "Any owner"], ...(me.id ? [["me", "Mine"]] : []), ["none", "Unassigned"], ...ownerIds.map(id => [id, personName(id)])];
-  if (filters.owner && !oo.some(o => o[0] === filters.owner)) oo.push([filters.owner, personName(filters.owner)]);
+  fPick("owner").v.forEach(o => { if (!oo.some(x => x[0] === o)) oo.push([o, personName(o)]); });
   fillSelect($("#flt-owner"), oo, filters.owner);
-  const fd = $("#flt-due"); fd.value = filters.due; fd.classList.toggle("is-on", !!filters.due);
+  const fd = $("#flt-due");
+  fillSelect(fd, Array.from(fd.options).map(o => [o.value, o.text]), filters.due);
   const q = $("#flt-q"); if (document.activeElement !== q) q.value = filters.q; q.classList.toggle("is-on", !!filters.q);
   ["min", "max"].forEach(k => { const el = $("#flt-" + k); if (document.activeElement !== el) el.value = filters[k]; el.classList.toggle("is-on", filters[k] !== ""); });
   $("#flt-clear").hidden = !activeFilterCount();
@@ -491,8 +510,8 @@ function quoteTotals(q) {
 function docMatch(title, leadId, ownerId, useOwner) {
   const l = leadOf(leadId), q = filters.q.trim().toLowerCase();
   if (q && !`${title || ""} ${l?.company || ""}`.toLowerCase().includes(q)) return false;
-  if (filters.type && (l?.projectType || "") !== filters.type) return false;
-  if (useOwner && (filters.owner === "me" ? ownerId !== me.id : filters.owner === "none" ? !!ownerId : filters.owner && ownerId !== filters.owner)) return false;
+  if (!fPass("type", t => (l?.projectType || "") === t)) return false;
+  if (useOwner && !fPass("owner", o => ownerIs(o, ownerId))) return false;
   return true;
 }
 function pDue(p) {
@@ -1065,6 +1084,11 @@ ROOT.addEventListener("input", e => {
 });
 ROOT.addEventListener("change", e => {
   const el = e.target, id = el.id;
+  if (window.MultiFilter && el.hasAttribute && el.hasAttribute("data-multi") && id.startsWith("flt-")) {
+    const s = window.MultiFilter.state(el);
+    setFilter(id.slice(4), s.values.length || s.exclude ? { v: s.values, x: s.exclude } : "");
+    return;
+  }
   if (["flt-stage", "flt-type", "flt-source", "flt-owner", "flt-due"].includes(id)) { setFilter(id.slice(4), el.value); return; }
   if (id === "f-stage") updateWeighted();
   if (el.dataset.stageFor) { moveStage(el.dataset.stageFor, el.value); return; }

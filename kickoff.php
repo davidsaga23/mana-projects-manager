@@ -350,11 +350,11 @@ elseif ($view === 'compare'):
   if ($fSteps || $fPeople): ?>
     <div class="inline-form kickoff-filter">
       <label>Department
-        <select id="kfStep"><option value="">All departments</option>
+        <select id="kfStep" data-multi data-multi-label=""><option value="">All departments</option>
           <?php foreach (array_keys($fSteps) as $st): ?><option value="<?= e((string)$st) ?>"><?= e((string)$st) ?></option><?php endforeach; ?>
         </select></label>
       <label>Person
-        <select id="kfPerson"><option value="">Everyone</option>
+        <select id="kfPerson" data-multi data-multi-label=""><option value="">Everyone</option>
           <?php foreach ($fPeople as $pp): ?><option value="<?= e((string)$pp) ?>"><?= e((string)$pp) ?></option><?php endforeach; ?>
         </select></label>
       <span class="muted small" id="kfNote" hidden>Showing only matching rows; the totals above each list are still the whole show.</span>
@@ -378,13 +378,21 @@ elseif ($view === 'compare'):
           return /^\s*(\(|·|#)/.test(l.slice(n.length));
         });
       }
+      // Several departments and people, or all but some (David, 2026-11-20):
+      // assets/multi-filter.js. A row passes on ANY ticked, NONE under Exclude.
+      var MF = window.MultiFilter || {
+        active: function (el) { return !!el.value; },
+        matches: function (el, v, same) { return !el.value || same(el.value, v); }
+      };
       function apply() {
-        var step = stepSel.value, person = personSel.value.toLowerCase();
+        var step = MF.active(stepSel), person = MF.active(personSel);
         var rows = document.querySelectorAll('.kickoff-list tbody tr, .kickoff-gantt-row[data-key]');
         rows.forEach(function (tr) {
           var th = tr.querySelector('th[scope="row"]');
           var label = tr.getAttribute('data-key') || (th ? th.textContent.trim() : '');
-          var ok = (!step || stepMatch(label, step)) && (!person || tr.textContent.toLowerCase().indexOf(person) !== -1);
+          var text = tr.textContent.toLowerCase();
+          var ok = (!step || MF.matches(stepSel, label, function (st, l) { return stepMatch(l, st); }))
+                && (!person || MF.matches(personSel, text, function (p, t) { return t.indexOf(p.toLowerCase()) !== -1; }));
           tr.hidden = !ok;
         });
         // A list with nothing left to show folds away entirely.

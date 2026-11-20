@@ -188,6 +188,21 @@
     window.addEventListener('resize', placeCountRow);
     if (window.ResizeObserver) new ResizeObserver(placeCountRow).observe(headRow);
 
+    // ⚠ A DROPDOWN FILTER PICKS SEVERAL, with Include / Exclude (David,
+    // 2026-11-20). assets/multi-filter.js draws it and the <select> holds the
+    // ticks; a row passes when its cell is ANY ticked value, or NONE under
+    // Exclude. A typed box is unchanged: "contains".
+    var MF = window.MultiFilter;
+    function isOn(f) {
+      if (f.tagName === 'SELECT' && MF) return MF.active(f);
+      return f.value !== '';
+    }
+    function blankCell(td, many) {
+      if (many) return many.length === 0;
+      var got = text(td).toLowerCase();
+      return got === '' || got === '—';
+    }
+
     function applyFilters() {
       if (sortOnly) return;            // nothing filters, so nothing to recount
       // ⚠ A ROW THE PAGE HAS REMOVED IS NO LONGER ONE OF THE ROWS. `rows` is
@@ -195,13 +210,22 @@
       // DOM, and without this the count kept saying eleven of a list of ten and
       // a filter still measured a node nobody could see.
       rows = rows.filter(function (tr) { return tr.isConnected; });
-      var active = filters().filter(function (f) { return f.value !== ''; });
+      var active = filters().filter(isOn);
       var shown = [];
       rows.forEach(function (tr) {
         var hit = active.every(function (f) {
           var col = +f.getAttribute('data-col');
           var td = tr.cells[col];
           var many = list(td);
+
+          if (f.tagName === 'SELECT' && MF) {
+            var got1 = many ? many.map(function (v) { return v.toLowerCase(); }) : [text(td).toLowerCase()];
+            var blank = blankCell(td, many);
+            return MF.matches(f, got1, function (want, got) {
+              if (want === NONE) return blank;
+              return got === want.toLowerCase();
+            });
+          }
 
           // A CELL THAT HOLDS SEVERAL THINGS is matched item by item. A shot's
           // Prop cell reads "Boots, SoccerBall"; picking SoccerBall has to find
@@ -235,7 +259,7 @@
       // not be left wondering whether the page broke.
       countLine.classList.toggle('err', active.length > 0 && shown.length === 0);
 
-      filters().forEach(function (f) { f.classList.toggle('on', f.value !== ''); });
+      filters().forEach(function (f) { f.classList.toggle('on', isOn(f)); });
       // Decided HERE, not in a listener on the header: pressing Clear sets the
       // boxes from script, which fires no `input` event, so a listener left the
       // button offering to clear what it had just cleared.
@@ -320,6 +344,11 @@
       // carry no name attribute, so nothing here is ever posted with a row.
       f.addEventListener('input', applyFilters);
       th.appendChild(f);
+      if (f.tagName === 'SELECT' && MF) {
+        f.setAttribute('data-multi-label', '');
+        f.setAttribute('data-multi-apply', 'live');
+        MF.enhance(f);
+      }
     });
 
     // A filter is worth clearing in one go, and one control says so.
@@ -330,7 +359,9 @@
     clear.textContent = 'Clear column filters';
     clear.hidden = true;
     clear.addEventListener('click', function () {
-      filters().forEach(function (f) { f.value = ''; });
+      filters().forEach(function (f) {
+        if (f.tagName === 'SELECT' && MF) MF.clear(f); else f.value = '';
+      });
       applyFilters();
     });
     countCell.appendChild(clear);
