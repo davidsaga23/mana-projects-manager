@@ -66,8 +66,10 @@ function review_stage_of(string $statusName): ?string {
  * status puts it in. Newest version first, because the thing that
  * just arrived is the thing somebody is waiting to hear about.
  */
-function review_queue(PDO $pdo): array {
-    $from = review_from_names();
+function review_queue(PDO $pdo, ?array $statusNames = null): array {
+    // A tab of the Reviews page (review_tab_names()) passes its own statuses; with
+    // none, the statuses waiting on this account, as before.
+    $from = $statusNames ?? review_from_names();
     $ids = $from ? review_project_ids($pdo) : [];
     if (!$ids) return [];
     $q = $pdo->prepare(
@@ -130,6 +132,23 @@ function review_queue(PDO $pdo): array {
         return strcmp((string)$tb, (string)$ta);
     });
     return $rows;
+}
+
+/** How many tasks on the shows this account sees are in one of $statusNames. Never throws. */
+function review_tab_count(PDO $pdo, array $statusNames): int {
+    $ids = $statusNames ? review_project_ids($pdo) : [];
+    if (!$ids) return 0;
+    try {
+        $q = $pdo->prepare(
+            'SELECT COUNT(*) FROM progress pr JOIN statuses st ON st.id = pr.status_id
+              WHERE pr.project_id IN (' . implode(',', $ids) . ')
+                AND LOWER(TRIM(st.name)) IN (' . implode(',', array_fill(0, count($statusNames), '?')) . ')'
+        );
+        $q->execute(array_values($statusNames));
+        return (int)$q->fetchColumn();
+    } catch (PDOException $e) {
+        return 0;
+    }
 }
 
 /**

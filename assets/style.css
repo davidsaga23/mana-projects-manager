@@ -4950,6 +4950,20 @@ button.rq-media.is-empty:hover { color: var(--text); background: var(--surface-3
   font-size: 11.5px; font-weight: 600; border: 1px solid; }
 .rq-stage.is-supervisor { color: var(--warn); background: var(--warn-tint); border-color: var(--warn-border); }
 .rq-stage.is-final { color: var(--primary); background: var(--primary-tint); border-color: var(--primary-border); }
+/* The three tabs, and the Approved tab's departments and sort (David, 2026-11-20). */
+.rq-tabs { margin: 4px 0 12px; }
+.rq-tabs .mytasks-badge { margin-left: 6px; }
+.rq-stage.is-done { color: var(--ok, #3ecf8e); background: transparent; border-color: currentColor; }
+.rq-approved-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 12px; }
+.rq-approved-tools .rq-depts { flex: 1; min-width: 0; margin: 0; }
+.rq-sort label { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--muted); }
+.rq-sort select { width: auto; margin: 0; }
+.rq-lookonly { margin: 0; padding: 10px 0 2px; }
+.rq-depts .board-chip { white-space: nowrap; }
+@media (max-width: 700px) {
+  .rq-approved-tools { flex-direction: column; align-items: stretch; }
+  .rq-approved-tools .rq-depts { flex: none; }
+}
 .rq-verdict { margin: auto 0 0; padding: 10px 12px 12px; }
 .rq-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rq-buttons button { margin: 0; width: 100%; }

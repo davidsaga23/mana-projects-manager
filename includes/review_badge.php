@@ -66,6 +66,44 @@ function review_stages(): array {
     return $stage ? [$stage] : [];
 }
 
+/**
+ * THE THREE TABS OF REVIEWS (David, 2026-11-20):
+ *   "1. Pending approvals: This is meant for Jorik or Tim and it should only include the
+ *    Pending approval status (formerly Ready for review)
+ *    2. Supervisor approvals: This one is meant for the supervisors with the Pending
+ *    review status
+ *    3. Approved: this will have all the versions with Approved or Final status."
+ * and who sees which: "Supervisors can access only Supervisor approvals and approved.
+ * Production can see them all. Admins can see them all. Artists and others can't see
+ * the review button at all."
+ *
+ * ⚠ SEEING A TAB IS NOT APPROVING ON IT. Production sees Pending approvals but only
+ * looks (David, same day, asked: "Look only"): the Approve and Retake buttons follow
+ * review_stages(), which still gives Production the supervisor stage only, and
+ * review_apply() refuses the rest. The keys of the first two are REVIEW_STAGES keys.
+ */
+const REVIEW_TABS = [
+    'final'      => 'Pending approvals',
+    'supervisor' => 'Supervisor approvals',
+    'approved'   => 'Approved',
+];
+
+/** The statuses the Approved tab lists: Approved (once Complete/Completed) and Final. */
+const REVIEW_APPROVED_NAMES = ['approved', 'complete', 'completed', 'final'];
+
+/** Which tabs this account sees, in order. Empty: no Reviews at all. */
+function review_tabs(): array {
+    if (review_stage() === null) return [];
+    if (is_admin() || can_edit()) return array_keys(REVIEW_TABS);
+    return ['supervisor', 'approved'];
+}
+
+/** The status names (normalised) that put a task on tab $tab. */
+function review_tab_names(string $tab): array {
+    if ($tab === 'approved') return REVIEW_APPROVED_NAMES;
+    return isset(REVIEW_STAGES[$tab]) ? review_name_spellings(REVIEW_STAGES[$tab]['from']) : [];
+}
+
 /** The statuses ("from") that put a task in this account's queue. */
 function review_from_names(): array {
     $out = [];
