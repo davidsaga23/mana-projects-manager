@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-23 — Dashboard: "Who is carrying what" is now "Artist workload" *(no migration)*
+
+On a project's **Dashboard** tab, the section listing each person's tasks, Still to do and Runs
+is now titled **Artist workload** (W21 in the MSD Dashboard changes). Only the title changed: the
+table, its columns and the PNG download are the same, and it applies to every project.
+
 ## 2026-11-20 — Reviews: departments in pipeline order *(no migration)*
 
 On the **Approved** tab of Reviews, the department chips now run in the show's pipeline order
