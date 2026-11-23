@@ -323,7 +323,7 @@ if ($unmatched) $attention[] = [$unmatched . ' imported name or status didn\'t m
   <?php endif; ?>
 <?php endif; ?>
 
-<h3>Who is carrying what</h3>
+<h3>Artist workload</h3>
 <?php if (!$workload): ?>
   <p class="muted">No scheduled task has anyone on it yet, slots come from the headcount on the
     <a href="crew.php?project=<?= $projectId ?>">crew screen</a>.</p>
