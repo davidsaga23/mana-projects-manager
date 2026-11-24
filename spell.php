@@ -389,7 +389,24 @@ if (!empty($projectId)) echo project_color_page_style(project_color($pdo, (int)$
                     // block is clipped with an ellipsis and keeps its full text
                     // in the title. ?>
               <span class="board-item-label">
-                <?php if ($item['kind'] === 'project'): ?>
+                <?php if ($item['kind'] === 'project' && $self): ?>
+                  <?php // A WHOLE-SHOW DELIVERABLE IS A TASK (David, 2026-11-24: "the color
+                        // script and animatic ... should be treated as tasks too (as a rule
+                        // if a task doesn't have subtasks, it's because that's a task) so we
+                        // can upload versions there and behave as a regular task"). So its
+                        // name is the same button a task row's department is: it opens the
+                        // task panel, with Versions, notes and history, in its own colour. ?>
+                  <?php $dc = trim((string)($self['step_color'] ?? '')); ?>
+                  <button type="button" class="board-open-task board-open-deliverable" title="<?= e($item['name']) ?>"<?php if ($dc !== ''): ?>
+                          style="color:<?= e($dc) ?>;background:<?= e(board_tint($dc)) ?>;border-color:<?= e(board_tint($dc, 0.4)) ?>"<?php endif; ?>
+                          data-project="<?= $projectId ?>" data-step="<?= (int)$self['step_id'] ?>"
+                          data-item="<?= e((string)$self['item_key']) ?>"
+                          aria-label="Open <?= e($item['name']) ?>"><?= e($item['name']) ?></button>
+                  <?php if ($followReady): ?>
+                    <span class="board-following" title="You subscribed to this task"
+                          <?= !empty($followMine[(int)$self['step_id'] . ':' . $self['item_key']]) ? '' : 'hidden' ?>><?= task_follow_bell_svg(13) ?></span>
+                  <?php endif; ?>
+                <?php elseif ($item['kind'] === 'project'): ?>
                   <span class="board-name" title="<?= e($item['name']) ?>"><?= e($item['name']) ?></span>
                 <?php else: ?>
                   <a class="board-name" title="<?= e($item['name']) ?>"
