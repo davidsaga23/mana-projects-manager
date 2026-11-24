@@ -14,6 +14,12 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-24 — Spell: whole-show deliverables open like tasks *(no migration)*
+
+- A whole-show deliverable (Animatic, Color Script…) has no tasks under it because it IS the task. Its name is
+  now the same coloured button a task row has: it opens the task panel, so versions can be uploaded and reviewed
+  there like any task. The subscribe bell shows on it too.
+
 ## 2026-11-23 — Dashboard: "Who is carrying what" is now "Artist workload" *(no migration)*
 
 On a project's **Dashboard** tab, the section listing each person's tasks, Still to do and Runs
