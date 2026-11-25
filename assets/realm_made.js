@@ -109,6 +109,9 @@ function openSettings() {
   var h = '<h2 id="chanTitle" class="rchanhead">' + (c.private ? LOCK : '#') + ' ' + esc(c.name) + '</h2><form id="chanSet" class="rprofform rchanform" novalidate>' +
     '<p class="rchanabout">' + (c.private ? 'Private: only its members see it.' : 'Public: everybody in the Realm reads and writes in it.') + ' ' + esc(where) + '.' + esc(mine) + '</p>';
   if (c.manage) h += '<label>Name<span class="rchanrow"><input name="name" maxlength="60" autocomplete="off" value="' + esc(c.name) + '"><button type="button" class="rbtn" data-chando="rename">Save name</button></span></label>';
+  /* PUBLIC OR PRIVATE, changeable afterwards (David, 2026-11-25: "can we also add the option to
+     make it public/private"). */
+  if (c.manage) h += '<div class="rchanrow rchanpriv"><span>' + (c.private ? 'Private' : 'Public') + '</span><button type="button" class="rbtn" data-chando="privacy">' + (c.private ? 'Make it public' : 'Make it private') + '</button></div>';
   if (c.private) {
     var ids = c.members.map(function (m) { return m.id; });
     if (c.manage) {
@@ -137,6 +140,12 @@ function settingsDo(what, btn) {
     /* A locked box (me, the one who made it) still counts as ticked, so it is never sent as removed. */
     fields.remove = was.filter(function (x) { return now.indexOf(x) < 0; }).join(',');
   }
+  if (what === 'privacy') {
+    fields.private = c.private ? '0' : '1';
+    if (!window.confirm(c.private
+        ? 'Make "' + c.name + '" public? Everybody in the Realm will see it and its past messages.'
+        : 'Make "' + c.name + '" private? Only you and the person who made it stay in it at first: add the others under Members. Everybody else stops seeing it.')) return;
+  }
   if (what === 'archive' && !window.confirm('Archive "' + c.name + '"? It leaves the channel list and nobody can write in it any more. Its messages are kept and can still be found with the search.')) return;
   if (what === 'leave' && !window.confirm('Leave "' + c.name + '"? It is private, so you will no longer see it. Somebody in it can add you back.')) return;
   btn.disabled = true;
@@ -151,7 +160,7 @@ function settingsDo(what, btn) {
     }
     if (j.info) { INFO[id] = j.info; head(id); }
     openSettings();
-    toast(what === 'rename' ? 'Renamed.' : 'Members saved.');
+    toast(what === 'rename' ? 'Renamed.' : what === 'privacy' ? (fields.private === '1' ? 'Now private.' : 'Now public.') : 'Members saved.');
   }, function () { btn.disabled = false; });
 }
 
@@ -159,14 +168,34 @@ function settingsDo(what, btn) {
 function post(fields, done, fail) {
   var f = new URLSearchParams();
   Object.keys(fields).forEach(function (k) { f.append(k, fields[k]); });
+  /* ⚠ THREE DIFFERENT FAILURES, THREE MESSAGES (David, 2026-11-25: "That could not be saved" on
+     Save members). The server not answering, the server answering something that is not JSON
+     (busy, or a PHP warning printed first), and the page stumbling while redrawing AFTER a save
+     that worked used to share one sentence, so a saved change could read as a failed one. */
   fetch(R.api, {method:'POST', body:f, credentials:'same-origin', headers:{'Accept':'application/json'}})
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      return r.text().then(function (t) {
+        try { return JSON.parse(t); }
+        catch (e) {
+          if (window.console) console.error('Realm channel save: not JSON (HTTP ' + r.status + ')', t.slice(0, 500));
+          return {ok: false, error: r.status >= 500 || r.status === 0
+            ? 'The server is busy (HTTP ' + r.status + '). Try again in a moment.'
+            : 'The server gave an answer the page could not read (HTTP ' + r.status + '). Try again, and tell David if it keeps happening.'};
+        }
+      });
+    }, function () { return {ok: false, error: 'The server could not be reached. Check the connection and try again.'}; })
     .then(function (j) {
       if (!j || !j.ok) { err((j && j.error) || 'That could not be saved. Try again in a moment.'); if (fail) fail(); return; }
-      if (j.chat && R.takeChat) R.takeChat(j.chat);
-      done(j);
-    })
-    .catch(function () { err('That could not be saved. Try again in a moment.'); if (fail) fail(); });
+      try {
+        if (j.chat && R.takeChat) R.takeChat(j.chat);
+        done(j);
+      } catch (e) {
+        /* Saved. Only the redraw failed: say so, and leave the details for whoever debugs it. */
+        if (window.console) console.error('Realm channel: saved, but redrawing failed', e);
+        if (fail) fail();
+        toast('Saved. Reopen the channel to see the change.');
+      }
+    });
 }
 
 /* ---------- the head of the open conversation ---------- */
