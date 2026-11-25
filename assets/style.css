@@ -3486,7 +3486,24 @@ button.secondary.danger:hover { background: var(--danger-border); }
    purpose: the value is seeing forty shots at once, not one comfortably. */
 .breakdown-table td, .breakdown-table th { padding: 5px 8px; vertical-align: top; }
 .breakdown-table .bd-ep     { width: 70px; }
-.breakdown-table .bd-shot   { width: 96px; }
+.breakdown-table .bd-shot   { width: 140px; }
+/* A picture per shot (migration 109, David 2026-11-25), under its code: 16:9,
+   cropped to fill, so a column of them reads as a contact sheet. */
+.bd-thumb { margin-top: 4px; width: 124px; }
+.bd-thumb-link { display: block; width: 124px; aspect-ratio: 16 / 9; border-radius: 4px;
+  overflow: hidden; background: var(--surface-2, rgba(255,255,255,.04)); border: 1px solid var(--border); }
+.bd-thumb-link img, .bd-thumb-link video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bd-thumb-link:hover { border-color: var(--primary); }
+.bd-thumb-label { margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bd-thumb-tools { display: flex; gap: 4px; margin-top: 3px; }
+.bd-thumb-tools button {
+  padding: 2px 8px; font-size: 12px; line-height: 1.4; border-radius: 12px; cursor: pointer;
+  color: var(--muted); background: var(--surface-2); border: 1px solid var(--border-strong);
+}
+.bd-thumb-tools button:hover { color: var(--text); border-color: var(--primary); }
+.bd-thumb-remove { color: var(--muted); }
+.bd-thumb.is-drop { outline: 2px dashed var(--primary); outline-offset: 2px; }
+.bd-thumb.is-busy { opacity: .5; pointer-events: none; }
 .breakdown-table .bd-frames { width: 92px; }
 .breakdown-table .bd-notes  { width: 190px; }
 /* The frame box sizes to its content rather than being stretched to the column

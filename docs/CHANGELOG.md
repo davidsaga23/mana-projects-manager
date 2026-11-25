@@ -14,6 +14,17 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-25 — Shots breakdown: a picture per shot *(migration 109)*
+
+- Each shot on **Shots** (what appears in each one) now shows a small picture under its code, so a shot can
+  be recognised at a glance. **Click it** to see it full size (a film opens in a new tab).
+- Production adds one by hand with **+ Picture** (or by dropping an image file on the shot), and can
+  **Change** or remove it (×). PNG, JPG, GIF or WebP.
+- **As soon as a Department puts a version up on the shot, the version replaces it**, and from then on it is
+  always the newest version of the Department furthest along the pipeline (Comp v01 beats Rough Animation
+  v07). The label under the picture says which ("Comp v02"). Only pictures and films count; a PDF is skipped.
+- Versions show up without the migration; adding a picture by hand needs **migration 109**.
+
 ## 2026-11-25 — Realm channel settings: public/private switch, readable Archive, clearer errors *(no migration)*
 
 - A channel's Settings can now **make it public or private**. Going private keeps whoever is already listed, plus

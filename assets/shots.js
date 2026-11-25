@@ -544,6 +544,136 @@
       .then(function () { box.disabled = false; });
   });
 
+  // --- a picture per shot (migration 109) -------------------------------------
+  //
+  // David, 2026-11-25: "add a way to manually add a thumbnail per shot". Click
+  // "+ Picture" (or Change) and pick one, or drop an image file on the shot's
+  // cell. ONE hidden file input for the whole page, pointed at whichever shot
+  // asked, rather than forty-five of them. The box is then redrawn from what
+  // the server answers, the same fields shots.php draws it from, so a shot that
+  // already has a version keeps showing the version.
+  var picker1 = document.createElement('input');
+  picker1.type = 'file';
+  picker1.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  picker1.hidden = true;
+  document.body.appendChild(picker1);
+  var pickFor = null;
+
+  function drawThumb(box, code, t) {
+    box.innerHTML = '';
+    box.classList.toggle('has-pic', !!t);
+    box.setAttribute('data-manual', t && t.manual ? '1' : '0');
+    if (t) {
+      var a = document.createElement('a');
+      a.href = t.url;
+      a.className = 'bd-thumb-link' + (t.video ? '' : ' att-zoom');
+      a.setAttribute('data-name', code + ' · ' + t.label);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.title = 'Open ' + code + ' (' + t.label + ')';
+      var media = document.createElement(t.video ? 'video' : 'img');
+      if (t.video) {
+        media.src = t.url + '#t=0.1';
+        media.muted = true;
+        media.setAttribute('playsinline', '');
+        media.preload = 'metadata';
+      } else {
+        media.src = t.url;
+        media.alt = code;
+      }
+      a.appendChild(media);
+      box.appendChild(a);
+      var lab = document.createElement('div');
+      lab.className = 'bd-thumb-label muted small';
+      lab.textContent = t.label;
+      lab.title = t.from_version
+        ? 'The newest version of the furthest Department on this shot. It replaces the picture added by hand.'
+        : 'Added by hand. The first version put up on this shot will replace it.';
+      box.appendChild(lab);
+    }
+    if (t && t.from_version) return;       // a version is showing: nothing to change here
+    var tools = document.createElement('div');
+    tools.className = 'bd-thumb-tools';
+    var pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'bd-thumb-pick';
+    pick.title = 'Pick or drop a picture for ' + code;
+    pick.textContent = t ? 'Change' : '+ Picture';
+    tools.appendChild(pick);
+    if (t && t.manual) {
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'bd-thumb-remove';
+      x.title = 'Remove this picture';
+      x.setAttribute('aria-label', 'Remove the picture on ' + code);
+      x.textContent = '×';
+      tools.appendChild(x);
+    }
+    box.appendChild(tools);
+  }
+
+  function sendThumb(box, file, remove) {
+    var shot = shotOf(box);
+    var codeEl = box.closest('td') && box.closest('td').querySelector('strong');
+    var code = codeEl ? codeEl.textContent.trim() : '';
+    var body = new FormData();
+    body.append('action', remove ? 'thumb_remove' : 'thumb');
+    body.append('shot_id', shot);
+    if (file) body.append('thumb', file);
+    box.classList.add('is-busy');
+    post(body)
+      .then(function (d) { drawThumb(box, code, d.thumb || null); say(''); })
+      .catch(function (err) { say(err.message, true); })
+      .then(function () { box.classList.remove('is-busy'); });
+  }
+
+  table.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t.closest) return;
+    var pickBtn = t.closest('.bd-thumb-pick');
+    if (pickBtn) {
+      pickFor = pickBtn.closest('.bd-thumb');
+      picker1.value = '';
+      picker1.click();
+      return;
+    }
+    var rm = t.closest('.bd-thumb-remove');
+    if (rm) {
+      if (!window.confirm('Remove this picture from the shot?')) return;
+      sendThumb(rm.closest('.bd-thumb'), null, true);
+    }
+  });
+
+  picker1.addEventListener('change', function () {
+    if (pickFor && picker1.files && picker1.files[0]) sendThumb(pickFor, picker1.files[0], false);
+  });
+
+  // Dropping an image on the shot's cell does the same as picking one. Only
+  // where the box offers a pick, so a shot showing a version is left alone.
+  function dropBox(ev) {
+    var td = ev.target.closest ? ev.target.closest('td.bd-shot') : null;
+    var box = td && td.querySelector('.bd-thumb');
+    return box && box.querySelector('.bd-thumb-pick') ? box : null;
+  }
+  table.addEventListener('dragover', function (ev) {
+    var box = dropBox(ev);
+    if (!box || !ev.dataTransfer || Array.prototype.indexOf.call(ev.dataTransfer.types || [], 'Files') < 0) return;
+    ev.preventDefault();
+    box.classList.add('is-drop');
+  });
+  table.addEventListener('dragleave', function (ev) {
+    var box = dropBox(ev);
+    if (box) box.classList.remove('is-drop');
+  });
+  table.addEventListener('drop', function (ev) {
+    var box = dropBox(ev);
+    if (!box) return;
+    ev.preventDefault();
+    box.classList.remove('is-drop');
+    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) sendThumb(box, f, false);
+  });
+
   }   // end of the editing half
 
   // --- column filters, sorting, and live totals -------------------------------
@@ -587,6 +717,12 @@
       noun: ['shot', 'shots'],
       cellText: function (td) {
         if (td && td.classList && td.classList.contains('bd-cell')) return chipText(td);
+        // The shot's own cell also holds its picture, its label ("Comp v02")
+        // and its buttons; the filter and the sort are on the code alone.
+        if (td && td.classList && td.classList.contains('bd-shot')) {
+          var code = td.querySelector('strong');
+          return code ? code.textContent.trim() : '';
+        }
         return window.GridTools.cellText(td);
       },
       // A chip cell is a LIST, so a filter matches one item of it whole rather

@@ -83,6 +83,26 @@ try {
         exit;
     }
 
+    // A picture per shot, put up or taken off by hand (migration 109; David,
+    // 2026-11-25). Sent as a file, so this one request is multipart. The page
+    // reloads the cell from what it answers, which is breakdown_thumbs()'s
+    // view: a version, where there is one, still wins over the new picture.
+    if ($action === 'thumb' || $action === 'thumb_remove') {
+        if (!can_edit_area('shots')) throw new RuntimeException('This account cannot change the breakdown.');
+        if ($action === 'thumb') {
+            $f = $_FILES['thumb'] ?? null;
+            if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE || is_array($f['name'])) {
+                throw new RuntimeException('Pick one picture to put up.');
+            }
+            $msg = shot_thumb_save($pdo, $projectId, $shotId, $f, (int)($_SESSION['user_id'] ?? 0));
+        } else {
+            $msg = shot_thumb_remove($pdo, $projectId, $shotId);
+        }
+        $all = breakdown_thumbs($pdo, $projectId);
+        echo json_encode(['ok' => true, 'message' => $msg, 'thumb' => $all[$shotId] ?? null]);
+        exit;
+    }
+
     if ($action === 'notes') {
         $r = breakdown_set_note($pdo, $project, $shotId, (string)($_POST['notes'] ?? ''));
         echo json_encode([

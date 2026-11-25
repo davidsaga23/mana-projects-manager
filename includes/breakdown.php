@@ -538,3 +538,172 @@ function breakdown_by_asset(PDO $pdo, int $projectId): array {
     }
     return $out;
 }
+
+/* ---------------------------------------------------------------------------
+ * A picture per shot (migration 109).
+ *
+ * David, 2026-11-25, on this screen: "let's add a way to manually add a
+ * thumbnail per shot. When the first task version is available, it should
+ * override the original thumbnail and always use the latest version of the
+ * latest department. We want an easy way to visualize in the breakdown (and
+ * open a preview) of the shot so we can easily identify it."
+ * ------------------------------------------------------------------------ */
+
+/** Has migration 109 run? Before it, nobody is offered a picture upload. */
+function shot_thumbs_available(PDO $pdo): bool {
+    static $ok = null;
+    if ($ok === null) $ok = column_exists($pdo, 'shot_thumbnails', 'stored_name');
+    return $ok;
+}
+
+/**
+ * The picture each shot shows, keyed by shot id.
+ *
+ * ⚠ THE VERSIONS WIN OVER THE HAND-ADDED PICTURE, as soon as there is one. Of
+ * every Department that has put a picture or a film up on the shot, the one
+ * FURTHEST ALONG THE PIPELINE (step_order, as Spell lists them) gives it, and
+ * its NEWEST such version is the one shown. So Comp v01 replaces Rough
+ * Animation v07, even if the animation went up later: "the latest version of
+ * the latest department", read as how far the shot has got, not as which
+ * upload was last in time.
+ *
+ * A PDF or any other file that is not a picture or a film is skipped, because
+ * it has nothing to show at this size; the Department's newest picture stands.
+ *
+ * Read fresh on every page, never copied into shot_thumbnails, so a new
+ * version is on the breakdown the moment it is up, with nothing to keep in step.
+ * Versions work without migration 109: only the hand-added half needs it.
+ *
+ * TWO QUERIES FOR THE WHOLE SHOW, whatever its size, matched up in PHP like
+ * board_data(). Never throws: on any error, no pictures.
+ *
+ * @return array shot id => ['url', 'video' (bool), 'label', 'from_version' (bool),
+ *                           'manual' (bool: a hand-added one exists, shown or not)]
+ */
+function breakdown_thumbs(PDO $pdo, int $projectId): array {
+    require_once __DIR__ . '/uploads.php';      // version_label()
+    $out = [];
+    try {
+        // Hand-added first, so a version found below replaces it.
+        if (shot_thumbs_available($pdo)) {
+            $q = $pdo->prepare('SELECT id, shot_id, original_name FROM shot_thumbnails WHERE project_id = ?');
+            $q->execute([$projectId]);
+            foreach ($q as $r) {
+                $out[(int)$r['shot_id']] = [
+                    'url'          => 'attachment.php?kind=shot&id=' . (int)$r['id'],
+                    'video'        => false,
+                    'label'        => 'Added by hand',
+                    'from_version' => false,
+                    'manual'       => true,
+                ];
+            }
+        }
+
+        if (!column_exists($pdo, 'progress_versions', 'version_no')) return $out;
+
+        // Every picture or film put up on a shot of this show, with how far
+        // along the pipeline its Department sits. Shots only ('s' + id): an
+        // asset's versions are that asset's, not the shot's.
+        $q = $pdo->prepare(
+            "SELECT pr.item_key, ps.step_order, ps.id AS step_id, ps.name AS step_name,
+                    v.id, v.version_no, v.mime_type
+               FROM progress pr
+               JOIN pipeline_steps ps ON ps.id = pr.step_id
+               JOIN progress_versions v ON v.progress_id = pr.id
+              WHERE pr.project_id = ? AND pr.item_key LIKE 's%'
+                AND (v.mime_type LIKE 'image/%' OR v.mime_type LIKE 'video/%')"
+        );
+        $q->execute([$projectId]);
+        $best = [];
+        foreach ($q as $r) {
+            if (!preg_match('/^s(\d+)$/', (string)$r['item_key'], $m)) continue;
+            $shotId = (int)$m[1];
+            // Pipeline order first (id breaks a tie, as pipeline_steps() orders
+            // them), then the newest version within that Department.
+            $rank = [(int)$r['step_order'], (int)$r['step_id'], (int)$r['version_no']];
+            if (isset($best[$shotId]) && $best[$shotId]['rank'] >= $rank) continue;
+            $best[$shotId] = ['rank' => $rank, 'row' => $r];
+        }
+        foreach ($best as $shotId => $b) {
+            $r = $b['row'];
+            $out[$shotId] = [
+                'url'          => 'attachment.php?kind=version&id=' . (int)$r['id'],
+                'video'        => strncmp((string)$r['mime_type'], 'video/', 6) === 0,
+                'label'        => $r['step_name'] . ' ' . version_label((int)$r['version_no']),
+                'from_version' => true,
+                'manual'       => isset($out[$shotId]) && $out[$shotId]['manual'],
+            ];
+        }
+    } catch (Throwable $e) {
+        error_log('[Anima breakdown] thumbs: ' . $e->getMessage());
+    }
+    return $out;
+}
+
+/**
+ * Put a picture up on one shot by hand, replacing the one it had.
+ *
+ * Pictures only (PNG, JPEG, GIF, WebP): it is a thumbnail. It passes the same
+ * checks as every other upload (accept_upload(): size, extension AND contents).
+ * The old file is removed from disk once the new one is recorded.
+ *
+ * @return string what happened, for the screen
+ */
+function shot_thumb_save(PDO $pdo, int $projectId, int $shotId, array $file, int $userId): string {
+    require_once __DIR__ . '/uploads.php';
+    if (!shot_thumbs_available($pdo)) {
+        throw new RuntimeException('Shot pictures need a database update first: open migrate.php.');
+    }
+    $s = $pdo->prepare('SELECT shot_code FROM shots WHERE id = ? AND project_id = ?');
+    $s->execute([$shotId, $projectId]);
+    $code = $s->fetchColumn();
+    if ($code === false) throw new RuntimeException('That shot is not on this show.');
+
+    $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+    if (!in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
+        throw new RuntimeException('A shot picture must be an image (PNG, JPG, GIF or WebP).');
+    }
+    $dir = ensure_upload_dir();
+    $errors = [];
+    $ok = accept_upload($file, $dir, $errors);
+    if ($ok === null) throw new RuntimeException($errors[0] ?? 'That picture could not be saved.');
+
+    $old = $pdo->prepare('SELECT stored_name FROM shot_thumbnails WHERE shot_id = ?');
+    $old->execute([$shotId]);
+    $oldName = $old->fetchColumn();
+
+    try {
+        $pdo->prepare(
+            'INSERT INTO shot_thumbnails
+               (shot_id, project_id, stored_name, original_name, mime_type, file_size, uploaded_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE stored_name = VALUES(stored_name),
+               original_name = VALUES(original_name), mime_type = VALUES(mime_type),
+               file_size = VALUES(file_size), uploaded_by = VALUES(uploaded_by),
+               uploaded_at = CURRENT_TIMESTAMP'
+        )->execute([$shotId, $projectId, $ok['stored'], $ok['name'], $ok['mime'], $ok['size'],
+                    $userId ?: null]);
+    } catch (Throwable $e) {
+        @unlink($dir . '/' . $ok['stored']);
+        throw new RuntimeException('That picture could not be recorded.');
+    }
+    // The replaced file belongs to nothing now. basename() as attachment.php
+    // checks it: a stored name is never a path.
+    if ($oldName !== false && basename((string)$oldName) === $oldName) @unlink($dir . '/' . $oldName);
+
+    return 'Picture saved on ' . $code . '.';
+}
+
+/** Take the hand-added picture off one shot. A version's picture is untouched. */
+function shot_thumb_remove(PDO $pdo, int $projectId, int $shotId): string {
+    require_once __DIR__ . '/uploads.php';
+    if (!shot_thumbs_available($pdo)) return '';
+    $q = $pdo->prepare('SELECT stored_name FROM shot_thumbnails WHERE shot_id = ? AND project_id = ?');
+    $q->execute([$shotId, $projectId]);
+    $name = $q->fetchColumn();
+    if ($name === false) return 'That shot had no picture.';
+    $pdo->prepare('DELETE FROM shot_thumbnails WHERE shot_id = ? AND project_id = ?')
+        ->execute([$shotId, $projectId]);
+    if (basename((string)$name) === $name) @unlink(upload_dir_path() . '/' . $name);
+    return 'Picture removed.';
+}

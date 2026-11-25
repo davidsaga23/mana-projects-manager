@@ -6615,3 +6615,22 @@ David: "let's also add 'Assign' and 'Change status' so we can do bulk actions wi
   change had been made by hand. A task already holding the value is skipped and rings nobody.
 - **The selection stays ticked after a bulk change**, so a status and an assignee can be given to
   the same tasks one after the other. Subscribe and Unsubscribe still clear it.
+
+## 2026-11-25 — A picture per shot: hand-added until a version exists
+
+David, on the shot breakdown: "let's add a way to manually add a thumbnail per shot. When the first task
+version is available, it should override the original thumbnail and always use the latest version of the
+latest department."
+
+- **Only the hand-added picture is stored** (`shot_thumbnails`, migration 109, one per shot). The version
+  picture is read from `progress_versions` every time the page is drawn (`breakdown_thumbs()`), so it can
+  never fall behind.
+- **"Latest department" means furthest along the pipeline** (`step_order`), not the most recent upload:
+  the picture should show how far the shot has got. Within that Department, its newest version.
+- **Pictures and films only.** A PDF has nothing to show at this size, so it is skipped.
+- **The hand-added picture is kept underneath** once a version replaces it, but cannot be changed while a
+  version is showing; there would be nothing to see.
+- **In the Shot cell, not a new column**, because the breakdown's column filters and sorting count columns
+  and the picture is how you identify the shot. The Shot filter still matches the code alone.
+- Same rights as the rest of the breakdown (`can_edit_area('shots')`): Production and supervisors.
+
