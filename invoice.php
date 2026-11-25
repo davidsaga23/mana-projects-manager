@@ -67,6 +67,10 @@ $problem = null;
 $details = ['ready' => false, 'row' => []];
 if (!$salaried) {
     if (function_exists('set_time_limit')) @set_time_limit(90);
+    // The session is let go while the lines are worked out, so this person's
+    // other tabs are not queued behind them (KnownHost, 2026-11-19;
+    // session_release() in includes/auth.php), and taken back before printing.
+    session_release();
     try {
         $info = invoice_doc_lines($pdo, $crewId, $month);
     } catch (Throwable $e) {
@@ -79,6 +83,7 @@ if (!$salaried) {
         error_log('[Anima invoice details] ' . $e->getMessage());
     }
 }
+session_resume();
 $d = $details['row'];
 $val = fn(string $k): string => trim((string)($d[$k] ?? ''));
 $legalName = $val('legal_name') !== '' ? $val('legal_name') : $personName;

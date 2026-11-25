@@ -9,7 +9,8 @@
  * This file is shared by every Anima page (loaded by includes/header.php, beside the bell) and by
  * the Realm (realm.php, which has its own top bar). It asks the server NOTHING by itself on an
  * Anima page: it is handed what the polls that already run bring back (assets/bell.js every 30
- * seconds, assets/realm-nudge.js every 20, the Realm's heartbeat every 25), and decides whether
+ * seconds, which since 2026-11-20 also carries the Realm button's count for assets/realm-nudge.js,
+ * and the Realm's heartbeat every 25), and decides whether
  * that is worth a notification. In the Realm, which has no bell, it asks notify_poll.php itself,
  * on each 25-second heartbeat and only while notifications are on.
  *
