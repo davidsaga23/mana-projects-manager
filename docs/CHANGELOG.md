@@ -14,6 +14,13 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-25 — Reviews: a note count for each version *(no migration)*
+
+Every Reviews card (all three tabs) shows how many review notes its versions have, only when there
+are any: a 💬 count on the picture for the version shown, and a line under the card ("Notes on
+earlier versions: v01 💬 3") for older versions, so notes on v01 stay visible once v02 is up.
+Replies to a note are not counted.
+
 ## 2026-11-24 — Spell: whole-show deliverables open like tasks *(no migration)*
 
 - A whole-show deliverable (Animatic, Color Script…) has no tasks under it because it IS the task. Its name is

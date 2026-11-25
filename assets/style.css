@@ -5011,6 +5011,8 @@ button.rq-media:hover img, button.rq-media:hover video { opacity: .85; }
   background: rgba(0, 0, 0, .6); color: #fff; font-size: 18px; pointer-events: none; }
 .rq-media .version-tag { position: absolute; top: 8px; left: 8px; }
 .rq-media .review-notes-count { position: absolute; top: 8px; right: 8px; }
+.rq-vnotes { margin-top: 4px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.rq-vnote { white-space: nowrap; padding: 0 6px; border-radius: 999px; background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn-border); font-size: 11px; line-height: 18px; }
 .review-notes-count { background: var(--warn-tint); color: var(--warn); border: 1px solid var(--warn-border);
   border-radius: 9px; padding: 0 7px; font-size: 12px; }
 .rq-info { padding: 10px 12px 0; min-width: 0; }
