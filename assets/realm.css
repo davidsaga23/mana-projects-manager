@@ -697,11 +697,12 @@ dialog.rchandlg { width: min(460px, calc(100% - 32px)); max-height: calc(100% - 
 .rchanlist { margin: 0; padding-left: 18px; color: var(--text-2); }
 .rchanrow { display: flex; gap: 8px; }
 .rchanrow input { flex: 1; min-width: 0; }
+.rchanpriv { align-items: center; justify-content: space-between; color: var(--muted); }
 .rchanabout { margin: 0; color: var(--muted); }
 .rchanerr { margin: 0; color: var(--danger); }
 .rchanerr[hidden] { display: none; }
 .rchanacts { align-items: center; }
-.rbtn.rdanger { color: var(--danger); border-color: var(--danger); }
+.rchanacts .rbtn.rdanger { background: transparent; color: var(--danger); border-color: var(--danger); }
 #chanSetBtn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 7px; }
 #chanSetBtn[hidden] { display: none; }
 #chanSetBtn svg { display: block; }

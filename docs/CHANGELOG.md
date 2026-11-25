@@ -14,6 +14,14 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-25 — Realm channel settings: public/private switch, readable Archive, clearer errors *(no migration)*
+
+- A channel's Settings can now **make it public or private**. Going private keeps whoever is already listed, plus
+  the person who made it and the person switching it; everybody else stops seeing it. Asks to confirm first.
+- The **Archive channel** button was a blank red block (red text on red). It is now a red outline with the words.
+- Saving no longer says "could not be saved" when the save worked and only the redraw after it stumbled, and a
+  busy server or an unreadable answer now says so, with the details in the browser console.
+
 ## 2026-11-25 — Realm: the channel settings button says Settings *(no migration)*
 
 - The button that opens a channel's settings (name, members, archiving) is now a proper gear with the word
