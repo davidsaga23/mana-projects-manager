@@ -435,8 +435,19 @@ foreach ($warnings as [$missing, $named, $button]):
       $tags = '';
       if ($v) $tags .= '<span class="version-tag">' . e(version_label((int)$v['version_no'])) . '</span>';
       if ($t['notes'] > 0) {
-          $tags .= '<span class="review-notes-count" title="Review notes already on this version">'
-                 . (int)$t['notes'] . ' note' . ($t['notes'] === 1 ? '' : 's') . '</span>';
+          $tags .= '<span class="review-notes-count" title="' . (int)$t['notes'] . ' review note'
+                 . ($t['notes'] === 1 ? '' : 's') . ' on this version">'
+                 . '<span aria-hidden="true">💬</span> ' . (int)$t['notes'] . '</span>';
+      }
+      // The notes on the EARLIER versions, newest first (David, 2026-11-25: "a counter
+      // for each version whenever there are notes in those versions"). The one shown
+      // is counted on the picture above, so it is left out here.
+      $olderNotes = [];
+      foreach ($t['version_notes'] ?? [] as $no => $cnt) {
+          if ($v && (int)$no === (int)$v['version_no']) continue;
+          $olderNotes[] = '<span class="rq-vnote" title="' . (int)$cnt . ' review note' . ($cnt === 1 ? '' : 's')
+                        . ' on ' . e(version_label((int)$no)) . '">' . e(version_label((int)$no))
+                        . ' <span aria-hidden="true">💬</span> ' . (int)$cnt . '</span>';
       }
   ?>
     <li class="rq-card">
@@ -485,6 +496,9 @@ foreach ($warnings as [$missing, $named, $button]):
           <?= $t['crew_name'] ? e($t['crew_name']) : 'Nobody assigned' ?>
           <?php if ($v): ?>· put up <?= e(date('j M · H:i', strtotime((string)$v['created_at']))) ?><?php endif; ?>
         </div>
+        <?php if ($olderNotes): ?>
+          <div class="small rq-vnotes">Notes on earlier versions: <?= implode(' ', $olderNotes) ?></div>
+        <?php endif; ?>
         <?php if ($v && trim((string)($v['note'] ?? '')) !== ''): ?>
           <div class="muted small rq-meta" title="<?= e((string)$v['note']) ?>">“<?= e((string)$v['note']) ?>”</div>
         <?php endif; ?>
