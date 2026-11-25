@@ -46,6 +46,10 @@ $byType   = breakdown_assets($pdo, $projectId);
 $rows     = array_values(array_filter(breakdown_rows($pdo, $projectId),
                 fn($r) => filter_hit($epF, $r['episode'])));
 $progress = breakdown_progress($pdo, $projectId);
+// A picture per shot (David, 2026-11-25): the newest version of the furthest
+// Department, else the one put up by hand. See breakdown_thumbs().
+$thumbs   = breakdown_thumbs($pdo, $projectId);
+$thumbsOk = shot_thumbs_available($pdo);
 
 // Only the columns worth drawing. A project with one asset type gets one column
 // rather than a row of empty ones, and a project with no assets at all gets the
@@ -172,7 +176,45 @@ $missingNote = $noFrames > 0
         <?php if (count($episodes) > 1): ?>
           <td class="muted small"><?= e($r['episode']) ?: '—' ?></td>
         <?php endif; ?>
-        <td><strong><?= e($r['shot_code']) ?></strong></td>
+        <td class="bd-shot">
+          <strong><?= e($r['shot_code']) ?></strong>
+          <?php // ⚠ THE PICTURE LIVES IN THE SHOT'S OWN CELL, not a column of
+                // its own: the column filters and sorting in gridtools.js count
+                // columns, and a picture is how you recognise the shot, so it
+                // belongs beside its name. assets/shots.js redraws this box
+                // from the same fields after an upload. ?>
+          <?php $pic = $thumbs[$r['id']] ?? null; ?>
+          <div class="bd-thumb<?= $pic ? ' has-pic' : '' ?>"
+               data-manual="<?= $pic && $pic['manual'] ? '1' : '0' ?>">
+            <?php if ($pic): ?>
+              <a href="<?= e($pic['url']) ?>" class="bd-thumb-link<?= $pic['video'] ? '' : ' att-zoom' ?>"
+                 data-name="<?= e($r['shot_code'] . ' · ' . $pic['label']) ?>" target="_blank" rel="noopener"
+                 title="Open <?= e($r['shot_code']) ?> (<?= e($pic['label']) ?>)">
+                <?php if ($pic['video']): ?>
+                  <video src="<?= e($pic['url']) ?>#t=0.1" muted playsinline preload="metadata"></video>
+                <?php else: ?>
+                  <img src="<?= e($pic['url']) ?>" alt="<?= e($r['shot_code']) ?>" loading="lazy">
+                <?php endif; ?>
+              </a>
+              <div class="bd-thumb-label muted small"
+                   title="<?= $pic['from_version']
+                      ? 'The newest version of the furthest Department on this shot. It replaces the picture added by hand.'
+                      : 'Added by hand. The first version put up on this shot will replace it.' ?>"><?= e($pic['label']) ?></div>
+            <?php endif; ?>
+            <?php if ($thumbsOk && can_edit_area('shots')): ?>
+              <div class="bd-thumb-tools">
+                <?php if (!$pic || !$pic['from_version']): ?>
+                  <button type="button" class="bd-thumb-pick"
+                          title="Pick or drop a picture for <?= e($r['shot_code']) ?>"><?= $pic ? 'Change' : '+ Picture' ?></button>
+                <?php endif; ?>
+                <?php if ($pic && $pic['manual'] && !$pic['from_version']): ?>
+                  <button type="button" class="bd-thumb-remove" title="Remove this picture"
+                          aria-label="Remove the picture on <?= e($r['shot_code']) ?>">×</button>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        </td>
         <td class="num bd-frames">
           <?php if (can_edit_area('shots')): ?>
             <?php // placeholder="?" is what the empty-box highlight in style.css
@@ -286,6 +328,8 @@ $missingNote = $noFrames > 0
 <?php // gridtools first: shots.js calls into it as it loads. ?>
 <script src="assets/gridtools.js<?= asset_ver('gridtools.js') ?>"></script>
 <script src="assets/shots.js<?= asset_ver('shots.js') ?>"></script>
+<?php // For its lightbox: a shot's picture opens full size over the page (att-zoom). ?>
+<script src="assets/tickets.js<?= asset_ver('tickets.js') ?>"></script>
 
 <?php endif; ?>
 
