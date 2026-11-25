@@ -21,8 +21,9 @@ if (!$id) { http_response_code(400); exit('Bad request'); }
 // ticket's. Whitelisted rather than interpolated — the table name comes from
 // this file, never from the request.
 $kind = (string)($_GET['kind'] ?? '');
+// ?kind=shot is a shot's hand-added picture on the breakdown (migration 109).
 $table = ['project' => 'project_attachments', 'bug' => 'bug_attachments',
-          'version' => 'progress_versions'][$kind] ?? 'ticket_attachments';
+          'version' => 'progress_versions', 'shot' => 'shot_thumbnails'][$kind] ?? 'ticket_attachments';
 
 $q = $pdo->prepare("SELECT stored_name, original_name, mime_type, uploaded_by FROM {$table} WHERE id = ?");
 $q->execute([$id]);

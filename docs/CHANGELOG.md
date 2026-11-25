@@ -14,6 +14,43 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-25 — Shots breakdown: a picture per shot *(migration 109)*
+
+- Each shot on **Shots** (what appears in each one) now shows a small picture under its code, so a shot can
+  be recognised at a glance. **Click it** to see it full size (a film opens in a new tab).
+- Production adds one by hand with **+ Picture** (or by dropping an image file on the shot), and can
+  **Change** or remove it (×). PNG, JPG, GIF or WebP.
+- **As soon as a Department puts a version up on the shot, the version replaces it**, and from then on it is
+  always the newest version of the Department furthest along the pipeline (Comp v01 beats Rough Animation
+  v07). The label under the picture says which ("Comp v02"). Only pictures and films count; a PDF is skipped.
+- Versions show up without the migration; adding a picture by hand needs **migration 109**.
+
+## 2026-11-25 — Realm channel settings: public/private switch, readable Archive, clearer errors *(no migration)*
+
+- A channel's Settings can now **make it public or private**. Going private keeps whoever is already listed, plus
+  the person who made it and the person switching it; everybody else stops seeing it. Asks to confirm first.
+- The **Archive channel** button was a blank red block (red text on red). It is now a red outline with the words.
+- Saving no longer says "could not be saved" when the save worked and only the redraw after it stumbled, and a
+  busy server or an unreadable answer now says so, with the details in the browser console.
+
+## 2026-11-25 — Realm: the channel settings button says Settings *(no migration)*
+
+- The button that opens a channel's settings (name, members, archiving) is now a proper gear with the word
+  **Settings**, left of Close. The old icon looked like a sun, so nobody found it.
+
+## 2026-11-25 — Reviews: a note count for each version *(no migration)*
+
+Every Reviews card (all three tabs) shows how many review notes its versions have, only when there
+are any: a 💬 count on the picture for the version shown, and a line under the card ("Notes on
+earlier versions: v01 💬 3") for older versions, so notes on v01 stay visible once v02 is up.
+Replies to a note are not counted.
+
+## 2026-11-24 — Spell: whole-show deliverables open like tasks *(no migration)*
+
+- A whole-show deliverable (Animatic, Color Script…) has no tasks under it because it IS the task. Its name is
+  now the same coloured button a task row has: it opens the task panel, so versions can be uploaded and reviewed
+  there like any task. The subscribe bell shows on it too.
+
 ## 2026-11-23 — Dashboard: "Who is carrying what" is now "Artist workload" *(no migration)*
 
 On a project's **Dashboard** tab, the section listing each person's tasks, Still to do and Runs

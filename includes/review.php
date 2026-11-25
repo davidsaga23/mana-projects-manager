@@ -97,6 +97,7 @@ function review_queue(PDO $pdo, ?array $statusNames = null): array {
         $r['stage'] = review_stage_of((string)$r['status_name']);
         $r['version'] = null;
         $r['notes'] = 0;
+        $r['version_notes'] = [];   // version_no => notes, every version that has any
         $rows[(int)$r['id']] = $r;
     }
     if (!$rows) return [];
@@ -122,6 +123,25 @@ function review_queue(PDO $pdo, ?array $statusNames = null): array {
                   GROUP BY version_id'
             );
             foreach ($n as $nr) $rows[$byVersion[(int)$nr['version_id']]]['notes'] = (int)$nr['n'];
+        }
+        // AND EVERY EARLIER VERSION (David, 2026-11-25: "a counter for each version
+        // whenever there are notes in those versions"). Notes stay on the version they
+        // were made on, so once v02 is up the v01 notes left the card; this keeps them
+        // counted. A reply (version_id NULL, under its note) is not counted, as above.
+        if (board_reviews_available($pdo)) {
+            try {
+                $n = $pdo->query(
+                    "SELECT v.progress_id, v.version_no, COUNT(*) AS n
+                       FROM ticket_comments c JOIN progress_versions v ON v.id = c.version_id
+                      WHERE v.progress_id IN ($in)
+                      GROUP BY v.progress_id, v.version_no"
+                );
+                foreach ($n as $nr) $rows[(int)$nr['progress_id']]['version_notes'][(int)$nr['version_no']] = (int)$nr['n'];
+                foreach ($rows as &$r) krsort($r['version_notes']);
+                unset($r);
+            } catch (PDOException $e) {
+                // Only the counts are missing; the queue still shows.
+            }
         }
     }
 

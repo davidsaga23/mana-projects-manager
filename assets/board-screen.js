@@ -1550,7 +1550,8 @@
     keys.forEach(function (k) {
       var at = k.indexOf(':');
       var step = k.slice(0, at), itemKey = k.slice(at + 1);
-      var btn = document.querySelector('.board-row-task .board-open-task[data-step="' + step + '"][data-item="'
+      // Any row's: a whole-show deliverable's button sits on its item row (2026-11-24).
+      var btn = document.querySelector('.board-open-task[data-step="' + step + '"][data-item="'
                                         + (window.CSS && CSS.escape ? CSS.escape(itemKey) : itemKey) + '"]');
       var bell = btn ? btn.parentNode.querySelector('.board-following') : null;
       if (bell) bell.hidden = !on;

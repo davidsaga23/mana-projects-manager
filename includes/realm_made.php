@@ -241,8 +241,8 @@ function realm_made_create(PDO $pdo, int $uid, string $name, bool $private, int 
 }
 
 /**
- * Rename, archive, change members, or leave. $what is one of rename, archive,
- * members, leave. Returns '' when done, or the sentence to show.
+ * Rename, archive, change members, make public/private, or leave. $what is one
+ * of rename, archive, members, privacy, leave. Returns '' when done, or the sentence to show.
  *
  * ⚠ THE CHANNEL IS LOOKED UP AS THIS ACCOUNT SEES IT. A private channel they
  * are not in answers "not there", exactly like one that does not exist.
@@ -272,6 +272,17 @@ function realm_made_change(PDO $pdo, int $uid, string $channel, string $what, ar
         $pdo->prepare('UPDATE realm_chat_channels SET name = ? WHERE id = ?')->execute([$name, $id]);
     } elseif ($what === 'archive') {
         $pdo->prepare('UPDATE realm_chat_channels SET archived_at = NOW(), archived_by = ? WHERE id = ? AND archived_at IS NULL')->execute([$uid, $id]);
+    } elseif ($what === 'privacy') {
+        // Public <-> private afterwards (David, 2026-11-25). Going private keeps
+        // whoever is already listed, and always the person who made it and the
+        // person switching it, so it never ends up with nobody able to see it.
+        $toPrivate = (string)($in['private'] ?? '') === '1';
+        if ($toPrivate === $private) return '';
+        $pdo->prepare('UPDATE realm_chat_channels SET is_private = ? WHERE id = ?')->execute([$toPrivate ? 1 : 0, $id]);
+        if ($toPrivate) {
+            $ins = $pdo->prepare('INSERT IGNORE INTO realm_chat_members (channel_id, user_id, added_by, added_at) VALUES (?, ?, ?, NOW())');
+            foreach (array_unique([(int)$row['created_by'], $uid]) as $m) if ($m > 0) $ins->execute([$id, $m, $uid]);
+        }
     } elseif ($what === 'members') {
         if (!$private) return 'Everybody is in a public channel already.';
         $add = realm_made_pick($pdo, (string)($in['add'] ?? ''));
