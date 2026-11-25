@@ -14,6 +14,11 @@ build logs in `docs/ROADMAP.md`. This file is the "what", those are the "why".
 
 ---
 
+## 2026-11-25 — Realm: the channel settings button says Settings *(no migration)*
+
+- The button that opens a channel's settings (name, members, archiving) is now a proper gear with the word
+  **Settings**, left of Close. The old icon looked like a sun, so nobody found it.
+
 ## 2026-11-25 — Reviews: a note count for each version *(no migration)*
 
 Every Reviews card (all three tabs) shows how many review notes its versions have, only when there
